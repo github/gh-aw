@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { Ledger } from "./ledger_store.cjs";
+import { applyTransitionToDirectory, createPlan, loadSegments, parseCompactionConfig, prepareApply, selectSources, validatePlan } from "./ledger_compaction.cjs";
 import { createProjection, formatReplayPrompt, formatReplayTable } from "./create_ledger_projection.cjs";
 
 test("creates a read-only SQLite projection from canonical ledger shards", () => {
@@ -126,7 +127,7 @@ test("invalid replay preserves generic records without partial tables", () => {
   }
 });
 
-test("compaction preserves replay's ordered logical history", async () => {
+test("compaction preserves replay's ordered logical history", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-compaction-"));
   const sourceDir = path.join(root, "source");
   fs.mkdirSync(sourceDir);
@@ -135,14 +136,22 @@ test("compaction preserves replay's ordered logical history", async () => {
   const config = { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script } };
   const first = new Ledger({ memoryDir: sourceDir });
   const second = new Ledger({ memoryDir: sourceDir });
-  const compactor = new Ledger({ memoryDir: sourceDir });
+  const compaction = parseCompactionConfig(
+    Buffer.from(JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })).toString("base64")
+  );
   try {
     first.append("finding", { id: "first" });
     second.append("finding", { id: "second" });
     const before = path.join(root, "before.db");
     const after = path.join(root, "after.db");
     createProjection({ sourceDir, databasePath: before, config });
-    assert.equal((await compactor.compact({ minSegments: 2, maxSegments: 2 })).changed, true);
+    const loaded = loadSegments(sourceDir, compaction);
+    const { sources } = selectSources(loaded, compaction);
+    assert.ok(sources);
+    const plan = validatePlan(createPlan({ loaded, sources, config: compaction, trigger: "scheduled", baseCommit: "a".repeat(40) }), compaction);
+    const prepared = prepareApply({ plan, sourceDir, config: compaction });
+    assert.equal(prepared.status, "ready");
+    applyTransitionToDirectory(sourceDir, prepared);
     createProjection({ sourceDir, databasePath: after, config });
     const oldDb = new DatabaseSync(before, { readOnly: true });
     const newDb = new DatabaseSync(after, { readOnly: true });
@@ -164,7 +173,6 @@ test("compaction preserves replay's ordered logical history", async () => {
   } finally {
     first.close();
     second.close();
-    compactor.close();
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

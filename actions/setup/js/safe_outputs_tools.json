@@ -14,6 +14,18 @@
     }
   },
   {
+    "name": "ledger_request_compaction",
+    "description": "Ask Agentic Maintenance to consider compacting a configured ledger. This never compacts anything directly: maintenance decides whether the ledger is eligible and performs compaction in isolated plan/apply jobs. Use only when the ledger has accumulated many small segments.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ledger": { "type": "string", "description": "Configured ledger name. Optional when the workflow has exactly one compaction-enabled ledger." },
+        "reason": { "type": "string", "description": "Optional short explanation of why compaction would help." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "linear_create_issue",
     "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team UUID/key/name, and project ID are trusted workflow configuration and are not agent inputs.",
     "inputSchema": {

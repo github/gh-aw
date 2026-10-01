@@ -54,19 +54,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 		safeOutputsConfig[ledgerMutationHandlerKey] = ledgerConfig
 		safeOutputsConfigLog.Print("Added ledger_mutation config so ledger audit entries are ingested")
 	}
-	if data.LedgerConfig != nil && data.LedgerConfig.Enabled() {
-		ledgerConfigs := make([]map[string]any, 0, len(data.LedgerConfig.Ledgers))
-		for _, ledger := range data.LedgerConfig.Ledgers {
-			ledgerConfigs = append(ledgerConfigs, map[string]any{
-				"name":           ledger.Name,
-				"schema":         ledger.Schema,
-				"max_record_kb":  ledger.MaxRecordKB,
-				"max_segment_kb": ledger.MaxSegmentKB,
-				"max_patch_kb":   ledger.MaxPatchKB,
-			})
-		}
-		safeOutputsConfig["ledger_append"] = map[string]any{"max": 100, "ledgers": ledgerConfigs}
-	}
+	addStandaloneLedgerConfigs(safeOutputsConfig, data.LedgerConfig)
 
 	if len(safeOutputsConfig) == 0 {
 		return "", nil
@@ -87,6 +75,27 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 	}
 	safeOutputsConfigLog.Printf("Safe outputs config generation complete: %d tool types configured", len(safeOutputsConfig))
 	return string(configJSON), nil
+}
+
+// addStandaloneLedgerConfigs adds the ledger_append and ledger_request_compaction configs for
+// standalone tools.ledger ledgers.
+func addStandaloneLedgerConfigs(safeOutputsConfig map[string]any, config *LedgerToolConfig) {
+	if config != nil && config.Enabled() {
+		ledgerConfigs := make([]map[string]any, 0, len(config.Ledgers))
+		for _, ledger := range config.Ledgers {
+			ledgerConfigs = append(ledgerConfigs, map[string]any{
+				"name":           ledger.Name,
+				"schema":         ledger.Schema,
+				"max_record_kb":  ledger.MaxRecordKB,
+				"max_segment_kb": ledger.MaxSegmentKB,
+				"max_patch_kb":   ledger.MaxPatchKB,
+			})
+		}
+		safeOutputsConfig["ledger_append"] = map[string]any{"max": 100, "ledgers": ledgerConfigs}
+	}
+	if handlerConfig := buildLedgerRequestCompactionHandlerConfig(config); handlerConfig != nil {
+		safeOutputsConfig[ledgerRequestCompactionHandlerKey] = handlerConfig
+	}
 }
 
 // addStandardHandlerConfigs adds config for every registered standard safe-output

@@ -1709,19 +1709,21 @@ describe("push_repo_memory.cjs - changed-file limit checks", () => {
   });
 });
 
-describe("push_repo_memory.cjs - ledger limit parsing", () => {
-  it("parses the shard limit as a count and only scales KiB limits (source check)", () => {
+describe("push_repo_memory.cjs - ledger compaction ownership", () => {
+  it("does not compact ledgers in the agent persistence path (source check)", () => {
     const nodeFs = require("fs");
     const nodePath = require("path");
     const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
     const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
 
-    // GH_AW_LEDGER_MAX_SHARDS is a file count; scaling it by 1024 exceeds the Ledger
-    // shard bound, throws, and silently disables compaction through the fail-open catch.
-    expect(scriptContent).toContain('maxFiles: parseLedgerCount("GH_AW_LEDGER_MAX_SHARDS")');
-    expect(scriptContent).toContain('maxSegmentBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_SEGMENT_KB")');
-    expect(scriptContent).toContain('maxRecordBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_RECORD_KB")');
-    expect(scriptContent).toContain('maxPatchBytes: parseLedgerLimitKb("GH_AW_LEDGER_MAX_PATCH_KB")');
+    // Ledger compaction is owned by Agentic Maintenance (plan/apply jobs), never by agent runs.
+    expect(scriptContent).not.toContain("LEDGER_COMPACTION_OPTIONS_B64");
+    expect(scriptContent).not.toContain(".compact(");
+    expect(scriptContent).not.toContain("ledger_compaction");
+  });
+
+  it("treats agent-supplied compaction state as untrusted", () => {
+    expect(isUntrustedLedgerArtifact("ledger/compaction/state.json", new Set())).toBe(true);
   });
 });
 
@@ -1749,7 +1751,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
     const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
     const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
 
-    expect(scriptContent).toContain("if (filesToCopy.length === 0 && !compactionOptionsBase64 && !formatJSON)");
+    expect(scriptContent).toContain("if (filesToCopy.length === 0 && !formatJSON)");
     expect(scriptContent).toContain("No eligible files to copy from artifact");
   });
 

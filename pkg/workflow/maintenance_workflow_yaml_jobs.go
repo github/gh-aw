@@ -128,7 +128,7 @@ func buildMaintenanceRunOperationJob(ctx context.Context, opts buildMaintenanceW
 	var b strings.Builder
 	b.WriteString(`
   run_operation:
-    if: ${{ ` + RenderCondition(buildRunOperationCondition("safe_outputs", "create_labels", "activity_report", "close_agentic_workflows_issues", "clean_cache_memories", "update_pull_request_branches", "validate", "forecast")) + ` }}
+    if: ${{ ` + RenderCondition(buildRunOperationCondition(maintenanceRunOperationExclusions(opts)...)) + ` }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
       actions: write
@@ -163,6 +163,15 @@ func buildMaintenanceRunOperationJob(ctx context.Context, opts buildMaintenanceW
         run: echo "operation=$GH_AW_OPERATION" >> "$GITHUB_OUTPUT"
 `)
 	return b.String()
+}
+
+// maintenanceRunOperationExclusions lists operations handled by dedicated jobs rather than run_operation.
+func maintenanceRunOperationExclusions(opts buildMaintenanceWorkflowYAMLOptions) []string {
+	excluded := []string{"safe_outputs", "create_labels", "activity_report", "close_agentic_workflows_issues", "clean_cache_memories", "update_pull_request_branches", "validate", "forecast"}
+	if len(opts.compactionLedgers) > 0 {
+		excluded = append(excluded, maintenanceCompactLedgerOperation)
+	}
+	return excluded
 }
 
 func buildMaintenanceUpdatePRBranchesJob(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {

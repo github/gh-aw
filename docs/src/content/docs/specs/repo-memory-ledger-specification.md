@@ -69,7 +69,9 @@ implementation MUST NOT move a responsibility to a less trusted job.
 | Agent job | Untrusted | Runs the ledger MCP server; requests `ledger_append`, `ledger_get`, `ledger_query`, `ledger_status`; writes shards into the run's writer shard and audit entries into the transaction log | No memory-branch write token |
 | Agent job (post-agent steps) | Trusted | Merges the ledger transaction log into the safe-output file after revalidating, redacting, deduplicating, and bounding entries | Runner-side only; no memory-branch write token |
 | Safe-outputs job | Trusted | Ingests and validates `ledger_mutation` entries and reports them through the log-only handler | Safe-output tokens; no ledger storage access |
-| Persistence job | Trusted | Restores memory, reconstructs the DAG, runs compaction and retirement, normalizes files, selects the trusted copy set, commits and pushes | Memory-branch `contents: write` token |
+| Persistence job | Trusted | Restores memory, reconstructs the DAG, normalizes files, selects the trusted copy set, commits and pushes. It MUST NOT compact. | Memory-branch `contents: write` token |
+| Maintenance plan job | Untrusted | Per ledger: reads the ledger branch, runs the optional compaction selection script, and emits a compaction plan artifact | `contents: read` only |
+| Maintenance apply job | Trusted | Per ledger: validates the hostile plan against the latest ledger state and atomically applies it | `contents: write`; never runs user JavaScript |
 
 The agent job MUST NOT perform compaction, retirement, or persistence. The
 safe-outputs job MUST NOT mutate ledger storage; its `ledger_mutation` handler is
@@ -81,7 +83,8 @@ untrusted input.
 ## 4. Script extension points
 
 Two user-supplied scripts may exist near the ledger. Both are workflow-author
-code, not agent output, and both run in the persistence job.
+code, not agent output. The validation script runs in the persistence job; the
+compaction selection script runs only in the untrusted maintenance plan job.
 
 ### 4.1 Memory validation script
 
@@ -90,24 +93,16 @@ MUST run in a separate Node process with a bounded timeout and a sanitized
 environment, and a non-zero exit MUST fail persistence (fail-closed), because it
 is a policy gate on what is about to be pushed.
 
-### 4.2 Compactor script
+### 4.2 Compaction selection script
 
-A custom `ledger.compactor.script` is **not supported**. Configuring it MUST be a
-compile-time error. An in-process Node `vm` context is not a security boundary:
-host functions exposed to the context reach the host realm through their own
-constructors, which in the persistence job would expose the push token, the
-filesystem, and process execution. Compaction policy is therefore declarative
-(`ledger.compaction.min-segments`, `ledger.compaction.max-segments`), and all
-correctness-sensitive steps — canonical serialization, hash validation, segment
-identity, atomic writes, `fsync`, path safety, writer exclusion, coverage
-verification, and retirement — remain runtime-owned.
-
-If a future revision reintroduces scripted compaction policy, the script MUST run
-in a separate least-privilege process that exchanges only serialized data, MUST
-NOT receive host objects, credentials, network access, or Git access, MUST be
-deterministic given the restored ledger state, MUST be able to declare coverage
-but never delete a source shard, and MUST fail open so that a failed compaction
-never blocks ledger reads, appends, or persistence.
+Compaction is owned by Agentic Maintenance (section 5.3), never by the agent or
+persistence job. An optional `tools.ledger.<name>.compaction.script` MAY choose
+which segments to compact. It MUST run only in the maintenance plan job, in a
+separate Node process with an empty environment and restrictive Node.js
+permissions, and MUST NOT receive repository write credentials. It exchanges only
+serialized data and returns `{ sources: string[] }`. Its output is a proposal: the
+planner validates it and the trusted apply job independently revalidates the
+resulting plan without executing the script again.
 
 ## 5. Lifecycle
 
@@ -163,16 +158,38 @@ provenance is not verifiable from the transaction log alone.
 
 ### 5.3 Compaction
 
-Compaction runs outside the agent, after restore and before the next agent
-execution. Only closed stable shards MAY be selected; the current writer shard
-MUST be excluded. The runtime MUST deduplicate records by SHA, sort them
-deterministically, validate them, create an immutable replacement shard, and
-write a coverage declaration.
+Compaction runs in the generated Agentic Maintenance workflow, as one
+plan/apply job pair per ledger, sharing a per-ledger concurrency group. It runs
+on the ledger's `compaction.schedule` (`daily` by default, `weekly`, or `manual`)
+and on demand through the `compact_ledger` maintenance operation, which the
+`ledger_request_compaction` safe output dispatches. Both triggers use the same
+jobs.
 
-Compaction policy is declarative and bounded by `min-segments` and
-`max-segments`; see section 4.2 for why scripted policy is not supported.
-Compaction MUST fail open: a failed compaction MUST leave the ledger readable and
-MUST NOT block persistence.
+The plan job MUST produce a plan of version `gh-aw/ledger-compaction-plan/v1`
+containing exactly `version`, `ledger`, `branch`, `trigger`, `created_at`,
+`base_commit`, `sources`, `replacement`, and `plan_id`. Each source and the
+replacement MUST be identified by segment ID, the SHA-256 of the segment bytes,
+the byte size, and the sorted record SHAs. `plan_id` MUST be the SHA-256 of the
+canonical ledger, branch, version, source identities, and replacement identity,
+so the same transition always has the same ID. Plans MUST NOT contain commands,
+paths, or Git arguments.
+
+The apply job MUST treat the plan as hostile input: it MUST enforce size and
+count limits, reject unknown keys, recompute `plan_id`, and require that the
+plan targets the configured ledger and branch. It MUST then reload the latest
+ledger branch, verify that every source segment still has the expected bytes and
+records, rebuild the replacement from those verified records, and prove that no
+record is lost. Segments appended after planning MUST be preserved. The
+transition (add the replacement and state file, delete the sources) MUST be
+published as a single commit guarded by the expected branch head; a moved head
+MUST cause a refetch and revalidation, never an overwrite.
+
+A plan whose sources are all gone and whose replacement or recorded plan ID is
+present is already applied and MUST succeed as a no-op. A plan with only some
+sources present is stale, and a plan whose segments changed is a conflict; both
+MUST leave the ledger unchanged so the next maintenance run can plan again.
+Compaction MUST fail open: a failed plan or apply MUST leave the ledger readable
+and MUST NOT block appends or persistence.
 
 ### 5.4 Retirement
 
@@ -238,7 +255,8 @@ memory-branch write credential.
 | Record or segment identity forgery | Record SHA, canonical serialization, and duplicate identity MUST be revalidated on read; mismatches MUST be diagnostics, never silent acceptance |
 | Unbounded growth or denial of service | Record, segment, patch, and shard-count limits MUST be enforced before acknowledging a mutation, and file scanning MUST stop at the configured shard bound |
 | Path traversal, symlinks, or non-regular files | Ledger paths MUST be derived from validated UUIDs, opened without following symlinks, and rejected when not regular files |
-| Escaping the persistence job through scripted policy | Compactor scripts MUST NOT execute; policy is declarative (section 4.2) |
+| Escaping a trusted job through scripted compaction policy | Selection scripts MUST run only in the read-only maintenance plan job; the apply job MUST NOT execute them and MUST revalidate every plan (sections 4.2 and 5.3) |
+| Malicious, stale, or replayed compaction plans | The apply job MUST strictly validate the plan, revalidate it against the latest ledger state, commit with an expected-head guard, and treat a reapplied plan as an idempotent no-op |
 | Forged `ledger_mutation` audit entries | The audit handler MUST be log-only, and authoritative state MUST be derived from validated shard content, never from the transaction log |
 | Agent-authored lines mixing into trusted output records | The ledger transaction log MUST be a dedicated file, and merged entries MUST be revalidated, redacted, deduplicated, and bounded before ingestion |
 | Durable prompt injection through stored payloads | Ledger payloads are untrusted content; consumers MUST treat `ledger_get` and `ledger_query` results as data, never as instructions |

@@ -1644,7 +1644,7 @@ func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
 }
 
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, false, func(string) string {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
 	}), "")
 
@@ -1661,19 +1661,19 @@ func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T)
 	}
 }
 
-func TestUsageArtifactReceivesLedgerCompactionOutput(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", false, "", false, true, func(action string) string { return action }), "")
-	if !strings.Contains(steps, "GH_AW_LEDGER_COMPACTION: ${{ needs.push_repo_memory.outputs.ledger_compaction }}") {
-		t.Fatalf("expected usage collection to receive repo-memory compaction stats:\n%s", steps)
+func TestUsageArtifactDoesNotReceiveAgentLedgerCompaction(t *testing.T) {
+	steps := strings.Join(buildUsageArtifactUploadSteps("", false, "", false, func(action string) string { return action }), "")
+	if strings.Contains(steps, "GH_AW_LEDGER_COMPACTION") {
+		t.Fatalf("expected agent workflows not to wire ledger compaction (owned by agentic maintenance):\n%s", steps)
 	}
 }
 
-func TestUsageArtifactCollectionCombinesDetectionAndLedgerEnvironment(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactCollectionStep(true, true), "")
+func TestUsageArtifactCollectionIncludesDetectionEnvironment(t *testing.T) {
+	steps := strings.Join(buildUsageArtifactCollectionStep(true), "")
 	if strings.Count(steps, "        env:\n") != 1 {
 		t.Fatalf("expected one environment mapping for collection inputs:\n%s", steps)
 	}
-	for _, key := range []string{"GH_AW_DETECTION_JOB_RESULT", "GH_AW_DETECTION_CONCLUSION", "GH_AW_DETECTION_REASON", "GH_AW_LEDGER_COMPACTION"} {
+	for _, key := range []string{"GH_AW_DETECTION_JOB_RESULT", "GH_AW_DETECTION_CONCLUSION", "GH_AW_DETECTION_REASON"} {
 		if !strings.Contains(steps, key+":") {
 			t.Errorf("expected collection environment to include %s:\n%s", key, steps)
 		}

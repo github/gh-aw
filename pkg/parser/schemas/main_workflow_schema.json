@@ -5491,7 +5491,7 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Use an empty object or schema/limit properties for one default ledger, or name independent ledgers under this object.",
+          "description": "Standalone Git-backed ledger configuration. Use an empty object or schema/limit properties for one default ledger, or name independent ledgers under this object. Each ledger may set compaction (false, or an object with schedule: daily|weekly|manual, min-segments, max-segments, and an optional selection script); compaction defaults to daily and runs only in Agentic Maintenance, never in the agent job.",
           "type": "object",
           "additionalProperties": true
         },

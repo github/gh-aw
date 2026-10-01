@@ -24,8 +24,9 @@
 # This file defines the generated agentic maintenance workflow for this repository.
 # It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 #
-# This workflow is generated automatically when workflows use expiring safe outputs
-# or when repository maintenance features are enabled in .github/workflows/aw.json.
+# This workflow is generated automatically when workflows use expiring safe outputs,
+# when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+# maintenance features are enabled in .github/workflows/aw.json.
 #
 # To disable maintenance workflow generation, set in .github/workflows/aw.json:
 # {"maintenance": false}
@@ -66,20 +67,31 @@ on:
           - 'update_pull_request_branches'
           - 'validate'
           - 'forecast'
+          - 'compact_ledger'
       run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
+        required: false
+        type: string
+        default: ''
+      ledger:
+        description: 'Ledger name to compact when operation is compact_ledger (empty compacts every due ledger).'
         required: false
         type: string
         default: ''
   workflow_call:
     inputs:
       operation:
-        description: 'Optional maintenance operation to run (disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast)'
+        description: 'Optional maintenance operation to run (disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast, compact_ledger)'
         required: false
         type: string
         default: ''
       run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
+        required: false
+        type: string
+        default: ''
+      ledger:
+        description: 'Ledger name to compact when operation is compact_ledger (empty compacts every due ledger).'
         required: false
         type: string
         default: ''
@@ -213,7 +225,7 @@ jobs:
             await main();
 
   run_operation:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && (!(github.event.repository.fork)) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && inputs.operation != 'compact_ledger' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     permissions:
       actions: write
@@ -948,3 +960,585 @@ jobs:
           path: secret-validation-report.md
           retention-days: 30
           if-no-files-found: warn
+
+  ledger_compaction_plan_audit-history:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'audit-history') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-audit-history
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-audit-history
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_audit-history:
+    needs: ledger_compaction_plan_audit-history
+    if: ${{ needs.ledger_compaction_plan_audit-history.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-audit-history
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-audit-history
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+  ledger_compaction_plan_awf-feature-reviews:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'awf-feature-reviews') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-awf-feature-reviews
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-awf-feature-reviews
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_awf-feature-reviews:
+    needs: ledger_compaction_plan_awf-feature-reviews
+    if: ${{ needs.ledger_compaction_plan_awf-feature-reviews.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-awf-feature-reviews
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-awf-feature-reviews
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+  ledger_compaction_plan_caveman-run-history:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'caveman-run-history') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-caveman-run-history
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-caveman-run-history
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_caveman-run-history:
+    needs: ledger_compaction_plan_caveman-run-history
+    if: ${{ needs.ledger_compaction_plan_caveman-run-history.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-caveman-run-history
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-caveman-run-history
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+  ledger_compaction_plan_centralization:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'centralization') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-centralization
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-centralization
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_centralization:
+    needs: ledger_compaction_plan_centralization
+    if: ${{ needs.ledger_compaction_plan_centralization.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-centralization
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-centralization
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+  ledger_compaction_plan_concurrency-audits:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'concurrency-audits') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-concurrency-audits
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-concurrency-audits
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_concurrency-audits:
+    needs: ledger_compaction_plan_concurrency-audits
+    if: ${{ needs.ledger_compaction_plan_concurrency-audits.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-concurrency-audits
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-concurrency-audits
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+  ledger_compaction_plan_smoke:
+    if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') && (inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke') }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-smoke
+      cancel-in-progress: false
+    outputs:
+      plan_created: ${{ steps.plan.outputs.plan_created }}
+      plan_id: ${{ steps.plan.outputs.plan_id }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Plan ledger compaction (untrusted, read-only)
+        id: plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
+      - name: Upload ledger compaction plan
+        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ledger-compaction-plan-smoke
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+          retention-days: 1
+          if-no-files-found: error
+
+  ledger_compaction_apply_smoke:
+    needs: ledger_compaction_plan_smoke
+    if: ${{ needs.ledger_compaction_plan_smoke.outputs.plan_created == 'true' }}
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-aw-ledger-compaction-${{ github.repository }}-smoke
+      cancel-in-progress: false
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            actions
+          clean: false
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+
+      - name: Download ledger compaction plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ledger-compaction-plan-smoke
+          path: ${{ runner.temp }}/gh-aw/ledger-compaction
+
+      - name: Validate and apply ledger compaction (trusted)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
