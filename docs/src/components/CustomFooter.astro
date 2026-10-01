@@ -1,174 +1,237 @@
 ---
-import octicons from '@primer/octicons';
+/**
+ * Footer override. Docs and blog pages keep Starlight's own footer first
+ * (edit link, last updated, prev/next), then every page gets the site footer:
+ * brand + four link columns, and a bottom bar with credits and legal links.
+ * It lays out from its own width (container queries), so it works full-bleed
+ * on the landing page and inside the docs content column.
+ */
 import Default from '@astrojs/starlight/components/Footer.astro';
+import darkLogoSvg from '../assets/agentic-workflow.svg?raw';
+import lightLogoSvg from '../assets/agentic-workflow-light.svg?raw';
+import { getFooterGroups } from './site-nav';
 
-const heartIcon = octicons.heart.toSVG({ width: 14, height: 14 });
+const base = import.meta.env.BASE_URL;
+const groups = getFooterGroups(base);
+const isLanding = Astro.locals.starlightRoute.entry.data.template === 'splash';
+
+const toDataUrl = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+const darkLogoUrl = toDataUrl(darkLogoSvg);
+const lightLogoUrl = toDataUrl(lightLogoSvg);
+
+const legalLinks = [
+	{ href: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service', label: 'Terms' },
+	{ href: 'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', label: 'Privacy' },
+	{ href: 'https://github.com/security', label: 'Security' },
+];
 ---
 
-<Default {...Astro.props} />
+{!isLanding && <Default {...Astro.props} />}
 
-<div class="github-next-footer">
-  <div class="community-feedback">
-    <a href="https://github.com/orgs/community/discussions/186451" target="_blank" rel="noopener noreferrer">Community Feedback</a>
-  </div>
+<footer class:list={['site-footer', 'not-content', 'print:hidden', { 'site-footer--landing': isLanding }]}>
+	<div class="site-footer-inner">
+		<div class="site-footer-top">
+			<div class="site-footer-brand">
+				<a href={base} class="site-footer-title">
+					<img src={darkLogoUrl} alt="" width="20" height="20" class="site-footer-logo site-footer-logo--dark" />
+					<img src={lightLogoUrl} alt="" width="20" height="20" class="site-footer-logo site-footer-logo--light" />
+					<span>GitHub Agentic Workflows</span>
+				</a>
+				<p>Repository automation, written in Markdown.</p>
+			</div>
 
-  <div class="agent-links">
-    <a href="https://github.github.com/gh-aw/llms.txt">llms.txt</a>
-    <span class="legal-separator" aria-hidden="true">·</span>
-    <a href="https://github.github.com/gh-aw/llms-full.txt">llms-full.txt</a>
-    <span class="legal-separator" aria-hidden="true">·</span>
-    <a href="https://raw.githubusercontent.com/github/gh-aw/main/create.md">Create Workflow</a>
-    <span class="legal-separator" aria-hidden="true">·</span>
-    <a href="https://raw.githubusercontent.com/github/gh-aw/main/install.md">Install</a>
-    <span class="legal-separator" aria-hidden="true">·</span>
-    <a href="https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md">Reference</a>
-  </div>
-  <p>
-    <span class="footer-main">
-      Made with <span class="heart-icon" set:html={heartIcon} /> by <a href="https://githubnext.com/" target="_blank" rel="noopener noreferrer">GitHub Next</a> & <a href="https://www.microsoft.com/en-us/research/" target="_blank" rel="noopener noreferrer">Microsoft Research</a>
-    </span>
-    <span class="footer-separator" aria-hidden="true">•</span>
-    <span class="footer-terms">
-      <a href="https://docs.github.com/en/site-policy/github-terms/github-terms-of-service" target="_blank" rel="noopener noreferrer">Terms</a>
-      <span class="legal-separator" aria-hidden="true">·</span>
-      <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">Privacy</a>
-      <span class="legal-separator" aria-hidden="true">·</span>
-      <a href="https://github.com/security" target="_blank" rel="noopener noreferrer">Security</a>
-    </span>
-  </p>
-</div>
+			<div class="site-footer-groups">
+				{
+					groups.map((group) => (
+						<nav aria-label={group.label}>
+							<h2>{group.label}</h2>
+							<ul>
+								{group.links.map((link) => (
+									<li>
+										<a href={link.href}>{link.label}</a>
+									</li>
+								))}
+							</ul>
+						</nav>
+					))
+				}
+			</div>
+		</div>
+
+		<div class="site-footer-bottom">
+			<p>
+				Made by <a href="https://githubnext.com/">GitHub Next</a> &amp;{' '}
+				<a href="https://www.microsoft.com/en-us/research/">Microsoft Research</a>
+			</p>
+			<nav aria-label="Legal">
+				<ul>
+					{
+						legalLinks.map((link) => (
+							<li>
+								<a href={link.href}>{link.label}</a>
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+		</div>
+	</div>
+</footer>
 
 <style>
-  .github-next-footer {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #21262d;
-    text-align: center;
-  }
+	.site-footer {
+		container-type: inline-size;
+		margin-top: 4rem;
+		padding-block: 3rem 2rem;
+		border-top: 1px solid var(--aw-color-divider);
+		font-size: var(--aw-step--1);
+		line-height: 1.5;
+		color: var(--aw-color-text-secondary);
+	}
 
-  :global([data-theme='light']) .github-next-footer {
-    border-top: 1px solid #e6e8eb;
-  }
+	/* Landing: full-bleed band, content on the same 72rem grid as the sections */
+	.site-footer--landing {
+		margin-top: 0;
+		padding-block: 4rem 2.5rem;
+		background: var(--aw-color-bg);
+	}
 
-  .community-feedback {
-    margin-bottom: 1rem;
-    text-align: center;
-  }
+	.site-footer--landing .site-footer-inner {
+		max-width: 72rem;
+		margin-inline: auto;
+		padding-inline: clamp(1rem, 4vw, 2rem);
+	}
 
-  .community-feedback a {
-    font-size: var(--aw-step--1);
-  }
+	.site-footer a {
+		color: var(--aw-color-text-secondary);
+		text-decoration: none;
+		transition: color 0.15s ease;
+	}
 
-  .agent-links {
-    margin-bottom: 1rem;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    font-size: var(--aw-step--1);
-  }
+	.site-footer a:hover {
+		color: var(--aw-color-text-strong);
+	}
 
-  .github-next-footer p {
-    margin: 0;
-    font-size: var(--aw-step--1);
-    color: #8d96a0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25rem;
-    flex-wrap: wrap;
-  }
+	.site-footer ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
 
-  :global([data-theme='light']) .github-next-footer p {
-    color: #656d76;
-  }
+	.site-footer li,
+	.site-footer p {
+		margin: 0;
+	}
 
-  .footer-main {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+	/* Top: brand stacked over the columns; side by side once there's room */
+	.site-footer-top {
+		display: grid;
+		gap: 2.5rem;
+	}
 
-  .footer-separator {
-    margin: 0 0.25rem;
-  }
+	.site-footer-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: var(--aw-step-0);
+		font-weight: 600;
+		letter-spacing: var(--aw-tracking-snug);
+	}
 
-  .footer-terms {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
+	.site-footer .site-footer-title {
+		color: var(--aw-color-text-strong);
+	}
 
-  .legal-separator {
-    color: #8d96a0;
-  }
+	.site-footer-logo {
+		display: block;
+		flex-shrink: 0;
+	}
 
-  :global([data-theme='light']) .legal-separator {
-    color: #656d76;
-  }
+	.site-footer-logo--light {
+		display: none;
+	}
 
-  /* Mobile responsive: stack vertically */
-  @media (max-width: 768px) {
-    .github-next-footer p {
-      flex-direction: column;
-      gap: 0.5rem;
-    }
+	:global(:root[data-theme='light']) .site-footer-logo--light {
+		display: block;
+	}
 
-    .footer-separator {
-      display: none;
-    }
+	:global(:root[data-theme='light']) .site-footer-logo--dark {
+		display: none;
+	}
 
-    .footer-main,
-    .footer-terms {
-      text-align: center;
-    }
+	.site-footer-brand p {
+		margin-top: 0.75rem;
+		max-width: 34ch;
+		color: var(--aw-color-text-muted);
+	}
 
-    /* WCAG 2.5.5: Minimum 44×44px touch target for footer links on mobile */
-    .community-feedback a,
-    .agent-links a,
-    .footer-terms a {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      padding: 0.25rem 0.5rem;
-    }
+	.site-footer-groups {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 2rem 1.5rem;
+	}
 
-    .agent-links {
-      gap: 0.25rem;
-    }
-  }
+	.site-footer-groups h2 {
+		margin: 0 0 0.875rem;
+		font-size: var(--aw-step--1);
+		font-weight: 500;
+		line-height: 1.5;
+		letter-spacing: 0;
+		color: var(--aw-color-text-muted);
+	}
 
-  .heart-icon {
-    display: inline-flex;
-    align-items: center;
-    color: #8b5cf6;
-  }
+	.site-footer-groups ul {
+		display: grid;
+		gap: 0.625rem;
+	}
 
-  .heart-icon :global(svg) {
-    fill: currentColor;
-    display: block;
-  }
+	/* Bottom bar */
+	.site-footer-bottom {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 2rem;
+		margin-top: 3rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--aw-color-divider);
+		color: var(--aw-color-text-muted);
+	}
 
-  .github-next-footer a {
-    color: #8d96a0;
-    text-decoration: none;
-    transition: color 0.2s ease;
-    font-weight: 600;
-  }
+	.site-footer-bottom ul {
+		display: flex;
+		gap: 1.25rem;
+	}
 
-  :global([data-theme='light']) .github-next-footer a {
-    color: #656d76;
-  }
+	@container (min-width: 34rem) {
+		.site-footer-groups {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+	}
 
-  .github-next-footer a:hover {
-    color: #c06eff;
-  }
+	@container (min-width: 60rem) {
+		.site-footer-top {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+			gap: 3rem;
+		}
+	}
 
-  :global([data-theme='light']) .github-next-footer a:hover {
-    color: #6b46c1;
-  }
+	/* Touch targets on phones */
+	@media (max-width: 50rem) {
+		.site-footer-groups ul {
+			gap: 0.125rem;
+		}
+
+		.site-footer-groups a,
+		.site-footer-bottom a {
+			display: inline-block;
+			padding-block: 0.375rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.site-footer a {
+			transition: none;
+		}
+	}
 </style>

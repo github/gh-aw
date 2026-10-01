@@ -649,47 +649,62 @@ starlight-toc h2 {
   margin-bottom: 2.5rem; /* Increased from default for cleaner look */
 }
 
-/* Pagination Links */
-.pagination-links {
-  border-top: 1px solid var(--aw-color-border);
-}
-
-.pagination-links a {
-  border: 1px solid var(--aw-color-border-strong);
-  border-radius: 6px;
-  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.06), rgba(var(--aw-accent-rgb), 0.03));
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  text-decoration: none;
-}
-
-.pagination-links a:hover {
-  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.12), rgba(var(--aw-accent-rgb), 0.05));
-  border-color: var(--aw-color-accent);
-  box-shadow: 0 4px 12px rgba(var(--aw-accent-rgb), 0.12);
-}
-
-.pagination-links a .meta {
+/* Docs footer: edit link / last updated, then prev/next. Flat cards that sit
+   above the site footer (CustomFooter.astro) without competing with it. */
+.content-panel footer.sl-flex .meta {
   font-size: var(--aw-step--1);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--aw-color-text-muted);
-  transition: color 0.2s ease;
 }
 
-.pagination-links a:hover .meta {
+.content-panel footer.sl-flex .meta a {
   color: var(--aw-color-text-secondary);
 }
 
-.pagination-links .link-title {
-  font-weight: 600;
-  font-size: var(--aw-step-0);
-  color: var(--aw-color-text);
-  transition: color 0.2s ease;
+.content-panel footer.sl-flex .meta a:hover {
+  color: var(--aw-color-text-strong);
 }
 
-.pagination-links a:hover .link-title {
-  color: var(--aw-color-accent-text);
+.pagination-links a {
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--aw-color-border-strong);
+  border-radius: 0.5rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--aw-color-text-muted);
+  font-size: var(--aw-step--1);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.pagination-links a:hover {
+  border-color: var(--aw-color-accent);
+  background: var(--aw-color-bg-subtle);
+}
+
+.pagination-links a svg {
+  color: var(--aw-color-text-muted);
+  transition: color 0.15s ease;
+}
+
+.pagination-links a:hover svg {
+  color: var(--aw-color-accent);
+}
+
+.pagination-links .link-title {
+  display: inline-block;
+  margin-top: 0.125rem;
+  font-weight: 500;
+  font-size: var(--aw-step-0);
+  line-height: var(--aw-leading-snug);
+  color: var(--aw-color-text-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagination-links a,
+  .pagination-links a svg {
+    transition: none;
+  }
 }
 
 /* Aside/Callout Blocks */
