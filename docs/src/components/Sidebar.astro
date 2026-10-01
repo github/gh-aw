@@ -1,0 +1,42 @@
+---
+/**
+ * Overrides Starlight's Sidebar. Below 50rem the sidebar is the mobile menu
+ * sheet, so it leads with the primary site links and a section heading, then
+ * Starlight's own tree and MobileMenuFooter. Above 50rem only the tree shows.
+ */
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import MobileNav from './MobileNav.astro';
+import { getSection } from './site-nav';
+
+const section = getSection(Astro.locals.starlightRoute.id);
+const heading = section === 'blog' ? 'Blog posts' : 'Documentation';
+---
+
+<div class="mobile-menu-top">
+	<MobileNav />
+	<h2 class="mobile-menu-heading">{heading}</h2>
+</div>
+<Default />
+
+<style>
+	.mobile-menu-top {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.mobile-menu-heading {
+		margin: 0;
+		padding-top: 1rem;
+		border-top: 1px solid var(--aw-color-divider);
+		font-size: var(--aw-step--1);
+		font-weight: 500;
+		color: var(--aw-color-text-muted);
+	}
+
+	@media (min-width: 50rem) {
+		.mobile-menu-top {
+			display: none;
+		}
+	}
+</style>

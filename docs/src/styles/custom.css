@@ -32,7 +32,7 @@ body:has(.aw-hero) .sl-container {
 }
 
 /* Let the page background show through Starlight's frames on desktop */
-@media (min-width: 769px) {
+@media (min-width: 50rem) {
   .page,
   .main-frame,
   main,
@@ -161,8 +161,8 @@ body:has(.aw-hero) .sl-container {
   background: transparent;
 }
 
-/* Mobile-specific: Increase touch targets for sidebar navigation */
-@media (max-width: 768px) {
+/* Mobile menu sheet: Increase touch targets for sidebar navigation */
+@media (max-width: 49.99rem) {
   .sidebar .top-level > li > details > summary,
   .sidebar .top-level > li > a,
   .sidebar .top-level li li a {
@@ -899,36 +899,40 @@ main,
   }
 }
 
-/* === W2: Lower sidebar breakpoint to 768px for tablet support === */
-/* Starlight default is 50rem (800px). At 48rem (768px) the sidebar becomes persistent */
-/* so iPad (768×1024) and iPad Pro 11 (834×1194) show a sidebar instead of hamburger menu. */
-@media (min-width: 48rem) {
-  /* Offset main content to make room for the persistent sidebar */
-  html[data-has-sidebar] {
-    --sl-content-inline-start: var(--sl-sidebar-width);
+/* === Mobile menu sheet ===
+   Below 50rem (Starlight's own sidebar breakpoint, which also drives its popover JS)
+   the header's menu button (SiteMenuToggle) opens one sheet: Starlight's sidebar
+   popover on pages with a sidebar, or #site-menu (SiteHeader) on the landing page.
+   Sidebar.astro puts the site links on top; MobileMenuFooter sits pinned at the bottom. */
+@media (max-width: 49.99rem) {
+  /* The menu button is in the header row now, so drop Starlight's reserved space */
+  [data-has-sidebar] header.header {
+    padding-inline-end: var(--sl-nav-pad-x);
   }
 
-  /* Make the sidebar pane always visible (not overlay) */
-  .sidebar-pane {
-    --sl-sidebar-visibility: visible;
-    width: var(--sl-sidebar-width) !important;
-    background-color: var(--sl-color-bg-sidebar) !important;
-    border-inline-end: 1px solid var(--sl-color-hairline-shade) !important;
+  body:has(#starlight__sidebar:popover-open),
+  body:has(#site-menu:popover-open) {
+    overflow: hidden;
   }
 
-  /* Remove the extra header padding that was reserved for the hamburger button */
-  [data-has-sidebar] .header {
-    padding-inline-end: var(--sl-nav-pad-x) !important;
+  #starlight__sidebar {
+    background-color: var(--aw-color-bg);
+    border-right: 0;
+    overscroll-behavior: contain;
   }
 
-  /* Hide the mobile hamburger toggle since the sidebar is now persistent */
-  starlight-menu-button button {
-    display: none !important;
+  .sidebar-pane .sidebar-content {
+    gap: 1.25rem;
   }
 
-  /* Restore body scroll when sidebar becomes persistent (was locked when menu was open) */
-  [data-mobile-menu-expanded] {
-    overflow: auto !important;
+  /* Pin the footer row (GitHub, theme, Get started) to the bottom of the sheet */
+  .sidebar-content > :has(> .mobile-menu-footer) {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    margin-inline: calc(-1 * var(--sl-sidebar-pad-x));
+    padding-inline: var(--sl-sidebar-pad-x);
+    background-color: var(--aw-color-bg);
   }
 }
 

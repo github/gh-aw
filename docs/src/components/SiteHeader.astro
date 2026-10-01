@@ -2,6 +2,7 @@
 /**
  * Site header (overrides Starlight's Header). One layout for landing and docs:
  * [logo] Docs  Workflow examples  Blog ............ [Search ⌘K] (GitHub) (theme) [Get started]
+ * Below 50rem: [logo] ...... (search) (menu); the menu opens a sheet.
  * Search, SiteTitle and ThemeSelect come from Starlight's virtual modules so
  * their overrides and the Pagefind dialog keep working.
  */
@@ -10,19 +11,18 @@ import Search from 'virtual:starlight/components/Search';
 import SiteTitle from 'virtual:starlight/components/SiteTitle';
 import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
 
-const base = import.meta.env.BASE_URL;
-const { id } = Astro.locals.starlightRoute;
-const section =
-	id === '' ? 'home'
-	: id === 'blog' || id.startsWith('blog/') ? 'blog'
-	: id === 'gallery' || id.startsWith('gallery/') ? 'gallery'
-	: 'docs';
+import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
+import MobileNav from './MobileNav.astro';
+import SiteMenuToggle from './SiteMenuToggle.astro';
+import { getNavLinks, getSection } from './site-nav';
 
-const links = [
-	{ href: `${base}introduction/overview/`, label: 'Docs', section: 'docs' },
-	{ href: `${base}gallery/`, label: 'Workflow examples', section: 'gallery' },
-	{ href: `${base}blog/`, label: 'Blog', section: 'blog' },
-];
+const base = import.meta.env.BASE_URL;
+const { id, hasSidebar } = Astro.locals.starlightRoute;
+const section = getSection(id);
+const links = getNavLinks(base);
+// Below 50rem one menu button opens one sheet: Starlight's sidebar where the
+// page has one (Sidebar.astro adds the site links to it), else #site-menu.
+const menuTarget = hasSidebar ? 'starlight__sidebar' : 'site-menu';
 
 const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-hidden': 'true' });
 ---
@@ -47,8 +47,18 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		</a>
 		<ThemeSelect />
 		<a class="site-header-cta" href={`${base}setup/quick-start/`}>Get started</a>
+		<SiteMenuToggle target={menuTarget} />
 	</div>
 </div>
+
+{
+	!hasSidebar && (
+		<div popover="auto" id="site-menu" class="site-menu-sheet print:hidden">
+			<MobileNav />
+			<MobileMenuFooter />
+		</div>
+	)
+}
 
 <style>
 	.site-header {
@@ -227,22 +237,59 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		}
 	}
 
-	/* Mobile: logo, search, GitHub, theme. Full mobile menu comes later. */
-	@media (max-width: 47.99rem) {
+	/* Mobile: logo, search, menu. Nav, GitHub, theme and CTA move into the sheet.
+	   50rem matches Starlight's sidebar/popover breakpoint. */
+	@media (max-width: 49.99rem) {
 		.site-header-nav,
-		.site-header-cta {
+		.site-header-cta,
+		.site-header-icon,
+		.site-header-end > :global(starlight-theme-select) {
 			display: none;
 		}
 
 		.site-header-end {
 			gap: 0;
+			margin-inline-end: -0.625rem;
 		}
 
-		.site-header-end :global(button[data-open-modal]),
-		.site-header-icon {
+		.site-header-end :global(button[data-open-modal]) {
 			width: 44px;
 			height: 44px;
 			margin: 0;
+		}
+	}
+
+	/* Landing-page sheet (docs pages reuse Starlight's sidebar popover instead) */
+	.site-menu-sheet {
+		position: fixed;
+		inset: var(--sl-nav-height) 0 0;
+		width: 100%;
+		height: auto;
+		max-width: none;
+		max-height: none;
+		margin: 0;
+		padding: 1rem var(--sl-nav-pad-x) 0;
+		border: 0;
+		background: var(--aw-color-bg);
+		color: var(--aw-color-text);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.site-menu-sheet:popover-open {
+		display: flex;
+	}
+
+	.site-menu-sheet :global(.mobile-menu-footer) {
+		margin-top: auto;
+	}
+
+	@media (min-width: 50rem) {
+		.site-menu-sheet,
+		.site-menu-sheet:popover-open {
+			display: none;
 		}
 	}
 </style>

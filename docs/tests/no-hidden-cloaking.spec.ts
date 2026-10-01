@@ -15,25 +15,34 @@ test.describe("Hidden text cloaking guard", () => {
     expect(readme).not.toContain("If this repository hasn't been configured with agentic workflows yet");
   });
 
-  test("responsive header does not ship hidden dropdown link text while closed", async ({ page }) => {
+  test("responsive header keeps primary links visible and the mobile sheet closed by default", async ({ page }) => {
+    // At desktop widths the primary links are visible in the header, not tucked into a menu.
     await page.setViewportSize({ width: 900, height: 768 });
     await page.goto("/gh-aw/");
     await page.waitForLoadState("networkidle");
 
-    const menuButton = page.locator(".hamburger-btn");
-    const dropdown = page.locator(".tablet-dropdown");
+    await expect(page.locator(".site-menu-toggle")).toBeHidden();
+    await expect(page.locator(".site-header-nav a")).toHaveCount(3);
+    for (const link of await page.locator(".site-header-nav a").all()) {
+      await expect(link).toBeVisible();
+    }
+
+    // Below 50rem the same links live in the menu sheet, which is hidden (display: none,
+    // so out of the accessibility tree) until the menu button opens it.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const menuButton = page.locator(".site-menu-toggle");
+    const sheet = page.locator("#site-menu");
 
     await expect(menuButton).toBeVisible();
-    await expect(dropdown).toBeHidden();
-    await expect(dropdown).toHaveText("");
+    await expect(sheet).toBeHidden();
 
     await menuButton.click();
-    await expect(dropdown.locator(".dropdown-link")).toHaveCount(7);
-    await expect(dropdown.locator(".dropdown-link", { hasText: "Quick Start" })).toBeVisible();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    await expect(sheet.locator(".mobile-nav a")).toHaveCount(3);
+    await expect(sheet.locator("a", { hasText: "Get started" })).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(menuButton).toHaveAttribute("aria-expanded", "false");
-    await expect(dropdown).toBeHidden();
-    await expect(dropdown).toHaveText("");
+    await expect(sheet).toBeHidden();
   });
 });

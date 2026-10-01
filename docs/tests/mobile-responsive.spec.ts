@@ -114,23 +114,32 @@ test.describe('Mobile and Responsive Layout', () => {
     await expect(page.locator('#main-content')).toHaveCount(1);
   });
 
+  // Below 50rem (800px) the header collapses to logo, search and a menu button
+  // that opens one sheet; at 800px and up the nav and Get started sit in the header.
   for (const viewport of [
-    { name: 'mobile', width: 390, height: 844 },
-    { name: 'tablet', width: 768, height: 1024 },
-    { name: 'large tablet', width: 834, height: 1194 },
-    { name: 'tablet landscape', width: 1024, height: 768 },
+    { name: 'mobile', width: 390, height: 844, menu: true },
+    { name: 'tablet', width: 768, height: 1024, menu: true },
+    { name: 'large tablet', width: 834, height: 1194, menu: false },
+    { name: 'tablet landscape', width: 1024, height: 768, menu: false },
   ]) {
-    test(`should navigate through the responsive header menu on ${viewport.name}`, async ({ page }) => {
-      await page.setViewportSize(viewport);
+    test(`should navigate through the responsive header on ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto('/gh-aw/');
       await page.waitForLoadState('networkidle');
 
-      const menuButton = page.locator('.hamburger-btn');
-      await expect(menuButton).toBeVisible();
-      await menuButton.click();
-      await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+      const menuButton = page.locator('.site-menu-toggle');
+      let quickStartLink;
+      if (viewport.menu) {
+        await expect(menuButton).toBeVisible();
+        await menuButton.click();
+        await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+        quickStartLink = page.locator('#site-menu a[href$="setup/quick-start/"]');
+      } else {
+        await expect(menuButton).toBeHidden();
+        await expect(page.locator('.site-header-nav')).toBeVisible();
+        quickStartLink = page.locator('.site-header-cta[href$="setup/quick-start/"]');
+      }
 
-      const quickStartLink = page.locator('.tablet-dropdown .dropdown-link[href$="setup/quick-start/"]:visible');
       await expect(quickStartLink).toBeVisible();
       await quickStartLink.click();
       await expect(page).toHaveURL(/\/gh-aw\/setup\/quick-start\/$/);
@@ -154,8 +163,8 @@ test.describe('Mobile and Responsive Layout', () => {
           // Verify page loads
           await expect(page).toHaveTitle(/GitHub Agentic Workflows/);
 
-          // Verify header is visible
-          const header = page.locator('header');
+          // Verify the site header is visible (landing sections use <header> too)
+          const header = page.locator('header.header');
           await expect(header).toBeVisible();
 
           // Verify main content is visible
@@ -172,7 +181,7 @@ test.describe('Mobile and Responsive Layout', () => {
       }
 
       test('should have proper content spacing on mobile', async ({ page }) => {
-        if (formFactor.width < 768) {
+        if (formFactor.width < 800) {
           await page.goto('/gh-aw/introduction/overview/');
           await page.waitForLoadState('networkidle');
 
@@ -180,20 +189,22 @@ test.describe('Mobile and Responsive Layout', () => {
           const contentPanel = page.locator('.content-panel').first();
           await expect(contentPanel).toBeVisible();
 
-          // Sidebar should be hidden on mobile (below 768px)
-          const sidebar = page.locator('.sidebar');
+          // Sidebar should be hidden on mobile (below 50rem / 800px) until the menu opens
+          const sidebar = page.locator('#starlight__sidebar');
           await expect(sidebar).not.toBeVisible();
         }
       });
 
-      test('should show persistent sidebar on tablet (WCAG W2)', async ({ page }) => {
-        if (formFactor.width >= 768) {
+      test('should show persistent sidebar on large tablet and desktop', async ({ page }) => {
+        if (formFactor.width >= 800) {
           await page.goto('/gh-aw/introduction/overview/');
           await page.waitForLoadState('networkidle');
 
-          // Sidebar should be persistently visible on tablet and desktop (768px+)
-          const sidebar = page.locator('.sidebar');
+          // Sidebar is persistent from Starlight's 50rem (800px) breakpoint up, and the
+          // mobile menu button is gone
+          const sidebar = page.locator('#starlight__sidebar');
           await expect(sidebar).toBeVisible();
+          await expect(page.locator('.site-menu-toggle')).toBeHidden();
         }
       });
     });
@@ -212,12 +223,13 @@ test.describe('Mobile and Responsive Layout', () => {
     await page.goto('/gh-aw/');
     await page.waitForLoadState('networkidle');
 
-    // At 1024px the hamburger should be active, not the full 7-item nav bar.
-    const fullNav = page.locator('.custom-header-links');
-    await expect(fullNav).toBeHidden();
+    // At 1024px the compact three-link nav shows and the mobile menu button is hidden.
+    const fullNav = page.locator('.site-header-nav');
+    await expect(fullNav).toBeVisible();
+    await expect(fullNav.locator('a')).toHaveCount(3);
 
-    const hamburgerBtn = page.locator('.hamburger-btn');
-    await expect(hamburgerBtn).toBeVisible();
+    const menuButton = page.locator('.site-menu-toggle');
+    await expect(menuButton).toBeHidden();
 
     // The site-title must be visible and its bounding box must not be covered by
     // any sibling element (i.e. the element at its centre must be the title itself
@@ -287,7 +299,9 @@ test.describe('Mobile and Responsive Layout', () => {
     await page.goto('/gh-aw/');
     await page.waitForLoadState('networkidle');
 
-    const select = page.locator('starlight-theme-select select').first();
+    // Below 50rem the theme control lives in the menu sheet, so open it first.
+    await page.locator('.site-menu-toggle').click();
+    const select = page.locator('#site-menu starlight-theme-select select');
     await expect(select).toHaveCount(1);
 
     // The control is styled to `width: 1px; height: 1px`. Allow a small
@@ -307,7 +321,7 @@ test.describe('Mobile and Responsive Layout', () => {
   // Regression test for https://github.com/github/gh-aw/issues/29545
   // Verify the navigation dropdown is fully within the viewport when large
   // user fonts cause header elements to shift on Android Chrome.
-  test('hamburger dropdown stays within viewport with large user fonts', async ({ browser }) => {
+  test('mobile menu sheet stays within viewport with large user fonts', async ({ browser }) => {
     const VIEWPORT_WIDTH = 393;
     const context = await browser.newContext({
       // Simulate Android Chrome with the user's accessibility font size set to
@@ -324,17 +338,17 @@ test.describe('Mobile and Responsive Layout', () => {
     // Done after navigation so the document exists and the style tag can attach.
     await page.addStyleTag({ content: 'html { font-size: 20px !important; }' });
 
-    // The hamburger wrapper should be visible on a narrow mobile viewport.
-    const hamburgerBtn = page.locator('.hamburger-btn');
-    await expect(hamburgerBtn).toBeVisible();
+    // The menu button should be visible on a narrow mobile viewport.
+    const menuButton = page.locator('.site-menu-toggle');
+    await expect(menuButton).toBeVisible();
 
-    // Click the hamburger to open the dropdown.
-    await hamburgerBtn.click();
+    // Open the menu sheet (Starlight's sidebar popover on docs pages).
+    await menuButton.click();
 
-    const dropdown = page.locator('.tablet-dropdown');
+    const dropdown = page.locator('#starlight__sidebar');
     await expect(dropdown).toBeVisible();
 
-    // The dropdown must be fully within the viewport horizontally.
+    // The sheet must be fully within the viewport horizontally.
     const dropdownBox = await dropdown.boundingBox();
     expect(dropdownBox).not.toBeNull();
     if (dropdownBox) {
@@ -345,9 +359,9 @@ test.describe('Mobile and Responsive Layout', () => {
     await context.close();
   });
 
-  // Verify mobile navigation toggle: hamburger menu nav links become visible on narrow viewports.
+  // Verify mobile navigation toggle: the menu sheet's site links become visible on narrow viewports.
   // Addresses the manual verification recommendation from the 2026-06-24 multi-device docs test report.
-  test('hamburger menu toggles navigation visibility on mobile viewport', async ({ browser }) => {
+  test('menu button toggles navigation visibility on mobile viewport', async ({ browser }) => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       javaScriptEnabled: true,
@@ -357,31 +371,42 @@ test.describe('Mobile and Responsive Layout', () => {
     await page.goto('/gh-aw/introduction/overview/');
     await page.waitForLoadState('networkidle');
 
-    // The hamburger button must be present and focusable on a narrow mobile viewport.
-    const hamburgerBtn = page.locator('.hamburger-btn');
-    await expect(hamburgerBtn).toBeVisible();
-    await expect(hamburgerBtn).toHaveAttribute('aria-expanded', 'false');
+    // The menu button must be present and focusable on a narrow mobile viewport.
+    const menuButton = page.locator('.site-menu-toggle');
+    await expect(menuButton).toBeVisible();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    await expect(menuButton).toHaveAttribute('aria-controls', 'starlight__sidebar');
 
-    // The dropdown must be hidden before the button is clicked.
-    const dropdown = page.locator('.tablet-dropdown');
-    await expect(dropdown).toBeHidden();
+    // The sheet must be hidden before the button is clicked.
+    const sheet = page.locator('#starlight__sidebar');
+    await expect(sheet).toBeHidden();
 
-    // Click the button; the dropdown must become visible and contain nav links.
-    await hamburgerBtn.click();
-    await expect(hamburgerBtn).toHaveAttribute('aria-expanded', 'true');
-    await expect(dropdown).toBeVisible();
+    // Click the button; the sheet must become visible with the site links on top
+    // and the docs tree below, in one menu.
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    await expect(sheet).toBeVisible();
 
-    const navLinks = dropdown.locator('.dropdown-link');
-    const linkCount = await navLinks.count();
-    expect(linkCount).toBeGreaterThan(0);
+    const navLinks = sheet.locator('.mobile-nav a');
+    await expect(navLinks).toHaveCount(3);
     for (const link of await navLinks.all()) {
       await expect(link).toBeVisible();
     }
+    await expect(sheet.locator('.mobile-nav a[aria-current="page"]')).toHaveText('Docs');
+    await expect(sheet.locator('ul.top-level').first()).toBeVisible();
 
-    // A second click must close the dropdown.
-    await hamburgerBtn.click();
-    await expect(hamburgerBtn).toHaveAttribute('aria-expanded', 'false');
-    await expect(dropdown).toBeHidden();
+    // A second click must close the sheet.
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    await expect(sheet).toBeHidden();
+
+    // Esc closes it too and returns focus to the button.
+    await menuButton.click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    await expect(menuButton).toBeFocused();
 
     await context.close();
   });
@@ -434,17 +459,17 @@ test.describe('Mobile and Responsive Layout', () => {
 
       await expectCtaHittable();
 
-      // Open the mobile navigation menu, then dismiss it by clicking outside.
-      const hamburgerBtn = page.locator('.hamburger-btn');
-      await expect(hamburgerBtn).toBeVisible();
-      await hamburgerBtn.click();
+      // Open the mobile navigation menu, then dismiss it with Escape.
+      const menuButton = page.locator('.site-menu-toggle');
+      await expect(menuButton).toBeVisible();
+      await menuButton.click();
 
-      const dropdown = page.locator('.tablet-dropdown');
-      await expect(dropdown).toBeVisible();
+      const sheet = page.locator('#site-menu');
+      await expect(sheet).toBeVisible();
 
       await page.keyboard.press('Escape');
-      await expect(dropdown).toBeHidden();
-      await expect(hamburgerBtn).toHaveAttribute('aria-expanded', 'false');
+      await expect(sheet).toBeHidden();
+      await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
 
       // After dismissal the CTA must still be tappable and must navigate.
       await expectCtaHittable();
