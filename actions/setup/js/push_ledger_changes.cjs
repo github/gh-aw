@@ -9,6 +9,7 @@ const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { pushRepoMemoryChangesWithRetry, configureRepoMemoryMergePolicy } = require("./push_repo_memory.cjs");
 const { finalId } = require("./ledger_transactions.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const { createReducer, validateOperation } = require("./ledger_builtin.cjs");
 
 const MAX_TRANSACTION_BYTES = 12 * 1024 * 1024;
 const LEDGER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -123,7 +124,9 @@ function validateTransactions(artifact, ledgerConfigs) {
       const payload = { ...record };
       delete payload.id;
       validateRecordShape(payload);
-      if (config.schema) {
+      if (config.type) {
+        validateOperation(payload, config);
+      } else if (config.schema) {
         const schemaError = validateValueAgainstSchema(payload, config.schema);
         if (schemaError) throw new TypeError("Ledger record does not match configured schema");
       }
@@ -206,10 +209,19 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       maxPatchBytes: limits.maxPatchBytes,
     });
 
+    // Validate the entire state transition before the first append mutates this branch.
+    const current = ledger.reconstruct();
+    if (current.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
+    if (config.type) {
+      const reducer = createReducer(config);
+      for (const record of current.records) reducer.apply(record.payload);
+      const existing = new Set(current.records.map(record => record.payload?.id));
+      for (const append of appends) if (!existing.has(append.record.id)) reducer.apply(append.record);
+    }
     let persisted = 0;
     let alreadyPresent = 0;
     for (const append of appends) {
-      const exists = ledger.reconstruct().records.some(record => record.payload?.id === append.record.id);
+      const exists = current.records.some(record => record.payload?.id === append.record.id);
       if (exists) {
         alreadyPresent++;
         continue;
@@ -237,6 +249,13 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
       ghToken: token,
       serverHost,
       originUrlForPush: repoUrl(serverHost, owner, repo),
+      validateBeforePush: config.type
+        ? () => {
+            const state = ledgerForValidation(workspaceDir, config);
+            const reducer = createReducer(config);
+            for (const record of state) reducer.apply(record.payload);
+          }
+        : undefined,
     });
     if (!pushed) throw new Error(`Failed to persist records to ${branchName}`);
     return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent };
@@ -244,6 +263,23 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
     if (ledger) ledger.close();
     execGitSync(["checkout", "--detach", originalHead], { cwd: workspaceDir, stdio: "pipe", suppressLogs: true });
     execGitSync(["clean", "-fd"], { cwd: workspaceDir, stdio: "pipe", suppressLogs: true });
+  }
+
+  function ledgerForValidation(workspaceDir, config) {
+    const limits = configuredLedgerLimits(config);
+    const ledger = new Ledger({
+      memoryDir: workspaceDir,
+      maxSegmentBytes: config.max_segment_kb * 1024,
+      maxRecordBytes: limits.maxRecordBytes,
+      maxPatchBytes: limits.maxPatchBytes,
+    });
+    try {
+      const state = ledger.reconstruct();
+      if (state.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
+      return state.records;
+    } finally {
+      ledger.close();
+    }
   }
 }
 

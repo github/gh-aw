@@ -119,6 +119,7 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
  * @param {(delay: number) => Promise<void>} [opts.sleepFn]
  * @param {string} [opts.originUrlForPush]
  * @param {string} [opts.repoUrlForRetry]
+ * @param {() => void} [opts.validateBeforePush]
  */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
@@ -135,6 +136,7 @@ async function pushRepoMemoryChangesWithRetry({
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   originUrlForPush,
   repoUrlForRetry,
+  validateBeforePush,
 }) {
   const retryUrl = repoUrlForRetry || `https://${serverHost}/${targetRepo}.git`;
 
@@ -154,6 +156,9 @@ async function pushRepoMemoryChangesWithRetry({
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     core.info(`Pushing changes to ${branchName} (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+    // A typed ledger must revalidate the merged history after a concurrent
+    // writer moves the branch; validation errors must not enter the retry loop.
+    if (validateBeforePush) validateBeforePush();
     try {
       await pushSignedCommitsFn({
         githubClient,

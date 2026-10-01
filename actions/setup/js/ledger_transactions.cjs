@@ -3,6 +3,7 @@
 
 const crypto = require("node:crypto");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const { validateOperation } = require("./ledger_builtin.cjs");
 
 const TEMPORARY_ID = /^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const RESERVED_RECORD_KEYS = new Set(["hash", "id", "parents", "payload_sha", "sha", "timestamp", "transaction_id", "version"]);
@@ -28,12 +29,17 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
   const mapping = new Map();
   const normalized = [];
   for (const [index, request] of requests.entries()) {
-    if (!request || typeof request !== "object" || !request.record || typeof request.record !== "object" || Array.isArray(request.record)) throw new TypeError("Invalid ledger append request");
+    if (!request || typeof request !== "object" || Array.isArray(request)) throw new TypeError("Invalid ledger append request");
     const ledger = request.ledger || (ledgerNames.size === 1 ? [...ledgerNames][0] : undefined);
     if (!ledger || !ledgerNames.has(ledger)) throw new TypeError("Unknown target ledger");
     const options = ledgers[ledger] || {};
-    const record = sanitizeRecord(request.record);
-    if (options.schema) {
+    if (options.type && (request.record !== undefined || typeof request.operation !== "string")) throw new TypeError("Built-in ledger requires an operation, not a record");
+    if (!options.type && (!request.record || typeof request.record !== "object" || Array.isArray(request.record) || request.operation !== undefined)) throw new TypeError("Custom ledger requires a record");
+    const record = sanitizeRecord(options.type ? Object.fromEntries(["operation", "value", "key", "patch", "name", "amount"].filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]])) : request.record);
+    if (options.type) {
+      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount"].includes(key))) throw new TypeError("Invalid built-in transaction fields");
+      validateOperation(record, options);
+    } else if (options.schema) {
       const schemaError = validateValueAgainstSchema(record, options.schema);
       if (schemaError) throw new TypeError(`Ledger record does not match schema: ${schemaError.path || "(root)"} ${schemaError.message || "is invalid"}`);
     }
@@ -64,6 +70,7 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
   for (const item of normalized) {
     item.record = rewrite(item.record, item.ledger);
     const config = ledgers[item.ledger] || {};
+    if (config.type) validateOperation(item.record, config);
     const recordBytes = Buffer.byteLength(JSON.stringify(item.record), "utf8");
     if (recordBytes > (config.max_record_kb || 32) * 1024) throw new RangeError("Ledger record exceeds max-record-kb");
     const totalBytes = (patchBytes.get(item.ledger) || 0) + recordBytes;

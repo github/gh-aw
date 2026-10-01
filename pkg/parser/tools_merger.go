@@ -178,7 +178,7 @@ func isSingleLedgerMap(config map[string]any) bool {
 	}
 	for key, value := range config {
 		switch key {
-		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
+		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb", "type", "key":
 			return true
 		case "compaction":
 			switch compaction := value.(type) {

@@ -1,14 +1,24 @@
 [
   {
     "name": "ledger_append",
-    "description": "Submit a record append to a configured Git-backed ledger. This requests validation only; durable persistence is performed later by push_ledger_changes. Temporary IDs may be used for references within the same batch.",
+    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
-      "required": ["record"],
+      "oneOf": [{ "required": ["record"] }, { "required": ["operation"] }],
       "properties": {
         "ledger": { "type": "string", "description": "Configured ledger name." },
         "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
-        "record": { "type": "object", "description": "Ledger record payload matching its configured schema, e.g. {\"severity\":\"high\",\"subject\":\"cache miss\"}." }
+        "record": { "type": "object", "description": "Custom ledger record payload." },
+        "operation": {
+          "type": "string",
+          "enum": ["append", "add", "remove", "put", "delete", "insert", "update", "upsert", "increment", "decrement"],
+          "description": "Built-in ledger operation (allowed operations depend on its configured type)."
+        },
+        "value": { "description": "Value for append, add, remove, put, insert, or upsert." },
+        "key": { "type": "string", "description": "String key for put, delete, or update." },
+        "patch": { "type": "object", "description": "Shallow object merge patch for table update." },
+        "name": { "type": "string", "description": "Counter name." },
+        "amount": { "type": "number", "description": "Nonnegative safe integer counter delta." }
       },
       "additionalProperties": false
     }

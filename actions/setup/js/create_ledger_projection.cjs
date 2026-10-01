@@ -8,6 +8,7 @@ const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
+const { replayBuiltin } = require("./ledger_builtin.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -94,7 +95,7 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
   try {
     const state = ledger.reconstruct();
     if (state.diagnostics.length) throw new TypeError("Ledger branch contains invalid canonical records");
-    if (config.schema) {
+    if (config.schema && !config.type) {
       for (const record of state.records) {
         const payload = { ...record.payload };
         delete payload.id;
@@ -106,12 +107,13 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
     let tables = null;
-    if (config.replay) {
+    if (config.replay || config.type) {
       try {
-        const output = executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.replay.script, state.records, output);
+        const output = config.type ? replayBuiltin(config, state.records) : executeReplay(config.replay.script, state.records, config.replay.config || {});
+        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output);
         tables = output.tables;
       } catch (error) {
+        if (config.type) throw error;
         onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);
       }
     }
@@ -158,7 +160,7 @@ async function main(options = {}) {
       if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
       else fs.mkdirSync(sourceDir, { recursive: true });
       const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
-      if (ledger.replay) {
+      if (ledger.replay || ledger.type) {
         replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
         if (tables && Object.keys(tables).length) {
           replayGuidance.push(...Object.entries(tables).map(([name, table]) => formatReplayTable(name, table)));

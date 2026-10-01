@@ -511,9 +511,15 @@ var ValidationConfig = map[string]TypeValidationConfig{
 	"ledger_append": {
 		DefaultMax: 100,
 		Fields: map[string]FieldValidation{
-			"ledger":  {Type: "string", Sanitize: true, MaxLength: 64},
-			"temp_id": {Type: "string", Pattern: `^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`},
-			"record":  {Required: true, Type: "object"},
+			"ledger":    {Type: "string", Sanitize: true, MaxLength: 64},
+			"temp_id":   {Type: "string", Pattern: `^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`},
+			"record":    {Type: "object"},
+			"operation": {Type: "string", MaxLength: 32},
+			"value":     {},
+			"key":       {Type: "string", MaxLength: 256},
+			"patch":     {Type: "object"},
+			"name":      {Type: "string", MaxLength: 256},
+			"amount":    {Type: "number"},
 		},
 	},
 	"ledger_request_compaction": {

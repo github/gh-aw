@@ -5486,8 +5486,12 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Use an empty object or schema/limit properties for one default ledger, or name independent ledgers under this object. Each ledger may set compaction (false, or an object with schedule: daily|weekly|manual, min-segments, max-segments, and an optional selection script); compaction defaults to daily and runs only in Agentic Maintenance, never in the agent job.",
+          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, or counter for trusted built-in replay, or replay.script for custom replay. Tables require key (the string primary-key field). Built-ins accept typed operations via the ledger append safe output. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
           "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["log", "set", "map", "table", "counter"], "description": "Built-in ledger reducer type." },
+            "key": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$", "description": "Table primary-key field (only for type: table)." }
+          },
           "additionalProperties": true
         },
         "repo-memory": {

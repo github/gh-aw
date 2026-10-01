@@ -34,6 +34,37 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
+func TestBuiltinLedgerDeclarations(t *testing.T) {
+	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
+		t.Run(kind, func(t *testing.T) {
+			declaration := map[string]any{"type": kind}
+			if kind == "table" {
+				declaration["key"] = "id"
+				declaration["schema"] = map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}
+			}
+			cfg, err := parseLedgerToolConfig(map[string]any{"records": declaration})
+			require.NoError(t, err)
+			require.Equal(t, kind, cfg.Ledgers[0].Type)
+			section := buildLedgerPromptSection(cfg)
+			require.Contains(t, section.Content, "records ("+kind+")")
+			require.Contains(t, section.Content, "ledger append safe output")
+			if kind == "table" {
+				require.Contains(t, section.Content, "primary key: id")
+			}
+		})
+	}
+	for _, declaration := range []map[string]any{
+		{"type": "unknown"},
+		{"type": "log", "key": "id"},
+		{"type": "table"},
+		{"type": "counter", "schema": map[string]any{"type": "number"}},
+		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
+	} {
+		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
+		require.Error(t, err)
+	}
+}
+
 func TestStandaloneLedgerRejectsUnsafeSchemas(t *testing.T) {
 	_, err := parseLedgerToolConfig(map[string]any{
 		"schema": map[string]any{"properties": map[string]any{"${{ inputs.name }}": map[string]any{}}},
