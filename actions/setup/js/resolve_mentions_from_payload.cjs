@@ -7,6 +7,7 @@
 
 const { resolveMentionsLazily, isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { parseRepoSlug } = require("./repo_helpers.cjs");
 
 /**
  * Push a non-bot user's login to the array if present.
@@ -172,16 +173,17 @@ async function fetchTeamMembers(teamEntry, defaultOrg, github, core) {
  * @param {any} core - GitHub Actions core
  * @param {any} [mentionsConfig] - Mentions configuration from safe-outputs
  * @param {string[]} [extraKnownAuthors] - Additional known authors to allow (e.g. pre-fetched target issue authors)
+ * @param {{ owner: string, repo: string }} [targetRepo] - Repository receiving the safe output
  * @returns {Promise<string[]>} Array of allowed mention usernames
  */
-async function resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, extraKnownAuthors) {
+async function resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, extraKnownAuthors, targetRepo) {
   // Return empty array if context is not available (e.g., in tests)
   if (!context || !github || !core) {
     return [];
   }
 
   // If mentions is explicitly set to false, return empty array (all mentions escaped)
-  if (mentionsConfig && mentionsConfig.enabled === false) {
+  if (mentionsConfig === false || mentionsConfig?.enabled === false) {
     core.info("[MENTIONS] Mentions explicitly disabled - all mentions will be escaped");
     return [];
   }
@@ -193,7 +195,6 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   const allowedTeams = mentionsConfig?.allowedTeams || [];
 
   try {
-    const { owner, repo } = context.repo;
     const knownAuthors = allowContext ? extractKnownAuthorsFromPayload(context) : [];
 
     // Add allowed list (always included regardless of configuration)
@@ -202,11 +203,11 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
     }
 
     // Add members from allowed-teams (always included regardless of collaborator mention setting)
-    if (Array.isArray(allowedTeams) && allowedTeams.length > 0) {
+    if (targetRepo?.owner && targetRepo.repo && Array.isArray(allowedTeams) && allowedTeams.length > 0) {
       core.info(`[MENTIONS] Fetching members for ${allowedTeams.length} configured team(s)`);
       for (const teamEntry of allowedTeams) {
         if (typeof teamEntry === "string" && teamEntry.length > 0) {
-          const teamMembers = await fetchTeamMembers(teamEntry, owner, github, core);
+          const teamMembers = await fetchTeamMembers(teamEntry, targetRepo.owner, github, core);
           knownAuthors.push(...teamMembers);
         }
       }
@@ -229,6 +230,13 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
       seenKnownAuthors.add(key);
       deduplicatedKnownAuthors.push(author);
     }
+
+    if (!targetRepo?.owner || !targetRepo.repo) {
+      core.info("[MENTIONS] No target repository - only allowing context and explicit aliases");
+      return deduplicatedKnownAuthors;
+    }
+
+    const { owner, repo } = targetRepo;
 
     // If collaborator mentions are disabled, only use known authors (context + allowed list)
     if (!allowCollaboratorMentions) {
@@ -255,8 +263,43 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   }
 }
 
+/**
+ * Re-resolve aliases when an item overrides its handler's default repository.
+ * @param {any} context
+ * @param {any} github
+ * @param {any} core
+ * @param {any} mentionsConfig
+ * @param {string[]} defaultAliases
+ * @param {string} defaultRepo
+ * @param {{ repo: string, repoParts: { owner: string, repo: string } }} itemRepo
+ * @returns {Promise<string[]>}
+ */
+async function resolveMentionsForItem(context, github, core, mentionsConfig, defaultAliases, defaultRepo, itemRepo) {
+  if (mentionsConfig == null || mentionsConfig === false || itemRepo.repo.toLowerCase() === defaultRepo.toLowerCase()) {
+    return defaultAliases;
+  }
+  return resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, undefined, itemRepo.repoParts);
+}
+
+/**
+ * Resolve a handler's default aliases only when its configured destination is concrete.
+ * Wildcard targets must be resolved once the item supplies its repository.
+ * @param {any} context
+ * @param {any} github
+ * @param {any} core
+ * @param {any} mentionsConfig
+ * @param {string} defaultRepo
+ * @returns {Promise<string[]>}
+ */
+async function resolveDefaultMentions(context, github, core, mentionsConfig, defaultRepo) {
+  const targetRepo = parseRepoSlug(defaultRepo);
+  return targetRepo ? resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, undefined, targetRepo) : [];
+}
+
 module.exports = {
   resolveAllowedMentionsFromPayload,
+  resolveMentionsForItem,
+  resolveDefaultMentions,
   extractKnownAuthorsFromPayload,
   fetchTeamMembers,
   pushNonBotUser,

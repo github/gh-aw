@@ -26,6 +26,7 @@ type copilotSDKToolConfig struct {
 	Version                 int                        `json:"version"`
 	Capabilities            copilotSDKToolCapabilities `json:"capabilities"`
 	Permissions             copilotSDKPermissionConfig `json:"permissions"`
+	MaxToolCalls            string                     `json:"maxToolCalls,omitempty"`
 	ExplicitlyDisabledTools []string                   `json:"explicitlyDisabledTools,omitempty"`
 }
 
@@ -160,9 +161,14 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 	if workflowData == nil {
 		workflowData = &WorkflowData{}
 	}
+	maxToolCalls := ""
+	if workflowData.EngineConfig != nil {
+		maxToolCalls = workflowData.EngineConfig.MaxToolCalls
+	}
 	tools := workflowData.Tools
 	config := copilotSDKToolConfig{
-		Version: copilotSDKToolConfigVersion,
+		Version:      copilotSDKToolConfigVersion,
+		MaxToolCalls: maxToolCalls,
 		Capabilities: copilotSDKToolCapabilities{
 			Bash:     isCopilotBashToolEnabled(workflowData),
 			Edit:     isCopilotEditToolEnabled(tools, workflowData),

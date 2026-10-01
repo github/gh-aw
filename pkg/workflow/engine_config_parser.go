@@ -122,6 +122,10 @@ func parseMaxToolDenialsValue(raw any) string {
 	return parseIntOrExpressionValue(raw, 1, "max-tool-denials")
 }
 
+func parseMaxToolCallsValue(raw any) string {
+	return parseIntOrExpressionValue(raw, 1, "max-tool-calls")
+}
+
 // parseAuthDefinition converts a raw auth config map (from engine.provider.auth) into
 // an AuthDefinition. It is backward-compatible: a map with only a "secret" key produces
 // an AuthDefinition with Strategy="" and Secret set (callers normalise Strategy to api-key).

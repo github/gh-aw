@@ -691,7 +691,7 @@ Named shorthand references to predefined domain sets used in `network.allowed` a
 
 ### Copilot SDK (`engine.copilot-sdk`)
 
-An engine option that enables the Copilot engine to run in SDK mode, giving the workflow direct access to the Copilot SDK runtime for advanced integration patterns such as inline sub-agents. Set `engine.copilot-sdk: true` to activate, or set `engine.driver` on the Copilot engine to enable SDK mode automatically while replacing the built-in driver. Supports `max-tool-denials` to stop inference when tool requests are denied too frequently. See [AI Engines Reference](/gh-aw/reference/engines/#copilot-sdk-support).
+An engine option that enables the Copilot engine to run in SDK mode, giving the workflow direct access to the Copilot SDK runtime for advanced integration patterns such as inline sub-agents. Set `engine.copilot-sdk: true` to activate, or set `engine.driver` on the Copilot engine to enable SDK mode automatically while replacing the built-in driver. Supports `max-tool-denials` to stop inference when tool requests are denied too frequently. The built-in driver also supports the run-wide `max-tool-calls` budget. See [AI Engines Reference](/gh-aw/reference/engines/#copilot-sdk-support).
 
 ```aw wrap
 engine:
@@ -1044,6 +1044,13 @@ engine:
   copilot-sdk: true
 max-tool-denials: 8
 ```
+
+### Max Tool Calls (`max-tool-calls`)
+
+A positive run-wide budget on primary-agent and Copilot SDK subagent tool
+dispatches. The built-in Copilot SDK driver enforces it before tool execution,
+including for failed and permission-denied dispatches. Other engines and custom
+Copilot SDK drivers/harnesses are explicitly unsupported.
 
 See [Engines Reference](/gh-aw/reference/engines/).
 

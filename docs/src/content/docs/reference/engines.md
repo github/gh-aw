@@ -413,6 +413,20 @@ tool requests are repeatedly denied. The default is `5`.
 This field is only supported when `engine.id: copilot` and
 `engine.copilot-sdk: true`.
 
+Use top-level `max-tool-calls` to configure a positive run-wide limit on
+tool dispatches. The built-in Copilot SDK driver's pre-tool hook reserves the
+budget before execution, so failed and permission-denied calls count, concurrent
+calls cannot overspend it, and calls made by SDK subagents share the same count.
+When exhausted, further calls are rejected with an explanatory reason and
+`guard.tool_call_budget_exceeded` run event.
+
+Aggregate `max-tool-calls` is currently enforceable only with
+`engine.id: copilot`, `engine.copilot-sdk: true`, and the built-in SDK driver
+and harness. It is rejected for the Copilot CLI mode, other engines, and custom
+`engine.driver` or `engine.harness` overrides. It is distinct from
+`tools.github.allowed[].max-calls`, which remains a per-tool MCP Gateway limit
+and does not cover local tools such as bash.
+
 Use `engine.driver` to replace the built-in
 `copilot_sdk_driver.cjs` implementation. On the Copilot engine,
 setting `engine.driver` also enables `engine.copilot-sdk: true`:
@@ -422,6 +436,13 @@ engine:
   id: copilot
   driver: .github/drivers/custom-copilot-driver.js
 max-tool-denials: 8
+```
+
+```yaml wrap
+engine:
+  id: copilot
+  copilot-sdk: true
+max-tool-calls: 100
 ```
 
 `engine.driver` must be a **relative path from the workspace root**

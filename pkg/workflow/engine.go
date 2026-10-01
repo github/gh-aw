@@ -51,6 +51,7 @@ type EngineConfig struct {
 	PermissionMode     string
 	MaxTurns           string
 	MaxToolDenials     string // Maximum repeated tool denials before stopping inference (copilot SDK mode only)
+	MaxToolCalls       string // Maximum dispatched tool calls (Copilot SDK mode only)
 	MaxRuns            int    // Maximum number of LLM invocations per run (AWF apiProxy.maxRuns)
 	MaxTurnCacheMisses int    // Maximum number of consecutive cache misses per run (AWF apiProxy.maxCacheMisses)
 	MaxContinuations   int    // Maximum number of continuations for autopilot mode (copilot engine only; > 1 enables --autopilot)
@@ -270,6 +271,7 @@ type EngineNetworkConfig struct {
 type engineTopLevelConfig struct {
 	maxTurns           string
 	maxToolDenials     string
+	maxToolCalls       string
 	maxAICredits       int64
 	maxTurnCacheMisses int
 	maxRuns            int
@@ -323,6 +325,7 @@ func parseTopLevelEngineConfig(frontmatter map[string]any) engineTopLevelConfig 
 	topLevel := engineTopLevelConfig{
 		maxTurns:           parseMaxTurnsValue(frontmatter["max-turns"]),
 		maxToolDenials:     parseMaxToolDenialsValue(frontmatter["max-tool-denials"]),
+		maxToolCalls:       parseMaxToolCallsValue(frontmatter["max-tool-calls"]),
 		maxAICredits:       parseMaxAICreditsValue(frontmatter["max-ai-credits"]),
 		maxTurnCacheMisses: parseMaxTurnCacheMissesValue(frontmatter["max-turn-cache-misses"]),
 		maxRuns:            parseMaxRunsValue(frontmatter["max-turns"]),
@@ -342,6 +345,7 @@ func extractStringEngineConfig(engineStr string, topLevel engineTopLevelConfig) 
 		ID:                 engineStr,
 		MaxTurns:           topLevel.maxTurns,
 		MaxToolDenials:     topLevel.maxToolDenials,
+		MaxToolCalls:       topLevel.maxToolCalls,
 		MaxRuns:            topLevel.maxRuns,
 		MaxTurnCacheMisses: topLevel.maxTurnCacheMisses,
 		MaxAICredits:       topLevel.maxAICredits,
@@ -416,6 +420,7 @@ func applyInlineEngineFields(config *EngineConfig, engineObj map[string]any, top
 	applyEngineContextWindowField(config, engineObj)
 	config.MaxTurns = topLevel.maxTurns
 	config.MaxToolDenials = topLevel.maxToolDenials
+	config.MaxToolCalls = topLevel.maxToolCalls
 	config.MaxRuns = topLevel.maxRuns
 	config.MaxTurnCacheMisses = topLevel.maxTurnCacheMisses
 	config.MaxAICredits = topLevel.maxAICredits
@@ -522,6 +527,7 @@ func applyEngineTurnFields(config *EngineConfig, engineObj map[string]any, topLe
 		config.MaxTurns = topLevel.maxTurns
 	}
 	config.MaxToolDenials = topLevel.maxToolDenials
+	config.MaxToolCalls = topLevel.maxToolCalls
 	if maxCont, hasMaxCont := engineObj["max-continuations"]; hasMaxCont {
 		if val, ok := typeutil.ParseIntValue(maxCont); ok {
 			config.MaxContinuations = val
@@ -758,17 +764,21 @@ func applyEngineTopLevelOverrides(config *EngineConfig, topLevel engineTopLevelC
 	if topLevel.maxTurns != "" {
 		config.MaxTurns = topLevel.maxTurns
 	}
+	if topLevel.maxToolCalls != "" {
+		config.MaxToolCalls = topLevel.maxToolCalls
+	}
 	config.MaxRuns = topLevel.maxRuns
 	config.MaxTurnCacheMisses = topLevel.maxTurnCacheMisses
 	config.MaxAICredits = topLevel.maxAICredits
 }
 
 func buildTopLevelOnlyEngineConfig(topLevel engineTopLevelConfig) (string, *EngineConfig, string) {
-	if topLevel.maxTurns != "" || topLevel.maxToolDenials != "" || topLevel.maxAICredits != 0 ||
+	if topLevel.maxTurns != "" || topLevel.maxToolDenials != "" || topLevel.maxToolCalls != "" || topLevel.maxAICredits != 0 ||
 		topLevel.maxRuns > 0 || topLevel.maxTurnCacheMisses > 0 || topLevel.model != "" {
 		return "", &EngineConfig{
 			MaxTurns:           topLevel.maxTurns,
 			MaxToolDenials:     topLevel.maxToolDenials,
+			MaxToolCalls:       topLevel.maxToolCalls,
 			MaxRuns:            topLevel.maxRuns,
 			MaxTurnCacheMisses: topLevel.maxTurnCacheMisses,
 			MaxAICredits:       topLevel.maxAICredits,

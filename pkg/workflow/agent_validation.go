@@ -202,6 +202,26 @@ func (c *Compiler) validateMaxToolDenialsSupport(frontmatter map[string]any, eng
 	return nil
 }
 
+// validateMaxToolCallsSupport limits aggregate tool-call enforcement to the built-in
+// Copilot SDK driver, whose pre-tool hook intercepts primary and subagent dispatches.
+func (c *Compiler) validateMaxToolCallsSupport(frontmatter map[string]any, engine CodingAgentEngine) error {
+	_, engineConfig, _ := c.ExtractEngineConfig(frontmatter)
+	return validateMaxToolCallsConfig(engineConfig, engine)
+}
+
+func validateMaxToolCallsConfig(engineConfig *EngineConfig, engine CodingAgentEngine) error {
+	if engineConfig == nil || engineConfig.MaxToolCalls == "" {
+		return nil
+	}
+	if engine.GetID() != string(constants.CopilotEngine) || !engineConfig.CopilotSDK {
+		return errors.New("max-tool-calls requires engine 'copilot' with engine.copilot-sdk: true; other engines do not currently expose an enforceable tool-dispatch hook")
+	}
+	if engineConfig.Driver != "" || engineConfig.HarnessScript != "" {
+		return errors.New("max-tool-calls requires the built-in Copilot SDK driver and harness; custom engine.driver or engine.harness overrides cannot enforce the aggregate budget")
+	}
+	return nil
+}
+
 // validateUniversalLLMConsumerModel validates that universal consumer engines
 // (behavior-defined engines using the universal-llm-consumer secret strategy)
 // declare a provider-qualified engine.model.
