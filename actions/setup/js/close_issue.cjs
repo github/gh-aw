@@ -180,7 +180,9 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
       });
       return issue;
     } catch (error) {
-      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      const errorRecord = error && typeof error === "object" ? /** @type {Record<string, unknown>} */ error : undefined;
+      const response = errorRecord?.response;
+      const status = response && typeof response === "object" && "status" in response ? response.status : errorRecord?.status;
       if (status !== 404 && status !== 501) {
         throw error;
       }

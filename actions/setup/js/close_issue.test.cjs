@@ -210,6 +210,23 @@ describe("close_issue", () => {
       expect(updateCalled).toBe(true);
     });
 
+    it("should fall back when the unavailable intent status is wrapped in the response", async () => {
+      const handler = await main({ max: 10 });
+      let updateCalled = false;
+      mockGithub.request = async () => {
+        throw Object.assign(new Error("Intent endpoint unavailable"), { response: { status: 404 } });
+      };
+      mockGithub.rest.issues.update = async params => {
+        updateCalled = true;
+        return { data: { number: params.issue_number, title: "Test Issue", html_url: "https://github.com/test-owner/test-repo/issues/456" } };
+      };
+
+      const result = await handler({ issue_number: 456, body: "Closing this issue", rationale: "Confirmed" }, {});
+
+      expect(result.success).toBe(true);
+      expect(updateCalled).toBe(true);
+    });
+
     it("should skip issue-intent metadata when explicitly disabled", async () => {
       const handler = await main({ max: 10, issue_intent: false });
       const updateCalls = [];
