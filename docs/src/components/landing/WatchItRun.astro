@@ -1,7 +1,310 @@
 ---
 import LandingSection from './LandingSection.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const options = [
+  {
+    id: 'cli',
+    title: 'From the terminal',
+    duration: '1:16',
+    description: 'Install the extension, add a sample workflow and trigger the first run.',
+    linkText: 'Follow the quick start',
+    href: `${base}/setup/quick-start/`,
+    video: 'install-and-add-workflow-in-cli',
+  },
+  {
+    id: 'web',
+    title: 'From github.com',
+    duration: '1:41',
+    description: "Ask Copilot in your repository's Agents tab to write the workflow for you.",
+    linkText: 'Create a workflow',
+    href: `${base}/setup/creating-workflows/`,
+    video: 'create-workflow-on-github',
+  },
+];
 ---
 
 <LandingSection id="watch" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
-  <p class="aw-placeholder">Placeholder — slice 3</p>
+  <div class="aw-watch" data-watch>
+    <div class="aw-tabs" role="tablist" aria-label="Choose a walkthrough" aria-orientation="vertical">
+      {options.map((o, i) => (
+        <div class="aw-opt" role="presentation" data-selected={i === 0 ? 'true' : 'false'}>
+          <button
+            type="button"
+            class="aw-tab"
+            role="tab"
+            id={`watch-tab-${o.id}`}
+            aria-controls={`watch-panel-${o.id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            <span class="aw-tab-head">
+              <span class="aw-tab-title">{o.title}</span>
+              <span class="aw-tab-time">{o.duration}</span>
+            </span>
+            <span class="aw-tab-desc">{o.description}</span>
+          </button>
+          <a class="aw-more aw-more-side" href={o.href}>{o.linkText} →</a>
+        </div>
+      ))}
+    </div>
+
+    <div class="aw-stage">
+      {options.map((o, i) => (
+        <div
+          class="aw-panel"
+          role="tabpanel"
+          id={`watch-panel-${o.id}`}
+          aria-labelledby={`watch-tab-${o.id}`}
+          data-selected={i === 0 ? 'true' : 'false'}
+        >
+          <div class="aw-frame">
+            <video
+              controls
+              playsinline
+              preload="none"
+              poster={`${base}/videos/${o.video}-poster.jpg`}
+              aria-label={o.title}
+            >
+              <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+              <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+            </video>
+          </div>
+          <div class="aw-below">
+            <p>{o.description}</p>
+            <a class="aw-more" href={o.href}>{o.linkText} →</a>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
 </LandingSection>
+
+<style>
+  .aw-watch {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+  .aw-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 10px;
+  }
+  .aw-opt {
+    display: contents;
+  }
+  .aw-watch .aw-tabs .aw-tab {
+    appearance: none;
+    display: block;
+    width: 100%;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    box-sizing: border-box;
+    cursor: pointer;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 7px;
+    color: var(--aw-color-text-muted);
+    text-align: center;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .aw-watch .aw-tabs .aw-tab:hover {
+    color: var(--aw-color-text);
+  }
+  .aw-watch .aw-tabs .aw-tab:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .aw-watch .aw-tabs .aw-tab[aria-selected='true'] {
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text-strong);
+    box-shadow: 0 0 0 1px var(--aw-color-border);
+  }
+  .aw-tab-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: var(--aw-step--1);
+    font-weight: 540;
+  }
+  .aw-tab-time {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-tab-desc,
+  .aw-more-side {
+    display: none;
+  }
+
+  .aw-frame {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    box-shadow: var(--aw-shadow);
+  }
+  .aw-frame video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--aw-color-bg-subtle);
+  }
+  .aw-panel + .aw-panel {
+    margin-top: 2rem;
+  }
+  .aw-below {
+    margin-top: 1rem;
+  }
+  .aw-below p {
+    margin: 0 0 0.5rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-more {
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+    color: var(--aw-color-accent-text);
+    text-decoration: none;
+  }
+  .aw-more:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .aw-more:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Enhanced: one panel at a time */
+  .aw-watch[data-enhanced] .aw-panel[data-selected='false'] {
+    display: none;
+  }
+  /* Without JS the switcher is inert; hide it and show both videos with captions */
+  .aw-watch:not([data-enhanced]) .aw-tabs {
+    display: none;
+  }
+
+  @media (min-width: 900px) {
+    .aw-watch {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: clamp(2rem, 4vw, 3.5rem);
+      align-items: start;
+    }
+    .aw-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0;
+      background: none;
+      border: 0;
+    }
+    .aw-watch:not([data-enhanced]) .aw-tabs {
+      display: none;
+    }
+    .aw-opt {
+      display: block;
+      padding: 1rem 1.125rem;
+      border-radius: 10px;
+      transition: background-color 0.15s ease;
+    }
+    .aw-opt[data-selected='true'] {
+      background: var(--aw-color-bg-subtle);
+    }
+    .aw-watch .aw-tabs .aw-tab {
+      display: block;
+      padding: 0;
+      border-radius: 4px;
+      text-align: left;
+      color: var(--aw-color-text-muted);
+    }
+    .aw-watch .aw-tabs .aw-tab[aria-selected='true'] {
+      background: transparent;
+      box-shadow: none;
+      color: var(--aw-color-text-strong);
+    }
+    .aw-tab-head {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: var(--aw-step-0);
+      font-weight: 560;
+    }
+    .aw-tab-desc {
+      display: block;
+      margin-top: 0.375rem;
+      font-size: var(--aw-step--1);
+      line-height: 1.5;
+      font-weight: 400;
+      color: var(--aw-color-text-secondary);
+    }
+    .aw-more-side {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .aw-opt[data-selected='true'] .aw-more-side {
+      display: inline-block;
+    }
+    .aw-below {
+      display: none;
+    }
+    .aw-watch:not([data-enhanced]) .aw-below {
+      display: block;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aw-watch .aw-tabs .aw-tab,
+    .aw-opt {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const panels = tabs.map((t) => root.querySelector<HTMLElement>('#' + t.getAttribute('aria-controls'))!);
+    root.setAttribute('data-enhanced', '');
+
+    const select = (index: number, focus = false) => {
+      tabs.forEach((tab, i) => {
+        const on = i === index;
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+        tab.parentElement?.setAttribute('data-selected', String(on));
+        panels[i].setAttribute('data-selected', String(on));
+        if (!on) panels[i].querySelector('video')?.pause();
+      });
+      if (focus) tabs[index].focus();
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i));
+      tab.addEventListener('keydown', (e) => {
+        const n = tabs.length;
+        let next = -1;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % n;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + n) % n;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = n - 1;
+        if (next >= 0) {
+          e.preventDefault();
+          select(next, true);
+        }
+      });
+    });
+  });
+</script>
