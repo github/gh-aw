@@ -459,8 +459,12 @@ func applyEngineModelRoutingField(config *EngineConfig, engineObj map[string]any
 		return
 	}
 	modelRouting := &CopilotModelRoutingConfig{}
-	modelRouting.Goal, _ = routing["goal"].(string)
-	modelRouting.Mode, _ = routing["mode"].(string)
+	if goal, ok := routing["goal"].(string); ok {
+		modelRouting.Goal = goal
+	}
+	if mode, ok := routing["mode"].(string); ok {
+		modelRouting.Mode = mode
+	}
 	if models, ok := routing["allowed-models"].([]any); ok {
 		modelRouting.AllowedModels = make([]string, 0, len(models))
 		for _, model := range models {

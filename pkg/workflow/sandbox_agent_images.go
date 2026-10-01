@@ -15,6 +15,7 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -95,9 +96,7 @@ func getSandboxAgentImages(workflowData *WorkflowData) map[string]string {
 	}
 	images := make(map[string]string)
 	if agentConfig != nil {
-		for role, image := range agentConfig.Images {
-			images[role] = image
-		}
+		maps.Copy(images, agentConfig.Images)
 	}
 	if isModelRoutingEnabled(workflowData) {
 		for role, image := range modelRoutingDefaultImages {
@@ -110,9 +109,9 @@ func getSandboxAgentImages(workflowData *WorkflowData) map[string]string {
 }
 
 var modelRoutingDefaultImages = map[string]string{
-	awfImageRoleSquid:    "ghcr.io/github/gh-aw-firewall/squid:0.28.29@sha256:1d5e169c4df14e87fc826261b94cf4ddaf2f08aca2a5b88701100ec193968193",
-	awfImageRoleAgent:    "ghcr.io/github/gh-aw-firewall/agent:0.28.29@sha256:edcf17ae63dd74366bc911a74678b9e264d66ac51c48ec156c80e2619892ebbb",
-	awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy:0.28.29@sha256:5cc683af8156b39c15bd2370615a85775a8b179bed9f49c490a3068d667dfa2b",
+	awfImageRoleSquid:    "ghcr.io/github/gh-aw-firewall/squid:0.28.30@sha256:a147f70732f81d02d59b3bddc2f7ad074d51a291f12abd8bc310b0f3ef5e1629",
+	awfImageRoleAgent:    "ghcr.io/github/gh-aw-firewall/agent:0.28.30@sha256:ae5d5b76eba522c375a36dd92a0146188bec19b2b7febae304e0dc420a28972b",
+	awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy:0.28.30@sha256:6294a95f9ca39be1cd6125cebffa9d2ba72a9bfabb8bab2160111788b67ab94d",
 	awfImageRoleRouter:   "ghcr.io/githubnext/gh-aw-router:latest@sha256:d1612d0eaec3fa8f14c38bbd0a6a0682732fc9f83b7fec94219d3e757a048270",
 }
 

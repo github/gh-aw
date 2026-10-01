@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -28,7 +29,7 @@ func resolveModelRoutingAllowedModels(routing *CopilotModelRoutingConfig) ([]str
 		return nil, nil
 	}
 	if len(routing.AllowedModels) == 0 {
-		return nil, fmt.Errorf("engine.model-routing.allowed-models must contain at least one Copilot model")
+		return nil, errors.New("engine.model-routing.allowed-models must contain at least one Copilot model")
 	}
 
 	models := make([]string, 0, len(routing.AllowedModels))
@@ -62,7 +63,7 @@ func intersectModelRoutingPolicy(candidates, allowed, blocked []string) ([]strin
 		result = append(result, candidate)
 	}
 	if len(result) == 0 {
-		return nil, fmt.Errorf("all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy")
+		return nil, errors.New("all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy")
 	}
 	return result, nil
 }
@@ -122,13 +123,6 @@ func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowD
 	yaml.WriteString("      - name: Prepare model-routing conversation\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_ROUTING_PROMPT: " + constants.AwPromptsFileExpr + "\n")
-	yaml.WriteString("        run: |\n")
-	yaml.WriteString("          node <<'NODE'\n")
-	yaml.WriteString("          const fs = require('node:fs');\n")
-	yaml.WriteString("          const prompt = fs.readFileSync(process.env.GH_AW_ROUTING_PROMPT, 'utf8');\n")
-	yaml.WriteString("          if (!prompt.trim()) throw new Error('Rendered workflow prompt is empty; cannot route this task');\n")
-	yaml.WriteString("          const destination = " + fmt.Sprintf("%q", modelRoutingConversationFile) + ";\n")
-	yaml.WriteString("          fs.mkdirSync(require('node:path').dirname(destination), { recursive: true, mode: 0o700 });\n")
-	yaml.WriteString("          fs.writeFileSync(destination, JSON.stringify([{ role: 'user', parts: [{ text: prompt }] }]), { mode: 0o600 });\n")
-	yaml.WriteString("          NODE\n")
+	yaml.WriteString("          GH_AW_ROUTING_CONVERSATION_FILE: " + modelRoutingConversationFile + "\n")
+	yaml.WriteString("        run: node -e \"const fs=require('node:fs'); const path=require('node:path'); const prompt=fs.readFileSync(process.env.GH_AW_ROUTING_PROMPT,'utf8'); if (!prompt.trim()) throw new Error('Rendered workflow prompt is empty; cannot route this task'); const destination=process.env.GH_AW_ROUTING_CONVERSATION_FILE; fs.mkdirSync(path.dirname(destination),{recursive:true,mode:0o700}); fs.writeFileSync(destination,JSON.stringify([{role:'user',parts:[{text:prompt}]}]),{mode:0o600});\"\n")
 }
