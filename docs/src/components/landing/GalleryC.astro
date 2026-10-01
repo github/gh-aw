@@ -1,0 +1,98 @@
+---
+import LandingSection from './LandingSection.astro';
+import GalleryFragment from './GalleryFragment.astro';
+import { jobs, workflows } from './GalleryData';
+---
+
+<LandingSection tone="subtle" titleId="gallery-c-title" title="What teams automate" lede="Pick the job you want off your plate and start from a proven workflow.">
+  <div class="gc" data-gc>
+    <div class="gc-tabs" role="tablist" aria-label="Workflow categories">
+      {jobs.map((j, i) => (
+        <button type="button" role="tab" class="gc-tab" id={`gc-tab-${j.key}`} aria-controls={`gc-panel-${j.key}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+          {j.name}<span class="gc-count">{workflows.filter((w) => w.job === j.key).length}</span>
+        </button>
+      ))}
+    </div>
+
+    {jobs.map((j, i) => (
+      <div class="gc-panel" role="tabpanel" id={`gc-panel-${j.key}`} aria-labelledby={`gc-tab-${j.key}`} hidden={i !== 0 ? true : undefined}>
+        <h3 class="gc-sr">{j.name}</h3>
+        <ul class="gc-grid" role="list">
+          {workflows.filter((w) => w.job === j.key).map((w) => (
+            <li>
+              <a class="gc-card" href={w.href}>
+                <GalleryFragment frag={w.frag} />
+                <span class="gc-name">{w.title}</span>
+                <span class="gc-desc">{w.text}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+
+  <p class="gc-foot"><a class="gc-all" href="/gh-aw/gallery/">Browse the full gallery <span aria-hidden="true">→</span></a></p>
+</LandingSection>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-gc]').forEach((root) => {
+    const tabs = Array.from(root.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+    root.dataset.ready = '';
+    const select = (i: number, focus = false) => {
+      tabs.forEach((t, j) => {
+        t.setAttribute('aria-selected', String(i === j));
+        t.tabIndex = i === j ? 0 : -1;
+        panels[j].hidden = i !== j;
+      });
+      if (focus) tabs[i].focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(i));
+      t.addEventListener('keydown', (e) => {
+        const k = (e as KeyboardEvent).key;
+        const n = tabs.length;
+        const to = k === 'ArrowRight' ? (i + 1) % n : k === 'ArrowLeft' ? (i - 1 + n) % n : k === 'Home' ? 0 : k === 'End' ? n - 1 : -1;
+        if (to >= 0) { e.preventDefault(); select(to, true); }
+      });
+    });
+  });
+</script>
+
+<style>
+  .gc { margin-top: 2.5rem; }
+  .gc:not([data-ready]) .gc-tabs { display: none; }
+  .gc-tabs { display: flex; gap: 0.25rem; margin: 0 0 2rem; padding: 0.25rem; width: max-content; max-width: 100%; overflow-x: auto; scrollbar-width: none; background: var(--aw-color-bg); border: 1px solid var(--aw-color-border); border-radius: 10px; }
+  .gc-tabs::-webkit-scrollbar { display: none; }
+  .gc-tab {
+    all: unset; box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 0.5rem;
+    min-height: 2.25rem; padding: 0 0.875rem; border-radius: 7px; cursor: pointer;
+    font-size: var(--aw-step--1); font-weight: 500; color: var(--aw-color-text-secondary); white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .gc-tab:hover { color: var(--aw-color-text-strong); }
+  .gc-tab[aria-selected='true'] { background: var(--aw-color-bg-subtle); color: var(--aw-color-text-strong); box-shadow: inset 0 0 0 1px var(--aw-color-border); }
+  .gc-count { color: var(--aw-color-text-muted); font-weight: 400; }
+  .gc-tab:focus-visible, .gc-card:focus-visible, .gc-all:focus-visible { outline: 2px solid var(--aw-color-accent); outline-offset: 3px; }
+  .gc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .gc:not([data-ready]) .gc-sr { position: static; width: auto; height: auto; clip-path: none; margin: 2rem 0 1rem; font-size: var(--aw-step-1); font-weight: 550; border: 0; color: var(--aw-color-text-strong); }
+  .gc-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; }
+  .gc-grid li { margin: 0; padding: 0; min-width: 0; }
+  .gc-card {
+    display: flex; flex-direction: column; height: 100%; padding: 1rem; gap: 0.25rem;
+    background: var(--aw-color-bg); border: 1px solid var(--aw-color-border); border-radius: 12px;
+    color: inherit; text-decoration: none; transition: border-color 0.15s;
+  }
+  .gc-card:hover { border-color: var(--aw-color-border-strong); }
+  .gc-card > :global(.gf) { margin-bottom: 0.75rem; box-shadow: none; background: var(--aw-color-bg-subtle); min-height: 5.5rem; justify-content: center; }
+  .gc-card :global(.gf-t) { white-space: normal; }
+  .gc-card :global(.gf-row) { align-items: flex-start; }
+  .gc-name { font-size: var(--aw-step-0); font-weight: 550; letter-spacing: -0.01em; color: var(--aw-color-text-strong); }
+  .gc-card:hover .gc-name { text-decoration: underline; text-decoration-color: var(--aw-color-border-strong); text-underline-offset: 3px; }
+  .gc-desc { font-size: var(--aw-step--1); line-height: 1.5; color: var(--aw-color-text-muted); text-wrap: pretty; }
+  .gc-foot { margin: 2.5rem 0 0; }
+  .gc-all { font-size: var(--aw-step-0); color: var(--aw-color-accent-text); text-decoration: none; border-radius: 4px; }
+  .gc-all:hover { text-decoration: underline; text-underline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .gc-tab, .gc-card { transition: none; } }
+</style>

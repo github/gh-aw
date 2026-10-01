@@ -1,0 +1,104 @@
+---
+import octicons from '@primer/octicons';
+import LandingSection from './LandingSection.astro';
+import GalleryFragment from './GalleryFragment.astro';
+import { workflows } from './GalleryData';
+
+const arrow = octicons['arrow-right'].toSVG({ width: 16, height: 16 });
+const chev = octicons['chevron-down'].toSVG({ width: 16, height: 16 });
+const ids = ['triage', 'review', 'ci', 'docs', 'report', 'security'];
+const shown = ids.map((id) => workflows.find((w) => w.id === id)!);
+const rest = workflows.filter((w) => !ids.includes(w.id));
+---
+
+<LandingSection tone="dark" titleId="gallery-d-title" title="What teams automate" lede="Every workflow starts with an event and ends with something you can review.">
+  <div class="gd">
+    <div class="gd-head" aria-hidden="true"><span>When</span><span></span><span>The agent</span><span>You get</span></div>
+    <ul class="gd-list" role="list">
+      {shown.map((w) => (
+        <li>
+          <a class="gd-row" href={w.href}>
+            <code class="gd-trig">{w.trigger}</code>
+            <span class="gd-arrow" aria-hidden="true" set:html={arrow} />
+            <span class="gd-what"><span class="gd-name">{w.title}</span><span class="gd-desc">{w.text}</span></span>
+            <span class="gd-result"><GalleryFragment frag={w.frag} /></span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <details class="gd-more">
+      <summary>
+        <span class="gd-sum-closed">Show all 15 workflows</span>
+        <span class="gd-sum-open">Show fewer</span>
+        <span class="gd-chev" aria-hidden="true" set:html={chev} />
+      </summary>
+      <ul class="gd-list" role="list">
+        {rest.map((w) => (
+          <li>
+            <a class="gd-row" href={w.href}>
+              <code class="gd-trig">{w.trigger}</code>
+              <span class="gd-arrow" aria-hidden="true" set:html={arrow} />
+              <span class="gd-what"><span class="gd-name">{w.title}</span><span class="gd-desc">{w.text}</span></span>
+              <span class="gd-result"><GalleryFragment frag={w.frag} /></span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </details>
+  </div>
+  <p class="gd-foot"><a class="gd-all" href="/gh-aw/gallery/">Browse the full gallery <span aria-hidden="true">→</span></a></p>
+</LandingSection>
+
+<style>
+  .gd { margin-top: 3rem; }
+  .gd-head, .gd-row {
+    display: grid;
+    grid-template-columns: 11rem 1rem minmax(0, 1fr) minmax(0, 20rem);
+    gap: 0 1.5rem;
+    align-items: center;
+  }
+  .gd-head { padding: 0 0 0.75rem; border-bottom: 1px solid var(--aw-color-divider); font-size: var(--aw-step--1); color: var(--aw-color-text-muted); }
+  .gd-head span:nth-child(3) { grid-column: 3; }
+  .gd-list { list-style: none; margin: 0; padding: 0; }
+  .gd-list li { margin: 0; padding: 0; border-bottom: 1px solid var(--aw-color-divider); }
+  .gd-row { padding: 1.25rem 0; color: inherit; text-decoration: none; }
+  .gd-trig {
+    justify-self: start; padding: 0.125rem 0.5rem; background: var(--aw-color-bg-subtle); border: 1px solid var(--aw-color-border);
+    border-radius: 6px; font-family: var(--aw-font-mono); font-size: var(--aw-step--1); color: var(--aw-color-text-secondary); white-space: nowrap;
+  }
+  .gd-arrow { display: inline-flex; color: var(--aw-color-text-muted); }
+  .gd-arrow :global(svg) { fill: currentColor; }
+  .gd-what { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+  .gd-name { font-size: var(--aw-step-0); font-weight: 550; letter-spacing: -0.01em; color: var(--aw-color-text-strong); }
+  .gd-row:hover .gd-name { text-decoration: underline; text-decoration-color: var(--aw-color-border-strong); text-underline-offset: 3px; }
+  .gd-desc { font-size: var(--aw-step--1); line-height: 1.5; color: var(--aw-color-text-muted); text-wrap: pretty; }
+  .gd-result { min-width: 0; }
+  .gd-result :global(.gf) { box-shadow: none; }
+  .gd-row:focus-visible, .gd-more summary:focus-visible, .gd-all:focus-visible { outline: 2px solid var(--aw-color-accent); outline-offset: 2px; border-radius: 6px; }
+
+  .gd-more summary {
+    list-style: none; display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; margin-top: 1.5rem; padding: 0 1rem;
+    border: 1px solid var(--aw-color-border-strong); border-radius: 8px; background: var(--aw-color-surface);
+    font-size: var(--aw-step-0); font-weight: 500; color: var(--aw-color-text-strong); cursor: pointer; user-select: none;
+  }
+  .gd-more summary::-webkit-details-marker { display: none; }
+  .gd-more summary:hover { background: var(--aw-color-bg-subtle); }
+  .gd-more[open] summary { margin-bottom: 0.5rem; }
+  .gd-sum-open, .gd-more[open] .gd-sum-closed { display: none; }
+  .gd-more[open] .gd-sum-open { display: inline; }
+  .gd-chev { display: inline-flex; color: var(--aw-color-text-muted); transition: transform 0.2s; }
+  .gd-chev :global(svg) { fill: currentColor; }
+  .gd-more[open] .gd-chev { transform: rotate(180deg); }
+  .gd-more .gd-list li:first-child { border-top: 1px solid var(--aw-color-divider); }
+  .gd-foot { margin: 2.5rem 0 0; }
+  .gd-all { font-size: var(--aw-step-0); color: var(--aw-color-accent-text); text-decoration: none; }
+  .gd-all:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  @media (max-width: 64rem) {
+    .gd-head { display: none; }
+    .gd-row { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; }
+    .gd-arrow { display: none; }
+    .gd-result { max-width: 24rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { .gd-chev { transition: none; } }
+</style>

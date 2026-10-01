@@ -1,0 +1,65 @@
+---
+import octicons from '@primer/octicons';
+import type { Frag } from './GalleryData';
+interface Props { frag: Frag }
+const { frag } = Astro.props;
+const names = { issue: 'issue-opened', pr: 'git-pull-request', run: 'x-circle', alert: 'shield', comment: 'comment-discussion' } as const;
+const svg = octicons[names[frag.kind]].toSVG({ width: 16, height: 16 });
+---
+
+<div class={`gf gf-${frag.kind}`} aria-hidden="true">
+  <div class="gf-row">
+    <span class="gf-ico" set:html={svg} />
+    <span class="gf-t">{frag.title}</span>
+    {frag.kind === 'run' && <span class="gf-m">{frag.meta}</span>}
+  </div>
+  {frag.kind === 'comment' && frag.note && <div class="gf-sub"><span class="gf-note">{frag.note}</span></div>}
+  {frag.kind === 'run' && frag.note && (
+    <div class="gf-row">
+      <span class="gf-ico gf-open" set:html={octicons['issue-opened'].toSVG({ width: 16, height: 16 })} />
+      <span class="gf-t">{frag.note}</span>
+    </div>
+  )}
+  {(frag.num || frag.add || frag.chips || (frag.meta && frag.kind !== 'run')) && (
+    <div class="gf-row gf-sub">
+      {frag.num && <span class="gf-m">{frag.num}</span>}
+      {frag.add && <span class="gf-plus">{frag.add}</span>}
+      {frag.del && <span class="gf-minus">{frag.del}</span>}
+      {frag.meta && frag.kind !== 'run' && <span class="gf-m">{frag.meta}</span>}
+      {frag.chips?.map((c) => <span class:list={['gf-chip', c.tone && `gf-chip-${c.tone}`]}>{c.t}</span>)}
+    </div>
+  )}
+</div>
+
+<style>
+  .gf {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-hairline-light);
+    border-radius: 8px;
+    box-shadow: var(--aw-shadow-raised);
+    font-size: var(--aw-step--1);
+    line-height: 1.35;
+    color: var(--aw-color-text-body);
+  }
+  .gf-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+  .gf-sub { padding-left: 1.5rem; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
+  .gf-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; color: var(--aw-color-text-strong); }
+  .gf-note { color: var(--aw-color-text-secondary); text-wrap: pretty; }
+  .gf-m { flex: none; color: var(--aw-color-text-muted); }
+  .gf-ico { display: inline-flex; flex: none; color: var(--aw-color-success); }
+  .gf-ico :global(svg) { fill: currentColor; }
+  .gf-pr .gf-ico, .gf-comment .gf-ico { color: var(--aw-color-text-secondary); }
+  .gf-run .gf-ico:first-child, .gf-alert .gf-ico { color: var(--aw-color-danger); }
+  .gf-run .gf-ico.gf-open { color: var(--aw-color-success); }
+  .gf-chip { display: inline-block; padding: 0 0.5rem; border: 1px solid var(--aw-color-border); border-radius: 999px; color: var(--aw-color-text-secondary); white-space: nowrap; }
+  .gf-chip-new { border-color: var(--aw-color-complement); color: var(--aw-color-complement); }
+  .gf-chip-danger { border-color: var(--aw-color-danger); color: var(--aw-color-danger); }
+  .gf-plus { color: var(--aw-color-success); }
+  .gf-minus { color: var(--aw-color-danger); }
+</style>

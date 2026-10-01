@@ -1,6 +1,10 @@
 ---
 import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
+import VariantGroup from './VariantGroup.astro';
+import GalleryB from './GalleryB.astro';
+import GalleryC from './GalleryC.astro';
+import GalleryD from './GalleryD.astro';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 const G = '/gh-aw/gallery/';
@@ -42,118 +46,125 @@ const more = [
 ];
 ---
 
-<LandingSection id="gallery" title="What teams automate" lede="Start from a proven workflow and adapt it to your repository.">
-  <ul class="aw-feat" role="list">
-    {featured.map((f) => (
-      <li>
-        <a class="aw-item" href={f.href}>
-          <div class="aw-stage" aria-hidden="true">
-            {f.id === 'triage' && (
-              <div class="aw-frag">
-                <div class="aw-row">
-                  <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                  <span class="aw-t">Crash when saving an empty file</span>
-                </div>
-                <div class="aw-chips">
-                  <span class="aw-chip">bug</span>
-                  <span class="aw-chip">area: editor</span>
-                  <span class="aw-chip aw-chip-new">needs repro</span>
-                </div>
+<VariantGroup id="gallery" label="What teams automate" defaultKey="a" variants={[{key:'a',name:'Current: 3×2 grid'},{key:'b',name:'Spotlight'},{key:'c',name:'By job (tabs)'},{key:'d',name:'Trigger → result log'}]}>
+  <div data-variant="a">
+    <LandingSection titleId="gallery-a-title" title="What teams automate" lede="Start from a proven workflow and adapt it to your repository.">
+      <ul class="aw-feat" role="list">
+        {featured.map((f) => (
+          <li>
+            <a class="aw-item" href={f.href}>
+              <div class="aw-stage" aria-hidden="true">
+                {f.id === 'triage' && (
+                  <div class="aw-frag">
+                    <div class="aw-row">
+                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
+                      <span class="aw-t">Crash when saving an empty file</span>
+                    </div>
+                    <div class="aw-chips">
+                      <span class="aw-chip">bug</span>
+                      <span class="aw-chip">area: editor</span>
+                      <span class="aw-chip aw-chip-new">needs repro</span>
+                    </div>
+                  </div>
+                )}
+                {f.id === 'review' && (
+                  <div class="aw-frag">
+                    <div class="aw-diff"><span class="aw-ln">42</span><span class="aw-add">+ items.forEach(save)</span></div>
+                    <div class="aw-comment">
+                      <span class="aw-ico" set:html={icon('comment-discussion', 14)} />
+                      <span><b>github-actions</b> Errors from <code>save</code> are dropped here.</span>
+                    </div>
+                  </div>
+                )}
+                {f.id === 'ci' && (
+                  <div class="aw-frag">
+                    <div class="aw-row">
+                      <span class="aw-ico aw-fail" set:html={icon('x-circle')} />
+                      <span class="aw-t">build / test (ubuntu)</span>
+                      <span class="aw-m">failed</span>
+                    </div>
+                    <div class="aw-row">
+                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
+                      <span class="aw-t">Diagnosis: flaky timeout in db setup</span>
+                    </div>
+                  </div>
+                )}
+                {f.id === 'docs' && (
+                  <div class="aw-frag">
+                    <div class="aw-row">
+                      <span class="aw-ico aw-pr" set:html={icon('git-pull-request')} />
+                      <span class="aw-t">docs: sync CLI flags with --help</span>
+                    </div>
+                    <div class="aw-row aw-sub">
+                      <span class="aw-m">#214</span>
+                      <span class="aw-plus">+18</span>
+                      <span class="aw-minus">−6</span>
+                      <span class="aw-chip">documentation</span>
+                    </div>
+                  </div>
+                )}
+                {f.id === 'report' && (
+                  <div class="aw-frag">
+                    <div class="aw-row">
+                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
+                      <span class="aw-t">Release notes: v2.3.1</span>
+                    </div>
+                    <div class="aw-row aw-sub">
+                      <span class="aw-ico" set:html={icon('tag', 14)} />
+                      <span class="aw-m">14 merged pull requests · 3 fixes</span>
+                    </div>
+                  </div>
+                )}
+                {f.id === 'security' && (
+                  <div class="aw-frag">
+                    <div class="aw-row">
+                      <span class="aw-ico aw-fail" set:html={icon('shield')} />
+                      <span class="aw-t">Unpinned action in release.yml</span>
+                    </div>
+                    <div class="aw-row aw-sub">
+                      <span class="aw-chip aw-chip-danger">High</span>
+                      <span class="aw-m">Code scanning · Open</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {f.id === 'review' && (
-              <div class="aw-frag">
-                <div class="aw-diff"><span class="aw-ln">42</span><span class="aw-add">+ items.forEach(save)</span></div>
-                <div class="aw-comment">
-                  <span class="aw-ico" set:html={icon('comment-discussion', 14)} />
-                  <span><b>github-actions</b> Errors from <code>save</code> are dropped here.</span>
-                </div>
-              </div>
-            )}
-            {f.id === 'ci' && (
-              <div class="aw-frag">
-                <div class="aw-row">
-                  <span class="aw-ico aw-fail" set:html={icon('x-circle')} />
-                  <span class="aw-t">build / test (ubuntu)</span>
-                  <span class="aw-m">failed</span>
-                </div>
-                <div class="aw-row">
-                  <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                  <span class="aw-t">Diagnosis: flaky timeout in db setup</span>
-                </div>
-              </div>
-            )}
-            {f.id === 'docs' && (
-              <div class="aw-frag">
-                <div class="aw-row">
-                  <span class="aw-ico aw-pr" set:html={icon('git-pull-request')} />
-                  <span class="aw-t">docs: sync CLI flags with --help</span>
-                </div>
-                <div class="aw-row aw-sub">
-                  <span class="aw-m">#214</span>
-                  <span class="aw-plus">+18</span>
-                  <span class="aw-minus">−6</span>
-                  <span class="aw-chip">documentation</span>
-                </div>
-              </div>
-            )}
-            {f.id === 'report' && (
-              <div class="aw-frag">
-                <div class="aw-row">
-                  <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                  <span class="aw-t">Release notes: v2.3.1</span>
-                </div>
-                <div class="aw-row aw-sub">
-                  <span class="aw-ico" set:html={icon('tag', 14)} />
-                  <span class="aw-m">14 merged pull requests · 3 fixes</span>
-                </div>
-              </div>
-            )}
-            {f.id === 'security' && (
-              <div class="aw-frag">
-                <div class="aw-row">
-                  <span class="aw-ico aw-fail" set:html={icon('shield')} />
-                  <span class="aw-t">Unpinned action in release.yml</span>
-                </div>
-                <div class="aw-row aw-sub">
-                  <span class="aw-chip aw-chip-danger">High</span>
-                  <span class="aw-m">Code scanning · Open</span>
-                </div>
-              </div>
-            )}
-          </div>
-          <h3>{f.title}</h3>
-          <p>{f.text}</p>
-        </a>
-      </li>
-    ))}
-  </ul>
-
-  <div class="aw-more-bar">
-    <details class="aw-more">
-      <summary>
-        <span class="aw-sum-closed">Show all 15 workflows</span>
-        <span class="aw-sum-open">Show fewer</span>
-        <span class="aw-chev" set:html={icon('chevron-down', 16)} />
-      </summary>
-      <div class="aw-groups">
-        {more.map((g) => (
-          <section>
-            <h3>{g.heading}</h3>
-            <ul role="list">
-              {g.items.map((i) => (
-                <li>
-                  <a href={i.href}><span class="aw-li-t">{i.title}</span><span class="aw-li-d">{i.text}</span></a>
-                </li>
-              ))}
-            </ul>
-          </section>
+              <h3>{f.title}</h3>
+              <p>{f.text}</p>
+            </a>
+          </li>
         ))}
+      </ul>
+
+      <div class="aw-more-bar">
+        <details class="aw-more">
+          <summary>
+            <span class="aw-sum-closed">Show all 15 workflows</span>
+            <span class="aw-sum-open">Show fewer</span>
+            <span class="aw-chev" set:html={icon('chevron-down', 16)} />
+          </summary>
+          <div class="aw-groups">
+            {more.map((g) => (
+              <section>
+                <h3>{g.heading}</h3>
+                <ul role="list">
+                  {g.items.map((i) => (
+                    <li>
+                      <a href={i.href}><span class="aw-li-t">{i.title}</span><span class="aw-li-d">{i.text}</span></a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </details>
+        <a class="aw-all" href="/gh-aw/gallery/">Browse the full gallery <span aria-hidden="true">→</span></a>
       </div>
-    </details>
-    <a class="aw-all" href="/gh-aw/gallery/">Browse the full gallery <span aria-hidden="true">→</span></a>
+    </LandingSection>
   </div>
-</LandingSection>
+  <div data-variant="b"><GalleryB /></div>
+  <div data-variant="c"><GalleryC /></div>
+  <div data-variant="d"><GalleryD /></div>
+</VariantGroup>
 
 <style>
   /* Featured row: scrolls inside itself on mobile, 3x2 grid on desktop */
