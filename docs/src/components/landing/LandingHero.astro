@@ -1,9 +1,28 @@
 ---
 import CtaRow from './CtaRow.astro';
 import HeroExample from './HeroExample.astro';
+import VariantGroup from './VariantGroup.astro';
+import HeroBgA from './HeroBgA.astro';
+import HeroBgB from './HeroBgB.astro';
+import HeroBgC from './HeroBgC.astro';
 ---
 
 <section class="aw-hero not-content">
+  <div class="aw-hero-bg" aria-hidden="true">
+    <VariantGroup
+      id="hero-bg"
+      label="Hero background"
+      variants={[
+        { key: 'a', name: 'A' },
+        { key: 'b', name: 'B' },
+        { key: 'c', name: 'C' },
+      ]}
+    >
+      <div data-variant="a"><HeroBgA /></div>
+      <div data-variant="b"><HeroBgB /></div>
+      <div data-variant="c"><HeroBgC /></div>
+    </VariantGroup>
+  </div>
   <div class="aw-hero-inner">
     <div class="aw-hero-text">
       <h1><span class="aw-line">Intelligent GitHub</span> <span class="aw-line">repository automation,</span> <span class="aw-line aw-muted">written in Markdown.</span></h1>
@@ -18,7 +37,21 @@ import HeroExample from './HeroExample.astro';
 
 <style>
   .aw-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     padding-block: clamp(3rem, 8vw, 7rem);
+  }
+  /* Decorative background layer; each variant fills it edge to edge. */
+  .aw-hero-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .aw-hero-bg :global(.aw-variant-group),
+  .aw-hero-bg :global([data-variant]) {
+    height: 100%;
   }
   .aw-hero-inner {
     display: grid;
