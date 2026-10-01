@@ -1,0 +1,51 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  lede?: string;
+}
+const { id, title, lede } = Astro.props;
+---
+
+<section id={id} class="aw-section not-content" aria-labelledby={`${id}-title`}>
+  <div class="aw-container">
+    <h2 id={`${id}-title`}>{title}</h2>
+    {lede && <p class="aw-lede">{lede}</p>}
+    <slot />
+  </div>
+</section>
+
+<style>
+  .aw-section {
+    padding-block: clamp(4rem, 8vw, 7rem);
+  }
+  .aw-container {
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 2rem);
+  }
+  h2 {
+    margin: 0;
+    max-width: 24ch;
+    font-size: var(--aw-step-4);
+    font-weight: 460;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+    color: var(--aw-color-text);
+    border: 0;
+  }
+  .aw-lede {
+    margin: 1rem 0 0;
+    max-width: 46ch;
+    font-size: var(--aw-step-1);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-section :global(.aw-placeholder) {
+    margin: 2rem 0 0;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+</style>

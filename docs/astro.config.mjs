@@ -270,6 +270,7 @@ export default defineConfig({
         SocialIcons: "./src/components/CustomHeader.astro",
         ThemeSelect: "./src/components/ThemeToggle.astro",
         Footer: "./src/components/CustomFooter.astro",
+        PageTitle: "./src/components/PageTitle.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
       customCss: ["./src/styles/tokens.css", "./src/styles/custom.css"],

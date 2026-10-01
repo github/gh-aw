@@ -1,0 +1,213 @@
+---
+import octicons from '@primer/octicons';
+const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+---
+
+<div
+  class="aw-example"
+  role="img"
+  aria-label="A workflow file named daily-status.md that runs daily in GitHub Actions and opens an issue titled Daily status report with highlights and blockers."
+>
+  <div class="aw-file">
+    <div class="aw-file-bar"><span class="aw-ico" set:html={icon('file')} />.github/workflows/daily-status.md</div>
+<pre class="aw-code"><span class="m">---</span>
+<span class="k">on:</span>
+<span class="k">  schedule:</span> daily
+<span class="k">permissions:</span>
+<span class="k">  issues:</span> read
+<span class="k">safe-outputs:</span>
+<span class="k">  create-issue:</span>
+<span class="k">    labels:</span> [report]
+<span class="m">---</span>
+<span class="h">## Daily status report</span>
+Summarise yesterday's issues, PRs and
+releases. Flag anything blocked.</pre>
+  </div>
+
+  <div class="aw-link">
+    <span class="aw-ico" set:html={icon('clock')} />Runs daily in GitHub Actions
+  </div>
+
+  <div class="aw-issue">
+    <div class="aw-issue-head">
+      <span class="aw-state"><span class="aw-ico" set:html={icon('issue-opened')} />Open</span>
+      <span class="aw-issue-title">Daily status report — Oct 1</span>
+    </div>
+    <div class="aw-meta">
+      <span class="aw-avatar"><span class="aw-ico" set:html={icon('hubot', 14)} /></span>
+      <span>github-actions[bot] opened this · now</span>
+      <span class="aw-label">report</span>
+    </div>
+    <div class="aw-issue-body">
+      <h4>Highlights</h4>
+      <ul>
+        <li>12 issues triaged, 3 need a reviewer</li>
+        <li>4 pull requests merged</li>
+        <li>v2.3.1 released</li>
+      </ul>
+      <h4>Blocked</h4>
+      <ul>
+        <li>#482 waiting on design review</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<style>
+  .aw-example {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+  }
+  .aw-ico {
+    display: inline-flex;
+    flex: none;
+  }
+  .aw-ico :global(svg) {
+    fill: currentColor;
+  }
+  .aw-file,
+  .aw-issue {
+    background: var(--aw-color-bg);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    min-width: 0;
+  }
+  .aw-file {
+    overflow: hidden;
+    width: 100%;
+  }
+  .aw-file-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--aw-color-border);
+    background: var(--aw-color-bg-subtle);
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .aw-code {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    line-height: 1.6;
+    color: var(--aw-color-text);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+  .aw-code .k,
+  .aw-code .m {
+    color: var(--aw-color-text-muted);
+  }
+  .aw-code .h {
+    color: var(--aw-color-accent-text);
+  }
+  .aw-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.25rem;
+    margin-left: 1.5rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-issue {
+    box-shadow: var(--aw-shadow);
+    padding: 1rem 1.25rem 1.25rem;
+    animation: aw-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+  }
+  .aw-issue-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .aw-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: var(--aw-color-success);
+    color: var(--aw-gray-0);
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+  }
+  .aw-issue-title {
+    font-size: var(--aw-step-0);
+    font-weight: 560;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--aw-color-border);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    color: var(--aw-color-text-secondary);
+  }
+  .aw-label {
+    padding: 0.0625rem 0.5rem;
+    border-radius: 999px;
+    background: var(--aw-color-complement-low);
+    color: var(--aw-color-complement);
+    font-weight: 500;
+  }
+  .aw-issue-body {
+    margin-top: 0.875rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-body);
+  }
+  .aw-issue-body h4 {
+    margin: 0 0 0.375rem;
+    font-size: var(--aw-step--1);
+    font-weight: 600;
+    color: var(--aw-color-text);
+  }
+  .aw-issue-body h4:not(:first-child) {
+    margin-top: 0.875rem;
+  }
+  .aw-issue-body ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    line-height: 1.6;
+  }
+  @media (min-width: 640px) {
+    .aw-issue {
+      margin-left: 3rem;
+    }
+  }
+  @keyframes aw-rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aw-issue {
+      animation: none;
+    }
+  }
+</style>

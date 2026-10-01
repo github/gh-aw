@@ -1,0 +1,62 @@
+---
+import CtaRow from './CtaRow.astro';
+import HeroExample from './HeroExample.astro';
+---
+
+<section class="aw-hero not-content">
+  <div class="aw-hero-inner">
+    <div class="aw-hero-text">
+      <h1>Repository automation, <span>written in Markdown.</span></h1>
+      <p class="aw-hero-sub">
+        Describe a task in plain language. GitHub turns it into an Actions workflow that runs Copilot, Claude, Codex or Gemini — read-only by default, with every change checked before it lands.
+      </p>
+      <div class="aw-hero-cta"><CtaRow /></div>
+    </div>
+    <div class="aw-hero-visual"><HeroExample /></div>
+  </div>
+</section>
+
+<style>
+  .aw-hero {
+    padding-block: clamp(3rem, 8vw, 7rem);
+  }
+  .aw-hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2.5rem, 5vw, 3.5rem);
+    align-items: center;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 2rem);
+  }
+  @media (min-width: 1024px) {
+    .aw-hero-inner {
+      grid-template-columns: minmax(0, 11fr) minmax(0, 10fr);
+    }
+  }
+  h1 {
+    margin: 0;
+    font-size: var(--aw-step-5);
+    font-weight: 460;
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+    text-wrap: balance;
+    color: var(--aw-color-text);
+    border: 0;
+  }
+  h1 span {
+    display: block;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-hero-sub {
+    margin: 1.25rem 0 0;
+    max-width: 42ch;
+    font-size: var(--aw-step-1);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-hero-cta {
+    margin-top: 2rem;
+  }
+</style>
