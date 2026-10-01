@@ -171,6 +171,12 @@ body:has(.aw-hero) .sl-container {
     align-items: center;
     padding: 0.75rem 1rem;
   }
+
+  /* Group labels align with the sheet's nav rows and heading; nested links keep their indent */
+  .sidebar .top-level > li > details > summary,
+  .sidebar .top-level > li > a {
+    padding-inline: 0;
+  }
 }
 
 .sidebar .top-level li li a:hover {
@@ -923,6 +929,15 @@ main,
 
   .sidebar-pane .sidebar-content {
     gap: 1.25rem;
+  }
+
+  /* starlight-blog adds a mobile-only "Blog" link to the docs tree; Blog is already a nav row */
+  .sidebar .top-level > li:has(> .sl-blog-mobile-link) {
+    display: none;
+  }
+
+  .sidebar .top-level > li:has(> .sl-blog-mobile-link) + li {
+    margin-top: 0;
   }
 
   /* Pin the footer row (GitHub, theme, Get started) to the bottom of the sheet */

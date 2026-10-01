@@ -133,7 +133,7 @@ test.describe('Mobile and Responsive Layout', () => {
         await expect(menuButton).toBeVisible();
         await menuButton.click();
         await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
-        quickStartLink = page.locator('#site-menu a[href$="setup/quick-start/"]');
+        quickStartLink = page.locator('#site-menu .mobile-menu-cta[href$="setup/quick-start/"]');
       } else {
         await expect(menuButton).toBeHidden();
         await expect(page.locator('.site-header-nav')).toBeVisible();
