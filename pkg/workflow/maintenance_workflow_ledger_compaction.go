@@ -118,7 +118,7 @@ func buildMaintenanceLedgerCompactionJobs(opts buildMaintenanceWorkflowYAMLOptio
 		if err != nil {
 			return "", err
 		}
-		planFile := path.Join(maintenanceLedgerCompactionPlanDir, "plan-"+ledger.Name+".json")
+		planFile := path.Join(maintenanceLedgerCompactionPlanDir, fmt.Sprintf("plan-%d.json", i))
 		jobs = append(jobs, ledgerCompactionJobSpec{
 			ledger: ledger.Name,
 			stepID: fmt.Sprintf("plan_%d", i),
@@ -143,17 +143,19 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
 	for _, job := range jobs {
 		created = append(created, "steps."+job.stepID+".outputs.plan_created == 'true'")
 	}
+	failed := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		failed = append(failed, "steps."+job.stepID+".outcome == 'failure'")
+	}
 	b.WriteString(`
   ledger_compaction_plan:
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnlyOrOperation(maintenanceCompactLedgerOperation)) + ` }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
       contents: read
-    concurrency:
-      group: gh-aw-ledger-compaction-${{ github.repository }}
-      cancel-in-progress: false
     outputs:
       plan_created: ${{ ` + strings.Join(created, " || ") + ` }}
+      plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
 `)
 	for _, job := range jobs {
 		b.WriteString("      " + job.stepID + "_created: ${{ steps." + job.stepID + ".outputs.plan_created }}\n")
@@ -165,6 +167,8 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
 	for _, job := range jobs {
 		b.WriteString(`      - name: Plan ledger compaction (` + job.ledger + `, untrusted, read-only)
         if: ${{ ` + RenderCondition(buildLedgerCompactionStepCondition(job.ledger)) + ` }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: ` + job.stepID + `
         uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
         env:
@@ -180,6 +184,7 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
 	}
 	b.WriteString(`      - name: Upload ledger compaction plans
         if: ${{ ` + strings.Join(created, " || ") + ` }}
+        id: upload_plans
         uses: ` + getActionPin("actions/upload-artifact") + `
         with:
           name: ledger-compaction-plans
@@ -187,19 +192,25 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
           retention-days: 1
           if-no-files-found: error
 `)
+	b.WriteString(`      - name: Report ledger compaction planning failures
+        if: ${{ ` + strings.Join(failed, " || ") + ` }}
+        run: exit 1
+`)
 }
 
 func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string, jobs []ledgerCompactionJobSpec) {
+	failed := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		applyStepID := "apply_" + strings.TrimPrefix(job.stepID, "plan_")
+		failed = append(failed, "steps."+applyStepID+".outcome == 'failure'")
+	}
 	b.WriteString(`
   ledger_compaction_apply:
     needs: ledger_compaction_plan
-    if: ${{ needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
+    if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
       contents: write
-    concurrency:
-      group: gh-aw-ledger-compaction-${{ github.repository }}
-      cancel-in-progress: false
     steps:
 `)
 	writeMaintenanceConditionalActionsCheckoutStep(b, opts)
@@ -211,9 +222,12 @@ func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWork
           path: ` + maintenanceLedgerCompactionPlanDir + `
 `)
 	for _, job := range jobs {
+		applyStepID := "apply_" + strings.TrimPrefix(job.stepID, "plan_")
 		b.WriteString(`
       - name: Validate and apply ledger compaction (` + job.ledger + `, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.` + job.stepID + `_created == 'true' }}
+        id: ` + applyStepID + `
+        continue-on-error: true
         uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -226,6 +240,10 @@ func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWork
             await main();
 `)
 	}
+	b.WriteString(`      - name: Report ledger compaction application failures
+        if: ${{ ` + strings.Join(failed, " || ") + ` }}
+        run: exit 1
+`)
 }
 
 // ledgerRequestCompactionHandlerKey is the safe-output type that asks Agentic Maintenance to

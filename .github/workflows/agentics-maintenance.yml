@@ -966,11 +966,9 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-    concurrency:
-      group: gh-aw-ledger-compaction-${{ github.repository }}
-      cancel-in-progress: false
     outputs:
       plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+      plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
       plan_0_created: ${{ steps.plan_0.outputs.plan_created }}
       plan_1_created: ${{ steps.plan_1.outputs.plan_created }}
       plan_2_created: ${{ steps.plan_2.outputs.plan_created }}
@@ -993,13 +991,15 @@ jobs:
 
       - name: Plan ledger compaction (audit-history, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'audit-history' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_0
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-audit-history.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
         with:
           script: |
             const path = require('path');
@@ -1011,13 +1011,15 @@ jobs:
 
       - name: Plan ledger compaction (awf-feature-reviews, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'awf-feature-reviews' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_1
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-awf-feature-reviews.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
           script: |
             const path = require('path');
@@ -1029,13 +1031,15 @@ jobs:
 
       - name: Plan ledger compaction (caveman-run-history, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'caveman-run-history' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_2
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-caveman-run-history.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
           script: |
             const path = require('path');
@@ -1047,13 +1051,15 @@ jobs:
 
       - name: Plan ledger compaction (centralization, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'centralization' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_3
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-centralization.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
           script: |
             const path = require('path');
@@ -1065,13 +1071,15 @@ jobs:
 
       - name: Plan ledger compaction (concurrency-audits, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'concurrency-audits' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_4
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-concurrency-audits.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
           script: |
             const path = require('path');
@@ -1083,13 +1091,15 @@ jobs:
 
       - name: Plan ledger compaction (smoke, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke' }}
+        continue-on-error: true
+        timeout-minutes: 15
         id: plan_5
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-smoke.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:
           script: |
             const path = require('path');
@@ -1101,22 +1111,23 @@ jobs:
 
       - name: Upload ledger compaction plans
         if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+        id: upload_plans
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ledger-compaction-plans
           path: ${{ runner.temp }}/gh-aw/ledger-compaction
           retention-days: 1
           if-no-files-found: error
+      - name: Report ledger compaction planning failures
+        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' }}
+        run: exit 1
 
   ledger_compaction_apply:
     needs: ledger_compaction_plan
-    if: ${{ needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
+    if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ubuntu-slim
     permissions:
       contents: write
-    concurrency:
-      group: gh-aw-ledger-compaction-${{ github.repository }}
-      cancel-in-progress: false
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1139,12 +1150,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (audit-history, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_0_created == 'true' }}
+        id: apply_0
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-audit-history.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1157,12 +1170,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (awf-feature-reviews, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_1_created == 'true' }}
+        id: apply_1
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-awf-feature-reviews.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1175,12 +1190,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (caveman-run-history, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_2_created == 'true' }}
+        id: apply_2
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-caveman-run-history.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1193,12 +1210,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (centralization, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
+        id: apply_3
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-centralization.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1211,12 +1230,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (concurrency-audits, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
+        id: apply_4
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-concurrency-audits.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1229,12 +1250,14 @@ jobs:
 
       - name: Validate and apply ledger compaction (smoke, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
+        id: apply_5
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-smoke.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1244,3 +1267,6 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
+      - name: Report ledger compaction application failures
+        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
+        run: exit 1

@@ -44,13 +44,19 @@ tools:
 
 ## Trust boundary
 
-All compaction-enabled ledgers share two maintenance jobs and a repository-wide
-compaction concurrency group:
+All compaction-enabled ledgers share two maintenance jobs:
 
 | Job | Permissions | Responsibility |
 | --- | --- | --- |
 | `ledger_compaction_plan` | `contents: read` | Checks each selected ledger branch, runs any optional selection script in an isolated Node.js process with no environment or credentials, and uploads the created plans in one artifact |
 | `ledger_compaction_apply` | `contents: write` | Downloads the plans, validates each one against the latest ledger branch, and applies each in one commit |
+
+Each ledger runs in its own step. Plan steps have a 15-minute timeout, and a failed
+step does not prevent sibling ledgers from being processed. The plan job reports
+step failures after uploading any successful plans; the apply job still handles
+those plans and reports its own step failures after processing all of them. The
+jobs do not share a workflow concurrency group: apply revalidates the latest branch
+and commits only when its expected head still matches.
 
 Each plan is only a proposal. The apply job runs no user JavaScript and treats
 each plan as hostile input. Before it writes to a ledger, it:

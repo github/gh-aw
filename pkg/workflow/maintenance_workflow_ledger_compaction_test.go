@@ -146,15 +146,20 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	assert.NotContains(t, plan, "ledger_compaction_apply.cjs")
 	assert.Equal(t, 1, strings.Count(plan, "upload-artifact"))
 	assert.Contains(t, plan, "steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true'")
+	assert.Contains(t, plan, "steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure'")
+	assert.Contains(t, plan, "plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}")
+	assert.Equal(t, 2, strings.Count(plan, "continue-on-error: true"))
+	assert.Equal(t, 2, strings.Count(plan, "timeout-minutes: 15"))
 	assert.Contains(t, apply, "needs: ledger_compaction_plan")
-	assert.Contains(t, apply, "needs.ledger_compaction_plan.outputs.plan_created == 'true'")
+	assert.Contains(t, apply, "!cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true'")
 	assert.Contains(t, apply, "contents: write")
 	assert.Equal(t, 1, strings.Count(apply, "download-artifact"))
 	assert.Contains(t, apply, "ledger_compaction_apply.cjs")
 	assert.NotContains(t, apply, "ledger_compaction_plan.cjs")
+	assert.Contains(t, apply, "steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure'")
+	assert.Equal(t, 2, strings.Count(apply, "continue-on-error: true"))
 	for _, body := range []string{plan, apply} {
-		assert.Contains(t, body, "group: gh-aw-ledger-compaction-${{ github.repository }}")
-		assert.Contains(t, body, "cancel-in-progress: false")
+		assert.NotContains(t, body, "concurrency:")
 		assert.Contains(t, body, "name: ledger-compaction-plans")
 	}
 	for i, name := range []string{"audit", "findings"} {
@@ -164,7 +169,7 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 		assert.Contains(t, plan, stepID+"_created: ${{ steps."+stepID+".outputs.plan_created }}")
 		assert.Contains(t, apply, "needs.ledger_compaction_plan.outputs."+stepID+"_created == 'true'")
 		for _, body := range []string{plan, apply} {
-			assert.Contains(t, body, "GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-"+name+".json")
+			assert.Contains(t, body, "GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-"+strconv.Itoa(i)+".json")
 		}
 	}
 	assert.NotContains(t, plan, "plan-metrics.json", "ledgers with compaction disabled get no maintenance steps")
@@ -217,10 +222,12 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing
 	require.NotEmpty(t, apply)
 	assert.Contains(t, plan, "inputs.ledger == 'foo'")
 	assert.Contains(t, plan, "inputs.ledger == 'Foo'")
-	for _, name := range []string{"foo", "Foo"} {
-		assert.Contains(t, plan, "plan-"+name+".json")
-		assert.Contains(t, apply, "plan-"+name+".json")
+	for _, filename := range []string{"plan-0.json", "plan-1.json"} {
+		assert.Contains(t, plan, filename)
+		assert.Contains(t, apply, filename)
 	}
+	assert.NotContains(t, plan, "plan-foo.json")
+	assert.NotContains(t, plan, "plan-Foo.json")
 }
 
 func TestComputeEnabledToolNames_LedgerNilSafety(t *testing.T) {
