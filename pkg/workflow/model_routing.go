@@ -124,5 +124,5 @@ func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowD
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_ROUTING_PROMPT: " + constants.AwPromptsFileExpr + "\n")
 	yaml.WriteString("          GH_AW_ROUTING_CONVERSATION_FILE: " + modelRoutingConversationFile + "\n")
-	yaml.WriteString("        run: node -e \"const fs=require('node:fs'); const path=require('node:path'); const prompt=fs.readFileSync(process.env.GH_AW_ROUTING_PROMPT,'utf8'); if (!prompt.trim()) throw new Error('Rendered workflow prompt is empty; cannot route this task'); const destination=process.env.GH_AW_ROUTING_CONVERSATION_FILE; fs.mkdirSync(path.dirname(destination),{recursive:true,mode:0o700}); fs.writeFileSync(destination,JSON.stringify([{role:'user',parts:[{text:prompt}]}]),{mode:0o600});\"\n")
+	yaml.WriteString("        run: node \"${RUNNER_TEMP}/gh-aw/actions/prepare_model_routing_conversation.cjs\"\n")
 }

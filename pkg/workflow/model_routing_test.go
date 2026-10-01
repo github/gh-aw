@@ -71,7 +71,8 @@ func TestGenerateModelRoutingConversationStep(t *testing.T) {
 	require.Contains(t, yaml.String(), "Prepare model-routing conversation")
 	require.Contains(t, yaml.String(), "GH_AW_ROUTING_PROMPT")
 	require.Contains(t, yaml.String(), modelRoutingConversationFile)
-	require.Contains(t, yaml.String(), "role:'user',parts:[{text:prompt}]")
+	require.Contains(t, yaml.String(), "GH_AW_ROUTING_CONVERSATION_FILE")
+	require.Contains(t, yaml.String(), `node "${RUNNER_TEMP}/gh-aw/actions/prepare_model_routing_conversation.cjs"`)
 }
 
 func TestExtractEngineConfig_ModelRouting(t *testing.T) {
