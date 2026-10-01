@@ -11,19 +11,24 @@
  * Typeface follows GitHub brand typography: https://brand.github.com/foundations/typography
  */
 
+/* Mona Sans variable font: full weight (200–900), width (75–125%) and optical-size axes.
+   Source: https://github.com/github/mona-sans (v2.0.27). Optical sizing adjusts the
+   letterforms automatically to the rendered size (tighter display cuts for headings). */
 @font-face {
   font-family: "Mona Sans";
-  src: url("/gh-aw/fonts/MonaSans-Regular.woff2") format("woff2");
+  src: url("/gh-aw/fonts/MonaSansVF.woff2") format("woff2-variations"), url("/gh-aw/fonts/MonaSansVF.woff2") format("woff2");
   font-style: normal;
-  font-weight: 400;
+  font-weight: 200 900;
+  font-stretch: 75% 125%;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Mona Sans";
-  src: url("/gh-aw/fonts/MonaSans-Bold.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 700;
+  src: url("/gh-aw/fonts/MonaSansVF-Italic.woff2") format("woff2-variations"), url("/gh-aw/fonts/MonaSansVF-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 200 900;
+  font-stretch: 75% 125%;
   font-display: swap;
 }
 
