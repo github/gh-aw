@@ -4,9 +4,28 @@
 // quantised with an 8x8 Bayer ordered dither into a few purple steps, with
 // small sparse coral clusters drifting through the denser cloud. Rendered at low resolution and scaled up with
 // `image-rendering: pixelated` so each dither cell reads as a deliberate dot.
+//
+// Props let other sections reuse it as a quieter accent:
+// - placement: "hero" (default, top-right anchored) or "top-band" (a shallow
+//   band across the full top edge, fading downward).
+// - strength: multiplier on the field's intensity (1 = hero).
+// - forceDark: always use the dark palette, for bands that stay dark in
+//   light theme. Ignores data-theme.
+interface Props {
+  placement?: 'hero' | 'top-band';
+  strength?: number;
+  forceDark?: boolean;
+}
+const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
 ---
 
-<div class="hero-bg-a" data-hero-bg-a>
+<div
+  class="hero-bg-a"
+  data-hero-bg-a
+  data-placement={placement}
+  data-strength={strength}
+  data-force-dark={forceDark ? '' : undefined}
+>
   <canvas class="hero-bg-a-canvas"></canvas>
 </div>
 
@@ -53,6 +72,8 @@
     uniform vec3 u_p3;
     uniform vec3 u_p4;
     uniform vec3 u_coral;
+    uniform float u_band;       // 1 = shallow full-width top band
+    uniform float u_coralRate;  // multiplier on coral cluster frequency
 
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
@@ -110,13 +131,16 @@
       // Falloff: originates top-right, deep behind the hero visual, thinning
       // to a soft shallow wisp across the top-left so the headline stays calm. Narrow screens get a thinner cap.
       bool narrow = size.x < 720.0;
-      float depth = narrow
+      bool band = u_band > 0.5;
+      float depth = band
+        ? (narrow ? 110.0 : 150.0)
+        : narrow
         ? mix(30.0, 160.0, smoothstep(0.5, 1.0, xn))
         : mix(80.0, 440.0, smoothstep(0.1, 1.0, xn));
       // Wobble the lower edge so it never reads as a straight gradient.
       depth *= 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, 3.1));
       float m = 1.0 - smoothstep(0.0, depth, fromTop);
-      m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
+      if (!band) m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
       m = m * (0.55 + 0.45 * m);
 
       float v = n * m * u_strength;
@@ -129,7 +153,7 @@
       vec2 dc = floor(drift);
       vec2 blk = floor(dc / 3.0);
       float hot = n * m;
-      if (hot > 0.14 && hash(blk + 17.3) < 0.03 * smoothstep(0.14, 0.4, hot)
+      if (hot > 0.14 && hash(blk + 17.3) < 0.03 * u_coralRate * smoothstep(0.14, 0.4, hot)
           && hash(dc + 4.1) < 0.45) {
         gl_FragColor = vec4(u_coral, 1.0);
         return;
@@ -197,20 +221,25 @@
     const uStrength = u('u_strength');
     const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
     const uCoral = u('u_coral');
+    const band = root.dataset.placement === 'top-band';
+    const strength = Number(root.dataset.strength) || 1;
+    const forceDark = root.hasAttribute('data-force-dark');
     gl.uniform1f(uCell, CELL);
+    gl.uniform1f(u('u_band'), band ? 1 : 0);
+    gl.uniform1f(u('u_coralRate'), band ? 0.35 : 1);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
 
     function readColors() {
       if (!probe || !gl) return;
       const cs = getComputedStyle(document.documentElement);
-      const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+      const dark = forceDark || document.documentElement.getAttribute('data-theme') !== 'light';
       const steps = dark
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
         : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
       gl.uniform3fv(uCoral, parseColor(probe, cs.getPropertyValue('--aw-coral-4')));
-      gl.uniform1f(uStrength, dark ? 0.9 : 0.86);
+      gl.uniform1f(uStrength, (dark ? 0.9 : 0.86) * strength);
     }
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
