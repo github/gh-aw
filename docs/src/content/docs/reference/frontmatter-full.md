@@ -10488,10 +10488,11 @@ safe-outputs:
     allowed-events: []
       # Array of strings
 
-    # When true, after posting a replacement review this workflow dismisses older
-    # REQUEST_CHANGES reviews previously posted by the same workflow on the same pull
-    # request. This is best-effort and requires workflow markers in prior review
-    # bodies.
+    # When true, a clean COMMENT review with no inline findings dismisses older
+    # REQUEST_CHANGES bot reviews from the same workflow on the same pull request.
+    # Blocking reviews and reviews with inline findings do not trigger dismissal,
+    # newer reviews are never dismissed, and this best-effort behavior requires
+    # workflow provenance markers in prior review bodies.
     # (optional)
     supersede-older-reviews: true
 

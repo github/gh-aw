@@ -191,17 +191,22 @@ function generateWorkflowCallIdReviewMarker(callerWorkflowId) {
 function matchesWorkflowCallIdReviewMarker(body, callerWorkflowId) {
   if (!body || !callerWorkflowId) return false;
   const legacyMarker = generateWorkflowCallIdMarker(callerWorkflowId);
-  return body.split(/\r?\n/).some(line => {
+  const lines = body.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
     const marker = line.trim();
-    if (marker === legacyMarker) return true;
+    const legacyMatch = marker.match(/^<!-- gh-aw-workflow-call-id: (.*) -->$/);
+    if (legacyMatch) return marker === legacyMarker;
     const match = marker.match(/^\[gh-aw-workflow-call-id\]: # "([^"]+)"$/);
-    if (!match) return false;
-    try {
-      return decodeURIComponent(match[1]) === callerWorkflowId;
-    } catch {
-      return false;
+    if (match) {
+      try {
+        return decodeURIComponent(match[1]) === callerWorkflowId;
+      } catch {
+        return false;
+      }
     }
-  });
+  }
+  return false;
 }
 
 /**

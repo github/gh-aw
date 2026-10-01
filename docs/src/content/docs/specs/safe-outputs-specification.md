@@ -1770,7 +1770,7 @@ submit-pull-request-review:
   target-repo: owner/repo        # Cross-repository target
   allowed-repos: [...]           # Additional allowed repositories
   allowed-events: [COMMENT]      # Preferred default for non-blocking bot reviews
-  supersede-older-reviews: true  # Best-effort dismissal of older same-workflow REQUEST_CHANGES reviews (including legacy blockers)
+  supersede-older-reviews: true  # Best-effort dismissal of older same-workflow blockers after a clean COMMENT review without inline findings
   footer: "always" | "none" | "if-body"     # Footer on review body
 ```
 

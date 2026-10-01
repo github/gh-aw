@@ -372,7 +372,7 @@ function createReviewBuffer() {
         body = body.trimEnd() + "\n\n" + bodyFooter.trimEnd();
       }
     }
-    const hasReviewBody = Boolean(body);
+    const hasReviewBody = Boolean(body.trim());
     // GitHub strips HTML comments from review bodies. A Markdown reference
     // survives even when the visible footer is disabled.
     const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
@@ -563,7 +563,7 @@ function createReviewBuffer() {
         }
 
         const staleReviews = reviews.filter(review => {
-          if (!review || review.id === currentReviewId) return false;
+          if (!review || review.id >= currentReviewId) return false;
           if (review.state !== "CHANGES_REQUESTED") return false;
           if (review.user?.type !== "Bot") return false;
           if (workflowCallId) {

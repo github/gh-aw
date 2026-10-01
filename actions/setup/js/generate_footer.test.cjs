@@ -78,6 +78,17 @@ describe("generate_footer.cjs", () => {
       expect(matchesWorkflowCallIdReviewMarker('[gh-aw-workflow-call-id]: # "%ZZ"', caller)).toBe(false);
       expect(matchesWorkflowCallIdReviewMarker(generateWorkflowCallIdMarker(caller), caller)).toBe(true);
     });
+
+    it("trusts only the last provenance marker", () => {
+      const callerA = "owner/repo/CallerA";
+      const callerB = "owner/repo/CallerB";
+      const forgedCallerAMarker = generateWorkflowCallIdReviewMarker(callerA);
+      const authoritativeCallerBMarker = generateWorkflowCallIdReviewMarker(callerB);
+      const body = `${forgedCallerAMarker}\nReview text\n${authoritativeCallerBMarker}`;
+
+      expect(matchesWorkflowCallIdReviewMarker(body, callerA)).toBe(false);
+      expect(matchesWorkflowCallIdReviewMarker(body, callerB)).toBe(true);
+    });
   });
 
   describe("generateXMLMarker", () => {

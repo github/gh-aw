@@ -532,7 +532,7 @@ A field on `submit-pull-request-review:` safe outputs that restricts which PR re
 
 ### Supersede Older Reviews (`supersede-older-reviews:`)
 
-A field on `submit-pull-request-review:` safe outputs that dismisses older `REQUEST_CHANGES` reviews from the same workflow after posting a replacement review. When `supersede-older-reviews: true` is set, the safe-output handler fetches recent reviews, identifies prior `REQUEST_CHANGES` reviews submitted by the same workflow call, and dismisses them before the new review takes effect. This is best-effort behavior — dismissal failures do not block the new review. Useful when a workflow is configured with `allowed-events: [REQUEST_CHANGES]` and repeated runs would otherwise accumulate blocking reviews. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#submit-pr-review-submit-pull-request-review).
+A field on `submit-pull-request-review:` safe outputs that dismisses older `REQUEST_CHANGES` bot reviews from the same workflow after a clean `COMMENT` review with no inline findings is posted. When `supersede-older-reviews: true` is set, the safe-output handler uses review-body provenance to identify and dismiss only earlier blocking reviews from the same workflow call. A blocking review or a review with inline findings never triggers dismissal. This is best-effort behavior — dismissal failures do not block the new review. Useful when a workflow is configured with `allowed-events: [REQUEST_CHANGES]` and repeated runs would otherwise accumulate blocking reviews. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/#submit-pr-review-submit-pull-request-review).
 
 ### Deduplicate by Title (`deduplicate-by-title:`)
 

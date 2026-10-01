@@ -1053,7 +1053,7 @@ safe-outputs:
     target-repo: "owner/repo"  # cross-repository: submit review on PR in another repo
     allowed-repos: ["org/repo1", "org/repo2"]  # additional allowed repositories
     allowed-events: [COMMENT, REQUEST_CHANGES]  # include REQUEST_CHANGES when using supersede mode for blocking reviews
-    supersede-older-reviews: true  # dismiss older same-workflow REQUEST_CHANGES reviews after posting a replacement review
+    supersede-older-reviews: true  # dismiss older same-workflow blockers after a clean COMMENT review with no inline findings
     footer: false     # omit AI-generated footer from review body (default: true)
 ```
 
@@ -1061,7 +1061,7 @@ Use `allowed-events` to restrict which review event types the agent can submit. 
 
 **Recommendation:** prefer `allowed-events: [COMMENT]` as the default for automated review workflows. This keeps AI feedback visible without creating a persistent merge-blocking state.
 
-Set `supersede-older-reviews: true` only when your workflow intentionally uses `REQUEST_CHANGES` and you want newer runs to dismiss older blocking reviews from the same workflow. Superseding is best-effort and happens after the replacement review is posted.
+Set `supersede-older-reviews: true` only when your workflow intentionally uses `REQUEST_CHANGES` and you want a clean `COMMENT` review with no inline findings to dismiss older blocking bot reviews from the same workflow. A blocking review or one with inline findings does not trigger supersession, and newer reviews are never dismissed. Superseding is best-effort.
 
 ### Resolve PR Review Thread (`resolve-pull-request-review-thread:`)
 

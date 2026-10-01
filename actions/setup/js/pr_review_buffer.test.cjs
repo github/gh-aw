@@ -1290,6 +1290,7 @@ describe("pr_review_buffer (factory pattern)", () => {
             { id: 102, state: "APPROVED", user: { login: "github-actions[bot]", type: "Bot" }, body: "<!-- gh-aw-workflow-call-id: owner/repo/CallerA -->" },
             { id: 103, state: "CHANGES_REQUESTED", user: { login: "github-actions[bot]", type: "Bot" }, body: '[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerB"' },
             { id: 104, state: "CHANGES_REQUESTED", user: { login: "github-actions[bot]", type: "Bot" }, body: "<!-- gh-aw-workflow-id: test-workflow -->" },
+            { id: 901, state: "CHANGES_REQUESTED", user: { login: "github-actions[bot]", type: "Bot" }, body: '[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerA"' },
           ],
         });
         mockGithub.rest.pulls.dismissReview.mockResolvedValue({ data: {} });
@@ -1436,6 +1437,31 @@ describe("pr_review_buffer (factory pattern)", () => {
 
         expect((await buffer.submitReview()).success).toBe(shouldSubmit);
         expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(shouldSubmit ? 1 : 0);
+        expect(mockGithub.rest.pulls.dismissReview).not.toHaveBeenCalled();
+      } finally {
+        if (previousCallerWorkflowId === undefined) delete process.env.GH_AW_CALLER_WORKFLOW_ID;
+        else process.env.GH_AW_CALLER_WORKFLOW_ID = previousCallerWorkflowId;
+      }
+    });
+
+    it.each(["   ", " \n\t "])("does not submit or supersede for whitespace-only review body %j", async body => {
+      const previousCallerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID;
+      process.env.GH_AW_CALLER_WORKFLOW_ID = "owner/repo/CallerA";
+      try {
+        buffer.setSupersedeOlderReviews(true);
+        buffer.setReviewMetadata(body, "COMMENT");
+        buffer.setReviewContext({
+          repo: "owner/repo",
+          repoParts: { owner: "owner", repo: "repo" },
+          pullRequestNumber: 42,
+          pullRequest: { head: { sha: "abc123" } },
+        });
+
+        const result = await buffer.submitReview();
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("Empty review");
+        expect(mockGithub.rest.pulls.createReview).not.toHaveBeenCalled();
         expect(mockGithub.rest.pulls.dismissReview).not.toHaveBeenCalled();
       } finally {
         if (previousCallerWorkflowId === undefined) delete process.env.GH_AW_CALLER_WORKFLOW_ID;
@@ -1933,7 +1959,7 @@ describe("pr_review_buffer (factory pattern)", () => {
         expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Empty review"));
       });
 
-      it("should NOT block review when body is whitespace-only (truthy string passes guard)", async () => {
+      it("should block review when body is whitespace-only", async () => {
         buffer.setReviewMetadata("   \n  ", "COMMENT");
         buffer.setReviewContext({
           repo: "owner/repo",
@@ -1941,17 +1967,15 @@ describe("pr_review_buffer (factory pattern)", () => {
           pullRequestNumber: 42,
           pullRequest: { head: { sha: "abc123" } },
         });
-        // Whitespace body is truthy so guard should NOT trigger; POST proceeds.
-
         mockGithub.rest.pulls.createReview.mockResolvedValue({
           data: { id: 999, html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-999" },
         });
 
         const result = await buffer.submitReview();
 
-        // Whitespace body is truthy so should still POST (GitHub may accept or reject it)
-        expect(result.success).toBe(true);
-        expect(mockGithub.rest.pulls.createReview).toHaveBeenCalledTimes(1);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("Empty review");
+        expect(mockGithub.rest.pulls.createReview).not.toHaveBeenCalled();
       });
 
       it("should return failure when metadata has no body and footerContext is null (body stays empty)", async () => {
