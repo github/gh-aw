@@ -14,6 +14,7 @@ operation and replays it in trusted code, without a custom script.
 | Latest value by key | `map` |
 | Mutable structured rows | `table` |
 | Numeric accumulation | `counter` |
+| Deterministic work claims and terminal state | `work-pool` |
 
 ```yaml
 tools:
@@ -49,6 +50,20 @@ All writes use the **same** `ledger_append` safe output. For built-ins, provide
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+| `work-pool` | `submit(work)`, `cancel(work)`, `acquire(work)`, `acquire-next(filter?)`, `finish(result?)`, `abandon(reason?)` | `work(work_id, payload, state, effective_claim_id)`, `claims(claim_id, work_id, claimant, generation, previous_claim_id, released, effective, superseded)` |
+
+`work-pool` derives Work identity from canonical JSON of the complete Work object,
+or from the configured `identity` list of top-level Work fields. Its optional
+`schema` validates Work payloads. The claimant is the trusted workflow run and
+attempt, never a caller-provided ID. Facts retain immutable claims, releases,
+completions and cancellations; cancellation is terminal. Arbitration uses
+generation and Claim ID rather than record order or timestamps.
+
+`ledger_append` is a **deferred** safe output: its immediate response only confirms
+that the intent was queued. The trusted persistence job resolves the outcome
+later, after the agent has finished. In particular, a queued acquisition is **not**
+an authorization to do work; this interface does not yet support the interactive
+acquire → do work → finish protocol within one execution.
 
 The declared schema validates **values**, not operation envelopes. `table` rows
 must be objects with a string primary key. `insert` rejects duplicate keys;
@@ -68,7 +83,8 @@ queryable. The generic `records` table still exposes immutable provenance.
 The trusted persistence result reports ledger type, operation, deterministic
 record ID, transaction ID, and validation status without echoing values.
 
-Built-in projections replay canonical transaction order and cannot be combined
+Other built-in projections replay canonical transaction order; `work-pool`
+replays the unordered fact set. Built-ins cannot be combined
 with a custom `replay.script`. Domain concepts should be expressed as schemas
 on generic ledger types, not as new built-in types; custom replay remains an
 escape hatch. Existing maintenance compaction is deliberately lossless: it

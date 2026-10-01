@@ -41,12 +41,15 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
-	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "work-pool"} {
 		t.Run(kind, func(t *testing.T) {
 			declaration := map[string]any{"type": kind}
 			if kind == "table" {
 				declaration["key"] = "id"
 				declaration["schema"] = map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}
+			}
+			if kind == "work-pool" {
+				declaration["identity"] = []any{"task"}
 			}
 			cfg, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 			require.NoError(t, err)
@@ -57,6 +60,10 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 			if kind == "table" {
 				require.Contains(t, section.Content, "primary key: id")
 			}
+			if kind == "work-pool" {
+				require.Equal(t, []string{"task"}, cfg.Ledgers[0].Identity)
+				require.Contains(t, section.Content, "acquire-next(filter?)")
+			}
 		})
 	}
 	for _, declaration := range []map[string]any{
@@ -65,6 +72,8 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 		{"type": "table"},
 		{"type": "counter", "schema": map[string]any{"type": "number"}},
 		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
+		{"type": "set", "identity": []any{"task"}},
+		{"type": "work-pool", "identity": []any{"task", "task"}},
 	} {
 		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 		require.Error(t, err)
