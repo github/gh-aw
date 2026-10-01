@@ -347,7 +347,10 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 			contextWindowAssignment,
 			nodeRuntimeResolutionCommand, SetupActionDestinationShell,
 		)
-		if !driverConfigured {
+		if modelID == "auto" && !driverConfigured {
+			setup += `IFS= read -r GH_AW_PI_RESOLVED_MODEL_ID < "$PI_CODING_AGENT_DIR/resolved-model-id" && `
+		}
+		if !driverConfigured && modelID != "auto" {
 			piArgs = append(piArgs, "--model", "aw-gateway/"+modelID)
 		}
 		piLog.Printf("Pi: using /reflect-resolved models.json gateway routing for model %q via aw-gateway (fallback port %d)", modelID, profile.gatewayPort)
@@ -367,9 +370,13 @@ func (e *PiEngine) buildPiCommand(workflowData *WorkflowData, commandName string
 		piCommand = buildPiDriverCommand(workflowData.EngineConfig.Driver)
 		piLog.Printf("Pi: using driver mode with driver=%s", workflowData.EngineConfig.Driver)
 	} else {
+		modelArg := ""
+		if piModelsJSONSetup != "" && extractPiModelID(workflowData.Model) == "auto" {
+			modelArg = ` --model "aw-gateway/${GH_AW_PI_RESOLVED_MODEL_ID}"`
+		}
 		piCommand = fmt.Sprintf(
-			`cat /tmp/gh-aw/aw-prompts/prompt.txt | %s %s --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" 2>&1 | tee %s`,
-			commandName, shellJoinArgs(piArgs), PiStreamingLogFile)
+			`cat /tmp/gh-aw/aw-prompts/prompt.txt | %s %s%s --extension "${RUNNER_TEMP}/gh-aw/actions/pi_provider.cjs" --extension "${RUNNER_TEMP}/gh-aw/actions/pi_steering_extension.cjs" 2>&1 | tee %s`,
+			commandName, shellJoinArgs(piArgs), modelArg, PiStreamingLogFile)
 	}
 	if piModelsJSONSetup != "" {
 		piCommand = piModelsJSONSetup + piCommand
@@ -411,6 +418,12 @@ printf '%%s' "$(date +%%s%%3N)" > %s
 touch %s
 (umask 177 && touch %s)
 %s 2>&1 | tee -a %s`, AgentCLIStartMsPath, AgentStepSummaryPath, logFile, buildShellHarnessCommand("pi", piCommand), logFile)
+}
+
+// GetErrorDetectionScriptId enables host-runner classification of Pi provider
+// errors recorded in agent-stdio.log after the sandbox exits.
+func (e *PiEngine) GetErrorDetectionScriptId() string {
+	return "detect_agent_errors"
 }
 
 func (e *PiEngine) piAllowedDomains(workflowData *WorkflowData, modelConfigured bool) string {

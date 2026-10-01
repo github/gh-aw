@@ -57,6 +57,26 @@ describe("pi_models_json.cjs", () => {
       expect(result).toEqual({ baseUrl: "http://api-proxy:10000", source: "fallback" });
     });
 
+    describe("resolveAutoModelId", () => {
+      it("selects an available Copilot chat model, not the literal auto or another provider's model", () => {
+        const reflectData = {
+          endpoints: [
+            { provider: "openai", configured: true, models: ["claude-sonnet-5"] },
+            { provider: "copilot", configured: true, models: ["auto", "text-embedding-3-small", "gpt-5.4", "claude-sonnet-4"] },
+          ],
+        };
+        expect(piModelsJson.resolveAutoModelId(reflectData, "github")).toBe("claude-sonnet-4");
+      });
+
+      it("fails closed when no suitable model is available", () => {
+        expect(piModelsJson.resolveAutoModelId({ endpoints: [{ provider: "copilot", configured: true, models: ["auto", "text-embedding-3-small"] }] }, "github")).toBeNull();
+      });
+
+      it("falls back to a non-image GPT model when Sonnet is unavailable", () => {
+        expect(piModelsJson.resolveAutoModelId({ endpoints: [{ provider: "github", configured: true, models: ["gpt-5-image", "gpt-5.4", "gpt-4o"] }] }, "github")).toBe("gpt-5.4");
+      });
+    });
+
     it("prefers the live baseUrl reported by /reflect when a matching endpoint is configured", () => {
       const reflectData = { endpoints: [{ provider: "openai", configured: true, port: 10000, base_url: "http://api-proxy:10000" }] };
       // Sanity-check the real resolver agrees the fixture resolves to the live port before
@@ -192,6 +212,24 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
+    it("resolves auto to a concrete Copilot model in models.json and the Pi model-id file", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "auto";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      const reflectPayload = {
+        endpoints: [{ provider: "copilot", configured: true, port: 10002, base_url: "http://api-proxy:10002", models: ["auto", "claude-sonnet-5"] }],
+      };
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => reflectPayload }));
+
+      await piModelsJson.main();
+
+      expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8")).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
+      expect(fs.readFileSync(path.join(tmpDir, "resolved-model-id"), "utf8")).toBe("claude-sonnet-5\n");
+    });
+
     it.each(["openai", "codex"])("writes models.json using the live /reflect baseUrl and responses api for the %s provider", async provider => {
       process.env.GH_AW_PI_MODEL_ID = "gpt-4.1";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";

@@ -35,7 +35,7 @@ func compileWorkflowAndReadLock(t *testing.T, workflow string) string {
 // expose model_not_supported_error from that step.
 func TestModelNotSupportedErrorDetectionStep(t *testing.T) {
 	t.Parallel()
-	engines := []string{"copilot", "codex", "claude"}
+	engines := []string{"copilot", "codex", "claude", "pi"}
 	for _, engine := range engines {
 		t.Run(engine, func(t *testing.T) {
 			t.Parallel()
@@ -62,7 +62,7 @@ Test workflow`)
 // model-not-supported error env var when the engine provides detect-agent-errors support.
 func TestModelNotSupportedErrorInConclusionJob(t *testing.T) {
 	t.Parallel()
-	engines := []string{"copilot", "codex", "claude"}
+	engines := []string{"copilot", "codex", "claude", "pi"}
 	for _, engine := range engines {
 		t.Run(engine, func(t *testing.T) {
 			t.Parallel()

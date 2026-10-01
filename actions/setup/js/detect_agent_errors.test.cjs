@@ -145,6 +145,13 @@ describe("detect_agent_errors.cjs", () => {
       expect(MODEL_NOT_SUPPORTED_PATTERN.test(log)).toBe(true);
     });
 
+    it("classifies a Pi provider error with model_not_supported from the gateway", () => {
+      const log = String.raw`provider_error provider=aw-gateway model=auto api=openai-completions error="400: {\"message\":\"The requested model is not supported.\",\"code\":\"model_not_supported\",\"param\":\"model\"}"`;
+      expect(detectErrors(log).modelNotSupportedError).toBe(true);
+      expect(detectErrors(String.raw`provider_error provider=aw-gateway error="400: {\"code\":\"model_not_supported\",\"param\":\"model\"}"`).modelNotSupportedError).toBe(true);
+      expect(detectErrors("model_not_supported_error=false").modelNotSupportedError).toBe(false);
+    });
+
     it("matches invalid/unknown model name variants", () => {
       expect(MODEL_NOT_SUPPORTED_PATTERN.test("invalid model name 'claude-sonnet-999'")).toBe(true);
       expect(MODEL_NOT_SUPPORTED_PATTERN.test("unknown model gpt-unknown")).toBe(true);

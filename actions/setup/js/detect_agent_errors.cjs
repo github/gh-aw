@@ -145,6 +145,7 @@ function isAgenticEngineTimeout(logContent) {
 // Pattern: Configured model is invalid or unavailable.
 // Covers common engine/provider variants:
 //   - "The requested model is not supported"
+//   - "model_not_supported" provider error code (including Pi gateway errors)
 //   - "invalid model name '...'"
 //   - "unknown model <id>"
 //   - "model ... not found"
@@ -155,7 +156,7 @@ function isAgenticEngineTimeout(logContent) {
 //     by the org/repo Copilot policy). Anchored to the "policy enablement" phrase so that the
 //     generic "No model available" wording alone does not produce false positives.
 const MODEL_NOT_SUPPORTED_PATTERN =
-  /(?:The requested model is not supported|invalid model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|unknown model\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?\s+(?:is\s+)?(?:not found|does not exist|not supported|not available|unavailable)|404\b[^\n]*\bModel\s+not\s+found|No model available\b[^\n]*policy enablement)/i;
+  /(?:The requested model is not supported|\bmodel_not_supported\b|invalid model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|unknown model\s+['"`]?[a-z0-9._:/@-]+['"`]?(?=(?:\s*$|\s*[\n\r.,;:!?)]))|model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?\s+(?:is\s+)?(?:not found|does not exist|not supported|not available|unavailable)|404\b[^\n]*\bModel\s+not\s+found|No model available\b[^\n]*policy enablement)/i;
 
 /**
  * Determines if Codex emitted a `turn.failed` event for a model that does not

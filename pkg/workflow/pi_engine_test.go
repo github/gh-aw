@@ -242,6 +242,26 @@ func TestPiEngine_GetExecutionSteps_WithModel(t *testing.T) {
 	assert.NotContains(t, stepText, "\n          PI_MODEL:", "Step should not set PI_MODEL in the environment when the CLI model is passed via --model")
 }
 
+func TestPiEngine_GetExecutionSteps_AutoModel(t *testing.T) {
+	for _, model := range []string{"auto", "copilot/auto"} {
+		t.Run(model, func(t *testing.T) {
+			workflowData := &WorkflowData{
+				Name:               "test-auto-model",
+				Model:              model,
+				EngineConfig:       &EngineConfig{ID: "pi"},
+				ParsedTools:        NewTools(map[string]any{}),
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+			}
+			steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+			stepText := strings.Join(steps[0], "\n")
+			assert.Contains(t, stepText, `IFS= read -r GH_AW_PI_RESOLVED_MODEL_ID < "$PI_CODING_AGENT_DIR/resolved-model-id"`)
+			assert.Contains(t, stepText, `--model "aw-gateway/${GH_AW_PI_RESOLVED_MODEL_ID}"`)
+			assert.NotContains(t, stepText, "--model aw-gateway/auto")
+			assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID=auto")
+		})
+	}
+}
+
 func TestPiEngine_GetExecutionSteps_IgnoresRedundantYoloArg(t *testing.T) {
 	engine := NewPiEngine()
 	workflowData := &WorkflowData{

@@ -11,6 +11,8 @@ Pi requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. The compi
 
 To select Pi as the AI engine, with inference hosted and billed through a GitHub Copilot subscription, use a `copilot/` model. A model without a provider prefix also uses the Copilot backend.
 
+With the AWF firewall enabled, `model: auto` and `model: copilot/auto` select an available Copilot chat model from the gateway's `/reflect` model list before Pi starts. Pi sends the selected model ID to the gateway, not the literal `auto`. If model discovery does not return a suitable model, setup fails rather than sending an unsupported model request.
+
 ```yaml
 engine:
   id: pi

@@ -72,6 +72,32 @@ function resolveGatewayBaseUrl(options) {
   return { baseUrl: fallbackBaseUrl, source: "fallback" };
 }
 
+function resolveAutoModelId(reflectData, provider) {
+  const aliases = REFLECT_PROVIDER_ALIASES[normalizeReflectProviderName(provider)] || new Set([provider]);
+  const models = (Array.isArray(reflectData?.endpoints) ? reflectData.endpoints : [])
+    .filter(endpoint => endpoint.configured && aliases.has(normalizeReflectProviderName(endpoint.provider)))
+    .flatMap(endpoint => (Array.isArray(endpoint.models) ? endpoint.models : []))
+    .filter(id => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(id) && id !== "auto");
+  // Prefer a current general-purpose coding model over the first catalog entry
+  // (which may be an embedding or image model).
+  return (
+    models.find(id => id === "claude-sonnet-5") ||
+    models
+      .filter(id => /claude.*sonnet/i.test(id))
+      .sort()
+      .at(-1) ||
+    models
+      .filter(id => /^gpt-[456]/i.test(id) && !/image|embed|audio|realtime|transcribe|tts/i.test(id))
+      .sort()
+      .at(-1) ||
+    models
+      .filter(id => /claude.*(?:opus|haiku)/i.test(id))
+      .sort()
+      .at(-1) ||
+    null
+  );
+}
+
 /**
  * Build the Pi models.json payload that registers a single custom provider
  * named "aw-gateway" pointing at the resolved AWF LLM gateway base URL.
@@ -149,7 +175,7 @@ function resolvePiApiForProvider(provider) {
 
 async function main() {
   const logger = DEFAULT_LOGGER;
-  const modelId = process.env.GH_AW_PI_MODEL_ID || "";
+  let modelId = process.env.GH_AW_PI_MODEL_ID || "";
   const apiKeyEnvVar = process.env.GH_AW_PI_GATEWAY_SECRET_ENV || "";
   const contextWindow = process.env.GH_AW_PI_CONTEXT_WINDOW || "";
   const fallbackPort = Number.parseInt(process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT || "", 10);
@@ -176,6 +202,16 @@ async function main() {
     }
   }
 
+  if (modelId === "auto") {
+    modelId = resolveAutoModelId(reflectData, provider);
+    if (!modelId) {
+      throw new Error(`cannot resolve Pi auto model: no supported ${provider} chat model available from /reflect`);
+    }
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "resolved-model-id"), `${modelId}\n`, "utf8");
+    logger(`resolved auto model to ${modelId}`);
+  }
+
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
@@ -195,4 +231,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, DEFAULT_PI_CODING_AGENT_DIR };
+module.exports = { main, resolveGatewayBaseUrl, resolveAutoModelId, buildModelsJSON, resolvePiApiForProvider, DEFAULT_PI_CODING_AGENT_DIR };
