@@ -105,7 +105,7 @@
         fbm(p + 2.2 * q + vec2(8.3, 2.8) - t * 0.015)
       );
       float n = fbm(p + 2.0 * r);
-      n = smoothstep(0.28, 0.78, n);
+      n = smoothstep(0.32, 0.82, n);
 
       // Falloff: a band across the whole top, deeper and heavier on the
       // right so it can sit behind the hero visual, shallow on the left so
@@ -113,7 +113,7 @@
       bool narrow = size.x < 720.0;
       float depth = narrow
         ? mix(30.0, 160.0, smoothstep(0.5, 1.0, xn))
-        : mix(170.0, 560.0, smoothstep(0.15, 1.0, xn));
+        : mix(160.0, 440.0, smoothstep(0.15, 1.0, xn));
       // Wobble the lower edge so it never reads as a straight gradient.
       depth *= 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, 3.1));
       float m = 1.0 - smoothstep(0.0, depth, fromTop);
@@ -130,7 +130,7 @@
       vec2 dc = floor(drift);
       vec2 blk = floor(dc / 3.0);
       float hot = n * m;
-      if (hot > 0.18 && hash(blk + 17.3) < 0.03 * smoothstep(0.18, 0.45, hot)
+      if (hot > 0.14 && hash(blk + 17.3) < 0.03 * smoothstep(0.14, 0.4, hot)
           && hash(dc + 4.1) < 0.45) {
         gl_FragColor = vec4(u_coral, 1.0);
         return;
@@ -208,10 +208,10 @@
       const dark = document.documentElement.getAttribute('data-theme') !== 'light';
       const steps = dark
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
-        : ['--aw-purple-3', '--aw-purple-4', '--aw-purple-6', '--aw-purple-7'];
+        : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
       gl.uniform3fv(uCoral, parseColor(probe, cs.getPropertyValue(dark ? '--aw-coral-4' : '--aw-coral-6')));
-      gl.uniform1f(uStrength, dark ? 1.0 : 0.9);
+      gl.uniform1f(uStrength, dark ? 0.9 : 0.86);
     }
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');

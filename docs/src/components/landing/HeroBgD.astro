@@ -78,7 +78,16 @@
       return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     }
 
-    const float SLOT = 40.0; // cells per slot; each slot splits into 2-4 columns
+    // Four fixed column widths (cells) plus one constant gap. A group holds
+    // one of each, so every group is the same width and the row tiles cleanly.
+    const float GAP = 3.0;
+    const float SLOT = 20.0 + 14.0 + 9.0 + 5.0 + 4.0 * GAP;
+
+    // Width of the k-th column in the base rhythm: very wide, medium, wide, small.
+    float baseWidth(float k) {
+      k = mod(k, 4.0);
+      return k < 0.5 ? 20.0 : k < 1.5 ? 9.0 : k < 2.5 ? 14.0 : 5.0;
+    }
 
     void main() {
       vec2 cell = floor(gl_FragCoord.xy);     // cell coords, y up
@@ -86,20 +95,21 @@
       float fromTop = (row + 0.5) * u_cell;   // CSS px from the top
       float t = u_time;
 
-      // Split the width into columns of about 8-20 cells (24-60px), each
-      // followed by a 2-3 cell gap (6-9px).
+      // Each group plays the base rhythm from a rotated starting point, and
+      // some groups play it backwards, so it reads rhythmic but not mechanical.
       float slot = floor(cell.x / SLOT);
       float local = cell.x - slot * SLOT;
+      float rot = floor(hash(vec2(slot, 0.5)) * 4.0);
+      float dir = hash(vec2(slot, 2.5)) < 0.35 ? -1.0 : 1.0;
       float start = 0.0;
       float size = SLOT;
       float idx = 0.0;
       for (int k = 0; k < 4; k++) {
-        float s = 10.0 + floor(hash(vec2(slot, float(k) + 0.5)) * 10.0);
-        if (SLOT - (start + s) < 10.0 || k == 3) s = SLOT - start;
-        if (local < start + s) { size = s; idx = float(k); break; }
+        float s = baseWidth(rot + dir * float(k) + 4.0) + GAP;
+        if (local < start + s || k == 3) { size = s; idx = float(k); break; }
         start += s;
       }
-      float gap = 2.0 + step(0.5, hash(vec2(slot, float(idx) + 4.2)));
+      float gap = GAP;
       if (local >= start + size - gap) { gl_FragColor = vec4(0.0); return; }
       float colId = slot * 4.0 + idx;
       float centerX = (slot * SLOT + start + (size - gap) * 0.5) * u_cell;
