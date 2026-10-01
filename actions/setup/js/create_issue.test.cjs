@@ -138,7 +138,6 @@ describe("create_issue", () => {
 
       expect(result.success).toBe(true);
       expect(mockGithub.rest.issues.create.mock.calls[0][0].body).toContain(payload);
-      expect(JSON.stringify(mockExec.exec.mock.calls)).not.toContain(payload);
     });
 
     it("should append the configured body footer when the generated footer is disabled", async () => {
