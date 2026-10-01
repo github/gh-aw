@@ -275,6 +275,19 @@ describe("resolveAllowedMentionsFromPayload", () => {
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("disabled"));
   });
 
+  it("returns empty array when mentions is false", async () => {
+    const context = { eventName: "issues", payload: {}, repo: { owner: "o", repo: "r" } };
+    expect(await resolveAllowedMentionsFromPayload(context, mockGithub, mockCore, false)).toEqual([]);
+  });
+
+  it("does not query collaborators without a concrete default target", async () => {
+    const { resolveDefaultMentions } = await import("./resolve_mentions_from_payload.cjs");
+    const context = { eventName: "issues", payload: {}, repo: { owner: "workflow-org", repo: "workflow-repo" } };
+    mockGithub.rest = { repos: { listCollaborators: vi.fn() } };
+    expect(await resolveDefaultMentions(context, mockGithub, mockCore, {}, "*")).toEqual([]);
+    expect(mockGithub.rest.repos.listCollaborators).not.toHaveBeenCalled();
+  });
+
   it("respects allowContext: false by skipping payload extraction", async () => {
     const context = {
       eventName: "issues",

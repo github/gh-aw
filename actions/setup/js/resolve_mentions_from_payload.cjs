@@ -7,6 +7,7 @@
 
 const { resolveMentionsLazily, isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { parseRepoSlug } = require("./repo_helpers.cjs");
 
 /**
  * Push a non-bot user's login to the array if present.
@@ -182,7 +183,7 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   }
 
   // If mentions is explicitly set to false, return empty array (all mentions escaped)
-  if (mentionsConfig && mentionsConfig.enabled === false) {
+  if (mentionsConfig === false || mentionsConfig?.enabled === false) {
     core.info("[MENTIONS] Mentions explicitly disabled - all mentions will be escaped");
     return [];
   }
@@ -256,8 +257,43 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   }
 }
 
+/**
+ * Re-resolve aliases when an item overrides its handler's default repository.
+ * @param {any} context
+ * @param {any} github
+ * @param {any} core
+ * @param {any} mentionsConfig
+ * @param {string[]} defaultAliases
+ * @param {string} defaultRepo
+ * @param {{ repo: string, repoParts: { owner: string, repo: string } }} itemRepo
+ * @returns {Promise<string[]>}
+ */
+async function resolveMentionsForItem(context, github, core, mentionsConfig, defaultAliases, defaultRepo, itemRepo) {
+  if (mentionsConfig == null || mentionsConfig === false || itemRepo.repo.toLowerCase() === defaultRepo.toLowerCase()) {
+    return defaultAliases;
+  }
+  return resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, undefined, itemRepo.repoParts);
+}
+
+/**
+ * Resolve a handler's default aliases only when its configured destination is concrete.
+ * Wildcard targets must be resolved once the item supplies its repository.
+ * @param {any} context
+ * @param {any} github
+ * @param {any} core
+ * @param {any} mentionsConfig
+ * @param {string} defaultRepo
+ * @returns {Promise<string[]>}
+ */
+async function resolveDefaultMentions(context, github, core, mentionsConfig, defaultRepo) {
+  const targetRepo = parseRepoSlug(defaultRepo);
+  return targetRepo ? resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, undefined, targetRepo) : [];
+}
+
 module.exports = {
   resolveAllowedMentionsFromPayload,
+  resolveMentionsForItem,
+  resolveDefaultMentions,
   extractKnownAuthorsFromPayload,
   fetchTeamMembers,
   pushNonBotUser,
