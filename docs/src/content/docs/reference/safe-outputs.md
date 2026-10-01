@@ -2077,6 +2077,8 @@ Accepts a literal integer or a GitHub Actions expression string (e.g., `${{ inpu
 
 By default, `@mentions` in AI-generated content are escaped with backticks unless the mentioned user is a verified collaborator or inferred from the event context (issue/PR author, assignees, etc.). Use `mentions:` to control this behavior:
 
+Collaborator checks use the repository receiving each safe output. With `target-repo`, the workflow repository's collaborators are not used as a fallback when the token cannot read the target repository. The agent job sanitizes output first, so its token needs read access to the target repository to preserve collaborator mentions; a later handler token cannot restore escaped mentions.
+
 ```yaml wrap
 safe-outputs:
   mentions: false          # Escape all mentions

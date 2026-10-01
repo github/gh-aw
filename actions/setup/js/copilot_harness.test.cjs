@@ -49,12 +49,14 @@ const {
   generateCopilotConnectionToken,
   GEMINI_MODEL_NAME_PREFIX,
   isCAPIQuotaExceededError,
+  isCAPIServerError,
   isHTTP400ResponseError,
   isSDKSessionIdleTimeoutError,
   PROMPT_FILE_INLINE_THRESHOLD_BYTES,
   resolvePromptFileInput,
   resolveRetryConfig,
   shouldRetryFailedExecution,
+  shouldContinueCopilotSessionAfterFailure,
   resolveAWFModelRoutingSelection,
   applyCopilotRoutingSelection,
   applyCopilotRoutingArgs,
@@ -238,9 +240,37 @@ describe("copilot_harness.cjs", () => {
         expect(isCAPIQuotaExceededError(output)).toBe(true);
       });
 
-      it("matches the Copilot CLI's own retry-exhaustion message for 5xx statuses (503)", () => {
-        const output = "Failed to get response from the AI model; retried 5 times (total retry wait time: 300 seconds) Last error: 503 Service Unavailable";
-        expect(isCAPIQuotaExceededError(output)).toBe(true);
+      it("classifies retry-exhausted 503 as a retryable server error, even without agent output", () => {
+        const output = "Failed to get response from the AI model; retried 5 times (total retry wait time: 14.90 seconds) Last error: 503 Service Unavailable";
+        expect(isCAPIQuotaExceededError(output)).toBe(false);
+        expect(isCAPIServerError(output)).toBe(true);
+        expect(classifyCopilotFailure({ hasOutput: false, isQuotaExceeded: isCAPIQuotaExceededError(output), isCAPIServerError: isCAPIServerError(output) })).toBe("capi_server_error");
+        for (const hasOutput of [false, true]) {
+          expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput, output, attempt: 0, maxRetries: 3 })).toBe(true);
+          expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput, output, attempt: 3, maxRetries: 3 })).toBe(false);
+        }
+      });
+
+      it("restarts fresh for a no-output retry-exhausted CAPI 5xx and continues when output exists", () => {
+        const output = "Failed to get response from the AI model; retried 5 times Last error: 503 Service Unavailable";
+        const hasCAPIServerError = isCAPIServerError(output);
+
+        expect(
+          shouldContinueCopilotSessionAfterFailure({
+            copilotSDKMode: false,
+            continueDisabledPermanently: false,
+            hasOutput: false,
+            hasCAPIServerError,
+          })
+        ).toBe(false);
+        expect(
+          shouldContinueCopilotSessionAfterFailure({
+            copilotSDKMode: false,
+            continueDisabledPermanently: false,
+            hasOutput: true,
+            hasCAPIServerError,
+          })
+        ).toBe(true);
       });
 
       it("does not retry a zero-progress attempt that exhausted the CLI's own 429 retries", () => {

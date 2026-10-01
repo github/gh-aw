@@ -41,7 +41,7 @@ const { findAgent, getIssueDetails, assignAgentToIssue } = require("./assign_age
 const { ensureFullHistoryForBundle, extractBundlePrerequisiteCommits, getBundlePrerequisites, isShallowOrSparseCheckout, linearizeRangeAsCommit } = require("./git_helpers.cjs");
 const { parseDiffGitHeader: parseDiffGitHeaderPaths, extractDiffGitHeaderEntries } = require("./patch_path_helpers.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
-const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
+const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const {
   MANAGED_FALLBACK_ISSUE_LABEL,
   LABEL_MAX_RETRIES,
@@ -794,11 +794,11 @@ async function main(config = {}) {
   const stackTracker = createStackTracker();
   const githubClient = await createAuthenticatedGitHubClient(config);
   const maxMentions = parseIntTemplatable(config.mentions?.max, 50);
-  let allowedMentionAliases = [];
+  let defaultMentionAliases = [];
   if (Array.isArray(config.allowedMentionAliases)) {
-    allowedMentionAliases = config.allowedMentionAliases;
+    defaultMentionAliases = config.allowedMentionAliases;
   } else if (config.mentions != null) {
-    allowedMentionAliases = await resolveAllowedMentionsFromPayload(context, githubClient, core, config.mentions);
+    defaultMentionAliases = await resolveDefaultMentions(context, githubClient, core, config.mentions, defaultTargetRepo);
   }
 
   // Check if copilot assignment is enabled for fallback issues
@@ -1024,6 +1024,7 @@ async function main(config = {}) {
       };
     }
     const { repo: itemRepo, repoParts } = repoResult;
+    const allowedMentionAliases = await resolveMentionsForItem(context, githubClient, core, config.mentions, defaultMentionAliases, defaultTargetRepo, repoResult);
     core.info(`Target repository: ${itemRepo}`);
     let pushRepo = itemRepo;
     let pushRepoParts = repoParts;
