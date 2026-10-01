@@ -4,7 +4,6 @@
     "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
-      "oneOf": [{ "required": ["record"] }, { "required": ["operation"] }],
       "properties": {
         "ledger": { "type": "string", "description": "Configured ledger name." },
         "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
@@ -14,7 +13,7 @@
           "enum": ["append", "add", "remove", "put", "delete", "insert", "update", "upsert", "increment", "decrement"],
           "description": "Built-in ledger operation (allowed operations depend on its configured type)."
         },
-        "value": { "description": "Value for append, add, remove, put, insert, or upsert." },
+        "value": { "type": ["object", "array", "string", "number", "boolean", "null"], "description": "Value for append, add, remove, put, insert, or upsert." },
         "key": { "type": "string", "description": "String key for put, delete, or update." },
         "patch": { "type": "object", "description": "Shallow object merge patch for table update." },
         "name": { "type": "string", "description": "Counter name." },
