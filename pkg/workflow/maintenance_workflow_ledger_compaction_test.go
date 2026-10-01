@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -131,31 +132,42 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	yaml := string(content)
 
 	jobs := parseMaintenanceJobs(t, yaml)
-	for _, name := range []string{"findings", "audit"} {
-		plan := jobs["ledger_compaction_plan_"+name]
-		apply := jobs["ledger_compaction_apply_"+name]
-		require.NotEmpty(t, plan, "plan job for %s", name)
-		require.NotEmpty(t, apply, "apply job for %s", name)
-
-		assert.Contains(t, plan, "contents: read")
-		assert.NotContains(t, plan, "contents: write")
-		assert.NotContains(t, plan, "secrets.GITHUB_TOKEN")
-		assert.Contains(t, plan, "ledger_compaction_plan.cjs")
-		assert.NotContains(t, plan, "ledger_compaction_apply.cjs")
-		assert.Contains(t, plan, "upload-artifact")
-		assert.Contains(t, plan, "inputs.ledger == '"+name+"'")
-		assert.Contains(t, plan, "group: gh-aw-ledger-compaction-${{ github.repository }}-"+name)
-		assert.Contains(t, plan, "cancel-in-progress: false")
-
-		assert.Contains(t, apply, "needs: ledger_compaction_plan_"+name)
-		assert.Contains(t, apply, "needs.ledger_compaction_plan_"+name+".outputs.plan_created == 'true'")
-		assert.Contains(t, apply, "contents: write")
-		assert.Contains(t, apply, "download-artifact")
-		assert.Contains(t, apply, "ledger_compaction_apply.cjs")
-		assert.NotContains(t, apply, "ledger_compaction_plan.cjs")
-		assert.Contains(t, apply, "group: gh-aw-ledger-compaction-${{ github.repository }}-"+name)
+	plan := jobs["ledger_compaction_plan"]
+	apply := jobs["ledger_compaction_apply"]
+	require.NotEmpty(t, plan)
+	require.NotEmpty(t, apply)
+	for name := range jobs {
+		assert.False(t, strings.HasPrefix(name, "ledger_compaction_plan_") || strings.HasPrefix(name, "ledger_compaction_apply_"), "unexpected per-ledger job %s", name)
 	}
-	assert.NotContains(t, yaml, "ledger_compaction_plan_metrics", "ledgers with compaction disabled get no maintenance jobs")
+	assert.Contains(t, plan, "contents: read")
+	assert.NotContains(t, plan, "contents: write")
+	assert.NotContains(t, plan, "secrets.GITHUB_TOKEN")
+	assert.Contains(t, plan, "ledger_compaction_plan.cjs")
+	assert.NotContains(t, plan, "ledger_compaction_apply.cjs")
+	assert.Equal(t, 1, strings.Count(plan, "upload-artifact"))
+	assert.Contains(t, plan, "steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true'")
+	assert.Contains(t, apply, "needs: ledger_compaction_plan")
+	assert.Contains(t, apply, "needs.ledger_compaction_plan.outputs.plan_created == 'true'")
+	assert.Contains(t, apply, "contents: write")
+	assert.Equal(t, 1, strings.Count(apply, "download-artifact"))
+	assert.Contains(t, apply, "ledger_compaction_apply.cjs")
+	assert.NotContains(t, apply, "ledger_compaction_plan.cjs")
+	for _, body := range []string{plan, apply} {
+		assert.Contains(t, body, "group: gh-aw-ledger-compaction-${{ github.repository }}")
+		assert.Contains(t, body, "cancel-in-progress: false")
+		assert.Contains(t, body, "name: ledger-compaction-plans")
+	}
+	for i, name := range []string{"audit", "findings"} {
+		stepID := "plan_" + strconv.Itoa(i)
+		assert.Contains(t, plan, "inputs.ledger == '"+name+"'")
+		assert.Contains(t, plan, "id: "+stepID)
+		assert.Contains(t, plan, stepID+"_created: ${{ steps."+stepID+".outputs.plan_created }}")
+		assert.Contains(t, apply, "needs.ledger_compaction_plan.outputs."+stepID+"_created == 'true'")
+		for _, body := range []string{plan, apply} {
+			assert.Contains(t, body, "GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-"+name+".json")
+		}
+	}
+	assert.NotContains(t, plan, "plan-metrics.json", "ledgers with compaction disabled get no maintenance steps")
 	assert.Contains(t, yaml, "- 'compact_ledger'")
 	assert.Contains(t, yaml, "ledger:")
 	assert.Contains(t, jobs["run_operation"], "'compact_ledger'", "the generic operation job must not handle compact_ledger")
@@ -199,10 +211,16 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing
 	yaml := string(content)
 
 	jobs := parseMaintenanceJobs(t, yaml)
-	require.NotEmpty(t, jobs["ledger_compaction_plan_foo"], "plan job for lowercase foo")
-	require.NotEmpty(t, jobs["ledger_compaction_apply_foo"], "apply job for lowercase foo")
-	require.NotEmpty(t, jobs["ledger_compaction_plan_Foo"], "plan job for uppercase Foo")
-	require.NotEmpty(t, jobs["ledger_compaction_apply_Foo"], "apply job for uppercase Foo")
+	plan := jobs["ledger_compaction_plan"]
+	apply := jobs["ledger_compaction_apply"]
+	require.NotEmpty(t, plan)
+	require.NotEmpty(t, apply)
+	assert.Contains(t, plan, "inputs.ledger == 'foo'")
+	assert.Contains(t, plan, "inputs.ledger == 'Foo'")
+	for _, name := range []string{"foo", "Foo"} {
+		assert.Contains(t, plan, "plan-"+name+".json")
+		assert.Contains(t, apply, "plan-"+name+".json")
+	}
 }
 
 func TestComputeEnabledToolNames_LedgerNilSafety(t *testing.T) {
