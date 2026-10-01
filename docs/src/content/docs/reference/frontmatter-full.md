@@ -3390,6 +3390,19 @@ max-tool-denials: 1
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
 max-tool-denials: "example-value"
 
+# Maximum aggregate number of tool dispatches for the workflow run, including
+# subagents. Enforced before execution only by the built-in Copilot SDK driver.
+# Supports GitHub Actions expressions. Not supported by other engines or custom
+# Copilot SDK drivers/harnesses.
+# (optional)
+# Accepted formats:
+
+# Format 1: positive integer
+max-tool-calls: 1
+
+# Format 2: GitHub Actions expression that resolves to an integer at runtime
+max-tool-calls: "${{ inputs.max-tool-calls }}"
+
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
 # default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement
 # and token steering. Supports GitHub Actions expressions.

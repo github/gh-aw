@@ -521,6 +521,10 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"patch":     {Type: "object"},
 			"name":      {Type: "string", MaxLength: 256},
 			"amount":    {Type: "number"},
+			"work":      {Type: "object"},
+			"filter":    {Type: "object"},
+			"result":    {AllowNull: true},
+			"reason":    {Type: "string", MaxLength: 1024},
 		},
 	},
 	"ledger_request_compaction": {

@@ -22,6 +22,32 @@ func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"); err != nil {
 		t.Fatalf("expected issue field activity types to validate: %v", err)
 	}
+
+}
+
+func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		value   any
+		wantErr bool
+	}{
+		{name: "positive integer", value: 10},
+		{name: "expression", value: "${{ inputs.max-tool-calls }}"},
+		{name: "zero", value: 0, wantErr: true},
+		{name: "negative", value: -1, wantErr: true},
+		{name: "fraction", value: 1.5, wantErr: true},
+		{name: "plain string", value: "10", wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on":             "workflow_dispatch",
+				"max-tool-calls": test.value,
+			}, "workflow.md")
+			if (err != nil) != test.wantErr {
+				t.Fatalf("validation error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
 }
 
 func TestValidateMainWorkflowFrontmatter_RejectsUnsupportedTopLevelFields(t *testing.T) {

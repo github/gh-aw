@@ -436,6 +436,9 @@ func applyMainWorkflowEngineOverrides(engineConfig, overrides *EngineConfig) {
 	if overrides.MaxToolDenials != "" {
 		engineConfig.MaxToolDenials = overrides.MaxToolDenials
 	}
+	if overrides.MaxToolCalls != "" {
+		engineConfig.MaxToolCalls = overrides.MaxToolCalls
+	}
 	if overrides.MaxRuns > 0 {
 		engineConfig.MaxRuns = overrides.MaxRuns
 	}
@@ -505,6 +508,7 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 			}
 		}
 	}
+	applyImportedMaxToolCalls(engineConfig, opts.importsResult)
 	if engineConfig.MaxRuns <= 0 && opts.importsResult.MergedMaxRuns != "" {
 		var importedMaxRuns any
 		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxRuns), &importedMaxRuns); err == nil {
@@ -551,6 +555,20 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 		}
 	}
 	return engineConfig, model
+}
+
+func applyImportedMaxToolCalls(engineConfig *EngineConfig, importsResult *parser.ImportsResult) {
+	if engineConfig.MaxToolCalls != "" || importsResult.MergedMaxToolCalls == "" {
+		return
+	}
+	var importedMaxToolCalls any
+	if err := json.Unmarshal([]byte(importsResult.MergedMaxToolCalls), &importedMaxToolCalls); err != nil {
+		return
+	}
+	if parsed := parseMaxToolCallsValue(importedMaxToolCalls); parsed != "" {
+		engineConfig.MaxToolCalls = parsed
+		orchestratorEngineLog.Printf("Applied max-tool-calls from import")
+	}
 }
 
 func findImportedEngineDefinition(engineDefinitions []string, id string) *EngineDefinition {
@@ -602,6 +620,9 @@ func (c *Compiler) runPostEngineValidations(
 	enableFirewallByDefaultForClaude(engineSetting, networkPermissions, sandboxConfig)
 	enableFirewallByDefaultForPi(engineSetting, networkPermissions, sandboxConfig)
 	enableFirewallByDefaultForGemini(engineSetting, networkPermissions, sandboxConfig)
+	if err := validateMaxToolCallsConfig(engineConfig, agenticEngine); err != nil {
+		return err
+	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
 		orchestratorEngineLog.Printf("Validating strict firewall (strict=%v)", c.strictMode)
 		if err := c.validateStrictFirewall(engineSetting, networkPermissions, sandboxConfig); err != nil {

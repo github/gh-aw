@@ -659,6 +659,9 @@ jobs:
                   "amount": {
                     "type": "number"
                   },
+                  "filter": {
+                    "type": "object"
+                  },
                   "key": {
                     "type": "string",
                     "maxLength": 256
@@ -679,8 +682,15 @@ jobs:
                   "patch": {
                     "type": "object"
                   },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
                   "record": {
                     "type": "object"
+                  },
+                  "result": {
+                    "allowNull": true
                   },
                   "temp_id": {
                     "type": "string",
@@ -688,6 +698,9 @@ jobs:
                   },
                   "value": {
                     "allowNull": true
+                  },
+                  "work": {
+                    "type": "object"
                   }
                 }
               },

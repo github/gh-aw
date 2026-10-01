@@ -7,7 +7,7 @@ import { execFileSync, execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { finalId } from "./ledger_transactions.cjs";
+import { finalId, normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { execGitSync } from "./git_helpers.cjs";
 import { main, persistLedgerAppends, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
 
@@ -148,6 +148,75 @@ test("appends canonical ledger state and delegates the upstream push", async () 
     assert.equal(pushCalls[0].branchName, "ledgers/findings");
     assert.match(shard, /^ledger\/shards\//);
     assert.equal(JSON.parse(canonical.trim()).payload.id, largeTransaction.ledgers.findings.appends[0].record.id);
+  } finally {
+    if (previousCore === undefined) delete global.core;
+    else global.core = previousCore;
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("normalizes and persists work-pool operations through the trusted reducer", async () => {
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "work-pool-persist-"));
+  const config = {
+    name: "pool",
+    type: "work-pool",
+    identity: ["task"],
+    max_record_kb: 32,
+    max_segment_kb: 100,
+    max_patch_kb: 10,
+  };
+  const normalized = normalizeLedgerAppends(
+    [
+      { operation: "submit", work: { task: "a", title: "Do A" } },
+      { operation: "acquire-next", filter: { task: "a" } },
+    ],
+    {
+      transactionId: "run-pool:1",
+      ledgerNames: new Set(["pool"]),
+      ledgers: { pool: config },
+    }
+  );
+  const artifact = {
+    version: 1,
+    transaction_id: normalized.transaction_id,
+    ledgers: { pool: { appends: normalized.appends } },
+  };
+  const pushCalls = [];
+  const previousCore = global.core;
+  global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
+  try {
+    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base", {
+      cwd: workspaceDir,
+      stdio: "pipe",
+    });
+    const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+    assert.doesNotThrow(() => validateTransactions(artifact, [config]));
+    const persisted = await persistLedgerAppends({
+      appends: normalized.appends,
+      config,
+      githubClient: {},
+      owner: "octo",
+      repo: "repo",
+      token: "test-token",
+      serverHost: "github.com",
+      workspaceDir,
+      checkoutLedgerBranchFn: async ({ branchName }) => {
+        execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
+        return baseRef;
+      },
+      pushChangesFn: async options => {
+        pushCalls.push(options);
+        return true;
+      },
+    });
+    const shard = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/pool"], { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const records = execFileSync("git", ["show", `ledgers/pool:${shard}`], { cwd: workspaceDir, encoding: "utf8" })
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line).payload);
+    assert.equal(persisted.persisted, 2);
+    assert.equal(pushCalls.length, 1);
+    assert.deepEqual(records.map(record => record.operation).sort(), ["claim", "work"]);
   } finally {
     if (previousCore === undefined) delete global.core;
     else global.core = previousCore;
