@@ -127,8 +127,6 @@ func getDefaultAgentModel(engineID string) string {
 		return constants.CopilotBYOKDefaultModel
 	case string(constants.ClaudeEngine), string(constants.GeminiEngine), string(constants.PiEngine):
 		return constants.AgentDefaultModel
-	case string(constants.CodexEngine):
-		return constants.CodexDefaultModel
 	default:
 		return ""
 	}

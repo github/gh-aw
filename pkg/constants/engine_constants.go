@@ -311,11 +311,6 @@ const (
 	// "auto" lets the Copilot API select the best available model automatically.
 	CopilotBYOKDefaultModel = "auto"
 
-	// CodexDefaultModel is the default model for the Codex agentic engine.
-	// Used as the fallback when no explicit model is configured and the
-	// GH_AW_MODEL_AGENT_CODEX / GH_AW_MODEL_DETECTION_CODEX variable is unset.
-	CodexDefaultModel = "gpt-5.4"
-
 	// AgentDefaultModel is the model display string returned for engines whose model is
 	// dynamically determined by the AI provider (e.g. Claude, Gemini, Pi).
 	// It is used as the GH_AW_INFO_MODEL value when no explicit model is configured.

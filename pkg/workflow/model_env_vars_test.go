@@ -33,7 +33,7 @@ func TestModelEnvVarInjectionForAgentJob(t *testing.T) {
 			engine:                  "codex",
 			expectedEnvVar:          constants.EnvVarModelAgentCodex,
 			expectedCommand:         "${" + constants.EnvVarModelAgentCodex + `:+ --model "`,
-			expectedDefault:         constants.CodexDefaultModel,
+			expectedDefault:         "",
 			expectedDefaultOverride: compilerenv.DefaultModelCodex,
 		},
 	}
@@ -116,7 +116,7 @@ func TestModelEnvVarInjectionForDetectionJob(t *testing.T) {
 			name:                    "Codex detection uses GH_AW_MODEL_DETECTION_CODEX",
 			engine:                  "codex",
 			expectedEnvVar:          constants.EnvVarModelDetectionCodex,
-			expectedDefault:         constants.CodexDefaultModel,
+			expectedDefault:         "",
 			expectedDefaultOverride: compilerenv.DefaultModelCodex,
 		},
 	}
@@ -513,7 +513,7 @@ func TestExpressionModelUsesEnvVar(t *testing.T) {
 			model:                "${{ inputs.provider }}/${{ inputs.model }}",
 			expectedModelEnvVar:  constants.EnvVarModelAgentCodex,
 			expectedModelEnvVal:  "${{ inputs.provider }}/${{ inputs.model }}",
-			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '" + constants.CodexDefaultModel + "' }}",
+			expectedFallbackVal:  "${{ vars." + constants.EnvVarModelAgentCodex + " || vars." + compilerenv.DefaultModelCodex + " || '' }}",
 			expectShellExpansion: true, // Codex has no native model env var, uses shell expansion
 		},
 	}

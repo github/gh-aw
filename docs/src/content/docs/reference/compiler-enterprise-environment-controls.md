@@ -82,7 +82,7 @@ For model selection, precedence is:
 1. `engine.model` in workflow frontmatter
 2. `GH_AW_MODEL_AGENT_*` or `GH_AW_MODEL_DETECTION_*`
 3. `GH_AW_DEFAULT_MODEL_*`
-4. Built-in compiler fallback
+4. Built-in compiler fallback (not for Codex; Codex leaves the model unset)
 
 For max AI credits, precedence is:
 

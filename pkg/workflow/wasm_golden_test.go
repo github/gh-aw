@@ -82,8 +82,6 @@ func normalizeOutput(content string) string {
 	normalized = strings.ReplaceAll(normalized, fmt.Sprintf("|| '%s'", constants.CopilotBYOKDefaultModel), "|| 'default'")
 	// Keep golden fixtures stable across claude default model fallback updates.
 	normalized = strings.ReplaceAll(normalized, fmt.Sprintf("|| '%s'", constants.SonnetDefaultModel), "|| 'default'")
-	// Keep golden fixtures stable across codex default model fallback updates.
-	normalized = strings.ReplaceAll(normalized, fmt.Sprintf("|| '%s'", constants.CodexDefaultModel), "|| 'default'")
 	// Keep golden fixtures stable across temporary workspace-path allowlist shape changes.
 	for _, op := range []string{"Edit", "MultiEdit", "Read", "Write"} {
 		normalized = strings.ReplaceAll(normalized, op+"(/tmp/gh-aw/*)", op+"(/tmp/gh-aw/agent/*)")

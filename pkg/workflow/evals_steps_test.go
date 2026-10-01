@@ -370,6 +370,12 @@ func TestBuildParseEvalsResultsStepUsesExpressionModelAndFallbackEnv(t *testing.
 			defaultEnvVar: compilerenv.DefaultModelClaude,
 			defaultModel:  constants.SonnetDefaultModel,
 		},
+		{
+			name:          "codex evals expression model has no built-in fallback",
+			engineID:      "codex",
+			modelEnvVar:   constants.EnvVarModelEvalsCodex,
+			defaultEnvVar: compilerenv.DefaultModelCodex,
+		},
 	}
 
 	for _, tt := range tests {

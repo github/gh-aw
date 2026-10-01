@@ -35,7 +35,7 @@ func TestGetDefaultAgentModel(t *testing.T) {
 		},
 		{
 			engineID:      string(constants.CodexEngine),
-			expectedModel: constants.CodexDefaultModel,
+			expectedModel: "",
 		},
 		{
 			engineID:      "unknown-engine",

@@ -880,9 +880,12 @@ func TestCodexEngineExecutionPassesModelEnvVarIntoAWFStep(t *testing.T) {
 			}
 
 			stepContent := strings.Join([]string(steps[0]), "\n")
-			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '" + constants.CodexDefaultModel + "' }}"
+			expectedEnvLine := tt.expectedModelEnv + ": ${{ vars." + tt.expectedModelEnv + " || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}"
 			if !strings.Contains(stepContent, expectedEnvLine) {
 				t.Errorf("Expected model env var to be included in AWF step env:\n%s", stepContent)
+			}
+			if strings.Contains(stepContent, "|| 'gpt-5.4'") {
+				t.Errorf("Codex step must not choose a built-in model:\n%s", stepContent)
 			}
 
 			expectedModelFlag := fmt.Sprintf("${%s:+ --model \"$%s\"}", tt.expectedModelEnv, tt.expectedModelEnv)
