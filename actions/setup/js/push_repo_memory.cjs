@@ -168,6 +168,8 @@ async function pushRepoMemoryChangesWithRetry({
         baseRef: currentBaseRef,
         cwd: workspaceDir,
         gitAuthEnv: getGitAuthEnv(ghToken),
+        allowGitPushFallback: !validateBeforePush,
+        requireBaseRefMatch: Boolean(validateBeforePush),
       });
       core.info(`Successfully pushed changes to ${branchName} branch`);
       return true;

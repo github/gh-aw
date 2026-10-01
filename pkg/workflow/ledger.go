@@ -105,8 +105,11 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 	single := false
 	for key := range root {
 		switch key {
-		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb", "type", "key":
+		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
 			single = true
+		case "type", "key":
+			_, scalar := root[key].(string)
+			single = single || scalar
 		case "compaction":
 			single = single || isLedgerCompactionValue(root[key])
 		case "replay":

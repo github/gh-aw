@@ -754,7 +754,9 @@ jobs:
                     "type": "string",
                     "pattern": "^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
                   },
-                  "value": {}
+                  "value": {
+                    "allowNull": true
+                  }
                 }
               },
               "ledger_request_compaction": {

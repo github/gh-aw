@@ -3,10 +3,12 @@
 
 import { test } from "vitest";
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { createReducer, replayBuiltin } from "./ledger_builtin.cjs";
 import { normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { finalId } from "./ledger_transactions.cjs";
 import { validateTransactions } from "./push_ledger_changes.cjs";
+import { materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
 
 const configs = {
   log: { type: "log", schema: { type: "number" } },
@@ -93,6 +95,19 @@ test("log preserves duplicates in exact order", () => {
       { position: 2, value: "2" },
     ]
   );
+});
+
+test("built-in logs can materialize more rows than the custom replay limit", () => {
+  const records = Array.from({ length: 10001 }, (_, value) => ({ payload: { operation: "append", value } }));
+  const output = replayBuiltin({ type: "log" }, records);
+  assert.throws(() => validateReplayOutput(output), /Too many replay rows/);
+  const db = new DatabaseSync(":memory:");
+  try {
+    materializeReplay(db, "history", "builtin:log", records, output, records.length);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM state").get().count, records.length);
+  } finally {
+    db.close();
+  }
 });
 
 test("set uses canonical JSON equality across all supported JSON types", () => {

@@ -210,6 +210,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
  * @property {boolean} [positiveInteger] - Must be a positive integer
  * @property {boolean} [optionalPositiveInteger] - Optional but if present must be positive integer
  * @property {boolean} [allowAuto] - Allows "auto" for optional positive integer fields
+ * @property {boolean} [allowNull] - Preserves explicit JSON null for optional fields that accept it
  * @property {boolean} [issueOrPRNumber] - Can be issue/PR number or undefined
  * @property {boolean} [issueNumberOrTemporaryId] - Can be issue number or temporary ID
  * @property {string[]} [enum] - Allowed values for the field
@@ -473,6 +474,9 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
   }
 
   // If not required and not present, skip other validations
+  if (value === null && validation.allowNull) {
+    return { isValid: true, normalizedValue: null };
+  }
   if (value === undefined || value === null) {
     return { isValid: true };
   }

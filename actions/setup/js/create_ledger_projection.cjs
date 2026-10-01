@@ -110,7 +110,7 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     if (config.replay || config.type) {
       try {
         const output = config.type ? replayBuiltin(config, state.records) : executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output);
+        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output, config.type ? state.records.length : 10000);
         tables = output.tables;
       } catch (error) {
         if (config.type) throw error;

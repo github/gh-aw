@@ -35,6 +35,12 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 }
 
 func TestBuiltinLedgerDeclarations(t *testing.T) {
+	named, err := parseLedgerToolConfig(map[string]any{
+		"type": map[string]any{},
+		"key":  map[string]any{},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
 	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
 		t.Run(kind, func(t *testing.T) {
 			declaration := map[string]any{"type": kind}
