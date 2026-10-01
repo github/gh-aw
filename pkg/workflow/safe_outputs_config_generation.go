@@ -83,7 +83,7 @@ func addStandaloneLedgerConfigs(safeOutputsConfig map[string]any, config *Ledger
 	if config != nil && config.Enabled() {
 		ledgerConfigs := make([]map[string]any, 0, len(config.Ledgers))
 		for _, ledger := range config.Ledgers {
-			ledgerConfigs = append(ledgerConfigs, map[string]any{
+			ledgerConfig := map[string]any{
 				"name":           ledger.Name,
 				"type":           ledger.Type,
 				"key":            ledger.Key,
@@ -91,7 +91,11 @@ func addStandaloneLedgerConfigs(safeOutputsConfig map[string]any, config *Ledger
 				"max_record_kb":  ledger.MaxRecordKB,
 				"max_segment_kb": ledger.MaxSegmentKB,
 				"max_patch_kb":   ledger.MaxPatchKB,
-			})
+			}
+			if len(ledger.Identity) > 0 {
+				ledgerConfig["identity"] = ledger.Identity
+			}
+			ledgerConfigs = append(ledgerConfigs, ledgerConfig)
 		}
 		safeOutputsConfig["ledger_append"] = map[string]any{"max": 100, "ledgers": ledgerConfigs}
 	}

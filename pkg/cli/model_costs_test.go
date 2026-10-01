@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,41 @@ import (
 
 	"github.com/github/gh-aw/pkg/modelsdev"
 )
+
+func TestNewModelPricingEntries(t *testing.T) {
+	t.Parallel()
+	var catalog modelsCatalogData
+	require.NoError(t, json.Unmarshal(modelsJSON, &catalog))
+
+	for _, tt := range []struct {
+		provider, model                      string
+		input, output, cacheRead, cacheWrite float64
+	}{
+		{"anthropic", "claude-opus-5-5", 4e-6, 20e-6, 0.2e-6, 5e-6},
+		{"anthropic", "claude-sonnet-5-5", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "claude-opus-5.5", 4e-6, 20e-6, 0.2e-6, 5e-6},
+		{"github-copilot", "claude-sonnet-5.5", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "gpt-6-sol", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "gpt-6-luna", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
+		{"github-copilot", "gpt-6.1-sol", 2e-6, 10e-6, 0.1e-6, 2.5e-6},
+		{"openai", "gpt-6-sol", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
+		{"openai", "gpt-6-luna", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
+		{"openai", "gpt-6.1-sol", 2e-6, 10e-6, 0.1e-6, 2.5e-6},
+	} {
+		t.Run(tt.provider+"/"+tt.model, func(t *testing.T) {
+			t.Parallel()
+			entry, exists := catalog.Providers[tt.provider].Models[tt.model]
+			require.True(t, exists, "missing catalog entry")
+			pricing, ok := findModelPricing(tt.provider, tt.model)
+			require.True(t, ok)
+			assert.InDelta(t, tt.input, pricing["input"], 1e-12)
+			assert.InDelta(t, tt.output, pricing["output"], 1e-12)
+			assert.InDelta(t, tt.cacheRead, pricing["cache_read"], 1e-12)
+			assert.InDelta(t, tt.cacheWrite, pricing["cache_write"], 1e-12)
+			assert.NotEmpty(t, entry.Cost)
+		})
+	}
+}
 
 func TestFindModelPricing(t *testing.T) {
 	t.Parallel()

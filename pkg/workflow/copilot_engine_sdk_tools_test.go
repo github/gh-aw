@@ -173,8 +173,19 @@ func TestBuildCopilotSDKToolConfigJSONOnlyForSDKMode(t *testing.T) {
 		EngineConfig: &EngineConfig{CopilotSDK: false},
 		Tools:        map[string]any{"edit": true},
 	}
+
 	if actual := buildCopilotSDKToolConfigJSON(workflowData, []string{"--allow-tool", "write"}); actual != "" {
 		t.Fatalf("buildCopilotSDKToolConfigJSON() = %q, want empty string outside SDK mode", actual)
+	}
+
+}
+
+func TestBuildCopilotSDKToolConfigIncludesAggregateToolCallLimit(t *testing.T) {
+	config := buildCopilotSDKToolConfig(&WorkflowData{
+		EngineConfig: &EngineConfig{CopilotSDK: true, MaxToolCalls: "24"},
+	}, nil)
+	if config.MaxToolCalls != "24" {
+		t.Fatalf("MaxToolCalls = %q, want %q", config.MaxToolCalls, "24")
 	}
 }
 
