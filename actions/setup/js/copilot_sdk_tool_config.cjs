@@ -3,6 +3,7 @@
 "use strict";
 
 const { createCopilotSDKWebFetchTool } = require("./copilot_sdk_web_fetch.cjs");
+const { parseMaxToolCalls } = require("./copilot_sdk_tool_budget.cjs");
 
 const COPILOT_SDK_TOOL_CONFIG_VERSION = 1;
 const COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS = Object.freeze(["view", "rg", "glob", "sql"]);
@@ -168,7 +169,7 @@ function parseCopilotSDKToolConfig(value) {
   if (allowedTools.length === 0) {
     throw new Error("permissions.allowedTools must not be empty");
   }
-  const maxToolCalls = Object.hasOwn(parsed, "maxToolCalls") ? require("./copilot_sdk_tool_budget.cjs").parseMaxToolCalls(parsed.maxToolCalls) : undefined;
+  const maxToolCalls = Object.hasOwn(parsed, "maxToolCalls") ? parseMaxToolCalls(parsed.maxToolCalls) : undefined;
   const config = {
     version: COPILOT_SDK_TOOL_CONFIG_VERSION,
     capabilities: parseCapabilities(parsed.capabilities),
