@@ -1,0 +1,42 @@
+---
+import { base } from './SafeByDefaultData';
+---
+
+<div class="sf-foot">
+  <p>
+    Try it safely: <a href={`${base}/reference/safe-outputs/`}><code>staged: true</code></a> previews every output without writing anything.
+  </p>
+  <p>
+    <a href={`${base}/introduction/architecture/`}>Read the security architecture →</a>
+  </p>
+</div>
+
+<style>
+  .sf-foot {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  p {
+    margin: 0;
+    font-size: var(--aw-step--1);
+    line-height: 1.7;
+    color: var(--aw-color-text-muted);
+  }
+  p + p {
+    margin-top: 0.5rem;
+  }
+  a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  code {
+    font-size: inherit;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    background: var(--aw-color-code-bg);
+    color: inherit;
+  }
+</style>

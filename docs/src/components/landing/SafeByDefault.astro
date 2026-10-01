@@ -1,6 +1,10 @@
 ---
 import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
+import VariantGroup from './VariantGroup.astro';
+import SafeByDefaultJourney from './SafeByDefaultJourney.astro';
+import SafeByDefaultVenn from './SafeByDefaultVenn.astro';
+import SafeByDefaultArchitecture from './SafeByDefaultArchitecture.astro';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
@@ -57,7 +61,19 @@ const layers = [
 ] as const;
 ---
 
-<LandingSection id="safety" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
+<VariantGroup
+  id="safety"
+  label="Safe by default"
+  variants={[
+    { key: 'a', name: 'Current: layer stack' },
+    { key: 'b', name: 'Request journey' },
+    { key: 'c', name: 'Breaking the trifecta' },
+    { key: 'd', name: 'Annotated architecture' },
+  ]}
+  defaultKey="a"
+>
+<div data-variant="a">
+<LandingSection titleId="safety-a-title" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
   <div class="aw-safe">
     <div class="aw-risk">
       <p class="aw-risk-intro">
@@ -118,6 +134,11 @@ const layers = [
     </p>
   </div>
 </LandingSection>
+</div>
+<div data-variant="b"><SafeByDefaultJourney /></div>
+<div data-variant="c"><SafeByDefaultVenn /></div>
+<div data-variant="d"><SafeByDefaultArchitecture /></div>
+</VariantGroup>
 
 <style>
   .aw-safe {

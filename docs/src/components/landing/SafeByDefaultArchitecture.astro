@@ -1,0 +1,353 @@
+---
+import LandingSection from './LandingSection.astro';
+import Foot from './SafeByDefaultFoot.astro';
+import { icon, layers, TRIFECTA_URL } from './SafeByDefaultData';
+
+const n = (id: (typeof layers)[number]['id']) => layers.findIndex((l) => l.id === id) + 1;
+const arrow = '<svg viewBox="0 0 24 8" width="24" height="8" aria-hidden="true"><path d="M0 4h22M18 1l4 3-4 3" fill="none" stroke="currentColor" stroke-width="1.25"/></svg>';
+---
+
+<LandingSection
+  titleId="safety-d-title"
+  tone="dark"
+  title="Safe by default"
+  lede="Agents read by default. Every write is checked before it lands."
+>
+  <div class="sa-root">
+    <p class="sa-intro">
+      An agent becomes dangerous when it combines private data, untrusted content and outbound access. Security
+      researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. This is where gh-aw breaks it.
+    </p>
+
+    <figure class="sa-diagram" aria-label="Architecture of a gh-aw run, with six numbered safeguards">
+      <div class="sa-row sa-top">
+        <div class="sa-box sa-compile">
+          <span class="sa-badge" data-n={n('compile')}>{n('compile')}</span>
+          <span class="sa-name">Workflow markdown</span>
+          <span class="sa-sub">Validated when compiled to a lock file</span>
+        </div>
+        <span class="sa-arrow" set:html={arrow} aria-hidden="true" />
+
+        <div class="sa-job">
+          <span class="sa-job-name"><span class="sa-ico" set:html={icon('workflow', 14)} />Agent job · GitHub Actions</span>
+          <div class="sa-job-grid">
+            <div class="sa-box sa-sandbox">
+              <span class="sa-badge" data-n={n('sandbox')}>{n('sandbox')}</span>
+              <span class="sa-name"><span class="sa-ico" set:html={icon('hubot', 16)} />Agent sandbox</span>
+              <span class="sa-sub">Read-only. No tokens inside.</span>
+            </div>
+              <div class="sa-link sa-link-1"><span class="sa-arrow" set:html={arrow} aria-hidden="true" /></div>
+              <div class="sa-box sa-proxy">
+                <span class="sa-badge" data-n={n('credentials')}>{n('credentials')}</span>
+                <span class="sa-name"><span class="sa-ico" set:html={icon('key', 16)} />API proxy and firewall</span>
+                <span class="sa-sub">Holds the tokens. Network allowlist.</span>
+              </div>
+              <div class="sa-link sa-link-2"><span class="sa-arrow" set:html={arrow} aria-hidden="true" /></div>
+              <div class="sa-box sa-gateway">
+                <span class="sa-badge" data-n={n('integrity')}>{n('integrity')}</span>
+                <span class="sa-name"><span class="sa-ico" set:html={icon('filter', 16)} />MCP gateway</span>
+                <span class="sa-sub">Filters untrusted content.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sa-down" aria-hidden="true"><span class="sa-arrow" set:html={arrow} /><span>Proposed outputs</span></div>
+
+      <div class="sa-row sa-bottom">
+        <div class="sa-box sa-threat">
+          <span class="sa-badge" data-n={n('threat')}>{n('threat')}</span>
+          <span class="sa-name"><span class="sa-ico" set:html={icon('shield', 16)} />Threat detection job</span>
+          <span class="sa-sub">Scans every proposed output.</span>
+        </div>
+        <span class="sa-arrow" set:html={arrow} aria-hidden="true" />
+        <div class="sa-box sa-outputs">
+          <span class="sa-badge" data-n={n('outputs')}>{n('outputs')}</span>
+          <span class="sa-name"><span class="sa-ico" set:html={icon('check-circle', 16)} />Safe outputs job</span>
+          <span class="sa-sub">Applies only the writes you declared.</span>
+        </div>
+        <span class="sa-arrow" set:html={arrow} aria-hidden="true" />
+        <div class="sa-box sa-repo">
+          <span class="sa-name"><span class="sa-ico" set:html={icon('repo', 16)} />Your repository</span>
+        </div>
+      </div>
+    </figure>
+
+    <ol class="sa-legend">
+      {layers.map((l, i) => (
+        <li class="sa-leg" data-n={i + 1}>
+          <span class="sa-badge sa-badge-static" aria-hidden="true">{i + 1}</span>
+          <div>
+            <h3>{l.name}</h3>
+            <p>{l.text}</p>
+            <a href={l.href}>Learn more <span class="sa-ico" set:html={icon('arrow-right', 12)} /></a>
+          </div>
+        </li>
+      ))}
+    </ol>
+
+    <Foot />
+  </div>
+</LandingSection>
+
+<style>
+  .sa-root {
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  .sa-ico {
+    display: inline-flex;
+    flex: none;
+  }
+  .sa-ico :global(svg) {
+    fill: currentColor;
+  }
+  a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .sa-intro {
+    margin: 0;
+    max-width: 58ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+
+  /* Diagram */
+  .sa-diagram {
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    display: grid;
+    gap: 1rem;
+  }
+  .sa-row {
+    display: grid;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .sa-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--aw-color-text-muted);
+    transform: rotate(90deg);
+    padding: 0.25rem 0;
+  }
+  .sa-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 1rem 1rem 1rem 1rem;
+    border: 1px solid var(--aw-color-border-strong);
+    border-radius: 10px;
+    background: var(--aw-color-surface);
+  }
+  .sa-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-right: 1.75rem;
+    font-size: var(--aw-step-0);
+    font-weight: 560;
+    color: var(--aw-color-text-strong);
+  }
+  .sa-name .sa-ico {
+    color: var(--aw-color-text-muted);
+  }
+  .sa-sub {
+    font-size: var(--aw-step--1);
+    line-height: 1.45;
+    color: var(--aw-color-text-secondary);
+  }
+  .sa-repo {
+    border-style: dashed;
+    justify-content: center;
+  }
+  .sa-compile {
+    justify-content: center;
+  }
+  .sa-job {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px dashed var(--aw-color-border-strong);
+    border-radius: 14px;
+  }
+  .sa-job-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem 0.25rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .sa-job-grid {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .sa-link {
+    display: flex;
+    justify-content: center;
+    color: var(--aw-color-text-muted);
+  }
+  .sa-link .sa-arrow {
+    padding: 0;
+  }
+  .sa-link-2 {
+    display: none;
+  }
+  .sa-down .sa-arrow {
+    transform: rotate(90deg);
+    padding: 0.5rem 0;
+  }
+  .sa-down {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+
+  /* Numbered badge: the same mark on the diagram and in the legend */
+  .sa-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--aw-color-accent-low);
+    border: 1px solid var(--aw-color-accent);
+    color: var(--aw-color-text-strong);
+    font-size: var(--aw-step--1);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+  }
+  .sa-badge-static {
+    position: static;
+    flex: none;
+  }
+  .sa-root:has(.sa-leg:is(:hover, :focus-within)) .sa-badge {
+    opacity: 0.45;
+  }
+  .sa-root:has(.sa-leg[data-n='1']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='1'],
+  .sa-root:has(.sa-leg[data-n='2']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='2'],
+  .sa-root:has(.sa-leg[data-n='3']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='3'],
+  .sa-root:has(.sa-leg[data-n='4']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='4'],
+  .sa-root:has(.sa-leg[data-n='5']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='5'],
+  .sa-root:has(.sa-leg[data-n='6']:is(:hover, :focus-within)) .sa-diagram .sa-badge[data-n='6'] {
+    opacity: 1;
+    transform: scale(1.2);
+    background: var(--aw-color-accent);
+    color: var(--aw-color-text-invert);
+  }
+
+  /* Legend */
+  .sa-legend {
+    list-style: none;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0 clamp(2rem, 4vw, 3rem);
+  }
+  .sa-leg {
+    display: flex;
+    gap: 1rem;
+    padding-block: 1.25rem;
+    border-top: 1px solid var(--aw-color-border);
+  }
+  .sa-leg h3 {
+    margin: 0;
+    font-size: var(--aw-step-0);
+    font-weight: 560;
+    color: var(--aw-color-text-strong);
+  }
+  .sa-leg p {
+    margin: 0.375rem 0 0.5rem;
+    max-width: 44ch;
+    font-size: var(--aw-step--1);
+    line-height: 1.55;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .sa-leg a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--aw-step--1);
+  }
+  @media (min-width: 40rem) {
+    .sa-legend {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .sa-legend {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* Diagram, wide: rows run left to right */
+  @media (min-width: 64rem) {
+    .sa-top {
+      grid-template-columns: 11rem auto minmax(0, 1fr);
+    }
+    .sa-bottom {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 0.7fr);
+    }
+    .sa-arrow,
+    .sa-link .sa-arrow {
+      transform: none;
+      padding: 0 0.25rem;
+    }
+    .sa-job-grid {
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: stretch;
+    }
+    .sa-sandbox {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      justify-content: center;
+    }
+    .sa-link-1,
+    .sa-proxy {
+      grid-row: 1;
+    }
+    .sa-link-2,
+    .sa-gateway {
+      grid-row: 2;
+    }
+    .sa-link {
+      grid-column: 2;
+      align-items: center;
+    }
+    .sa-proxy,
+    .sa-gateway {
+      grid-column: 3;
+    }
+    .sa-link-2 {
+      display: flex;
+    }
+    .sa-down {
+      justify-content: flex-start;
+      padding-left: 1rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sa-badge {
+      transition: none;
+    }
+  }
+</style>

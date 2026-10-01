@@ -1,0 +1,444 @@
+---
+import LandingSection from './LandingSection.astro';
+import Foot from './SafeByDefaultFoot.astro';
+import { icon, layers, risks, TRIFECTA_URL } from './SafeByDefaultData';
+---
+
+<LandingSection
+  titleId="safety-b-title"
+  tone="subtle"
+  title="Safe by default"
+  lede="Agents read by default. Every write is checked before it lands."
+>
+  <div class="sj-root" data-sj-root>
+    <p class="sj-intro">
+      An agent becomes dangerous when it combines private data, untrusted content and outbound access. Security
+      researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six gates between the agent
+      and your repository.
+    </p>
+
+    <div class="sj-bar">
+      <p class="sj-hint">Select a gate to see what it does.</p>
+      <button type="button" class="sj-pause" data-sj-pause aria-pressed="false" hidden>
+        <span class="sj-ico sj-i-pause" set:html={icon('pause', 12)} />
+        <span class="sj-ico sj-i-play" set:html={icon('play', 12)} />
+        <span class="sj-pause-label">Pause animation</span>
+      </button>
+    </div>
+
+    <div class="sj-pipe">
+      <div class="sj-line" aria-hidden="true"><span class="sj-packet"></span></div>
+      <ol class="sj-nodes" aria-label="Request path from the agent to your repository">
+        <li class="sj-node sj-end" style="--i:0">
+          <span class="sj-dot"><span class="sj-ico" set:html={icon('hubot', 20)} /></span>
+          <span class="sj-label">The agent</span>
+        </li>
+        {layers.map((l, i) => (
+          <li class="sj-node sj-gate-li" style={`--i:${i + 1}`}>
+            <button
+              type="button"
+              class:list={['sj-gate', i === 0 && 'is-active']}
+              id={`sj-${l.id}-btn`}
+              aria-controls={`sj-${l.id}`}
+              aria-expanded={i === 0 ? 'true' : 'false'}
+            >
+              <span class="sj-dot"><span class="sj-ico" set:html={icon(l.icon, 20)} /></span>
+              <span class="sj-label">{l.short}</span>
+            </button>
+          </li>
+        ))}
+        <li class="sj-node sj-end" style="--i:7">
+          <span class="sj-dot"><span class="sj-ico" set:html={icon('repo', 20)} /></span>
+          <span class="sj-label">Your repository</span>
+        </li>
+      </ol>
+    </div>
+
+    <div class="sj-details">
+      {layers.map((l, i) => (
+        <div
+          class:list={['sj-detail', i === 0 && 'is-active']}
+          id={`sj-${l.id}`}
+          role="region"
+          aria-labelledby={`sj-${l.id}-btn`}
+        >
+          <span class="sj-ico sj-detail-icon" set:html={icon(l.icon, 20)} />
+          <div>
+            <h3>{l.name}</h3>
+            <p>{l.text}</p>
+            <a href={l.href}>Learn more <span class="sj-ico" set:html={icon('arrow-right', 12)} /></a>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <Foot />
+  </div>
+</LandingSection>
+
+<style>
+  .sj-root {
+    --sj-t: 18s;
+    --sj-dot: 3rem;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  .sj-ico {
+    display: inline-flex;
+    flex: none;
+  }
+  .sj-ico :global(svg) {
+    fill: currentColor;
+  }
+  a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 3px;
+  }
+  .sj-intro {
+    margin: 0;
+    max-width: 58ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+
+  .sj-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+    min-height: 2rem;
+  }
+  .sj-hint {
+    margin: 0;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .sj-pause {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    white-space: nowrap;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--aw-color-border-strong);
+    border-radius: 999px;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+    cursor: pointer;
+  }
+  .sj-pause[hidden] {
+    display: none;
+  }
+  .sj-pause:hover {
+    color: var(--aw-color-text-strong);
+    background: var(--aw-color-surface);
+  }
+  .sj-pause:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .sj-i-play,
+  .sj-pause[aria-pressed='true'] .sj-i-pause {
+    display: none;
+  }
+  .sj-pause[aria-pressed='true'] .sj-i-play {
+    display: inline-flex;
+  }
+
+  /* Pipeline: desktop is a row, mobile a column */
+  .sj-pipe {
+    position: relative;
+    margin-top: 1rem;
+  }
+  .sj-nodes {
+    position: relative;
+    z-index: 1;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .sj-node {
+    display: flex;
+    min-width: 0;
+  }
+  .sj-gate {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    gap: 0.75rem;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .sj-dot {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--sj-dot);
+    height: var(--sj-dot);
+    border: 1px solid var(--aw-color-border-strong);
+    border-radius: 50%;
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text-muted);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .sj-end .sj-dot {
+    border-style: dashed;
+  }
+  .sj-label {
+    font-size: var(--aw-step--1);
+    line-height: 1.35;
+    color: var(--aw-color-text-secondary);
+    text-wrap: balance;
+  }
+  .sj-gate:hover .sj-dot {
+    border-color: var(--aw-color-text-muted);
+    color: var(--aw-color-text);
+  }
+  .sj-gate:hover .sj-label {
+    color: var(--aw-color-text);
+  }
+  .sj-gate.is-active .sj-dot {
+    border-color: var(--aw-color-accent);
+    background: var(--aw-color-accent-low);
+    color: var(--aw-color-accent-text);
+  }
+  .sj-gate.is-active .sj-label {
+    color: var(--aw-color-text-strong);
+    font-weight: 560;
+  }
+  .sj-gate:focus-visible {
+    outline: none;
+  }
+  .sj-gate:focus-visible .sj-dot {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 3px;
+  }
+
+  /* the soft ring that marks the packet passing each gate */
+  .sj-dot::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border: 1px solid var(--aw-color-accent);
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    animation: sj-pass var(--sj-t) linear infinite;
+    animation-delay: calc(var(--sj-t) * 0.06 + var(--sj-t) * 0.86 * var(--i) / 7 - 0.3s);
+  }
+  @keyframes sj-pass {
+    0% { opacity: 0; transform: scale(0.9); }
+    2% { opacity: 0.9; transform: scale(1); }
+    6% { opacity: 0; transform: scale(1.12); }
+    100% { opacity: 0; }
+  }
+
+  /* line + packet */
+  .sj-line {
+    position: absolute;
+    z-index: 0;
+    background: var(--aw-color-border-strong);
+  }
+  .sj-packet {
+    position: absolute;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--aw-color-accent);
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    animation: sj-travel-x var(--sj-t) linear infinite;
+  }
+  @keyframes sj-travel-x {
+    0% { left: 0; opacity: 0; }
+    6% { left: 0; opacity: 1; }
+    92% { left: 100%; opacity: 1; }
+    98% { left: 100%; opacity: 0; }
+    100% { left: 100%; opacity: 0; }
+  }
+  @keyframes sj-travel-y {
+    0% { top: 0; opacity: 0; }
+    6% { top: 0; opacity: 1; }
+    92% { top: 100%; opacity: 1; }
+    98% { top: 100%; opacity: 0; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .sj-root.is-paused .sj-packet,
+  .sj-root.is-paused .sj-dot::after {
+    animation-play-state: paused;
+  }
+
+  /* mobile: vertical */
+  .sj-line {
+    left: calc(var(--sj-dot) / 2);
+    top: calc(var(--sj-dot) / 2);
+    bottom: calc(var(--sj-dot) / 2);
+    width: 1px;
+  }
+  .sj-packet {
+    left: 50%;
+    animation-name: sj-travel-y;
+  }
+  .sj-node {
+    min-height: var(--sj-dot);
+    align-items: center;
+  }
+  .sj-gate {
+    align-items: center;
+  }
+  .sj-node.sj-end {
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  @media (min-width: 52rem) {
+    .sj-nodes {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    .sj-node {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.75rem;
+    }
+    .sj-gate {
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      gap: 0.75rem;
+    }
+    .sj-node.sj-end {
+      flex-direction: column;
+      min-height: 0;
+    }
+    .sj-line {
+      left: calc(100% / 16);
+      right: calc(100% / 16);
+      top: calc(var(--sj-dot) / 2);
+      bottom: auto;
+      width: auto;
+      height: 1px;
+    }
+    .sj-packet {
+      top: 50%;
+      left: 0;
+      animation-name: sj-travel-x;
+    }
+    .sj-label {
+      padding-inline: 0.25rem;
+    }
+  }
+
+  /* Details */
+  .sj-details {
+    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+    display: grid;
+    gap: 1rem;
+    max-width: 44rem;
+  }
+  .sj-detail {
+    display: flex;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    background: var(--aw-color-surface);
+  }
+  .sj-detail-icon {
+    margin-top: 0.2rem;
+    color: var(--aw-color-accent-text);
+  }
+  .sj-detail h3 {
+    margin: 0;
+    font-size: var(--aw-step-1);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--aw-color-text-strong);
+  }
+  .sj-detail p {
+    margin: 0.5rem 0 0.75rem;
+    max-width: 52ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .sj-detail a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--aw-step--1);
+  }
+  [data-enhanced] .sj-detail:not(.is-active) {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sj-packet,
+    .sj-dot::after,
+    .sj-pause {
+      display: none !important;
+    }
+    .sj-dot {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-sj-root]');
+  if (root) {
+    const gates = Array.from(root.querySelectorAll<HTMLButtonElement>('.sj-gate'));
+    const details = Array.from(root.querySelectorAll<HTMLElement>('.sj-detail'));
+    const setActive = (idx: number) => {
+      gates.forEach((g, i) => {
+        g.classList.toggle('is-active', i === idx);
+        g.setAttribute('aria-expanded', String(i === idx));
+        details[i].classList.toggle('is-active', i === idx);
+      });
+    };
+    root.setAttribute('data-enhanced', '');
+    gates.forEach((g, i) => {
+      g.addEventListener('click', () => setActive(i));
+      g.addEventListener('focus', () => setActive(i));
+      g.addEventListener('keydown', (e) => {
+        const next: Record<string, number> = {
+          ArrowRight: (i + 1) % gates.length,
+          ArrowDown: (i + 1) % gates.length,
+          ArrowLeft: (i - 1 + gates.length) % gates.length,
+          ArrowUp: (i - 1 + gates.length) % gates.length,
+          Home: 0,
+          End: gates.length - 1,
+        };
+        if (!(e.key in next)) return;
+        e.preventDefault();
+        gates[next[e.key]].focus();
+      });
+    });
+
+    const pause = root.querySelector<HTMLButtonElement>('[data-sj-pause]');
+    if (pause) {
+      pause.hidden = false;
+      const label = pause.querySelector('.sj-pause-label')!;
+      pause.addEventListener('click', () => {
+        const paused = root.classList.toggle('is-paused');
+        pause.setAttribute('aria-pressed', String(paused));
+        label.textContent = paused ? 'Play animation' : 'Pause animation';
+      });
+    }
+  }
+</script>
