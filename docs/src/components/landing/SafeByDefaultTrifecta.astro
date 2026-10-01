@@ -211,6 +211,17 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     display: grid;
     gap: 2.5rem;
   }
+  /* Wide screens: paragraph on the left, diagram on the right. */
+  @media (min-width: 64rem) {
+    .tri {
+      grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+      gap: 3rem;
+      align-items: center;
+    }
+    .tri-fig {
+      margin-right: 0;
+    }
+  }
   .tri-text {
     margin: 0;
     max-width: 60ch;
