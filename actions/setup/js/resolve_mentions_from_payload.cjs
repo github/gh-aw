@@ -172,9 +172,10 @@ async function fetchTeamMembers(teamEntry, defaultOrg, github, core) {
  * @param {any} core - GitHub Actions core
  * @param {any} [mentionsConfig] - Mentions configuration from safe-outputs
  * @param {string[]} [extraKnownAuthors] - Additional known authors to allow (e.g. pre-fetched target issue authors)
+ * @param {{ owner: string, repo: string }} [targetRepo] - Repository receiving the safe output
  * @returns {Promise<string[]>} Array of allowed mention usernames
  */
-async function resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, extraKnownAuthors) {
+async function resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, extraKnownAuthors, targetRepo) {
   // Return empty array if context is not available (e.g., in tests)
   if (!context || !github || !core) {
     return [];
@@ -193,7 +194,7 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   const allowedTeams = mentionsConfig?.allowedTeams || [];
 
   try {
-    const { owner, repo } = context.repo;
+    const { owner, repo } = targetRepo ?? context.repo;
     const knownAuthors = allowContext ? extractKnownAuthorsFromPayload(context) : [];
 
     // Add allowed list (always included regardless of configuration)
@@ -206,7 +207,7 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
       core.info(`[MENTIONS] Fetching members for ${allowedTeams.length} configured team(s)`);
       for (const teamEntry of allowedTeams) {
         if (typeof teamEntry === "string" && teamEntry.length > 0) {
-          const teamMembers = await fetchTeamMembers(teamEntry, owner, github, core);
+          const teamMembers = await fetchTeamMembers(teamEntry, context.repo.owner, github, core);
           knownAuthors.push(...teamMembers);
         }
       }

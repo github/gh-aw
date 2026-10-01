@@ -309,6 +309,18 @@ describe("resolveAllowedMentionsFromPayload", () => {
     expect(result).toContain("alice");
   });
 
+  it("checks collaborators in the target repository instead of the workflow repository", async () => {
+    const context = {
+      eventName: "issues",
+      payload: { issue: { user: { login: "alice", type: "User" } } },
+      repo: { owner: "workflow-org", repo: "workflow-repo" },
+    };
+    mockGithub.rest = { repos: { listCollaborators: vi.fn().mockResolvedValue({ data: [] }) } };
+    await resolveAllowedMentionsFromPayload(context, mockGithub, mockCore, undefined, undefined, { owner: "target-org", repo: "target-repo" });
+    expect(mockGithub.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "target-repo" }));
+    expect(mockGithub.rest.repos.listCollaborators).not.toHaveBeenCalledWith(expect.objectContaining({ owner: "workflow-org", repo: "workflow-repo" }));
+  });
+
   it("includes extra known authors", async () => {
     const context = {
       eventName: "issues",

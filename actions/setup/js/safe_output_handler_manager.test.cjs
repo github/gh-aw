@@ -617,6 +617,21 @@ describe("Safe Output Handler Manager", () => {
       }
     });
 
+    it("resolves each handler's mentions against its configured target repository", async () => {
+      const addCommentModule = require("./add_comment.cjs");
+      const addCommentMainSpy = vi.spyOn(addCommentModule, "main").mockImplementation(async () => async () => ({ success: true }));
+      global.context = { eventName: "issues", payload: { issue: { user: { login: "alice", type: "User" } } }, repo: { owner: "workflow-org", repo: "workflow-repo" } };
+      global.github = { rest: { repos: { listCollaborators: vi.fn().mockResolvedValue({ data: [] }) } } };
+
+      try {
+        await loadHandlers({ add_comment: { "target-repo": "target-org/target-repo" }, mentions: { allowContext: true } });
+        expect(global.github.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "target-repo" }));
+        expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalledWith(expect.objectContaining({ owner: "workflow-org", repo: "workflow-repo" }));
+      } finally {
+        addCommentMainSpy.mockRestore();
+      }
+    });
+
     it("injects GH_AW_PROJECT_GITHUB_TOKEN for project handlers when github-token is missing", async () => {
       process.env.GH_AW_PROJECT_GITHUB_TOKEN = "projects-token";
       global.getOctokit = vi.fn().mockReturnValue({ client: "project-client" });
