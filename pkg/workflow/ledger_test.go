@@ -34,6 +34,32 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
+func TestSingleWorkPoolLedgerCompiles(t *testing.T) {
+	workflowDir := t.TempDir()
+	workflowPath := filepath.Join(workflowDir, "work-pool.md")
+	workflow := `---
+on: workflow_dispatch
+engine: copilot
+tools:
+  ledger:
+    type: work-pool
+    identity: [task]
+---
+
+# Work pool
+
+Process queued work.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(workflowPath)
+	require.NoError(t, err)
+	require.Len(t, data.LedgerConfig.Ledgers, 1)
+	require.Equal(t, "work-pool", data.LedgerConfig.Ledgers[0].Type)
+	require.Equal(t, []string{"task"}, data.LedgerConfig.Ledgers[0].Identity)
+	require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+}
+
 func TestBuiltinLedgerDeclarations(t *testing.T) {
 	named, err := parseLedgerToolConfig(map[string]any{
 		"type": map[string]any{},
@@ -234,6 +260,14 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	typedLedger := typedSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
 	require.Equal(t, "table", typedLedger["type"])
 	require.Equal(t, "id", typedLedger["key"])
+
+	workPoolConfig := &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "pool", Type: "work-pool", Identity: []string{"task"}}}}
+	workPoolJSON, err := generateSafeOutputsConfig(&WorkflowData{SafeOutputs: &SafeOutputsConfig{}, LedgerConfig: workPoolConfig})
+	require.NoError(t, err)
+	var workPoolSafeOutput map[string]any
+	require.NoError(t, json.Unmarshal([]byte(workPoolJSON), &workPoolSafeOutput))
+	workPoolLedger := workPoolSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
+	require.Equal(t, []any{"task"}, workPoolLedger["identity"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))

@@ -55,6 +55,22 @@ test("release, successor generation, cancellation and no resurrection", () => {
   assert.equal(reducer.output().tables.work.rows[0].effective_claim_id, null);
 });
 
+test("claimants can acquire and finish multiple Work items sequentially", () => {
+  const reducer = createReducer(config);
+  const first = { task: "first" };
+  const second = { task: "second" };
+  const third = { task: "third" };
+  step(reducer, { operation: "submit", work: first });
+  step(reducer, { operation: "submit", work: second });
+  assert.equal(step(reducer, { operation: "acquire", work: first }).outcome, "acquired");
+  assert.equal(step(reducer, { operation: "abandon" }).outcome, "abandoned");
+  assert.equal(step(reducer, { operation: "acquire-next", filter: { task: "second" } }).outcome, "acquired");
+  assert.equal(step(reducer, { operation: "finish" }).outcome, "finished");
+  step(reducer, { operation: "submit", work: third });
+  assert.equal(step(reducer, { operation: "acquire-next", filter: { task: "third" } }).outcome, "acquired");
+  assert.equal(step(reducer, { operation: "finish" }).outcome, "finished");
+});
+
 test("competing claims converge, stale owners cannot finish or abandon", () => {
   const id = workId(work, config);
   const first = { operation: "claim", work_id: id, claimant: "a", previous_claim_id: null, claim_id: claimId(id, "a", null) };

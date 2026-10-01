@@ -58,6 +58,9 @@ or from the configured `identity` list of top-level Work fields. Its optional
 attempt, never a caller-provided ID. Facts retain immutable claims, releases,
 completions and cancellations; cancellation is terminal. Arbitration uses
 generation and Claim ID rather than record order or timestamps.
+Without a schema, Work properties are unrestricted, but the full payload is
+pinned to its identity: submitting a different payload for the same identity
+is invalid.
 
 `ledger_append` is a **deferred** safe output: its immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome

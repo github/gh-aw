@@ -38,7 +38,7 @@ function validateIntent(intent, config) {
     abandon: ["reason"],
     cancel: ["work"],
   }[intent.operation];
-  if (Object.keys(intent).some(key => key !== "operation" && !fields.includes(key))) throw new TypeError("Invalid work-pool operation fields");
+  if (Object.keys(intent).some(key => key !== "operation" && key !== "id" && !fields.includes(key))) throw new TypeError("Invalid work-pool operation fields");
   if (["submit", "acquire", "cancel"].includes(intent.operation)) checkWork(intent.work, config);
   if (intent.operation === "acquire-next" && intent.filter !== undefined) {
     if (!intent.filter || typeof intent.filter !== "object" || Array.isArray(intent.filter) || Object.keys(intent.filter).some(key => STRUCTURAL.has(key))) throw new TypeError("Invalid work-pool filter");
@@ -188,7 +188,6 @@ function createReducer(config) {
     }
     if (intent.operation === "acquire-next") {
       if (active) return { outcome: "acquired", facts: [] };
-      if ([...claims.values()].some(claim => claim.claimant === claimant)) return { outcome: "no_work", facts: [] };
       const matching = [...work.values()].filter(
         item => item.state === "available" && Object.entries(intent.filter || {}).every(([key, value]) => Object.hasOwn(item.payload, key) && canonicalJSON(item.payload[key]) === canonicalJSON(value))
       );
@@ -212,7 +211,7 @@ function createReducer(config) {
       const effective = preview.snapshot().claims.get(fact.claim_id)?.effective;
       return { outcome: effective ? "acquired" : "busy", facts: additions };
     }
-    const mine = [...claims.values()].find(claim => claim.claimant === claimant && (claim.effective || !claim.released || intent.operation === "abandon" || intent.operation === "finish"));
+    const mine = active || [...claims.values()].find(claim => claim.claimant === claimant && (claim.effective || !claim.released || intent.operation === "abandon" || intent.operation === "finish"));
     if (!mine) return { outcome: "nothing_acquired", facts: [] };
     if (intent.operation === "abandon" && mine.released) return { outcome: "already_abandoned", facts: [] };
     if (intent.operation === "finish" && work.get(mine.work_id).state === "completed" && facts.has(`completion:${mine.claim_id}`)) return { outcome: "already_finished", facts: [] };
