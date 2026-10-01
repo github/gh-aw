@@ -23,8 +23,9 @@ function toolHandler(operation) {
   };
 }
 
-function createDispatchWorkCoordinatorServer({ coordinator }) {
+function createDispatchWorkCoordinatorServer({ coordinator, workSchema }) {
   if (!coordinator) throw new TypeError("Dispatch Work Coordinator is required");
+  if (!workSchema || typeof workSchema !== "object" || Array.isArray(workSchema)) throw new TypeError("Dispatch Work Coordinator requires a Work schema");
   const server = createServer({ name: "dispatch-work-coordinator", version: "1.0.0" });
 
   registerTool(server, {
@@ -32,7 +33,7 @@ function createDispatchWorkCoordinatorServer({ coordinator }) {
     description: "Submit Work to the durable Dispatch Work Coordinator queue. Identical Work is idempotent.",
     inputSchema: {
       type: "object",
-      properties: { work: { type: "object", description: "JSON object describing the Work item." } },
+      properties: { work: workSchema },
       required: ["work"],
       additionalProperties: false,
     },
@@ -121,9 +122,19 @@ function createDispatchWorkCoordinatorServer({ coordinator }) {
 
 function createServerFromEnvironment() {
   const token = process.env.GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN;
+  const schemaJSON = process.env.GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA;
   const repository = process.env.GITHUB_REPOSITORY;
-  if (!token || typeof repository !== "string" || !/^[^/]+\/[^/]+$/.test(repository)) {
+  if (!token || typeof schemaJSON !== "string" || Buffer.byteLength(schemaJSON, "utf8") > 16 * 1024 || typeof repository !== "string" || !/^[^/]+\/[^/]+$/.test(repository)) {
     throw new TypeError("Dispatch Work Coordinator runtime configuration is incomplete");
+  }
+  let workSchema;
+  try {
+    workSchema = JSON.parse(schemaJSON);
+  } catch (error) {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid", { cause: error });
+  }
+  if (!workSchema || typeof workSchema !== "object" || Array.isArray(workSchema) || workSchema.type !== "object") {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid");
   }
   const [owner, repo] = repository.split("/");
   const workflowRef = process.env.GITHUB_WORKFLOW_REF;
@@ -134,8 +145,9 @@ function createServerFromEnvironment() {
     identity: workflowRef?.split("@", 1)[0],
     runId: process.env.GITHUB_RUN_ID,
     workflowId: workflowRef,
+    workSchema,
   });
-  return createDispatchWorkCoordinatorServer({ coordinator });
+  return createDispatchWorkCoordinatorServer({ coordinator, workSchema });
 }
 
 if (require.main === module) {

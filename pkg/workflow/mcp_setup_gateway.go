@@ -130,6 +130,10 @@ func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpE
 		if isReservedMCPGatewayEnvVar(envVarName) {
 			continue
 		}
+		if envVarName == "GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA" {
+			yaml.WriteString(formatYAMLEnv("          ", envVarName, mcpEnvVars[envVarName]))
+			continue
+		}
 		fmt.Fprintf(yaml, "          %s: %s\n", envVarName, mcpEnvVars[envVarName])
 	}
 	// Write safe-outputs input env vars (sorted); these must also be present in the

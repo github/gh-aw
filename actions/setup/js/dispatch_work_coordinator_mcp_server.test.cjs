@@ -5,6 +5,13 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { createDispatchWorkCoordinatorServer } from "./dispatch_work_coordinator_mcp_server.cjs";
 
+const workSchema = {
+  type: "object",
+  properties: { title: { type: "string" } },
+  required: ["title"],
+  additionalProperties: false,
+};
+
 test("MCP server exposes only explicitly named Work operations", () => {
   const coordinator = {
     submit: async work => ({ work }),
@@ -15,14 +22,15 @@ test("MCP server exposes only explicitly named Work operations", () => {
     claimNext: async filter => ({ filter }),
     cancel: async workId => ({ workId }),
   };
-  const server = createDispatchWorkCoordinatorServer({ coordinator });
+  const server = createDispatchWorkCoordinatorServer({ coordinator, workSchema });
   assert.deepEqual(Object.keys(server.tools).sort(), ["dispatch_work_cancel", "dispatch_work_claim", "dispatch_work_claim_next", "dispatch_work_get", "dispatch_work_list", "dispatch_work_status", "dispatch_work_submit"]);
   for (const tool of Object.values(server.tools)) {
     assert.equal(tool.inputSchema.additionalProperties, false);
   }
-  assert.equal(server.tools.dispatch_work_submit.inputSchema.properties.work.type, "object");
+  assert.deepEqual(server.tools.dispatch_work_submit.inputSchema.properties.work, workSchema);
   assert.equal(server.tools.dispatch_work_claim.inputSchema.properties.work_id.type, "string");
   assert.throws(() => createDispatchWorkCoordinatorServer({ coordinator: undefined }), /required/);
+  assert.throws(() => createDispatchWorkCoordinatorServer({ coordinator }), /Work schema/);
 });
 
 test("MCP handlers use the coordinator and return safe validation errors", async () => {
@@ -32,7 +40,7 @@ test("MCP handlers use the coordinator and return safe validation errors", async
       return { work_id: workId };
     },
   };
-  const server = createDispatchWorkCoordinatorServer({ coordinator });
+  const server = createDispatchWorkCoordinatorServer({ coordinator, workSchema });
   assert.deepEqual(await server.tools.dispatch_work_get.handler({ work_id: "work-a" }), {
     content: [{ type: "text", text: JSON.stringify({ work_id: "work-a" }) }],
   });

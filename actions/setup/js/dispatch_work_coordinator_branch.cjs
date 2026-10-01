@@ -4,6 +4,7 @@
 const crypto = require("node:crypto");
 const { TextDecoder } = require("node:util");
 const { deriveWorkId, parseTransactionLog, replayTransactions, serializeTransactions } = require("./dispatch_work_coordinator.cjs");
+const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const COORDINATOR_FILE = "dispatch-work-coordinator.jsonl";
 const MAX_ATTEMPTS = 5;
@@ -41,7 +42,7 @@ function decodeContent(content) {
   return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(encoded, "base64"));
 }
 
-async function readSnapshot({ githubClient, owner, repo, branchName }) {
+async function readSnapshot({ githubClient, owner, repo, branchName, workSchema }) {
   let ref;
   try {
     ({ data: ref } = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${branchName}` }));
@@ -62,6 +63,11 @@ async function readSnapshot({ githubClient, owner, repo, branchName }) {
   }
   const { data: content } = await githubClient.rest.git.getBlob({ owner, repo, file_sha: entries[0].sha });
   const transactions = parseTransactionLog(decodeContent(content));
+  for (const transaction of transactions) {
+    if (transaction.type === "Work" && validateValueAgainstSchema(transaction.work, workSchema)) {
+      throw new TypeError("Coordinator branch contains Work that violates its configured schema");
+    }
+  }
   return { headSha, transactions, projection: replayTransactions(transactions) };
 }
 
@@ -105,7 +111,7 @@ async function writeSnapshot({ githubClient, owner, repo, branchName, headSha, t
 }
 
 class DispatchWorkCoordinator {
-  constructor({ githubClient, owner, repo, identity, runId, workflowId, maxAttempts = MAX_ATTEMPTS, sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)), random = Math.random }) {
+  constructor({ githubClient, owner, repo, identity, runId, workflowId, workSchema, maxAttempts = MAX_ATTEMPTS, sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)), random = Math.random }) {
     if (!githubClient?.rest?.git || !githubClient?.rest?.repos) throw new TypeError("Coordinator requires a GitHub client");
     if (typeof owner !== "string" || !owner || typeof repo !== "string" || !repo) throw new TypeError("Coordinator requires a repository");
     if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > MAX_ATTEMPTS) throw new TypeError("Invalid coordinator retry limit");
@@ -115,12 +121,14 @@ class DispatchWorkCoordinator {
     this.branchName = coordinatorBranchName(identity);
     this.runId = runId;
     this.workflowId = workflowId;
+    this.workSchema = workSchema;
     this.maxAttempts = maxAttempts;
     this.sleep = sleep;
     this.random = random;
     if (typeof runId !== "string" || !runId || typeof workflowId !== "string" || !workflowId) {
       throw new TypeError("Coordinator requires trusted workflow-run provenance");
     }
+    if (!workSchema || typeof workSchema !== "object" || Array.isArray(workSchema)) throw new TypeError("Coordinator requires a Work schema");
   }
 
   async read() {
@@ -129,6 +137,7 @@ class DispatchWorkCoordinator {
       owner: this.owner,
       repo: this.repo,
       branchName: this.branchName,
+      workSchema: this.workSchema,
     });
   }
 
@@ -161,6 +170,7 @@ class DispatchWorkCoordinator {
   }
 
   async submit(work) {
+    if (validateValueAgainstSchema(work, this.workSchema)) throw new TypeError("Work payload does not match its configured schema");
     const workId = deriveWorkId(work);
     const snapshot = await this.mutate((transactions, projection) => {
       if (projection.works.some(item => item.work_id === workId)) return transactions;

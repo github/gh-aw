@@ -112,6 +112,7 @@ function coordinator(client, options = {}) {
     identity: "octo/repo/.github/workflows/dispatch.yml",
     runId: "1234",
     workflowId: "octo/repo/.github/workflows/dispatch.yml@refs/heads/main",
+    workSchema: { type: "object" },
     sleep: async () => {},
     random: () => 0,
     ...options,
@@ -136,6 +137,24 @@ test("submit initializes an isolated branch with one canonical transaction log a
   assert.equal(second.work_id, first.work_id);
   assert.equal((await client.getTransactions(instance.branchName)).length, 1);
   assert.equal(client.branchExists(instance.branchName), true);
+});
+
+test("submit and replay enforce the configured Work schema", async () => {
+  const client = mockGitHub();
+  const schema = {
+    type: "object",
+    properties: { title: { type: "string" } },
+    required: ["title"],
+    additionalProperties: false,
+  };
+  const instance = coordinator(client, { workSchema: schema });
+  await assert.rejects(instance.submit({ title: 42 }), /configured schema/);
+  await assert.rejects(instance.submit({}), /configured schema/);
+  await instance.submit({ title: "Valid" });
+
+  const invalidWork = { title: 42 };
+  await client.seed(instance.branchName, [{ type: "Work", work_id: deriveWorkId(invalidWork), work: invalidWork }]);
+  await assert.rejects(instance.status(), /violates its configured schema/);
 });
 
 test("each call reads the latest branch and replayed projection", async () => {

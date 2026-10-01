@@ -162,9 +162,6 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		if memory.Ledger.Schema != "" {
 			envVars["GH_AW_LEDGER_SCHEMA"] = memory.Ledger.Schema
 		}
-		if workflowData.DispatchWorkCoordinator != nil {
-			envVars["GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
-		}
 		if memory.Ledger.MaxShards > 0 {
 			envVars["GH_AW_LEDGER_MAX_SHARDS"] = strconv.Itoa(memory.Ledger.MaxShards)
 		}
@@ -177,6 +174,10 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		if memory.Ledger.MaxPatchKB > 0 {
 			envVars["GH_AW_LEDGER_MAX_PATCH_KB"] = strconv.Itoa(memory.Ledger.MaxPatchKB)
 		}
+	}
+	if workflowData.DispatchWorkCoordinator != nil {
+		envVars["GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
+		envVars["GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA"] = workflowData.DispatchWorkCoordinator.SchemaJSON
 	}
 
 	// Check for mcp-scripts env vars
