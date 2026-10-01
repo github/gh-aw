@@ -1,7 +1,8 @@
 ---
 import LandingSection from './LandingSection.astro';
+import SafeByDefaultTrifecta from './SafeByDefaultTrifecta.astro';
 import Foot from './SafeByDefaultFoot.astro';
-import { icon, layers, risks, TRIFECTA_URL } from './SafeByDefaultData';
+import { icon, layers } from './SafeByDefaultData';
 ---
 
 <LandingSection
@@ -11,11 +12,7 @@ import { icon, layers, risks, TRIFECTA_URL } from './SafeByDefaultData';
   lede="Agents read by default. Every write is checked before it lands."
 >
   <div class="sj-root" data-sj-root>
-    <p class="sj-intro">
-      An agent becomes dangerous when it combines private data, untrusted content and outbound access. Security
-      researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six gates between the agent
-      and your repository.
-    </p>
+    <SafeByDefaultTrifecta noun="gates" />
 
     <div class="sj-bar">
       <p class="sj-hint">Select a gate to see what it does.</p>
@@ -97,14 +94,6 @@ import { icon, layers, risks, TRIFECTA_URL } from './SafeByDefaultData';
   button:focus-visible {
     outline: 2px solid var(--aw-color-accent);
     outline-offset: 3px;
-  }
-  .sj-intro {
-    margin: 0;
-    max-width: 58ch;
-    font-size: var(--aw-step-0);
-    line-height: 1.6;
-    color: var(--aw-color-text-secondary);
-    text-wrap: pretty;
   }
 
   .sj-bar {

@@ -6,12 +6,6 @@ export const TRIFECTA_URL = 'https://simonw.substack.com/p/the-lethal-trifecta-f
 export const icon = (n: keyof typeof octicons, size = 16) =>
   octicons[n].toSVG({ width: size, height: size });
 
-export const risks = [
-  { icon: 'lock', label: 'Private data', text: 'Code, secrets and issues it can read' },
-  { icon: 'alert', label: 'Untrusted content', text: 'Issues and comments anyone can write' },
-  { icon: 'globe', label: 'Outbound access', text: 'A way to send things out or change state' },
-] as const;
-
 export const layers = [
   {
     id: 'compile',

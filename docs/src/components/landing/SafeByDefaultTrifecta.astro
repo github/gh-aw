@@ -1,0 +1,133 @@
+---
+import { TRIFECTA_URL } from './SafeByDefaultData';
+
+interface Props {
+  /** What gh-aw puts between the agent and the repository, e.g. "layers" or "gates". */
+  noun?: string;
+}
+const { noun = 'layers' } = Astro.props;
+---
+
+<div class="tri">
+  <p class="tri-text">
+    An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
+    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six {noun} between
+    the agent and your repository.
+  </p>
+
+  <figure class="tri-fig">
+    <div class="tri-art" aria-hidden="true">
+      <svg viewBox="0 0 320 150" focusable="false">
+        <polygon class="tri-area" points="160,16 60,100 260,100"></polygon>
+        <circle class="tri-node" cx="160" cy="16" r="5"></circle>
+        <circle class="tri-node" cx="60" cy="100" r="5"></circle>
+        <circle class="tri-node" cx="260" cy="100" r="5"></circle>
+        <circle class="tri-core" cx="160" cy="60" r="4"></circle>
+      </svg>
+      <span class="tri-label tri-top">Private data</span>
+      <span class="tri-label tri-bl">Untrusted content</span>
+      <span class="tri-label tri-br">Outbound access</span>
+      <span class="tri-core-label">the lethal trifecta</span>
+    </div>
+    <figcaption class="tri-sr">
+      Private data, untrusted content and outbound access, all present together, make up the lethal trifecta.
+    </figcaption>
+  </figure>
+</div>
+
+<style>
+  .tri {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem 3rem;
+  }
+  .tri-text {
+    flex: 1 1 22rem;
+    margin: 0;
+    max-width: 52ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .tri-text a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+  .tri-text a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .tri-fig {
+    margin: 0;
+    flex: none;
+  }
+  .tri-art {
+    position: relative;
+    width: 20rem;
+    max-width: 100%;
+    aspect-ratio: 320 / 150;
+  }
+  .tri-art svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .tri-area {
+    fill: var(--aw-color-complement-low);
+    stroke: var(--aw-color-border-strong);
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+  .tri-node {
+    fill: var(--aw-color-surface);
+    stroke: var(--aw-color-text-muted);
+    stroke-width: 1.5;
+  }
+  .tri-core {
+    fill: var(--aw-color-complement);
+  }
+  .tri-label,
+  .tri-core-label {
+    position: absolute;
+    white-space: nowrap;
+    font-size: var(--aw-step--1);
+    line-height: 1.2;
+  }
+  .tri-label {
+    color: var(--aw-color-text-strong);
+    font-weight: 500;
+  }
+  .tri-top {
+    left: calc(50% + 0.875rem);
+    top: 0;
+  }
+  .tri-bl {
+    left: 18.75%;
+    top: calc(66.7% + 0.75rem);
+    transform: translateX(-50%);
+  }
+  .tri-br {
+    left: 81.25%;
+    top: calc(66.7% + 0.75rem);
+    transform: translateX(-50%);
+  }
+  .tri-core-label {
+    left: 50%;
+    top: calc(40% + 0.75rem);
+    transform: translateX(-50%);
+    font-weight: 560;
+    color: var(--tri-core-text, var(--aw-color-complement));
+  }
+  .tri-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>

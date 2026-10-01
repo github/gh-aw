@@ -3,18 +3,11 @@ import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
 import VariantGroup from './VariantGroup.astro';
 import SafeByDefaultJourney from './SafeByDefaultJourney.astro';
-import SafeByDefaultVenn from './SafeByDefaultVenn.astro';
-import SafeByDefaultArchitecture from './SafeByDefaultArchitecture.astro';
+import SafeByDefaultTrifecta from './SafeByDefaultTrifecta.astro';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
 const base = '/gh-aw';
-const risks = [
-  { icon: 'lock', label: 'Private data', text: 'Code, secrets and issues it can read' },
-  { icon: 'alert', label: 'Untrusted content', text: 'Issues and comments anyone can write' },
-  { icon: 'globe', label: 'Outbound access', text: 'A way to send things out or change state' },
-] as const;
-
 const layers = [
   {
     id: 'compile',
@@ -67,35 +60,15 @@ const layers = [
   variants={[
     { key: 'a', name: 'Current: layer stack' },
     { key: 'b', name: 'Request journey' },
-    { key: 'c', name: 'Breaking the trifecta' },
-    { key: 'd', name: 'Annotated architecture' },
   ]}
   defaultKey="a"
 >
 <div data-variant="a">
 <LandingSection titleId="safety-a-title" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
   <div class="aw-safe">
-    <div class="aw-risk">
-      <p class="aw-risk-intro">
-        An agent becomes dangerous when it combines all three of these. Security researchers call it{' '}
-        <a href="https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents">the lethal trifecta</a>.
-      </p>
-      <ul class="aw-risk-list">
-        {risks.map((r, i) => (
-          <>
-            {i > 0 && <li class="aw-plus" aria-hidden="true">+</li>}
-            <li class="aw-risk-item">
-              <span class="aw-risk-name"><span class="aw-ico" set:html={icon(r.icon)} />{r.label}</span>
-              <span class="aw-risk-text">{r.text}</span>
-            </li>
-          </>
-        ))}
-      </ul>
-    </div>
+    <SafeByDefaultTrifecta noun="layers" />
 
-    <p class="aw-defence-intro">
-      gh-aw puts six layers between the agent and your repository. Step through them.
-    </p>
+    <p class="aw-defence-intro">Step through the layers.</p>
 
     <div class="aw-layout" data-safe-root>
       <div class="aw-stack">
@@ -136,8 +109,6 @@ const layers = [
 </LandingSection>
 </div>
 <div data-variant="b"><SafeByDefaultJourney /></div>
-<div data-variant="c"><SafeByDefaultVenn /></div>
-<div data-variant="d"><SafeByDefaultArchitecture /></div>
 </VariantGroup>
 
 <style>
@@ -161,8 +132,12 @@ const layers = [
     outline-offset: 2px;
   }
 
-  /* Risk */
-  .aw-risk-intro,
+  .aw-defence-intro {
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+  }
   .aw-defence-intro {
     margin: 0;
     max-width: 52ch;
@@ -225,9 +200,6 @@ const layers = [
     }
   }
 
-  .aw-defence-intro {
-    margin-top: clamp(2.5rem, 5vw, 4rem);
-  }
 
   /* Stack */
   .aw-layout {
