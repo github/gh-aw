@@ -241,13 +241,13 @@ const more = [
      Cropped product shots in GitHub's Primer style. GitHub's cool neutrals and
      functional colours are derived from site tokens. Dark values first. */
   .gh {
-    --gh-canvas: color-mix(in srgb, var(--aw-gray-13) 93%, var(--aw-blue-6));
-    --gh-subtle: color-mix(in srgb, var(--aw-gray-12) 90%, var(--aw-blue-6));
-    --gh-border: color-mix(in srgb, var(--aw-gray-9) 90%, var(--aw-blue-6));
-    --gh-rail: color-mix(in srgb, var(--aw-gray-10) 90%, var(--aw-blue-6));
-    --gh-fg: color-mix(in srgb, var(--aw-gray-1) 96%, var(--aw-blue-6));
-    --gh-muted: color-mix(in srgb, var(--aw-gray-5) 88%, var(--aw-blue-6));
-    --gh-neutral: color-mix(in srgb, var(--aw-gray-8) 85%, var(--aw-blue-6));
+    --gh-canvas: var(--aw-gray-13);
+    --gh-subtle: var(--aw-gray-12);
+    --gh-border: var(--aw-gray-9);
+    --gh-rail: var(--aw-gray-10);
+    --gh-fg: var(--aw-gray-1);
+    --gh-muted: var(--aw-gray-5);
+    --gh-neutral: var(--aw-gray-8);
     --gh-success: color-mix(in srgb, var(--aw-green-6) 85%, var(--gh-fg));
     --gh-success-em: color-mix(in srgb, var(--aw-green-6) 85%, var(--aw-gray-13));
     --gh-danger: var(--aw-red-5);
@@ -280,12 +280,12 @@ const more = [
   }
   :global(:root[data-theme='light']) .gh {
     --gh-canvas: var(--aw-gray-0);
-    --gh-subtle: color-mix(in srgb, var(--aw-gray-0) 97%, var(--aw-blue-6));
-    --gh-border: color-mix(in srgb, var(--aw-gray-3) 90%, var(--aw-blue-6));
-    --gh-rail: color-mix(in srgb, var(--aw-gray-2) 92%, var(--aw-blue-6));
-    --gh-fg: color-mix(in srgb, var(--aw-gray-12) 95%, var(--aw-blue-6));
-    --gh-muted: color-mix(in srgb, var(--aw-gray-7) 85%, var(--aw-blue-6));
-    --gh-neutral: color-mix(in srgb, var(--aw-gray-3) 92%, var(--aw-blue-6));
+    --gh-subtle: var(--aw-gray-0);
+    --gh-border: var(--aw-gray-3);
+    --gh-rail: var(--aw-gray-2);
+    --gh-fg: var(--aw-gray-12);
+    --gh-muted: var(--aw-gray-7);
+    --gh-neutral: var(--aw-gray-3);
     --gh-success: color-mix(in srgb, var(--aw-green-6) 80%, var(--aw-gray-13));
     --gh-danger: color-mix(in srgb, var(--aw-red-5) 82%, var(--aw-gray-13));
     --gh-add-bg: color-mix(in srgb, var(--aw-green-6) 13%, var(--gh-canvas));
