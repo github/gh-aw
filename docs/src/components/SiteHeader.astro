@@ -124,7 +124,7 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		color: var(--aw-color-text-muted);
 		text-decoration: none;
 		white-space: nowrap;
-		transition: color 0.15s ease;
+		transition: color 0.15s ease, background-color 0.15s ease;
 	}
 
 	.site-header-nav a:hover,
@@ -132,18 +132,10 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		color: var(--aw-color-text-strong);
 	}
 
-	/* Current section: the mobile sheet's accent dot, centred under the label
-	   so the active link doesn't widen and shift its neighbours */
-	.site-header-nav a[aria-current='page']::after {
-		content: '';
-		position: absolute;
-		left: 50%;
-		bottom: -0.25rem;
-		width: 0.3125rem;
-		height: 0.3125rem;
-		margin-left: -0.15625rem;
-		border-radius: 999px;
-		background: var(--aw-color-accent);
+	/* Current section: the same quiet pill as the sidebar's current page */
+	.site-header-nav a[aria-current='page'] {
+		background: var(--aw-color-bg-subtle);
+		box-shadow: inset 0 0 0 1px var(--aw-color-divider);
 	}
 
 	/* Search: restyle Starlight's trigger as a quiet pill */
