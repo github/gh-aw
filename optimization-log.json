@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-06-14",
-    "workflow_name": "jsweep - JavaScript Unbloater",
-    "workflow_file": "jsweep",
-    "total_aic_analyzed": 1315.73,
-    "runs_audited": 1,
-    "recommendations_count": 5,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 245
-  },
-  {
     "date": "2026-06-15",
     "workflow_name": "Repository Quality Improvement Agent",
     "workflow_file": "repository-quality-improver",
@@ -284,6 +274,16 @@
     "workflow_file": "mattpocock-skills-reviewer",
     "total_aic_analyzed": 310.09,
     "runs_audited": 4,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 60
+  },
+  {
+    "date": "2026-10-01",
+    "workflow_name": "Deep Report",
+    "workflow_file": "deep-report",
+    "total_aic_analyzed": 151.16,
+    "runs_audited": 1,
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 60
