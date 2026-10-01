@@ -1,7 +1,392 @@
 ---
 import LandingSection from './LandingSection.astro';
+
+const total = 14; // seconds on the time axis
+const cap = 60;
+const used = 42;
+const ticks = [0, 4, 8, 12];
+const pct = (n: number) => `${(n / total) * 100}%`;
+const spans = [
+  { name: 'setup', start: 0, dur: 1.2, aic: null, depth: 0 },
+  { name: 'read issue', start: 1.2, dur: 0.8, aic: 2, depth: 0 },
+  { name: 'agent reasoning', start: 2, dur: 10.1, aic: 33, depth: 0, main: true },
+  { name: 'MCP: github.search', start: 4.6, dur: 1.5, aic: 4, depth: 1 },
+  { name: 'safe output: add-labels', start: 12.1, dur: 1.3, aic: 3, depth: 0 },
+];
+const fmt = (n: number) => `${n.toFixed(1)}s`;
 ---
 
 <LandingSection id="cost" title="Cost under control" lede="Set a budget per run and see where every credit goes.">
-  <p class="aw-placeholder">Placeholder — slice 6</p>
+  <div class="aw-cost">
+    <figure class="aw-trace">
+      <figcaption class="aw-trace-head">
+        <span class="aw-run"><strong>issue-triage</strong> · run #1842</span>
+        <span class="aw-budget">
+          <span class="aw-budget-text"><strong>{used}</strong> of {cap} AIC</span>
+          <span class="aw-meter" role="meter" aria-valuemin="0" aria-valuemax={cap} aria-valuenow={used} aria-label={`AI credits used: ${used} of ${cap}`}>
+            <span class="aw-meter-fill" style={`width:${(used / cap) * 100}%`}></span>
+            <span class="aw-meter-cap"></span>
+          </span>
+          <span class="aw-budget-cap"><code>max-ai-credits: {cap}</code></span>
+        </span>
+      </figcaption>
+
+      <div class="aw-scroll" tabindex="0" role="region" aria-label="Run trace, scrollable">
+        <table class="aw-table">
+          <caption class="aw-sr">Spans in workflow run #1842, with start time on a 14 second axis, duration and AI credits used.</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="aw-th-name">Span</th>
+              <th scope="col" class="aw-th-axis">
+                <span class="aw-sr">Timeline</span>
+                <span class="aw-axis" aria-hidden="true">
+                  {ticks.map((t) => <span class="aw-tick" style={`left:${pct(t)}`}>{t}s</span>)}
+                </span>
+              </th>
+              <th scope="col" class="aw-num">Time</th>
+              <th scope="col" class="aw-num">AIC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {spans.map((s) => (
+              <tr>
+                <th scope="row" class={`aw-name${s.depth ? ' is-child' : ''}`}>{s.name}</th>
+                <td class="aw-lane">
+                  {ticks.map((t) => <span class="aw-grid" style={`left:${pct(t)}`} aria-hidden="true"></span>)}
+                  <span class={`aw-bar${s.main ? ' is-main' : ''}`} style={`left:${pct(s.start)};width:${pct(s.dur)}`}></span>
+                </td>
+                <td class="aw-num">{fmt(s.dur)}</td>
+                <td class="aw-num">{s.aic ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" class="aw-name">Total</th>
+              <td></td>
+              <td class="aw-num">13.4s</td>
+              <td class="aw-num">{used}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </figure>
+
+    <div class="aw-points">
+      <ul>
+        <li>
+          <h3>Cap every run</h3>
+          <p><code>max-ai-credits</code> gives each run a hard budget.</p>
+          <a href="/gh-aw/reference/frontmatter/#ai-credits-guardrail-max-ai-credits">Set a budget<span aria-hidden="true"> →</span></a>
+        </li>
+        <li>
+          <h3>Find the expensive runs</h3>
+          <p><code>gh aw logs</code> and <code>gh aw audit 1842</code> show the runs using the most time, tokens and credits.</p>
+          <a href="/gh-aw/reference/cost-management/">Manage cost<span aria-hidden="true"> →</span></a>
+        </li>
+        <li>
+          <h3>Send traces to your dashboards</h3>
+          <p>OpenTelemetry export to any OTLP backend.</p>
+          <a href="/gh-aw/reference/open-telemetry/">Export traces<span aria-hidden="true"> →</span></a>
+        </li>
+      </ul>
+      <p class="aw-more">Compare cost with outcomes so cheaper runs still get accepted. <a href="/gh-aw/reference/outcomes/">Measure outcomes<span aria-hidden="true"> →</span></a></p>
+    </div>
+  </div>
 </LandingSection>
+
+<style>
+  .aw-cost {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+    margin-top: 2.5rem;
+  }
+  @media (min-width: 64rem) {
+    .aw-cost {
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      gap: 4rem;
+      align-items: start;
+    }
+  }
+
+  /* Trace */
+  .aw-trace {
+    margin: 0;
+    min-width: 0;
+    background: var(--aw-color-bg);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    box-shadow: var(--aw-shadow);
+    overflow: hidden;
+  }
+  .aw-trace-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 0.875rem 1.25rem;
+    background: var(--aw-color-bg-subtle);
+    border-bottom: 1px solid var(--aw-color-border);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+  }
+  .aw-run strong,
+  .aw-budget-text strong {
+    font-weight: 560;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-run strong {
+    font-family: var(--aw-font-mono);
+    font-weight: 500;
+  }
+  .aw-budget {
+    display: flex;
+    flex-wrap: wrap;
+    white-space: nowrap;
+    align-items: center;
+    gap: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .aw-meter {
+    position: relative;
+    display: block;
+    width: 7.5rem;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--aw-color-border);
+  }
+  .aw-meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 3px;
+    background: var(--aw-color-accent);
+  }
+  .aw-meter-cap {
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--aw-color-complement);
+  }
+  .aw-budget-cap code {
+    padding: 0;
+    background: none;
+    border: 0;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+
+  .aw-scroll {
+    overflow-x: auto;
+  }
+  .aw-table {
+    width: 100%;
+    min-width: 38rem;
+    margin: 0;
+    border-collapse: collapse;
+    display: table;
+    font-size: var(--aw-step--1);
+    font-variant-numeric: tabular-nums;
+  }
+  .aw-table :is(th, td) {
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    font-weight: 400;
+    color: var(--aw-color-text-body);
+  }
+  /* Undo the docs' stacked-card table layout on small screens */
+  .aw-trace .aw-table thead {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
+  .aw-trace .aw-table tbody { display: table-row-group; }
+  .aw-trace .aw-table tr {
+    display: table-row;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .aw-trace .aw-table td {
+    display: table-cell;
+    padding: 0;
+    border: 0;
+  }
+  .aw-trace .aw-table td::before { content: none; }
+  .aw-table tbody tr {
+    border-top: 1px solid var(--aw-color-hairline-light);
+  }
+  .aw-table tfoot tr {
+    border-top: 1px solid var(--aw-color-border);
+  }
+  .aw-th-name,
+  .aw-name {
+    width: 13rem;
+    padding: 0 0.75rem 0 1.25rem !important;
+    white-space: nowrap;
+  }
+  .aw-name {
+    height: 2.5rem;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text) !important;
+  }
+  .aw-name.is-child {
+    padding-left: 2.25rem !important;
+    color: var(--aw-color-text-secondary) !important;
+  }
+  thead .aw-th-name,
+  thead .aw-num {
+    height: 2rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted) !important;
+  }
+  .aw-th-axis {
+    position: relative;
+    padding: 0 !important;
+  }
+  .aw-axis {
+    position: relative;
+    display: block;
+    height: 2rem;
+  }
+  .aw-tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    padding-left: 0.375rem;
+    border-left: 1px solid var(--aw-color-border);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-num {
+    width: 4.5rem;
+    padding: 0 0.75rem !important;
+    text-align: right !important;
+    white-space: nowrap;
+    font-family: var(--aw-font-mono);
+    color: var(--aw-color-text-secondary) !important;
+  }
+  .aw-num:last-child {
+    padding-right: 1.25rem !important;
+  }
+  .aw-lane {
+    min-width: 16rem;
+    position: relative;
+    height: 2.5rem;
+  }
+  .aw-grid {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--aw-color-hairline-light);
+  }
+  .aw-bar {
+    position: absolute;
+    top: 50%;
+    height: 8px;
+    margin-top: -4px;
+    min-width: 3px;
+    border-radius: 2px;
+    background: var(--aw-color-text-muted);
+    opacity: 0.55;
+  }
+  .aw-bar.is-main {
+    background: var(--aw-color-accent);
+    opacity: 1;
+  }
+  .aw-table tfoot :is(th, td) {
+    height: 2.5rem;
+  }
+  .aw-table tfoot .aw-num {
+    color: var(--aw-color-text-strong) !important;
+    font-weight: 500 !important;
+  }
+  @media (max-width: 40rem) {
+    .aw-table { min-width: 0; }
+    .aw-th-name, .aw-name { width: 7.5rem; padding-left: 0.75rem !important; padding-right: 0.5rem !important; white-space: normal; line-height: 1.3; }
+    .aw-name.is-child { padding-left: 1.25rem !important; }
+    .aw-lane { min-width: 6rem; }
+    .aw-num { width: 3.25rem; padding: 0 0.375rem !important; }
+    .aw-num:last-child { padding-right: 0.75rem !important; }
+    .aw-tick:nth-child(even) { display: none; }
+    .aw-trace-head { padding-inline: 0.75rem; }
+  }
+  .aw-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Points */
+  .aw-points ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .aw-points li {
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--aw-color-border);
+  }
+  .aw-points li:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .aw-points h3 {
+    margin: 0;
+    font-size: var(--aw-step-1);
+    font-weight: 520;
+    letter-spacing: -0.015em;
+    color: var(--aw-color-text);
+    border: 0;
+  }
+  .aw-points li p {
+    margin: 0.375rem 0 0.5rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.55;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-points code {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    background: var(--aw-color-code-bg);
+    font-family: var(--aw-font-mono);
+    font-size: 0.875em;
+    color: var(--aw-color-text);
+    white-space: nowrap;
+  }
+  .aw-points a {
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-accent-text);
+    text-decoration: none;
+  }
+  .aw-points a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .aw-more {
+    margin: 0.5rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--aw-color-border);
+    font-size: var(--aw-step--1);
+    line-height: 1.55;
+    color: var(--aw-color-text-muted);
+  }
+</style>
