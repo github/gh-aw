@@ -598,7 +598,7 @@ gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandb
 
 The `--repo` flag accepts `owner/repo` format and is required when passing a bare numeric run ID without a full URL, allowing the command to locate the correct repository.
 
-The `--artifacts` flag selects which artifact sets to download (default: `all`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `mcp`, and `usage`. Use `all` to download the full artifact set. Unlike `gh aw logs`, which defaults to `usage`, `audit` defaults to `all` for comprehensive analysis. The `--experiment` flag filters to runs that include the named experiment; `--variant` further restricts to a specific variant value and requires `--experiment` to be set. The `--output/-o` flag overrides the output directory.
+The `--artifacts` flag selects which artifact sets to download (default: `all`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, and `usage`. Use `all` to download the full artifact set. Unlike `gh aw logs`, which defaults to `usage`, `audit` defaults to `all` for comprehensive analysis. The `--experiment` flag filters to runs that include the named experiment; `--variant` further restricts to a specific variant value and requires `--experiment` to be set. The `--output/-o` flag overrides the output directory.
 
 Logs are saved to `.github/aw/logs/run-{id}/` with filenames indicating the extraction level. Pre-agent failures (integrity filtering, missing secrets, binary install) surface the actual error in `failure_analysis.error_summary`. Invalid run IDs return a human-readable error.
 
@@ -898,7 +898,9 @@ gh aw env update defaults.yml --scope org --org my-org --dry-run
 gh aw env update defaults.yml --scope ent --enterprise my-enterprise --yes
 ```
 
-**Options:** `--scope` (required), `--repo/-r`, `--org`, `--enterprise`, `--yes/-y`, `--dry-run`
+**Options:** `--scope` (required), `--repo/-r`, `--org`, `--enterprise`, `--visibility`, `--yes/-y`, `--dry-run`
+
+The `--visibility` flag sets access for newly created org or ent variables (`all`, `private`, or `selected`; default: `all`). Existing variables keep their current visibility. The flag is rejected with `--scope repo`.
 
 For repository scope, `--repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
@@ -924,6 +926,8 @@ gh aw mcp add workflow server --transport stdio   # Prefer stdio transport
 gh aw mcp add workflow server --registry https://custom.registry.com/v1  # Use custom registry
 gh aw mcp add workflow server --tool-id my-server  # Override the tool ID
 ```
+
+**`mcp list-tools` options:** `--server` (required)
 
 **`mcp inspect` options:** `--check-secrets`, `--inspector`, `--server`, `--tool`
 
@@ -970,7 +974,7 @@ gh aw domains weekly-research --json    # Output workflow domains in JSON format
 
 **Options:** `--json/-j`
 
-When no workflow is specified, lists all workflows with a summary of allowed and blocked domain counts. When a workflow is specified, lists all effective allowed and blocked domains including domains expanded from ecosystem identifiers (e.g., `node`, `python`, `github`) and engine defaults.
+When no workflow is specified, lists all workflows with a summary of allowed and blocked domain counts. When a workflow is specified, lists all effective allowed and blocked domains including domains expanded from named domain sets (e.g., `node`, `python`, `github`, `copilot`) and engine defaults.
 
 ### Utility Commands
 
@@ -1037,6 +1041,18 @@ gh aw hash-frontmatter .github/workflows/audit-workflows.md
 ```
 
 Includes all frontmatter fields, imported workflow frontmatter (BFS traversal), template expressions containing `env.` or `vars.`, and version information (gh-aw, awf, agents).
+
+#### `json-schema`
+
+Print the JSON Schema for structured command output.
+
+```bash wrap
+gh aw json-schema audit        # Schema for gh aw audit --json
+gh aw json-schema logs         # Schema for gh aw logs --json
+gh aw json-schema logs-jsonl   # Schema for each gh aw logs --cached-jsonl line
+```
+
+**Schema arguments:** `audit`, `logs`, `logs-jsonl`. The schema is written to stdout. See [JSON output schemas](/gh-aw/reference/audit/#json-output-schemas).
 
 ## Shell Completions
 
