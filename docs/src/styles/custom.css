@@ -53,6 +53,69 @@ body:has(.aw-hero) .sl-container {
   }
 }
 
+/* === Docs page layout (components: Starlight's TwoColumnContent, ContentPanel) ===
+   Starlight puts the title in its own .content-panel with a hairline under it,
+   and centres the content column in the space left by the sidebars. Here the
+   title and body read as one unit, and the column sits left-aligned a fixed
+   gutter from the sidebar, with a narrower "On this page" column on the right.
+   The landing page (splash, .aw-hero) keeps its own rules above. */
+:root {
+  --aw-toc-width: 15rem;
+  --aw-content-gutter: 3.5rem;
+}
+
+.content-panel + .content-panel {
+  border-top: 0;
+}
+
+/* Title panel: no bottom padding; the body follows at heading-to-body rhythm */
+main > .content-panel:has(h1#_top) {
+  padding-bottom: 0;
+}
+
+main > .content-panel:has(h1#_top) + .content-panel {
+  padding-top: 1.75rem;
+}
+
+@media (min-width: 50rem) {
+  [data-has-sidebar] .content-panel {
+    padding-inline-start: var(--aw-content-gutter);
+  }
+
+  [data-has-sidebar] .main-pane {
+    --sl-content-margin-inline: 0 auto;
+  }
+}
+
+@media (min-width: 50rem) and (max-width: 71.99rem) {
+  :root {
+    --aw-content-gutter: 2.5rem;
+  }
+}
+
+@media (min-width: 72rem) {
+  .right-sidebar-container,
+  .right-sidebar {
+    width: var(--aw-toc-width);
+  }
+
+  /* Starlight sizes the TOC list from --sl-sidebar-width (the left sidebar's
+     width); let it fill the narrower column instead */
+  .right-sidebar-panel {
+    padding-inline: 0 1.5rem;
+  }
+
+  .right-sidebar-panel .sl-container {
+    width: auto;
+    max-width: none;
+  }
+
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: 0 auto;
+    width: calc(100% - var(--aw-toc-width));
+  }
+}
+
 
 /* Skip to Content Link - Enhanced Accessibility (WCAG 2.4.1) */
 /* The .skip-link is visually hidden until focused via keyboard, then revealed. */
@@ -239,6 +302,11 @@ header.header {
   border-bottom: none;
   margin-top: 0;
   margin-bottom: 0.75rem;
+}
+
+/* Page title: spacing comes from the panels (see Docs page layout) */
+.content-panel h1#_top {
+  margin-bottom: 0;
 }
 
 /* Header Anchor Links */
@@ -583,7 +651,7 @@ a.button:hover {
    strong text with a 1px accent segment over the rail. Starlight sets
    aria-current="true" on the link as you scroll. --depth comes from Starlight. */
 .right-sidebar {
-  border-inline-start: 1px solid var(--aw-color-divider);
+  border-inline-start: 0; /* no rule between content and TOC; the list keeps its own rail */
 }
 
 .right-sidebar-panel {
@@ -873,8 +941,8 @@ html {
 
 /* Site Title */
 .site-title {
-  font-size: var(--aw-step-0);
-  font-weight: 700;
+  font-size: var(--aw-text-ui);
+  font-weight: 600;
   text-decoration: none;
   display: inline-flex;
   align-items: center;

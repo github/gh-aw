@@ -36,7 +36,8 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 <div class="site-header">
 	<div class="site-header-start">
 		<SiteTitle />
-		<nav class="site-header-nav" aria-label="Main">
+		<!-- Current-section style: data-active-style="pixels" (dithered underline) or "tint" -->
+		<nav class="site-header-nav" aria-label="Main" data-active-style="pixels">
 			{
 				links.map((link) => (
 					<a href={link.href} aria-current={link.section === section ? 'page' : undefined}>
@@ -112,14 +113,14 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 	.site-header-nav {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.125rem;
 	}
 
 	.site-header-nav a {
 		position: relative;
-		padding: 0.375rem 0.625rem;
+		padding: 0.375rem 0.5rem;
 		border-radius: 0.375rem;
-		font-size: var(--aw-step--1);
+		font-size: var(--aw-text-ui);
 		font-weight: 500;
 		color: var(--aw-color-text-muted);
 		text-decoration: none;
@@ -127,15 +128,74 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		transition: color 0.15s ease, background-color 0.15s ease;
 	}
 
-	.site-header-nav a:hover,
+	/* Hover: text only, so it stays quieter than the current section */
+	.site-header-nav a:hover {
+		color: var(--aw-color-text);
+	}
+
 	.site-header-nav a[aria-current='page'] {
 		color: var(--aw-color-text-strong);
 	}
 
-	/* Current section: the same quiet pill as the sidebar's current page */
-	.site-header-nav a[aria-current='page'] {
-		background: var(--aw-color-bg-subtle);
-		box-shadow: inset 0 0 0 1px var(--aw-color-divider);
+	/* Current section, "pixels": a short dithered underline in the hero's
+	   language. 2px purple cells thin out left to right (a Bayer-style fade),
+	   ending in one coral "sparkle" pixel. The cells are an SVG mask filled with
+	   the accent token, so both themes follow tokens.css. Absolutely positioned,
+	   so nothing shifts. */
+	.site-header-nav {
+		--aw-nav-px: 3px;
+	}
+
+	[data-active-style='pixels'] a[aria-current='page']::before,
+	[data-active-style='pixels'] a[aria-current='page']::after {
+		content: '';
+		position: absolute;
+		inset-inline-start: 0.5rem;
+		bottom: 0;
+		pointer-events: none;
+	}
+
+	[data-active-style='pixels'] a[aria-current='page']::before {
+		width: calc(var(--aw-nav-px) * 9);
+		height: calc(var(--aw-nav-px) * 2);
+		background-color: var(--aw-color-accent);
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 2' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h4v1H0zM5 0h1v1H5zM7 0h1v1H7zM0 1h3v1H0zM4 1h1v1H4zM6 1h1v1H6z'/%3E%3C/svg%3E")
+			no-repeat 0 0 / 100% 100%;
+		animation: aw-nav-pixels 0.32s steps(9, jump-none) both;
+	}
+
+	[data-active-style='pixels'] a[aria-current='page']::after {
+		width: var(--aw-nav-px);
+		height: var(--aw-nav-px);
+		margin-inline-start: calc(var(--aw-nav-px) * 9);
+		bottom: var(--aw-nav-px);
+		background-color: var(--aw-color-complement);
+		animation: aw-nav-sparkle 0.32s steps(1, end) both;
+	}
+
+	@keyframes aw-nav-pixels {
+		from { clip-path: inset(0 100% 0 0); }
+		to { clip-path: inset(0 0 0 0); }
+	}
+
+	@keyframes aw-nav-sparkle {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
+	/* Current section, "tint": accent text on a soft accent wash, no border */
+	[data-active-style='tint'] a[aria-current='page'] {
+		color: var(--aw-color-accent-text);
+		background-color: rgba(var(--aw-accent-rgb), 0.14);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.site-header-nav a,
+		.site-header-nav a::before,
+		.site-header-nav a::after {
+			transition: none;
+			animation: none;
+		}
 	}
 
 	/* Search: restyle Starlight's trigger as a quiet pill */
