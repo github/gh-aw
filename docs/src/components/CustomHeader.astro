@@ -19,8 +19,7 @@ const navItems = [
 	{navItems.map((item) => <a href={item.href} class="header-link">{item.label}</a>)}
 </nav>
 
-<!-- Hamburger menu for tablets (769–1050px) where full nav would overflow -->
-<!-- Upper bound raised to 1050px to cover iPad Pro 12.9 (1024px portrait); see issues/45211 -->
+<!-- Hamburger menu for tablets and small laptops (769–1200px) where the full nav would overflow; see issues/45211 -->
 <div class="tablet-nav-wrapper" data-nav-items={JSON.stringify(navItems)}>
 	<button class="hamburger-btn" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="tablet-nav-dropdown">
 		<span class="hamburger-icon" aria-hidden="true"></span>
@@ -34,17 +33,18 @@ const navItems = [
 	.custom-header-links {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
-		margin-right: 1rem;
+		gap: 0.125rem;
+		margin-right: 0.5rem;
 	}
 	
 	.header-link {
 		color: var(--sl-color-text);
 		text-decoration: none;
-		font-size: 0.875rem;
+		font-size: var(--aw-step--1);
 		font-weight: 500;
-		padding: 0.25rem 0.75rem;
-		border-radius: 4px;
+		white-space: nowrap;
+		padding: 0.25rem 0.5rem;
+		border-radius: 6px;
 		transition: color 0.15s ease, background-color 0.15s ease;
 	}
 	
@@ -53,7 +53,7 @@ const navItems = [
 		background-color: rgba(var(--aw-accent-rgb, 130, 80, 223), 0.12);
 	}
 
-	/* Tablet navigation wrapper — hidden by default; shown via global CSS at widths up to 1050px */
+	/* Tablet navigation wrapper — hidden by default; shown via global CSS at widths up to 1200px */
 	.tablet-nav-wrapper {
 		display: none;
 		position: relative;
@@ -127,7 +127,7 @@ const navItems = [
 		padding: 0.625rem 1rem;
 		color: var(--sl-color-text);
 		text-decoration: none;
-		font-size: 0.875rem;
+		font-size: var(--aw-step--1);
 		font-weight: 500;
 		transition: background-color 0.15s ease;
 	}
