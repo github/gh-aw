@@ -48,79 +48,89 @@ const more = [
           <li>
             <a class="aw-item" href={f.href}>
               <div class="aw-stage" aria-hidden="true">
-                {f.id === 'triage' && (
-                  <div class="aw-frag">
-                    <div class="aw-row">
-                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                      <span class="aw-t">Crash when saving an empty file</span>
-                    </div>
-                    <div class="aw-chips">
-                      <span class="aw-chip">bug</span>
-                      <span class="aw-chip">area: editor</span>
-                      <span class="aw-chip aw-chip-new">needs repro</span>
-                    </div>
+                <div class="aw-mock">
+                {f.id === 'triage' && (<>
+                  <div class="aw-head">
+                    <span class="aw-badge aw-badge-open"><span set:html={icon('issue-opened', 12)} />Open</span>
+                    <span class="aw-t">Crash on empty file save</span>
+                    <span class="aw-m">#482</span>
                   </div>
-                )}
-                {f.id === 'review' && (
-                  <div class="aw-frag">
-                    <div class="aw-diff"><span class="aw-ln">42</span><span class="aw-add">+ items.forEach(save)</span></div>
-                    <div class="aw-comment">
-                      <span class="aw-ico" set:html={icon('comment-discussion', 14)} />
-                      <span><b>github-actions</b> Errors from <code>save</code> are dropped here.</span>
-                    </div>
+                  <div class="aw-event">
+                    <span class="aw-av" set:html={icon('hubot', 12)} />
+                    <span><b>github-actions</b> added</span>
+                    <span class="aw-chip"><i class="aw-dot"></i>bug</span>
+                    <span class="aw-chip"><i class="aw-dot"></i>editor</span>
                   </div>
-                )}
-                {f.id === 'ci' && (
-                  <div class="aw-frag">
-                    <div class="aw-row">
-                      <span class="aw-ico aw-fail" set:html={icon('x-circle')} />
-                      <span class="aw-t">build / test (ubuntu)</span>
-                      <span class="aw-m">failed</span>
-                    </div>
-                    <div class="aw-row">
-                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                      <span class="aw-t">Diagnosis: flaky timeout in db setup</span>
-                    </div>
+                  <div class="aw-body">
+                    <span class="aw-av" set:html={icon('hubot', 12)} />
+                    <span><b>github-actions</b> commented<br />Thanks! Could you share your editor version and steps to reproduce?</span>
                   </div>
-                )}
-                {f.id === 'docs' && (
-                  <div class="aw-frag">
-                    <div class="aw-row">
-                      <span class="aw-ico aw-pr" set:html={icon('git-pull-request')} />
-                      <span class="aw-t">docs: sync CLI flags with --help</span>
-                    </div>
-                    <div class="aw-row aw-sub">
-                      <span class="aw-m">#214</span>
-                      <span class="aw-plus">+18</span>
-                      <span class="aw-minus">−6</span>
-                      <span class="aw-chip">documentation</span>
-                    </div>
+                </>)}
+                {f.id === 'review' && (<>
+                  <div class="aw-file"><span class="aw-ico" set:html={icon('file', 12)} /><span class="aw-code">src/store.ts</span></div>
+                  <div class="aw-code aw-lines">
+                    <div><span class="aw-ln">41</span><span>  const items = load()</span></div>
+                    <div class="aw-addrow"><span class="aw-ln">42</span><span>+ items.forEach(save)</span></div>
+                    <div><span class="aw-ln">43</span><span>  return items.length</span></div>
                   </div>
-                )}
-                {f.id === 'report' && (
-                  <div class="aw-frag">
-                    <div class="aw-row">
-                      <span class="aw-ico aw-open" set:html={icon('issue-opened')} />
-                      <span class="aw-t">Release notes: v2.3.1</span>
-                    </div>
-                    <div class="aw-row aw-sub">
-                      <span class="aw-ico" set:html={icon('tag', 14)} />
-                      <span class="aw-m">14 merged pull requests · 3 fixes</span>
-                    </div>
+                  <div class="aw-body aw-thread">
+                    <span class="aw-av" set:html={icon('hubot', 12)} />
+                    <span><b>github-actions</b> commented<br />Errors thrown by <code>save</code> are dropped here. Consider awaiting each call.</span>
                   </div>
-                )}
-                {f.id === 'security' && (
-                  <div class="aw-frag">
-                    <div class="aw-row">
-                      <span class="aw-ico aw-fail" set:html={icon('shield')} />
-                      <span class="aw-t">Unpinned action in release.yml</span>
-                    </div>
-                    <div class="aw-row aw-sub">
-                      <span class="aw-chip aw-chip-danger">High</span>
-                      <span class="aw-m">Code scanning · Open</span>
-                    </div>
+                </>)}
+                {f.id === 'ci' && (<>
+                  <div class="aw-checks">
+                    <div class="aw-check"><span class="aw-ok" set:html={icon('check-circle-fill', 14)} /><span class="aw-t">lint</span><span class="aw-m">12s</span></div>
+                    <div class="aw-check"><span class="aw-ok" set:html={icon('check-circle-fill', 14)} /><span class="aw-t">build</span><span class="aw-m">48s</span></div>
+                    <div class="aw-check"><span class="aw-bad" set:html={icon('x-circle-fill', 14)} /><span class="aw-t">test (ubuntu)</span><span class="aw-m">2m 3s</span></div>
                   </div>
-                )}
+                  <div class="aw-event">
+                    <span class="aw-av" set:html={icon('hubot', 12)} />
+                    <span><b>github-actions</b> opened</span>
+                    <span class="aw-ok" set:html={icon('issue-opened', 14)} />
+                    <span class="aw-t">Flaky db timeout <span class="aw-m">#519</span></span>
+                  </div>
+                </>)}
+                {f.id === 'docs' && (<>
+                  <div class="aw-head">
+                    <span class="aw-ico" set:html={icon('git-pull-request', 16)} />
+                    <span class="aw-t">docs: sync CLI flags with --help</span>
+                    <span class="aw-m">#214</span>
+                  </div>
+                  <div class="aw-files">
+                    <div class="aw-fhead">Files changed <span class="aw-m">2</span></div>
+                    <div class="aw-frow"><span class="aw-code aw-t">docs/cli.md</span><span class="aw-plus">+18</span><span class="aw-minus">−6</span><span class="aw-stat"><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-d"></i><i class="aw-s-n"></i></span></div>
+                    <div class="aw-frow"><span class="aw-code aw-t">docs/flags.md</span><span class="aw-plus">+4</span><span class="aw-minus">−2</span><span class="aw-stat"><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-d"></i><i class="aw-s-n"></i><i class="aw-s-n"></i></span></div>
+                  </div>
+                </>)}
+                {f.id === 'report' && (<>
+                  <div class="aw-head">
+                    <span class="aw-badge aw-badge-open"><span set:html={icon('issue-opened', 12)} />Open</span>
+                    <span class="aw-t">Weekly digest · Sep 22–29</span>
+                  </div>
+                  <div class="aw-md">
+                    <div class="aw-h">Highlights</div>
+                    <ul>
+                      <li>14 pull requests merged</li>
+                      <li>3 bugs fixed in the editor</li>
+                      <li>New contributor: <span class="aw-link">@lena</span></li>
+                    </ul>
+                  </div>
+                </>)}
+                {f.id === 'security' && (<>
+                  <div class="aw-head">
+                    <span class="aw-bad" set:html={icon('shield', 16)} />
+                    <span class="aw-t">Unpinned third-party action</span>
+                    <span class="aw-chip aw-chip-danger">High</span>
+                  </div>
+                  <div class="aw-file"><span class="aw-ico" set:html={icon('file', 12)} /><span class="aw-code">.github/workflows/release.yml</span></div>
+                  <div class="aw-code aw-lines">
+                    <div><span class="aw-ln">18</span><span>  - name: Deploy</span></div>
+                    <div class="aw-hit"><span class="aw-ln">19</span><span>    uses: some-org/deploy@v2</span></div>
+                  </div>
+                  <div class="aw-hint"><span class="aw-ico" set:html={icon('light-bulb', 12)} />Pin to a full-length commit SHA</div>
+                </>)}
+                </div>
               </div>
               <h3>{f.title}</h3>
               <p>{f.text}</p>
@@ -209,12 +219,11 @@ const more = [
     outline-offset: 3px;
   }
   .aw-stage {
-    display: flex;
-    align-items: center;
-    height: 9rem;
-    padding: 1rem;
+    position: relative;
+    overflow: hidden;
+    height: 12.5rem;
     background: var(--aw-color-bg-subtle);
-    border: 1px solid var(--aw-color-hairline-light);
+    border: 1px solid var(--aw-color-divider);
     border-radius: 12px;
     transition: border-color 0.2s;
   }
@@ -243,137 +252,238 @@ const more = [
     text-wrap: pretty;
   }
 
-  /* Fragments */
-  .aw-frag {
-    width: 100%;
-    min-width: 0;
+  /* Cropped product shots: the mock is inset top/left and runs off the right/bottom */
+  .aw-mock {
+    position: absolute;
+    top: 1.25rem;
+    left: 1.25rem;
+    width: calc(100% + 0.25rem);
+    min-height: 14rem;
+    box-sizing: border-box;
+    /* the overshoot past the stage edge, so text wraps inside the visible area */
+    padding-right: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.625rem 0.75rem;
     background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-hairline-light);
+    border: 1px solid var(--aw-color-divider);
     border-radius: 8px;
     box-shadow: var(--aw-shadow-raised);
     font-size: var(--aw-step--1);
-    line-height: 1.35;
+    line-height: 1.4;
     color: var(--aw-color-text-body);
   }
-  .aw-row {
+  .aw-mock > * {
+    padding: 0.625rem 0.875rem;
+    border-top: 1px solid var(--aw-color-divider);
+    white-space: nowrap;
+  }
+  .aw-mock > :first-child {
+    border-top: 0;
+  }
+  .aw-mock b {
+    font-weight: 550;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-head,
+  .aw-event,
+  .aw-check,
+  .aw-frow,
+  .aw-file,
+  .aw-hint,
+  .aw-fhead {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
   }
-  .aw-sub {
-    padding-left: 1.5rem;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.5rem;
-  }
-  .aw-sub .aw-ico {
-    margin-left: -0.125rem;
+  .aw-head .aw-t {
+    font-size: var(--aw-step-0);
   }
   .aw-t {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: none;
     font-weight: 550;
     color: var(--aw-color-text-strong);
+    min-width: 0;
   }
   .aw-m {
     flex: none;
     color: var(--aw-color-text-muted);
+    font-weight: 400;
   }
-  .aw-ico {
+  .aw-ico,
+  .aw-ok,
+  .aw-bad,
+  .aw-av {
     display: inline-flex;
     flex: none;
     color: var(--aw-color-text-muted);
   }
-  .aw-ico :global(svg) {
+  .aw-ok { color: var(--aw-color-success); }
+  .aw-bad { color: var(--aw-color-danger); }
+  .aw-mock :global(svg) {
     fill: currentColor;
   }
-  .aw-open {
-    color: var(--aw-color-success);
-  }
-  .aw-fail {
-    color: var(--aw-color-danger);
-  }
-  .aw-pr {
+  .aw-av {
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
     color: var(--aw-color-text-secondary);
   }
-  .aw-chips {
-    display: flex;
-    flex-wrap: wrap;
+  .aw-badge {
+    display: inline-flex;
+    align-items: center;
     gap: 0.25rem;
-    padding-left: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    font-weight: 550;
+  }
+  .aw-badge-open {
+    background: var(--aw-color-success);
+    color: var(--aw-color-surface);
+  }
+  .aw-event {
+    background: var(--aw-color-bg-subtle);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-body {
+    white-space: normal;
+    text-wrap: pretty;
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+  .aw-body .aw-av {
+    margin-top: 0.125rem;
   }
   .aw-chip {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     padding: 0 0.5rem;
     border: 1px solid var(--aw-color-border);
     border-radius: 999px;
     color: var(--aw-color-text-secondary);
     white-space: nowrap;
   }
-  .aw-chip-new {
-    border-color: var(--aw-color-complement);
-    color: var(--aw-color-complement);
-    animation: aw-chip-in 0.6s ease-out 0.4s backwards;
+  .aw-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--aw-color-text-muted);
   }
   .aw-chip-danger {
     border-color: var(--aw-color-danger);
     color: var(--aw-color-danger);
+    font-weight: 550;
   }
-  .aw-plus {
-    color: var(--aw-color-success);
-  }
-  .aw-minus {
-    color: var(--aw-color-danger);
-  }
-  .aw-diff {
-    display: flex;
-    gap: 0.625rem;
-    padding: 0.125rem 0.5rem;
-    margin: -0.125rem -0.25rem 0;
-    border-radius: 4px;
-    background: var(--aw-color-surface-header);
+  .aw-code,
+  .aw-lines {
     font-family: var(--aw-font-mono);
-    white-space: nowrap;
-    overflow: hidden;
+  }
+  .aw-lines {
+    padding: 0.25rem 0;
+    background: var(--aw-color-surface-header);
+  }
+  .aw-lines > div {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0 0.875rem;
   }
   .aw-ln {
+    width: 1.5rem;
+    flex: none;
+    text-align: right;
     color: var(--aw-color-text-muted);
   }
-  .aw-add {
-    color: var(--aw-color-success);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .aw-comment {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--aw-color-hairline-light);
-  }
-  .aw-comment .aw-ico {
-    margin-top: 0.125rem;
-  }
-  .aw-comment b {
-    font-weight: 550;
+  .aw-addrow,
+  .aw-hit {
     color: var(--aw-color-text-strong);
-    margin-right: 0.25rem;
   }
-  .aw-comment code {
+  .aw-addrow {
+    background: color-mix(in srgb, var(--aw-color-success) 16%, transparent);
+  }
+  .aw-hit {
+    background: color-mix(in srgb, var(--aw-color-danger) 14%, transparent);
+  }
+  .aw-mock code {
     padding: 0;
     background: none;
     border: 0;
     font-size: inherit;
   }
-  @keyframes aw-chip-in {
-    from { opacity: 0; transform: translateY(2px); }
+  .aw-thread {
+    padding-left: 2.5rem;
+  }
+  .aw-checks {
+    padding: 0;
+  }
+  .aw-check {
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .aw-check:first-child {
+    border-top: 0;
+  }
+  .aw-check .aw-t {
+    flex: 1 0 auto;
+    font-weight: 500;
+  }
+  .aw-files {
+    padding: 0;
+  }
+  .aw-fhead {
+    padding: 0.5rem 0.875rem;
+    background: var(--aw-color-surface-header);
+    font-weight: 550;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-frow {
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .aw-frow .aw-t {
+    flex: 1 0 auto;
+    font-weight: 400;
+  }
+  .aw-plus { color: var(--aw-color-success); }
+  .aw-minus { color: var(--aw-color-danger); }
+  .aw-stat {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .aw-stat i {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--aw-color-border);
+  }
+  .aw-stat .aw-s-a { background: var(--aw-color-success); }
+  .aw-stat .aw-s-d { background: var(--aw-color-danger); }
+  .aw-md .aw-h {
+    padding-bottom: 0.375rem;
+    margin-bottom: 0.375rem;
+    border-bottom: 1px solid var(--aw-color-divider);
+    font-size: var(--aw-step-0);
+    font-weight: 600;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-md ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+  .aw-md li {
+    margin: 0;
+    padding: 0;
+  }
+  .aw-link {
+    color: var(--aw-color-link);
+  }
+  .aw-hint {
+    color: var(--aw-color-text-muted);
   }
 
   /* Disclosure */
@@ -455,7 +565,7 @@ const more = [
   .aw-groups h3 {
     margin: 0 0 0.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--aw-color-hairline-light);
+    border-bottom: 1px solid var(--aw-color-divider);
     font-size: var(--aw-step--1);
     font-weight: 550;
     color: var(--aw-color-text-muted);
@@ -501,7 +611,6 @@ const more = [
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .aw-chip-new { animation: none; }
     .aw-chev, .aw-stage { transition: none; }
   }
 </style>
