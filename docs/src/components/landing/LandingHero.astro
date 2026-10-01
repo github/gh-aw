@@ -3,7 +3,6 @@ import CtaRow from './CtaRow.astro';
 import HeroExample from './HeroExample.astro';
 import VariantGroup from './VariantGroup.astro';
 import HeroBgA from './HeroBgA.astro';
-import HeroBgB from './HeroBgB.astro';
 import HeroBgC from './HeroBgC.astro';
 import HeroBgD from './HeroBgD.astro';
 ---
@@ -15,13 +14,11 @@ import HeroBgD from './HeroBgD.astro';
       label="Hero background"
       variants={[
         { key: 'a', name: 'A · clouds' },
-        { key: 'b', name: 'B · rays' },
         { key: 'c', name: 'C · waves' },
         { key: 'd', name: 'D · columns' },
       ]}
     >
       <div data-variant="a"><HeroBgA /></div>
-      <div data-variant="b"><HeroBgB /></div>
       <div data-variant="c"><HeroBgC /></div>
       <div data-variant="d"><HeroBgD /></div>
     </VariantGroup>

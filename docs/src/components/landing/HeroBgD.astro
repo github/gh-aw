@@ -4,7 +4,7 @@
 // equaliser or rain streaks. Each column's length breathes on smooth noise
 // sampled along x, so neighbours move together as gentle waves. Columns fade
 // from strong at the top to nothing at the tip through an 8x8 Bayer dither,
-// and a rare GitHub-green cell lights up at a tip like a finished run.
+// and a few small coral cells twinkle inside the columns and at their tips.
 // Rendered at low resolution and upscaled with `image-rendering: pixelated`.
 ---
 
@@ -56,7 +56,7 @@
     uniform vec3 u_p2;
     uniform vec3 u_p3;
     uniform vec3 u_p4;
-    uniform vec3 u_green;
+    uniform vec3 u_accent;
 
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
@@ -78,7 +78,7 @@
       return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     }
 
-    const float SLOT = 12.0; // cells per slot; each slot splits into 2-4 columns
+    const float SLOT = 40.0; // cells per slot; each slot splits into 2-4 columns
 
     void main() {
       vec2 cell = floor(gl_FragCoord.xy);     // cell coords, y up
@@ -86,21 +86,23 @@
       float fromTop = (row + 0.5) * u_cell;   // CSS px from the top
       float t = u_time;
 
-      // Split the width into columns of 2-6 cells with a 1-cell gap after each.
+      // Split the width into columns of about 8-20 cells (24-60px), each
+      // followed by a 2-3 cell gap (6-9px).
       float slot = floor(cell.x / SLOT);
       float local = cell.x - slot * SLOT;
       float start = 0.0;
       float size = SLOT;
       float idx = 0.0;
       for (int k = 0; k < 4; k++) {
-        float s = 3.0 + floor(hash(vec2(slot, float(k) + 0.5)) * 5.0);
-        if (SLOT - (start + s) < 3.0 || k == 3) s = SLOT - start;
+        float s = 10.0 + floor(hash(vec2(slot, float(k) + 0.5)) * 10.0);
+        if (SLOT - (start + s) < 10.0 || k == 3) s = SLOT - start;
         if (local < start + s) { size = s; idx = float(k); break; }
         start += s;
       }
-      if (local >= start + size - 1.0) { gl_FragColor = vec4(0.0); return; }
+      float gap = 2.0 + step(0.5, hash(vec2(slot, float(idx) + 4.2)));
+      if (local >= start + size - gap) { gl_FragColor = vec4(0.0); return; }
       float colId = slot * 4.0 + idx;
-      float centerX = (slot * SLOT + start + (size - 1.0) * 0.5) * u_cell;
+      float centerX = (slot * SLOT + start + (size - gap) * 0.5) * u_cell;
       float xn = centerX / (u_res.x * u_cell);
 
       // Column length: a slow wave along x shared by neighbours, plus a
@@ -121,14 +123,28 @@
 
       float th = bayer8(cell);
 
-      // Rare green glint: one or two cells at the tip of a few columns, each
-      // lit for a moment as if a run just finished.
-      float tipRow = floor(L / u_cell);
-      float epoch = floor(t * 0.45 + hash(vec2(colId, 8.7)) * 7.0);
-      float lit = hash(vec2(colId, epoch));
-      float centerCell = slot * SLOT + start + floor((size - 1.0) * 0.5);
-      if (lit < 0.03 && len > 0.45 && cell.x == centerCell && row >= tipRow - 2.0 && row <= tipRow - 1.0) {
-        gl_FragColor = vec4(u_green, 1.0);
+      // Coral glints: small 1-2 cell sparks scattered through the column body
+      // and at its tip, each lit for a couple of seconds then gone.
+      float tipRow = floor(L * 0.62 / u_cell); // where the dither visibly thins out
+      float colX = cell.x - (slot * SLOT + start);
+      vec2 blk = vec2(floor(colX / 5.0), floor(row / 5.0));
+      vec2 inBlk = vec2(colX, row) - blk * 5.0;
+      vec2 bid = vec2(colId * 13.0 + blk.x, blk.y);
+      float epoch = floor(t * 0.4 + hash(bid + 8.7) * 9.0);
+      float lit = hash(bid + epoch * 1.37);
+      vec2 spot = floor(vec2(hash(bid + epoch + 2.1), hash(bid + epoch + 5.3)) * 4.0);
+      float wide = step(0.5, hash(bid + epoch + 7.7));
+      bool onSpot = inBlk.y == spot.y && (inBlk.x == spot.x || (wide > 0.5 && inBlk.x == spot.x + 1.0));
+      bool inside = colX < size - gap && f < 0.85;
+      bool atTip = row >= tipRow - 2.0 && row <= tipRow - 1.0 && len > 0.4;
+      if (onSpot && inside && lit < 0.016) {
+        gl_FragColor = vec4(u_accent, 1.0);
+        return;
+      }
+      float tipLit = hash(vec2(colId, floor(t * 0.4 + hash(vec2(colId, 8.7)) * 7.0)));
+      float tipCell = slot * SLOT + start + floor((size - gap) * 0.5) - 1.0;
+      if (atTip && tipLit < 0.08 && cell.x >= tipCell && cell.x <= tipCell + 1.0) {
+        gl_FragColor = vec4(u_accent, 1.0);
         return;
       }
 
@@ -198,7 +214,7 @@
     const uCalm = u('u_calm');
     const uWide = u('u_wide');
     const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
-    const uGreen = u('u_green');
+    const uAccent = u('u_accent');
     gl.uniform1f(uCell, CELL);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
@@ -211,7 +227,7 @@
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
         : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
-      gl.uniform3fv(uGreen, parseColor(probe, cs.getPropertyValue('--aw-green-6')));
+      gl.uniform3fv(uAccent, parseColor(probe, cs.getPropertyValue(dark ? '--aw-coral-4' : '--aw-coral-6')));
       gl.uniform1f(uStrength, 1.0);
     }
 

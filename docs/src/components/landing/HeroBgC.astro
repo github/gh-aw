@@ -1,12 +1,11 @@
 ---
 // Hero background variant C: "waves".
-// Four travelling sine waves with different wavelengths, speeds and slight
-// angles are summed into horizontal interference bands across the full width
-// of the hero's top edge. Their beating makes moiré swells and ribbons that
-// drift left to right. The field is quantised with an 8x8 Bayer ordered
-// dither into a few purple steps (3 CSS px cells, upscaled with
-// `image-rendering: pixelated`). Rare green glints sit on the constructive
-// interference peaks.
+// Three broad, soft ribbons hang from the top edge of the hero across the
+// full width. Each ribbon's centre line undulates as a long, slow wave
+// drifting left to right, and the ribbons thicken and thin along their
+// length. The field is quantised with an 8x8 Bayer ordered dither into a few
+// purple steps (3 CSS px cells, upscaled with `image-rendering: pixelated`),
+// so the dither supplies the texture. Sparse coral glints sit on the crests.
 ---
 
 <div class="hero-bg-c" data-hero-bg-c>
@@ -61,11 +60,20 @@
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
     float bayer8(vec2 a) { return bayer4(0.5 * a) * 0.25 + bayer2(a); }
 
-    // One travelling ribbon: horizontal bands (phase mostly along y) with a
-    // slight tilt, whose vertical position undulates as a wave moving right.
-    float ribbon(vec2 p, float ky, float tilt, float kx, float amp, float speed, float ph, float t) {
-      float wobble = amp * sin(p.x * kx - t * speed + ph);
-      return sin(p.y * ky + p.x * tilt + wobble - t * speed * 0.35);
+    float hash(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }
+
+    // One broad ribbon: a soft band whose centre line undulates as a long,
+    // slow wave travelling left to right. Returns intensity in .x and how
+    // close this point is to a wave crest (the band's highest point) in .y.
+    vec2 ribbon(vec2 p, float base, float amp, float kx, float speed, float ph, float halfW, float t) {
+      float phase = p.x * kx - t * speed + ph;
+      float s = sin(phase);
+      // A second, longer undulation so the swells don't repeat too evenly.
+      float yc = base + amp * s + amp * 0.45 * sin(p.x * kx * 0.37 + t * speed * 0.6 + ph * 1.9);
+      float d = (p.y - yc) / halfW;
+      // Breathing along the length: each ribbon thickens and thins.
+      float body = 0.62 + 0.38 * sin(p.x * kx * 0.55 - t * speed * 0.5 + ph * 2.3);
+      return vec2(exp(-d * d) * body, max(-s, 0.0));
     }
 
     void main() {
@@ -75,18 +83,6 @@
       vec2 p = vec2(cell.x * u_cell, size.y - cell.y * u_cell);
       float t = u_time;
 
-      // Four waves. Two fine carriers with close wavelengths multiply into
-      // moiré stripes whose contrast beats in slow swells; the tilts make the
-      // beats wander across the width. Two broad waves add ribbons of swell.
-      float w1 = ribbon(p, 1.0 / 5.2,   0.0030, 1.0 / 230.0, 6.5, 0.55, 0.0, t);
-      float w2 = ribbon(p, 1.0 / 4.6,  -0.0045, 1.0 / 340.0, 8.0, 0.40, 1.7, t);
-      float w3 = ribbon(p, 1.0 / 22.0,  0.0020, 1.0 / 150.0, 1.2, 0.70, 3.1, t);
-      float w4 = ribbon(p, 1.0 / 48.0,  0.0026, 1.0 / 420.0, 1.6, 0.24, 4.4, t);
-      float weave = w1 * w2;                       // -1 .. 1, fine moiré
-      float swell = 0.5 + 0.25 * w3 + 0.25 * w4;   //  0 .. 1, broad ribbons
-      float n = swell * (0.55 + 0.45 * weave);
-      n = clamp(n * 1.25, 0.0, 1.0);
-
       // Falloff: a band hanging from the top edge across the full width.
       // Desktop: gone by ~40% of the height (where the h1 starts), reaching a
       // little lower on the right behind the hero visual. Narrow screens: the
@@ -95,15 +91,32 @@
       float fall = mix(105.0, 0.38 * size.y, wide);
       float xN = p.x / size.x;
       fall *= 1.0 + 0.55 * wide * smoothstep(0.5, 0.95, xN);
+
+      // Ribbons are laid out in a space scaled to the band height so narrow
+      // screens get the same composition, just shorter.
+      float sc = clamp(fall / 340.0, 0.45, 1.0);
+      vec2 q = vec2(p.x, p.y / sc);
+
+      // Three large swells, 60-150px tall, stacked from the top edge down.
+      vec2 r1 = ribbon(q, 44.0,  22.0, 1.0 / 125.0, 0.40, 0.0, 26.0, t);
+      vec2 r2 = ribbon(q, 125.0, 30.0, 1.0 / 175.0, 0.30, 2.1, 34.0, t);
+      vec2 r3 = ribbon(q, 230.0, 36.0, 1.0 / 240.0, 0.22, 4.3, 44.0, t);
+      // Screen-blend so overlaps glow without clipping.
+      float n = 1.0 - (1.0 - r1.x) * (1.0 - r2.x) * (1.0 - r3.x);
+
       float m = 1.0 - smoothstep(0.0, fall, p.y);
       m = m * m * (1.0 + 0.15 * m);
 
       float v = n * m * u_strength;
       float th = bayer8(cell);
 
-      // Green glints only at the strongest constructive peaks near the top.
-      float hot = n * m;
-      if (hot > 0.88 && (hot - 0.88) * 2.5 > th) {
+      // Coral glints: small and sparse, only on the brightest crests of the
+      // two upper ribbons. Picked per 3x3-cell block so they read as specks.
+      float crest = max(r1.x * r1.y, r2.x * r2.y);
+      float hot = crest * m;
+      vec2 blk = floor(cell / 3.0);
+      float pick = hash(blk);
+      if (hot > 0.55 && pick > 0.84 && (hot - 0.55) * 3.5 > th) {
         gl_FragColor = vec4(u_glint, 1.0);
         return;
       }
@@ -182,7 +195,7 @@
         ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
         : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
       steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
-      gl.uniform3fv(uGlint, parseColor(probe, cs.getPropertyValue('--aw-green-6')));
+      gl.uniform3fv(uGlint, parseColor(probe, cs.getPropertyValue(dark ? '--aw-coral-4' : '--aw-coral-6')));
       gl.uniform1f(uStrength, dark ? 1.0 : 1.05);
     }
 
