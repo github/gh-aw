@@ -58,14 +58,13 @@
   --aw-purple-9: #2f234a;
 
   --aw-blue-2: #c6e6ff;
+  --aw-blue-4: #79c0ff;
   --aw-blue-6: #0969da;
   --aw-blue-7: #0753b6;
 
   --aw-pink-2: #ffd6e8;
   --aw-pink-6: #bf3989;
   --aw-pink-8: #7d2457;
-
-  --aw-amber-9: #6a4500;
 
   --aw-font-sans: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --aw-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -99,6 +98,8 @@
   --aw-diagram-text: var(--aw-gray-0);
 
   --aw-color-text: var(--aw-gray-1);
+  --aw-color-text-body: var(--aw-gray-3);
+  --aw-color-text-secondary: var(--aw-gray-3);
   --aw-color-text-muted: var(--aw-gray-4);
   --aw-color-text-strong: var(--aw-gray-0);
   --aw-color-text-invert: var(--aw-gray-13);
@@ -115,7 +116,10 @@
   /* Bare RGB triplet, for rgba(var(--aw-accent-rgb), <alpha>) */
   --aw-accent-rgb: 168, 139, 250;
 
-  --aw-color-callout-preview-text: inherit;
+  --aw-color-link: var(--aw-blue-4);
+  --aw-color-code-bg: rgba(110, 118, 129, 0.4);
+  --aw-color-scrollbar: rgba(48, 54, 61, 0.4);
+  --aw-color-scrollbar-hover: rgba(72, 79, 88, 0.6);
 
   --aw-shadow: 0 18px 48px rgba(1, 4, 9, 0.22);
 
@@ -155,6 +159,8 @@
   --aw-diagram-text: var(--aw-gray-13);
 
   --aw-color-text: var(--aw-gray-13);
+  --aw-color-text-body: var(--aw-gray-13);
+  --aw-color-text-secondary: var(--aw-gray-8);
   --aw-color-text-muted: var(--aw-gray-7);
   --aw-color-text-strong: var(--aw-gray-13);
   --aw-color-text-invert: var(--aw-gray-0);
@@ -170,7 +176,10 @@
   --aw-color-accent-text: var(--aw-purple-7);
   --aw-accent-rgb: 130, 80, 223;
 
-  --aw-color-callout-preview-text: var(--aw-amber-9);
+  --aw-color-link: var(--aw-blue-6);
+  --aw-color-code-bg: rgba(175, 184, 193, 0.2);
+  --aw-color-scrollbar: rgba(208, 215, 222, 0.5);
+  --aw-color-scrollbar-hover: rgba(175, 184, 193, 0.7);
 
   --aw-shadow: 0 18px 42px rgba(31, 35, 40, 0.08);
 
@@ -221,5 +230,4 @@
   --aw-border: var(--aw-color-border);
   --aw-border-strong: var(--aw-color-border-strong);
   --aw-text-muted: var(--aw-color-text-muted);
-  --aw-callout-preview-text: var(--aw-color-callout-preview-text);
 }
