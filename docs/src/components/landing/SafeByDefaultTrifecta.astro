@@ -27,7 +27,7 @@ const nodes = [
     label: 'Private data',
     sub: 'Secrets, tokens, private repos',
     cut: 'Credential isolation',
-    t: 0.56, // wide layout: where the pill sits along the spoke
+    t: 0.44, // wide layout: where the pill sits along the spoke
     tc: 0.45, // compact layout: where the cut disc sits
   },
   {
@@ -38,7 +38,7 @@ const nodes = [
     label: 'Untrusted content',
     sub: 'Issues, PR comments, web pages',
     cut: 'Integrity filtering',
-    t: 0.6,
+    t: 0.48,
     tc: 0.6,
   },
   {
@@ -49,7 +49,7 @@ const nodes = [
     label: 'Outbound access',
     sub: 'Network, APIs, writes',
     cut: 'Sandboxed agent',
-    t: 0.6,
+    t: 0.48,
     tc: 0.6,
   },
 ] as const;
@@ -142,7 +142,7 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
             class="tri-cut"
             style={`--i:${i};--wx:${pct(sp.wide.p.x, W)};--wy:${pct(sp.wide.p.y, H)};--cx:${pct(sp.compact.p.x, W)};--cy:${pct(sp.compact.p.y, H)}`}
           >
-            <span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />
+            <span class="tri-cut-icon" set:html={icon('circle-slash', 16)} />
             <span class="tri-cut-name">{sp.cut}</span>
           </span>
         ))}
