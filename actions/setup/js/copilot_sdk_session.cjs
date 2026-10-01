@@ -107,6 +107,7 @@ function extractPromptFromArgs(args) {
  *   logger: (msg: string) => void,
  *   attempt?: number,
  *   model?: string,
+ *   reasoningEffort?: string,
  *   connectionToken?: string,
  *   providers?: import("@github/copilot-sdk").NamedProviderConfig[],
  *   models?: import("@github/copilot-sdk").ProviderModelConfig[],
@@ -136,6 +137,7 @@ async function runWithCopilotSDK({
   logger,
   attempt = 0,
   model,
+  reasoningEffort,
   connectionToken,
   providers,
   models: providerModels,
@@ -324,9 +326,12 @@ async function runWithCopilotSDK({
     });
 
     // Build session config using the multi-provider surface.
+    /** @type {any} */
+    const sdkReasoningEffort = reasoningEffort;
     /** @type {import("@github/copilot-sdk").SessionConfig} */
     const sessionConfig = {
       model: model || resolveModelWithFallback(process.env, "COPILOT_MODEL") || undefined,
+      ...(sdkReasoningEffort ? { reasoningEffort: sdkReasoningEffort } : {}),
       providers,
       models: providerModels,
       onPermissionRequest,

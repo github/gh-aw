@@ -69,6 +69,8 @@ type AWFConfigFile struct {
 	// Schema is the JSON schema reference for IDE auto-complete support.
 	Schema string `json:"$schema,omitempty"`
 
+	Experimental *AWFExperimentalConfig `json:"experimental,omitempty"`
+
 	// Runner contains runner topology metadata that AWF uses to activate
 	// topology-specific behaviors (split-filesystem handling, network isolation,
 	// tool cache redirection, sysroot image selection).
@@ -148,6 +150,10 @@ type AWFPlatformConfig struct {
 	Type string `json:"type,omitempty"`
 }
 
+type AWFExperimentalConfig struct {
+	ModelRouting bool `json:"modelRouting,omitempty"`
+}
+
 // AWFAPIProxyConfig is the "apiProxy" section of the AWF config file.
 // It maps to the apiProxy.* fields in the AWF config schema.
 // Note: --enable-api-proxy is deprecated since AWF v0.27.32 (API proxy is always on).
@@ -204,7 +210,8 @@ type AWFAPIProxyConfig struct {
 	Models map[string][]string `json:"models,omitempty"`
 
 	// AllowedModels is the explicit allowlist policy for model names/patterns.
-	AllowedModels []string `json:"allowedModels,omitempty"`
+	AllowedModels []string               `json:"allowedModels,omitempty"`
+	Routing       *AWFModelRoutingConfig `json:"routing,omitempty"`
 	// DisallowedModels is the explicit denylist policy for model names/patterns.
 	DisallowedModels []string `json:"disallowedModels,omitempty"`
 
@@ -213,6 +220,20 @@ type AWFAPIProxyConfig struct {
 	// Only emitted for AWF v0.28.10+ (see AWFAPIProxyCACertMinVersion); older
 	// AWF strict config validation rejects the unknown property.
 	CACert string `json:"caCert,omitempty"`
+}
+
+type AWFModelRoutingConfig struct {
+	Objective AWFModelRoutingObjective `json:"objective"`
+	Task      AWFModelRoutingTask      `json:"task"`
+}
+
+type AWFModelRoutingObjective struct {
+	Goal string `json:"goal"`
+	Mode string `json:"mode"`
+}
+
+type AWFModelRoutingTask struct {
+	ConversationFile string `json:"conversationFile"`
 }
 
 // AWFHostedWebConfig is the "apiProxy.hostedWeb" section of the AWF config file.
