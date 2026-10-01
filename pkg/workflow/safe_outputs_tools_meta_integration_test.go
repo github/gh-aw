@@ -118,6 +118,33 @@ func extractToolsMetaFromLockFile(t *testing.T, yamlStr string) ToolsMeta {
 	return meta
 }
 
+func TestBuiltinLedgerSmokeCompiledTools(t *testing.T) {
+	source, err := os.ReadFile("../../.github/workflows/smoke-builtin-ledgers.md")
+	require.NoError(t, err)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "smoke-builtin-ledgers.md")
+	require.NoError(t, os.WriteFile(path, source, 0600))
+	require.NoError(t, NewCompiler().CompileWorkflow(path))
+
+	compiled, err := os.ReadFile(filepath.Join(dir, "smoke-builtin-ledgers.lock.yml"))
+	require.NoError(t, err)
+	meta := extractToolsMetaFromLockFile(t, string(compiled))
+	names := make(map[string]map[string]any)
+	for _, tool := range meta.DynamicTools {
+		names[tool["name"].(string)] = tool
+	}
+	for name, ledgerType := range map[string]string{
+		"ledger_map_put": "map", "ledger_map_delete": "map",
+		"ledger_work_pool_submit": "work-pool", "ledger_work_pool_cancel": "work-pool",
+		"ledger_work_pool_acquire": "work-pool", "ledger_work_pool_acquire_next": "work-pool",
+		"ledger_work_pool_finish": "work-pool", "ledger_work_pool_abandon": "work-pool",
+	} {
+		require.Contains(t, names, name)
+		assert.Equal(t, ledgerType, names[name]["_ledger_type"])
+		assert.NotEmpty(t, names[name]["_ledger_operation"])
+	}
+}
+
 // TestToolsMetaJSONCompiledWorkflowZeroArgCustomJob verifies that a custom safe-output job
 // with no inputs compiles to a dynamic_tools entry with an empty properties schema and no
 // required key. This protects the compiler/bridge contract: the bridge must pass {} through
