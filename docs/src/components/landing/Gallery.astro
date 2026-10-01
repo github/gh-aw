@@ -48,87 +48,138 @@ const more = [
           <li>
             <a class="aw-item" href={f.href}>
               <div class="aw-stage" aria-hidden="true">
-                <div class="aw-mock">
+                <div class={`gh gh-${f.id}`}>
                 {f.id === 'triage' && (<>
-                  <div class="aw-head">
-                    <span class="aw-badge aw-badge-open"><span set:html={icon('issue-opened', 12)} />Open</span>
-                    <span class="aw-t">Crash on empty file save</span>
-                    <span class="aw-m">#482</span>
+                  <div class="gh-head">
+                    <div class="gh-title">Crash on empty file save <span class="gh-num">#482</span></div>
+                    <div class="gh-meta">
+                      <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+                      <span><b>mona</b> opened 1 hour ago</span>
+                    </div>
                   </div>
-                  <div class="aw-event">
-                    <span class="aw-av" set:html={icon('hubot', 12)} />
-                    <span><b>github-actions</b> added</span>
-                    <span class="aw-chip"><i class="aw-dot"></i>bug</span>
-                    <span class="aw-chip"><i class="aw-dot"></i>editor</span>
-                  </div>
-                  <div class="aw-body">
-                    <span class="aw-av" set:html={icon('hubot', 12)} />
-                    <span><b>github-actions</b> commented<br />Thanks! Could you share your editor version and steps to reproduce?</span>
+                  <div class="gh-tl">
+                    <div class="gh-ev">
+                      <span class="gh-badge" set:html={icon('tag', 16)} />
+                      <span class="gh-ev-text">
+                        <span class="gh-av gh-av-sm" set:html={icon('mark-github', 12)} />
+                        <b>github-actions</b> added
+                        <span class="gh-lbl gh-lbl-red">bug</span>
+                        <span class="gh-lbl gh-lbl-blue">editor</span>
+                      </span>
+                    </div>
+                    <div class="gh-cm">
+                      <span class="gh-av" set:html={icon('mark-github', 16)} />
+                      <div class="gh-box">
+                        <div class="gh-box-head"><b>github-actions</b><span class="gh-bot">bot</span><span class="gh-muted">commented now</span></div>
+                        <div class="gh-box-body">Thanks! Could you share your editor version and steps to reproduce?</div>
+                      </div>
+                    </div>
                   </div>
                 </>)}
                 {f.id === 'review' && (<>
-                  <div class="aw-file"><span class="aw-ico" set:html={icon('file', 12)} /><span class="aw-code">src/store.ts</span></div>
-                  <div class="aw-code aw-lines">
-                    <div><span class="aw-ln">41</span><span>  const items = load()</span></div>
-                    <div class="aw-addrow"><span class="aw-ln">42</span><span>+ items.forEach(save)</span></div>
-                    <div><span class="aw-ln">43</span><span>  return items.length</span></div>
+                  <div class="gh-fh">
+                    <span class="gh-muted" set:html={icon('chevron-down', 16)} />
+                    <span class="gh-mono">src/store.ts</span>
+                    <span class="gh-add-n">+1</span><span class="gh-del-n">−1</span>
                   </div>
-                  <div class="aw-body aw-thread">
-                    <span class="aw-av" set:html={icon('hubot', 12)} />
-                    <span><b>github-actions</b> commented<br />Errors thrown by <code>save</code> are dropped here. Consider awaiting each call.</span>
+                  <div class="gh-diff">
+                    <div class="gh-dl gh-hunk"><span class="gh-ln"></span><span class="gh-ln"></span><span class="gh-sg"></span><span class="gh-cd">@@ -41,3 +41,3 @@ persist()</span></div>
+                    <div class="gh-dl gh-del"><span class="gh-ln">42</span><span class="gh-ln"></span><span class="gh-sg">-</span><span class="gh-cd">  await all(items, save)</span></div>
+                    <div class="gh-dl gh-add"><span class="gh-ln"></span><span class="gh-ln">42</span><span class="gh-sg">+</span><span class="gh-cd">  items.forEach(save)</span></div>
+                    <div class="gh-thread">
+                      <div class="gh-box">
+                        <div class="gh-box-body">
+                          <div class="gh-thread-head"><span class="gh-av gh-av-sm" set:html={icon('mark-github', 12)} /><b>github-actions</b><span class="gh-bot">bot</span><span class="gh-muted">now</span></div>
+                          <code>forEach</code> won’t await <code>save</code>, so its errors are dropped.
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </>)}
                 {f.id === 'ci' && (<>
-                  <div class="aw-checks">
-                    <div class="aw-check"><span class="aw-ok" set:html={icon('check-circle-fill', 14)} /><span class="aw-t">lint</span><span class="aw-m">12s</span></div>
-                    <div class="aw-check"><span class="aw-ok" set:html={icon('check-circle-fill', 14)} /><span class="aw-t">build</span><span class="aw-m">48s</span></div>
-                    <div class="aw-check"><span class="aw-bad" set:html={icon('x-circle-fill', 14)} /><span class="aw-t">test (ubuntu)</span><span class="aw-m">2m 3s</span></div>
+                  <div class="gh-tl gh-tl-top">
+                    <div class="gh-ev">
+                      <span class="gh-badge" set:html={icon('cross-reference', 16)} />
+                      <span class="gh-ev-text">
+                        <span class="gh-av gh-av-sm" set:html={icon('mark-github', 12)} />
+                        <b>github-actions</b> mentioned this
+                      </span>
+                    </div>
+                    <div class="gh-ev-ref">
+                      <span class="gh-ok" set:html={icon('issue-opened', 16)} />
+                      <b>Flaky db timeout</b><span class="gh-muted">#519</span>
+                    </div>
                   </div>
-                  <div class="aw-event">
-                    <span class="aw-av" set:html={icon('hubot', 12)} />
-                    <span><b>github-actions</b> opened</span>
-                    <span class="aw-ok" set:html={icon('issue-opened', 14)} />
-                    <span class="aw-t">Flaky db timeout <span class="aw-m">#519</span></span>
+                  <div class="gh-box gh-merge">
+                    <div class="gh-merge-head">
+                      <span class="gh-merge-ico" set:html={icon('x', 16)} />
+                      <span><b>Some checks were not successful</b><br /><span class="gh-muted">1 failing, 1 skipped, 2 successful</span></span>
+                    </div>
+                    <div class="gh-run"><span class="gh-bad" set:html={icon('x-circle-fill', 16)} /><span><b>CI / test (ubuntu)</b> <span class="gh-muted">Failing after 2m</span></span><span class="gh-link">Details</span></div>
+                    <div class="gh-run"><span class="gh-muted" set:html={icon('skip', 16)} /><span><b>CI / deploy</b> <span class="gh-muted">Skipped</span></span><span class="gh-link">Details</span></div>
+                    <div class="gh-run"><span class="gh-ok" set:html={icon('check-circle-fill', 16)} /><span><b>CI / lint</b> <span class="gh-muted">Successful in 12s</span></span><span class="gh-link">Details</span></div>
                   </div>
                 </>)}
                 {f.id === 'docs' && (<>
-                  <div class="aw-head">
-                    <span class="aw-ico" set:html={icon('git-pull-request', 16)} />
-                    <span class="aw-t">docs: sync CLI flags with --help</span>
-                    <span class="aw-m">#214</span>
+                  <div class="gh-head">
+                    <div class="gh-title">docs: sync CLI flags with --help <span class="gh-num">#214</span></div>
+                    <div class="gh-meta">
+                      <span class="gh-state"><span set:html={icon('git-pull-request', 14)} />Open</span>
+                      <span>into <span class="gh-ref">main</span> from <span class="gh-ref">docs/cli-flags</span></span>
+                    </div>
                   </div>
-                  <div class="aw-files">
-                    <div class="aw-fhead">Files changed <span class="aw-m">2</span></div>
-                    <div class="aw-frow"><span class="aw-code aw-t">docs/cli.md</span><span class="aw-plus">+18</span><span class="aw-minus">−6</span><span class="aw-stat"><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-d"></i><i class="aw-s-n"></i></span></div>
-                    <div class="aw-frow"><span class="aw-code aw-t">docs/flags.md</span><span class="aw-plus">+4</span><span class="aw-minus">−2</span><span class="aw-stat"><i class="aw-s-a"></i><i class="aw-s-a"></i><i class="aw-s-d"></i><i class="aw-s-n"></i><i class="aw-s-n"></i></span></div>
+                  <div class="gh-tabs">
+                    <span><span set:html={icon('git-commit', 16)} />Commits <span class="gh-count">1</span></span>
+                    <span class="gh-tab-on"><span set:html={icon('file-diff', 16)} />Files changed <span class="gh-count">2</span></span>
+                  </div>
+                  <div class="gh-files">
+                    <div class="gh-fh"><span class="gh-muted" set:html={icon('chevron-down', 16)} /><span class="gh-mono">docs/cli.md</span><span class="gh-add-n">+18</span><span class="gh-del-n">−6</span><span class="gh-stat"><i class="a"></i><i class="a"></i><i class="a"></i><i class="d"></i><i></i></span></div>
+                    <div class="gh-fh"><span class="gh-muted" set:html={icon('chevron-down', 16)} /><span class="gh-mono">docs/flags.md</span><span class="gh-add-n">+4</span><span class="gh-del-n">−2</span><span class="gh-stat"><i class="a"></i><i class="a"></i><i class="a"></i><i class="d"></i><i></i></span></div>
                   </div>
                 </>)}
                 {f.id === 'report' && (<>
-                  <div class="aw-head">
-                    <span class="aw-badge aw-badge-open"><span set:html={icon('issue-opened', 12)} />Open</span>
-                    <span class="aw-t">Weekly digest · Sep 22–29</span>
+                  <div class="gh-head">
+                    <div class="gh-title">Weekly digest: Sep 22–29 <span class="gh-num">#530</span></div>
+                    <div class="gh-meta">
+                      <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+                      <span><b>github-actions</b> opened yesterday</span>
+                    </div>
                   </div>
-                  <div class="aw-md">
-                    <div class="aw-h">Highlights</div>
-                    <ul>
-                      <li>14 pull requests merged</li>
-                      <li>3 bugs fixed in the editor</li>
-                      <li>New contributor: <span class="aw-link">@lena</span></li>
-                    </ul>
+                  <div class="gh-cm gh-cm-top">
+                    <span class="gh-av" set:html={icon('mark-github', 16)} />
+                    <div class="gh-box">
+                      <div class="gh-box-head"><b>github-actions</b><span class="gh-bot">bot</span><span class="gh-muted">opened yesterday</span></div>
+                      <div class="gh-box-body gh-md">
+                        <div class="gh-h3">Highlights</div>
+                        <ul>
+                          <li>14 pull requests merged</li>
+                          <li>3 bugs fixed in the editor</li>
+                          <li>New contributor: <span class="gh-link">@lena</span></li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </>)}
                 {f.id === 'security' && (<>
-                  <div class="aw-head">
-                    <span class="aw-bad" set:html={icon('shield', 16)} />
-                    <span class="aw-t">Unpinned third-party action</span>
-                    <span class="aw-chip aw-chip-danger">High</span>
+                  <div class="gh-head">
+                    <div class="gh-title">Unpinned third-party action</div>
+                    <div class="gh-meta">
+                      <span class="gh-state"><span set:html={icon('shield', 14)} />Open</span>
+                      <span class="gh-sev">High</span>
+                      <span>in <span class="gh-ref">main</span> 2 days ago</span>
+                    </div>
                   </div>
-                  <div class="aw-file"><span class="aw-ico" set:html={icon('file', 12)} /><span class="aw-code">.github/workflows/release.yml</span></div>
-                  <div class="aw-code aw-lines">
-                    <div><span class="aw-ln">18</span><span>  - name: Deploy</span></div>
-                    <div class="aw-hit"><span class="aw-ln">19</span><span>    uses: some-org/deploy@v2</span></div>
+                  <div class="gh-box gh-loc">
+                    <div class="gh-box-head gh-mono">.github/workflows/release.yml:19</div>
+                    <div class="gh-diff">
+                      <div class="gh-dl gh-dl-1"><span class="gh-ln">18</span><span class="gh-cd">  - name: Deploy</span></div>
+                      <div class="gh-dl gh-dl-1"><span class="gh-ln">19</span><span class="gh-cd">    uses: some-org/deploy@v2</span></div>
+                    </div>
+                    <div class="gh-annot">
+                      <span class="gh-sev-ico" set:html={icon('alert', 16)} />
+                      <span>Step uses <code>some-org/deploy</code> with ref <code>v2</code>, not a pinned commit hash</span>
+                    </div>
                   </div>
-                  <div class="aw-hint"><span class="aw-ico" set:html={icon('light-bulb', 12)} />Pin to a full-length commit SHA</div>
                 </>)}
                 </div>
               </div>
@@ -138,6 +189,7 @@ const more = [
           </li>
         ))}
       </ul>
+
 
       <div class="aw-more-bar">
         <details class="aw-more">
@@ -221,7 +273,7 @@ const more = [
   .aw-stage {
     position: relative;
     overflow: hidden;
-    height: 12.5rem;
+    height: 14rem;
     background: var(--aw-color-bg-subtle);
     border: 1px solid var(--aw-color-divider);
     border-radius: 12px;
@@ -231,7 +283,7 @@ const more = [
     border-color: var(--aw-color-border-strong);
   }
   .aw-item h3 {
-    margin: 1rem 0 0;
+    margin: 1.125rem 0 0;
     font-size: var(--aw-step-0);
     font-weight: 550;
     letter-spacing: -0.01em;
@@ -245,246 +297,471 @@ const more = [
     text-underline-offset: 3px;
   }
   .aw-item p {
-    margin: 0.375rem 0 0;
-    font-size: var(--aw-step--1);
-    line-height: 1.5;
+    margin: 0.5rem 0 0;
+    font-size: var(--aw-step-0);
+    line-height: 1.55;
     color: var(--aw-color-text-muted);
     text-wrap: pretty;
   }
 
-  /* Cropped product shots: the mock is inset top/left and runs off the right/bottom */
-  .aw-mock {
+  /* GitHub UI mocks ---------------------------------------------------------
+     Cropped product shots in GitHub's Primer style. The palette below derives
+     GitHub's cool neutrals and functional colours from site tokens, so the
+     mocks read as github.com in both themes. Dark values first. */
+  .gh {
+    --gh-canvas: color-mix(in srgb, var(--aw-gray-13) 93%, var(--aw-blue-6));
+    --gh-subtle: color-mix(in srgb, var(--aw-gray-12) 90%, var(--aw-blue-6));
+    --gh-border: color-mix(in srgb, var(--aw-gray-9) 90%, var(--aw-blue-6));
+    --gh-border-muted: color-mix(in srgb, var(--aw-gray-10) 90%, var(--aw-blue-6));
+    --gh-fg: color-mix(in srgb, var(--aw-gray-1) 96%, var(--aw-blue-6));
+    --gh-muted: color-mix(in srgb, var(--aw-gray-5) 88%, var(--aw-blue-6));
+    --gh-neutral: color-mix(in srgb, var(--aw-gray-8) 85%, var(--aw-blue-6));
+    --gh-accent: color-mix(in srgb, var(--aw-blue-6) 75%, var(--gh-fg));
+    --gh-success: color-mix(in srgb, var(--aw-green-6) 85%, var(--gh-fg));
+    --gh-success-em: color-mix(in srgb, var(--aw-green-6) 85%, var(--aw-gray-13));
+    --gh-danger: var(--aw-red-5);
+    --gh-severe: var(--aw-coral-4);
+    --gh-tab-line: var(--aw-coral-4);
+    --gh-add-bg: color-mix(in srgb, var(--aw-green-6) 15%, var(--gh-canvas));
+    --gh-add-num: color-mix(in srgb, var(--aw-green-6) 30%, var(--gh-canvas));
+    --gh-del-bg: color-mix(in srgb, var(--aw-red-5) 12%, var(--gh-canvas));
+    --gh-del-num: color-mix(in srgb, var(--aw-red-5) 25%, var(--gh-canvas));
+    --gh-hunk-bg: color-mix(in srgb, var(--aw-blue-6) 12%, var(--gh-canvas));
+    --gh-hunk-num: color-mix(in srgb, var(--aw-blue-6) 25%, var(--gh-canvas));
+
     position: absolute;
     top: 1.25rem;
     left: 1.25rem;
     width: calc(100% + 0.25rem);
-    min-height: 14rem;
+    min-height: 15rem;
     box-sizing: border-box;
-    /* the overshoot past the stage edge, so text wraps inside the visible area */
-    padding-right: 1.5rem;
+    /* the overshoot past the stage edge, so content wraps inside the visible area */
+    padding: 0.875rem 2.5rem 1rem 1rem;
     display: flex;
     flex-direction: column;
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-divider);
-    border-radius: 8px;
+    gap: 0.75rem;
+    background: var(--gh-canvas);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
     box-shadow: var(--aw-shadow-raised);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
     font-size: var(--aw-step--1);
-    line-height: 1.4;
-    color: var(--aw-color-text-body);
-  }
-  .aw-mock > * {
-    padding: 0.625rem 0.875rem;
-    border-top: 1px solid var(--aw-color-divider);
+    line-height: 1.5;
+    color: var(--gh-fg);
     white-space: nowrap;
   }
-  .aw-mock > :first-child {
-    border-top: 0;
+  :global(:root[data-theme='light']) .gh {
+    --gh-canvas: var(--aw-gray-0);
+    --gh-subtle: color-mix(in srgb, var(--aw-gray-0) 97%, var(--aw-blue-6));
+    --gh-border: color-mix(in srgb, var(--aw-gray-3) 90%, var(--aw-blue-6));
+    --gh-border-muted: color-mix(in srgb, var(--aw-gray-2) 92%, var(--aw-blue-6));
+    --gh-fg: color-mix(in srgb, var(--aw-gray-12) 95%, var(--aw-blue-6));
+    --gh-muted: color-mix(in srgb, var(--aw-gray-7) 85%, var(--aw-blue-6));
+    --gh-neutral: color-mix(in srgb, var(--aw-gray-3) 92%, var(--aw-blue-6));
+    --gh-accent: var(--aw-blue-6);
+    --gh-success: color-mix(in srgb, var(--aw-green-6) 80%, var(--aw-gray-13));
+    --gh-danger: color-mix(in srgb, var(--aw-red-5) 82%, var(--aw-gray-13));
+    --gh-severe: var(--aw-coral-6);
+    --gh-add-bg: color-mix(in srgb, var(--aw-green-6) 13%, var(--gh-canvas));
+    --gh-add-num: color-mix(in srgb, var(--aw-green-6) 24%, var(--gh-canvas));
+    --gh-del-bg: color-mix(in srgb, var(--aw-red-5) 10%, var(--gh-canvas));
+    --gh-del-num: color-mix(in srgb, var(--aw-red-5) 20%, var(--gh-canvas));
+    --gh-hunk-bg: color-mix(in srgb, var(--aw-blue-6) 9%, var(--gh-canvas));
+    --gh-hunk-num: color-mix(in srgb, var(--aw-blue-6) 18%, var(--gh-canvas));
   }
-  .aw-mock b {
-    font-weight: 550;
-    color: var(--aw-color-text-strong);
-  }
-  .aw-head,
-  .aw-event,
-  .aw-check,
-  .aw-frow,
-  .aw-file,
-  .aw-hint,
-  .aw-fhead {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-  .aw-head .aw-t {
-    font-size: var(--aw-step-0);
-  }
-  .aw-t {
-    flex: none;
-    font-weight: 550;
-    color: var(--aw-color-text-strong);
-    min-width: 0;
-  }
-  .aw-m {
-    flex: none;
-    color: var(--aw-color-text-muted);
-    font-weight: 400;
-  }
-  .aw-ico,
-  .aw-ok,
-  .aw-bad,
-  .aw-av {
-    display: inline-flex;
-    flex: none;
-    color: var(--aw-color-text-muted);
-  }
-  .aw-ok { color: var(--aw-color-success); }
-  .aw-bad { color: var(--aw-color-danger); }
-  .aw-mock :global(svg) {
+  .gh :global(svg) {
+    display: block;
     fill: currentColor;
   }
-  .aw-av {
-    align-items: center;
-    justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    background: var(--aw-color-bg-subtle);
-    border: 1px solid var(--aw-color-border);
-    color: var(--aw-color-text-secondary);
+  .gh b {
+    font-weight: 600;
+    color: var(--gh-fg);
   }
-  .aw-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0 0.5rem;
-    border-radius: 999px;
-    font-weight: 550;
-  }
-  .aw-badge-open {
-    background: var(--aw-color-success);
-    color: var(--aw-color-surface);
-  }
-  .aw-event {
-    background: var(--aw-color-bg-subtle);
-    color: var(--aw-color-text-muted);
-  }
-  .aw-body {
-    white-space: normal;
-    text-wrap: pretty;
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-  }
-  .aw-body .aw-av {
-    margin-top: 0.125rem;
-  }
-  .aw-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0 0.5rem;
-    border: 1px solid var(--aw-color-border);
-    border-radius: 999px;
-    color: var(--aw-color-text-secondary);
-    white-space: nowrap;
-  }
-  .aw-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--aw-color-text-muted);
-  }
-  .aw-chip-danger {
-    border-color: var(--aw-color-danger);
-    color: var(--aw-color-danger);
-    font-weight: 550;
-  }
-  .aw-code,
-  .aw-lines {
+  .gh code,
+  .gh-mono {
     font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
   }
-  .aw-lines {
-    padding: 0.25rem 0;
-    background: var(--aw-color-surface-header);
-  }
-  .aw-lines > div {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0 0.875rem;
-  }
-  .aw-ln {
-    width: 1.5rem;
-    flex: none;
-    text-align: right;
-    color: var(--aw-color-text-muted);
-  }
-  .aw-addrow,
-  .aw-hit {
-    color: var(--aw-color-text-strong);
-  }
-  .aw-addrow {
-    background: color-mix(in srgb, var(--aw-color-success) 16%, transparent);
-  }
-  .aw-hit {
-    background: color-mix(in srgb, var(--aw-color-danger) 14%, transparent);
-  }
-  .aw-mock code {
-    padding: 0;
-    background: none;
+  .gh code {
+    padding: 0.1em 0.35em;
     border: 0;
-    font-size: inherit;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--gh-muted) 20%, transparent);
+    font-size: var(--aw-step--1);
   }
-  .aw-thread {
-    padding-left: 2.5rem;
+  .gh-muted { color: var(--gh-muted); }
+  .gh-ok { color: var(--gh-success); }
+  .gh-bad { color: var(--gh-danger); }
+  .gh-link { color: var(--gh-accent); }
+
+  /* Issue / PR header */
+  .gh-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gh-border);
   }
-  .aw-checks {
-    padding: 0;
+  .gh-title {
+    font-size: var(--aw-step-0);
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--gh-fg);
   }
-  .aw-check {
-    padding: 0.5rem 0.875rem;
-    border-top: 1px solid var(--aw-color-divider);
+  .gh-num {
+    color: var(--gh-muted);
+    font-weight: 300;
   }
-  .aw-check:first-child {
-    border-top: 0;
+  .gh-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gh-muted);
   }
-  .aw-check .aw-t {
-    flex: 1 0 auto;
+  .gh-meta b { color: var(--gh-muted); }
+  .gh-state {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.625rem;
+    padding: 0 0.625rem 0 0.5rem;
+    border-radius: 2em;
+    background: var(--gh-success-em);
+    color: var(--aw-gray-0);
     font-weight: 500;
   }
-  .aw-files {
-    padding: 0;
+  .gh-ref {
+    padding: 0.1em 0.4em;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--gh-accent) 15%, transparent);
+    color: var(--gh-accent);
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
   }
-  .aw-fhead {
-    padding: 0.5rem 0.875rem;
-    background: var(--aw-color-surface-header);
-    font-weight: 550;
-    color: var(--aw-color-text-strong);
-  }
-  .aw-frow {
-    padding: 0.5rem 0.875rem;
-    border-top: 1px solid var(--aw-color-divider);
-  }
-  .aw-frow .aw-t {
-    flex: 1 0 auto;
-    font-weight: 400;
-  }
-  .aw-plus { color: var(--aw-color-success); }
-  .aw-minus { color: var(--aw-color-danger); }
-  .aw-stat {
+
+  /* Avatars: the GitHub mark in a circle */
+  .gh-av {
     display: inline-flex;
-    gap: 2px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--gh-canvas);
+    box-shadow: 0 0 0 1px var(--gh-border);
+    color: var(--gh-fg);
   }
-  .aw-stat i {
+  .gh-av-sm {
+    width: 1.25rem;
+    height: 1.25rem;
+    vertical-align: middle;
+  }
+  .gh-bot {
+    padding: 0 0.375rem;
+    border: 1px solid var(--gh-border);
+    border-radius: 2em;
+    color: var(--gh-muted);
+    font-size: var(--aw-step--1);
+    line-height: 1.5;
+    font-weight: 500;
+  }
+
+  /* Timeline: a 2px rail with circular event badges sitting on it */
+  .gh-tl {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: -0.75rem;
+    padding-top: 0.625rem;
+  }
+  .gh-tl::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: -2rem;
+    left: calc(1rem - 1px);
+    width: 2px;
+    background: var(--gh-border-muted);
+  }
+  .gh-ev {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--gh-muted);
+  }
+  .gh-ev-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .gh-badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--gh-subtle);
+    box-shadow: 0 0 0 2px var(--gh-canvas);
+    color: var(--gh-muted);
+  }
+  .gh-ev-ref {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: -0.5rem;
+    padding-left: 2.75rem;
+  }
+  .gh-lbl {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 2em;
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+    line-height: 1.5;
+    --lbl-fg: color-mix(in srgb, var(--lbl) 55%, var(--gh-fg));
+    background: color-mix(in srgb, var(--lbl) 18%, transparent);
+    border-color: color-mix(in srgb, var(--lbl) 30%, transparent);
+    color: var(--lbl-fg);
+  }
+  .gh-lbl-red { --lbl: var(--aw-red-5); }
+  .gh-lbl-blue { --lbl: var(--aw-blue-6); }
+  :global(:root[data-theme='light']) .gh-lbl {
+    background: var(--lbl);
+    border-color: transparent;
+    color: var(--aw-gray-0);
+  }
+  :global(:root[data-theme='light']) .gh-lbl-red {
+    --lbl: color-mix(in srgb, var(--aw-red-5) 88%, var(--aw-gray-13));
+  }
+
+  /* Comments: avatar outside a bordered box with a tinted header */
+  .gh-cm {
+    position: relative;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+  .gh-box {
+    flex: 1 0 auto;
+    min-width: 0;
+    background: var(--gh-canvas);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .gh-box-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--gh-subtle);
+    border-bottom: 1px solid var(--gh-border);
+    color: var(--gh-muted);
+  }
+  .gh-box-body {
+    padding: 0.625rem 0.75rem;
+    white-space: normal;
+    text-wrap: pretty;
+  }
+  .gh-cm .gh-box-head::before {
+    /* the caret pointing at the avatar */
+    content: "";
+    position: absolute;
+    top: 0.75rem;
+    left: 2.5rem;
     width: 0.5rem;
     height: 0.5rem;
-    background: var(--aw-color-border);
+    background: var(--gh-subtle);
+    border-left: 1px solid var(--gh-border);
+    border-bottom: 1px solid var(--gh-border);
+    transform: rotate(45deg);
   }
-  .aw-stat .aw-s-a { background: var(--aw-color-success); }
-  .aw-stat .aw-s-d { background: var(--aw-color-danger); }
-  .aw-md .aw-h {
-    padding-bottom: 0.375rem;
-    margin-bottom: 0.375rem;
-    border-bottom: 1px solid var(--aw-color-divider);
+
+  /* Diffs: two number gutters, a sign column and code */
+  .gh-fh {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--gh-subtle);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px 6px 0 0;
+    font-size: var(--aw-step--1);
+  }
+  .gh-fh .gh-mono { flex: 0 1 auto; }
+  .gh-add-n { color: var(--gh-success); font-weight: 600; }
+  .gh-del-n { color: var(--gh-danger); font-weight: 600; }
+  .gh-review { gap: 0; }
+  .gh-diff {
+    margin-top: 0;
+    border: 1px solid var(--gh-border);
+    border-top: 0;
+    font-family: var(--aw-font-mono);
+    line-height: 1.6;
+  }
+  .gh-review .gh-diff { border-radius: 0 0 6px 6px; }
+  .gh-dl {
+    display: grid;
+    grid-template-columns: 2.25rem 2.25rem 1.125rem 1fr;
+  }
+  .gh-ln {
+    padding-right: 0.5rem;
+    text-align: right;
+    color: var(--gh-muted);
+  }
+  .gh-sg {
+    padding-left: 0.375rem;
+    color: var(--gh-muted);
+  }
+  .gh-cd { white-space: pre; }
+  .gh-hunk { background: var(--gh-hunk-bg); color: var(--gh-muted); }
+  .gh-hunk .gh-ln { background: var(--gh-hunk-num); }
+  .gh-hunk .gh-cd { padding-left: 0; grid-column: 3 / -1; }
+  .gh-hunk .gh-sg { display: none; }
+  .gh-add { background: var(--gh-add-bg); }
+  .gh-add .gh-ln { background: var(--gh-add-num); color: var(--gh-fg); }
+  .gh-del { background: var(--gh-del-bg); }
+  .gh-del .gh-ln { background: var(--gh-del-num); color: var(--gh-fg); }
+  .gh-add .gh-sg, .gh-del .gh-sg { color: var(--gh-fg); }
+  .gh-thread {
+    padding: 0.625rem 0.75rem;
+    border-top: 1px solid var(--gh-border);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .gh-thread-head {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-bottom: 0.25rem;
+    color: var(--gh-muted);
+  }
+
+  /* Checks: cross-reference event above a merge box */
+  .gh-ci { gap: 0.875rem; }
+  .gh-tl-top { margin-top: 0; padding-top: 0; }
+  .gh-ci .gh-tl::before { top: -1rem; bottom: -1rem; }
+  .gh-merge { position: relative; flex: none; }
+  .gh-merge-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--gh-border);
+    line-height: 1.4;
+  }
+  .gh-merge-ico {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 6px;
+    background: var(--gh-danger);
+    color: var(--aw-gray-0);
+  }
+  :global(:root[data-theme='light']) .gh-merge-ico { background: var(--gh-danger); }
+  .gh-run {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--gh-subtle);
+    border-top: 1px solid var(--gh-border-muted);
+  }
+  .gh-run:nth-child(2) { border-top: 0; }
+  .gh-run > :nth-child(2) { flex: 1 0 auto; }
+
+  /* PR tabs and files */
+  .gh-docs { gap: 0; }
+  .gh-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gh-border);
+    color: var(--gh-muted);
+  }
+  .gh-docs .gh-head { border-bottom: 0; padding-bottom: 0.75rem; }
+  .gh-tabs > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.125rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .gh-tabs .gh-tab-on {
+    color: var(--gh-fg);
+    font-weight: 600;
+    border-bottom-color: var(--gh-tab-line);
+  }
+  .gh-count {
+    padding: 0 0.375rem;
+    border-radius: 2em;
+    background: color-mix(in srgb, var(--gh-muted) 20%, transparent);
+    color: var(--gh-fg);
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+  }
+  .gh-files { display: flex; flex-direction: column; gap: 0.75rem; }
+  .gh-files .gh-fh { border-radius: 6px; }
+  .gh-stat { display: inline-flex; gap: 1px; }
+  .gh-stat i {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--gh-neutral);
+  }
+  .gh-stat i.a { background: var(--gh-success-em); }
+  .gh-stat i.d { background: var(--gh-danger); }
+
+  /* Markdown body */
+  .gh-md .gh-h3 {
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gh-border-muted);
     font-size: var(--aw-step-0);
     font-weight: 600;
-    color: var(--aw-color-text-strong);
   }
-  .aw-md ul {
-    margin: 0;
-    padding-left: 1.25rem;
-    list-style: disc;
+  .gh-md ul { margin: 0; padding-left: 1.25rem; list-style: disc; }
+  .gh-md li { margin: 0.125rem 0 0; padding: 0; }
+  .gh-cm-top .gh-box-head::before { top: 0.75rem; }
+
+  /* Code scanning */
+  .gh-sev {
+    flex: none;
+    padding: 0 0.5rem;
+    border: 1px solid var(--gh-severe);
+    border-radius: 2em;
+    color: var(--gh-severe);
+    font-weight: 500;
+    line-height: 1.5;
   }
-  .aw-md li {
-    margin: 0;
-    padding: 0;
+  .gh-security .gh-head { border-bottom: 0; padding-bottom: 0; }
+  .gh-loc .gh-box-head { font-size: var(--aw-step--1); color: var(--gh-fg); }
+  .gh-loc .gh-diff { border: 0; }
+  .gh-dl-1 { grid-template-columns: 2.25rem 1fr; }
+  .gh-dl-1 .gh-cd { padding-left: 0.5rem; }
+  .gh-annot {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0 0.75rem 0.75rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    white-space: normal;
   }
-  .aw-link {
-    color: var(--aw-color-link);
-  }
-  .aw-hint {
-    color: var(--aw-color-text-muted);
-  }
+  .gh-sev-ico { flex: none; color: var(--gh-severe); padding-top: 0.125rem; }
 
   /* Disclosure */
   .aw-more-bar {
