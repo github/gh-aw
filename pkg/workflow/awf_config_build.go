@@ -30,9 +30,15 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	// Resolve firewall config once — used for both the schema URL and the container image tag.
 	firewallConfig := getFirewallConfig(config.WorkflowData)
+	if err := validateModelRouting(config.WorkflowData, config.EngineName); err != nil {
+		return "", err
+	}
 
 	awfConfig := AWFConfigFile{
 		Schema: buildAWFConfigSchemaURL(firewallConfig),
+	}
+	if isModelRoutingEnabled(config.WorkflowData) {
+		awfConfig.Experimental = &AWFExperimentalConfig{ModelRouting: true}
 	}
 	if config.WorkflowData != nil {
 		awfConfig.Enclaves = buildAWFEnclavesConfig(config.WorkflowData.Enclaves)
@@ -136,6 +142,13 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		MaxTurnCacheMisses:  maxTurnCacheMisses,
 		MaxAICredits:        maxAICredits,
 		EnableTokenSteering: tokenSteeringEnabled,
+	}
+	if isModelRoutingEnabled(config.WorkflowData) {
+		routing := config.WorkflowData.EngineConfig.ModelRouting
+		apiProxy.Routing = &AWFModelRoutingConfig{
+			Objective: AWFModelRoutingObjective{Goal: routing.Goal, Mode: routing.Mode},
+			Task:      AWFModelRoutingTask{ConversationFile: modelRoutingConversationFile},
+		}
 	}
 	if hostedWeb := buildHostedWebConfig(config.EngineName, config.EngineRuntimeID, config.WorkflowData, firewallConfig); hostedWeb != nil {
 		apiProxy.HostedWeb = hostedWeb
@@ -257,6 +270,16 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfigLog.Printf("Models section: %d alias entries", len(config.WorkflowData.ModelMappings))
 	}
 	allowedModels, disallowedModels := resolveModelPolicyForAWFConfig(config.WorkflowData)
+	if isModelRoutingEnabled(config.WorkflowData) {
+		candidates, err := resolveModelRoutingAllowedModels(config.WorkflowData.EngineConfig.ModelRouting)
+		if err != nil {
+			return "", NewValidationError("engine.model-routing.allowed-models", "", "invalid model-routing candidates", err.Error())
+		}
+		allowedModels, err = intersectModelRoutingPolicy(candidates, allowedModels, disallowedModels)
+		if err != nil {
+			return "", NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
+		}
+	}
 	if len(allowedModels) > 0 {
 		apiProxy.AllowedModels = allowedModels
 		awfConfigLog.Printf("Models policy: %d allowed model pattern(s)", len(allowedModels))

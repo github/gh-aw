@@ -589,6 +589,8 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 		}
 	}
 
+	generateModelRoutingConversationStep(yaml, data)
+
 	// Start CLI proxy on the host before AWF execution. When tools.github.mode is gh-proxy,
 	// the compiler starts a difc-proxy container on the host that AWF's cli-proxy sidecar
 	// connects to via host.docker.internal:18443.
