@@ -144,3 +144,6 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 | 2609.16884v1 | Bridging Visual Perception and Symbolic Belief-Space Planning | 2026-09-15 | N | | |
 | 2609.16852v1 | CoAdapt: Adaptive Collaborative Perception in IIoT Swarms | 2026-09-15 | N | | |
 | 2609.16824v1 | Adapting to Non-Stationarity in Decentralized Bandits | 2026-09-15 | N | | |
+| 2609.40303v1 | How Much of a Harness Does a Strong Agent Need for Autonomous ML Engineering? | 2026-09-30 | Y | | |
+| 2609.39982v1 | Mid-Harness: Scaling Actions Between Model and Harness for Terminal Agents | 2026-09-30 | Y | | |
+| 2609.40027v1 | Who Verifies the Graph? Misspecification Attacks on Causal Action Verification | 2026-09-30 | Y | | |
