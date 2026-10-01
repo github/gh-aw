@@ -91,6 +91,7 @@ func TestEnhanceToolDescription(t *testing.T) {
 			safeOutputs: &SafeOutputsConfig{
 				AddLabels: &AddLabelsConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("5")},
+					MaxLabels:            strPtr("25"),
 					SafeOutputAllowBlockConfig: SafeOutputAllowBlockConfig{
 						Allowed: []string{"bug", "enhancement", "question"},
 					},
@@ -98,7 +99,8 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				"Maximum 5 label(s)",
+				"Maximum 5 add_labels call(s)",
+				"Maximum 25 label(s) per call",
 				`Only these labels are allowed: ["bug" "enhancement" "question"]`,
 			},
 		},
@@ -116,7 +118,8 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				"Maximum 3 label(s)",
+				"Maximum 3 add_labels call(s)",
+				"Maximum 10 label(s) per call",
 				`Only these labels are allowed: ["bug" "feature request" "good first issue" "help wanted"]`,
 			},
 		},

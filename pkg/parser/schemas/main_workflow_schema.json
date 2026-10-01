@@ -9194,7 +9194,21 @@
                   "maxItems": 50
                 },
                 "max": {
-                  "description": "Optional maximum number of labels to add (default: 3) Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
+                  "description": "Optional maximum number of add_labels calls (default: 3). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\$\\{\\{.*\\}\\}$",
+                      "description": "GitHub Actions expression that resolves to an integer at runtime"
+                    }
+                  ]
+                },
+                "max-labels": {
+                  "description": "Maximum number of labels per add_labels call (default: 10). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max_labels }}').",
                   "oneOf": [
                     {
                       "type": "integer",

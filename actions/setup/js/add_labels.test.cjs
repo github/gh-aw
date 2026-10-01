@@ -1384,6 +1384,39 @@ describe("add_labels", () => {
       expect(result.error).toContain("received 11");
     });
 
+    it("allows more than ten labels when max_labels permits it, independently of max calls", async () => {
+      const labels = Array.from({ length: 16 }, (_, i) => `label${i + 1}`);
+      mockGithub._repoLabels = labels;
+      const added = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        added.push(params.labels);
+        return {};
+      };
+      const handler = await main({ max: 2, max_labels: 25 });
+
+      expect((await handler({ labels }, {})).success).toBe(true);
+      expect(added[0]).toEqual(labels);
+      expect((await handler({ labels: ["label1"] }, {})).success).toBe(true);
+      expect((await handler({ labels: ["label2"] }, {})).success).toBe(false);
+      expect(added).toHaveLength(2);
+    });
+
+    it("rejects an entire call exceeding max_labels instead of dropping extra labels", async () => {
+      const added = [];
+      mockGithub.rest.issues.addLabels = async params => {
+        added.push(params.labels);
+        return {};
+      };
+      const handler = await main({ max: 10, max_labels: 2 });
+
+      const result = await handler({ labels: ["bug", "enhancement", "documentation"] }, {});
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Cannot add more than 2 labels");
+      expect(added).toHaveLength(0);
+      expect((await handler({ labels: ["bug", "enhancement"] }, {})).success).toBe(true);
+      expect(added).toEqual([["bug", "enhancement"]]);
+    });
+
     it("should resolve temporary ID in item_number to real issue number", async () => {
       const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];

@@ -479,6 +479,8 @@ safe-outputs:
 
 Adds labels to issues or PRs. Specify `allowed` to restrict to specific labels or glob patterns, or `blocked` to deny specific label patterns regardless of the allow list.
 
+`max` limits the number of `add_labels` calls (default: 3); `max-labels` limits the labels in each call (default: 10). Calls exceeding `max-labels` are rejected without adding any labels.
+
 Use `required-labels` to only add labels to issues/PRs that already have **all** of the specified labels. Use `required-title-prefix` to only add labels to issues/PRs whose title starts with the given prefix.
 
 By default, labels that don't already exist in the target repository are rejected with an error. Set `create-if-missing: true` to automatically create any missing labels before they are applied.
@@ -490,7 +492,8 @@ safe-outputs:
   add-labels:
     allowed: [bug, team-*, area/*] # restrict to specific labels or glob patterns
     blocked: ["~*", "*[bot]"]   # deny labels matching these glob patterns
-    max: 3                       # max labels (default: 3)
+    max: 10                      # max add_labels calls (default: 3)
+    max-labels: 5                # max labels per call (default: 10)
     target: "*"                  # "triggering" (default), "*", or number
     target-repo: "owner/repo"    # cross-repository
     allowed-repos: ["org/repo1", "org/repo2"]  # additional allowed repositories

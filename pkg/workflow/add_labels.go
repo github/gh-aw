@@ -14,6 +14,7 @@ type AddLabelsConfig struct {
 	SafeOutputTargetConfig     `yaml:",inline"`
 	SafeOutputFilterConfig     `yaml:",inline"`
 	SafeOutputAllowBlockConfig `yaml:",inline"`
+	MaxLabels                  *string        `yaml:"max-labels,omitempty"`        // Maximum labels per add_labels call (default: 10).
 	Issues                     *bool          `yaml:"issues,omitempty"`            // When false, excludes issues:write permission. Default (nil or true) includes issues:write.
 	PullRequests               *bool          `yaml:"pull-requests,omitempty"`     // When false, excludes pull-requests:write permission. Default (nil or true) includes pull-requests:write.
 	CreateIfMissing            *bool          `yaml:"create-if-missing,omitempty"` // When true, automatically creates labels that don't already exist in the target repository. Default (nil or false) does not create missing labels.

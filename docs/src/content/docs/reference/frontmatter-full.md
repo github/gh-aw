@@ -13149,8 +13149,8 @@ safe-outputs:
     blocked: []
       # Array of strings
 
-    # Optional maximum number of labels to add (default: 3) Supports integer or GitHub
-    # Actions expression (e.g. '${{ inputs.max }}').
+    # Optional maximum number of add_labels calls (default: 3). Supports integer
+    # or GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
     # Accepted formats:
 
@@ -13159,6 +13159,17 @@ safe-outputs:
 
     # Format 2: GitHub Actions expression that resolves to an integer at runtime
     max: "example-value"
+
+    # Maximum number of labels per add_labels call (default: 10). Supports
+    # integer or GitHub Actions expression (e.g. '${{ inputs.max_labels }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max-labels: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max-labels: "example-value"
 
     # When false, excludes issues:write from the minted GitHub App token for
     # add-labels. Default (omitted or true) includes issues:write.

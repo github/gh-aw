@@ -414,7 +414,12 @@ func createCheckRunConstraints(config *CreateCheckRunConfig) []string {
 
 func addLabelsConstraints(config *AddLabelsConfig) []string {
 	return buildConstraints(config, func(config *AddLabelsConfig, constraints *[]string) {
-		appendMaxConstraint(constraints, config.Max, "Maximum %d label(s) can be added.")
+		appendMaxConstraint(constraints, config.Max, "Maximum %d add_labels call(s) allowed.")
+		if config.MaxLabels == nil {
+			*constraints = append(*constraints, "Maximum 10 label(s) per call.")
+		} else {
+			appendMaxConstraint(constraints, config.MaxLabels, "Maximum %d label(s) per call.")
+		}
 		if len(config.Allowed) > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Only these labels are allowed: %s.", formatStringList(config.Allowed)))
 		}

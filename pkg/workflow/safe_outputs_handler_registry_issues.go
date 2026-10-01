@@ -149,6 +149,7 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.AddLabels
 		config := newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
+			AddTemplatableInt("max_labels", c.MaxLabels).
 			AddStringSlice("allowed", c.Allowed).
 			AddStringSlice("blocked", c.Blocked).
 			AddBoolPtr("issue_intent", c.IssueIntent).
