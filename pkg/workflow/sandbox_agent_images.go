@@ -90,10 +90,30 @@ var awfPinnedImagePattern = regexp.MustCompile(`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[
 // getSandboxAgentImages returns the configured sandbox.agent.images manifest, or nil.
 func getSandboxAgentImages(workflowData *WorkflowData) map[string]string {
 	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || len(agentConfig.Images) == 0 {
+	if (agentConfig == nil || len(agentConfig.Images) == 0) && !isModelRoutingEnabled(workflowData) {
 		return nil
 	}
-	return agentConfig.Images
+	images := make(map[string]string)
+	if agentConfig != nil {
+		for role, image := range agentConfig.Images {
+			images[role] = image
+		}
+	}
+	if isModelRoutingEnabled(workflowData) {
+		for role, image := range modelRoutingDefaultImages {
+			if _, exists := images[role]; !exists {
+				images[role] = image
+			}
+		}
+	}
+	return images
+}
+
+var modelRoutingDefaultImages = map[string]string{
+	awfImageRoleSquid:    "ghcr.io/github/gh-aw-firewall/squid:0.28.29@sha256:1d5e169c4df14e87fc826261b94cf4ddaf2f08aca2a5b88701100ec193968193",
+	awfImageRoleAgent:    "ghcr.io/github/gh-aw-firewall/agent:0.28.29@sha256:edcf17ae63dd74366bc911a74678b9e264d66ac51c48ec156c80e2619892ebbb",
+	awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy:0.28.29@sha256:5cc683af8156b39c15bd2370615a85775a8b179bed9f49c490a3068d667dfa2b",
+	awfImageRoleRouter:   "ghcr.io/githubnext/gh-aw-router:latest@sha256:d1612d0eaec3fa8f14c38bbd0a6a0682732fc9f83b7fec94219d3e757a048270",
 }
 
 // isKnownAWFImageRole reports whether role is part of the closed AWF role set.
@@ -105,6 +125,9 @@ func isKnownAWFImageRole(role string) bool {
 // manifest for the workflow's enabled feature set.
 func requiredAWFImageRoles(workflowData *WorkflowData) []string {
 	required := []string{awfImageRoleSquid, awfImageRoleAgent, awfImageRoleAPIProxy}
+	if isModelRoutingEnabled(workflowData) {
+		required = appendUniqueRole(required, awfImageRoleRouter)
+	}
 	args := customAWFArgs(workflowData)
 	if isCliProxyNeeded(workflowData) || hasEnabledAWFArg(args, "--difc-proxy-host") {
 		required = append(required, awfImageRoleCliProxy)

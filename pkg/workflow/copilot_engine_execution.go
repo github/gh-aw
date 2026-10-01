@@ -623,6 +623,9 @@ func (e *CopilotEngine) addCopilotWorkflowStepEnv(env map[string]string, workflo
 	}
 	// Always add GH_AW_PROMPT for agentic workflows
 	env["GH_AW_PROMPT"] = constants.AwPromptsFile
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.ModelRouting != nil {
+		env["GH_AW_MODEL_ROUTING"] = "1"
+	}
 	// Tag the step as a GitHub AW agentic execution for discoverability by agents
 	env["GITHUB_AW"] = "true"
 	env["GH_AW_PHASE"] = workflowRunPhase(workflowData)
@@ -666,6 +669,9 @@ func (e *CopilotEngine) addCopilotGitHubToolEnv(env map[string]string, workflowD
 }
 
 func (e *CopilotEngine) addCopilotModelEnv(env map[string]string, workflowData *WorkflowData, modelConfigured bool, modelEnvVar string) {
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.ModelRouting != nil {
+		return
+	}
 	// Set the model environment variable.
 	// The model is always passed via the native COPILOT_MODEL env var, which the Copilot CLI reads directly.
 	// When model is not configured, map the GitHub org variable to COPILOT_MODEL so users can set a default.

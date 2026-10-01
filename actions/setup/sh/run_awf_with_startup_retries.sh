@@ -98,6 +98,9 @@ while true; do
     rm -f "$gh_aw_awf_attempt_log"
     exit 0
   fi
+  if [ "$gh_aw_awf_status" -eq 78 ] && [ "${GH_AW_MODEL_ROUTING:-}" = "1" ]; then
+    echo "[ERROR] Fatal error: AWF model routing failed (exit code 78); check router diagnostics for no_route or router errors" | tee -a "$GH_AW_AWF_LOG_FILE"
+  fi
   if ! grep -Fq "$GH_AW_AWF_HARNESS_MARKER" "$gh_aw_awf_attempt_log" &&
     grep -Eqi '(Fatal error:|Process exiting with code:|Refusing to use symlink as bind mountpoint|mcp gateway[^[:cntrl:]]{0,80}(startup failed|failed to start|startup error))' "$gh_aw_awf_attempt_log" &&
     [ "$gh_aw_awf_attempt" -lt "$gh_aw_awf_startup_retries" ]; then

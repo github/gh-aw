@@ -2982,6 +2982,16 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("transient infrastructure issue");
     });
 
+    it("surfaces AWF model-routing exit 78 as the failure cause", () => {
+      fs.writeFileSync(stdioLogPath, "[ERROR] Fatal error: AWF model routing failed (exit code 78); check router diagnostics for no_route or router errors\n");
+
+      const result = buildEngineFailureContext();
+
+      expect(result).toContain("Engine Failure");
+      expect(result).toContain("AWF model routing failed (exit code 78)");
+      expect(result).toContain("no_route or router errors");
+    });
+
     it("detects Fatal: prefix pattern", () => {
       fs.writeFileSync(stdioLogPath, "Fatal: out of memory\n");
       const result = buildEngineFailureContext();

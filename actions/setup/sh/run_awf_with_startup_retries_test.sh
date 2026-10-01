@@ -70,6 +70,33 @@ set -e
 [ "$STATUS" -eq 7 ] || fail "expected original post-harness failure status, got $STATUS"
 [ "$(cat "$ATTEMPT_FILE")" = "1" ] || fail "expected no retry after harness marker"
 
+run_routing_with_env() {
+  GH_AW_MODEL_ROUTING="1" \
+    GH_AW_AWF_ENGINE_NAME="copilot" \
+    GH_AW_AWF_HARNESS_MARKER="[copilot-harness]" \
+    GH_AW_AWF_LOG_FILE="$WORKDIR/routing-agent.log" \
+    GH_AW_AWF_ATTEMPT_LOG_NAME="copilot-routing" \
+    GH_AW_HARNESS_STARTUP_RETRIES="2" \
+    GH_AW_HARNESS_INITIAL_DELAY_MS="0" \
+    bash "$SCRIPT" -- "$@"
+}
+
+OUTPUT="$WORKDIR/model-routing-failure.log"
+ATTEMPT_FILE="$WORKDIR/model-routing-attempts"
+set +e
+run_routing_with_env bash -c '
+  attempts="$(cat "$1" 2>/dev/null || echo 0)"
+  printf "%s" "$((attempts + 1))" > "$1"
+  exit 78
+' bash "$ATTEMPT_FILE" > "$OUTPUT" 2>&1
+STATUS=$?
+set -e
+
+[ "$STATUS" -eq 78 ] || fail "expected routing failure status 78, got $STATUS"
+[ "$(cat "$ATTEMPT_FILE")" = "1" ] || fail "expected routing failure not to be retried"
+grep -Fq "[ERROR] Fatal error: AWF model routing failed (exit code 78)" "$OUTPUT" || fail "expected routing-specific failure diagnostic"
+grep -Fq "AWF model routing failed (exit code 78)" "$WORKDIR/routing-agent.log" || fail "expected routing diagnostic in agent log"
+
 run_with_evidence_env() {
   GH_AW_AWF_ENGINE_NAME="codex" \
     GH_AW_AWF_HARNESS_MARKER="[codex-harness]" \

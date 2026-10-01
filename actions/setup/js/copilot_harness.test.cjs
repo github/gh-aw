@@ -55,6 +55,9 @@ const {
   resolvePromptFileInput,
   resolveRetryConfig,
   shouldRetryFailedExecution,
+  resolveAWFModelRoutingSelection,
+  applyCopilotRoutingSelection,
+  applyCopilotRoutingArgs,
   isCrashSignalExitCode,
   crashSignalNameForExitCode,
   writeCopilotOutputs,
@@ -127,6 +130,57 @@ function withTemporaryPromptTemplate(prefix, sourceTemplateDir, promptDirResolve
 }
 
 describe("copilot_harness.cjs", () => {
+  describe("AWF task-level model routing", () => {
+    const routingEnvKeys = ["GH_AW_MODEL_ROUTING", "GH_AW_COPILOT_ROUTING_EFFORT", "COPILOT_MODEL", "COPILOT_PROVIDER_WIRE_API"];
+    const originalRoutingEnv = Object.fromEntries(routingEnvKeys.map(key => [key, process.env[key]]));
+
+    afterEach(() => {
+      for (const key of routingEnvKeys) {
+        if (originalRoutingEnv[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = originalRoutingEnv[key];
+        }
+      }
+    });
+
+    it("requires a selected route when routing is enabled", () => {
+      expect(resolveAWFModelRoutingSelection({ routing: { status: "pending" } }, true).error).toContain("pending");
+      expect(resolveAWFModelRoutingSelection({ routing: { status: "failed", failure_code: "no_route" } }, true).error).toContain("no_route");
+    });
+
+    it("applies the selected model, endpoint and effort over existing values", () => {
+      process.env.COPILOT_MODEL = "configured-model";
+      process.env.COPILOT_PROVIDER_WIRE_API = "completions";
+      const messages = [];
+      const result = resolveAWFModelRoutingSelection(
+        {
+          routing: {
+            status: "selected",
+            selection: { provider: "copilot", model: "github-copilot/gpt-5.4-mini", wire_model: "gpt-5.4-mini", effort: "xhigh", endpoint: "/responses" },
+          },
+        },
+        true
+      );
+      expect(result.error).toBeNull();
+      applyCopilotRoutingSelection(result.selection, message => messages.push(message));
+      expect(process.env.COPILOT_MODEL).toBe("gpt-5.4-mini");
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
+      expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBe("xhigh");
+      expect(messages[0]).toContain("inference routing: mode=awf-routed");
+    });
+
+    it("removes compile-time model and effort flags when the route has no effort", () => {
+      const args = ["--model", "small", "--reasoning-effort=high", "--silent"];
+      expect(applyCopilotRoutingArgs(args, { wire_model: "claude-haiku-4.5", effort: null })).toEqual(["--silent", "--model", "claude-haiku-4.5"]);
+    });
+
+    it("classifies routing exit 78 as terminal", () => {
+      expect(classifyCopilotFailure({ hasOutput: true, isModelRoutingFailure: true })).toBe("model_routing_failed");
+      expect(shouldRetryFailedExecution({ exitCode: 78, hasOutput: true, output: "router failed", attempt: 0, maxRetries: 3, isModelRoutingFailure: true })).toBe(false);
+    });
+  });
+
   // Test the core logic patterns used by the driver without importing the module
   // (importing the module would invoke main() which calls process.exit).
 

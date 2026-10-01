@@ -86,6 +86,8 @@ type EngineConfig struct {
 	// Currently used by the Pi engine: each entry is passed to `pi install <extension>`.
 	Extensions []string
 
+	ModelRouting *CopilotModelRoutingConfig
+
 	// CopilotSDK enables the GitHub Copilot SDK integration.
 	// When true the compiler enables a harness-managed Copilot CLI headless sidecar
 	// and sets COPILOT_SDK_URI on child processes so the SDK can connect to it.
@@ -437,6 +439,7 @@ func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any,
 	applyEngineProviderFields(config, engineObj)
 	applyEnginePermissionMode(config, engineObj)
 	applyEngineContextWindowField(config, engineObj)
+	applyEngineModelRoutingField(config, engineObj)
 	applyEngineTurnFields(config, engineObj, topLevel)
 	applyEngineConcurrencyField(config, engineObj)
 	applyEngineStringFields(config, engineObj)
@@ -448,6 +451,25 @@ func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any,
 	applyEngineExtensionsField(config, engineObj)
 	applyEngineBooleanFields(config, engineObj)
 	applyEngineTopLevelOverrides(config, topLevel)
+}
+
+func applyEngineModelRoutingField(config *EngineConfig, engineObj map[string]any) {
+	routing, ok := engineObj["model-routing"].(map[string]any)
+	if !ok {
+		return
+	}
+	modelRouting := &CopilotModelRoutingConfig{}
+	modelRouting.Goal, _ = routing["goal"].(string)
+	modelRouting.Mode, _ = routing["mode"].(string)
+	if models, ok := routing["allowed-models"].([]any); ok {
+		modelRouting.AllowedModels = make([]string, 0, len(models))
+		for _, model := range models {
+			if modelName, ok := model.(string); ok {
+				modelRouting.AllowedModels = append(modelRouting.AllowedModels, modelName)
+			}
+		}
+	}
+	config.ModelRouting = modelRouting
 }
 
 func resolveEngineModel(engineObj map[string]any, topLevel engineTopLevelConfig, fallback string) string {

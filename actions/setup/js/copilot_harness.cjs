@@ -478,6 +478,80 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
 }
 
 /**
+ * Resolve the task-level AWF model selection when routing is enabled.
+ * @param {any} reflectData
+ * @param {boolean} routingRequired
+ * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string}|null, error: string|null}}
+ */
+function resolveAWFModelRoutingSelection(reflectData, routingRequired = false) {
+  const routing = reflectData && typeof reflectData === "object" ? reflectData.routing : null;
+  if (routing == null) {
+    return routingRequired ? { selection: null, error: "AWF /reflect did not return the required model-routing selection" } : { selection: null, error: null };
+  }
+  if (routing.status !== "selected") {
+    const failure = typeof routing.failure_code === "string" ? ` (${routing.failure_code})` : "";
+    return { selection: null, error: `AWF model routing is ${String(routing.status || "pending")}${failure}` };
+  }
+  const selection = routing.selection;
+  if (!selection || typeof selection !== "object") {
+    return { selection: null, error: "AWF /reflect reported selected routing without a selection object" };
+  }
+  const provider = typeof selection.provider === "string" ? selection.provider.trim().toLowerCase() : "";
+  const wireModel = typeof selection.wire_model === "string" ? selection.wire_model.trim() : "";
+  const endpoint = typeof selection.endpoint === "string" ? selection.endpoint.trim() : "";
+  if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
+    return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
+  }
+  const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
+  if (effort && !["minimal", "low", "medium", "high", "xhigh"].includes(effort)) {
+    return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
+  }
+  return { selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint }, error: null };
+}
+
+/**
+ * Apply the model and API endpoint selected by AWF, bypassing compile-time model resolution.
+ * @param {{wire_model: string, effort: string|null, endpoint: string}} selection
+ * @param {(msg: string) => void} [logger]
+ */
+function applyCopilotRoutingSelection(selection, logger = log) {
+  const wireApi = selection.endpoint === "/responses" ? "responses" : "completions";
+  process.env.GH_AW_MODEL_ROUTING = "1";
+  process.env.COPILOT_MODEL = selection.wire_model;
+  process.env.COPILOT_PROVIDER_WIRE_API = wireApi;
+  if (selection.effort) {
+    process.env.GH_AW_COPILOT_ROUTING_EFFORT = selection.effort;
+  } else {
+    delete process.env.GH_AW_COPILOT_ROUTING_EFFORT;
+  }
+  logger(`inference routing: mode=awf-routed model=${selection.wire_model} effort=${selection.effort || "none"} wire_api=${wireApi}`);
+}
+
+/**
+ * Remove caller model/effort overrides and apply the AWF selection to a CLI invocation.
+ * @param {string[]} args
+ * @param {{wire_model: string, effort: string|null}} selection
+ * @returns {string[]}
+ */
+function applyCopilotRoutingArgs(args, selection) {
+  const routedArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--model" || arg === "--reasoning-effort") {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--model=") || arg.startsWith("--reasoning-effort=")) {
+      continue;
+    }
+    routedArgs.push(arg);
+  }
+  routedArgs.push("--model", selection.wire_model);
+  if (selection.effort) routedArgs.push("--reasoning-effort", selection.effort);
+  return routedArgs;
+}
+
+/**
  * Check whether a model is present in AWF /reflect endpoint data.
  * @param {string} model
  * @param {unknown} reflectData
@@ -658,12 +732,14 @@ function extractTokenCountFromOutput(output) {
  *   isQuotaExceeded?: boolean,
  *   isTrustedAICreditsBudgetExhausted?: boolean,
  *   isSDKSessionIdleTimeout?: boolean,
+ *   isModelRoutingFailure?: boolean,
  *   hasNumerousPermissionDenied?: boolean,
  *   tokenCount?: number,
  * }} detection
  * @returns {string}
  */
 function classifyCopilotFailure(detection) {
+  if (detection.isModelRoutingFailure) return "model_routing_failed";
   if (detection.isInvocationCapExceeded) return "invocation_cap_exceeded";
   if (detection.isTrustedAICreditsBudgetExhausted) return "ai_credits_exhausted";
   // An AWF API proxy guardrail rejection is a policy outcome, not a credential failure: it must
@@ -688,12 +764,13 @@ function classifyCopilotFailure(detection) {
 /**
  * Shared retry predicate for the generic partial-execution branch.
  * Used by the runtime loop and unit tests to avoid divergence.
- * @param {{ exitCode: number, hasOutput: boolean, output: string, attempt: number, maxRetries: number }} params
+ * @param {{ exitCode: number, hasOutput: boolean, output: string, attempt: number, maxRetries: number, isModelRoutingFailure?: boolean }} params
  *   output must be the combined stdout/stderr text for the failed attempt.
  * @returns {boolean}
  */
 function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
+  if (params.isModelRoutingFailure) return false;
   if (hasNumerousPermissionDeniedIssues(params.output)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
@@ -1133,26 +1210,43 @@ async function main() {
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. sandbox.agent: false — no api-proxy running).
   /** @type {any} */
   let awfReflectData = null;
-  if (process.env.AWF_REFLECT_ENABLED === "1") {
+  const modelRoutingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
+  /** @type {any} */
+  let modelRoutingSelection = null;
+  if (process.env.AWF_REFLECT_ENABLED === "1" || modelRoutingRequired) {
     const reflectResult = await fetchAWFReflect({ logger: log });
     if (reflectResult.ok && reflectResult.reflectData) {
       awfReflectData = reflectResult.reflectData;
     }
   }
 
-  applyModelFallback(process.env, "COPILOT_MODEL", log);
-  await applyCopilotModelAliasResolution({
-    awfReflectData,
-    logger: log,
-    refetchReflectData: async () => {
-      if (process.env.AWF_REFLECT_ENABLED !== "1") {
-        return null;
-      }
-      const refreshed = await fetchAWFReflect({ logger: log });
-      return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
-    },
-  });
-  applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+  const routingResult = resolveAWFModelRoutingSelection(awfReflectData, modelRoutingRequired);
+  if (routingResult.error) {
+    log(`unexpected error: AWF model routing failed: ${routingResult.error}; refusing to start Copilot`);
+    process.exit(1);
+    return;
+  }
+  modelRoutingSelection = routingResult.selection;
+  if (modelRoutingSelection) {
+    applyCopilotRoutingSelection(modelRoutingSelection, log);
+    if (!copilotSDKMode) {
+      resolvedArgs = applyCopilotRoutingArgs(resolvedArgs, modelRoutingSelection);
+    }
+  } else {
+    applyModelFallback(process.env, "COPILOT_MODEL", log);
+    await applyCopilotModelAliasResolution({
+      awfReflectData,
+      logger: log,
+      refetchReflectData: async () => {
+        if (process.env.AWF_REFLECT_ENABLED !== "1") {
+          return null;
+        }
+        const refreshed = await fetchAWFReflect({ logger: log });
+        return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
+      },
+    });
+    applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+  }
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
   // A noop indicates the work is complete or there is nothing to do — starting the agent
@@ -1170,6 +1264,7 @@ async function main() {
   // provider cannot be resolved so retries are not wasted on a misconfigured environment.
   let providerBaseUrl = "";
   let providerType = "openai";
+  /** @type {"responses" | "completions" | ""} */
   let providerWireApi = "";
   let resolvedModel = "";
   let multiProviderJson = "";
@@ -1184,14 +1279,18 @@ async function main() {
       process.exit(1);
     }
     resolvedModel = multiProvider.model;
-    multiProviderJson = JSON.stringify({ model: multiProvider.model, providers: multiProvider.providers, models: multiProvider.models });
     // Set the primary provider's details as COPILOT_PROVIDER_* env vars for the headless sidecar
     // (which still reads those to configure its own sub-agent sessions).
     primaryProviderName = multiProvider.models.find(m => m.id === resolvedModel)?.provider ?? multiProvider.providers[0]?.name ?? "";
     const primaryProvider = multiProvider.providers.find(p => p.name === primaryProviderName) ?? multiProvider.providers[0];
+    if (modelRoutingSelection) {
+      providerWireApi = modelRoutingSelection.endpoint === "/responses" ? "responses" : "completions";
+      if (primaryProvider) primaryProvider.wireApi = providerWireApi;
+    }
     providerBaseUrl = primaryProvider?.baseUrl ?? "";
     providerType = primaryProvider?.type ?? "openai";
-    providerWireApi = primaryProvider?.wireApi ?? "";
+    providerWireApi = providerWireApi || primaryProvider?.wireApi || "";
+    multiProviderJson = JSON.stringify({ model: multiProvider.model, providers: multiProvider.providers, models: multiProvider.models });
 
     // For BYOK copilot providers, prefix the model with "copilot/" so subagents treat it as BYOK.
     // The headless sidecar reads COPILOT_MODEL to configure sub-agent sessions spawned via the task tool,
@@ -1380,6 +1479,7 @@ async function main() {
           //   - Null-type tool_call 400 errors poison conversation history — always restart fresh and
           //     permanently disable --continue so the corrupt state is never reloaded.
           const isCAPIError = isTransientCAPIError(result.output);
+          const isModelRoutingFailure = modelRoutingRequired && result.exitCode === 78;
           const isQuotaExceeded = isCAPIQuotaExceededError(result.output);
           const isMCPPolicy = isMCPPolicyError(result.output);
           const isModelNotSupported = isModelNotSupportedError(result.output);
@@ -1414,6 +1514,7 @@ async function main() {
           const apiProxyGuardRejection = nonRetryableGuard.apiProxyGuardRejection || (shouldCheckEventLogForAPIProxyGuard ? parseAPIProxyGuardRejectionFromEventLog() : null);
           const failureClass = classifyCopilotFailure({
             hasOutput: result.hasOutput,
+            isModelRoutingFailure,
             isAuthErr,
             isAuthenticationFailed,
             isTransientCAPIError: isCAPIError,
@@ -1436,6 +1537,7 @@ async function main() {
               ` exitCode=${result.exitCode}` +
               ` failureClass=${failureClass}` +
               ` isCAPIError400=${isCAPIError}` +
+              ` isModelRoutingFailure=${isModelRoutingFailure}` +
               ` isCAPIQuotaExceededError=${isQuotaExceeded}` +
               ` isInvocationCapExceeded=${isInvocationCapExceeded}` +
               ` apiProxyGuardRejection=${apiProxyGuardRejection ? formatAPIProxyGuardRejection(apiProxyGuardRejection) : "none"}` +
@@ -1457,6 +1559,9 @@ async function main() {
           );
           if (outputTail) {
             log(`attempt ${attempt + 1}: outputTail=${JSON.stringify(outputTail)}`);
+          }
+          if (isModelRoutingFailure) {
+            log("unexpected error: AWF model routing failed with terminal exit code 78; inspect the AWF routing failure_code and router diagnostics");
           }
           // Driver-handoff diagnostic: when no output was produced, the agent never ran a turn.
           // This is the Turns=0 signature.  Log a named diagnostic to make it clearly visible
@@ -1661,7 +1766,7 @@ async function main() {
             return { action: "stop" };
           }
 
-          if (shouldRetryFailedExecution({ ...result, attempt, maxRetries })) {
+          if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {
             const reason = isCAPIError ? "CAPIError 400 (transient)" : "partial execution";
             const isCrashSignal = isCrashSignalExitCode(result.exitCode);
             const crashSignalName = crashSignalNameForExitCode(result.exitCode);
@@ -1773,6 +1878,9 @@ if (typeof module !== "undefined" && module.exports) {
     applyModelFallback,
     applyCopilotModelAliasResolution,
     applyCopilotWireAPI,
+    resolveAWFModelRoutingSelection,
+    applyCopilotRoutingSelection,
+    applyCopilotRoutingArgs,
     formatInferenceEndpointForLog,
     logCopilotInferenceConfiguration,
     loadAwfConfigData,
