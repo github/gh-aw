@@ -1,5 +1,6 @@
 ---
 import LandingSection from './LandingSection.astro';
+import VariantGroup from './VariantGroup.astro';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const options = [
@@ -23,62 +24,156 @@ const options = [
   },
 ];
 ---
-
-<LandingSection id="watch" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
-  <div class="aw-watch" data-watch>
-    <div class="aw-tabs" role="tablist" aria-label="Choose a walkthrough" aria-orientation="vertical">
-      {options.map((o, i) => (
-        <div class="aw-opt" role="presentation" data-selected={i === 0 ? 'true' : 'false'}>
-          <button
-            type="button"
-            class="aw-tab"
-            role="tab"
-            id={`watch-tab-${o.id}`}
-            aria-controls={`watch-panel-${o.id}`}
-            aria-selected={i === 0 ? 'true' : 'false'}
-            tabindex={i === 0 ? 0 : -1}
-          >
-            <span class="aw-tab-head">
-              <span class="aw-tab-title">{o.title}</span>
-              <span class="aw-tab-time">{o.duration}</span>
-            </span>
-            <span class="aw-tab-desc">{o.description}</span>
-          </button>
-          <a class="aw-more aw-more-side" href={o.href}>{o.linkText} →</a>
+<VariantGroup
+  id="watch"
+  label="Watch it run"
+  variants={[
+    { key: 'a', name: 'Current: side tabs' },
+    { key: 'b', name: 'Cinema: centred toggle' },
+    { key: 'c', name: 'Thumbnails: poster switcher' },
+    { key: 'd', name: 'Wide stage: underline tabs' },
+  ]}
+  defaultKey="a"
+>
+  <div data-variant="a">
+    <LandingSection titleId="watch-a-title" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
+      <div class="aw-watch" data-watch>
+        <div class="aw-tabs" role="tablist" aria-label="Choose a walkthrough" aria-orientation="vertical">
+          {options.map((o, i) => (
+            <div class="aw-opt" role="presentation" data-selected={i === 0 ? 'true' : 'false'}>
+              <button
+                type="button"
+                class="aw-tab"
+                role="tab"
+                id={`watch-tab-${o.id}`}
+                aria-controls={`watch-panel-${o.id}`}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                tabindex={i === 0 ? 0 : -1}
+              >
+                <span class="aw-tab-head">
+                  <span class="aw-tab-title">{o.title}</span>
+                  <span class="aw-tab-time">{o.duration}</span>
+                </span>
+                <span class="aw-tab-desc">{o.description}</span>
+              </button>
+              <a class="aw-more aw-more-side" href={o.href}>{o.linkText} →</a>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
 
-    <div class="aw-stage">
-      {options.map((o, i) => (
-        <div
-          class="aw-panel"
-          role="tabpanel"
-          id={`watch-panel-${o.id}`}
-          aria-labelledby={`watch-tab-${o.id}`}
-          data-selected={i === 0 ? 'true' : 'false'}
-        >
-          <div class="aw-frame">
-            <video
-              controls
-              playsinline
-              preload="none"
-              poster={`${base}/videos/${o.video}-poster.jpg`}
-              aria-label={o.title}
+        <div class="aw-stage">
+          {options.map((o, i) => (
+            <div
+              class="aw-panel"
+              role="tabpanel"
+              id={`watch-panel-${o.id}`}
+              aria-labelledby={`watch-tab-${o.id}`}
+              data-selected={i === 0 ? 'true' : 'false'}
             >
-              <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
-              <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
-            </video>
+              <div class="aw-frame">
+                <video
+                  controls
+                  playsinline
+                  preload="none"
+                  poster={`${base}/videos/${o.video}-poster.jpg`}
+                  aria-label={o.title}
+                >
+                  <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+                  <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+                </video>
+              </div>
+              <div class="aw-below">
+                <p>{o.description}</p>
+                <a class="aw-more" href={o.href}>{o.linkText} →</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </LandingSection>
+  </div>
+    <div data-variant="b">
+      <LandingSection tone="dark" titleId="watch-b-title" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
+        <div class="wb-root" data-wv>
+          <div class="wb-tabs" role="tablist" aria-label="Choose a walkthrough">
+            {options.map((o, i) => (
+              <button type="button" class="wb-tab" role="tab" id={`watch-b-tab-${o.id}`} aria-controls={`watch-b-panel-${o.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                <span>{o.title}</span><span class="wb-time">{o.duration}</span>
+              </button>
+            ))}
           </div>
-          <div class="aw-below">
-            <p>{o.description}</p>
-            <a class="aw-more" href={o.href}>{o.linkText} →</a>
+          {options.map((o, i) => (
+            <div class="wb-panel" role="tabpanel" id={`watch-b-panel-${o.id}`} aria-labelledby={`watch-b-tab-${o.id}`} data-selected={i === 0 ? 'true' : 'false'}>
+              <div class="wb-frame">
+              <video controls playsinline preload="none" poster={`${base}/videos/${o.video}-poster.jpg`} aria-label={o.title}>
+                <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+                <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+              </video>
+              </div>
+              <p class="wb-desc">{o.description} <a href={o.href}>{o.linkText} →</a></p>
+            </div>
+          ))}
+        </div>
+      </LandingSection>
+    </div>
+    <div data-variant="c">
+      <LandingSection tone="dark" titleId="watch-c-title" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
+        <div class="wc-root" data-wv>
+          {options.map((o, i) => (
+            <div class="wc-panel" role="tabpanel" id={`watch-c-panel-${o.id}`} aria-labelledby={`watch-c-tab-${o.id}`} data-selected={i === 0 ? 'true' : 'false'}>
+              <div class="wc-frame">
+              <video controls playsinline preload="none" poster={`${base}/videos/${o.video}-poster.jpg`} aria-label={o.title}>
+                <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+                <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+              </video>
+              </div>
+              <p class="wc-link"><span class="wc-static"><strong>{o.title}</strong> · {o.duration}. {o.description} </span><a href={o.href}>{o.linkText} →</a></p>
+            </div>
+          ))}
+          <div class="wc-tabs" role="tablist" aria-label="Choose a walkthrough">
+            {options.map((o, i) => (
+              <button type="button" class="wc-tab" role="tab" id={`watch-c-tab-${o.id}`} aria-controls={`watch-c-panel-${o.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                <span class="wc-thumb">
+                  <img src={`${base}/videos/${o.video}-poster.jpg`} alt="" loading="lazy" decoding="async" />
+                  <span class="wc-badge">{o.duration}</span>
+                </span>
+                <span class="wc-meta">
+                  <span class="wc-title">{o.title}<span class="wc-now">Now playing</span></span>
+                  <span class="wc-text">{o.description}</span>
+                </span>
+              </button>
+            ))}
           </div>
         </div>
-      ))}
+      </LandingSection>
     </div>
-  </div>
-</LandingSection>
+    <div data-variant="d">
+      <LandingSection tone="dark" titleId="watch-d-title" title="Watch it run">
+        <div class="wd-root" data-wv>
+          <div class="wd-tabs" role="tablist" aria-label="Choose a walkthrough">
+            {options.map((o, i) => (
+              <button type="button" class="wd-tab" role="tab" id={`watch-d-tab-${o.id}`} aria-controls={`watch-d-panel-${o.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                {o.title} <span class="wd-time">{o.duration}</span>
+              </button>
+            ))}
+          </div>
+          <div class="wd-stage">
+            {options.map((o, i) => (
+              <div class="wd-panel" role="tabpanel" id={`watch-d-panel-${o.id}`} aria-labelledby={`watch-d-tab-${o.id}`} data-selected={i === 0 ? 'true' : 'false'}>
+                <div class="wd-frame">
+                <video controls playsinline preload="none" poster={`${base}/videos/${o.video}-poster.jpg`} aria-label={o.title}>
+                <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+                <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+              </video>
+                </div>
+                <p class="wd-desc"><span>{o.description}</span> <a href={o.href}>{o.linkText} →</a></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </LandingSection>
+    </div>
+</VariantGroup>
 
 <style>
   .aw-watch {
@@ -305,6 +400,310 @@ const options = [
           select(next, true);
         }
       });
+    });
+  });
+</script>
+
+<style>
+  /* Shared bits for variants B-D */
+  .wb-frame, .wc-frame, .wd-frame {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    box-shadow: var(--aw-shadow-raised);
+  }
+  .wb-frame video, .wc-frame video, .wd-frame video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--aw-color-bg-subtle);
+  }
+  .wb-tab, .wc-tab, .wd-tab {
+    appearance: none;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+  .wb-tab:focus-visible, .wc-tab:focus-visible, .wd-tab:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .wb-desc a, .wc-link a, .wd-desc a {
+    font-weight: 500;
+    color: var(--aw-color-accent-text);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .wb-desc a:hover, .wc-link a:hover, .wd-desc a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .wb-desc a:focus-visible, .wc-link a:focus-visible, .wd-desc a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  [data-wv][data-enhanced] [role='tabpanel'][data-selected='false'] {
+    display: none;
+  }
+  [data-wv]:not([data-enhanced]) [role='tablist'] {
+    display: none;
+  }
+
+  /* B: Cinema */
+  :global(.aw-container:has(.wb-root) > h2) {
+    margin-inline: auto;
+    text-align: center;
+  }
+  :global(.aw-container:has(.wb-root) > .aw-lede) {
+    margin-inline: auto;
+    text-align: center;
+  }
+  .wb-root {
+    margin-top: 2.5rem;
+    display: grid;
+    justify-items: center;
+    gap: 1.5rem;
+  }
+  .wb-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    max-width: 100%;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 999px;
+  }
+  .wb-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.0625rem;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font-size: var(--aw-step--1);
+    font-weight: 540;
+    color: var(--aw-color-text-muted);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .wb-tab:hover { color: var(--aw-color-text); }
+  .wb-tab[aria-selected='true'] {
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text-strong);
+    box-shadow: 0 0 0 1px var(--aw-color-border-strong);
+  }
+  .wb-time {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .wb-panel { width: 100%; max-width: 64rem; }
+  .wb-panel + .wb-panel { margin-top: 2rem; }
+  .wb-desc {
+    margin: 1.25rem auto 0;
+    max-width: 52ch;
+    text-align: center;
+    font-size: var(--aw-step-0);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  @media (min-width: 520px) {
+    .wb-tab { flex-direction: row; gap: 0.625rem; padding-inline: 1.25rem; }
+  }
+
+  /* C: Thumbnails */
+  .wc-root { margin-top: 2.5rem; }
+  .wc-panel + .wc-panel { margin-top: 2rem; }
+  .wc-link {
+    margin: 1rem 0 0;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+  }
+  .wc-static { display: block; margin-bottom: 0.25rem; }
+  .wc-root[data-enhanced] .wc-static { display: none; }
+  .wc-tabs {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .wc-tab {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 1rem;
+    align-items: start;
+    padding: 0.75rem;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    color: var(--aw-color-text-secondary);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+  .wc-tab:hover { border-color: var(--aw-color-border-strong); }
+  .wc-tab[aria-selected='true'] {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 1px var(--aw-color-accent);
+    background: var(--aw-color-bg-subtle);
+  }
+  .wc-thumb {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 7px;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+  }
+  .wc-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .wc-tab[aria-selected='false'] .wc-thumb img { opacity: 0.7; }
+  .wc-badge {
+    position: absolute;
+    right: 0.375rem;
+    bottom: 0.375rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 4px;
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+    font-size: var(--aw-step--1);
+    font-variant-numeric: tabular-nums;
+  }
+  .wc-meta { display: grid; gap: 0.25rem; min-width: 0; }
+  .wc-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    font-size: var(--aw-step-0);
+    font-weight: 560;
+    color: var(--aw-color-text-strong);
+  }
+  .wc-now {
+    display: none;
+    font-size: var(--aw-step--1);
+    font-weight: 450;
+    color: var(--aw-color-accent-text);
+  }
+  .wc-tab[aria-selected='true'] .wc-now { display: inline; }
+  .wc-text {
+    font-size: var(--aw-step--1);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+  @media (min-width: 760px) {
+    .wc-tabs { grid-template-columns: 1fr 1fr; }
+    .wc-tab { grid-template-columns: 1fr; padding: 1rem; gap: 0.875rem; }
+    .wc-thumb { border-radius: 8px; }
+  }
+
+  /* D: Wide stage. The container becomes a grid so the tabs sit beside the heading. */
+  :global(.aw-container:has(.wd-root)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: end;
+    column-gap: 2rem;
+  }
+  .wd-root { display: contents; }
+  .wd-tabs {
+    display: flex;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+    border-bottom: 1px solid var(--aw-color-divider);
+    overflow-x: auto;
+  }
+  .wd-tab {
+    padding: 0.625rem 0;
+    margin-bottom: -1px;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+    color: var(--aw-color-text-muted);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .wd-tab:hover { color: var(--aw-color-text); }
+  .wd-tab[aria-selected='true'] {
+    color: var(--aw-color-text-strong);
+    border-bottom-color: var(--aw-color-text-strong);
+  }
+  .wd-time {
+    margin-left: 0.25rem;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .wd-stage {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(84rem, calc(100vw - 2rem));
+    margin-top: 2rem;
+  }
+  .wd-panel + .wd-panel { margin-top: 2rem; }
+  .wd-desc {
+    margin: 1.25rem 0 0;
+    max-width: 60ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  @media (min-width: 760px) {
+    :global(.aw-container:has(.wd-root)) { grid-template-columns: minmax(0, 1fr) auto; }
+    .wd-tabs { grid-column: 2; grid-row: 1; margin-top: 0; gap: 1.75rem; }
+    .wd-stage { margin-top: 3rem; width: min(84rem, calc(100vw - 4rem)); }
+    .wd-desc { padding-inline: 0; }
+  }
+  @media (min-width: 1280px) {
+    .wd-desc { max-width: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wb-tab, .wc-tab, .wd-tab { transition: none; }
+  }
+</style>
+
+<script>
+  /* Variants B-D: ARIA tabs, one video at a time, pause on switch or variant change. */
+  document.querySelectorAll<HTMLElement>('[data-wv]').forEach((root) => {
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const panels = tabs.map((t) => root.querySelector<HTMLElement>('#' + t.getAttribute('aria-controls'))!);
+    root.setAttribute('data-enhanced', '');
+    const select = (index: number, focus = false) => {
+      tabs.forEach((tab, i) => {
+        const on = i === index;
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+        panels[i].setAttribute('data-selected', String(on));
+        if (!on) panels[i].querySelector('video')?.pause();
+      });
+      if (focus) tabs[index].focus();
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i));
+      tab.addEventListener('keydown', (e) => {
+        const n = tabs.length;
+        let next = -1;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % n;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + n) % n;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = n - 1;
+        if (next >= 0) {
+          e.preventDefault();
+          select(next, true);
+        }
+      });
+    });
+  });
+  document.querySelectorAll<HTMLElement>('[data-variant-group="watch"]').forEach((group) => {
+    group.addEventListener('variantchange', () => {
+      group.querySelectorAll('video').forEach((v) => v.pause());
     });
   });
 </script>
