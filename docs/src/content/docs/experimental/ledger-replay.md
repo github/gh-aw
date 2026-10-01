@@ -14,7 +14,6 @@ operation and replays it in trusted code, without a custom script.
 | Latest value by key | `map` |
 | Mutable structured rows | `table` |
 | Numeric accumulation | `counter` |
-| Deterministic work claims and terminal state | `work-pool` |
 
 ```yaml
 tools:
@@ -40,12 +39,9 @@ tools:
       type: counter
 ```
 
-The `map` and `work-pool` built-ins expose dedicated safe-output tools:
-`ledger_map_put`, `ledger_map_delete`, and `ledger_work_pool_submit`,
-`ledger_work_pool_cancel`, `ledger_work_pool_acquire`,
-`ledger_work_pool_acquire_next`, `ledger_work_pool_finish`, and
-`ledger_work_pool_abandon`. Supply the operation's fields and a `ledger` name
-when more than one ledger of that type is configured. These tools produce
+The `map` built-in exposes dedicated safe-output tools:
+`ledger_map_put` and `ledger_map_delete`. Supply the operation's fields and a
+`ledger` name when more than one map ledger is configured. These tools produce
 `ledger_append` entries internally; they do not expose the low-level operation
 envelope to the agent. Other ledger types continue to use `ledger_append`
 with `ledger` and `operation` instead of `record`, plus the indicated fields:
@@ -57,23 +53,10 @@ with `ledger` and `operation` instead of `record`, plus the indicated fields:
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
-| `work-pool` | `submit(work)`, `cancel(work)`, `acquire(work)`, `acquire-next(filter?)`, `finish(result?)`, `abandon(reason?)` | `work(work_id, payload, state, effective_claim_id)`, `claims(claim_id, work_id, claimant, generation, previous_claim_id, released, effective, superseded)` |
-
-`work-pool` derives Work identity from canonical JSON of the complete Work object,
-or from the configured `identity` list of top-level Work fields. Its optional
-`schema` validates Work payloads. The claimant is the trusted workflow run and
-attempt, never a caller-provided ID. Facts retain immutable claims, releases,
-completions and cancellations; cancellation is terminal. Arbitration uses
-generation and Claim ID rather than record order or timestamps.
-Without a schema, Work properties are unrestricted, but the full payload is
-pinned to its identity: submitting a different payload for the same identity
-is invalid.
 
 Ledger writes are **deferred** safe outputs: their immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome
-later, after the agent has finished. In particular, a queued acquisition is **not**
-an authorization to do work; this interface does not yet support the interactive
-acquire → do work → finish protocol within one execution.
+later, after the agent has finished.
 
 The declared schema validates **values**, not operation envelopes. `table` rows
 must be objects with a string primary key. `insert` rejects duplicate keys;
@@ -93,8 +76,7 @@ queryable. The generic `records` table still exposes immutable provenance.
 The trusted persistence result reports ledger type, operation, deterministic
 record ID, transaction ID, and validation status without echoing values.
 
-Other built-in projections replay canonical transaction order; `work-pool`
-replays the unordered fact set. Built-ins cannot be combined
+Built-in projections replay canonical transaction order and cannot be combined
 with a custom `replay.script`. Domain concepts should be expressed as schemas
 on generic ledger types, not as new built-in types; custom replay remains an
 escape hatch. Existing maintenance compaction is deliberately lossless: it

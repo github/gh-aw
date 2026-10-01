@@ -44,7 +44,6 @@ type LedgerConfig struct {
 	Name         string              `json:"name"`
 	Type         string              `json:"type,omitempty"`
 	Key          string              `json:"key,omitempty"`
-	Identity     []string            `json:"identity,omitempty"`
 	Schema       map[string]any      `json:"schema,omitempty"`
 	SchemaPath   string              `json:"-"`
 	MaxRecordKB  int                 `json:"max_record_kb"`
@@ -79,7 +78,7 @@ func (c *LedgerToolConfig) Enabled() bool { return c != nil && len(c.Ledgers) > 
 
 func (c *LedgerToolConfig) hasGeneralAppendTool() bool {
 	for _, ledger := range c.Ledgers {
-		if ledger.Type != "map" && ledger.Type != "work-pool" {
+		if ledger.Type != "map" {
 			return true
 		}
 	}
@@ -115,7 +114,7 @@ func parseLedgerToolConfig(raw any) (*LedgerToolConfig, error) {
 	single := false
 	for key := range root {
 		switch key {
-		case "schema", "identity", "max-record-kb", "max-segment-kb", "max-patch-kb":
+		case "schema", "max-record-kb", "max-segment-kb", "max-patch-kb":
 			single = true
 		case "type", "key":
 			_, scalar := root[key].(string)
@@ -172,12 +171,6 @@ func parseLedgerConfig(name string, raw map[string]any) (LedgerConfig, error) {
 			if err := setLedgerSchema(&cfg, value); err != nil {
 				return LedgerConfig{}, err
 			}
-		case "identity":
-			fields, err := parseLedgerIdentity(name, value)
-			if err != nil {
-				return LedgerConfig{}, err
-			}
-			cfg.Identity = fields
 		case "compaction":
 			compaction, err := parseLedgerCompactionConfig(name, value)
 			if err != nil {
@@ -231,23 +224,6 @@ func setLedgerSchema(cfg *LedgerConfig, value any) error {
 	return nil
 }
 
-func parseLedgerIdentity(name string, value any) ([]string, error) {
-	fields, ok := value.([]any)
-	if !ok || len(fields) == 0 || len(fields) > 16 {
-		return nil, fmt.Errorf("tools.ledger.%s.identity must be a nonempty list of up to 16 field names", name)
-	}
-	identity := make([]string, 0, len(fields))
-	for _, rawField := range fields {
-		field, ok := rawField.(string)
-		if !ok || !ledgerKeyPattern.MatchString(field) || slices.Contains(identity, field) {
-			return nil, fmt.Errorf("tools.ledger.%s.identity contains an invalid or duplicate field", name)
-		}
-		identity = append(identity, field)
-	}
-	sort.Strings(identity)
-	return identity, nil
-}
-
 func finishLedgerConfig(cfg LedgerConfig) (LedgerConfig, error) {
 	if err := validateLedgerTypeConfig(cfg); err != nil {
 		return LedgerConfig{}, err
@@ -258,8 +234,8 @@ func finishLedgerConfig(cfg LedgerConfig) (LedgerConfig, error) {
 func setLedgerTypeField(cfg *LedgerConfig, field string, value any) error {
 	text, ok := value.(string)
 	if field == "type" {
-		if !ok || !slices.Contains([]string{"log", "set", "map", "table", "counter", "work-pool"}, text) {
-			return fmt.Errorf("tools.ledger.%s.type must be one of: log, set, map, table, counter, work-pool", cfg.Name)
+		if !ok || !slices.Contains([]string{"log", "set", "map", "table", "counter"}, text) {
+			return fmt.Errorf("tools.ledger.%s.type must be one of: log, set, map, table, counter", cfg.Name)
 		}
 		cfg.Type = text
 	} else {
@@ -284,9 +260,6 @@ func validateLedgerTypeConfig(cfg LedgerConfig) error {
 	}
 	if cfg.Type == "counter" && (cfg.Schema != nil || cfg.SchemaPath != "") {
 		return fmt.Errorf("tools.ledger.%s.counter does not accept a value schema", name)
-	}
-	if cfg.Type != "work-pool" && len(cfg.Identity) > 0 {
-		return fmt.Errorf("tools.ledger.%s.identity is supported only for type: work-pool", name)
 	}
 	return nil
 }
@@ -544,7 +517,7 @@ func buildLedgerPromptSection(config *LedgerToolConfig) *PromptSection {
 	b.WriteString("Persistent ledgers available (SQLite is read-only and disposable):\n")
 	for _, ledger := range config.Ledgers {
 		if ledger.Type != "" {
-			operations := map[string]string{"log": "append(value)", "set": "add(value), remove(value)", "map": "put(key, value), delete(key)", "table": "insert(value), update(key, patch), upsert(value), delete(key)", "counter": "increment(name, amount), decrement(name, amount)", "work-pool": "submit(work), cancel(work), acquire(work), acquire-next(filter?), finish(result?), abandon(reason?)"}
+			operations := map[string]string{"log": "append(value)", "set": "add(value), remove(value)", "map": "put(key, value), delete(key)", "table": "insert(value), update(key, patch), upsert(value), delete(key)", "counter": "increment(name, amount), decrement(name, amount)"}
 			fmt.Fprintf(&b, "- %s (%s): %s; operations: %s", ledger.Name, ledger.Type, filepath.Join(ledgerProjectionRoot, ledger.Name, "ledger.db"), operations[ledger.Type])
 			if ledger.Key != "" {
 				fmt.Fprintf(&b, "; primary key: %s", ledger.Key)

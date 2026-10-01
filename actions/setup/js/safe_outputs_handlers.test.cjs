@@ -81,12 +81,11 @@ describe("safe_outputs_handlers", () => {
     expect(mockAppendSafeOutput.mock.calls[0][0].temporary_id).toMatch(/^#aw_/);
   });
 
-  it("converts built-in map and work-pool calls into ledger_append entries", () => {
+  it("converts built-in map calls into ledger_append entries", () => {
     const configured = createHandlers(mockServer, mockAppendSafeOutput, {
       ledger_append: {
         ledgers: [
           { name: "cache", type: "map" },
-          { name: "queue", type: "work-pool" },
           { name: "other", type: "map" },
         ],
       },
@@ -96,13 +95,9 @@ describe("safe_outputs_handlers", () => {
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "cache", key: "a", value: 1, operation: "delete" }).isError).toBe(true);
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "cache", key: "a", value: { status: "ready" }, temp_id: "entry" }).isError).not.toBe(true);
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "other", key: "b", value: 2 }).isError).not.toBe(true);
-    expect(configured.ledgerBuiltinHandler("work-pool", "submit")({ work: { task: "test" } }).isError).not.toBe(true);
-    expect(configured.ledgerBuiltinHandler("work-pool", "acquire-next")({}).isError).not.toBe(true);
     expect(mockAppendSafeOutput.mock.calls.map(([entry]) => entry)).toEqual([
       { type: "ledger_append", ledger: "cache", operation: "put", key: "a", value: { status: "ready" }, temp_id: "entry" },
       { type: "ledger_append", ledger: "other", operation: "put", key: "b", value: 2 },
-      { type: "ledger_append", ledger: "queue", operation: "submit", work: { task: "test" } },
-      { type: "ledger_append", ledger: "queue", operation: "acquire-next" },
     ]);
   });
 

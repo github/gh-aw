@@ -50,12 +50,6 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 		}{
 			{"ledger_map_put", "map", "put", "value", true},
 			{"ledger_map_delete", "map", "delete", "", false},
-			{"ledger_work_pool_submit", "work-pool", "submit", "work", true},
-			{"ledger_work_pool_cancel", "work-pool", "cancel", "work", true},
-			{"ledger_work_pool_acquire", "work-pool", "acquire", "work", true},
-			{"ledger_work_pool_acquire_next", "work-pool", "acquire-next", "filter", false},
-			{"ledger_work_pool_finish", "work-pool", "finish", "result", false},
-			{"ledger_work_pool_abandon", "work-pool", "abandon", "reason", false},
 		} {
 			ledgerNames := ledgerNamesByType[spec.ledgerType]
 			if len(ledgerNames) == 0 {
@@ -75,12 +69,6 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 			}
 			if spec.field != "" {
 				fieldSchema := map[string]any{}
-				switch spec.field {
-				case "work", "filter":
-					fieldSchema["type"] = "object"
-				case "reason":
-					fieldSchema["type"] = "string"
-				}
 				properties[spec.field] = fieldSchema
 				if spec.required {
 					required = append(required, spec.field)

@@ -1,6 +1,6 @@
 ---
 title: Repository Memory Ledger Specification
-description: W3C-style specification for append-only repository-memory and work-pool ledgers, their projections, compaction, and audit trails
+description: W3C-style specification for append-only repository-memory ledgers, their projections, compaction, and audit trails
 sidebar:
   order: 1370
 ---
@@ -14,7 +14,7 @@ sidebar:
 ## Abstract
 
 This specification defines bounded, deterministic, append-only JSONL ledgers with
-disposable query projections. It specifies repository-memory and work-pool
+disposable query projections. It specifies repository-memory
 profiles, record identity, per-job responsibilities, script extension points,
 concurrent reconstruction, compaction, retirement, configuration limits, the
 transaction log consumed by safe-output threat detection, and the adversarial
@@ -273,87 +273,10 @@ budget, and can emit audit entries for mutations that a reviewer must correlate
 with shard content. Repository memory is not confidential; it MUST NOT be used
 for secrets.
 
-## 10. Work-pool profile
-
-This profile defines an unordered, append-only fact set for coordinating work.
-It applies to the built-in `work-pool` ledger type and uses the RFC 2119 and
-RFC 8174 terms defined in section 1.
-
-### 10.1 Facts and identity
-
-Work, Claim, Release, Completion, and Cancellation facts MUST be immutable and
-append-only. Implementations MUST NOT edit or delete an existing fact. Repeating
-the same semantic operation after a lost response MUST converge on the same
-logical fact and MUST NOT create a new retry generation. A conflicting payload
-for an existing fact identity MUST be rejected without changing valid state.
-
-Trusted code MUST derive Work and Claim IDs; caller-supplied structural IDs MUST
-NOT be trusted. A Work ID MUST derive from the configured identity fields (or the
-canonical Work payload when no identity fields are configured). A Claim ID MUST
-derive from the Work ID, trusted claimant identity, and predecessor Claim ID.
-Claimant identity MUST come from trusted runtime context, not free-form agent
-input. Claim generation MUST be derived from Claim ancestry, never supplied by a
-caller. A retry MUST create a new Claim referencing its predecessor.
-
-### 10.2 Replay and arbitration
-
-Replay MUST derive Work state and effective Claims from the immutable fact set;
-state values such as `available`, `claimed`, `completed`, and `cancelled` MUST
-NOT be persisted as mutable status. Given the same valid facts, replay MUST
-produce the same projection regardless of JSONL order, Git merge order,
-timestamps, runner timing, or network timing. Version 1 MUST NOT use leases,
-timeouts, heartbeats, or wall-clock time in replay or arbitration.
-
-At most one Claim MUST be effective for a Work item at any time. Arbitration
-MUST use one shared deterministic reducer: highest generation wins, followed by
-the lexicographically smallest Claim ID as the tie-break. A claimant's effective
-Claim count MUST NOT exceed its configured capacity; implementations MAY expose
-a capacity setting, whose default MUST be 1. Competing Claims are valid durable
-history: losing Claims MUST remain historical facts and MUST NOT be treated as
-malformed merely because they lost arbitration.
-
-### 10.3 Ownership and terminal state
-
-Only the effective claimant MAY append a valid Release or Completion for a Work
-item. Superseded, stale, released, or losing claimants MUST NOT finish or release
-that Work. Releasing a Claim MUST NOT delete its Work or implicitly release its
-descendants or sibling Claims. A retry MUST reference its predecessor, and a
-predecessor MUST be released before a successor Claim is valid.
-
-Cancellation and Completion are terminal. Cancelled Work MUST have no effective
-Claim, MUST NOT be newly claimed, and MUST NOT be resurrected in version 1.
-Completed Work MUST NOT be claimed again. Compound operations, including creating
-Work and its initial Claim together, MUST be atomic from the protocol's point of
-view; partial publication MUST NOT authorize work.
-
-### 10.4 Dispatch protocol
-
-A worker MUST be dispatched only after its Claim is durably persisted and
-confirmed effective by trusted orchestration. Initial Claim creation MUST be
-performed by trusted orchestration or safe-output processing before the worker
-run; a worker MUST NOT make its own execution valid by claiming after it starts.
-An immediate response that only confirms a deferred `ledger_append` intent MUST
-NOT authorize dispatch. The compiled workflow MUST carry all configuration,
-runtime support, provenance validation, claimant identity, and safe-output
-handling required to enforce this protocol.
-
-### 10.5 Fail-closed validation and audit
-
-Implementations MUST fail closed on invented IDs, mismatched references,
-malformed ancestry, stale ownership, malformed facts, or contradictory payloads.
-Invalid or ambiguous operations MUST NOT change valid state. The durable facts
-MUST be sufficient to reconstruct every ownership decision, including contention,
-supersession, retries, releases, completion, and cancellation.
-
-## 11. Conformance tests
+## 10. Conformance tests
 
 A conforming implementation SHOULD test canonical serialization, hash
 verification, malformed-line isolation, concurrent-head convergence, all
 configured limits, deterministic compaction, forged and current-run coverage,
 safe retirement, transaction-log redaction, audit-entry merge validation,
-log-only audit handling, ledger limit unit parsing, and projection rebuilds. A
-work-pool implementation SHOULD additionally test immutable and idempotent facts,
-trusted deterministic IDs, shuffled and retimed replay, canonical contention
-arbitration, claimant capacity, stale-owner rejection, claim-before-dispatch,
-retry ancestry, claim-scoped release, terminal cancellation and completion,
-fail-closed malformed references, and reconstruction of the audit history.
+log-only audit handling, ledger limit unit parsing, and projection rebuilds.
