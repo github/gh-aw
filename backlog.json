@@ -1,17 +1,5 @@
 [
  {
-  "id": "githubnext/gh-aw-workshop",
-  "kind": "other",
-  "source": "topic:gh-aw",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "verkyyi/github-agent-runner",
-  "kind": "tool",
-  "source": "topic:gh-aw",
-  "discovered": "2026-09-29"
- },
- {
   "id": "idorozin/AgentPages",
   "kind": "workflow-collection",
   "source": "topic:gh-aw",
@@ -21,12 +9,6 @@
   "id": "zircote-plugins/github-agentic-workflows",
   "kind": "tool",
   "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "Hack23/European-Parliament-MCP-Server",
-  "kind": "mcp-server",
-  "source": "topic:gh-aw",
   "discovered": "2026-09-29"
  },
  {

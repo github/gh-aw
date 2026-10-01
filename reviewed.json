@@ -67,5 +67,41 @@
    "Evaluation reports with verbosity modes"
   ],
   "blogged": false
+ },
+ "githubnext/gh-aw-workshop": {
+  "kind": "other",
+  "reviewed": "2026-10-01",
+  "score": 6,
+  "summary": "Hands-on workshop building a safe daily repo-status agentic workflow; excellent onboarding, not a novel tool.",
+  "highlights": [
+   "README.md: end-to-end path from zero to scheduled report",
+   "Docs site at githubnext.github.io/gh-aw-workshop",
+   "Active (pushed 2026-10-01)"
+  ],
+  "blogged": false
+ },
+ "verkyyi/github-agent-runner": {
+  "kind": "tool",
+  "reviewed": "2026-10-01",
+  "score": 5,
+  "summary": "Claude Code plugin to discover/install gh-aw workflows from agentics catalog plus agent-team pattern; stale since June 2026.",
+  "highlights": [
+   "Conversational discover/install skills",
+   "catalog/agent-team: spec\u2192plan\u2192impl\u2192review workflows",
+   "Starter pitch: zero-risk daily-repo-status"
+  ],
+  "blogged": false
+ },
+ "Hack23/European-Parliament-MCP-Server": {
+  "kind": "mcp-server",
+  "reviewed": "2026-10-01",
+  "score": 6,
+  "summary": "Well-documented TypeScript MCP server for EP open data with 15 OSINT tools and SLSA L3 provenance; gh-aw usage is secondary.",
+  "highlights": [
+   "Published on npm with SLSA Level 3",
+   "Powers EU Parliament Monitor AI newsroom",
+   "Active (pushed 2026-10-01)"
+  ],
+  "blogged": false
  }
 }
