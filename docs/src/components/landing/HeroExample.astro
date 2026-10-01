@@ -69,8 +69,9 @@ releases. Flag anything blocked.</pre>
   }
   .aw-file,
   .aw-issue {
-    background: var(--aw-color-bg);
+    background: var(--aw-color-surface);
     border: 1px solid var(--aw-color-border);
+    box-shadow: var(--aw-shadow-raised);
     border-radius: 12px;
     min-width: 0;
   }
@@ -84,7 +85,7 @@ releases. Flag anything blocked.</pre>
     gap: 0.5rem;
     padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--aw-color-border);
-    background: var(--aw-color-bg-subtle);
+    background: var(--aw-color-surface-header);
     font-family: var(--aw-font-mono);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-secondary);
@@ -120,7 +121,6 @@ releases. Flag anything blocked.</pre>
     color: var(--aw-color-text-muted);
   }
   .aw-issue {
-    box-shadow: var(--aw-shadow);
     padding: 1rem 1.25rem 1.25rem;
     animation: aw-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
   }
