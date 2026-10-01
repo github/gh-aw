@@ -159,6 +159,7 @@ describe("copilot_harness.cjs", () => {
             status: "selected",
             selection: { provider: "copilot", model: "github-copilot/gpt-5.4-mini", wire_model: "gpt-5.4-mini", effort: "xhigh", endpoint: "/responses" },
           },
+          endpoints: [{ configured: true, models: ["gpt-5.4-mini"] }],
         },
         true
       );
@@ -304,6 +305,7 @@ describe("copilot_harness.cjs", () => {
         providerType: "openai",
         providerWireApi: "completions",
         resolvedModel: "gpt-5.4",
+        routingEffort: "high",
         multiProviderJson,
       });
 
@@ -312,6 +314,7 @@ describe("copilot_harness.cjs", () => {
         COPILOT_CONNECTION_TOKEN: "token-123",
         GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON: multiProviderJson,
         COPILOT_MODEL: "gpt-5.4",
+        COPILOT_REASONING_EFFORT: "high",
         COPILOT_PROVIDER_BASE_URL: "http://api-proxy:10002",
         COPILOT_PROVIDER_TYPE: "openai",
         COPILOT_PROVIDER_WIRE_API: "completions",

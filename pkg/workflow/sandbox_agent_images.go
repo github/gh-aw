@@ -112,6 +112,7 @@ var modelRoutingDefaultImages = map[string]string{
 	awfImageRoleSquid:    "ghcr.io/github/gh-aw-firewall/squid:0.28.30@sha256:a147f70732f81d02d59b3bddc2f7ad074d51a291f12abd8bc310b0f3ef5e1629",
 	awfImageRoleAgent:    "ghcr.io/github/gh-aw-firewall/agent:0.28.30@sha256:ae5d5b76eba522c375a36dd92a0146188bec19b2b7febae304e0dc420a28972b",
 	awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy:0.28.30@sha256:6294a95f9ca39be1cd6125cebffa9d2ba72a9bfabb8bab2160111788b67ab94d",
+	awfImageRoleCliProxy: "ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.30@sha256:f57aae1f4d91feda6f45633bcc7a3e1b0de70a97326dde354f3448a3f09de02c",
 	awfImageRoleRouter:   "ghcr.io/githubnext/gh-aw-router:latest@sha256:d1612d0eaec3fa8f14c38bbd0a6a0682732fc9f83b7fec94219d3e757a048270",
 }
 

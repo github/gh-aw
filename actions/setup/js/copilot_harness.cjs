@@ -502,6 +502,9 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false) {
   if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
     return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
   }
+  if (!isModelAvailableInReflectData(wireModel, reflectData)) {
+    return { selection: null, error: `AWF /reflect selected unavailable Copilot wire model ${wireModel}` };
+  }
   const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
   if (effort && !["minimal", "low", "medium", "high", "xhigh"].includes(effort)) {
     return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
@@ -925,11 +928,12 @@ function detectCopilotErrors(output) {
  *   providerType: string,
  *   providerWireApi: string,
  *   resolvedModel: string,
+ *   routingEffort?: string|null,
  *   multiProviderJson?: string,
  * }} options
  * @returns {NodeJS.ProcessEnv}
  */
-function buildCopilotSDKChildEnv({ sdkEnv, copilotSDKMode, copilotConnectionToken, providerBaseUrl, providerType, providerWireApi, resolvedModel, multiProviderJson }) {
+function buildCopilotSDKChildEnv({ sdkEnv, copilotSDKMode, copilotConnectionToken, providerBaseUrl, providerType, providerWireApi, resolvedModel, routingEffort, multiProviderJson }) {
   if (!copilotSDKMode) {
     return sdkEnv;
   }
@@ -938,6 +942,7 @@ function buildCopilotSDKChildEnv({ sdkEnv, copilotSDKMode, copilotConnectionToke
     COPILOT_CONNECTION_TOKEN: copilotConnectionToken,
     ...(multiProviderJson ? { GH_AW_COPILOT_SDK_MULTI_PROVIDER_JSON: multiProviderJson } : {}),
     COPILOT_MODEL: resolvedModel,
+    ...(routingEffort ? { COPILOT_REASONING_EFFORT: routingEffort } : {}),
     // Native Copilot CLI BYOK env vars — consumed by the headless sidecar for all sessions.
     COPILOT_PROVIDER_BASE_URL: providerBaseUrl,
     COPILOT_PROVIDER_TYPE: providerType,
@@ -1296,7 +1301,7 @@ async function main() {
     // The headless sidecar reads COPILOT_MODEL to configure sub-agent sessions spawned via the task tool,
     // and the "copilot/" prefix signals to use the custom provider config from COPILOT_PROVIDER_* env vars.
     const isCopilotProvider = primaryProviderName && (primaryProviderName.toLowerCase().includes("copilot") || primaryProviderName.toLowerCase().includes("github-copilot"));
-    if (isCopilotProvider && resolvedModel && !resolvedModel.includes("/")) {
+    if (!modelRoutingSelection && isCopilotProvider && resolvedModel && !resolvedModel.includes("/")) {
       resolvedModel = `copilot/${resolvedModel}`;
     }
 
@@ -1357,6 +1362,7 @@ async function main() {
     providerType,
     providerWireApi,
     resolvedModel,
+    routingEffort: modelRoutingSelection?.effort ?? null,
     multiProviderJson,
   });
   const childEnv = Object.keys(sdkChildEnv).length > 0 ? { ...process.env, ...sdkChildEnv } : undefined;
