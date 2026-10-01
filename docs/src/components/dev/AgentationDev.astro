@@ -1,0 +1,23 @@
+---
+/**
+ * TEMPORARY design-feedback overlay (Agentation). Dev server only; remove before PRs.
+ * Loads React + Agentation from esm.sh so nothing is added to package.json.
+ * Annotations sync to a local agentation-mcp server on :4747.
+ */
+const enabled = import.meta.env.DEV;
+---
+
+{enabled && (
+  <script type="module" is:inline>
+    const v = 'deps=react@19.1.0,react-dom@19.1.0';
+    const [{ default: React }, { createRoot }, { Agentation }] = await Promise.all([
+      import('https://esm.sh/react@19.1.0'),
+      import('https://esm.sh/react-dom@19.1.0/client'),
+      import(`https://esm.sh/agentation@3.1.2?${v}`),
+    ]);
+    const host = document.createElement('div');
+    host.id = 'agentation-root';
+    document.body.appendChild(host);
+    createRoot(host).render(React.createElement(Agentation, { endpoint: 'http://localhost:4747' }));
+  </script>
+)}
