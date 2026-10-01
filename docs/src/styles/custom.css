@@ -540,15 +540,6 @@ nav a[aria-current="page"] {
   }
 }
 
-:root[data-theme='light'] .icon-wrapper {
-  color: #424a53 !important;
-}
-
-:root[data-theme='light'] .icon-wrapper:hover {
-  background: rgba(110, 118, 129, 0.15) !important;
-  color: #010409 !important;
-}
-
 /* Buttons */
 .sl-markdown-content button,
 .sl-markdown-content .button,
@@ -741,41 +732,26 @@ starlight-toc h2 {
 /* Horizontal Rules */
 .sl-markdown-content hr {
   border: none;
-  border-top: 1px solid #30363d;
-}
-
-:root[data-theme='light'] .sl-markdown-content hr {
-  border-top-color: #d0d7de;
+  border-top: 1px solid var(--aw-color-border);
 }
 
 /* Keyboard Keys */
 .sl-markdown-content kbd {
   font-size: 0.875em;
   line-height: 1;
-  color: #f0f6fc;
-  background-color: #161b22;
-  border: 1px solid #30363d;
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-bg-subtle);
+  border: 1px solid var(--aw-color-border);
   border-radius: 4px;
-  box-shadow: inset 0 -1px 0 #30363d;
+  box-shadow: inset 0 -1px 0 var(--aw-color-border);
   font-family: var(--sl-font-mono);
-}
-
-:root[data-theme='light'] .sl-markdown-content kbd {
-  color: #010409;
-  background-color: #f6f8fa;
-  border-color: #d0d7de;
-  box-shadow: inset 0 -1px 0 #d0d7de;
 }
 
 /* Focus Visible State */
 :focus-visible {
-  outline: 2px solid #d896ff;
+  outline: 2px solid var(--aw-color-accent-text);
   outline-offset: 2px;
   border-radius: 4px;
-}
-
-:root[data-theme='light'] :focus-visible {
-  outline-color: #5b3da3;
 }
 
 /* Scroll Behavior */
@@ -1143,19 +1119,15 @@ main,
 .gh-aw-video-container {
     position: relative;
     width: 100%;
-    background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    background: var(--aw-color-bg-subtle);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 
-        0 8px 16px rgba(0, 0, 0, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: var(--aw-shadow), 0 0 0 1px var(--aw-color-hairline-light);
     transition: box-shadow 0.3s ease;
 }
 
 .gh-aw-video-container:hover {
-    box-shadow: 
-        0 12px 24px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(139, 92, 246, 0.3);
+    box-shadow: var(--aw-shadow), 0 0 0 1px rgba(var(--aw-accent-rgb), 0.3);
 }
 
 .gh-aw-video-container.has-aspect-ratio {
@@ -1183,29 +1155,11 @@ main,
     margin-top: 0.75rem;
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
-    color: var(--sl-color-gray-3);
+    color: var(--aw-color-text-muted);
     text-align: center;
-    background: var(--sl-color-gray-6);
-    border-left: 3px solid var(--sl-color-purple);
+    background: var(--aw-color-bg-subtle);
+    border-left: 3px solid var(--aw-color-accent);
     border-radius: 0 6px 6px 0;
-}
-
-[data-theme='light'] .gh-aw-video-container {
-    background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
-    box-shadow: 
-        0 8px 16px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-
-[data-theme='light'] .gh-aw-video-container:hover {
-    box-shadow: 
-        0 12px 24px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(102, 57, 186, 0.3);
-}
-
-[data-theme='light'] .gh-aw-video-caption {
-    color: var(--sl-color-gray-2);
-    background: var(--sl-color-gray-7);
 }
 
 @media (max-width: 768px) {
