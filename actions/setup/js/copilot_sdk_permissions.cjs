@@ -417,6 +417,98 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
 }
 
 /**
+ * @typedef {{
+ *   limit: number | undefined,
+ *   count: number,
+ *   tryConsume: (requestSummary?: string) => boolean,
+ * }} CopilotSDKToolCallBudget
+ */
+
+/**
+ * Create an aggregate primary-agent tool-call budget.
+ *
+ * The budget is a single run-wide counter shared by every tool dispatch that the
+ * session routes through the permission handler: shell commands, file reads and
+ * writes, web fetches, MCP tool calls, custom tools, and the tool calls made by
+ * subagents the primary agent spawns. Each dispatched invocation consumes exactly
+ * one unit regardless of whether it later succeeds, fails, or is denied by the
+ * workflow tool-permission policy.
+ *
+ * `tryConsume` is synchronous and must be called before the invocation is
+ * approved, so concurrently dispatched tool calls cannot overshoot the cap: the
+ * JavaScript event loop serialises the counter update, and the first request that
+ * finds the budget exhausted is refused rather than executed.
+ *
+ * A missing or non-positive-integer limit means "unlimited" and `tryConsume`
+ * always returns true.
+ *
+ * @param {{limit?: unknown, onExceeded?: (info: {count: number, limit: number, request?: string}) => void}} options
+ * @returns {CopilotSDKToolCallBudget}
+ */
+function createToolCallBudget({ limit, onExceeded } = {}) {
+  const parsedLimit = parseStrictPositiveInteger(limit);
+  let count = 0;
+  let exceededReported = false;
+  return {
+    get limit() {
+      return parsedLimit;
+    },
+    get count() {
+      return count;
+    },
+    tryConsume(requestSummary) {
+      if (parsedLimit === undefined) {
+        return true;
+      }
+      if (count >= parsedLimit) {
+        if (!exceededReported) {
+          exceededReported = true;
+          if (onExceeded) {
+            onExceeded({ count, limit: parsedLimit, request: requestSummary });
+          }
+        }
+        return false;
+      }
+      count += 1;
+      return true;
+    },
+  };
+}
+
+/**
+ * Wrap a permission handler so that every tool invocation first consumes one unit
+ * of the aggregate tool-call budget. Returns the original handler unchanged when
+ * no budget is configured.
+ *
+ * @param {import("@github/copilot-sdk").PermissionHandler} handler
+ * @param {CopilotSDKToolCallBudget | undefined} budget
+ * @param {{logger?: (msg: string) => void, coreLogger?: CopilotSDKCoreLogger}} [logOptions]
+ * @returns {import("@github/copilot-sdk").PermissionHandler}
+ */
+function wrapHandlerWithToolCallBudget(handler, budget, logOptions) {
+  if (!budget || budget.limit === undefined) {
+    return handler;
+  }
+  const logger = logOptions?.logger ?? (() => {});
+  return (request, invocation) => {
+    const requestSummary = summarizePermissionRequest(request);
+    if (!budget.tryConsume(requestSummary)) {
+      const message = `tool call refused: max-tool-calls budget of ${budget.limit} exhausted (${requestSummary})`;
+      logger(message);
+      if (logOptions?.coreLogger?.warning) {
+        logOptions.coreLogger.warning(`Copilot SDK ${message}`);
+      }
+      return {
+        kind: "reject",
+        feedback: `Tool invocation refused: the workflow max-tool-calls budget of ${budget.limit} tool calls is exhausted.`,
+      };
+    }
+    logger(`tool call ${budget.count}/${budget.limit}: ${requestSummary}`);
+    return handler(request, invocation);
+  };
+}
+
+/**
  * Parse a CopilotSDKPermissionConfig from a JSON-encoded sidecar args array.
  *
  * Extracts --allow-tool values and the --allow-all-tools flag from the raw
@@ -473,5 +565,7 @@ module.exports = {
   extractReadablePathPatternsFromShellRule,
   isReadPathAllowedByShellRules,
   buildCopilotSDKPermissionHandler,
+  createToolCallBudget,
+  wrapHandlerWithToolCallBudget,
   parsePermissionConfigFromServerArgs,
 };

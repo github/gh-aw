@@ -89,6 +89,7 @@ type importAccumulator struct {
 	// round-trip consistently through import processing.
 	mergedMaxTurns           string
 	mergedMaxToolDenials     string
+	mergedMaxToolCalls       string
 	mergedMaxRuns            string
 	mergedMaxTurnCacheMisses string
 	mergedMaxAICredits       string
@@ -411,6 +412,7 @@ func (acc *importAccumulator) extractEngineMCPSettings(mcpVal any, fullPath stri
 func (acc *importAccumulator) extractConfigFields(fm map[string]any, fullPath string) {
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-turns", &acc.mergedMaxTurns)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-tool-denials", &acc.mergedMaxToolDenials)
+	acc.extractFirstWinsJSONField(fm, fullPath, "max-tool-calls", &acc.mergedMaxToolCalls)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-runs", &acc.mergedMaxRuns)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-turn-cache-misses", &acc.mergedMaxTurnCacheMisses)
 	acc.extractFirstWinsJSONField(fm, fullPath, "max-ai-credits", &acc.mergedMaxAICredits)
@@ -1084,6 +1086,7 @@ func (acc *importAccumulator) populateImportsResultScalars(result *ImportsResult
 	result.MergedEngineModel = acc.mergedEngineModel
 	result.MergedMaxTurns = acc.mergedMaxTurns
 	result.MergedMaxToolDenials = acc.mergedMaxToolDenials
+	result.MergedMaxToolCalls = acc.mergedMaxToolCalls
 	result.MergedMaxRuns = acc.mergedMaxRuns
 	result.MergedMaxTurnCacheMisses = acc.mergedMaxTurnCacheMisses
 	result.MergedMaxAICredits = acc.mergedMaxAICredits

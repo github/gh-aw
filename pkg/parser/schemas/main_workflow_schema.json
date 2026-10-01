@@ -4363,6 +4363,11 @@
       "default": 5,
       "examples": [5, "${{ inputs.max-tool-denials }}"]
     },
+    "max-tool-calls": {
+      "$ref": "#/$defs/templatable_integer",
+      "description": "Aggregate budget of primary-agent tool invocations for the whole run, counted across every dispatched tool call (shell, file read/write, web fetch, MCP, custom tools, and calls made by subagents the primary agent spawns), regardless of whether the call succeeds, fails, or is denied. Once the budget is exhausted no further tool invocation is executed and the session is stopped. Unlimited when omitted. Supports GitHub Actions expressions (for example, '${{ inputs.max-tool-calls }}'). Supported only with engine 'copilot' and engine.copilot-sdk: true.",
+      "examples": [200, "${{ inputs.max-tool-calls }}"]
+    },
     "max-ai-credits": {
       "$ref": "#/$defs/max_ai_credits_limit",
       "default": 1000,

@@ -35,7 +35,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { buildCopilotSDKPermissionHandler, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
+const { buildCopilotSDKPermissionHandler, createToolCallBudget, wrapHandlerWithToolCallBudget, getEnvPositiveIntOrDefault, parseMaxToolDenialsLimit, MAX_TOOL_DENIALS_DEFAULT } = require("./copilot_sdk_permissions.cjs");
 const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
@@ -111,6 +111,7 @@ function extractPromptFromArgs(args) {
  *   providers?: import("@github/copilot-sdk").NamedProviderConfig[],
  *   models?: import("@github/copilot-sdk").ProviderModelConfig[],
  *   maxToolDenials?: number | string,
+ *   maxToolCalls?: number | string,
  *   permissionConfig?: {
  *     allowAllTools?: boolean,
  *     allowedTools?: string[],
@@ -140,6 +141,7 @@ async function runWithCopilotSDK({
   providers,
   models: providerModels,
   maxToolDenials,
+  maxToolCalls,
   permissionConfig,
   toolConfig,
   webFetchOptions,
@@ -165,6 +167,8 @@ async function runWithCopilotSDK({
     maxToolDenialsLimit = parseMaxToolDenialsLimit(maxToolDenials);
   }
   log(`max-tool-denials threshold: ${maxToolDenialsLimit}`);
+  // Aggregate primary-agent tool-call budget. Unset means unlimited.
+  const maxToolCallsSetting = maxToolCalls === undefined ? process.env.GH_AW_MAX_TOOL_CALLS : maxToolCalls;
 
   // Session state directory — mirrors the target path used by unified_timeline.cjs.
   // /tmp/gh-aw/sandbox/agent/logs/copilot-session-state/{sessionId}/events.jsonl
@@ -203,28 +207,29 @@ async function runWithCopilotSDK({
   let toolDenialCount = 0;
   let assistantTurnCount = 0;
   /** @type {any} */
-  let catastrophicToolDenialsError = null;
-  let catastrophicToolDenialsTriggered = false;
+  let catastrophicGuardError = null;
+  let catastrophicGuardTriggered = false;
   /**
-   * Rejects `denialGuardPromise` once the tool-denial threshold is exceeded and the
-   * bounded force-exit interval elapses. Declared here so `recordToolDenial` (defined
-   * below) can arm the forced settlement independent of whether `session.disconnect()`
-   * or the in-flight `sendAndWait()` call ever resolves on their own.
+   * Rejects `guardPromise` once a catastrophic guard (max-tool-denials or
+   * max-tool-calls) trips and the bounded force-exit interval elapses. Declared here
+   * so `triggerCatastrophicGuard` (defined below) can arm the forced settlement
+   * independent of whether `session.disconnect()` or the in-flight `sendAndWait()`
+   * call ever resolves on their own.
    * @type {((reason: any) => void) | null}
    */
-  let denialGuardReject = null;
+  let guardReject = null;
   /** @type {ReturnType<typeof setTimeout> | null} */
-  let denialGuardTimer = null;
+  let guardTimer = null;
   /**
-   * Settles (rejects) only when the tool-denial guard forces an early exit after
+   * Settles (rejects) only when a catastrophic guard forces an early exit after
    * `DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT` (or `GH_AW_DENIAL_GUARD_TIMEOUT_MS`) elapses
-   * following `guard.tool_denials_exceeded`. Raced against `session.sendAndWait()` so
-   * the driver settles with a nonzero exit within a bounded interval even when
-   * disconnect or the in-flight SDK request stalls.
+   * following `guard.tool_denials_exceeded` / `guard.tool_calls_exceeded`. Raced
+   * against `session.sendAndWait()` so the driver settles with a nonzero exit within a
+   * bounded interval even when disconnect or the in-flight SDK request stalls.
    * @type {Promise<never>}
    */
-  const denialGuardPromise = new Promise((_resolve, reject) => {
-    denialGuardReject = reject;
+  const guardPromise = new Promise((_resolve, reject) => {
+    guardReject = reject;
   });
   // Prevent an unhandled-rejection warning when the guard never fires (the common
   // case): the promise is still raced below, but Node considers a promise
@@ -232,7 +237,7 @@ async function runWithCopilotSDK({
   // race only attaches one when sendAndWait settles first. The rejection reason
   // is already logged and handled via the Promise.race() result below, so this
   // is an intentional no-op (safe to ignore).
-  denialGuardPromise.catch(() => {});
+  guardPromise.catch(() => {});
   /**
    * Map from toolCallId → {toolName, mcpServerName} for enriching tool.execution_complete
    * events and for tracking in-flight tool calls when the idle-timeout fires.
@@ -273,22 +278,22 @@ async function runWithCopilotSDK({
   }
 
   /**
-   * @param {string} reason
+   * Trip a catastrophic guard: record the failure, emit a guard event, stop the
+   * session, and arm the bounded force-exit timer. Idempotent — the first guard to
+   * fire owns the failure.
+   *
+   * @param {string} message
+   * @param {string} eventType
+   * @param {any} eventData
    */
-  function recordToolDenial(reason) {
-    toolDenialCount += 1;
-    log(`tool denial ${toolDenialCount}/${maxToolDenialsLimit}: ${reason}`);
-    if (catastrophicToolDenialsTriggered || toolDenialCount < maxToolDenialsLimit) {
+  function triggerCatastrophicGuard(message, eventType, eventData) {
+    if (catastrophicGuardTriggered) {
       return;
     }
-    catastrophicToolDenialsTriggered = true;
-    catastrophicToolDenialsError = new Error(`max tool denials threshold reached (${toolDenialCount}/${maxToolDenialsLimit})`);
-    writeDriverEvent("guard.tool_denials_exceeded", {
-      denialCount: toolDenialCount,
-      threshold: maxToolDenialsLimit,
-      reason,
-    });
-    log(`${catastrophicToolDenialsError.message}; stopping SDK session early`);
+    catastrophicGuardTriggered = true;
+    catastrophicGuardError = new Error(message);
+    writeDriverEvent(eventType, eventData);
+    log(`${message}; stopping SDK session early`);
     if (session) {
       void session.disconnect().catch(() => {
         // best-effort early stop
@@ -298,13 +303,46 @@ async function runWithCopilotSDK({
     // or the in-flight SDK request never resolves on its own (observed hosted
     // failure: the process remained stalled for ~49 minutes after this guard
     // fired, until the surrounding job's own timeout cancelled it).
-    const denialGuardTimeoutMs = getEnvPositiveIntOrDefault("GH_AW_DENIAL_GUARD_TIMEOUT_MS", DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT);
-    denialGuardTimer = setTimeout(() => {
-      if (denialGuardReject) {
-        log(`warning: denial guard force-exit fired after ${denialGuardTimeoutMs}ms — sendAndWait did not settle on its own`);
-        denialGuardReject(catastrophicToolDenialsError);
+    const guardTimeoutMs = getEnvPositiveIntOrDefault("GH_AW_DENIAL_GUARD_TIMEOUT_MS", DENIAL_GUARD_FORCE_EXIT_MS_DEFAULT);
+    guardTimer = setTimeout(() => {
+      if (guardReject) {
+        log(`warning: guard force-exit fired after ${guardTimeoutMs}ms — sendAndWait did not settle on its own`);
+        guardReject(catastrophicGuardError);
       }
-    }, denialGuardTimeoutMs);
+    }, guardTimeoutMs);
+  }
+
+  /**
+   * @param {string} reason
+   */
+  function recordToolDenial(reason) {
+    toolDenialCount += 1;
+    log(`tool denial ${toolDenialCount}/${maxToolDenialsLimit}: ${reason}`);
+    if (catastrophicGuardTriggered || toolDenialCount < maxToolDenialsLimit) {
+      return;
+    }
+    triggerCatastrophicGuard(`max tool denials threshold reached (${toolDenialCount}/${maxToolDenialsLimit})`, "guard.tool_denials_exceeded", {
+      denialCount: toolDenialCount,
+      threshold: maxToolDenialsLimit,
+      reason,
+    });
+  }
+
+  // Single run-wide budget shared by every tool dispatch the session routes through
+  // the permission handler, including tool calls made by spawned subagents.
+  const toolCallBudget = createToolCallBudget({
+    limit: maxToolCallsSetting,
+    onExceeded: ({ count, limit, request }) =>
+      triggerCatastrophicGuard(`max tool calls budget exhausted (${count}/${limit})`, "guard.tool_calls_exceeded", {
+        toolCallCount: count,
+        threshold: limit,
+        request,
+      }),
+  });
+  if (toolCallBudget.limit === undefined) {
+    log("max-tool-calls budget: unlimited");
+  } else {
+    log(`max-tool-calls budget: ${toolCallBudget.limit}`);
   }
 
   try {
@@ -316,12 +354,16 @@ async function runWithCopilotSDK({
      * Build the session on-permission handler from configuration input.
      * @type {import("@github/copilot-sdk").PermissionHandler}
      */
-    const onPermissionRequest = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, {
+    const permissionHandler = buildCopilotSDKPermissionHandler(permissionConfig, approveAll, {
       coreLogger,
       logger: log,
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: process.env.GITHUB_WORKSPACE,
     });
+    // The budget wrapper runs before the permission policy so that every dispatched
+    // invocation consumes exactly one unit regardless of the policy outcome, and so
+    // that no invocation beyond the cap ever reaches execution.
+    const onPermissionRequest = wrapHandlerWithToolCallBudget(permissionHandler, toolCallBudget, { logger: log, coreLogger });
 
     // Build session config using the multi-provider surface.
     /** @type {import("@github/copilot-sdk").SessionConfig} */
@@ -507,14 +549,14 @@ async function runWithCopilotSDK({
 
     log("sending prompt...");
     const sendTimeoutMs = getEnvPositiveIntOrDefault("COPILOT_SDK_SEND_TIMEOUT_MS", SDK_SEND_TIMEOUT_MS_DEFAULT);
-    // Race against denialGuardPromise so that if the tool-denial guard fires and
+    // Race against guardPromise so that if a catastrophic guard fires and
     // session.disconnect()/sendAndWait then stall, the driver still settles with a
     // nonzero exit within a bounded interval instead of hanging until the job's own
-    // timeout intervenes. denialGuardPromise never settles unless the guard fires.
-    const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), denialGuardPromise]);
+    // timeout intervenes. guardPromise never settles unless a guard fires.
+    const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), guardPromise]);
 
-    if (catastrophicToolDenialsError) {
-      throw catastrophicToolDenialsError;
+    if (catastrophicGuardError) {
+      throw catastrophicGuardError;
     }
 
     // sendAndWait returns the last assistant.message event; capture its content
@@ -534,13 +576,13 @@ async function runWithCopilotSDK({
     return { exitCode: 0, output, hasOutput, durationMs };
   } catch (err) {
     const durationMs = Date.now() - startTime;
-    const failure = catastrophicToolDenialsError ?? (err instanceof Error ? err : new Error(String(err)));
+    const failure = catastrophicGuardError ?? (err instanceof Error ? err : new Error(String(err)));
     log(`error: ${failure.message}`);
 
     // When the post-completion idle watchdog force-disconnected the session, the
     // agent's work is done — the SDK simply failed to resolve sendAndWait after
     // the final tool result was returned.  Treat it as a successful completion.
-    if (postCompletionWatchdogTriggered && !catastrophicToolDenialsError && hasOutput && pendingToolCalls.size === 0) {
+    if (postCompletionWatchdogTriggered && !catastrophicGuardError && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: post-completion watchdog triggered disconnect — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
       return { exitCode: 0, output, hasOutput, durationMs };
@@ -550,7 +592,7 @@ async function runWithCopilotSDK({
     // output and all tracked tool calls have already completed, the session work is
     // done — the SDK simply failed to emit the idle signal.  Treat it as a successful
     // run so the harness does not classify it as a failure or waste retry attempts.
-    const isIdleTimeout = !catastrophicToolDenialsError && SDK_IDLE_TIMEOUT_PATTERN.test(failure.message);
+    const isIdleTimeout = !catastrophicGuardError && SDK_IDLE_TIMEOUT_PATTERN.test(failure.message);
     if (isIdleTimeout && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: SDK idle-timeout with collected output and no pending tool calls — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
@@ -566,9 +608,9 @@ async function runWithCopilotSDK({
       durationMs,
     };
   } finally {
-    if (denialGuardTimer) {
-      clearTimeout(denialGuardTimer);
-      denialGuardTimer = null;
+    if (guardTimer) {
+      clearTimeout(guardTimer);
+      guardTimer = null;
     }
     // Clear the post-completion watchdog if it has not already fired.
     if (postCompletionWatchdog) {

@@ -726,6 +726,7 @@ func TestExtractConfigFields_FirstWinsAndAccumulates(t *testing.T) {
 	first := map[string]any{
 		"max-turns":             10,
 		"max-tool-denials":      5,
+		"max-tool-calls":        120,
 		"max-runs":              3,
 		"max-turn-cache-misses": 4,
 		"max-ai-credits":        1234,
@@ -741,6 +742,7 @@ func TestExtractConfigFields_FirstWinsAndAccumulates(t *testing.T) {
 	second := map[string]any{
 		"max-turns":             99,
 		"max-tool-denials":      11,
+		"max-tool-calls":        777,
 		"max-runs":              88,
 		"max-turn-cache-misses": 99,
 		"max-ai-credits":        55,
@@ -759,6 +761,7 @@ func TestExtractConfigFields_FirstWinsAndAccumulates(t *testing.T) {
 
 	assert.Equal(t, "10", acc.mergedMaxTurns, "max-turns should be first-wins")
 	assert.Equal(t, "5", acc.mergedMaxToolDenials, "max-tool-denials should be first-wins")
+	assert.Equal(t, "120", acc.mergedMaxToolCalls, "max-tool-calls should be first-wins")
 	assert.Equal(t, "3", acc.mergedMaxRuns, "max-runs should be first-wins")
 	assert.Equal(t, "4", acc.mergedMaxTurnCacheMisses, "max-turn-cache-misses should be first-wins")
 	assert.Equal(t, "1234", acc.mergedMaxAICredits, "max-ai-credits should be first-wins")

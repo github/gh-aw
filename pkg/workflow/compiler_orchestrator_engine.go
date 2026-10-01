@@ -436,6 +436,9 @@ func applyMainWorkflowEngineOverrides(engineConfig, overrides *EngineConfig) {
 	if overrides.MaxToolDenials != "" {
 		engineConfig.MaxToolDenials = overrides.MaxToolDenials
 	}
+	if overrides.MaxToolCalls != "" {
+		engineConfig.MaxToolCalls = overrides.MaxToolCalls
+	}
 	if overrides.MaxRuns > 0 {
 		engineConfig.MaxRuns = overrides.MaxRuns
 	}
@@ -487,51 +490,7 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 	if opts.preservedMaxTurnCacheMisses > 0 {
 		engineConfig.MaxTurnCacheMisses = opts.preservedMaxTurnCacheMisses
 	}
-	if engineConfig.MaxTurns == "" && opts.importsResult.MergedMaxTurns != "" {
-		var importedMaxTurns any
-		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxTurns), &importedMaxTurns); err == nil {
-			if parsed := parseMaxTurnsValue(importedMaxTurns); parsed != "" {
-				engineConfig.MaxTurns = parsed
-				orchestratorEngineLog.Printf("Applied max-turns from import")
-			}
-		}
-	}
-	if engineConfig.MaxToolDenials == "" && opts.importsResult.MergedMaxToolDenials != "" {
-		var importedMaxToolDenials any
-		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxToolDenials), &importedMaxToolDenials); err == nil {
-			if parsed := parseMaxToolDenialsValue(importedMaxToolDenials); parsed != "" {
-				engineConfig.MaxToolDenials = parsed
-				orchestratorEngineLog.Printf("Applied max-tool-denials from import")
-			}
-		}
-	}
-	if engineConfig.MaxRuns <= 0 && opts.importsResult.MergedMaxRuns != "" {
-		var importedMaxRuns any
-		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxRuns), &importedMaxRuns); err == nil {
-			if parsed := parseMaxRunsValue(importedMaxRuns); parsed > 0 {
-				engineConfig.MaxRuns = parsed
-				orchestratorEngineLog.Printf("Applied max-runs from import")
-			}
-		}
-	}
-	if engineConfig.MaxAICredits == 0 && opts.importsResult.MergedMaxAICredits != "" {
-		var importedMaxAICredits any
-		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxAICredits), &importedMaxAICredits); err == nil {
-			if parsed := parseMaxAICreditsValue(importedMaxAICredits); parsed != 0 {
-				engineConfig.MaxAICredits = parsed
-				orchestratorEngineLog.Printf("Applied max-ai-credits from import")
-			}
-		}
-	}
-	if engineConfig.MaxTurnCacheMisses <= 0 && opts.importsResult.MergedMaxTurnCacheMisses != "" {
-		var importedMaxTurnCacheMisses any
-		if err := json.Unmarshal([]byte(opts.importsResult.MergedMaxTurnCacheMisses), &importedMaxTurnCacheMisses); err == nil {
-			if parsed := parseMaxTurnCacheMissesValue(importedMaxTurnCacheMisses); parsed > 0 {
-				engineConfig.MaxTurnCacheMisses = parsed
-				orchestratorEngineLog.Printf("Applied max-turn-cache-misses from import")
-			}
-		}
-	}
+	applyImportedGuardrailDefaults(engineConfig, opts.importsResult)
 	if engineConfig.MCPToolTimeout == "" && opts.importsResult.MergedEngineMCPToolTimeout != "" {
 		engineConfig.MCPToolTimeout = opts.importsResult.MergedEngineMCPToolTimeout
 		orchestratorEngineLog.Printf("Applied engine.mcp.tool-timeout from import: %s", engineConfig.MCPToolTimeout)
@@ -551,6 +510,65 @@ func (c *Compiler) applyEngineImportDefaults(opts engineImportDefaultsOptions) (
 		}
 	}
 	return engineConfig, model
+}
+
+// applyImportedGuardrailDefaults fills unset top-level guardrail fields on engineConfig
+// from import-merged (first-wins) frontmatter values.
+func applyImportedGuardrailDefaults(engineConfig *EngineConfig, importsResult *parser.ImportsResult) {
+	if engineConfig.MaxTurns == "" && importsResult.MergedMaxTurns != "" {
+		var importedMaxTurns any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxTurns), &importedMaxTurns); err == nil {
+			if parsed := parseMaxTurnsValue(importedMaxTurns); parsed != "" {
+				engineConfig.MaxTurns = parsed
+				orchestratorEngineLog.Printf("Applied max-turns from import")
+			}
+		}
+	}
+	if engineConfig.MaxToolDenials == "" && importsResult.MergedMaxToolDenials != "" {
+		var importedMaxToolDenials any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxToolDenials), &importedMaxToolDenials); err == nil {
+			if parsed := parseMaxToolDenialsValue(importedMaxToolDenials); parsed != "" {
+				engineConfig.MaxToolDenials = parsed
+				orchestratorEngineLog.Printf("Applied max-tool-denials from import")
+			}
+		}
+	}
+	if engineConfig.MaxToolCalls == "" && importsResult.MergedMaxToolCalls != "" {
+		var importedMaxToolCalls any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxToolCalls), &importedMaxToolCalls); err == nil {
+			if parsed := parseMaxToolCallsValue(importedMaxToolCalls); parsed != "" {
+				engineConfig.MaxToolCalls = parsed
+				orchestratorEngineLog.Printf("Applied max-tool-calls from import")
+			}
+		}
+	}
+	if engineConfig.MaxRuns <= 0 && importsResult.MergedMaxRuns != "" {
+		var importedMaxRuns any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxRuns), &importedMaxRuns); err == nil {
+			if parsed := parseMaxRunsValue(importedMaxRuns); parsed > 0 {
+				engineConfig.MaxRuns = parsed
+				orchestratorEngineLog.Printf("Applied max-runs from import")
+			}
+		}
+	}
+	if engineConfig.MaxAICredits == 0 && importsResult.MergedMaxAICredits != "" {
+		var importedMaxAICredits any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxAICredits), &importedMaxAICredits); err == nil {
+			if parsed := parseMaxAICreditsValue(importedMaxAICredits); parsed != 0 {
+				engineConfig.MaxAICredits = parsed
+				orchestratorEngineLog.Printf("Applied max-ai-credits from import")
+			}
+		}
+	}
+	if engineConfig.MaxTurnCacheMisses <= 0 && importsResult.MergedMaxTurnCacheMisses != "" {
+		var importedMaxTurnCacheMisses any
+		if err := json.Unmarshal([]byte(importsResult.MergedMaxTurnCacheMisses), &importedMaxTurnCacheMisses); err == nil {
+			if parsed := parseMaxTurnCacheMissesValue(importedMaxTurnCacheMisses); parsed > 0 {
+				engineConfig.MaxTurnCacheMisses = parsed
+				orchestratorEngineLog.Printf("Applied max-turn-cache-misses from import")
+			}
+		}
+	}
 }
 
 func findImportedEngineDefinition(engineDefinitions []string, id string) *EngineDefinition {

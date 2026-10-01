@@ -691,7 +691,7 @@ Named shorthand references to predefined domain sets used in `network.allowed` a
 
 ### Copilot SDK (`engine.copilot-sdk`)
 
-An engine option that enables the Copilot engine to run in SDK mode, giving the workflow direct access to the Copilot SDK runtime for advanced integration patterns such as inline sub-agents. Set `engine.copilot-sdk: true` to activate, or set `engine.driver` on the Copilot engine to enable SDK mode automatically while replacing the built-in driver. Supports `max-tool-denials` to stop inference when tool requests are denied too frequently. See [AI Engines Reference](/gh-aw/reference/engines/#copilot-sdk-support).
+An engine option that enables the Copilot engine to run in SDK mode, giving the workflow direct access to the Copilot SDK runtime for advanced integration patterns such as inline sub-agents. Set `engine.copilot-sdk: true` to activate, or set `engine.driver` on the Copilot engine to enable SDK mode automatically while replacing the built-in driver. Supports `max-tool-denials` to stop inference when tool requests are denied too frequently, and `max-tool-calls` to cap the total number of tool invocations in a run. See [AI Engines Reference](/gh-aw/reference/engines/#copilot-sdk-support).
 
 ```aw wrap
 engine:
@@ -1046,6 +1046,19 @@ max-tool-denials: 8
 ```
 
 See [Engines Reference](/gh-aw/reference/engines/).
+
+### Max Tool Calls (`max-tool-calls`)
+
+A top-level frontmatter field that caps the total number of tool invocations the primary agent may dispatch during a run. Only applies when `engine.id: copilot` and `engine.copilot-sdk: true` are set; omitting the field means unlimited. The budget is aggregate and run-wide: shell/bash commands, file reads and writes, URL fetches, MCP tools, and custom tools each consume one unit, whether the call succeeds, fails, or is denied. Tool calls made by sub-agents spawned by the primary agent share the same budget. The budget is consumed before the tool executes, so no call beyond the cap runs. Exhausting it emits a `guard.tool_calls_exceeded` event and fails the run. Example:
+
+```aw wrap
+engine:
+  id: copilot
+  copilot-sdk: true
+max-tool-calls: 150
+```
+
+Not to be confused with `max-tool-denials`, which counts only denied tool requests. See [Engines Reference](/gh-aw/reference/engines/#copilot-sdk-support).
 
 ### Max Turn Cache Misses (`max-turn-cache-misses`)
 

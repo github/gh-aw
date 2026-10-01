@@ -295,6 +295,7 @@ function buildFailureMatchCategories(options) {
   if (options.hasReportIncomplete) categories.push("report_incomplete");
   if (options.hasMissingTool) categories.push("missing_tool");
   if (options.hasToolDenialsExceeded) categories.push("tool_denials_exceeded");
+  if (options.hasToolCallsExceeded) categories.push("tool_calls_exceeded");
   if (options.hasMissingData) categories.push("missing_data");
   if (options.hasCacheMissMisconfiguration) categories.push("cache_miss_misconfiguration");
   if (options.secretVerificationFailed) categories.push("secret_verification_failed");
@@ -340,6 +341,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} options.hasMissingData
  * @param {boolean} options.hasCacheMissMisconfiguration
  * @param {boolean} options.hasToolDenialsExceeded
+ * @param {boolean} [options.hasToolCallsExceeded]
  * @param {boolean} options.hasAppTokenMintingFailed
  * @param {boolean} options.hasLockdownCheckFailed
  * @param {boolean} options.hasOAuthTokenCheckFailed
@@ -390,6 +392,7 @@ function buildFailureIssueTitle(options) {
   }
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
+  if (options.hasToolCallsExceeded) return `[aw] ${workflowName} exhausted its max-tool-calls budget`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
   if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
   if (options.hasMissingSafeOutputs) return `[aw] ${workflowName} produced no safe outputs`;
@@ -1566,6 +1569,42 @@ function loadToolDenialsExceededEvents() {
 }
 
 /**
+ * Detect whether the Copilot SDK driver tripped the aggregate max-tool-calls budget
+ * guard (guard.tool_calls_exceeded) in any session events.jsonl file.
+ * @returns {boolean}
+ */
+function hasToolCallsExceededEvent() {
+  try {
+    if (!fs.existsSync(COPILOT_SESSION_STATE_DIR)) {
+      return false;
+    }
+    const sessionDirs = fs.readdirSync(COPILOT_SESSION_STATE_DIR, { withFileTypes: true });
+    for (const entry of sessionDirs) {
+      if (!entry.isDirectory()) continue;
+      const eventsPath = path.join(COPILOT_SESSION_STATE_DIR, entry.name, "events.jsonl");
+      if (!fs.existsSync(eventsPath)) continue;
+      const content = fs.readFileSync(eventsPath, "utf8");
+      for (const rawLine of content.split("\n")) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === "guard.tool_calls_exceeded") {
+            return true;
+          }
+        } catch {
+          // Malformed line — ignored.
+        }
+      }
+    }
+    return false;
+  } catch (error) {
+    core.warning(`Failed to load tool-calls-exceeded events: ${getErrorMessage(error)}`);
+    return false;
+  }
+}
+
+/**
  * Build context for max-tool-denials guardrail failures from Copilot SDK events.
  * @param {Array<{denialCount: number, threshold: number, reason: string, recentToolCalls?: Array<string>, timestamp?: string}>} events
  * @param {string} [workflowId]
@@ -2479,12 +2518,13 @@ function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, e
  * @param {boolean} options.maxAICreditsExceeded       - max-ai-credits guardrail triggered
  * @param {boolean} options.hasDailyAICExceeded        - max-daily-ai-credits guardrail triggered
  * @param {boolean} options.hasToolDenialsExceeded     - max-tool-denials guardrail triggered
+ * @param {boolean} [options.hasToolCallsExceeded]      - max-tool-calls budget exhausted
  * @param {boolean} options.isTimedOut                 - timeout / max-turns guardrail triggered
  * @param {string}  options.runUrl                     - URL to the failed workflow run
  * @returns {string} Rendered section or empty string when no guardrail was triggered
  */
-function buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, isTimedOut, runUrl }) {
-  const guardrailTriggered = maxAICreditsExceeded || hasDailyAICExceeded || hasToolDenialsExceeded || isTimedOut;
+function buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, hasToolCallsExceeded, isTimedOut, runUrl }) {
+  const guardrailTriggered = maxAICreditsExceeded || hasDailyAICExceeded || hasToolDenialsExceeded || hasToolCallsExceeded || isTimedOut;
   if (!guardrailTriggered) {
     return "";
   }
@@ -2493,6 +2533,7 @@ function buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAI
   if (maxAICreditsExceeded) guardrailName = "max-ai-credits";
   else if (hasDailyAICExceeded) guardrailName = "max-daily-ai-credits";
   else if (hasToolDenialsExceeded) guardrailName = "max-tool-denials";
+  else if (hasToolCallsExceeded) guardrailName = "max-tool-calls";
   else if (isTimedOut) guardrailName = "max-turns / timeout";
 
   const templatePath = getPromptPath("optimize_token_consumption_context.md");
@@ -4006,6 +4047,10 @@ async function main() {
     if (hasToolDenialsExceeded) {
       core.info(`Detected ${toolDenialsExceededEvents.length} guard.tool_denials_exceeded event(s) from Copilot SDK events.jsonl`);
     }
+    const hasToolCallsExceeded = engineId === "copilot" ? hasToolCallsExceededEvent() : false;
+    if (hasToolCallsExceeded) {
+      core.info("Detected guard.tool_calls_exceeded event from Copilot SDK events.jsonl (max-tool-calls budget exhausted)");
+    }
     const hasEngineRateLimit429 = agentConclusion === "failure" && !maxAICreditsExceeded && !aiCreditsRateLimitError && detectEngineRateLimit429Failure();
 
     // Detect cache-miss misconfiguration: the agent reported a missing_data with reason
@@ -4154,6 +4199,7 @@ async function main() {
       hasMissingData,
       hasCacheMissMisconfiguration,
       hasToolDenialsExceeded,
+      hasToolCallsExceeded,
       hasAppTokenMintingFailed,
       hasLockdownCheckFailed,
       hasOAuthTokenCheckFailed,
@@ -4186,6 +4232,7 @@ async function main() {
       hasReportIncomplete,
       hasMissingTool,
       hasToolDenialsExceeded,
+      hasToolCallsExceeded,
       hasMissingData,
       hasCacheMissMisconfiguration,
       secretVerificationFailed: hasSecretVerificationFailed,
@@ -4655,7 +4702,7 @@ async function main() {
         const credentialAuthErrorContext = copilotOrgBillingErrorContext ? "" : buildCredentialAuthErrorContext();
 
         // Build optimize token consumption context (shown when a guardrail was the failure root cause)
-        const optimizeTokenConsumptionContext = buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, isTimedOut, runUrl });
+        const optimizeTokenConsumptionContext = buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, hasToolCallsExceeded, isTimedOut, runUrl });
 
         // Create template context with sanitized workflow name
         const templateContext = {

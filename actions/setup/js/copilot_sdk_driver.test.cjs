@@ -1556,6 +1556,241 @@ describe("copilot_sdk_driver.cjs", () => {
       }
     });
 
+    it("refuses tool calls past the max-tool-calls budget and stops the session", async () => {
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      let sessionConfig;
+      /** @type {any[]} */
+      const decisions = [];
+      const session = {
+        sessionId: "session-max-tool-calls",
+        on: () => {},
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          const allowedRequest = { kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" };
+          // Four dispatches against a budget of 2: the first two are approved, the
+          // remaining two must be refused before execution.
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          return { data: { content: "should-not-complete" } };
+        }),
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockImplementation(async config => {
+          sessionConfig = config;
+          return session;
+        });
+        stop = stop;
+      }
+
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          maxToolCalls: 2,
+          permissionConfig: { allowedTools: ["shell(git:*)"] },
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        expect(decisions[0]).toEqual({ kind: "approve-once" });
+        expect(decisions[1]).toEqual({ kind: "approve-once" });
+        expect(decisions[2].kind).toBe("reject");
+        expect(decisions[2].feedback).toContain("max-tool-calls budget of 2");
+        expect(decisions[3].kind).toBe("reject");
+        expect(result.exitCode).toBe(1);
+        expect(result.output).toContain("max tool calls budget exhausted");
+        expect(disconnect).toHaveBeenCalled();
+
+        const parsedEvents = stderrWriteSpy.mock.calls
+          .map(([message]) => {
+            if (typeof message !== "string" || !message.endsWith("\n")) return null;
+            try {
+              return JSON.parse(message.trimEnd());
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+        const budgetEvents = parsedEvents.filter(event => event.type === "guard.tool_calls_exceeded");
+        // The guard is idempotent: later refusals must not emit duplicate guard events.
+        expect(budgetEvents).toHaveLength(1);
+        expect(budgetEvents[0]).toMatchObject({
+          data: { toolCallCount: 2, threshold: 2 },
+        });
+      } finally {
+        stderrWriteSpy.mockRestore();
+      }
+    });
+
+    it("counts denied tool calls against the max-tool-calls budget", async () => {
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      let sessionConfig;
+      /** @type {any[]} */
+      const decisions = [];
+      const session = {
+        sessionId: "session-max-tool-calls-denied",
+        on: () => {},
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          const deniedRequest = { kind: "shell", commands: [{ identifier: "rm" }], fullCommandText: "rm -rf /tmp/x" };
+          decisions.push(sessionConfig.onPermissionRequest(deniedRequest));
+          decisions.push(sessionConfig.onPermissionRequest(deniedRequest));
+          return { data: { content: "should-not-complete" } };
+        }),
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockImplementation(async config => {
+          sessionConfig = config;
+          return session;
+        });
+        stop = stop;
+      }
+
+      const oldMaxToolDenials = process.env.GH_AW_MAX_TOOL_DENIALS;
+      process.env.GH_AW_MAX_TOOL_DENIALS = "50";
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          maxToolCalls: 1,
+          permissionConfig: { allowedTools: ["shell(git:*)"] },
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        // First call is dispatched (and denied by policy) — it still consumes the budget,
+        // so the second call is refused by the budget guard rather than the policy.
+        expect(decisions[0].feedback).toContain("not allowed by workflow tool permissions");
+        expect(decisions[1].feedback).toContain("max-tool-calls budget of 1");
+        expect(result.exitCode).toBe(1);
+        expect(result.output).toContain("max tool calls budget exhausted");
+      } finally {
+        stderrWriteSpy.mockRestore();
+        if (oldMaxToolDenials === undefined) delete process.env.GH_AW_MAX_TOOL_DENIALS;
+        else process.env.GH_AW_MAX_TOOL_DENIALS = oldMaxToolDenials;
+      }
+    });
+
+    it("reads the max-tool-calls budget from GH_AW_MAX_TOOL_CALLS", async () => {
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      let sessionConfig;
+      /** @type {any[]} */
+      const decisions = [];
+      const session = {
+        sessionId: "session-max-tool-calls-env",
+        on: () => {},
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          const allowedRequest = { kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" };
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          return { data: { content: "should-not-complete" } };
+        }),
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockImplementation(async config => {
+          sessionConfig = config;
+          return session;
+        });
+        stop = stop;
+      }
+
+      const oldMaxToolCalls = process.env.GH_AW_MAX_TOOL_CALLS;
+      process.env.GH_AW_MAX_TOOL_CALLS = "1";
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          permissionConfig: { allowedTools: ["shell(git:*)"] },
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        expect(decisions[0]).toEqual({ kind: "approve-once" });
+        expect(decisions[1].kind).toBe("reject");
+        expect(result.exitCode).toBe(1);
+      } finally {
+        stderrWriteSpy.mockRestore();
+        if (oldMaxToolCalls === undefined) delete process.env.GH_AW_MAX_TOOL_CALLS;
+        else process.env.GH_AW_MAX_TOOL_CALLS = oldMaxToolCalls;
+      }
+    });
+
+    it("leaves tool calls unlimited when no max-tool-calls budget is configured", async () => {
+      const disconnect = vi.fn().mockResolvedValue(undefined);
+      const stop = vi.fn().mockResolvedValue(undefined);
+      const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      let sessionConfig;
+      /** @type {any[]} */
+      const decisions = [];
+      const session = {
+        sessionId: "session-max-tool-calls-unlimited",
+        on: () => {},
+        sendAndWait: vi.fn().mockImplementation(async () => {
+          const allowedRequest = { kind: "shell", commands: [{ identifier: "git" }], fullCommandText: "git status" };
+          for (let i = 0; i < 25; i++) {
+            decisions.push(sessionConfig.onPermissionRequest(allowedRequest));
+          }
+          return { data: { content: "done" } };
+        }),
+        disconnect,
+      };
+      class FakeCopilotClient {
+        start = vi.fn().mockResolvedValue(undefined);
+        createSession = vi.fn().mockImplementation(async config => {
+          sessionConfig = config;
+          return session;
+        });
+        stop = stop;
+      }
+
+      const oldMaxToolCalls = process.env.GH_AW_MAX_TOOL_CALLS;
+      delete process.env.GH_AW_MAX_TOOL_CALLS;
+      try {
+        const result = await runWithCopilotSDK({
+          sdkUri: "http://127.0.0.1:3002",
+          prompt: "test prompt",
+          logger: () => {},
+          permissionConfig: { allowedTools: ["shell(git:*)"] },
+          sdkModule: {
+            CopilotClient: FakeCopilotClient,
+            RuntimeConnection: { forUri: vi.fn(() => ({})) },
+            approveAll: () => ({ kind: "approve-once" }),
+          },
+        });
+
+        expect(decisions.every(decision => decision.kind === "approve-once")).toBe(true);
+        expect(result.exitCode).toBe(0);
+      } finally {
+        stderrWriteSpy.mockRestore();
+        if (oldMaxToolCalls === undefined) delete process.env.GH_AW_MAX_TOOL_CALLS;
+        else process.env.GH_AW_MAX_TOOL_CALLS = oldMaxToolCalls;
+      }
+    });
+
     it("falls back to default threshold when GH_AW_MAX_TOOL_DENIALS is malformed", async () => {
       const disconnect = vi.fn().mockResolvedValue(undefined);
       const stop = vi.fn().mockResolvedValue(undefined);

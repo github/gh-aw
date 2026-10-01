@@ -642,6 +642,10 @@ func (e *CopilotEngine) addCopilotWorkflowStepEnv(env map[string]string, workflo
 		if workflowData.EngineConfig.MaxToolDenials != "" {
 			env[constants.EnvVarMaxToolDenials] = workflowData.EngineConfig.MaxToolDenials
 		}
+		// Unset means unlimited: only emit the budget when the workflow opts in.
+		if workflowData.EngineConfig.MaxToolCalls != "" {
+			env[constants.EnvVarMaxToolCalls] = workflowData.EngineConfig.MaxToolCalls
+		}
 	}
 }
 

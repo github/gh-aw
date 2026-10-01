@@ -3390,6 +3390,23 @@ max-tool-denials: 1
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
 max-tool-denials: "example-value"
 
+# Aggregate budget of primary-agent tool invocations for the whole run, counted
+# across every dispatched tool call (shell, file read/write, web fetch, MCP,
+# custom tools, and calls made by subagents the primary agent spawns), regardless
+# of whether the call succeeds, fails, or is denied. Once the budget is exhausted
+# no further tool invocation is executed and the session is stopped. Unlimited
+# when omitted. Supports GitHub Actions expressions (for example, '${{
+# inputs.max-tool-calls }}'). Supported only with engine 'copilot' and
+# engine.copilot-sdk: true.
+# (optional)
+# Accepted formats:
+
+# Format 1: integer
+max-tool-calls: 1
+
+# Format 2: GitHub Actions expression that resolves to an integer at runtime
+max-tool-calls: "example-value"
+
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
 # default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement
 # and token steering. Supports GitHub Actions expressions.
@@ -4506,6 +4523,13 @@ tools:
   # (optional)
   cli-proxy: true
 
+  # Standalone Git-backed ledger configuration. Use an empty object or schema/limit
+  # properties for one default ledger, or name independent ledgers under this
+  # object.
+  # (optional)
+  ledger:
+    {}
+
   # Repo memory configuration for git-based persistent storage
   # (optional)
   # Accepted formats:
@@ -4583,6 +4607,12 @@ tools:
     # committed, making them human-readable in the repository (default: false)
     # (optional)
     format-json: true
+
+    # Experimental. Enable the repo-memory ledger projection, optionally validated
+    # against a repository-relative JSON schema. Ledger workflows require AWF Cloud
+    # Hypervisor filesystem isolation. Using this field emits a compile-time warning.
+    # (optional)
+    ledger: null
 
     # Custom domain validation hook for this repo-memory entry
     # (optional)

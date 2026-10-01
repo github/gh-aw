@@ -1424,6 +1424,11 @@
       "desc": "Copilot SDK safeguard threshold for repeated tool denials before stopping inference.",
       "leaf": true
     },
+    "max-tool-calls": {
+      "type": "integer|string",
+      "desc": "Copilot SDK aggregate budget for total tool invocations in a run.",
+      "leaf": true
+    },
     "max-ai-credits": {
       "type": "integer|string",
       "desc": "Per-run AI Credits budget control for firewall cost enforcement.",

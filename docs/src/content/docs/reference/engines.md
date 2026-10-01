@@ -413,6 +413,30 @@ tool requests are repeatedly denied. The default is `5`.
 This field is only supported when `engine.id: copilot` and
 `engine.copilot-sdk: true`.
 
+Use top-level `max-tool-calls` to cap the **total** number of tool
+invocations the agent may dispatch during the run. The budget is
+run-wide and aggregate: every dispatched invocation counts once —
+shell/bash, file reads and writes, URL fetches, MCP tools and
+custom tools — regardless of whether it succeeds, fails, or is
+denied by tool permissions. Tool calls made by sub-agents spawned
+by the primary agent draw from the same budget. The budget is
+consumed *before* the tool executes, so no invocation beyond the
+cap ever runs, and concurrent dispatches cannot overshoot it.
+When the budget is exhausted the run stops with a
+`guard.tool_calls_exceeded` event and the agent step fails.
+Omitting the field means unlimited. Like `max-tool-denials`, this
+field is only supported when `engine.id: copilot` and
+`engine.copilot-sdk: true`; the compiler rejects it on other
+engines because no other engine exposes a pre-execution tool
+interception point.
+
+```yaml wrap
+engine:
+  id: copilot
+  copilot-sdk: true
+max-tool-calls: 150
+```
+
 Use `engine.driver` to replace the built-in
 `copilot_sdk_driver.cjs` implementation. On the Copilot engine,
 setting `engine.driver` also enables `engine.copilot-sdk: true`:

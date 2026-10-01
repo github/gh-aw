@@ -14,6 +14,7 @@
 //   - validateMaxTurnsSupport() - Validates max-turns feature support
 //   - validateMaxContinuationsSupport() - Validates max-continuations feature support
 //   - validateMaxToolDenialsSupport() - Validates max-tool-denials support for Copilot SDK mode
+//   - validateMaxToolCallsSupport() - Validates max-tool-calls support for Copilot SDK mode
 //   - validateWebSearchSupport() - Validates web-search feature support (warning)
 //   - validateBareModeSupport() - Validates bare mode feature support (warning)
 //   - validateBashCommandAllowlistSupport() - Errors when restricted bash allowlist is unsupported
@@ -197,6 +198,30 @@ func (c *Compiler) validateMaxToolDenialsSupport(frontmatter map[string]any, eng
 
 	if !engineConfig.CopilotSDK {
 		return errors.New("max-tool-denials requires Copilot SDK mode: set engine.copilot-sdk: true when using max-tool-denials")
+	}
+
+	return nil
+}
+
+// validateMaxToolCallsSupport validates that max-tool-calls is only used with the
+// Copilot engine in Copilot SDK mode, which is the only runtime where gh-aw can
+// refuse a tool invocation before it executes.
+func (c *Compiler) validateMaxToolCallsSupport(frontmatter map[string]any, engine CodingAgentEngine) error {
+	_, engineConfig, _ := c.ExtractEngineConfig(frontmatter)
+
+	if engineConfig == nil || engineConfig.MaxToolCalls == "" {
+		return nil
+	}
+
+	agentValidationLog.Printf("Validating max-tool-calls support: engine=%s, maxToolCalls=%s, copilotSDK=%v",
+		engine.GetID(), engineConfig.MaxToolCalls, engineConfig.CopilotSDK)
+
+	if engine.GetID() != string(constants.CopilotEngine) {
+		return fmt.Errorf("max-tool-calls not supported: engine '%s' does not support max-tool-calls (supported only with engine 'copilot' and engine.copilot-sdk: true)", engine.GetID())
+	}
+
+	if !engineConfig.CopilotSDK {
+		return errors.New("max-tool-calls requires Copilot SDK mode: set engine.copilot-sdk: true when using max-tool-calls")
 	}
 
 	return nil

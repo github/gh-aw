@@ -351,6 +351,13 @@ const (
 	// allowed in Copilot SDK driver mode before inference is stopped.
 	EnvVarMaxToolDenials = "GH_AW_MAX_TOOL_DENIALS"
 
+	// EnvVarMaxToolCalls is the aggregate budget of primary-agent tool
+	// invocations (shell, file read/write, web fetch, MCP, custom tools, and
+	// tool calls made by subagents the primary agent spawns) allowed in
+	// Copilot SDK driver mode before further invocations are refused and the
+	// session is stopped. Unset means unlimited.
+	EnvVarMaxToolCalls = "GH_AW_MAX_TOOL_CALLS"
+
 	// EnvVarStartupTimeout is the tool startup timeout in seconds
 	EnvVarStartupTimeout = "GH_AW_STARTUP_TIMEOUT"
 
