@@ -27,6 +27,9 @@ engine:
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: copilot-events
 network:
   allowed:
     - defaults
