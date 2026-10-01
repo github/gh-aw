@@ -30,6 +30,9 @@ imports:
   - shared/otlp.md
   - shared/token-telemetry-check.md
   - shared/smoke-test-brevity.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: agent-stdio
 network:
   allowed:
     - defaults

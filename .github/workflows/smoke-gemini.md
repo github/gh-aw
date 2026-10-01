@@ -43,6 +43,9 @@ imports:
   - shared/token-telemetry-check.md
   - shared/smoke-test-brevity.md
   - shared/playwright-title-test.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: agent-stdio
 network:
   allowed:
     - defaults

@@ -171,6 +171,7 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
   const hasIntentMetadata = Boolean(intentMetadata && Object.keys(intentMetadata).length > 0);
   if (useIssueIntent && hasIntentMetadata) {
     try {
+      core.debug("Attempting issue-intent close request");
       const { data: issue } = await github.request("PATCH /repos/{owner}/{repo}/issues/{issue_number}", {
         owner,
         repo,
@@ -178,9 +179,18 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
         state: { value: "closed", ...intentMetadata },
         state_reason: baseParams.state_reason,
       });
+      core.debug("Issue-intent close request succeeded");
       return issue;
     } catch (error) {
-      core.warning(`Issue-intent close path unavailable, falling back to legacy close path: ${getErrorMessage(error)}`);
+      const errorRecord = error && typeof error === "object" ? /** @type {Record<string, unknown>} */ error : undefined;
+      const response = errorRecord?.response;
+      const status = response && typeof response === "object" && "status" in response ? response.status : errorRecord?.status;
+      const statusForLog = typeof status === "number" && Number.isInteger(status) ? status : "unknown";
+      if (status !== 404 && status !== 501) {
+        core.debug(`Issue-intent close request failed; legacy fallback disabled (status=${statusForLog})`);
+        throw error;
+      }
+      core.warning(`Issue-intent close endpoint unavailable (status=${statusForLog}); falling back to legacy close path`);
     }
   }
 

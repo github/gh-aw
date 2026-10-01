@@ -13,6 +13,8 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+const copilotAWFSessionStateDir = constants.TmpGhAwDir + "/sandbox/agent/session-state"
+
 // BuildAWFCommand builds a complete AWF command with all arguments.
 // This consolidates the AWF command building logic that was duplicated across
 // Copilot, Claude, and Codex engines.
@@ -437,6 +439,7 @@ func BuildAWFArgs(config AWFCommandConfig) []string {
 	awfArgs := appendTTYAndContainerRuntimeArgs(config, firewallConfig)
 	awfArgs = appendEnvAndMountArgs(config, firewallConfig, agentConfig, awfArgs)
 	awfArgs = appendLogAndLegacySecurityArgs(config, firewallConfig, agentConfig, awfArgs)
+	awfArgs = appendCopilotSessionStateArgs(config, firewallConfig, awfArgs)
 	awfArgs = append(awfArgs, "--skip-pull")
 	awfHelpersLog.Print("Using --skip-pull since images are pre-downloaded")
 	awfArgs = appendCliProxyArgs(config, firewallConfig, awfArgs)
@@ -444,6 +447,22 @@ func BuildAWFArgs(config AWFCommandConfig) []string {
 	awfArgs = appendCustomAWFArgs(firewallConfig, agentConfig, awfArgs)
 	awfHelpersLog.Printf("Built %d AWF arguments", len(awfArgs))
 	return awfArgs
+}
+
+func appendCopilotSessionStateArgs(config AWFCommandConfig, firewallConfig *FirewallConfig, awfArgs []string) []string {
+	runtimeID := config.EngineRuntimeID
+	if runtimeID == "" {
+		runtimeID = config.EngineName
+	}
+	if runtimeID != "copilot" {
+		return awfArgs
+	}
+	if !awfSupportsSessionStateDir(firewallConfig) {
+		awfHelpersLog.Printf("Skipping --session-state-dir: AWF version %q is older than minimum %s", getAWFImageTag(firewallConfig), constants.AWFSessionStateDirMinVersion)
+		return awfArgs
+	}
+	awfHelpersLog.Printf("Added --session-state-dir %s for Copilot session artifacts", copilotAWFSessionStateDir)
+	return append(awfArgs, "--session-state-dir", copilotAWFSessionStateDir)
 }
 
 func appendTTYAndContainerRuntimeArgs(config AWFCommandConfig, firewallConfig *FirewallConfig) []string {

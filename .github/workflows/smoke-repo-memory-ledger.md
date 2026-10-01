@@ -12,6 +12,10 @@ permissions:
 engine:
   id: copilot
 model: copilot/gpt-5.3-codex
+imports:
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: copilot-events
 sandbox:
   agent:
     id: awf

@@ -839,7 +839,7 @@ umask "$GH_AW_PREV_UMASK"`, customEngineCommandScriptPath, heredocDelimiter, scr
 }
 
 // generateCopilotSessionFileCopyStep generates a step to copy the entire Copilot
-// session-state directory from ~/.copilot/session-state/ to /tmp/gh-aw/sandbox/agent/logs/
+// session-state directory from the AWF-managed host path to /tmp/gh-aw/sandbox/agent/logs/
 // This ensures all session files (events.jsonl, session.db, plan.md, checkpoints, etc.)
 // are in /tmp/gh-aw/ where secret redaction can scan them and they get uploaded as artifacts.
 // The logic is in actions/setup/sh/copy_copilot_session_state.sh.
