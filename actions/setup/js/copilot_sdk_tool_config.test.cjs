@@ -70,12 +70,18 @@ describe("parseCopilotSDKToolConfig", () => {
     expect(parseCopilotSDKToolConfig(JSON.stringify({ ...validToolConfig(), explicitlyDisabledTools: null })).explicitlyDisabledTools).toEqual([]);
   });
 
+  it("parses a configured aggregate tool-call limit", () => {
+    expect(parseCopilotSDKToolConfig(JSON.stringify({ ...validToolConfig(), maxToolCalls: "12" })).maxToolCalls).toBe(12);
+  });
+
   it.each([
     ["invalid JSON", "{", "must be valid JSON"],
     ["unsupported version", JSON.stringify({ ...validToolConfig(), version: 2 }), "unsupported"],
     ["missing capability", JSON.stringify({ ...validToolConfig(), capabilities: { bash: false } }), "capabilities.edit"],
     ["duplicate permission", JSON.stringify(validToolConfig({ permissions: { allowedTools: ["read", "read"] } })), "duplicate"],
     ["empty permissions", JSON.stringify(validToolConfig({ permissions: { allowedTools: [] } })), "must not be empty"],
+    ["zero tool-call limit", JSON.stringify({ ...validToolConfig(), maxToolCalls: 0 }), "positive safe integer"],
+    ["malformed tool-call limit", JSON.stringify({ ...validToolConfig(), maxToolCalls: "1.5" }), "positive safe integer"],
   ])("fails closed for %s", (_name, value, message) => {
     expect(() => parseCopilotSDKToolConfig(value)).toThrow(message);
   });
@@ -237,5 +243,132 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
       expect(sessionConfig.availableTools.toArray()).not.toContain(forbiddenTool);
     }
     expect(sessionConfig.tools.map(tool => tool.name)).toEqual(["web_fetch"]);
+  });
+
+  it("enforces one shared pre-tool budget across the parent and subagent hooks", async () => {
+    let onEvent = () => {};
+    let sessionConfig;
+    const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const session = {
+      sessionId: "session-tool-budget",
+      on: handler => {
+        onEvent = handler;
+      },
+      sendAndWait: vi.fn().mockImplementation(async () => {
+        const hook = sessionConfig.hooks.onPreToolUse;
+        expect(hook({ toolName: "bash", sessionId: "session-tool-budget", toolArgs: {} }, { sessionId: "session-tool-budget" })).toBeUndefined();
+        const denied = hook({ toolName: "mcp", sessionId: "subagent-session", toolArgs: {} }, { sessionId: "session-tool-budget" });
+        expect(denied.permissionDecision).toBe("deny");
+        expect(denied.permissionDecisionReason).toContain("budget is exhausted (1 calls)");
+        onEvent({
+          type: "assistant.message",
+          ephemeral: false,
+          timestamp: new Date().toISOString(),
+          data: { content: "done" },
+        });
+        return { data: { content: "done" } };
+      }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = vi.fn().mockImplementation(config => {
+        sessionConfig = config;
+        return session;
+      });
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+    const sdkModule = {
+      ...fakeSDKTools,
+      CopilotClient: FakeCopilotClient,
+      RuntimeConnection: { forUri: vi.fn(() => ({})) },
+      approveAll: () => ({ kind: "approve-once" }),
+    };
+
+    try {
+      const result = await runWithCopilotSDK({
+        sdkUri: "http://127.0.0.1:3002",
+        prompt: "test prompt",
+        logger: () => {},
+        permissionConfig: validToolConfig().permissions,
+        toolConfig: { ...validToolConfig(), maxToolCalls: 1 },
+        sdkModule,
+      });
+      expect(result.exitCode).toBe(0);
+      const events = stderrWriteSpy.mock.calls
+        .map(([line]) => {
+          try {
+            return JSON.parse(line.trim());
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: "guard.tool_call_budget_exceeded",
+          data: expect.objectContaining({ toolName: "mcp", sessionId: "subagent-session", callCount: 2, limit: 1 }),
+        })
+      );
+    } finally {
+      stderrWriteSpy.mockRestore();
+    }
+  });
+
+  it("debits failed tool executions and permission denials through the SDK harness", async () => {
+    let onEvent = () => {};
+    let sessionConfig;
+    const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const session = {
+      sessionId: "session-tool-budget-outcomes",
+      on: handler => {
+        onEvent = handler;
+      },
+      sendAndWait: vi.fn().mockImplementation(async () => {
+        const onPreToolUse = sessionConfig.hooks.onPreToolUse;
+        expect(onPreToolUse({ toolName: "web_fetch", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
+        await expect(sessionConfig.tools[0].handler({ url: "https://example.com" })).rejects.toThrow("fetch failed");
+        expect(onPreToolUse({ toolName: "bash", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
+        expect(sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "git status" })).toMatchObject({ kind: "reject" });
+        onEvent({ type: "assistant.message", ephemeral: false, timestamp: new Date().toISOString(), data: { content: "done" } });
+        return { data: { content: "done" } };
+      }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = vi.fn().mockImplementation(config => {
+        sessionConfig = config;
+        return session;
+      });
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+
+    try {
+      const result = await runWithCopilotSDK({
+        sdkUri: "http://127.0.0.1:3002",
+        prompt: "test prompt",
+        logger: () => {},
+        permissionConfig: validToolConfig().permissions,
+        toolConfig: { ...validToolConfig(), maxToolCalls: 2 },
+        webFetchOptions: { fetchImpl: vi.fn().mockRejectedValue(new Error("fetch failed")) },
+        sdkModule: { ...fakeSDKTools, CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => ({ kind: "approve-once" }) },
+      });
+
+      expect(result.exitCode).toBe(0);
+      const events = stderrWriteSpy.mock.calls
+        .map(([line]) => {
+          try {
+            return JSON.parse(line.trim());
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      expect(events).toContainEqual(expect.objectContaining({ type: "guard.tool_call_budget_debit", data: expect.objectContaining({ toolName: "web_fetch", callCount: 1 }) }));
+      expect(events).toContainEqual(expect.objectContaining({ type: "guard.tool_call_budget_debit", data: expect.objectContaining({ toolName: "bash", callCount: 2 }) }));
+    } finally {
+      stderrWriteSpy.mockRestore();
+    }
   });
 });
