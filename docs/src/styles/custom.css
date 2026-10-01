@@ -1,25 +1,5 @@
-/* Follows GitHub brand guidelines:
-   Typography: https://brand.github.com/foundations/typography
-   Color: https://brand.github.com/foundations/color
-*/
+/* Site styles. Tokens (colours, fonts, Starlight mapping) live in tokens.css. */
 
-@font-face {
-  font-family: "Mona Sans";
-  src: url("/gh-aw/fonts/MonaSans-Regular.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Mona Sans";
-  src: url("/gh-aw/fonts/MonaSans-Bold.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-}
-
-/* CSS Variables - Theme Colors */
 :root {
   /* Prevent Android Chrome from automatically inflating text sizes when the user
      has set a large system font. Without this, OS-level font scaling can push
@@ -27,40 +7,6 @@
      off-screen. See: https://github.com/github/gh-aw/issues/29545 */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-
-  --sl-font: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  --sl-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  
-  --sl-color-accent-low: #2f234a;
-  --sl-color-accent: #b694ff;
-  --sl-color-accent-high: #d8c4ff;
-  --sl-color-text-accent: #c7b2ff;
-  
-  --sl-color-white: #ffffff;
-  --sl-color-gray-1: #f6f8fa;
-  --sl-color-gray-2: #d0d7de;
-  --sl-color-gray-3: #8d96a0;
-  --sl-color-gray-4: #656d76;
-  --sl-color-gray-5: #424a53;
-  --sl-color-gray-6: #2d333b;
-  --sl-color-black: #010409;
-  
-  --sl-color-hairline: #21262d;
-  --sl-color-hairline-light: rgba(240, 246, 252, 0.1);
-  
-  --sl-color-text: #f0f6fc;
-  --sl-color-text-invert: #010409;
-  --sl-color-gray-7: #010409;
-
-  --aw-bg-page: #0d1117;
-  --aw-bg-subtle: #161b22;
-  --aw-bg-elevated: rgba(22, 27, 34, 0.88);
-  --aw-bg-overlay: rgba(13, 17, 23, 0.78);
-  --aw-border: rgba(99, 110, 123, 0.34);
-  --aw-border-strong: rgba(139, 148, 158, 0.42);
-  --aw-text-muted: #9ea7b3;
-  --aw-shadow: 0 18px 48px rgba(1, 4, 9, 0.22);
-  --aw-accent-rgb: 168, 139, 250;
 }
 
 /* Widen central docs content on large screens while avoiding TOC overflow on mid-width viewports. */
@@ -68,42 +14,6 @@
   :root {
     --sl-content-width: 60rem;
   }
-}
-
-/* Light Theme Colors */
-:root[data-theme='light'] {
-  --sl-color-accent-low: #efe7ff;
-  --sl-color-accent: #8250df;
-  --sl-color-accent-high: #5a32a3;
-  
-  --sl-color-text-accent: #6f42c1;
-  
-  --sl-color-white: #010409;
-  --sl-color-gray-1: #010409;
-  --sl-color-gray-2: #424a53;
-  --sl-color-gray-3: #656d76;
-  --sl-color-gray-4: #8d96a0;
-  --sl-color-gray-5: #d0d7de;
-  --sl-color-gray-6: #eaeef2;
-  --sl-color-black: #ffffff;
-  
-  --sl-color-hairline: #d0d7de;
-  --sl-color-hairline-light: rgba(1, 4, 9, 0.1);
-  
-  --sl-color-text: #010409;
-  --sl-color-text-invert: #ffffff;
-  --sl-color-gray-7: #ffffff;
-
-  --aw-bg-page: #ffffff;
-  --aw-bg-subtle: #f6f8fa;
-  --aw-bg-elevated: rgba(255, 255, 255, 0.88);
-  --aw-bg-overlay: rgba(246, 248, 250, 0.82);
-  --aw-border: rgba(208, 215, 222, 0.9);
-  --aw-border-strong: rgba(175, 184, 193, 0.95);
-  --aw-text-muted: #57606a;
-  --aw-callout-preview-text: #6a4500;
-  --aw-shadow: 0 18px 42px rgba(31, 35, 40, 0.08);
-  --aw-accent-rgb: 130, 80, 223;
 }
 
 /* Light Theme Body Background */

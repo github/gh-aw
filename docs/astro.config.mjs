@@ -272,7 +272,7 @@ export default defineConfig({
         Footer: "./src/components/CustomFooter.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
-      customCss: ["./src/styles/custom.css"],
+      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/github/gh-aw" }],
       tableOfContents: {
         minHeadingLevel: 2,

@@ -1,0 +1,181 @@
+/* Design tokens for the GitHub Agentic Workflows site.
+ *
+ * Three layers, each only reading from the one above it:
+ *   1. Primitives  – raw palette values (--aw-gray-*, --aw-purple-*). Never use these
+ *                    directly in components; reach for a semantic token instead.
+ *   2. Semantic    – what a value is for (--aw-color-text-muted, --aw-color-border).
+ *                    Redefined per theme, so components never need theme selectors.
+ *   3. Starlight   – Starlight's own --sl-* variables, mapped onto the semantic layer
+ *                    so built-in Starlight UI follows the same system.
+ *
+ * Typeface follows GitHub brand typography: https://brand.github.com/foundations/typography
+ */
+
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/gh-aw/fonts/MonaSans-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/gh-aw/fonts/MonaSans-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* 1. Primitives ---------------------------------------------------------- */
+
+:root {
+  /* Neutral scale, light → dark */
+  --aw-gray-0: #ffffff;
+  --aw-gray-1: #f6f8fa;
+  --aw-gray-2: #eaeef2;
+  --aw-gray-3: #d0d7de;
+  --aw-gray-4: #9ea7b3;
+  --aw-gray-5: #8d96a0;
+  --aw-gray-6: #656d76;
+  --aw-gray-7: #57606a;
+  --aw-gray-8: #424a53;
+  --aw-gray-9: #2d333b;
+  --aw-gray-10: #21262d;
+  --aw-gray-11: #161b22;
+  --aw-gray-12: #0d1117;
+  --aw-gray-13: #010409;
+
+  /* Brand accent, light → dark */
+  --aw-purple-1: #efe7ff;
+  --aw-purple-2: #d8c4ff;
+  --aw-purple-3: #c7b2ff;
+  --aw-purple-4: #b694ff;
+  --aw-purple-5: #a88bfa;
+  --aw-purple-6: #8250df;
+  --aw-purple-7: #6f42c1;
+  --aw-purple-8: #5a32a3;
+  --aw-purple-9: #2f234a;
+
+  --aw-amber-9: #6a4500;
+
+  --aw-font-sans: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --aw-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* 2. Semantic — dark (Starlight's default theme) ------------------------- */
+
+:root {
+  --aw-color-bg: var(--aw-gray-12);
+  --aw-color-bg-subtle: var(--aw-gray-11);
+  --aw-color-bg-raised: rgba(22, 27, 34, 0.88);
+  --aw-color-bg-overlay: rgba(13, 17, 23, 0.78);
+
+  --aw-color-text: var(--aw-gray-1);
+  --aw-color-text-muted: var(--aw-gray-4);
+  --aw-color-text-strong: var(--aw-gray-0);
+  --aw-color-text-invert: var(--aw-gray-13);
+
+  --aw-color-border: rgba(99, 110, 123, 0.34);
+  --aw-color-border-strong: rgba(139, 148, 158, 0.42);
+  --aw-color-hairline: var(--aw-gray-10);
+  --aw-color-hairline-light: rgba(240, 246, 252, 0.1);
+
+  --aw-color-accent: var(--aw-purple-4);
+  --aw-color-accent-low: var(--aw-purple-9);
+  --aw-color-accent-high: var(--aw-purple-2);
+  --aw-color-accent-text: var(--aw-purple-3);
+  /* Bare RGB triplet, for rgba(var(--aw-accent-rgb), <alpha>) */
+  --aw-accent-rgb: 168, 139, 250;
+
+  --aw-color-callout-preview-text: inherit;
+
+  --aw-shadow: 0 18px 48px rgba(1, 4, 9, 0.22);
+
+  /* Starlight's gray ramp runs from the text colour (gray-1) to the page colour (gray-7). */
+  --aw-ramp-1: var(--aw-gray-1);
+  --aw-ramp-2: var(--aw-gray-3);
+  --aw-ramp-3: var(--aw-gray-5);
+  --aw-ramp-4: var(--aw-gray-6);
+  --aw-ramp-5: var(--aw-gray-8);
+  --aw-ramp-6: var(--aw-gray-9);
+  --aw-ramp-7: var(--aw-gray-13);
+}
+
+/* 2. Semantic — light ---------------------------------------------------- */
+
+:root[data-theme='light'] {
+  --aw-color-bg: var(--aw-gray-0);
+  --aw-color-bg-subtle: var(--aw-gray-1);
+  --aw-color-bg-raised: rgba(255, 255, 255, 0.88);
+  --aw-color-bg-overlay: rgba(246, 248, 250, 0.82);
+
+  --aw-color-text: var(--aw-gray-13);
+  --aw-color-text-muted: var(--aw-gray-7);
+  --aw-color-text-strong: var(--aw-gray-13);
+  --aw-color-text-invert: var(--aw-gray-0);
+
+  --aw-color-border: rgba(208, 215, 222, 0.9);
+  --aw-color-border-strong: rgba(175, 184, 193, 0.95);
+  --aw-color-hairline: var(--aw-gray-3);
+  --aw-color-hairline-light: rgba(1, 4, 9, 0.1);
+
+  --aw-color-accent: var(--aw-purple-6);
+  --aw-color-accent-low: var(--aw-purple-1);
+  --aw-color-accent-high: var(--aw-purple-8);
+  --aw-color-accent-text: var(--aw-purple-7);
+  --aw-accent-rgb: 130, 80, 223;
+
+  --aw-color-callout-preview-text: var(--aw-amber-9);
+
+  --aw-shadow: 0 18px 42px rgba(31, 35, 40, 0.08);
+
+  --aw-ramp-1: var(--aw-gray-13);
+  --aw-ramp-2: var(--aw-gray-8);
+  --aw-ramp-3: var(--aw-gray-6);
+  --aw-ramp-4: var(--aw-gray-5);
+  --aw-ramp-5: var(--aw-gray-3);
+  --aw-ramp-6: var(--aw-gray-2);
+  --aw-ramp-7: var(--aw-gray-0);
+}
+
+/* 3. Starlight mapping --------------------------------------------------- */
+
+:root,
+:root[data-theme='light'] {
+  --sl-font: var(--aw-font-sans);
+  --sl-font-mono: var(--aw-font-mono);
+
+  --sl-color-accent-low: var(--aw-color-accent-low);
+  --sl-color-accent: var(--aw-color-accent);
+  --sl-color-accent-high: var(--aw-color-accent-high);
+  --sl-color-text-accent: var(--aw-color-accent-text);
+
+  --sl-color-white: var(--aw-color-text-strong);
+  --sl-color-gray-1: var(--aw-ramp-1);
+  --sl-color-gray-2: var(--aw-ramp-2);
+  --sl-color-gray-3: var(--aw-ramp-3);
+  --sl-color-gray-4: var(--aw-ramp-4);
+  --sl-color-gray-5: var(--aw-ramp-5);
+  --sl-color-gray-6: var(--aw-ramp-6);
+  --sl-color-gray-7: var(--aw-ramp-7);
+  --sl-color-black: var(--aw-ramp-7);
+
+  --sl-color-hairline: var(--aw-color-hairline);
+  --sl-color-hairline-light: var(--aw-color-hairline-light);
+
+  --sl-color-text: var(--aw-color-text);
+  --sl-color-text-invert: var(--aw-color-text-invert);
+}
+
+/* Legacy aliases — kept so existing rules keep working until step 2 migrates them. */
+:root {
+  --aw-bg-page: var(--aw-color-bg);
+  --aw-bg-subtle: var(--aw-color-bg-subtle);
+  --aw-bg-elevated: var(--aw-color-bg-raised);
+  --aw-bg-overlay: var(--aw-color-bg-overlay);
+  --aw-border: var(--aw-color-border);
+  --aw-border-strong: var(--aw-color-border-strong);
+  --aw-text-muted: var(--aw-color-text-muted);
+  --aw-callout-preview-text: var(--aw-color-callout-preview-text);
+}
