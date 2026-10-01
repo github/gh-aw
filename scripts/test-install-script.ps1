@@ -14,8 +14,9 @@ if (-not $Inner) {
 
     $oldHome = $env:HOME
     $oldUserProfile = $env:USERPROFILE
+    $oldGhToken = $env:GH_TOKEN
     try {
-        foreach ($testCase in @("channel-page-and-semver", "channel-no-v1-release", "exact-tag", "default-latest")) {
+        foreach ($testCase in @("channel-page-and-semver", "channel-no-v1-release", "exact-tag", "gh-install-metadata-tag", "default-latest")) {
             if ($testCase -eq "channel-no-v1-release") {
                 $binaryName = if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) { "gh-aw.exe" } else { "gh-aw" }
                 $existingBinary = Join-Path $installDir $binaryName
@@ -25,6 +26,7 @@ if (-not $Inner) {
 
             $env:HOME = $homePath
             $env:USERPROFILE = $homePath
+            $env:GH_TOKEN = if ($testCase -eq "channel-page-and-semver") { "test-token" } else { "" }
             $env:TEST_API_LOG = Join-Path $testRoot "$testCase-api.log"
             $env:TEST_PROCESS_LOG = Join-Path $testRoot "$testCase-process.log"
             Remove-Item $env:TEST_API_LOG, $env:TEST_PROCESS_LOG -Force -ErrorAction SilentlyContinue
@@ -53,6 +55,10 @@ if (-not $Inner) {
                     if (Test-Path $env:TEST_API_LOG) { throw "PowerShell queried the Releases API for an exact tag" }
                     if ((Get-Content $env:TEST_PROCESS_LOG -Raw) -notmatch "--pin v0\.37\.18") { throw "PowerShell gh install did not use the exact tag" }
                 }
+                "gh-install-metadata-tag" {
+                    if ($output -notmatch "Successfully installed gh-aw using gh extension install") { throw "PowerShell gh extension install rejected a matching version with build metadata`n$output" }
+                    if ((Get-Content $env:TEST_PROCESS_LOG -Raw) -notmatch "--pin v0\.37\.18\+build\.1") { throw "PowerShell gh install did not use the metadata-bearing tag" }
+                }
                 "default-latest" {
                     if ($output -notmatch "No version specified, using 'latest'") { throw "PowerShell omitted-version default was not latest`n$output" }
                     if ($output -notmatch "Download URL: https://github\.com/github/gh-aw/releases/latest/download/") { throw "PowerShell latest download behavior changed`n$output" }
@@ -66,6 +72,7 @@ if (-not $Inner) {
     } finally {
         $env:HOME = $oldHome
         $env:USERPROFILE = $oldUserProfile
+        $env:GH_TOKEN = $oldGhToken
         Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
     exit 0
@@ -75,21 +82,27 @@ $global:TestCaseName = $CaseName
 $global:PageOne = [System.Collections.Generic.List[object]]::new()
 if ($CaseName -eq "channel-page-and-semver") {
     for ($patch = 0; $patch -lt 97; $patch++) {
-        $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.0.$patch"; prerelease = $false })
+        $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.0.$patch"; draft = $false; prerelease = $false })
     }
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.9.0"; prerelease = $false })
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.99.0-rc.1"; prerelease = $true })
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.99.0"; prerelease = $false })
-    $global:PageTwo = @([pscustomobject]@{ tag_name = "v0.10.0"; prerelease = $false })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.9.0"; draft = $false; prerelease = $false })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.99.0-rc.1"; draft = $false; prerelease = $true })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.20.0"; draft = $true; prerelease = $false })
+    $global:PageTwo = @([pscustomobject]@{ tag_name = "v0.10.0"; draft = $false; prerelease = $false })
 } elseif ($CaseName -eq "channel-no-v1-release") {
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.37.18"; prerelease = $false })
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.0.0-rc.1"; prerelease = $true })
-    $global:PageOne.Add([pscustomobject]@{ tag_name = "v2.0.0"; prerelease = $false })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v0.37.18"; draft = $false; prerelease = $false })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.0.0-rc.1"; draft = $false; prerelease = $true })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v1.99.0"; draft = $true; prerelease = $false })
+    $global:PageOne.Add([pscustomobject]@{ tag_name = "v2.0.0"; draft = $false; prerelease = $false })
 }
 
 function Invoke-RestMethod {
     param([string]$Uri, [hashtable]$Headers, [int]$TimeoutSec)
 
+    if ($Uri -match "/releases\?") {
+        if ($Headers.Accept -ne "application/vnd.github+json") { throw "Missing GitHub API Accept header" }
+        if ($Headers["X-GitHub-Api-Version"] -ne "2022-11-28") { throw "Missing GitHub API version header" }
+        if ($env:GH_TOKEN -and $Headers.Authorization -ne ("Bearer " + $env:GH_TOKEN)) { throw "Missing GH_TOKEN authorization header" }
+    }
     Add-Content -Path $env:TEST_API_LOG -Value $Uri
     if ($Uri.EndsWith("page=1")) {
         return $global:PageOne.ToArray()
@@ -129,7 +142,16 @@ function Start-Process {
     )
 
     Add-Content -Path $env:TEST_PROCESS_LOG -Value "$FilePath $($ArgumentList -join ' ')"
-    $process = [pscustomobject]@{ ExitCode = 1 }
+    $exitCode = 1
+    if ($global:TestCaseName -eq "gh-install-metadata-tag") {
+        if ($ArgumentList -contains "version") {
+            Set-Content -Path $RedirectStandardOutput -Value "gh aw version v0.37.18"
+            $exitCode = 0
+        } elseif ($ArgumentList -contains "install") {
+            $exitCode = 0
+        }
+    }
+    $process = [pscustomobject]@{ ExitCode = $exitCode }
     $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value { return $true }
     return $process
 }
@@ -139,6 +161,7 @@ switch ($CaseName) {
     "channel-page-and-semver" { $env:INPUT_VERSION = "v0"; & $InstallerPath }
     "channel-no-v1-release" { $env:INPUT_VERSION = "v1"; & $InstallerPath }
     "exact-tag" { $env:INPUT_VERSION = "v0.37.18"; & $InstallerPath }
+    "gh-install-metadata-tag" { $env:INPUT_VERSION = "v0.37.18+build.1"; & $InstallerPath }
     "default-latest" { & $InstallerPath }
     default { throw "Unknown PowerShell installer test case: $CaseName" }
 }

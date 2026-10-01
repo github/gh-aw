@@ -205,7 +205,7 @@ EOF
 )
 
 emit_release() {
-    printf '  {\n    "tag_name": "%s",\n    "prerelease": %s\n  }' "$1" "$2"
+    printf '  {\n    "tag_name": "%s",\n    "draft": %s,\n    "prerelease": %s\n  }' "$1" "${3:-false}" "$2"
 }
 
 test_version_resolution() (
@@ -240,7 +240,7 @@ test_version_resolution() (
                 printf ',\n'
                 emit_release "v0.99.0-rc.1" true
                 printf ',\n'
-                emit_release "v1.99.0" false
+                emit_release "v0.20.0" false true
                 printf '\n]\n'
             } > "$case_root/releases/page-1.json"
             {
@@ -258,12 +258,18 @@ test_version_resolution() (
                 printf ',\n'
                 emit_release "v1.0.0-rc.1" true
                 printf ',\n'
+                emit_release "v1.99.0" false true
+                printf ',\n'
                 emit_release "v2.0.0" false
                 printf '\n]\n'
             } > "$case_root/releases/page-1.json"
             ;;
         exact-tag)
             requested_version="v0.37.18"
+            expected_tag="$requested_version"
+            ;;
+        gh-install-metadata-tag)
+            requested_version="v0.37.18+build.1"
             expected_tag="$requested_version"
             ;;
         *)
@@ -286,6 +292,28 @@ test_version_resolution() (
 #!/bin/bash
 set -e
 url="${!#}"
+if [[ "$url" == https://api.github.com/repos/github/gh-aw/releases\?* ]]; then
+    has_header() {
+        local expected_header=$1
+        shift
+        while [ "$#" -gt 0 ]; do
+            if [ "$1" = "-H" ] || [ "$1" = "--header" ]; then
+                shift
+                [ "$1" = "$expected_header" ] && return 0
+            fi
+            shift
+        done
+        return 1
+    }
+    has_header "Accept: application/vnd.github+json" "$@" || { echo "missing GitHub API Accept header" >&2; exit 1; }
+    has_header "User-Agent: gh-aw-install-gh-aw.sh" "$@" || { echo "missing GitHub API User-Agent header" >&2; exit 1; }
+    has_header "X-GitHub-Api-Version: 2022-11-28" "$@" || { echo "missing GitHub API version header" >&2; exit 1; }
+    if [ "$FIXTURE_EXPECT_GH_TOKEN" = true ]; then
+        expected_authorization="Authorization: Bearer "
+        expected_authorization+="$GH_TOKEN"
+        has_header "$expected_authorization" "$@" || { echo "missing GH_TOKEN authorization header" >&2; exit 1; }
+    fi
+fi
 case "$url" in
     https://api.github.com/repos/github/gh-aw/releases\?per_page=100\&page=*)
         page="${url##*page=}"
@@ -312,6 +340,17 @@ EOF
     cat > "$fixture_bin/gh" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$GH_ARGUMENT_LOG"
+if [ "$FIXTURE_GH_INSTALL_SUCCESS" = true ]; then
+    case "$*" in
+        "aw version")
+            echo "gh aw version $FIXTURE_INSTALLED_VERSION"
+            exit 0
+            ;;
+        "extension install "*)
+            exit 0
+            ;;
+    esac
+fi
 exit 1
 EOF
     cat > "$fixture_bin/sleep" <<'EOF'
@@ -331,6 +370,10 @@ EOF
         FIXTURE_BINARY="$asset" \
         FIXTURE_CHECKSUMS="$checksums" \
         FIXTURE_RELEASES_DIR="$case_root/releases" \
+        FIXTURE_EXPECT_GH_TOKEN="$([ "$case_name" = channel-page-and-semver ] && echo true || echo false)" \
+        GH_TOKEN="$([ "$case_name" = channel-page-and-semver ] && echo test-token || echo '')" \
+        FIXTURE_GH_INSTALL_SUCCESS="$([ "$case_name" = gh-install-metadata-tag ] && echo true || echo false)" \
+        FIXTURE_INSTALLED_VERSION="v0.37.18" \
         GH_ARGUMENT_LOG="$gh_log" \
         bash "$INSTALLER_PATH" > "$output" 2>&1; then
         [ "$case_name" != channel-no-v1-release ] || fail "v1 without a stable release unexpectedly succeeded"
@@ -346,6 +389,10 @@ EOF
             fail "missing stable channel did not produce a clear error"
         cmp "$binary_path" "$case_root/old-bytes" || fail "missing channel changed the existing binary"
         [ ! -s "$gh_log" ] || fail "gh extension install ran before channel resolution"
+    elif [ "$case_name" = gh-install-metadata-tag ]; then
+        grep -q "Successfully installed gh-aw using gh extension install" "$output" ||
+            fail "gh extension install rejected a matching version with build metadata"
+        grep -q -- "--pin $expected_tag" "$gh_log" || fail "gh extension install did not use the metadata-bearing tag"
     else
         grep -q -- "--pin $expected_tag" "$gh_log" || fail "gh extension install did not use resolved/exact tag"
         [ "$("$binary_path" version)" = "gh aw version $expected_tag" ] ||
@@ -369,7 +416,7 @@ fi
 for case_name in dangling-symlink live-symlink partial-download checksum-mismatch invalid-binary directory-conflict; do
     test_manual_binary_replacement "$case_name"
 done
-for case_name in channel-page-and-semver channel-no-v1-release exact-tag; do
+for case_name in channel-page-and-semver channel-no-v1-release exact-tag gh-install-metadata-tag; do
     test_version_resolution "$case_name"
 done
 

@@ -172,7 +172,7 @@ function Resolve-MajorVersionChannel {
         }
 
         foreach ($release in $releases) {
-            if ($release.prerelease) {
+            if ($release.draft -or $release.prerelease) {
                 continue
             }
 
@@ -309,7 +309,7 @@ if ($TryGhInstall -and (Get-Command gh -ErrorAction SilentlyContinue)) {
             if (-not $installedVersion) {
                 Write-WarningMessage "gh extension install completed but the installed gh-aw version could not be determined"
                 Write-Info "Falling back to manual installation..."
-            } elseif ($Version -ne "latest" -and $installedVersion -ne $Version) {
+            } elseif ($Version -ne "latest" -and $installedVersion -ne ($Version -replace '\+.*$', '')) {
                 Write-WarningMessage "Version mismatch: requested $Version but gh extension install installed $installedVersion"
                 Write-Info "Falling back to manual installation to install the correct version..."
             } else {

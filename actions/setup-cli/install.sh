@@ -222,7 +222,13 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
 
     while :; do
         RELEASES_URL="https://api.github.com/repos/$REPO/releases?per_page=$PER_PAGE&page=$PAGE"
-        if ! RELEASES_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "$RELEASES_URL"); then
+        RELEASES_CURL_ARGS=(-sLf --connect-timeout 15 --max-time 30 -H "Accept: application/vnd.github+json" -H "User-Agent: gh-aw-install-gh-aw.sh" -H "X-GitHub-Api-Version: 2022-11-28")
+        if [ -n "${GH_TOKEN:-}" ]; then
+            AUTHORIZATION_HEADER="Authorization: Bearer "
+            AUTHORIZATION_HEADER+="$GH_TOKEN"
+            RELEASES_CURL_ARGS+=(-H "$AUTHORIZATION_HEADER")
+        fi
+        if ! RELEASES_RESPONSE=$(curl "${RELEASES_CURL_ARGS[@]}" "$RELEASES_URL"); then
             print_error "Failed to resolve stable releases for version channel $VERSION from GitHub API."
             exit 1
         fi
@@ -233,21 +239,27 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
                 sub(/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"/, "", tag)
                 sub(/".*$/, "", tag)
             }
+            /^[[:space:]]*"draft"[[:space:]]*:/ {
+                draft = $0
+                sub(/^[[:space:]]*"draft"[[:space:]]*:[[:space:]]*/, "", draft)
+                sub(/[,[:space:]].*$/, "", draft)
+            }
             /^[[:space:]]*"prerelease"[[:space:]]*:/ {
                 prerelease = $0
                 sub(/^[[:space:]]*"prerelease"[[:space:]]*:[[:space:]]*/, "", prerelease)
                 sub(/[,[:space:]].*$/, "", prerelease)
                 if (tag != "") {
-                    print tag, prerelease
+                    print tag, draft, prerelease
                     tag = ""
+                    draft = ""
                 }
             }
         ')
         PAGE_RELEASE_COUNT=$(printf '%s\n' "$RELEASE_RECORDS" | awk 'NF { count++ } END { print count+0 }')
 
-        while IFS=' ' read -r release_tag prerelease; do
+        while IFS=' ' read -r release_tag draft prerelease; do
             [ -n "$release_tag" ] || continue
-            if [ "$prerelease" != false ]; then
+            if [ "$draft" != false ] || [ "$prerelease" != false ]; then
                 continue
             fi
             if [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]] &&
@@ -319,7 +331,8 @@ if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
                 print_info "Falling back to manual installation..."
             else
                 # Verify the installed version matches the requested version (if specific version was requested)
-                if [ "$VERSION" != "latest" ] && [ "$INSTALLED_VERSION" != "$VERSION" ]; then
+                REQUESTED_VERSION="${VERSION%%+*}"
+                if [ "$VERSION" != "latest" ] && [ "$INSTALLED_VERSION" != "$REQUESTED_VERSION" ]; then
                     print_warning "Version mismatch: requested $VERSION but gh extension install installed $INSTALLED_VERSION"
                     print_info "Falling back to manual installation to install the correct version..."
                 else
