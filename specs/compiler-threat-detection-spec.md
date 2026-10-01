@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.41
+**Version**: 1.0.42
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.42` | `v0.87.9` | Audit-only; same-repository bot PR checkout authorization is a runtime trust control governed by the security architecture specification, not a new compiler threat rule. |
 | `1.0.41` | `v0.87.9` | Adds CTR-031; private-to-public flow opt-outs are rejected in strict mode and warned in non-strict mode because they can expose private data through public logs or destinations. |
 | `1.0.40` | `v0.87.9` | Adds CTR-030; activation sparse checkouts use the PR base SHA for pull-request and review events before loading runtime imports or skills. |
 | `1.0.38` | `v0.87.9` | Audit-only; safe-outputs workspace checkout discovery is a runtime trust boundary governed by the safe-outputs and checkout-behavior specifications, not a new CTR rule. |
@@ -56,6 +57,8 @@ Each version maps to the minimum compatible binary. A version change MUST update
 Generated workflows run with elevated permissions and consume untrusted content (issues, PRs, comments, external tool output). The catalog in Section 5 groups the threats a conforming compiler MUST detect into five classes: unauthorized privilege or scope expansion, unsafe or bypassed sandboxing, injection (template, shell, or subprocess argument), unsafe output and supply-chain routes, and compile-time drift between manifests, mappings, and the rules that reference them. Each class maps to one or more `CTR-*` rules with a stable trigger and compiler action.
 
 Runtime trust boundaries inside the agent workspace are out of scope for this specification. In particular, the safe-outputs repository checkout discovery path (`actions/setup/js/find_repo_checkout.cjs`) resolves an `owner/repo` target from agent-writable workspace state; its normative controls — manifest precedence, workspace confinement, per-invocation `safe.directory` scoping, read-only discovery, remote host constraint, and deferred durable trust — are specified as Threat T7 and requirements RCR1–RCR7 in the Safe Outputs MCP Gateway Specification and as §3.5 of the Checkout Behavior Specification. A conforming compiler is not required to detect this class, because the compiler emits no generated-workflow construct that selects the checkout directory.
+
+PR-branch checkout authorization in `actions/setup/js/checkout_pr_branch.cjs` is also a runtime trust control, not a compiler-detectable threat. Its same-repository bot exception is limited to `pull_request` and `pull_request_target` `opened` or `synchronize` events where the bot sender matches the actor and the runtime, PR head, and PR base repository IDs match. Forks, unverifiable identities, and other event types or actions retain the collaborator-permission check. The normative requirements are in the Security Architecture Specification, RS-05a; this control does not add a `CTR-*` rule.
 
 Sandbox bypass includes the provenance of the agent's own configuration. On pull-request triggers the workspace holds head-branch content that the PR author controls, so agent configuration folders and root instruction files are attacker-controlled inputs until the generated job replaces them with the base-branch snapshot captured before that content was checked out.
 
