@@ -354,7 +354,7 @@ header::after {
   overflow-wrap: anywhere;
 }
 
-.sl-markdown-content td code:not(pre code) {
+.sl-markdown-content td:not(.not-content *) code:not(pre code) {
   white-space: nowrap;
   overflow-wrap: normal;
 }
@@ -376,7 +376,7 @@ header::after {
 }
 
 /* Tables - Desktop styles (open table: no outer border, hairline row dividers) */
-.sl-markdown-content table {
+.sl-markdown-content table:not(.not-content *) {
   width: 100%;
   max-width: 100%;
   table-layout: auto;
@@ -384,7 +384,7 @@ header::after {
   border-collapse: collapse;
 }
 
-.sl-markdown-content th {
+.sl-markdown-content th:not(.not-content *) {
   background-color: transparent;
   border-bottom: 1px solid var(--aw-color-border);
   color: var(--aw-color-text-secondary);
@@ -396,7 +396,7 @@ header::after {
   padding: 0.625rem 1rem;
 }
 
-.sl-markdown-content td {
+.sl-markdown-content td:not(.not-content *) {
   border-bottom: 1px solid var(--aw-color-hairline-light);
   color: var(--aw-color-text-body);
   font-size: var(--aw-step-0);
@@ -405,29 +405,29 @@ header::after {
   padding: 0.75rem 1rem;
 }
 
-.sl-markdown-content th:first-child,
-.sl-markdown-content td:first-child {
+.sl-markdown-content th:not(.not-content *):first-child,
+.sl-markdown-content td:not(.not-content *):first-child {
   padding-inline-start: 0;
 }
 
-.sl-markdown-content tbody tr:last-child td {
+.sl-markdown-content tbody:not(.not-content *) tr:last-child td {
   border-bottom: none;
 }
 
-.sl-markdown-content tbody tr:hover {
+.sl-markdown-content tbody:not(.not-content *) tr:hover {
   background-color: transparent;
 }
 
 /* Tables - Responsive card layout for mobile */
 @media (max-width: 640px) {
-  .sl-markdown-content table {
+  .sl-markdown-content table:not(.not-content *) {
     border: none;
     border-radius: 0;
     display: block;
   }
 
   /* Visually hide thead while keeping it accessible to screen readers */
-  .sl-markdown-content thead {
+  .sl-markdown-content thead:not(.not-content *) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -440,11 +440,11 @@ header::after {
   }
 
   /* Display each row as a card */
-  .sl-markdown-content tbody {
+  .sl-markdown-content tbody:not(.not-content *) {
     display: block;
   }
 
-  .sl-markdown-content tbody tr {
+  .sl-markdown-content tbody:not(.not-content *) tr {
     display: block;
     margin-bottom: 1rem;
     border: 1px solid var(--aw-color-border);
@@ -454,7 +454,7 @@ header::after {
   }
 
   /* Display each cell as a row within the card */
-  .sl-markdown-content td {
+  .sl-markdown-content td:not(.not-content *) {
     display: block;
     padding: 0.5rem 0;
     border: none;
@@ -462,22 +462,22 @@ header::after {
     padding-left: 0;
   }
 
-  .sl-markdown-content td:first-child {
+  .sl-markdown-content td:not(.not-content *):first-child {
     padding-top: 0;
     padding-inline-start: 0;
   }
 
-  .sl-markdown-content td code:not(pre code) {
+  .sl-markdown-content td:not(.not-content *) code:not(pre code) {
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
-  .sl-markdown-content td:last-child {
+  .sl-markdown-content td:not(.not-content *):last-child {
     padding-bottom: 0;
   }
 
   /* Label above the value, both left-aligned */
-  .sl-markdown-content td::before {
+  .sl-markdown-content td:not(.not-content *)::before {
     content: attr(data-label);
     display: block;
     margin-bottom: 0.125rem;
@@ -488,11 +488,11 @@ header::after {
   }
 
   /* Fallback: if data-label is not present, just display cells stacked */
-  .sl-markdown-content td:not([data-label])::before {
+  .sl-markdown-content td:not(.not-content *):not([data-label])::before {
     content: '';
   }
 
-  .sl-markdown-content td:not([data-label]) {
+  .sl-markdown-content td:not(.not-content *):not([data-label]) {
     text-align: left;
   }
 }
@@ -553,8 +553,8 @@ nav a[aria-current="page"] {
 }
 
 /* Buttons */
-.sl-markdown-content button:not(.expressive-code *),
-.sl-markdown-content .button,
+.sl-markdown-content button:not(.expressive-code *, .not-content *),
+.sl-markdown-content .button:not(.not-content *),
 a.button {
   background: var(--aw-color-bg-subtle);
   border: 1px solid var(--aw-color-border-strong);
@@ -564,8 +564,8 @@ a.button {
   transition: border-color 0.2s ease;
 }
 
-.sl-markdown-content button:not(.expressive-code *):hover,
-.sl-markdown-content .button:hover,
+.sl-markdown-content button:not(.expressive-code *, .not-content *):hover,
+.sl-markdown-content .button:not(.not-content *):hover,
 a.button:hover {
   border-color: rgba(var(--aw-accent-rgb), 0.45);
 }
