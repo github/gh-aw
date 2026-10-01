@@ -403,3 +403,45 @@ func TestExpandLocalWildcard(t *testing.T) {
 		assert.Nil(t, result, "result should be nil when nothing matches")
 	})
 }
+
+func TestCheckWorkflowHasDispatchFromContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name:    "mapping",
+			content: "---\non:\n  workflow_dispatch:\n---\n",
+			want:    true,
+		},
+		{
+			name:    "sequence",
+			content: "---\non: [push, workflow_dispatch]\n---\n",
+			want:    true,
+		},
+		{
+			name:    "scalar",
+			content: "---\non: workflow_dispatch\n---\n",
+			want:    true,
+		},
+		{
+			name:    "no dispatch",
+			content: "---\non: push\n---\n",
+			want:    false,
+		},
+		{
+			name:    "invalid frontmatter",
+			content: "---\non: [\n---\n",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := checkWorkflowHasDispatchFromContent(tt.content); got != tt.want {
+				t.Errorf("checkWorkflowHasDispatchFromContent() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
