@@ -422,6 +422,14 @@ func hasSafeOutputType(config *SafeOutputsConfig, key string) bool {
 	return hasSafeOutputFieldSet(config, handler.StructField)
 }
 
+func mergeAutoDefaultedSafeOutput[T any](result **T, imported *T, config, topRawSafeOutputs map[string]any, key string) {
+	_, hasImported := config[key]
+	_, hasMain := topRawSafeOutputs[key]
+	if (hasImported || (*result == nil && !hasMain)) && imported != nil {
+		*result = imported
+	}
+}
+
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
 //
 //nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
@@ -486,26 +494,10 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 	// if the import explicitly carries the key, its value wins over any auto-default in result.
 	// The nil fallback applies only when the main workflow did not explicitly configure
 	// the type (an explicit false also produces nil in the parsed result).
-	_, hasMissingTool := config["missing-tool"]
-	_, mainHasMissingTool := topRawSafeOutputs["missing-tool"]
-	if (hasMissingTool || (result.MissingTool == nil && !mainHasMissingTool)) && importedConfig.MissingTool != nil {
-		result.MissingTool = importedConfig.MissingTool
-	}
-	_, hasMissingData := config["missing-data"]
-	_, mainHasMissingData := topRawSafeOutputs["missing-data"]
-	if (hasMissingData || (result.MissingData == nil && !mainHasMissingData)) && importedConfig.MissingData != nil {
-		result.MissingData = importedConfig.MissingData
-	}
-	_, hasNoop := config["noop"]
-	_, mainHasNoop := topRawSafeOutputs["noop"]
-	if (hasNoop || (result.NoOp == nil && !mainHasNoop)) && importedConfig.NoOp != nil {
-		result.NoOp = importedConfig.NoOp
-	}
-	_, hasReportIncomplete := config["report-incomplete"]
-	_, mainHasReportIncomplete := topRawSafeOutputs["report-incomplete"]
-	if (hasReportIncomplete || (result.ReportIncomplete == nil && !mainHasReportIncomplete)) && importedConfig.ReportIncomplete != nil {
-		result.ReportIncomplete = importedConfig.ReportIncomplete
-	}
+	mergeAutoDefaultedSafeOutput(&result.MissingTool, importedConfig.MissingTool, config, topRawSafeOutputs, "missing-tool")
+	mergeAutoDefaultedSafeOutput(&result.MissingData, importedConfig.MissingData, config, topRawSafeOutputs, "missing-data")
+	mergeAutoDefaultedSafeOutput(&result.NoOp, importedConfig.NoOp, config, topRawSafeOutputs, "noop")
+	mergeAutoDefaultedSafeOutput(&result.ReportIncomplete, importedConfig.ReportIncomplete, config, topRawSafeOutputs, "report-incomplete")
 	// ThreatDetection is also auto-defaulted by extractSafeOutputsConfig; apply the same
 	// pattern — the import's explicit threat-detection key takes precedence over the result's
 	// auto-default empty struct (which is not user-authored). If the main workflow explicitly
