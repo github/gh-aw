@@ -309,6 +309,37 @@ func TestBuiltinLedgerTools(t *testing.T) {
 		"ledger_work_pool_finish", "ledger_work_pool_abandon"} {
 		require.True(t, names[name], name)
 	}
+	var mapPutTool map[string]any
+	for _, tool := range meta.DynamicTools {
+		if tool["name"] == "ledger_map_put" {
+			mapPutTool = tool
+			break
+		}
+	}
+	require.NotNil(t, mapPutTool)
+	schema := mapPutTool["inputSchema"].(map[string]any)
+	properties := schema["properties"].(map[string]any)
+	ledgerProperty := properties["ledger"].(map[string]any)
+	require.Equal(t, []any{"cache"}, ledgerProperty["enum"])
+	require.NotContains(t, schema["required"], "ledger")
+
+	config.Ledgers = append(config.Ledgers, LedgerConfig{Name: "archive", Type: "map"})
+	metaJSON, err = generateToolsMetaJSON(data, "")
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
+	for _, tool := range meta.DynamicTools {
+		if tool["name"] == "ledger_map_put" {
+			mapPutTool = tool
+			break
+		}
+	}
+	require.NotNil(t, mapPutTool)
+	schema = mapPutTool["inputSchema"].(map[string]any)
+	properties = schema["properties"].(map[string]any)
+	ledgerProperty = properties["ledger"].(map[string]any)
+	require.Equal(t, []any{"archive", "cache"}, ledgerProperty["enum"])
+	require.Contains(t, schema["required"], "ledger")
+
 	require.NotContains(t, computeEnabledToolNames(data), "ledger_append")
 
 	config.Ledgers = append(config.Ledgers, LedgerConfig{Name: "events", Type: "log"})

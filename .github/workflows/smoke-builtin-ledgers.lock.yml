@@ -604,7 +604,10 @@ jobs:
                         "type": "string"
                       },
                       "ledger": {
-                        "description": "Target ledger name; optional when there is only one ledger of this type.",
+                        "description": "Target ledger name; optional when there is only one ledger of this type, required otherwise.",
+                        "enum": [
+                          "map"
+                        ],
                         "type": "string"
                       },
                       "temp_id": {
@@ -632,7 +635,10 @@ jobs:
                         "type": "string"
                       },
                       "ledger": {
-                        "description": "Target ledger name; optional when there is only one ledger of this type.",
+                        "description": "Target ledger name; optional when there is only one ledger of this type, required otherwise.",
+                        "enum": [
+                          "map"
+                        ],
                         "type": "string"
                       },
                       "temp_id": {

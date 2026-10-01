@@ -37,9 +37,12 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 	var dynamicTools []map[string]any
 
 	if data.LedgerConfig != nil {
-		types := make(map[string]struct{})
+		ledgerNamesByType := make(map[string][]string)
 		for _, ledger := range data.LedgerConfig.Ledgers {
-			types[ledger.Type] = struct{}{}
+			ledgerNamesByType[ledger.Type] = append(ledgerNamesByType[ledger.Type], ledger.Name)
+		}
+		for ledgerType := range ledgerNamesByType {
+			slices.Sort(ledgerNamesByType[ledgerType])
 		}
 		for _, spec := range []struct {
 			name, ledgerType, operation, field string
@@ -54,14 +57,18 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 			{"ledger_work_pool_finish", "work-pool", "finish", "result", false},
 			{"ledger_work_pool_abandon", "work-pool", "abandon", "reason", false},
 		} {
-			if _, enabled := types[spec.ledgerType]; !enabled {
+			ledgerNames := ledgerNamesByType[spec.ledgerType]
+			if len(ledgerNames) == 0 {
 				continue
 			}
 			properties := map[string]any{
-				"ledger":  map[string]any{"type": "string", "description": "Target ledger name; optional when there is only one ledger of this type."},
+				"ledger":  map[string]any{"type": "string", "description": "Target ledger name; optional when there is only one ledger of this type, required otherwise.", "enum": ledgerNames},
 				"temp_id": map[string]any{"type": "string", "description": "Optional temporary ID for same-batch references."},
 			}
 			required := []string{}
+			if len(ledgerNames) > 1 {
+				required = append(required, "ledger")
+			}
 			if spec.ledgerType == "map" {
 				properties["key"] = map[string]any{"type": "string"}
 				required = append(required, "key")
