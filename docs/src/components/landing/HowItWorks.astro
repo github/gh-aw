@@ -216,8 +216,8 @@ Label new issues by type and priority.</pre>
   }
   .aw-step p {
     margin: 0.375rem 0 0;
-    max-width: 32ch;
-    font-size: var(--aw-step--1);
+    max-width: 36ch;
+    font-size: var(--aw-step-0);
     line-height: 1.55;
     color: var(--aw-color-text-muted);
     text-wrap: pretty;
@@ -241,7 +241,7 @@ Label new issues by type and priority.</pre>
   .aw-importable {
     margin: 0;
     text-align: center;
-    font-size: var(--aw-step--1);
+    font-size: var(--aw-step-0);
     color: var(--aw-color-text-muted);
   }
   .aw-importable {
@@ -257,15 +257,8 @@ Label new issues by type and priority.</pre>
   .aw-engine-list li {
     margin: 0;
     padding: 0;
-    /* hairlines between cells: right + bottom, trimmed at the edges below */
-    border-right: 1px solid var(--aw-color-border);
-    border-bottom: 1px solid var(--aw-color-border);
-  }
-  .aw-engine-list li:nth-child(2n) {
-    border-right: 0;
   }
   .aw-engine-list li:last-child {
-    border-bottom: 0;
     grid-column: 1 / -1;
   }
   .aw-engine-list a {
@@ -325,13 +318,7 @@ Label new issues by type and priority.</pre>
     .aw-engine-list {
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
-    .aw-engine-list li,
-    .aw-engine-list li:nth-child(2n) {
-      border-right: 1px solid var(--aw-color-border);
-      border-bottom: 0;
-    }
     .aw-engine-list li:last-child {
-      border-right: 0;
       grid-column: auto;
     }
   }
