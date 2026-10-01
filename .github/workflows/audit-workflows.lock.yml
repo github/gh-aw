@@ -809,19 +809,37 @@ jobs:
               "ledger_append": {
                 "defaultMax": 100,
                 "fields": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
                   "ledger": {
                     "type": "string",
                     "sanitize": true,
                     "maxLength": 64
                   },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "operation": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "patch": {
+                    "type": "object"
+                  },
                   "record": {
-                    "required": true,
                     "type": "object"
                   },
                   "temp_id": {
                     "type": "string",
                     "pattern": "^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
-                  }
+                  },
+                  "value": {}
                 }
               },
               "ledger_request_compaction": {

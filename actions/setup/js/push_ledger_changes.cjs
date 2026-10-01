@@ -314,6 +314,17 @@ async function main(options = {}) {
       reconciled: persisted.reconciled,
       rejected: 0,
       branch: `ledgers/${config.name}`,
+      ...(config.type
+        ? {
+            type: config.type,
+            transactions: appends.map(append => ({
+              id: append.record.id,
+              transaction_id: append.transaction_id,
+              operation: append.record.operation,
+              validated: true,
+            })),
+          }
+        : {}),
     };
   }
   if (options.outputFile === undefined ? process.env.GITHUB_OUTPUT : options.outputFile) {

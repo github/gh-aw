@@ -218,18 +218,38 @@ test("compaction preserves replay's ordered logical history", () => {
 });
 
 for (const [type, transactions] of Object.entries({
-  set: [{ operation: "add", value: "a" }, { operation: "remove", value: "a" }, { operation: "add", value: "a" }],
-  map: [{ operation: "put", key: "a", value: 1 }, { operation: "put", key: "a", value: 2 }, { operation: "delete", key: "missing" }],
-  counter: [{ operation: "increment", name: "a", amount: 3 }, { operation: "increment", name: "a", amount: 5 }, { operation: "decrement", name: "a", amount: 2 }],
+  set: [
+    { operation: "add", value: "a" },
+    { operation: "remove", value: "a" },
+    { operation: "add", value: "a" },
+  ],
+  map: [
+    { operation: "put", key: "a", value: 1 },
+    { operation: "put", key: "a", value: 2 },
+    { operation: "delete", key: "missing" },
+  ],
+  counter: [
+    { operation: "increment", name: "a", amount: 3 },
+    { operation: "increment", name: "a", amount: 5 },
+    { operation: "decrement", name: "a", amount: 2 },
+  ],
 })) {
   test(`${type} replay is unchanged by trusted lossless compaction`, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `ledger-${type}-compact-`));
     fs.mkdirSync(root, { recursive: true });
     const config = { name: type, type };
-    const compaction = parseCompactionConfig(Buffer.from(JSON.stringify({
-      name: type, branch_name: `ledgers/${type}`, max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10,
-      compaction: { min_segments: 2, max_segments: 2 },
-    })).toString("base64"));
+    const compaction = parseCompactionConfig(
+      Buffer.from(
+        JSON.stringify({
+          name: type,
+          branch_name: `ledgers/${type}`,
+          max_record_kb: 32,
+          max_segment_kb: 100,
+          max_patch_kb: 10,
+          compaction: { min_segments: 2, max_segments: 2 },
+        })
+      ).toString("base64")
+    );
     const writers = [];
     try {
       for (const payload of transactions) {

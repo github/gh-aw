@@ -18,8 +18,8 @@ function finalId(transactionId, index) {
 
 /**
  * Normalize safe-output ledger append requests without touching canonical state.
- * @param {Array<{ledger?: string, temp_id?: string, record: object}>} requests
- * @param {{transactionId: string, ledgerNames: Set<string>, ledgers?: Record<string, {schema?: object, max_record_kb?: number, max_patch_kb?: number}>}} options
+ * @param {Array<{ledger?: string, temp_id?: string, record?: object, operation?: string, value?: any, key?: string, patch?: object, name?: string, amount?: number}>} requests
+ * @param {{transactionId: string, ledgerNames: Set<string>, ledgers?: Record<string, {type?: string, key?: string, schema?: object, max_record_kb?: number, max_patch_kb?: number}>}} options
  */
 function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers = {} }) {
   if (typeof transactionId !== "string" || !transactionId || transactionId.length > 128) throw new TypeError("Invalid ledger transaction ID");

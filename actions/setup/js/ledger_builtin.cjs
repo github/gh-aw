@@ -60,13 +60,14 @@ function validateOperation(record, config) {
 
 function createReducer(config) {
   if (!Object.hasOwn(OPERATIONS, config.type)) throw new TypeError("Unknown built-in ledger type");
-  const state = config.type === "log" ? [] : new Map();
+  const sequence = [];
+  const state = new Map();
   function apply(record) {
     validateOperation(record, config);
     const { operation, value, key } = record;
     switch (config.type) {
       case "log":
-        state.push(value);
+        sequence.push(value);
         break;
       case "set": {
         const identity = canonicalJSON(value);
@@ -102,7 +103,7 @@ function createReducer(config) {
   function output() {
     const rows =
       config.type === "log"
-        ? state.map((value, index) => ({ position: index, value }))
+        ? sequence.map((value, index) => ({ position: index, value }))
         : [...state.entries()]
             .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
             .map(([key, value]) => {

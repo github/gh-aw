@@ -65,6 +65,8 @@ membership, and strings, numbers, booleans, and null retain their JSON types.
 The `state.value` column stores canonical JSON **text** for all types except
 `counter`, whose `value` is an SQLite integer. Key columns remain directly
 queryable. The generic `records` table still exposes immutable provenance.
+The trusted persistence result reports ledger type, operation, deterministic
+record ID, transaction ID, and validation status without echoing values.
 
 Built-in projections replay canonical transaction order and cannot be combined
 with a custom `replay.script`. Domain concepts should be expressed as schemas
