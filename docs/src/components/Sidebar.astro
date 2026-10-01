@@ -18,6 +18,23 @@ const heading = section === 'blog' ? 'Blog posts' : 'Documentation';
 </div>
 <Default />
 
+<script>
+	// Desktop: Starlight restores the sidebar's saved scroll position when you
+	// navigate within it, but a fresh load of a deep page leaves the current
+	// item far below the fold. If it's out of view, centre it in the pane.
+	const scrollCurrentIntoView = () => {
+		if (!matchMedia('(min-width: 50rem)').matches) return;
+		const pane = document.getElementById('starlight__sidebar');
+		const current = pane?.querySelector<HTMLElement>('.top-level a[aria-current="page"]');
+		if (!pane || !current) return;
+		const paneBox = pane.getBoundingClientRect();
+		const box = current.getBoundingClientRect();
+		if (box.top >= paneBox.top && box.bottom <= paneBox.bottom) return;
+		pane.scrollTop += box.top - paneBox.top - (paneBox.height - box.height) / 2;
+	};
+	scrollCurrentIntoView();
+</script>
+
 <style>
 	.mobile-menu-top {
 		display: flex;
