@@ -355,11 +355,9 @@ func selectBootstrapProfile(bootstrapProfiles []*resolvedBootstrapProfile, resol
 	case 0:
 		return nil, resolutionWarnings
 	case 1:
-		for _, bootstrapProfile := range bootstrapProfiles {
-			resolutionLog.Printf("Bootstrap profile found: packageID=%s", bootstrapProfile.PackageID)
-			return bootstrapProfile, resolutionWarnings
-		}
-		return nil, resolutionWarnings
+		bootstrapProfile := bootstrapProfiles[0] //nolint:uncheckedsliceindex // The switch guarantees exactly one profile.
+		resolutionLog.Printf("Bootstrap profile found: packageID=%s", bootstrapProfile.PackageID)
+		return bootstrapProfile, resolutionWarnings
 	default:
 		ids := make([]string, 0, len(bootstrapProfiles))
 		for _, p := range bootstrapProfiles {
