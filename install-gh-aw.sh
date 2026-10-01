@@ -187,6 +187,91 @@ else
     print_info "Using specified version: $VERSION"
 fi
 
+compare_semver() {
+    local candidate="$1"
+    local current="$2"
+    local candidate_part current_part
+    local candidate_parts current_parts
+    local i
+
+    IFS=. read -r -a candidate_parts <<< "${candidate#v}"
+    IFS=. read -r -a current_parts <<< "${current#v}"
+    candidate_parts[2]="${candidate_parts[2]%%+*}"
+    current_parts[2]="${current_parts[2]%%+*}"
+    for i in 0 1 2; do
+        candidate_part="${candidate_parts[$i]}"
+        current_part="${current_parts[$i]}"
+        if [ "${#candidate_part}" -gt "${#current_part}" ]; then
+            return 0
+        elif [ "${#candidate_part}" -lt "${#current_part}" ]; then
+            return 1
+        elif [[ "$candidate_part" > "$current_part" ]]; then
+            return 0
+        elif [[ "$candidate_part" < "$current_part" ]]; then
+            return 1
+        fi
+    done
+    return 1
+}
+
+if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
+    CHANNEL_MAJOR="${BASH_REMATCH[1]}"
+    BEST_TAG=""
+    PAGE=1
+    PER_PAGE=100
+
+    while :; do
+        RELEASES_URL="https://api.github.com/repos/$REPO/releases?per_page=$PER_PAGE&page=$PAGE"
+        if ! RELEASES_RESPONSE=$(curl -sLf --connect-timeout 15 --max-time 30 "$RELEASES_URL"); then
+            print_error "Failed to resolve stable releases for version channel $VERSION from GitHub API."
+            exit 1
+        fi
+
+        RELEASE_RECORDS=$(printf '%s\n' "$RELEASES_RESPONSE" | awk '
+            /^[[:space:]]*"tag_name"[[:space:]]*:/ {
+                tag = $0
+                sub(/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"/, "", tag)
+                sub(/".*$/, "", tag)
+            }
+            /^[[:space:]]*"prerelease"[[:space:]]*:/ {
+                prerelease = $0
+                sub(/^[[:space:]]*"prerelease"[[:space:]]*:[[:space:]]*/, "", prerelease)
+                sub(/[,[:space:]].*$/, "", prerelease)
+                if (tag != "") {
+                    print tag, prerelease
+                    tag = ""
+                }
+            }
+        ')
+        PAGE_RELEASE_COUNT=$(printf '%s\n' "$RELEASE_RECORDS" | awk 'NF { count++ } END { print count+0 }')
+
+        while IFS=' ' read -r release_tag prerelease; do
+            [ -n "$release_tag" ] || continue
+            if [ "$prerelease" != false ]; then
+                continue
+            fi
+            if [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]] &&
+                [ "${BASH_REMATCH[1]}" = "$CHANNEL_MAJOR" ]; then
+                if [ -z "$BEST_TAG" ] || compare_semver "$release_tag" "$BEST_TAG"; then
+                    BEST_TAG="$release_tag"
+                fi
+            fi
+        done <<< "$RELEASE_RECORDS"
+
+        if [ "$PAGE_RELEASE_COUNT" -lt "$PER_PAGE" ]; then
+            break
+        fi
+        PAGE=$((PAGE + 1))
+    done
+
+    if [ -z "$BEST_TAG" ]; then
+        print_error "No stable release found for version channel $VERSION."
+        exit 1
+    fi
+    print_info "Resolved version channel $VERSION to $BEST_TAG"
+    VERSION="$BEST_TAG"
+fi
+
 # Try gh extension install if requested (and gh is available)
 if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
     print_info "Attempting to install gh-aw using 'gh extension install'..."

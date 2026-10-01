@@ -1,11 +1,12 @@
 name: 'Setup gh-aw CLI'
-description: 'Install gh-aw CLI extension for a specific version'
+description: 'Install gh-aw CLI extension using latest, an exact tag, or a major-version channel'
 author: 'GitHub Next'
 
 inputs:
   version:
-    description: 'Version to install (release tag like v0.37.18)'
-    required: true
+    description: 'Version to install: latest, a release tag like v0.37.18, or a major-version channel like v1'
+    required: false
+    default: latest
   github-token:
     description: 'GitHub token for authentication (used for gh CLI and API calls)'
     required: false
