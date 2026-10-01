@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -76,16 +75,16 @@ func ledgerCompactionPayload(ledger LedgerConfig) map[string]any {
 	}
 }
 
-func encodeLedgerCompactionConfigBase64(ledger LedgerConfig) (string, error) {
-	encoded, err := json.Marshal(ledgerCompactionPayload(ledger))
+func encodeLedgerCompactionConfig(ledger LedgerConfig) (string, error) {
+	encoded, err := json.MarshalIndent(ledgerCompactionPayload(ledger), "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize ledger compaction configuration for %s: %w", ledger.Name, err)
 	}
-	encodedBase64 := base64.StdEncoding.EncodeToString(encoded)
-	if len(encodedBase64) > maxLedgerConfigBase64Bytes {
+	config := string(encoded)
+	if len(config) > maxLedgerConfigBase64Bytes {
 		return "", fmt.Errorf("serialized ledger compaction configuration for %s exceeds the %d-byte environment limit", ledger.Name, maxLedgerConfigBase64Bytes)
 	}
-	return encodedBase64, nil
+	return config, nil
 }
 
 // buildLedgerCompactionStepCondition selects a ledger on scheduled maintenance,
@@ -114,7 +113,7 @@ func buildMaintenanceLedgerCompactionJobs(opts buildMaintenanceWorkflowYAMLOptio
 	}
 	jobs := make([]ledgerCompactionJobSpec, 0, len(opts.compactionLedgers))
 	for i, ledger := range opts.compactionLedgers {
-		config, err := encodeLedgerCompactionConfigBase64(ledger)
+		config, err := encodeLedgerCompactionConfig(ledger)
 		if err != nil {
 			return "", err
 		}
@@ -122,7 +121,8 @@ func buildMaintenanceLedgerCompactionJobs(opts buildMaintenanceWorkflowYAMLOptio
 		jobs = append(jobs, ledgerCompactionJobSpec{
 			ledger: ledger.Name,
 			stepID: fmt.Sprintf("plan_%d", i),
-			env: `          GH_AW_LEDGER_COMPACTION_CONFIG_B64: ` + config + `
+			env: `          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            ` + strings.ReplaceAll(config, "\n", "\n            ") + `
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == '` + maintenanceCompactLedgerOperation + `' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ` + planFile + `
 `,

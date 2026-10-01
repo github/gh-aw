@@ -997,7 +997,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/audit-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 16,
+              "max_segment_kb": 100,
+              "name": "audit-history"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
         with:
@@ -1017,7 +1029,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/awf-feature-reviews",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "awf-feature-reviews"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
@@ -1037,7 +1061,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/caveman-run-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "caveman-run-history"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
@@ -1057,7 +1093,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/centralization",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "centralization"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
@@ -1077,7 +1125,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/concurrency-audits",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "concurrency-audits"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
@@ -1097,7 +1157,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/smoke",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "smoke"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:
@@ -1155,7 +1227,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXVkaXQtaGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6MTYsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJhdWRpdC1oaXN0b3J5In0=
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/audit-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 16,
+              "max_segment_kb": 100,
+              "name": "audit-history"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
         with:
@@ -1175,7 +1259,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvYXdmLWZlYXR1cmUtcmV2aWV3cyIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6OCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImF3Zi1mZWF0dXJlLXJldmlld3MifQ==
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/awf-feature-reviews",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "awf-feature-reviews"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
@@ -1195,7 +1291,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2F2ZW1hbi1ydW4taGlzdG9yeSIsImNvbXBhY3Rpb24iOnsic2NoZWR1bGUiOiJkYWlseSIsIm1pbl9zZWdtZW50cyI6MzIsIm1heF9zZWdtZW50cyI6MTI4fSwibWF4X3BhdGNoX2tiIjoxMCwibWF4X3JlY29yZF9rYiI6NCwibWF4X3NlZ21lbnRfa2IiOjEwMCwibmFtZSI6ImNhdmVtYW4tcnVuLWhpc3RvcnkifQ==
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/caveman-run-history",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "caveman-run-history"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
@@ -1215,7 +1323,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY2VudHJhbGl6YXRpb24iLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjgsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJjZW50cmFsaXphdGlvbiJ9
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/centralization",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 8,
+              "max_segment_kb": 100,
+              "name": "centralization"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
@@ -1235,7 +1355,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvY29uY3VycmVuY3ktYXVkaXRzIiwiY29tcGFjdGlvbiI6eyJzY2hlZHVsZSI6ImRhaWx5IiwibWluX3NlZ21lbnRzIjozMiwibWF4X3NlZ21lbnRzIjoxMjh9LCJtYXhfcGF0Y2hfa2IiOjEwLCJtYXhfcmVjb3JkX2tiIjo0LCJtYXhfc2VnbWVudF9rYiI6MTAwLCJuYW1lIjoiY29uY3VycmVuY3ktYXVkaXRzIn0=
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/concurrency-audits",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "concurrency-audits"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
@@ -1255,7 +1387,19 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_AW_LEDGER_COMPACTION_CONFIG_B64: eyJicmFuY2hfbmFtZSI6ImxlZGdlcnMvc21va2UiLCJjb21wYWN0aW9uIjp7InNjaGVkdWxlIjoiZGFpbHkiLCJtaW5fc2VnbWVudHMiOjMyLCJtYXhfc2VnbWVudHMiOjEyOH0sIm1heF9wYXRjaF9rYiI6MTAsIm1heF9yZWNvcmRfa2IiOjQsIm1heF9zZWdtZW50X2tiIjoxMDAsIm5hbWUiOiJzbW9rZSJ9
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/smoke",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "max_patch_kb": 10,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "smoke"
+            }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
           GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:

@@ -144,6 +144,8 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	assert.NotContains(t, plan, "secrets.GITHUB_TOKEN")
 	assert.Contains(t, plan, "ledger_compaction_plan.cjs")
 	assert.NotContains(t, plan, "ledger_compaction_apply.cjs")
+	assert.Contains(t, plan, "GH_AW_LEDGER_COMPACTION_CONFIG: |-")
+	assert.NotContains(t, plan, "GH_AW_LEDGER_COMPACTION_CONFIG_B64")
 	assert.Equal(t, 1, strings.Count(plan, "upload-artifact"))
 	assert.Contains(t, plan, "steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true'")
 	assert.Contains(t, plan, "steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure'")
