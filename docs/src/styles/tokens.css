@@ -30,35 +30,39 @@
 /* 1. Primitives ---------------------------------------------------------- */
 
 :root {
-  /* Neutral scale, light → dark */
+  /* Warm stone neutrals, light → dark */
   --aw-gray-0: #ffffff;
-  --aw-gray-1: #f6f8fa;
-  --aw-gray-2: #eaeef2;
-  --aw-gray-3: #d0d7de;
-  --aw-gray-4: #9ea7b3;
-  --aw-gray-5: #8d96a0;
-  --aw-gray-6: #656d76;
-  --aw-gray-7: #57606a;
-  --aw-gray-8: #424a53;
-  --aw-gray-9: #2d333b;
-  --aw-gray-10: #21262d;
-  --aw-gray-11: #161b22;
-  --aw-gray-12: #0d1117;
-  --aw-gray-13: #010409;
+  --aw-gray-1: #fcfcfb;
+  --aw-gray-2: #f5f5f4;
+  --aw-gray-3: #e7e5e4;
+  --aw-gray-4: #d6d3d1;
+  --aw-gray-5: #a8a29e;
+  --aw-gray-6: #8a837e;
+  --aw-gray-7: #78716c;
+  --aw-gray-8: #57534e;
+  --aw-gray-9: #44403c;
+  --aw-gray-10: #2c2825;
+  --aw-gray-11: #231f1c;
+  --aw-gray-12: #1c1917;
+  --aw-gray-13: #0c0a09;
 
   /* Brand accent, light → dark */
-  --aw-purple-1: #efe7ff;
-  --aw-purple-2: #d8c4ff;
-  --aw-purple-3: #c7b2ff;
-  --aw-purple-4: #b694ff;
-  --aw-purple-5: #a88bfa;
+  --aw-purple-1: #f3eefe;
+  --aw-purple-2: #ddd0fd;
+  --aw-purple-3: #c9b8ff;
+  --aw-purple-4: #b49cff;
   --aw-purple-6: #8250df;
   --aw-purple-7: #6f42c1;
   --aw-purple-8: #5a32a3;
-  --aw-purple-9: #2f234a;
+  --aw-purple-9: #272038;
+
+  /* Complementary accent */
+  --aw-coral-1: #fdebe4;
+  --aw-coral-4: #f0845f;
+  --aw-coral-6: #d4552f;
+  --aw-coral-9: #3a1d13;
 
   --aw-blue-2: #c6e6ff;
-  --aw-blue-4: #79c0ff;
   --aw-blue-5: #4fc0ff;
   --aw-blue-6: #0969da;
   --aw-blue-7: #0753b6;
@@ -78,24 +82,20 @@
 /* 2. Semantic — dark (Starlight's default theme) ------------------------- */
 
 :root {
-  --aw-color-bg: var(--aw-gray-12);
-  --aw-color-bg-subtle: var(--aw-gray-11);
-  --aw-color-bg-raised: rgba(22, 27, 34, 0.88);
-  --aw-color-bg-overlay: rgba(13, 17, 23, 0.78);
-
-  --aw-color-bg-page-end: var(--aw-gray-11);
+  --aw-color-bg: var(--aw-gray-13);
+  --aw-color-bg-subtle: var(--aw-gray-12);
+  --aw-color-bg-raised: rgba(28, 25, 23, 0.88);
+  --aw-color-bg-overlay: rgba(12, 10, 9, 0.8);
+  --aw-color-bg-page-end: var(--aw-gray-13);
 
   /* Homepage-only ambient glow (shown when WorkflowHero is on the page) */
-  --aw-landing-glow:
-    radial-gradient(ellipse 880px 640px at 16% 8%, rgba(139, 92, 246, 0.2), transparent 58%),
-    radial-gradient(ellipse 720px 540px at 92% 18%, rgba(192, 132, 252, 0.14), transparent 62%),
-    linear-gradient(180deg, rgba(76, 29, 149, 0.3), transparent 42%);
+  --aw-landing-glow: none;
 
   /* Mermaid node categories */
   --aw-diagram-tracked-fill: var(--aw-purple-7);
   --aw-diagram-tracked-stroke: var(--aw-purple-8);
-  --aw-diagram-untracked-fill: var(--aw-gray-8);
-  --aw-diagram-untracked-stroke: var(--aw-gray-9);
+  --aw-diagram-untracked-fill: var(--aw-gray-9);
+  --aw-diagram-untracked-stroke: var(--aw-gray-10);
   --aw-diagram-workflow-fill: var(--aw-blue-6);
   --aw-diagram-workflow-stroke: var(--aw-blue-7);
   --aw-diagram-external-fill: var(--aw-pink-6);
@@ -103,25 +103,33 @@
   --aw-diagram-text: var(--aw-gray-0);
 
   --aw-color-text: var(--aw-gray-1);
-  --aw-color-text-body: var(--aw-gray-3);
-  --aw-color-text-secondary: var(--aw-gray-3);
-  --aw-color-text-muted: var(--aw-gray-4);
+  --aw-color-text-body: var(--aw-gray-4);
+  --aw-color-text-secondary: var(--aw-gray-4);
+  --aw-color-text-muted: var(--aw-gray-5);
   --aw-color-text-strong: var(--aw-gray-0);
   --aw-color-text-invert: var(--aw-gray-13);
 
-  --aw-color-border: rgba(99, 110, 123, 0.34);
-  --aw-color-border-strong: rgba(139, 148, 158, 0.42);
-  --aw-color-hairline: var(--aw-gray-10);
-  --aw-color-hairline-light: rgba(240, 246, 252, 0.1);
+  --aw-color-border: var(--aw-gray-10);
+  --aw-color-border-strong: var(--aw-gray-9);
+  --aw-color-hairline: var(--aw-gray-11);
+  --aw-color-hairline-light: rgba(250, 250, 249, 0.08);
 
   --aw-color-accent: var(--aw-purple-4);
   --aw-color-accent-low: var(--aw-purple-9);
   --aw-color-accent-high: var(--aw-purple-2);
   --aw-color-accent-text: var(--aw-purple-3);
   /* Bare RGB triplet, for rgba(var(--aw-accent-rgb), <alpha>) */
-  --aw-accent-rgb: 168, 139, 250;
+  --aw-accent-rgb: 180, 156, 255;
 
-  --aw-color-link: var(--aw-blue-4);
+  --aw-color-complement: var(--aw-coral-4);
+  --aw-color-complement-low: var(--aw-coral-9);
+
+  --aw-color-link: var(--aw-color-accent-text);
+
+  /* Primary actions are ink on paper: inverted text/background */
+  --aw-color-button-bg: var(--aw-gray-1);
+  --aw-color-button-bg-hover: var(--aw-gray-4);
+  --aw-color-button-text: var(--aw-gray-13);
 
   /* Status colours (same in both themes) */
   --aw-color-note: var(--aw-blue-5);
@@ -129,36 +137,32 @@
   --aw-color-caution: var(--aw-amber-5);
   --aw-color-danger: var(--aw-red-5);
 
-  --aw-color-code-bg: rgba(110, 118, 129, 0.4);
-  --aw-color-scrollbar: rgba(48, 54, 61, 0.4);
-  --aw-color-scrollbar-hover: rgba(72, 79, 88, 0.6);
+  --aw-color-code-bg: var(--aw-gray-11);
+  --aw-color-scrollbar: rgba(250, 250, 249, 0.12);
+  --aw-color-scrollbar-hover: rgba(250, 250, 249, 0.22);
 
-  --aw-shadow: 0 18px 48px rgba(1, 4, 9, 0.22);
+  --aw-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
 
   /* Starlight's gray ramp runs from the text colour (gray-1) to the page colour (gray-7). */
   --aw-ramp-1: var(--aw-gray-1);
-  --aw-ramp-2: var(--aw-gray-3);
+  --aw-ramp-2: var(--aw-gray-4);
   --aw-ramp-3: var(--aw-gray-5);
-  --aw-ramp-4: var(--aw-gray-6);
-  --aw-ramp-5: var(--aw-gray-8);
-  --aw-ramp-6: var(--aw-gray-9);
+  --aw-ramp-4: var(--aw-gray-7);
+  --aw-ramp-5: var(--aw-gray-9);
+  --aw-ramp-6: var(--aw-gray-11);
   --aw-ramp-7: var(--aw-gray-13);
 }
 
 /* 2. Semantic — light ---------------------------------------------------- */
 
 :root[data-theme='light'] {
-  --aw-color-bg: var(--aw-gray-0);
-  --aw-color-bg-subtle: var(--aw-gray-1);
-  --aw-color-bg-raised: rgba(255, 255, 255, 0.88);
-  --aw-color-bg-overlay: rgba(246, 248, 250, 0.82);
-
+  --aw-color-bg: var(--aw-gray-1);
+  --aw-color-bg-subtle: var(--aw-gray-2);
+  --aw-color-bg-raised: rgba(255, 255, 255, 0.9);
+  --aw-color-bg-overlay: rgba(252, 252, 251, 0.85);
   --aw-color-bg-page-end: var(--aw-gray-1);
 
-  --aw-landing-glow:
-    radial-gradient(ellipse 900px 620px at 16% 8%, rgba(130, 80, 223, 0.16), transparent 60%),
-    radial-gradient(ellipse 760px 520px at 92% 20%, rgba(168, 139, 250, 0.12), transparent 62%),
-    linear-gradient(180deg, rgba(130, 80, 223, 0.06), transparent 38%);
+  --aw-landing-glow: none;
 
   --aw-diagram-tracked-fill: var(--aw-purple-2);
   --aw-diagram-tracked-stroke: var(--aw-purple-7);
@@ -170,17 +174,17 @@
   --aw-diagram-external-stroke: var(--aw-pink-6);
   --aw-diagram-text: var(--aw-gray-13);
 
-  --aw-color-text: var(--aw-gray-13);
-  --aw-color-text-body: var(--aw-gray-13);
+  --aw-color-text: var(--aw-gray-12);
+  --aw-color-text-body: var(--aw-gray-12);
   --aw-color-text-secondary: var(--aw-gray-8);
   --aw-color-text-muted: var(--aw-gray-7);
   --aw-color-text-strong: var(--aw-gray-13);
-  --aw-color-text-invert: var(--aw-gray-0);
+  --aw-color-text-invert: var(--aw-gray-1);
 
-  --aw-color-border: rgba(208, 215, 222, 0.9);
-  --aw-color-border-strong: rgba(175, 184, 193, 0.95);
+  --aw-color-border: var(--aw-gray-3);
+  --aw-color-border-strong: var(--aw-gray-4);
   --aw-color-hairline: var(--aw-gray-3);
-  --aw-color-hairline-light: rgba(1, 4, 9, 0.1);
+  --aw-color-hairline-light: rgba(28, 25, 23, 0.07);
 
   --aw-color-accent: var(--aw-purple-6);
   --aw-color-accent-low: var(--aw-purple-1);
@@ -188,20 +192,26 @@
   --aw-color-accent-text: var(--aw-purple-7);
   --aw-accent-rgb: 130, 80, 223;
 
-  --aw-color-link: var(--aw-blue-6);
-  --aw-color-code-bg: rgba(175, 184, 193, 0.2);
-  --aw-color-scrollbar: rgba(208, 215, 222, 0.5);
-  --aw-color-scrollbar-hover: rgba(175, 184, 193, 0.7);
+  --aw-color-complement: var(--aw-coral-6);
+  --aw-color-complement-low: var(--aw-coral-1);
 
-  --aw-shadow: 0 18px 42px rgba(31, 35, 40, 0.08);
+  --aw-color-button-bg: var(--aw-gray-12);
+  --aw-color-button-bg-hover: var(--aw-gray-9);
+  --aw-color-button-text: var(--aw-gray-1);
 
-  --aw-ramp-1: var(--aw-gray-13);
+  --aw-color-code-bg: rgba(28, 25, 23, 0.06);
+  --aw-color-scrollbar: rgba(28, 25, 23, 0.14);
+  --aw-color-scrollbar-hover: rgba(28, 25, 23, 0.26);
+
+  --aw-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 12px 32px rgba(28, 25, 23, 0.06);
+
+  --aw-ramp-1: var(--aw-gray-12);
   --aw-ramp-2: var(--aw-gray-8);
-  --aw-ramp-3: var(--aw-gray-6);
+  --aw-ramp-3: var(--aw-gray-7);
   --aw-ramp-4: var(--aw-gray-5);
   --aw-ramp-5: var(--aw-gray-3);
   --aw-ramp-6: var(--aw-gray-2);
-  --aw-ramp-7: var(--aw-gray-0);
+  --aw-ramp-7: var(--aw-gray-1);
 }
 
 /* 3. Starlight mapping --------------------------------------------------- */

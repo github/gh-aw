@@ -869,50 +869,44 @@ html {
   }
 }
 
-/* Hero Section */
-.sl-link-button.primary {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.85), rgba(91, 33, 182, 0.92)) !important;
-  border: 1px solid rgba(196, 181, 253, 0.42) !important;
-  color: #ffffff !important;
-  backdrop-filter: blur(8px) !important;
-  box-shadow: 0 12px 30px rgba(91, 33, 182, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-  font-weight: 600 !important;
+/* Link buttons (hero actions and <LinkButton>) */
+.sl-link-button {
+  font-weight: 500;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-/* Mobile-specific: Ensure primary buttons meet minimum touch target */
-@media (max-width: 768px) {
-  .sl-link-button.primary,
-  .sl-link-button {
-    min-height: 44px !important;
-    padding: 0.75rem 1.5rem !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
+.sl-link-button.primary {
+  background-color: var(--aw-color-button-bg);
+  border: 1px solid var(--aw-color-button-bg);
+  color: var(--aw-color-button-text);
 }
 
 .sl-link-button.primary:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(109, 40, 217, 0.95)) !important;
-  border-color: rgba(221, 214, 254, 0.58) !important;
-  box-shadow: 0 16px 34px rgba(91, 33, 182, 0.32), 0 3px 8px rgba(0, 0, 0, 0.2) !important;
-  color: #ffffff !important;
-  transform: translateY(-1px) !important;
+  background-color: var(--aw-color-button-bg-hover);
+  border-color: var(--aw-color-button-bg-hover);
+  color: var(--aw-color-button-text);
 }
 
-:root[data-theme='light'] .sl-link-button.primary {
-  background: linear-gradient(135deg, #8250df, #6f42c1) !important;
-  border: 1px solid rgba(111, 66, 193, 0.72) !important;
-  color: #ffffff !important;
-  box-shadow: 0 12px 26px rgba(111, 66, 193, 0.22), 0 1px 3px rgba(0, 0, 0, 0.08) !important;
-  font-weight: 600 !important;
+.sl-link-button.secondary {
+  background-color: transparent;
+  border: 1px solid var(--aw-color-border-strong);
+  color: var(--aw-color-text);
 }
 
-:root[data-theme='light'] .sl-link-button.primary:hover {
-  background: linear-gradient(135deg, #8f63e6, #7847cf) !important;
-  border: 1px solid rgba(111, 66, 193, 0.88) !important;
-  box-shadow: 0 16px 32px rgba(111, 66, 193, 0.26), 0 2px 6px rgba(0, 0, 0, 0.1) !important;
-  color: #ffffff !important;
-  transform: translateY(-1px) !important;
+.sl-link-button.secondary:hover {
+  border-color: var(--aw-color-text-muted);
+  color: var(--aw-color-text);
+}
+
+/* Mobile-specific: Ensure link buttons meet minimum touch target */
+@media (max-width: 768px) {
+  .sl-link-button {
+    min-height: 44px;
+    padding: 0.75rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* General Links */
