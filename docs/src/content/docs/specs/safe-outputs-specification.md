@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.7<br>
+**Version**: 1.29.8<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-09-23<br>
+**Publication Date**: 2026-10-01<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -2937,7 +2937,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 4. **Cross-Repository**: When `target-repo` is configured, operates on that repository (must be in `allowed-repos`).
 5. **Footer Injection**: Appends attribution footer to the closing comment when configured.
 6. **Body Suppression**: When `allow-body` is `false`, the handler MUST NOT post a closing comment. Any `body` value provided by the agent SHALL be discarded before the close operation is executed. The implementation MUST log a warning if a non-empty `body` value was discarded.
-7. **Native Duplicate Marking**: When `duplicate_of` is provided and `state_reason` is `duplicate`, the handler SHALL call the GitHub `markAsDuplicate` GraphQL mutation to create a native "marked this as a duplicate of #X" timeline event. If the mutation fails (e.g., missing permissions or invalid reference), a warning is logged and the close operation continues. The `duplicate_of` value MUST be parsed and resolved to a valid issue node ID before calling the mutation.
+7. **Issue-Intent Close**: When issue-intent metadata is present, the handler MUST submit the close through the issue-intent endpoint. If that request is rejected or otherwise fails, the safe-output item MUST fail and the handler MUST NOT retry through the legacy close endpoint, except for HTTP 404 or 501 responses, which MAY use the legacy endpoint as an availability fallback.
+8. **Native Duplicate Marking**: When `duplicate_of` is provided and `state_reason` is `duplicate`, the handler SHALL call the GitHub `markAsDuplicate` GraphQL mutation to create a native "marked this as a duplicate of #X" timeline event. If the mutation fails (e.g., missing permissions or invalid reference), a warning is logged and the close operation continues. The `duplicate_of` value MUST be parsed and resolved to a valid issue node ID before calling the mutation.
 
 **Configuration Parameters**:
 
@@ -2968,6 +2969,10 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **CI-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
 
 **CI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**CI-006**: When issue-intent metadata is present, a non-404/non-501 failure from the issue-intent close request MUST fail the safe-output item and MUST NOT invoke the legacy close endpoint.
+
+**CI-007**: The handler MAY invoke the legacy close endpoint only when the issue-intent close request returns HTTP 404 or 501, indicating that the intent endpoint may be unavailable.
 
 **Required Permissions**:
 
@@ -6051,6 +6056,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.8** (2026-10-01):
+
+- **Specified**: Issue-intent close failures MUST fail closed rather than bypassing review through the legacy close endpoint; only HTTP 404 and 501 responses MAY use the legacy endpoint as an availability fallback.
+- **Updated**: Publication metadata to 1.29.8.
 
 **Version 1.29.7** (2026-09-29):
 

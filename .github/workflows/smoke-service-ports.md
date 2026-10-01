@@ -54,6 +54,9 @@ imports:
   - shared/otlp.md
   - shared/token-telemetry-check.md
   - shared/reporting.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: agent-stdio
 features:
   gh-aw-detection: false
 ---

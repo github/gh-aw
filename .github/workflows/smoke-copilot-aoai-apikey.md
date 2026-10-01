@@ -43,6 +43,9 @@ imports:
   - shared/otlp.md
   - shared/token-telemetry-check.md
   - shared/smoke-test-brevity.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: copilot-events
 network:
   allowed:
     - defaults

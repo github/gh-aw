@@ -40,6 +40,9 @@ imports:
   - shared/smoke-test-brevity.md
   - shared/playwright-title-test.md
   - shared/reporting.md
+  - uses: shared/session-artifact-check.md
+    with:
+      session-artifact: agent-stdio
 network:
   allowed:
     - defaults
