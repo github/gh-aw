@@ -107,17 +107,16 @@
       float n = fbm(p + 2.0 * r);
       n = smoothstep(0.32, 0.82, n);
 
-      // Falloff: a band across the whole top, deeper and heavier on the
-      // right so it can sit behind the hero visual, shallow on the left so
-      // the headline stays calm. Narrow screens get a thinner cap.
+      // Falloff: originates top-right, deep behind the hero visual, thinning
+      // to a soft shallow wisp across the top-left so the headline stays calm. Narrow screens get a thinner cap.
       bool narrow = size.x < 720.0;
       float depth = narrow
         ? mix(30.0, 160.0, smoothstep(0.5, 1.0, xn))
-        : mix(160.0, 440.0, smoothstep(0.15, 1.0, xn));
+        : mix(80.0, 440.0, smoothstep(0.1, 1.0, xn));
       // Wobble the lower edge so it never reads as a straight gradient.
       depth *= 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, 3.1));
       float m = 1.0 - smoothstep(0.0, depth, fromTop);
-      m *= mix(narrow ? 0.5 : 0.62, 1.0, smoothstep(0.0, 1.0, xn));
+      m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
       m = m * (0.55 + 0.45 * m);
 
       float v = n * m * u_strength;
