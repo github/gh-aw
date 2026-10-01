@@ -9,11 +9,9 @@
   text-size-adjust: 100%;
 }
 
-/* Widen central docs content on large screens while avoiding TOC overflow on mid-width viewports. */
-@media (min-width: 1200px) {
-  :root {
-    --sl-content-width: 60rem;
-  }
+/* Reading measure: ~70-75 characters per line at 16px. */
+:root {
+  --sl-content-width: 38rem;
 }
 
 /* Page background */
@@ -117,25 +115,38 @@ body {
 .sidebar .top-level > li > a {
   font-weight: 600;
   font-size: 0.8125rem;
-  color: var(--aw-color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 0;
+  color: var(--aw-color-text);
+  letter-spacing: 0;
+  border-radius: 6px;
   background: none;
   transition: color 0.15s ease;
 }
 
-.sidebar .top-level > li > details > summary:hover,
-.sidebar .top-level > li > a:hover {
-  color: var(--aw-color-text);
+.sidebar .top-level > li > details > summary .large,
+.sidebar .top-level > li > a .large {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
 }
 
-.sidebar nav li li a {
-  transition: color 0.15s ease, border-color 0.15s ease;
+.sidebar .top-level > li > details > summary svg,
+.sidebar .top-level > li > details > summary .caret {
+  color: var(--aw-color-text-muted);
+}
+
+/* Breathing room between groups */
+.sidebar .top-level > li + li {
+  margin-top: 1.125rem;
+}
+
+.sidebar .top-level li li a {
+  transition: color 0.15s ease, background-color 0.15s ease;
   color: var(--aw-color-text-muted);
   font-size: 0.875rem;
-  line-height: 1.6;
-  border-left: 2px solid transparent;
+  line-height: 1.45;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: none;
   font-weight: 400;
   background: transparent;
 }
@@ -144,7 +155,7 @@ body {
 @media (max-width: 768px) {
   .sidebar .top-level > li > details > summary,
   .sidebar .top-level > li > a,
-  .sidebar nav li li a {
+  .sidebar .top-level li li a {
     min-height: 44px;
     display: flex;
     align-items: center;
@@ -152,20 +163,20 @@ body {
   }
 }
 
-.sidebar nav li li a:hover,
-.sidebar nav li li a[aria-current="page"] {
+.sidebar .top-level li li a:hover {
   color: var(--aw-color-text);
 }
 
-.sidebar nav li li a[aria-current="page"] {
+.sidebar .top-level li li a[aria-current="page"] {
+  color: var(--aw-color-text);
   font-weight: 500;
-  border-left-color: rgba(var(--aw-accent-rgb), 0.5);
+  background: var(--aw-color-bg-subtle);
 }
 
-/* Starlight fills the current page link with the accent colour; keep it plain. */
+/* Starlight fills the current page link with the accent colour; keep it quiet. */
 .sidebar a[aria-current="page"],
 a[aria-current="page"].link {
-  background: transparent;
+  background: var(--aw-color-bg-subtle);
 }
 
 /* Header Theme */
@@ -205,22 +216,28 @@ header::after {
   max-width: 100%;
 }
 
-.sl-markdown-content p {
-  line-height: 1.65;
-}
-
 .sl-markdown-content p,
 .sl-markdown-content li {
+  font-size: var(--aw-text-base);
+  line-height: var(--aw-leading-body);
   color: var(--aw-color-text-body);
 }
 
+.sl-markdown-content li + li {
+  margin-top: 0.375rem;
+}
+
+/* Page title (Starlight renders it outside .sl-markdown-content) and body h1 */
+.content-panel h1#_top,
 .sl-markdown-content h1 {
-  font-size: 2.5rem;
-  font-weight: 300;
-  line-height: 1.2;
+  font-size: var(--aw-text-3xl);
+  font-weight: 400;
+  line-height: var(--aw-leading-tight);
+  letter-spacing: var(--aw-tracking-tight);
   color: var(--aw-color-text);
   border-bottom: none;
-  letter-spacing: -0.01em;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
 }
 
 /* Header Anchor Links */
@@ -260,27 +277,36 @@ header::after {
 }
 
 .sl-markdown-content h2 {
-  font-size: 1.75rem;
-  font-weight: 300;
+  font-size: var(--aw-text-xl);
+  font-weight: 400;
+  line-height: var(--aw-leading-snug);
+  letter-spacing: var(--aw-tracking-snug);
   border-bottom: none;
   color: var(--aw-color-text);
-  letter-spacing: -0.01em;
+  margin-top: 3rem;
+  margin-bottom: 0.75rem;
 }
 
 .sl-markdown-content h3 {
-  font-size: 1.375rem;
-  font-weight: 400;
+  font-size: var(--aw-text-lg);
+  font-weight: 600;
+  line-height: var(--aw-leading-snug);
   border-bottom: none;
   color: var(--aw-color-text);
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
 }
 
 .sl-markdown-content h4,
 .sl-markdown-content h5,
 .sl-markdown-content h6 {
-  font-size: 1.125rem;
-  font-weight: 500;
+  font-size: var(--aw-text-base);
+  font-weight: 600;
+  line-height: var(--aw-leading-snug);
   border-bottom: none;
   color: var(--aw-color-text);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 /* Code Blocks */
@@ -446,36 +472,26 @@ header::after {
 
 /* Blockquotes */
 .sl-markdown-content blockquote {
-  border-left: 4px solid var(--aw-color-border-strong);
-  color: var(--aw-color-text-muted);
-  background: var(--aw-color-bg-subtle);
-  border-radius: 0 4px 4px 0;
+  border-left: 2px solid var(--aw-color-border-strong);
+  border-radius: 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: var(--aw-color-text-secondary);
+  background: none;
 }
 
 /* Links */
 .sl-markdown-content a:not(.sl-link-button) {
   color: var(--aw-color-link);
-  text-decoration: none;
-  transition: color 0.15s ease;
-  border-bottom: 1px solid transparent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: rgba(var(--aw-accent-rgb), 0.35);
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
-.sl-markdown-content a:hover {
-  color: var(--aw-color-accent-text);
-  border-bottom-color: rgba(var(--aw-accent-rgb), 0.3);
-}
-
-/* Mobile-specific: Add padding to inline links for better touch targets */
-@media (max-width: 768px) {
-  .sl-markdown-content p a,
-  .sl-markdown-content li a {
-    padding: 0.25rem 0.125rem;
-    margin: -0.25rem -0.125rem;
-    display: inline-block;
-    min-height: 44px;
-    line-height: 1.6;
-    vertical-align: baseline;
-  }
+.sl-markdown-content a:not(.sl-link-button):hover {
+  color: var(--aw-color-link);
+  text-decoration-color: var(--aw-color-accent);
 }
 
 /* Navigation Links */
@@ -571,15 +587,17 @@ a.button:hover {
 
 /* Table of Contents */
 starlight-toc nav {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 starlight-toc a {
   color: var(--aw-color-text-muted);
   text-decoration: none;
   border-left: none;
-  transition: none;
+  transition: color 0.15s ease;
+  font-size: 0.8125rem;
   line-height: 1.4;
+  padding-block: 0.25rem;
   font-weight: 400;
 }
 
@@ -592,9 +610,9 @@ starlight-toc a[aria-current="true"] {
 starlight-toc h2 {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--aw-color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--aw-color-text);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* Hide blog plugin's card-grid pagination (uses reverse chronological order) */
@@ -676,26 +694,31 @@ starlight-toc h2 {
 }
 
 /* Aside/Callout Blocks */
-.sl-markdown-content aside,
 .sl-markdown-content .starlight-aside {
-  border-radius: 6px;
-  border-left: none;
+  --aw-aside-accent: var(--aw-color-note);
+  background: color-mix(in srgb, var(--aw-aside-accent) 5%, var(--aw-color-bg-subtle));
+  border: 1px solid color-mix(in srgb, var(--aw-aside-accent) 22%, var(--aw-color-border));
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
 }
 
-.sl-markdown-content .starlight-aside--note {
-  background: color-mix(in srgb, var(--aw-color-note) 10%, transparent);
+.sl-markdown-content .starlight-aside--note { --aw-aside-accent: var(--aw-color-note); }
+.sl-markdown-content .starlight-aside--tip { --aw-aside-accent: var(--aw-color-success); }
+.sl-markdown-content .starlight-aside--caution { --aw-aside-accent: var(--aw-color-caution); }
+.sl-markdown-content .starlight-aside--danger { --aw-aside-accent: var(--aw-color-danger); }
+
+.sl-markdown-content .starlight-aside__title {
+  color: var(--aw-aside-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
-.sl-markdown-content .starlight-aside--tip {
-  background: color-mix(in srgb, var(--aw-color-success) 10%, transparent);
+.sl-markdown-content .starlight-aside__content {
+  color: var(--aw-color-text-body);
 }
 
-.sl-markdown-content .starlight-aside--caution {
-  background: color-mix(in srgb, var(--aw-color-caution) 10%, transparent);
-}
-
-.sl-markdown-content .starlight-aside--danger {
-  background: color-mix(in srgb, var(--aw-color-danger) 10%, transparent);
+:root[data-theme='light'] .sl-markdown-content .starlight-aside__title {
+  color: color-mix(in srgb, var(--aw-aside-accent) 45%, var(--aw-color-text));
 }
 
 /* Horizontal Rules */
@@ -1005,12 +1028,6 @@ main,
     display: flex !important;
     align-items: center;
   }
-
-  /* Ensure content has proper padding on mobile and tablet */
-  .sl-markdown-content {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
 }
 
 /* === W2: Lower sidebar breakpoint to 768px for tablet support === */
@@ -1063,12 +1080,15 @@ main,
   .sl-anchor-link,
   a.sl-anchor-link,
   .sl-markdown-content .sl-anchor-link {
-    min-height: 44px !important;
     min-width: 44px !important;
     padding: 0.75rem !important;
+    /* Grow the tap area sideways/outwards only, so heading line spacing stays even */
+    margin-block: -0.75rem !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    vertical-align: middle;
+    line-height: 1;
   }
 }
 
