@@ -164,7 +164,8 @@ fi
 FILE_COUNT_IN_DIR=$(ls -1 "${JS_SOURCE_DIR}" 2>/dev/null | wc -l)
 debug_log "Found ${FILE_COUNT_IN_DIR} files in ${JS_SOURCE_DIR}"
 
-# Copy all .cjs files from js/ to destination (excluding test files)
+# Copy all .cjs files from js/ to destination (excluding test files), including
+# shared runtime dependencies used by the Copilot harness and SDK driver.
 FILE_COUNT=0
 for file in "${JS_SOURCE_DIR}"/*.cjs; do
   if [ -f "$file" ]; then
