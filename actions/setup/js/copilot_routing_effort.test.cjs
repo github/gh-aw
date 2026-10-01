@@ -5,8 +5,8 @@ const require = createRequire(import.meta.url);
 const { ROUTING_REASONING_EFFORTS, isRoutingReasoningEffort, resolveRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
 
 describe("copilot_routing_effort.cjs", () => {
-  it("matches the Copilot CLI --reasoning-effort possible values", () => {
-    // Keep in sync with `copilot --help` for the pinned Copilot CLI version.
+  it("documents the expected Copilot CLI --reasoning-effort values for manual sync", () => {
+    // Manually verify against `copilot --help` when updating the pinned CLI version.
     expect(ROUTING_REASONING_EFFORTS).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
     expect(Object.isFrozen(ROUTING_REASONING_EFFORTS)).toBe(true);
   });
