@@ -267,7 +267,7 @@ export default defineConfig({
         Banner: "./src/components/RecruitmentBanner.astro",
         Head: "./src/components/CustomHead.astro",
         SkipLink: "./src/components/SkipLink.astro",
-        SocialIcons: "./src/components/CustomHeader.astro",
+        Header: "./src/components/SiteHeader.astro",
         ThemeSelect: "./src/components/ThemeToggle.astro",
         Footer: "./src/components/CustomFooter.astro",
         PageTitle: "./src/components/PageTitle.astro",

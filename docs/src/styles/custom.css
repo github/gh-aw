@@ -189,32 +189,14 @@ a[aria-current="page"].link {
   background: var(--aw-color-bg-subtle);
 }
 
-/* Header Theme */
-header {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--aw-color-bg) 92%, transparent),
-    color-mix(in srgb, var(--aw-color-bg-page-end) 86%, transparent)
-  );
-  border-bottom: 1px solid var(--aw-color-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Site header (component: SiteHeader.astro). Solid page background, hairline rule. */
+:root {
+  --sl-nav-height: 3.75rem;
 }
 
-header::after {
-  content: '';
-  position: absolute;
-  bottom: -40px;
-  left: 0;
-  right: 0;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--aw-color-bg) 74%, transparent),
-    color-mix(in srgb, var(--aw-color-bg-page-end) 28%, transparent),
-    transparent
-  );
-  pointer-events: none;
-  z-index: -1;
+header.header {
+  background: var(--aw-color-bg);
+  border-bottom: 1px solid var(--aw-color-divider);
 }
 
 /* Markdown Content Typography */
@@ -536,22 +518,6 @@ nav a[aria-current="page"] {
   font-weight: 600;
 }
 
-/* Social Icons */
-.social-icons a[href*="github.com"] {
-  color: var(--aw-color-text-strong);
-}
-
-/* Mobile-specific: Ensure social icons have adequate touch targets */
-@media (max-width: 768px) {
-  .social-icons a {
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-
 /* Buttons */
 .sl-markdown-content button:not(.expressive-code *, .not-content *),
 .sl-markdown-content .button:not(.not-content *),
@@ -809,82 +775,7 @@ html {
     display: inline-flex;
     align-items: center;
     padding: 0.5rem;
-  }
-}
-
-/* Mobile Navigation - Ensure theme toggle is visible on mobile */
-@media (max-width: 768px) {
-  /* Ensure theme toggle is visible on mobile */
-  starlight-theme-select {
-    display: flex !important;
-  }
-}
-
-/* Mobile - responsive navigation */
-@media (max-width: 768px) {
-  /* Hide title text on mobile to save space - keep only logo icon */
-  .site-title span {
-    display: none !important;
-  }
-  
-  /* Ensure search button meets minimum touch target */
-  site-search button[data-open-modal],
-  site-search button[aria-label="Search"] {
-    min-height: 44px !important;
-    min-width: 44px !important;
-    padding: 0.75rem !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  /* Force theme toggle and social icons to stay visible on mobile ONLY on landing page (with hero) */
-  body:has(.aw-hero) header starlight-theme-select,
-  body:has(.aw-hero) .header starlight-theme-select,
-  body:has(.aw-hero) starlight-theme-select {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-  
-  body:has(.aw-hero) .social-icons {
-    display: flex !important;
-    visibility: visible !important;
-  }
-  
-  /* Hide theme toggle and social icons on mobile for non-landing pages (without hero) to prevent overlap with TOC button */
-  body:not(:has(.aw-hero)) header starlight-theme-select,
-  body:not(:has(.aw-hero)) .header starlight-theme-select,
-  body:not(:has(.aw-hero)) starlight-theme-select {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-  }
-  
-  body:not(:has(.aw-hero)) .social-icons {
-    display: none !important;
-    visibility: hidden !important;
-  }
-  
-  /* Override Starlight's hiding of header right side on mobile */
-  header .sl-flex,
-  header .right-group,
-  header [class*="right"] {
-    display: flex !important;
-    visibility: visible !important;
-  }
-  
-  /* Make theme toggle easier to tap on mobile - WCAG 2.1 Level AAA (44x44px) */
-  starlight-theme-select .icon-wrapper {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-  }
-  
-  /* Ensure proper spacing on mobile header */
-  header {
-    padding: 0.5rem 1rem !important;
+    margin-inline-start: -0.5rem;
   }
 }
 
@@ -1005,23 +896,6 @@ main,
   /* Disable heavy background animation on mobile to reduce CPU/battery usage */
   body::before {
     animation: none;
-  }
-}
-
-/* Mobile and tablet navigation (all viewports ≤1200px) — hamburger replaces full header nav */
-/* The full 7-item nav bar only fits alongside the sidebar, search and icons from ~1200px up;
-   below that it overflowed (see https://github.com/github/gh-aw/issues/45211, which first
-   raised this from 900px to 1050px for iPad Pro 12.9). */
-@media (max-width: 1200px) {
-  /* Hide full nav; hamburger provides equivalent navigation on mobile and tablet */
-  .custom-header-links {
-    display: none !important;
-  }
-
-  /* Show hamburger wrapper on mobile and tablet */
-  .tablet-nav-wrapper {
-    display: flex !important;
-    align-items: center;
   }
 }
 
@@ -1156,15 +1030,13 @@ main,
     outline-width: 3px;
   }
 
-  .site-title span,
-  .header-link {
+  .site-title span {
     text-decoration: underline;
   }
 }
 
 @media (forced-colors: active) {
   .site-title,
-  .header-link,
   .gh-aw-video-container,
   .gh-aw-video-caption {
     border: 1px solid CanvasText;
@@ -1172,7 +1044,6 @@ main,
     color: CanvasText;
   }
 
-  .header-link:hover,
   .site-title:hover {
     forced-color-adjust: auto;
   }
