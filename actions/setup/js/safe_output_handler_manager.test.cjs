@@ -632,6 +632,19 @@ describe("Safe Output Handler Manager", () => {
       }
     });
 
+    it("does not inject repository-resolved aliases into project status updates", async () => {
+      const projectStatusModule = require("./create_project_status_update.cjs");
+      const projectStatusMainSpy = vi.spyOn(projectStatusModule, "main").mockImplementation(async () => async () => ({ success: true }));
+
+      try {
+        await loadHandlers({ create_project_status_update: {}, mentions: {} }, undefined, ["workflow-collaborator"]);
+        expect(projectStatusMainSpy).toHaveBeenCalledTimes(1);
+        expect(projectStatusMainSpy.mock.calls[0][0]).not.toHaveProperty("allowedMentionAliases");
+      } finally {
+        projectStatusMainSpy.mockRestore();
+      }
+    });
+
     it("does not query collaborators for handlers that do not use mention aliases", async () => {
       const addLabelsModule = require("./add_labels.cjs");
       const addLabelsMainSpy = vi.spyOn(addLabelsModule, "main").mockImplementation(async () => async () => ({ success: true }));

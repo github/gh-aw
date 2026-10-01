@@ -195,7 +195,6 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   const allowedTeams = mentionsConfig?.allowedTeams || [];
 
   try {
-    const { owner, repo } = targetRepo ?? context.repo;
     const knownAuthors = allowContext ? extractKnownAuthorsFromPayload(context) : [];
 
     // Add allowed list (always included regardless of configuration)
@@ -204,11 +203,11 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
     }
 
     // Add members from allowed-teams (always included regardless of collaborator mention setting)
-    if (Array.isArray(allowedTeams) && allowedTeams.length > 0) {
+    if (targetRepo?.owner && targetRepo.repo && Array.isArray(allowedTeams) && allowedTeams.length > 0) {
       core.info(`[MENTIONS] Fetching members for ${allowedTeams.length} configured team(s)`);
       for (const teamEntry of allowedTeams) {
         if (typeof teamEntry === "string" && teamEntry.length > 0) {
-          const teamMembers = await fetchTeamMembers(teamEntry, context.repo.owner, github, core);
+          const teamMembers = await fetchTeamMembers(teamEntry, targetRepo.owner, github, core);
           knownAuthors.push(...teamMembers);
         }
       }
@@ -231,6 +230,13 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
       seenKnownAuthors.add(key);
       deduplicatedKnownAuthors.push(author);
     }
+
+    if (!targetRepo?.owner || !targetRepo.repo) {
+      core.info("[MENTIONS] No target repository - only allowing context and explicit aliases");
+      return deduplicatedKnownAuthors;
+    }
+
+    const { owner, repo } = targetRepo;
 
     // If collaborator mentions are disabled, only use known authors (context + allowed list)
     if (!allowCollaboratorMentions) {

@@ -125,16 +125,7 @@ const CODE_PUSH_TYPES = new Set(["push_to_pull_request_branch", "create_pull_req
 
 /** @type {Set<string>} Project-safe-output handlers that should default to GH_AW_PROJECT_GITHUB_TOKEN when no per-handler github-token is configured. */
 const PROJECT_HANDLER_TYPES = new Set(["create_project", "create_project_status_update", "update_project"]);
-const MENTION_HANDLER_TYPES = new Set([
-  "add_comment",
-  "close_discussion",
-  "create_discussion",
-  "create_issue",
-  "create_project_status_update",
-  "create_pull_request",
-  "create_pull_request_review_comment",
-  "reply_to_pull_request_review_comment",
-]);
+const MENTION_HANDLER_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
 
 // Threat-detection warn-mode requirement IDs from safe-outputs specification:
 // - WTD2: Convertible outputs must be mapped to a reviewable type.
