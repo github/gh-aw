@@ -177,7 +177,7 @@ test("compaction preserves replay's ordered logical history", () => {
   const first = new Ledger({ memoryDir: sourceDir });
   const second = new Ledger({ memoryDir: sourceDir });
   const compaction = parseCompactionConfig(
-    Buffer.from(JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })).toString("base64")
+    JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })
   );
   try {
     first.append("finding", { id: "first" });
@@ -239,16 +239,14 @@ for (const [type, transactions] of Object.entries({
     fs.mkdirSync(root, { recursive: true });
     const config = { name: type, type };
     const compaction = parseCompactionConfig(
-      Buffer.from(
-        JSON.stringify({
-          name: type,
-          branch_name: `ledgers/${type}`,
-          max_record_kb: 32,
-          max_segment_kb: 100,
-          max_patch_kb: 10,
-          compaction: { min_segments: 2, max_segments: 2 },
-        })
-      ).toString("base64")
+      JSON.stringify({
+        name: type,
+        branch_name: `ledgers/${type}`,
+        max_record_kb: 32,
+        max_segment_kb: 100,
+        max_patch_kb: 10,
+        compaction: { min_segments: 2, max_segments: 2 },
+      })
     );
     const writers = [];
     try {

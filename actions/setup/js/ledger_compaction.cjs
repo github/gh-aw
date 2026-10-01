@@ -103,13 +103,13 @@ function isIntegerInRange(value, min, max) {
 
 /**
  * Parse the trusted, compiler-generated per-ledger compaction configuration.
- * @param {string | undefined} value base64-encoded JSON
+ * @param {string | undefined} value JSON
  */
-function parseCompactionConfig(value = process.env.GH_AW_LEDGER_COMPACTION_CONFIG_B64) {
+function parseCompactionConfig(value = process.env.GH_AW_LEDGER_COMPACTION_CONFIG) {
   if (!value) throw new TypeError("Missing ledger compaction configuration");
   let raw;
   try {
-    raw = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
+    raw = JSON.parse(value);
   } catch (error) {
     throw new TypeError("Invalid ledger compaction configuration", { cause: error });
   }

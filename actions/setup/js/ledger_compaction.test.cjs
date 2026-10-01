@@ -33,7 +33,7 @@ const NOW = new Date("2026-10-01T00:00:00.000Z");
 /** @param {Record<string, any>} [compaction] @param {Record<string, any>} [overrides] */
 function encodeConfig(compaction = {}, overrides = {}) {
   const raw = { name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 3, ...compaction }, ...overrides };
-  return Buffer.from(JSON.stringify(raw)).toString("base64");
+  return JSON.stringify(raw);
 }
 
 let sourceDir;
@@ -82,13 +82,13 @@ afterEach(() => fs.rmSync(sourceDir, { recursive: true, force: true }));
 
 describe("parseCompactionConfig", () => {
   it("parses compiler-generated configuration with defaults", () => {
-    const config = parseCompactionConfig(Buffer.from(JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: {} })).toString("base64"));
+    const config = parseCompactionConfig(JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: {} }));
     expect(config).toMatchObject({ name: "findings", branch: "ledgers/findings", schedule: "daily", minSegments: 32, maxSegments: 128, maxSegmentBytes: 100 * 1024 });
   });
 
   it.each([
     ["missing value", undefined],
-    ["non JSON", Buffer.from("nope").toString("base64")],
+    ["non JSON", "nope"],
     ["mismatched branch", encodeConfig({}, { branch_name: "main" })],
     ["invalid name", encodeConfig({}, { name: "../x", branch_name: "ledgers/../x" })],
     ["unknown schedule", encodeConfig({ schedule: "hourly" })],
