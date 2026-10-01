@@ -489,7 +489,6 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 func buildClaudeBaseEnvMap(provider LLMProvider, workflowData *WorkflowData) map[string]string {
 	return map[string]string{
 		"ANTHROPIC_API_KEY": llmProviderSecretExpression(provider, workflowData),
-		"CLAUDE_CONFIG_DIR": constants.TmpGhAwDir + "/agent/claude",
 		"DISABLE_TELEMETRY": "1",
 		// Prevent telemetry/crash reporting and optional features that don't work in CI.
 		"DISABLE_ERROR_REPORTING": "1",

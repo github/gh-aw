@@ -46,9 +46,6 @@ engine:
       model-env-var: CURSOR_MODEL
       mcp-config-env-var: GH_AW_MCP_CONFIG
       write-timestamp: true
-      env:
-        HOME: /tmp/gh-aw/agent/cursor-home
-        XDG_DATA_HOME: /tmp/gh-aw/agent/cursor-data
     mcp:
       config-path: .cursor/mcp.json
       config-adapter: |

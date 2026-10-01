@@ -237,7 +237,6 @@ func TestGeminiEngineExecution(t *testing.T) {
 		assert.Contains(t, stepContent, "GITHUB_WORKSPACE:", "Should include GITHUB_WORKSPACE")
 		assert.Contains(t, stepContent, "DEBUG: gemini-cli:*", "Should include DEBUG env var for verbose diagnostics")
 		assert.Contains(t, stepContent, "GEMINI_CLI_TRUST_WORKSPACE: true", "Should include GEMINI_CLI_TRUST_WORKSPACE")
-		assert.Contains(t, stepContent, "GEMINI_CLI_HOME: /tmp/gh-aw/agent/gemini", "Should store Gemini session state under /tmp/gh-aw")
 	})
 
 	t.Run("model environment variables", func(t *testing.T) {

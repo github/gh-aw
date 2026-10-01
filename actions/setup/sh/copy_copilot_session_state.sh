@@ -18,10 +18,27 @@ AWF_SESSION_STATE_DIR="${GH_AW_COPILOT_SESSION_STATE_DIR:-/tmp/gh-aw/sandbox/age
 LEGACY_SESSION_STATE_DIR="${GH_AW_COPILOT_LEGACY_SESSION_STATE_DIR:-$HOME/.copilot/session-state}"
 LOGS_DIR="${GH_AW_COPILOT_SESSION_LOGS_DIR:-/tmp/gh-aw/sandbox/agent/logs/copilot-session-state}"
 
+is_redactable_file() {
+  case "$1" in
+    *.txt|*.json|*.log|*.md|*.mdx|*.yml|*.jsonl|*.patch) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+has_redactable_files() {
+  local file
+  while IFS= read -r -d '' file; do
+    if is_redactable_file "$file"; then
+      return 0
+    fi
+  done < <(find "$1" -type f -print0)
+  return 1
+}
+
 SESSION_STATE_DIR=""
-if [ -d "$AWF_SESSION_STATE_DIR" ] && [ -n "$(find "$AWF_SESSION_STATE_DIR" -type f -print -quit)" ]; then
+if [ -d "$AWF_SESSION_STATE_DIR" ] && has_redactable_files "$AWF_SESSION_STATE_DIR"; then
   SESSION_STATE_DIR="$AWF_SESSION_STATE_DIR"
-elif [ -d "$LEGACY_SESSION_STATE_DIR" ] && [ -n "$(find "$LEGACY_SESSION_STATE_DIR" -type f -print -quit)" ]; then
+elif [ -d "$LEGACY_SESSION_STATE_DIR" ] && has_redactable_files "$LEGACY_SESSION_STATE_DIR"; then
   SESSION_STATE_DIR="$LEGACY_SESSION_STATE_DIR"
 fi
 
@@ -32,5 +49,13 @@ fi
 
 echo "Copying Copilot session state from $SESSION_STATE_DIR to $LOGS_DIR"
 mkdir -p "$LOGS_DIR"
-cp -r "$SESSION_STATE_DIR"/. "$LOGS_DIR/"
+while IFS= read -r -d '' file; do
+  if ! is_redactable_file "$file"; then
+    continue
+  fi
+  relative_path="${file#"$SESSION_STATE_DIR"/}"
+  destination_dir="$LOGS_DIR/$(dirname "$relative_path")"
+  mkdir -p "$destination_dir"
+  cp -- "$file" "$destination_dir/"
+done < <(find "$SESSION_STATE_DIR" -type f -print0)
 echo "Session state directory copied successfully"

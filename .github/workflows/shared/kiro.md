@@ -47,7 +47,6 @@ engine:
       mcp-config-env-var: GH_AW_MCP_CONFIG
       write-timestamp: true
       env:
-        HOME: /tmp/gh-aw/agent/kiro-home
         KIRO_LOG_NO_COLOR: "1"
         NO_COLOR: "1"
     mcp:

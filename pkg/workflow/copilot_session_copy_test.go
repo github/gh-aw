@@ -73,6 +73,7 @@ func TestCopilotSessionCopyScriptFallsBackToLegacyDirectory(t *testing.T) {
 	awfDir := t.TempDir()
 	legacyDir := t.TempDir()
 	logsDir := t.TempDir()
+	writeSessionStateFile(t, awfDir, "session/session.db", "awf database")
 	writeSessionStateFile(t, legacyDir, "session/events.jsonl", "legacy events")
 	writeSessionStateFile(t, legacyDir, "session/files/nested.txt", "legacy file")
 
@@ -80,6 +81,26 @@ func TestCopilotSessionCopyScriptFallsBackToLegacyDirectory(t *testing.T) {
 
 	assertSessionStateFile(t, logsDir, "session/events.jsonl", "legacy events")
 	assertSessionStateFile(t, logsDir, "session/files/nested.txt", "legacy file")
+	assertSessionStateFileMissing(t, logsDir, "session/session.db")
+}
+
+func TestCopilotSessionCopyScriptCopiesOnlyRedactableFiles(t *testing.T) {
+	awfDir := t.TempDir()
+	legacyDir := t.TempDir()
+	logsDir := t.TempDir()
+	writeSessionStateFile(t, awfDir, "session/events.jsonl", "awf events")
+	writeSessionStateFile(t, awfDir, "session/checkpoints/001.md", "awf checkpoint")
+	writeSessionStateFile(t, awfDir, "session/session.db", "sensitive database")
+	writeSessionStateFile(t, awfDir, "session/extensionless", "sensitive extensionless file")
+	writeSessionStateFile(t, awfDir, "session/settings.yaml", "unsupported extension")
+
+	runCopilotSessionCopyScript(t, awfDir, legacyDir, logsDir)
+
+	assertSessionStateFile(t, logsDir, "session/events.jsonl", "awf events")
+	assertSessionStateFile(t, logsDir, "session/checkpoints/001.md", "awf checkpoint")
+	assertSessionStateFileMissing(t, logsDir, "session/session.db")
+	assertSessionStateFileMissing(t, logsDir, "session/extensionless")
+	assertSessionStateFileMissing(t, logsDir, "session/settings.yaml")
 }
 
 func TestCopilotSessionCopyScriptSkipsEmptyDirectories(t *testing.T) {

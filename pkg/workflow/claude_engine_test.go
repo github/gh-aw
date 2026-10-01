@@ -127,10 +127,6 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected GH_AW_PROMPT environment variable in step: %s", stepContent)
 	}
 
-	if !strings.Contains(stepContent, "CLAUDE_CONFIG_DIR: /tmp/gh-aw/agent/claude") {
-		t.Errorf("Expected Claude session state to be stored under /tmp/gh-aw: %s", stepContent)
-	}
-
 	// When no tools/MCP servers are configured, GH_AW_MCP_CONFIG should NOT be present
 	if strings.Contains(stepContent, "GH_AW_MCP_CONFIG: ${{ runner.temp }}/gh-aw/mcp-config/mcp-servers.json") {
 		t.Errorf("Did not expect GH_AW_MCP_CONFIG environment variable in step (no MCP servers): %s", stepContent)

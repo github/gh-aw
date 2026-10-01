@@ -272,16 +272,10 @@ func (e *BehaviorDefinedEngine) GetPluginInstallationSteps(workflowData *Workflo
 		commandName = workflowData.EngineConfig.Command
 	}
 
-	homeDir := ""
-	if behavior.Execution != nil {
-		homeDir = behavior.Execution.Env["HOME"]
-	}
-
 	return generatePluginInstallationSteps(workflowData, pluginInstallSpec{
 		Command:     commandName,
 		InstallArgs: behavior.Plugins.InstallArgs,
 		Directory:   behavior.Plugins.Directory,
-		HomeDir:     homeDir,
 	})
 }
 
