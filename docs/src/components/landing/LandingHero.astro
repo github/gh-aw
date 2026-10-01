@@ -6,7 +6,7 @@ import HeroExample from './HeroExample.astro';
 <section class="aw-hero not-content">
   <div class="aw-hero-inner">
     <div class="aw-hero-text">
-      <h1>Intelligent GitHub automation, <span>written in Markdown.</span></h1>
+      <h1><span class="aw-line">Intelligent GitHub</span> <span class="aw-line">repository automation</span> <span class="aw-line aw-muted">written in Markdown.</span></h1>
       <p class="aw-hero-sub">
         Describe a task in plain language and GitHub turns it into an Actions workflow. Run the coding agents you know and love, with strong guardrails and cost controls.
       </p>
@@ -31,12 +31,12 @@ import HeroExample from './HeroExample.astro';
   }
   @media (min-width: 1024px) {
     .aw-hero-inner {
-      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      grid-template-columns: minmax(0, 11fr) minmax(0, 10fr);
     }
   }
   h1 {
     margin: 0;
-    font-size: var(--aw-step-4);
+    font-size: var(--aw-step-5);
     font-weight: 460;
     letter-spacing: -0.035em;
     line-height: 1.06;
@@ -44,13 +44,10 @@ import HeroExample from './HeroExample.astro';
     color: var(--aw-color-text);
     border: 0;
   }
-  @media (min-width: 1100px) {
-    h1 {
-      font-size: var(--aw-step-5);
-    }
-  }
-  h1 span {
+  .aw-line {
     display: block;
+  }
+  .aw-muted {
     color: var(--aw-color-text-muted);
   }
   .aw-hero-sub {
