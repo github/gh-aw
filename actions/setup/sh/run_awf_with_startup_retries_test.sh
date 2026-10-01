@@ -87,6 +87,7 @@ set +e
 run_routing_with_env bash -c '
   attempts="$(cat "$1" 2>/dev/null || echo 0)"
   printf "%s" "$((attempts + 1))" > "$1"
+  echo "Fatal error: task has no routing candidate"
   exit 78
 ' bash "$ATTEMPT_FILE" > "$OUTPUT" 2>&1
 STATUS=$?
