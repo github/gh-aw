@@ -217,11 +217,12 @@ const MISSING_MODEL_PRICING_PATTERN = /Model\s+"([^"]+)"\s+has no AI credits pri
 //   "CAPIError: 429 Too Many Requests"   (HTTP 429 form)
 //   "CAPIError: Too Many Requests"       (no status code in message)
 //   "Failed to get response from the AI model; retried 5 times ... Last error: 429 Too Many Requests"
-//     (Copilot CLI's own retry-exhaustion message, no "CAPIError:" prefix — seen with both
-//     429 and 5xx terminal statuses, e.g. "Last error: 503 Service Unavailable")
-// All forms are treated as non-retryable; the Copilot CLI/SDK has already retried
-// internally before surfacing this error (evidenced by "retried N times" context).
-const CAPI_QUOTA_EXCEEDED_PATTERN = /CAPIError:\s*(?:429\s+)?(?:429\s+quota exceeded|Too Many Requests)|Failed to get response from the AI model;\s*retried\s+\d+\s+times[^\n]{0,300}?Last error:\s*(?:429|5\d{2})\b/i;
+//     (Copilot CLI's own retry-exhaustion message, no "CAPIError:" prefix)
+// Quota errors remain non-retryable after the CLI's internal retries.
+const CAPI_QUOTA_EXCEEDED_PATTERN = /CAPIError:\s*(?:429\s+)?(?:429\s+quota exceeded|Too Many Requests)|Failed to get response from the AI model;\s*retried\s+\d+\s+times[^\n]{0,300}?Last error:\s*429\b/i;
+
+// Unlike quota exhaustion, a retry-exhausted 5xx may recover during harness backoff.
+const CAPI_SERVER_ERROR_PATTERN = /Failed to get response from the AI model;\s*retried\s+\d+\s+times[^\n]{0,300}?Last error:\s*5\d{2}\b/i;
 
 /**
  * Build a case-insensitive merged RegExp from literal/regex patterns.
@@ -269,6 +270,10 @@ const SHELL_EXPANSION_GUARD_REJECTED_PATTERN = /could enable arbitrary code exec
  */
 function isCAPIQuotaExceededError(output) {
   return CAPI_QUOTA_EXCEEDED_PATTERN.test(output);
+}
+
+function isCAPIServerError(output) {
+  return CAPI_SERVER_ERROR_PATTERN.test(output);
 }
 
 /**
@@ -623,6 +628,7 @@ module.exports = {
   detectErrors,
   extractMissingModelPricingModelName,
   isCAPIQuotaExceededError,
+  isCAPIServerError,
   isInvocationCapExceededError,
   isMaxCacheMissesExceededError,
   isAgenticEngineTimeout,

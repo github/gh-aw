@@ -15,6 +15,7 @@ global.core = mockCore;
 const {
   detectErrors,
   isCAPIQuotaExceededError,
+  isCAPIServerError,
   isInvocationCapExceededError,
   isMaxCacheMissesExceededError,
   isAgenticEngineTimeout,
@@ -260,9 +261,14 @@ describe("detect_agent_errors.cjs", () => {
       expect(isCAPIQuotaExceededError(message)).toBe(true);
     });
 
-    it("matches the Copilot CLI's own retry-exhaustion message for 5xx statuses (503)", () => {
-      const message = "Failed to get response from the AI model; retried 5 times (total retry wait time: 300 seconds) Last error: 503 Service Unavailable";
-      expect(isCAPIQuotaExceededError(message)).toBe(true);
+    it("does not classify retry-exhausted 502/503/504 as quota", () => {
+      for (const status of [502, 503, 504]) {
+        const message = `Failed to get response from the AI model; retried 5 times (total retry wait time: 14.90 seconds) Last error: ${status} Service Unavailable`;
+        expect(isCAPIQuotaExceededError(message)).toBe(false);
+        expect(isCAPIServerError(message)).toBe(true);
+      }
+      expect(isCAPIServerError("")).toBe(false);
+      expect(isCAPIServerError("Failed to get response from the AI model; retried 5 times. Last error: 429 Too Many Requests")).toBe(false);
     });
 
     it("does not match a 'Failed to get response' message without retry-exhaustion context", () => {
