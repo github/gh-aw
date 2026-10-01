@@ -34,11 +34,13 @@ const options = [
     </div>
     {options.map((o, i) => (
       <div class="aw-watch-panel" role="tabpanel" id={`watch-panel-${o.id}`} aria-labelledby={`watch-tab-${o.id}`} data-selected={i === 0 ? 'true' : 'false'}>
+        <div class="aw-watch-stage">
         <div class="aw-watch-frame">
           <video controls playsinline preload="none" poster={`${base}/videos/${o.video}-poster.jpg`} aria-label={o.title}>
             <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
             <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
           </video>
+        </div>
         </div>
         <p class="aw-watch-desc">{o.description} <a href={o.href}>{o.linkText} →</a></p>
       </div>
@@ -103,11 +105,36 @@ const options = [
   }
   .aw-watch-panel { width: 100%; max-width: 64rem; }
   .aw-watch-panel + .aw-watch-panel { margin-top: 2rem; }
+  /* Static dither fringe echoing the hero: 3px cells, a denser inner ring, a sparser outer ring, three coral cells. */
+  .aw-watch-stage { position: relative; margin: 0.75rem; }
+  .aw-watch-stage::before,
+  .aw-watch-stage::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+  .aw-watch-stage::before {
+    inset: -0.75rem;
+    background: var(--aw-color-accent);
+    opacity: 0.4;
+    border-radius: 14px;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0h3v3H0zM6 0h3v3H6zM3 3h3v3H3zM9 3h3v3H9zM0 6h3v3H0zM6 6h3v3H6zM3 9h3v3H3zM9 9h3v3H9z'/%3E%3C/svg%3E");
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0h3v3H0zM6 0h3v3H6zM3 3h3v3H3zM9 3h3v3H9zM0 6h3v3H0zM6 6h3v3H6zM3 9h3v3H3zM9 9h3v3H9z'/%3E%3C/svg%3E");
+  }
+  .aw-watch-stage::after {
+    top: -0.75rem;
+    right: 2.25rem;
+    width: 6px;
+    height: 6px;
+    background: var(--aw-color-complement);
+    box-shadow: 18px 6px 0 var(--aw-color-complement), -30px 0 0 var(--aw-color-complement);
+  }
   .aw-watch-frame {
+    position: relative;
     aspect-ratio: 16 / 9;
     overflow: hidden;
     background: var(--aw-color-bg-subtle);
-    border: 1px solid var(--aw-color-border);
+    border: 1px solid color-mix(in srgb, var(--aw-color-accent) 55%, transparent);
     border-radius: 12px;
     box-shadow: var(--aw-shadow-raised);
   }
