@@ -82,7 +82,7 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 			require.Equal(t, kind, cfg.Ledgers[0].Type)
 			section := buildLedgerPromptSection(cfg)
 			require.Contains(t, section.Content, "records ("+kind+")")
-			require.Contains(t, section.Content, "ledger append safe output")
+			require.Contains(t, section.Content, "configured ledger safe-output tools")
 			if kind == "table" {
 				require.Contains(t, section.Content, "primary key: id")
 			}
