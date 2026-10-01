@@ -51,6 +51,8 @@ func TestParseIntOrExpressionValues(t *testing.T) {
 		{name: "non-negative trims whitespace", parse: parseHarnessMaxRetriesValue, raw: " 2 ", expected: "2"},
 		{name: "max-tool-denials rejects zero", parse: parseMaxToolDenialsValue, raw: "0", expected: ""},
 		{name: "max-tool-denials accepts expression", parse: parseMaxToolDenialsValue, raw: "${{ inputs.max_tool_denials }}", expected: "${{ inputs.max_tool_denials }}"},
+		{name: "max-tool-calls rejects zero", parse: parseMaxToolCallsValue, raw: "0", expected: ""},
+		{name: "max-tool-calls accepts expression", parse: parseMaxToolCallsValue, raw: "${{ inputs.max_tool_calls }}", expected: "${{ inputs.max_tool_calls }}"},
 	}
 
 	for _, tt := range tests {

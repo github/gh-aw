@@ -34,6 +34,32 @@ func TestParseStandaloneLedgerForms(t *testing.T) {
 	require.Equal(t, "replay", namedReplay.Ledgers[0].Name)
 }
 
+func TestSingleWorkPoolLedgerCompiles(t *testing.T) {
+	workflowDir := t.TempDir()
+	workflowPath := filepath.Join(workflowDir, "work-pool.md")
+	workflow := `---
+on: workflow_dispatch
+engine: copilot
+tools:
+  ledger:
+    type: work-pool
+    identity: [task]
+---
+
+# Work pool
+
+Process queued work.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
+
+	data, err := NewCompiler().ParseWorkflowFile(workflowPath)
+	require.NoError(t, err)
+	require.Len(t, data.LedgerConfig.Ledgers, 1)
+	require.Equal(t, "work-pool", data.LedgerConfig.Ledgers[0].Type)
+	require.Equal(t, []string{"task"}, data.LedgerConfig.Ledgers[0].Identity)
+	require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+}
+
 func TestBuiltinLedgerDeclarations(t *testing.T) {
 	named, err := parseLedgerToolConfig(map[string]any{
 		"type": map[string]any{},
@@ -41,12 +67,15 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
-	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "work-pool"} {
 		t.Run(kind, func(t *testing.T) {
 			declaration := map[string]any{"type": kind}
 			if kind == "table" {
 				declaration["key"] = "id"
 				declaration["schema"] = map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}
+			}
+			if kind == "work-pool" {
+				declaration["identity"] = []any{"task"}
 			}
 			cfg, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 			require.NoError(t, err)
@@ -57,6 +86,10 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 			if kind == "table" {
 				require.Contains(t, section.Content, "primary key: id")
 			}
+			if kind == "work-pool" {
+				require.Equal(t, []string{"task"}, cfg.Ledgers[0].Identity)
+				require.Contains(t, section.Content, "acquire-next(filter?)")
+			}
 		})
 	}
 	for _, declaration := range []map[string]any{
@@ -65,6 +98,8 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 		{"type": "table"},
 		{"type": "counter", "schema": map[string]any{"type": "number"}},
 		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
+		{"type": "set", "identity": []any{"task"}},
+		{"type": "work-pool", "identity": []any{"task", "task"}},
 	} {
 		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 		require.Error(t, err)
@@ -225,6 +260,14 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	typedLedger := typedSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
 	require.Equal(t, "table", typedLedger["type"])
 	require.Equal(t, "id", typedLedger["key"])
+
+	workPoolConfig := &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "pool", Type: "work-pool", Identity: []string{"task"}}}}
+	workPoolJSON, err := generateSafeOutputsConfig(&WorkflowData{SafeOutputs: &SafeOutputsConfig{}, LedgerConfig: workPoolConfig})
+	require.NoError(t, err)
+	var workPoolSafeOutput map[string]any
+	require.NoError(t, json.Unmarshal([]byte(workPoolJSON), &workPoolSafeOutput))
+	workPoolLedger := workPoolSafeOutput["ledger_append"].(map[string]any)["ledgers"].([]any)[0].(map[string]any)
+	require.Equal(t, []any{"task"}, workPoolLedger["identity"])
 
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))
