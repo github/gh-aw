@@ -21,6 +21,36 @@ func TestCodexEngine_ResolveLLMProvider_DefaultOpenAI(t *testing.T) {
 	}
 }
 
+func TestCodexEngineOpenAINoModelUsesProviderDefault(t *testing.T) {
+	engine := NewCodexEngine()
+	workflowData := &WorkflowData{
+		Name:         "test-workflow",
+		EngineConfig: &EngineConfig{ID: "codex"},
+		SafeOutputs:  &SafeOutputsConfig{},
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "test-log")
+	if len(steps) == 0 {
+		t.Fatal("Expected execution step")
+	}
+
+	stepContent := strings.Join([]string(steps[0]), "\n")
+	for _, expected := range []string{
+		"GH_AW_LLM_PROVIDER: openai",
+		"CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}",
+		"OPENAI_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}",
+		"GH_AW_MODEL_AGENT_CODEX: ${{ vars.GH_AW_MODEL_AGENT_CODEX || vars.GH_AW_DEFAULT_MODEL_CODEX || '' }}",
+		`${GH_AW_MODEL_AGENT_CODEX:+ --model "$GH_AW_MODEL_AGENT_CODEX"}`,
+	} {
+		if !strings.Contains(stepContent, expected) {
+			t.Errorf("Expected OpenAI Codex step without a configured model to contain %q, got:\n%s", expected, stepContent)
+		}
+	}
+	if strings.Contains(stepContent, "--model gpt-5.4") {
+		t.Errorf("OpenAI Codex should choose its own default model when none is configured, got:\n%s", stepContent)
+	}
+}
+
 func TestCodexEngine_ResolveLLMProviderFromModel(t *testing.T) {
 	engine := NewCodexEngine()
 
