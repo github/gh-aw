@@ -57,7 +57,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `missing-t
 |--------|-----|-------------|
 | [Add Comment](#comment-creation-add-comment) | `add-comment` | Post comments on issues, PRs, or discussions (max: 1) |
 | [Hide Comment](#hide-comment-hide-comment) | `hide-comment` | Hide comments on issues, PRs, or discussions (max: 5) |
-| [Add Labels](#add-labels-add-labels) | `add-labels` | Add labels to issues or PRs (max: 3) |
+| [Add Labels](#add-labels-add-labels) | `add-labels` | Add labels to issues or PRs (max: 5 calls) |
 | [Remove Labels](#remove-labels-remove-labels) | `remove-labels` | Remove labels from issues or PRs (max: 3) |
 | [Assign Milestone](#assign-milestone-assign-milestone) | `assign-milestone` | Assign issues to milestones (max: 1) |
 | [Assign to Agent](#assign-to-agent-assign-to-agent) | `assign-to-agent` | Assign Copilot coding agent to issues or PRs (max: 1) |
@@ -479,6 +479,8 @@ safe-outputs:
 
 Adds labels to issues or PRs. Specify `allowed` to restrict to specific labels or glob patterns, or `blocked` to deny specific label patterns regardless of the allow list.
 
+`max` limits the number of `add_labels` calls (default: 5); `max-labels` limits the labels in each call (default: 10). Calls exceeding `max-labels` are rejected without adding any labels.
+
 Use `required-labels` to only add labels to issues/PRs that already have **all** of the specified labels. Use `required-title-prefix` to only add labels to issues/PRs whose title starts with the given prefix.
 
 By default, labels that don't already exist in the target repository are rejected with an error. Set `create-if-missing: true` to automatically create any missing labels before they are applied.
@@ -490,7 +492,8 @@ safe-outputs:
   add-labels:
     allowed: [bug, team-*, area/*] # restrict to specific labels or glob patterns
     blocked: ["~*", "*[bot]"]   # deny labels matching these glob patterns
-    max: 3                       # max labels (default: 3)
+    max: 10                      # max add_labels calls (default: 5)
+    max-labels: 5                # max labels per call (default: 10)
     target: "*"                  # "triggering" (default), "*", or number
     target-repo: "owner/repo"    # cross-repository
     allowed-repos: ["org/repo1", "org/repo2"]  # additional allowed repositories
@@ -1053,7 +1056,7 @@ safe-outputs:
     target-repo: "owner/repo"  # cross-repository: submit review on PR in another repo
     allowed-repos: ["org/repo1", "org/repo2"]  # additional allowed repositories
     allowed-events: [COMMENT, REQUEST_CHANGES]  # include REQUEST_CHANGES when using supersede mode for blocking reviews
-    supersede-older-reviews: true  # dismiss older same-workflow REQUEST_CHANGES reviews after posting a replacement review
+    supersede-older-reviews: true  # dismiss older same-workflow blockers after a clean COMMENT review with no inline findings
     footer: false     # omit AI-generated footer from review body (default: true)
 ```
 
@@ -1061,7 +1064,7 @@ Use `allowed-events` to restrict which review event types the agent can submit. 
 
 **Recommendation:** prefer `allowed-events: [COMMENT]` as the default for automated review workflows. This keeps AI feedback visible without creating a persistent merge-blocking state.
 
-Set `supersede-older-reviews: true` only when your workflow intentionally uses `REQUEST_CHANGES` and you want newer runs to dismiss older blocking reviews from the same workflow. Superseding is best-effort and happens after the replacement review is posted.
+Set `supersede-older-reviews: true` only when your workflow intentionally uses `REQUEST_CHANGES` and you want a clean `COMMENT` review with no inline findings to dismiss older blocking bot reviews from the same workflow. A blocking review or one with inline findings does not trigger supersession, and newer reviews are never dismissed. Superseding is best-effort.
 
 ### Resolve PR Review Thread (`resolve-pull-request-review-thread:`)
 
@@ -2076,6 +2079,8 @@ Accepts a literal integer or a GitHub Actions expression string (e.g., `${{ inpu
 ### Mention Filtering (`mentions:`)
 
 By default, `@mentions` in AI-generated content are escaped with backticks unless the mentioned user is a verified collaborator or inferred from the event context (issue/PR author, assignees, etc.). Use `mentions:` to control this behavior:
+
+Collaborator checks use the repository receiving each safe output. With `target-repo`, the workflow repository's collaborators are not used as a fallback when the token cannot read the target repository. The agent job sanitizes output first, so its token needs read access to the target repository to preserve collaborator mentions; a later handler token cannot restore escaped mentions.
 
 ```yaml wrap
 safe-outputs:

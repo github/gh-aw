@@ -658,7 +658,7 @@ jobs:
           GH_AW_TOOLS_META_JSON: |
             {
               "description_suffixes": {
-                "add_labels": " CONSTRAINTS: Only these labels are allowed: [\"spam\" \"ai-generated\" \"link-spam\" \"ai-inspected\"]. Target: *."
+                "add_labels": " CONSTRAINTS: Maximum 5 add_labels call(s) allowed. Maximum 10 label(s) per call. Only these labels are allowed: [\"spam\" \"ai-generated\" \"link-spam\" \"ai-inspected\"]. Target: *."
               },
               "repo_params": {},
               "dynamic_tools": [],

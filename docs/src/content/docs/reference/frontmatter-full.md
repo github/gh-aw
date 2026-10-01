@@ -10488,10 +10488,11 @@ safe-outputs:
     allowed-events: []
       # Array of strings
 
-    # When true, after posting a replacement review this workflow dismisses older
-    # REQUEST_CHANGES reviews previously posted by the same workflow on the same pull
-    # request. This is best-effort and requires workflow markers in prior review
-    # bodies.
+    # When true, a clean COMMENT review with no inline findings dismisses older
+    # REQUEST_CHANGES bot reviews from the same workflow on the same pull request.
+    # Blocking reviews and reviews with inline findings do not trigger dismissal,
+    # newer reviews are never dismissed, and this best-effort behavior requires
+    # workflow provenance markers in prior review bodies.
     # (optional)
     supersede-older-reviews: true
 
@@ -13149,8 +13150,8 @@ safe-outputs:
     blocked: []
       # Array of strings
 
-    # Optional maximum number of labels to add (default: 3) Supports integer or GitHub
-    # Actions expression (e.g. '${{ inputs.max }}').
+    # Optional maximum number of add_labels calls (default: 5). Supports integer or
+    # GitHub Actions expression (e.g. '${{ inputs.max }}').
     # (optional)
     # Accepted formats:
 
@@ -13159,6 +13160,17 @@ safe-outputs:
 
     # Format 2: GitHub Actions expression that resolves to an integer at runtime
     max: "example-value"
+
+    # Maximum number of labels per add_labels call (default: 10). Supports integer or
+    # GitHub Actions expression (e.g. '${{ inputs.max_labels }}').
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: integer
+    max-labels: 1
+
+    # Format 2: GitHub Actions expression that resolves to an integer at runtime
+    max-labels: "example-value"
 
     # When false, excludes issues:write from the minted GitHub App token for
     # add-labels. Default (omitted or true) includes issues:write.

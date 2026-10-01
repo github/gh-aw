@@ -70,6 +70,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
 	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 	"github.com/github/gh-aw/pkg/linters/uncheckedflushreturn"
@@ -156,6 +157,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	timenowsub.Analyzer,
 	tolowerequalfold.Analyzer,
 	trimleftright.Analyzer,
+	typeassertionnil.Analyzer,
 	typeassertionokdiscarded.Analyzer,
 	uncheckedsliceindex.Analyzer,
 	uncheckedtypeassertion.Analyzer,

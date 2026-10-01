@@ -470,6 +470,64 @@ engine: copilot
 		"centralized slash_command with discussion_comment events should include discussions:write for reactions")
 }
 
+func TestActivationPermissionsCentralizedSlashCommandText(t *testing.T) {
+	perms := map[PermissionScope]PermissionLevel{PermissionIssues: PermissionWrite}
+	ctx := &activationJobBuildContext{data: &WorkflowData{
+		CommandCentralized: true,
+		NeedsTextOutput:    true,
+		CommandEvents:      []string{"issue_comment", "pull_request_comment", "pull_request_review_comment", "discussion_comment"},
+	}}
+	NewCompiler().addCentralizedCommandActivationPermissions(perms, ctx)
+	assert.Equal(t, PermissionWrite, perms[PermissionIssues])
+	assert.Equal(t, PermissionRead, perms[PermissionPullRequests])
+	assert.Equal(t, PermissionRead, perms[PermissionDiscussions])
+
+	readPerms := make(map[PermissionScope]PermissionLevel)
+	NewCompiler().addCentralizedCommandActivationPermissions(readPerms, ctx)
+	assert.Equal(t, PermissionRead, readPerms[PermissionIssues])
+	assert.Equal(t, PermissionRead, readPerms[PermissionPullRequests])
+	assert.Equal(t, PermissionRead, readPerms[PermissionDiscussions])
+
+	tmpDir := testutil.TempDir(t, "activation-perms-centralized-text")
+	testFile := filepath.Join(tmpDir, "centralized-text.md")
+	testContent := `---
+on:
+  slash_command:
+    name: probe
+    strategy: centralized
+    events: [issue_comment, pull_request_review_comment, discussion_comment]
+engine: copilot
+---
+
+${{ steps.sanitized.outputs.text }}
+`
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(testFile))
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	require.NoError(t, err)
+
+	activationJobSection := extractJobSection(string(lockContent), string(constants.ActivationJobName))
+	assert.Regexp(t, `issues: (read|write)`, activationJobSection)
+	assert.Regexp(t, `pull-requests: (read|write)`, activationJobSection)
+	assert.Regexp(t, `discussions: (read|write)`, activationJobSection)
+}
+
+func TestActivationPermissionsCentralizedPullRequestComment(t *testing.T) {
+	perms := make(map[PermissionScope]PermissionLevel)
+	ctx := &activationJobBuildContext{data: &WorkflowData{
+		CommandCentralized: true,
+		NeedsTextOutput:    true,
+		CommandEvents:      []string{"pull_request_comment"},
+	}}
+
+	NewCompiler().addCentralizedCommandActivationPermissions(perms, ctx)
+
+	assert.Equal(t, PermissionRead, perms[PermissionPullRequests])
+	assert.NotContains(t, perms, PermissionIssues)
+}
+
 // TestActivationPermissionsCentralizedSlashCommandDiscussionOnlyReaction verifies that a
 // centralized slash_command workflow with only discussion events gets discussions:write but
 // not issues:write or pull-requests:write.

@@ -635,6 +635,7 @@ func TestGenerateSafeOutputsConfigAddLabelsBlocked(t *testing.T) {
 		SafeOutputs: &SafeOutputsConfig{
 			AddLabels: &AddLabelsConfig{
 				BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("5")},
+				MaxLabels:            strPtr("25"),
 				SafeOutputTargetConfig: SafeOutputTargetConfig{
 					Target:         "*",
 					TargetRepoSlug: "microsoft/vscode",
@@ -656,6 +657,8 @@ func TestGenerateSafeOutputsConfigAddLabelsBlocked(t *testing.T) {
 
 	addLabelsConfig, ok := parsed["add_labels"].(map[string]any)
 	require.True(t, ok, "Expected add_labels key in config")
+	assert.InDelta(t, 5, addLabelsConfig["max"], 0)
+	assert.InDelta(t, 25, addLabelsConfig["max_labels"], 0)
 
 	blocked, ok := addLabelsConfig["blocked"]
 	require.True(t, ok, "Expected blocked field in add_labels config")

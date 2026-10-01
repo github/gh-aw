@@ -35,7 +35,7 @@ const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates } = require("./issue_intents.cjs");
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
-const { SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { deterministicLabelColor } = require("./create_labels.cjs");
 
 /**
@@ -241,6 +241,11 @@ const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
+    const configuredMaxLabels = config.max_labels ?? MAX_LABELS;
+    const maxLabels = typeof configuredMaxLabels === "number" ? configuredMaxLabels : typeof configuredMaxLabels === "string" ? Number(configuredMaxLabels) : Number.NaN;
+    if (!Number.isSafeInteger(maxLabels) || maxLabels < 1) {
+      throw new Error(`${ERR_CONFIG}: Invalid max-labels value: ${configuredMaxLabels}. Must be a positive integer`);
+    }
     const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
     const issueIntentStrict = config.issue_intent === true; // strict mode: plain-string labels rejected, metadata required
@@ -250,7 +255,7 @@ const main = createCountGatedHandler({
     const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
     const githubClient = await createAuthenticatedGitHubClient(config);
 
-    core.info(`Add labels configuration: max=${maxCount}`);
+    core.info(`Add labels configuration: max=${maxCount}, max-labels=${maxLabels}`);
     if (allowedLabels.length > 0) core.info(`Allowed labels: ${allowedLabels.join(", ")}`);
     if (blockedPatterns.length > 0) core.info(`Blocked patterns: ${blockedPatterns.join(", ")}`);
     if (requiredLabels.length > 0) core.info(`Required labels (all): ${requiredLabels.join(", ")}`);
@@ -407,15 +412,15 @@ const main = createCountGatedHandler({
         };
       }
 
-      // Enforce max limits on labels before validation
-      const limitResult = tryEnforceArrayLimit(requestedLabelNames, MAX_LABELS, "labels");
+      // Enforce the per-call limit before validation so no requested labels are silently dropped.
+      const limitResult = tryEnforceArrayLimit(requestedLabelNames, maxLabels, "labels");
       if (!limitResult.success) {
         core.warning(`Label limit exceeded: ${limitResult.error}`);
         return { success: false, error: limitResult.error };
       }
 
       // Use validation helper to sanitize and validate labels
-      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxCount, blockedPatterns);
+      const labelsResult = validateLabels(requestedLabelNames, allowedLabels, maxLabels, blockedPatterns);
 
       if (!labelsResult.valid) {
         // If no valid labels, log info and return gracefully

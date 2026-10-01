@@ -16,7 +16,8 @@
  *   - CAPIError 400 is a well-known transient failure mode and is logged explicitly, but
  *     any partial-execution failure is retried — not just CAPIError 400.
  *   - If the process produced no output (failed to start / auth error before any work), the
- *     driver does not retry because there is nothing to resume.
+ *     driver does not retry because there is nothing to resume, except for retry-exhausted CAPI
+ *     5xx errors, which may recover during harness backoff and restart fresh without --continue.
  *   - "No authentication information found" errors are handled differently depending on context:
  *     - On a `--continue` attempt: the Copilot CLI's on-disk session credential written by the
  *       interrupted run may be incomplete/invalid.  The driver falls back to a single fresh run
@@ -85,7 +86,7 @@ const { runSafeOutputsCLI, buildMissingToolAlternatives, emitMissingToolPermissi
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError: isCommonAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
-const { isCAPIQuotaExceededError } = require("./detect_agent_errors.cjs");
+const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
 const { applyModelFallback } = require("./model_fallback.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
@@ -733,6 +734,7 @@ function extractTokenCountFromOutput(output) {
  *   isAPIProxyGuardRejected?: boolean,
  *   isNullTypeToolCall?: boolean,
  *   isQuotaExceeded?: boolean,
+ *   isCAPIServerError?: boolean,
  *   isTrustedAICreditsBudgetExhausted?: boolean,
  *   isSDKSessionIdleTimeout?: boolean,
  *   isModelRoutingFailure?: boolean,
@@ -750,6 +752,7 @@ function classifyCopilotFailure(detection) {
   // "Authentication failed with provider ...".
   if (detection.isAPIProxyGuardRejected) return "api_proxy_guard_rejected";
   if (detection.isQuotaExceeded) return "capi_quota_exceeded";
+  if (detection.isCAPIServerError) return "capi_server_error";
   if (detection.isMCPPolicy) return "mcp_policy_blocked";
   if (detection.isModelNotSupported) return "model_not_supported";
   if (detection.isHTTP400ResponseError) return "http_400_response_error";
@@ -779,7 +782,11 @@ function shouldRetryFailedExecution(params) {
   const nonRetryableGuard = detectNonRetryableHarnessGuard(params.output);
   if (nonRetryableGuard.maxRunsExceeded) return false;
   if (nonRetryableGuard.apiProxyGuardRejection) return false;
-  return params.attempt < params.maxRetries && params.hasOutput;
+  return params.attempt < params.maxRetries && (params.hasOutput || isCAPIServerError(params.output));
+}
+
+function shouldContinueCopilotSessionAfterFailure({ copilotSDKMode, continueDisabledPermanently, hasOutput, hasCAPIServerError }) {
+  return !copilotSDKMode && !continueDisabledPermanently && (hasOutput || !hasCAPIServerError);
 }
 
 /**
@@ -1487,6 +1494,7 @@ async function main() {
           const isCAPIError = isTransientCAPIError(result.output);
           const isModelRoutingFailure = modelRoutingRequired && result.exitCode === 78;
           const isQuotaExceeded = isCAPIQuotaExceededError(result.output);
+          const hasCAPIServerError = isCAPIServerError(result.output);
           const isMCPPolicy = isMCPPolicyError(result.output);
           const isModelNotSupported = isModelNotSupportedError(result.output);
           const hasHTTP400ResponseError = isHTTP400ResponseError(result.output);
@@ -1532,6 +1540,7 @@ async function main() {
             isAPIProxyGuardRejected: !!apiProxyGuardRejection,
             isNullTypeToolCall,
             isQuotaExceeded,
+            isCAPIServerError: hasCAPIServerError,
             isTrustedAICreditsBudgetExhausted,
             isSDKSessionIdleTimeout,
             hasNumerousPermissionDenied,
@@ -1773,14 +1782,19 @@ async function main() {
           }
 
           if (shouldRetryFailedExecution({ ...result, isModelRoutingFailure, attempt, maxRetries })) {
-            const reason = isCAPIError ? "CAPIError 400 (transient)" : "partial execution";
+            const reason = hasCAPIServerError ? "CAPI server error (transient)" : isCAPIError ? "CAPIError 400 (transient)" : "partial execution";
             const isCrashSignal = isCrashSignalExitCode(result.exitCode);
             const crashSignalName = crashSignalNameForExitCode(result.exitCode);
             if (isCrashSignal) {
               continueDisabledPermanently = true;
             }
             // --continue is only meaningful in CLI mode; SDK mode always restarts fresh.
-            useContinueOnRetry = !copilotSDKMode && !continueDisabledPermanently;
+            useContinueOnRetry = shouldContinueCopilotSessionAfterFailure({
+              copilotSDKMode,
+              continueDisabledPermanently,
+              hasOutput: result.hasOutput,
+              hasCAPIServerError,
+            });
             const retryMode = useContinueOnRetry ? "--continue" : copilotSDKMode ? "fresh run" : "fresh run (--continue permanently disabled)";
             const crashSuffix = isCrashSignal ? ` crashSignal=${crashSignalName}` : "";
             log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})${crashSuffix}`);
@@ -1858,6 +1872,7 @@ if (typeof module !== "undefined" && module.exports) {
     classifyCopilotFailure,
     extractTokenCountFromOutput,
     shouldRetryFailedExecution,
+    shouldContinueCopilotSessionAfterFailure,
     isCrashSignalExitCode,
     crashSignalNameForExitCode,
     extractOutputTail,
@@ -1880,6 +1895,7 @@ if (typeof module !== "undefined" && module.exports) {
     resolveRetryConfig,
     parseCopilotSDKServerArgsFromEnv,
     isCAPIQuotaExceededError,
+    isCAPIServerError,
     hasTerminalSafeOutput,
     applyModelFallback,
     applyCopilotModelAliasResolution,

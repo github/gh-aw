@@ -357,4 +357,4 @@ function buildAwContext() {
   };
 }
 
-module.exports = { buildAwContext, buildWorkflowCallId, resolveItemContext };
+module.exports = { buildAwContext, buildWorkflowCallId, resolveItemContext, parseInboundAwContext };

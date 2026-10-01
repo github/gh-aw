@@ -1361,6 +1361,66 @@ describe("collect_ndjson_output.cjs", () => {
             parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].body).toBe("Hey `@username` and `@org/team`, check this out! But preserve email@domain.com");
         }),
+        it("checks collaborators in each comment's target repository, never the workflow repository", async () => {
+          global.context.payload.issue = { user: { login: "alice", type: "User" } };
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(testFile, [JSON.stringify({ type: "add_comment", repo: "target-org/first", body: "Hello @alice" }), JSON.stringify({ type: "add_comment", repo: "target-org/second", body: "Hello @alice" })].join("\n"));
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ add_comment: { "target-repo": "*", max: 2 } }));
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          expect(global.github.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "first" }));
+          expect(global.github.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "second" }));
+          expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalledWith(expect.objectContaining({ owner: "test-owner", repo: "test-repo" }));
+        }),
+        it("keeps target issue authors scoped to their own repository and issue", async () => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(
+            testFile,
+            [
+              JSON.stringify({ type: "add_comment", repo: "target-org/first", item_number: 7, body: "Hello @first-author" }),
+              JSON.stringify({ type: "add_comment", repo: "target-org/second", item_number: 7, body: "Hello @first-author" }),
+            ].join("\n")
+          );
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ add_comment: { "target-repo": "*", max: 2 } }));
+          global.github.rest.issues = {
+            get: vi.fn(async ({ repo }) => ({ data: { user: { login: repo === "first" ? "first-author" : "second-author", type: "User" } } })),
+          };
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+          expect(parsed.items.map(item => item.body)).toEqual(["Hello @first-author", "Hello `@first-author`"]);
+          expect(global.github.rest.issues.get).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "first", issue_number: 7 }));
+        }),
+        it("looks up explicit issue authors in a configured target-repo", async () => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(testFile, JSON.stringify({ type: "add_comment", item_number: 7, body: "Hello @target-author" }));
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ add_comment: { "target-repo": "target-org/target-repo" } }));
+          global.github.rest.issues = { get: vi.fn().mockResolvedValue({ data: { user: { login: "target-author", type: "User" } } }) };
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          expect(global.github.rest.issues.get).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "target-repo", issue_number: 7 }));
+          const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+          expect(parsed.items[0].body).toBe("Hello @target-author");
+        }),
+        it("does not query either repository for a disallowed per-item override", async () => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(testFile, JSON.stringify({ type: "add_comment", repo: "unauthorized/repo", body: "Hello @alice" }));
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ add_comment: { "target-repo": "target-org/target-repo" } }));
+          global.context.payload.issue = { user: { login: "alice", type: "User" } };
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalled();
+          const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+          expect(parsed.items[0].body).toBe("Hello `@alice`");
+        }),
         it("should preserve allowed aliases after max when no more than max occur", async () => {
           const allowed = Array.from({ length: 60 }, (_, i) => `user${i}`);
           const validationPath = "/tmp/gh-aw/safeoutputs/validation.json";
