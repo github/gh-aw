@@ -56,6 +56,7 @@ const {
   resolvePromptFileInput,
   resolveRetryConfig,
   shouldRetryFailedExecution,
+  shouldContinueCopilotSessionAfterFailure,
   resolveAWFModelRoutingSelection,
   applyCopilotRoutingSelection,
   applyCopilotRoutingArgs,
@@ -248,6 +249,28 @@ describe("copilot_harness.cjs", () => {
           expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput, output, attempt: 0, maxRetries: 3 })).toBe(true);
           expect(shouldRetryFailedExecution({ exitCode: 1, hasOutput, output, attempt: 3, maxRetries: 3 })).toBe(false);
         }
+      });
+
+      it("restarts fresh for a no-output retry-exhausted CAPI 5xx and continues when output exists", () => {
+        const output = "Failed to get response from the AI model; retried 5 times Last error: 503 Service Unavailable";
+        const hasCAPIServerError = isCAPIServerError(output);
+
+        expect(
+          shouldContinueCopilotSessionAfterFailure({
+            copilotSDKMode: false,
+            continueDisabledPermanently: false,
+            hasOutput: false,
+            hasCAPIServerError,
+          })
+        ).toBe(false);
+        expect(
+          shouldContinueCopilotSessionAfterFailure({
+            copilotSDKMode: false,
+            continueDisabledPermanently: false,
+            hasOutput: true,
+            hasCAPIServerError,
+          })
+        ).toBe(true);
       });
 
       it("does not retry a zero-progress attempt that exhausted the CLI's own 429 retries", () => {

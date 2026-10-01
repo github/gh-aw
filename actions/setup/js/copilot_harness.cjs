@@ -16,7 +16,8 @@
  *   - CAPIError 400 is a well-known transient failure mode and is logged explicitly, but
  *     any partial-execution failure is retried — not just CAPIError 400.
  *   - If the process produced no output (failed to start / auth error before any work), the
- *     driver does not retry because there is nothing to resume.
+ *     driver does not retry because there is nothing to resume, except for retry-exhausted CAPI
+ *     5xx errors, which may recover during harness backoff and restart fresh without --continue.
  *   - "No authentication information found" errors are handled differently depending on context:
  *     - On a `--continue` attempt: the Copilot CLI's on-disk session credential written by the
  *       interrupted run may be incomplete/invalid.  The driver falls back to a single fresh run
@@ -782,6 +783,10 @@ function shouldRetryFailedExecution(params) {
   if (nonRetryableGuard.maxRunsExceeded) return false;
   if (nonRetryableGuard.apiProxyGuardRejection) return false;
   return params.attempt < params.maxRetries && (params.hasOutput || isCAPIServerError(params.output));
+}
+
+function shouldContinueCopilotSessionAfterFailure({ copilotSDKMode, continueDisabledPermanently, hasOutput, hasCAPIServerError }) {
+  return !copilotSDKMode && !continueDisabledPermanently && (hasOutput || !hasCAPIServerError);
 }
 
 /**
@@ -1784,7 +1789,12 @@ async function main() {
               continueDisabledPermanently = true;
             }
             // --continue is only meaningful in CLI mode; SDK mode always restarts fresh.
-            useContinueOnRetry = !copilotSDKMode && !continueDisabledPermanently && (result.hasOutput || !hasCAPIServerError);
+            useContinueOnRetry = shouldContinueCopilotSessionAfterFailure({
+              copilotSDKMode,
+              continueDisabledPermanently,
+              hasOutput: result.hasOutput,
+              hasCAPIServerError,
+            });
             const retryMode = useContinueOnRetry ? "--continue" : copilotSDKMode ? "fresh run" : "fresh run (--continue permanently disabled)";
             const crashSuffix = isCrashSignal ? ` crashSignal=${crashSignalName}` : "";
             log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})${crashSuffix}`);
@@ -1862,6 +1872,7 @@ if (typeof module !== "undefined" && module.exports) {
     classifyCopilotFailure,
     extractTokenCountFromOutput,
     shouldRetryFailedExecution,
+    shouldContinueCopilotSessionAfterFailure,
     isCrashSignalExitCode,
     crashSignalNameForExitCode,
     extractOutputTail,

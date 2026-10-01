@@ -27,10 +27,12 @@
  *     or rate-limited (e.g., "CAPIError: 429 429 quota exceeded",
  *     "CAPIError: Too Many Requests", or the Copilot CLI's own
  *     retry-exhaustion message "Failed to get response from the AI model;
- *     retried N times ... Last error: 429/5xx" which carries no "CAPIError:"
- *     prefix). All matched forms are treated as non-retryable because the
- *     Copilot CLI/SDK has already retried internally before surfacing the
- *     error.
+ *     retried N times ... Last error: 429" which carries no "CAPIError:"
+ *     prefix). Quota errors are non-retryable because the Copilot CLI/SDK has
+ *     already retried internally before surfacing the error.
+ *   - capi_server_error: The Copilot CLI exhausted its internal retries on a
+ *     5xx response. This is retryable by the harness because it may recover
+ *     during harness backoff.
  *   - invocation_cap_exceeded: The per-run pooled LLM invocation cap is
  *     fully exhausted (e.g., "CAPIError: 429 Maximum LLM invocations exceeded (N/N)"
  *     or `"type":"max_runs_exceeded"`). This is more specific than generic
@@ -221,7 +223,7 @@ const MISSING_MODEL_PRICING_PATTERN = /Model\s+"([^"]+)"\s+has no AI credits pri
 // Quota errors remain non-retryable after the CLI's internal retries.
 const CAPI_QUOTA_EXCEEDED_PATTERN = /CAPIError:\s*(?:429\s+)?(?:429\s+quota exceeded|Too Many Requests)|Failed to get response from the AI model;\s*retried\s+\d+\s+times[^\n]{0,300}?Last error:\s*429\b/i;
 
-// Unlike quota exhaustion, a retry-exhausted 5xx may recover during harness backoff.
+// Any retry-exhausted 5xx is treated as transient and may recover during harness backoff.
 const CAPI_SERVER_ERROR_PATTERN = /Failed to get response from the AI model;\s*retried\s+\d+\s+times[^\n]{0,300}?Last error:\s*5\d{2}\b/i;
 
 /**
