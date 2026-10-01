@@ -8,6 +8,11 @@ import (
 
 var addLabelsLog = logger.New("workflow:add_labels")
 
+const defaultMaxAddLabelsCalls = 5
+
+// Keep in sync with MAX_LABELS in actions/setup/js/constants.cjs.
+const defaultMaxLabelsPerAddLabelsCall = 10
+
 // AddLabelsConfig holds configuration for adding labels to issues/PRs from agent output
 type AddLabelsConfig struct {
 	BaseSafeOutputConfig       `yaml:",inline"`

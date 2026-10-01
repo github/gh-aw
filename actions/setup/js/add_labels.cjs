@@ -35,7 +35,7 @@ const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { normalizeIssueIntentLabelInputs, buildIssueIntentLabelUpdates } = require("./issue_intents.cjs");
 const { fetchAllRepoLabels } = require("./github_api_helpers.cjs");
-const { SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { deterministicLabelColor } = require("./create_labels.cjs");
 
 /**
@@ -241,7 +241,11 @@ const main = createCountGatedHandler({
   handlerType: HANDLER_TYPE,
   setup: async (config, maxCount, isStaged) => {
     const { allowed: allowedLabels = [], blocked: blockedPatterns = [] } = config;
-    const maxLabels = config.max_labels ?? MAX_LABELS;
+    const configuredMaxLabels = config.max_labels ?? MAX_LABELS;
+    const maxLabels = typeof configuredMaxLabels === "number" ? configuredMaxLabels : typeof configuredMaxLabels === "string" ? Number(configuredMaxLabels) : Number.NaN;
+    if (!Number.isSafeInteger(maxLabels) || maxLabels < 1) {
+      throw new Error(`${ERR_CONFIG}: Invalid max-labels value: ${configuredMaxLabels}. Must be a positive integer`);
+    }
     const target = config.target || "triggering";
     const issueIntentEnabled = config.issue_intent !== false;
     const issueIntentStrict = config.issue_intent === true; // strict mode: plain-string labels rejected, metadata required

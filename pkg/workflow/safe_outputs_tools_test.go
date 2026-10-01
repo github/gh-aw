@@ -85,6 +85,18 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 		},
 		{
+			name:            "add_labels with default limits",
+			toolName:        "add_labels",
+			baseDescription: "Add labels to an issue.",
+			safeOutputs: &SafeOutputsConfig{
+				AddLabels: &AddLabelsConfig{},
+			},
+			wantContains: []string{
+				"Maximum 5 add_labels call(s)",
+				"Maximum 10 label(s) per call",
+			},
+		},
+		{
 			name:            "add_labels with allowed labels",
 			toolName:        "add_labels",
 			baseDescription: "Add labels to an issue.",

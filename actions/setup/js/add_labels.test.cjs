@@ -92,6 +92,16 @@ describe("add_labels", () => {
   });
 
   describe("main factory", () => {
+    it.each(["", "invalid", "2.5", 0])("rejects invalid max_labels configuration %j", async max_labels => {
+      await expect(main({ max_labels })).rejects.toThrow("Invalid max-labels value");
+    });
+
+    it("accepts a resolved max_labels expression as an integer string", async () => {
+      const handler = await main({ max_labels: "25" });
+
+      expect(typeof handler).toBe("function");
+    });
+
     it("should create a handler function with default configuration", async () => {
       const handler = await main();
       expect(typeof handler).toBe("function");

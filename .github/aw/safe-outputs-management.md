@@ -88,7 +88,8 @@ description: Safe-output reference for update, label, milestone, project, releas
       required-title-prefix: "[bot]"              # Optional: issue/PR title must start with this prefix
       issues: true                                # Optional: set false to exclude issues:write permission (default: true)
       pull-requests: true                         # Optional: set false to exclude pull-requests:write permission (default: true)
-      max: 5                                      # Optional: maximum number of labels (default: 5)
+      max: 5                                      # Optional: maximum add_labels calls (default: 5)
+      max-labels: 10                              # Optional: maximum labels per call (default: 10)
       target: "*"                                 # Optional: "triggering" (default), "*" (any issue/PR), or number
       target-repo: "owner/repo"                   # Optional: cross-repository
       item-schema: { ... }                        # Optional: narrows the label item schema shown to/enforced on the agent (can only restrict, not widen, the built-in string-or-object shape)
