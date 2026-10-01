@@ -177,6 +177,54 @@ func TestGenerateMaintenanceWorkflow_NoLedgerCompactionInputsWithoutLedgers(t *t
 	assert.NotContains(t, string(content), "ledger_compaction_")
 }
 
+func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing.T) {
+	fooLedger, err := parseLedgerToolConfig(map[string]any{"foo": map[string]any{}})
+	require.NoError(t, err)
+	upperFooLedger, err := parseLedgerToolConfig(map[string]any{"Foo": map[string]any{}})
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+	err = GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+		WorkflowDataList: []*WorkflowData{
+			{Name: "wf1", WorkflowID: "wf1", LedgerConfig: fooLedger},
+			{Name: "wf2", WorkflowID: "wf2", LedgerConfig: upperFooLedger},
+		},
+		WorkflowDir: tmpDir,
+		Version:     "v1.0.0",
+		ActionMode:  ActionModeDev,
+	})
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(tmpDir, "agentics-maintenance.yml"))
+	require.NoError(t, err)
+	yaml := string(content)
+
+	jobs := parseMaintenanceJobs(t, yaml)
+	require.NotEmpty(t, jobs["ledger_compaction_plan_foo"], "plan job for lowercase foo")
+	require.NotEmpty(t, jobs["ledger_compaction_apply_foo"], "apply job for lowercase foo")
+	require.NotEmpty(t, jobs["ledger_compaction_plan_Foo"], "plan job for uppercase Foo")
+	require.NotEmpty(t, jobs["ledger_compaction_apply_Foo"], "apply job for uppercase Foo")
+}
+
+func TestComputeEnabledToolNames_LedgerNilSafety(t *testing.T) {
+	t.Run("nil SafeOutputs and nil LedgerConfig does not panic", func(t *testing.T) {
+		names := computeEnabledToolNames(&WorkflowData{SafeOutputs: nil, LedgerConfig: nil})
+		assert.Empty(t, names)
+	})
+
+	t.Run("nil SafeOutputs and disabled LedgerConfig does not panic", func(t *testing.T) {
+		names := computeEnabledToolNames(&WorkflowData{SafeOutputs: nil, LedgerConfig: &LedgerToolConfig{}})
+		assert.Empty(t, names)
+	})
+
+	t.Run("nil SafeOutputs and enabled LedgerConfig with compaction enables request tool", func(t *testing.T) {
+		config, err := parseLedgerToolConfig(map[string]any{"findings": map[string]any{}})
+		require.NoError(t, err)
+		names := computeEnabledToolNames(&WorkflowData{SafeOutputs: nil, LedgerConfig: config})
+		assert.Contains(t, names, "ledger_append")
+		assert.Contains(t, names, "ledger_request_compaction")
+	})
+}
+
 // parseMaintenanceJobs splits the generated maintenance workflow into top-level job bodies.
 func parseMaintenanceJobs(t *testing.T, content string) map[string]string {
 	t.Helper()

@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,12 +9,15 @@ const require = createRequire(import.meta.url);
 const { Ledger, canonicalJSON } = require("./ledger_store.cjs");
 const {
   PLAN_VERSION,
+  RejectedPlanError,
   STATE_PATH,
+  STATE_VERSION,
   applyTransitionToDirectory,
   computePlanId,
   createPlan,
   isCompactionDue,
   loadSegments,
+  materializeSnapshot,
   parseCompactionConfig,
   parseTrigger,
   prepareApply,
@@ -121,6 +125,83 @@ describe("isCompactionDue", () => {
   });
 });
 
+describe("readState", () => {
+  it("returns null when state file does not exist", () => {
+    expect(readState(sourceDir)).toBeNull();
+  });
+
+  it("parses valid state correctly", () => {
+    const valid = {
+      version: STATE_VERSION,
+      ledger: "findings",
+      last_applied_at: "2026-10-01T00:00:00.000Z",
+      last_plan_id: "sha256:" + "a".repeat(64),
+      last_trigger: "scheduled",
+      recent_plan_ids: ["sha256:" + "a".repeat(64)],
+    };
+    fs.mkdirSync(path.join(sourceDir, "ledger", "compaction"), { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, STATE_PATH), JSON.stringify(valid));
+    expect(readState(sourceDir)).toEqual(valid);
+  });
+
+  it("rejects invalid or unparseable timestamps", () => {
+    fs.mkdirSync(path.join(sourceDir, "ledger", "compaction"), { recursive: true });
+    for (const invalidTimestamp of ["2026-99-99T00:00:00Z", "invalid", "2026-13-45T00:00:00Z"]) {
+      fs.writeFileSync(
+        path.join(sourceDir, STATE_PATH),
+        JSON.stringify({
+          version: STATE_VERSION,
+          ledger: "findings",
+          last_applied_at: invalidTimestamp,
+          last_plan_id: "sha256:" + "a".repeat(64),
+          last_trigger: "scheduled",
+          recent_plan_ids: [],
+        })
+      );
+      expect(readState(sourceDir)).toBeNull();
+    }
+  });
+});
+
+describe("materializeSnapshot", () => {
+  it("creates parent directories when materializing files including state.json", () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-repo-"));
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-snap-"));
+    const segmentId = "00000000-0000-4000-8000-000000000001";
+    try {
+      execSync("git init && git config user.name test && git config user.email test@example.com", { cwd: repoDir, stdio: "pipe" });
+      const shardPath = path.join(repoDir, "ledger", "shards", `${segmentId}.jsonl`);
+      const stateFilePath = path.join(repoDir, STATE_PATH);
+      fs.mkdirSync(path.dirname(shardPath), { recursive: true });
+      fs.writeFileSync(shardPath, '{"id":"r1","subject":"s1"}\n');
+      fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
+      fs.writeFileSync(
+        stateFilePath,
+        JSON.stringify({
+          version: STATE_VERSION,
+          ledger: "findings",
+          last_applied_at: "2026-10-01T00:00:00.000Z",
+          last_plan_id: "sha256:" + "a".repeat(64),
+          last_trigger: "scheduled",
+          recent_plan_ids: [],
+        })
+      );
+      execSync("git add ledger/shards ledger/compaction && git commit -m 'Initial ledger state' && git branch -M ledgers/findings", {
+        cwd: repoDir,
+        stdio: "pipe",
+      });
+
+      const config = parseCompactionConfig(encodeConfig());
+      materializeSnapshot({ workspaceDir: repoDir, sourceDir: targetDir, refName: "ledgers/findings", config });
+      expect(fs.existsSync(path.join(targetDir, STATE_PATH))).toBe(true);
+      expect(fs.existsSync(path.join(targetDir, "ledger", "shards", `${segmentId}.jsonl`))).toBe(true);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("selectSources", () => {
   it("does nothing below the minimum segment count", () => {
     const config = parseCompactionConfig(encodeConfig({ min_segments: 4, max_segments: 4 }));
@@ -200,7 +281,7 @@ describe("compaction plans", () => {
   ])("rejects a plan with %s", (_name, tamper) => {
     const config = parseCompactionConfig(encodeConfig());
     writeSegments(3);
-    expect(() => validatePlan(tamper(planFor(config)), config)).toThrow("Rejected ledger compaction plan");
+    expect(() => validatePlan(tamper(planFor(config)), config)).toThrow(RejectedPlanError);
   });
 
   it("reads plan artifacts strictly", () => {
@@ -208,11 +289,11 @@ describe("compaction plans", () => {
     const link = path.join(sourceDir, "link.json");
     fs.writeFileSync(file, "{}");
     fs.symlinkSync(file, link);
-    expect(() => readPlanFile(link)).toThrow("invalid plan file");
+    expect(() => readPlanFile(link)).toThrow(RejectedPlanError);
     fs.writeFileSync(file, Buffer.from([0x7b, 0xff, 0x7d]));
-    expect(() => readPlanFile(file)).toThrow("malformed JSON");
+    expect(() => readPlanFile(file)).toThrow(RejectedPlanError);
     fs.writeFileSync(file, "");
-    expect(() => readPlanFile(file)).toThrow("invalid plan file");
+    expect(() => readPlanFile(file)).toThrow(RejectedPlanError);
   });
 });
 
@@ -295,7 +376,15 @@ describe("ledger_compaction_apply main", () => {
     const planFile = path.join(sourceDir, "plan.json");
     fs.writeFileSync(planFile, JSON.stringify({ version: PLAN_VERSION, ledger: "findings", command: "git push --force" }));
     const githubClient = { graphql: () => Promise.reject(new Error("must not be called")) };
-    await expect(main({ config: encodeConfig(), planFile, githubClient })).rejects.toThrow("Rejected ledger compaction plan");
+    await expect(main({ config: encodeConfig(), planFile, githubClient })).rejects.toThrow(RejectedPlanError);
     expect(global.core.outputs.result).toBe("rejected");
+  });
+
+  it("marks runtime failures as failed rather than rejected", async () => {
+    const { main } = require("./ledger_compaction_apply.cjs");
+    const missingPlanFile = path.join(sourceDir, "does-not-exist.json");
+    const githubClient = { graphql: () => Promise.reject(new Error("must not be called")) };
+    await expect(main({ config: encodeConfig(), planFile: missingPlanFile, githubClient })).rejects.toThrow();
+    expect(global.core.outputs.result).toBe("failed");
   });
 });

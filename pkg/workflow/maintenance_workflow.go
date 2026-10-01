@@ -267,11 +267,12 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	// Generate cron schedule based on minimum expires value. Without expiring safe outputs,
-	// ledger compaction only needs daily maintenance (ledgers default to a daily schedule and the
-	// compaction plan job no-ops when a ledger is not yet due).
+	// ledger compaction needs daily maintenance (ledgers default to a daily schedule and the
+	// compaction plan job no-ops when a ledger is not yet due). In generateMaintenanceCron,
+	// any minExpiresDays > 4 maps to a daily schedule ("37 0 * * *", "Daily").
 	cronDays := minExpiresDays
 	if !hasExpires {
-		cronDays = 7
+		cronDays = 7 // maps to daily in generateMaintenanceCron (> 4 days)
 	}
 	cronSchedule, scheduleDesc := generateMaintenanceCron(cronDays)
 	maintenanceLog.Printf("Maintenance schedule: %s (%s)", cronSchedule, scheduleDesc)

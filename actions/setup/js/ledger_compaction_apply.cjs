@@ -13,7 +13,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { fetchLedgerBranch } = require("./create_ledger_projection.cjs");
 const { execGitSync } = require("./git_helpers.cjs");
-const { materializeSnapshot, parseCompactionConfig, prepareApply, readPlanFile, validatePlan } = require("./ledger_compaction.cjs");
+const { RejectedPlanError, materializeSnapshot, parseCompactionConfig, prepareApply, readPlanFile, validatePlan } = require("./ledger_compaction.cjs");
 const { writeSummary } = require("./ledger_compaction_plan.cjs");
 
 const MAX_ATTEMPTS = 5;
@@ -40,8 +40,8 @@ async function main(options = {}) {
   const token = options.token || process.env.GH_TOKEN;
   const retryDelayMs = options.retryDelayMs ?? 2000;
   /** @type {Record<string, string | number>} */
-  const summary = { ledger: config.name, result: "rejected" };
-  core.setOutput("result", "rejected");
+  const summary = { ledger: config.name, result: "failed" };
+  core.setOutput("result", "failed");
   try {
     const plan = validatePlan(readPlanFile(planFile), config);
     Object.assign(summary, { trigger: plan.trigger, plan_id: plan.plan_id, validation: "plan schema valid" });
@@ -58,7 +58,7 @@ async function main(options = {}) {
         const head = execGitSync(["rev-parse", refName], { cwd: workspaceDir, stdio: "pipe" }).trim();
         materializeSnapshot({ workspaceDir, refName, sourceDir, config });
         const prepared = prepareApply({ plan, sourceDir, config, now: options.now });
-        if (prepared.status === "rejected") throw new TypeError(`Rejected ledger compaction plan: ${prepared.reason}`);
+        if (prepared.status === "rejected") throw new RejectedPlanError(`Rejected ledger compaction plan: ${prepared.reason}`);
         if (prepared.status !== "ready") return finish(summary, prepared.status, prepared.reason);
         Object.assign(summary, {
           validation: prepared.reason,
@@ -99,7 +99,7 @@ async function main(options = {}) {
     }
     return finish(summary, "failed", "unreachable");
   } catch (error) {
-    summary.result = error instanceof TypeError ? "rejected" : "failed";
+    summary.result = error instanceof RejectedPlanError ? "rejected" : "failed";
     summary.reason = error instanceof Error ? error.message : "apply failed";
     core.setOutput("result", summary.result);
     throw error;

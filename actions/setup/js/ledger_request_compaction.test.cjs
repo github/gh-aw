@@ -25,7 +25,9 @@ describe("ledger_request_compaction", () => {
 
   it("requires a configured compaction-enabled ledger", async () => {
     const handler = await main({ ledgers: ["findings", "metrics"], max: 2 });
-    expect((await handler({})).success).toBe(false);
+    const missing = await handler({});
+    expect(missing.success).toBe(false);
+    expect(missing.error).toBe("ledger is required when more than one compaction-enabled ledger is configured (findings, metrics)");
     expect((await handler({ ledger: "secrets" })).success).toBe(false);
     expect(dispatch).not.toHaveBeenCalled();
     expect((await handler({ ledger: "metrics" })).success).toBe(true);

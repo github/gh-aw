@@ -104,7 +104,8 @@ failure leaves the ledger unchanged.
 
 When at least one ledger has compaction enabled, agents get the
 `ledger_request_compaction` safe output with an optional `ledger` and `reason`.
-The `ledger` value is required only when the workflow has more than one ledger.
+The `ledger` value is required only when the workflow has more than one
+compaction-enabled ledger.
 This safe output never compacts anything itself. It dispatches Agentic
 Maintenance with `operation: compact_ledger` and the ledger name, and the
 maintenance jobs above handle the request the same way as a scheduled run. To

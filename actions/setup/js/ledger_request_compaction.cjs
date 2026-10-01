@@ -34,7 +34,7 @@ async function main(config = {}) {
   return async function handleLedgerRequestCompaction(message) {
     const rawName = message && message.ledger !== undefined && message.ledger !== null ? message.ledger : ledgers.length === 1 ? ledgers[0] : "";
     if (typeof rawName !== "string" || !rawName.trim()) {
-      return { success: false, error: `ledger is required when more than one ledger is configured (${ledgers.join(", ")})` };
+      return { success: false, error: `ledger is required when more than one compaction-enabled ledger is configured (${ledgers.join(", ")})` };
     }
     const ledger = rawName.trim();
     if (!ledgers.includes(ledger)) {

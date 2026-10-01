@@ -53,6 +53,14 @@ const PLAN_KEYS = ["base_commit", "branch", "created_at", "ledger", "plan_id", "
 const SOURCE_KEYS = ["bytes", "records", "segment", "sha256"];
 const STATE_KEYS = ["last_applied_at", "last_plan_id", "last_trigger", "ledger", "recent_plan_ids", "version"];
 
+class RejectedPlanError extends Error {
+  /** @param {string} message */
+  constructor(message) {
+    super(message);
+    this.name = "RejectedPlanError";
+  }
+}
+
 /** @param {unknown} value */
 function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
@@ -204,7 +212,9 @@ function materializeSnapshot({ workspaceDir, refName, sourceDir, config }) {
       const start = newline + 1;
       const end = start + item.size;
       if (end + 1 > output.length || output[end] !== 0x0a) throw new Error("Truncated ledger object stream");
-      fs.writeFileSync(path.join(sourceDir, item.path), output.subarray(start, end), { mode: 0o600 });
+      const destination = path.join(sourceDir, item.path);
+      fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+      fs.writeFileSync(destination, output.subarray(start, end), { mode: 0o600 });
       offset = end + 1;
     }
   }
@@ -270,6 +280,7 @@ function readState(sourceDir) {
       !TRIGGERS.has(state.last_trigger) ||
       typeof state.last_applied_at !== "string" ||
       !ISO_TIMESTAMP.test(state.last_applied_at) ||
+      Number.isNaN(Date.parse(state.last_applied_at)) ||
       !Array.isArray(state.recent_plan_ids) ||
       state.recent_plan_ids.length > MAX_RECENT_PLANS ||
       !state.recent_plan_ids.every(id => typeof id === "string" && DIGEST.test(id))
@@ -420,7 +431,7 @@ function createPlan({ loaded, sources, config, trigger, baseCommit, now = new Da
  */
 function validatePlan(plan, config) {
   const reject = message => {
-    throw new TypeError(`Rejected ledger compaction plan: ${message}`);
+    throw new RejectedPlanError(`Rejected ledger compaction plan: ${message}`);
   };
   if (!hasExactKeys(plan, PLAN_KEYS)) reject("unexpected plan structure");
   const candidate = plan;
@@ -466,7 +477,7 @@ function validatePlan(plan, config) {
  */
 function readPlanFile(file) {
   const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > MAX_PLAN_BYTES) throw new TypeError("Rejected ledger compaction plan: invalid plan file");
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > MAX_PLAN_BYTES) throw new RejectedPlanError("Rejected ledger compaction plan: invalid plan file");
   const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
   let content;
   try {
@@ -474,11 +485,11 @@ function readPlanFile(file) {
   } finally {
     fs.closeSync(fd);
   }
-  if (content.length > MAX_PLAN_BYTES) throw new TypeError("Rejected ledger compaction plan: invalid plan file");
+  if (content.length > MAX_PLAN_BYTES) throw new RejectedPlanError("Rejected ledger compaction plan: invalid plan file");
   try {
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content));
   } catch {
-    throw new TypeError("Rejected ledger compaction plan: malformed JSON");
+    throw new RejectedPlanError("Rejected ledger compaction plan: malformed JSON");
   }
 }
 
@@ -602,6 +613,7 @@ function applyTransitionToDirectory(sourceDir, transition) {
 module.exports = {
   MAX_PLAN_BYTES,
   PLAN_VERSION,
+  RejectedPlanError,
   STATE_PATH,
   STATE_VERSION,
   applyTransitionToDirectory,

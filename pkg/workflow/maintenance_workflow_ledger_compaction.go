@@ -40,14 +40,14 @@ func collectMaintenanceCompactionLedgers(workflowDataList []*WorkflowData) []Led
 	owners := make(map[string]string)
 	for _, workflowData := range sorted {
 		for _, ledger := range workflowData.LedgerConfig.compactionEnabledLedgers() {
-			key := strings.ToLower(ledger.Name)
+			key := ledger.Name
 			existing, ok := byName[key]
 			if !ok {
 				byName[key] = ledger
 				owners[key] = workflowData.WorkflowID
 				continue
 			}
-			if existing.Name != ledger.Name || !reflect.DeepEqual(ledgerCompactionPayload(existing), ledgerCompactionPayload(ledger)) {
+			if !reflect.DeepEqual(ledgerCompactionPayload(existing), ledgerCompactionPayload(ledger)) {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
 					"Ledger '%s' is configured differently in workflows '%s' and '%s'; Agentic Maintenance uses the compaction settings from '%s'.",
 					ledger.Name, owners[key], workflowData.WorkflowID, owners[key])))
@@ -223,6 +223,9 @@ const ledgerRequestCompactionHandlerKey = "ledger_request_compaction"
 // buildLedgerRequestCompactionHandlerConfig returns the handler configuration for
 // ledger_request_compaction, or nil when no ledger has compaction enabled.
 func buildLedgerRequestCompactionHandlerConfig(config *LedgerToolConfig) map[string]any {
+	if config == nil || !config.Enabled() {
+		return nil
+	}
 	ledgers := config.compactionEnabledLedgers()
 	if len(ledgers) == 0 {
 		return nil
