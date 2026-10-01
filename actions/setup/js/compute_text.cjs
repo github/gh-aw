@@ -20,13 +20,63 @@ function formatForWorkflowLog(content) {
   return String(content).replace(/\r?\n/g, "\\n");
 }
 
+function positiveId(value) {
+  const id = typeof value === "string" && /^[1-9]\d*$/.test(value) ? Number(value) : NaN;
+  return Number.isSafeInteger(id) ? id : null;
+}
+
+function commentBelongsToItem(item, urlField, collection, owner, repo, itemNumber) {
+  const resourceUrl = item?.[urlField];
+  if (typeof resourceUrl !== "string") {
+    return false;
+  }
+  try {
+    const path = new URL(resourceUrl).pathname.split("/").filter(Boolean);
+    return path.length === 5 && path[0] === "repos" && path[1].toLowerCase() === owner.toLowerCase() && path[2].toLowerCase() === repo.toLowerCase() && path[3] === collection && path[4] === String(itemNumber);
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   let text = "";
   let title = "";
   let body = "";
 
-  const actor = context.actor;
   const { owner, repo } = context.repo;
+  const dispatchAwContext = context.eventName === "workflow_dispatch" ? parseInboundAwContext(context.payload.inputs?.aw_context) : null;
+  let actor = context.actor;
+  let canUseDispatchAwContext = true;
+
+  if (context.eventName === "workflow_dispatch" && actor === "github-actions[bot]") {
+    canUseDispatchAwContext = false;
+    const commandName = typeof dispatchAwContext?.command_name === "string" ? dispatchAwContext.command_name.trim() : "";
+    const triggerLabel = typeof dispatchAwContext?.trigger_label === "string" ? dispatchAwContext.trigger_label.trim() : "";
+    const propagatedActor = typeof dispatchAwContext?.actor === "string" ? dispatchAwContext.actor.trim() : "";
+
+    if ((commandName || triggerLabel) && propagatedActor && propagatedActor !== "github-actions[bot]") {
+      let trustedDispatch = true;
+      if (dispatchAwContext?.item_type === "pull_request") {
+        const pullNumber = positiveId(dispatchAwContext.item_number);
+        if (!pullNumber) {
+          trustedDispatch = false;
+        } else {
+          try {
+            const { data: pullRequest } = await github.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+            const repository = `${owner}/${repo}`;
+            trustedDispatch = pullRequest?.head?.repo?.full_name === repository && pullRequest?.base?.repo?.full_name === repository;
+          } catch (error) {
+            core.warning(`Failed to verify centralized pull request provenance: ${getErrorMessage(error)}`);
+            trustedDispatch = false;
+          }
+        }
+      }
+      if (trustedDispatch) {
+        actor = propagatedActor;
+        canUseDispatchAwContext = true;
+      }
+    }
+  }
 
   // Check if the actor has repository access (admin, maintain, write permissions)
   // Non-user actors (bots, GitHub Apps like "Copilot") may not have a user record,
@@ -146,7 +196,7 @@ async function main() {
       if (context.payload.inputs) {
         const releaseUrl = context.payload.inputs.release_url;
         const releaseId = context.payload.inputs.release_id;
-        const awContext = parseInboundAwContext(context.payload.inputs.aw_context);
+        const awContext = dispatchAwContext;
 
         // If release_url is provided, extract owner/repo/tag
         if (releaseUrl) {
@@ -180,11 +230,7 @@ async function main() {
           } catch (error) {
             core.warning(`Failed to fetch release by ID: ${getErrorMessage(error)}`);
           }
-        } else if (awContext && (!awContext.repo || awContext.repo === `${owner}/${repo}`)) {
-          const positiveId = value => {
-            const id = typeof value === "string" && /^[1-9]\d*$/.test(value) ? Number(value) : NaN;
-            return Number.isSafeInteger(id) ? id : null;
-          };
+        } else if (canUseDispatchAwContext && awContext && (!awContext.repo || awContext.repo === `${owner}/${repo}`)) {
           const commentId = positiveId(awContext.comment_id);
           const itemNumber = positiveId(awContext.item_number);
           try {
@@ -192,10 +238,14 @@ async function main() {
             if (commentId) {
               switch (awContext.event_type) {
                 case "issue_comment":
-                  item = (await github.rest.issues.getComment({ owner, repo, comment_id: commentId })).data;
+                  if (itemNumber && (awContext.item_type === "issue" || awContext.item_type === "pull_request")) {
+                    item = (await github.rest.issues.getComment({ owner, repo, comment_id: commentId })).data;
+                  }
                   break;
                 case "pull_request_review_comment":
-                  item = (await github.rest.pulls.getReviewComment({ owner, repo, comment_id: commentId })).data;
+                  if (itemNumber && awContext.item_type === "pull_request") {
+                    item = (await github.rest.pulls.getReviewComment({ owner, repo, comment_id: commentId })).data;
+                  }
                   break;
                 case "pull_request_review":
                   if (itemNumber && awContext.item_type === "pull_request") {
@@ -222,7 +272,13 @@ async function main() {
                   }
                   break;
               }
-              if (item) {
+              const matchesItem =
+                awContext.event_type === "issue_comment"
+                  ? commentBelongsToItem(item, "issue_url", "issues", owner, repo, itemNumber)
+                  : awContext.event_type === "pull_request_review_comment"
+                    ? commentBelongsToItem(item, "pull_request_url", "pulls", owner, repo, itemNumber)
+                    : true;
+              if (item && matchesItem) {
                 body = item.body || "";
                 text = body;
               }

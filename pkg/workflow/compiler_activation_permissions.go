@@ -213,10 +213,10 @@ func (c *Compiler) addCentralizedCommandActivationPermissions(permsMap map[Permi
 	if ctx.data.CommandCentralized && ctx.data.NeedsTextOutput {
 		for _, event := range FilterCommentEvents(ctx.data.CommandEvents) {
 			var scope PermissionScope
-			switch GetActualGitHubEventName(event.EventName) {
+			switch event.EventName {
 			case "issues", "issue_comment":
 				scope = PermissionIssues
-			case "pull_request", "pull_request_review", "pull_request_review_comment":
+			case "pull_request", "pull_request_comment", "pull_request_review", "pull_request_review_comment":
 				scope = PermissionPullRequests
 			case "discussion", "discussion_comment":
 				scope = PermissionDiscussions

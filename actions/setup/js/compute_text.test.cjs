@@ -339,11 +339,91 @@ const mockCore = {
             mockContext.eventName = "workflow_dispatch";
             mockContext.payload = { inputs: { aw_context: JSON.stringify({ repo: "test-owner/test-repo", event_type: eventType, item_type: itemType, item_number: "7", comment_id: "42" }) } };
             const api = eventType === "issue_comment" ? (mockGithub.rest.issues = {}) : (mockGithub.rest.pulls = {});
-            api[method] = vi.fn().mockResolvedValue({ data: { body: "/plan @user" } });
+            const itemUrl = eventType === "issue_comment" ? { issue_url: "https://api.github.com/repos/test-owner/test-repo/issues/7" } : { pull_request_url: "https://api.github.com/repos/test-owner/test-repo/pulls/7" };
+            api[method] = vi.fn().mockResolvedValue({ data: { body: "/plan @user", ...itemUrl } });
             await testMain();
             expect(api[method]).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", ...expectedArgs });
             expect(mockCore.setOutput).toHaveBeenCalledWith("text", "/plan `@user`");
             expect(mockCore.setOutput).toHaveBeenCalledWith("body", "/plan `@user`");
+          }),
+          it("uses the propagated actor before checking centralized dispatch permissions", async () => {
+            mockContext.actor = "github-actions[bot]";
+            mockContext.eventName = "workflow_dispatch";
+            mockContext.payload = {
+              inputs: {
+                aw_context: JSON.stringify({
+                  repo: "test-owner/test-repo",
+                  command_name: "plan",
+                  actor: "trusted-maintainer",
+                  event_type: "issue_comment",
+                  item_type: "issue",
+                  item_number: "7",
+                  comment_id: "42",
+                }),
+              },
+            };
+            mockGithub.rest.issues = {
+              getComment: vi.fn().mockResolvedValue({
+                data: { body: "/plan @user", issue_url: "https://api.github.com/repos/test-owner/test-repo/issues/7" },
+              }),
+            };
+
+            await testMain();
+
+            expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({
+              owner: "test-owner",
+              repo: "test-repo",
+              username: "trusted-maintainer",
+            });
+            expect(mockCore.setOutput).toHaveBeenCalledWith("text", "/plan `@user`");
+          }),
+          it("validates centralized pull request provenance before trusting the propagated actor", async () => {
+            mockContext.actor = "github-actions[bot]";
+            mockContext.eventName = "workflow_dispatch";
+            mockContext.payload = {
+              inputs: {
+                aw_context: JSON.stringify({
+                  command_name: "plan",
+                  actor: "trusted-maintainer",
+                  event_type: "pull_request_review_comment",
+                  item_type: "pull_request",
+                  item_number: "7",
+                  comment_id: "42",
+                }),
+              },
+            };
+            mockGithub.rest.pulls = {
+              get: vi.fn().mockResolvedValue({
+                data: {
+                  head: { repo: { full_name: "someone/fork" } },
+                  base: { repo: { full_name: "test-owner/test-repo" } },
+                },
+              }),
+              getReviewComment: vi.fn(),
+            };
+
+            await testMain();
+
+            expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", pull_number: 7 });
+            expect(mockGithub.rest.pulls.getReviewComment).not.toHaveBeenCalled();
+            expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({
+              owner: "test-owner",
+              repo: "test-repo",
+              username: "github-actions[bot]",
+            });
+            expect(mockCore.setOutput).toHaveBeenCalledWith("text", "");
+          }),
+          it.each([
+            ["issue_comment", "issue", "issues", "getComment", "issue_url", "https://api.github.com/repos/test-owner/test-repo/issues/8"],
+            ["pull_request_review_comment", "pull_request", "pulls", "getReviewComment", "pull_request_url", "https://api.github.com/repos/test-owner/test-repo/pulls/8"],
+          ])("rejects a fetched %s from a different item", async (eventType, itemType, apiName, method, urlField, url) => {
+            mockContext.eventName = "workflow_dispatch";
+            mockContext.payload = { inputs: { aw_context: JSON.stringify({ event_type: eventType, item_type: itemType, item_number: "7", comment_id: "42" }) } };
+            mockGithub.rest[apiName] = { [method]: vi.fn().mockResolvedValue({ data: { body: "unrelated comment", [urlField]: url } }) };
+
+            await testMain();
+
+            expect(mockCore.setOutput).toHaveBeenCalledWith("text", "");
           }),
           it("fetches a discussion comment by node ID", async () => {
             mockContext.eventName = "workflow_dispatch";

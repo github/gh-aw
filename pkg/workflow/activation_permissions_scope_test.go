@@ -475,12 +475,18 @@ func TestActivationPermissionsCentralizedSlashCommandText(t *testing.T) {
 	ctx := &activationJobBuildContext{data: &WorkflowData{
 		CommandCentralized: true,
 		NeedsTextOutput:    true,
-		CommandEvents:      []string{"issue_comment", "pull_request_review_comment", "discussion_comment"},
+		CommandEvents:      []string{"issue_comment", "pull_request_comment", "pull_request_review_comment", "discussion_comment"},
 	}}
 	NewCompiler().addCentralizedCommandActivationPermissions(perms, ctx)
 	assert.Equal(t, PermissionWrite, perms[PermissionIssues])
 	assert.Equal(t, PermissionRead, perms[PermissionPullRequests])
 	assert.Equal(t, PermissionRead, perms[PermissionDiscussions])
+
+	readPerms := make(map[PermissionScope]PermissionLevel)
+	NewCompiler().addCentralizedCommandActivationPermissions(readPerms, ctx)
+	assert.Equal(t, PermissionRead, readPerms[PermissionIssues])
+	assert.Equal(t, PermissionRead, readPerms[PermissionPullRequests])
+	assert.Equal(t, PermissionRead, readPerms[PermissionDiscussions])
 
 	tmpDir := testutil.TempDir(t, "activation-perms-centralized-text")
 	testFile := filepath.Join(tmpDir, "centralized-text.md")
@@ -506,6 +512,20 @@ ${{ steps.sanitized.outputs.text }}
 	assert.Regexp(t, `issues: (read|write)`, activationJobSection)
 	assert.Regexp(t, `pull-requests: (read|write)`, activationJobSection)
 	assert.Regexp(t, `discussions: (read|write)`, activationJobSection)
+}
+
+func TestActivationPermissionsCentralizedPullRequestComment(t *testing.T) {
+	perms := make(map[PermissionScope]PermissionLevel)
+	ctx := &activationJobBuildContext{data: &WorkflowData{
+		CommandCentralized: true,
+		NeedsTextOutput:    true,
+		CommandEvents:      []string{"pull_request_comment"},
+	}}
+
+	NewCompiler().addCentralizedCommandActivationPermissions(perms, ctx)
+
+	assert.Equal(t, PermissionRead, perms[PermissionPullRequests])
+	assert.NotContains(t, perms, PermissionIssues)
 }
 
 // TestActivationPermissionsCentralizedSlashCommandDiscussionOnlyReaction verifies that a
