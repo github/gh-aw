@@ -183,8 +183,13 @@ func TestGenerateModelRoutingConversationStep(t *testing.T) {
 			require.Equal(t, tt.task, conversation[0].Parts[0].Text)
 
 			if runtime.GOOS != "windows" {
-				for _, name := range []string{"system.txt", "user.txt", "prompt.txt"} {
-					info, err := os.Stat(filepath.Join(promptDir, name))
+				for _, file := range []string{
+					filepath.Join(promptDir, "system.txt"),
+					filepath.Join(promptDir, "user.txt"),
+					promptPath,
+					conversationFile,
+				} {
+					info, err := os.Stat(file)
 					require.NoError(t, err)
 					require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 				}
