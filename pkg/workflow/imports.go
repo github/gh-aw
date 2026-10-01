@@ -363,7 +363,7 @@ func (c *Compiler) MergeSafeOutputs(topSafeOutputs *SafeOutputsConfig, importedS
 	// Merge each imported config
 	for _, config := range importedConfigs {
 		var err error
-		result, err = mergeSafeOutputConfig(result, config, c)
+		result, err = mergeSafeOutputConfig(result, config, topRawSafeOutputs, c)
 		if err != nil {
 			return nil, err
 		}
@@ -425,7 +425,7 @@ func hasSafeOutputType(config *SafeOutputsConfig, key string) bool {
 // mergeSafeOutputConfig merges a single imported config map into the result SafeOutputsConfig
 //
 //nolint:largefunc // Existing meta-field merge flow remains centralized for consistent import semantics.
-func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
+func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs map[string]any, c *Compiler) (*SafeOutputsConfig, error) {
 	importsLog.Printf("Merging imported safe-output config: key_count=%d", len(config))
 	// Create a frontmatter-like structure for extractSafeOutputsConfig
 	frontmatter := map[string]any{
@@ -484,21 +484,26 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	// auto-default) even though the main workflow never explicitly set it. We therefore use
 	// the presence of the key in the raw imported config map as the authoritative signal:
 	// if the import explicitly carries the key, its value wins over any auto-default in result.
-	// The "|| result.X == nil" arm preserves the legacy path where result has no value at all.
+	// The nil fallback applies only when the main workflow did not explicitly configure
+	// the type (an explicit false also produces nil in the parsed result).
 	_, hasMissingTool := config["missing-tool"]
-	if (hasMissingTool || result.MissingTool == nil) && importedConfig.MissingTool != nil {
+	_, mainHasMissingTool := topRawSafeOutputs["missing-tool"]
+	if (hasMissingTool || (result.MissingTool == nil && !mainHasMissingTool)) && importedConfig.MissingTool != nil {
 		result.MissingTool = importedConfig.MissingTool
 	}
 	_, hasMissingData := config["missing-data"]
-	if (hasMissingData || result.MissingData == nil) && importedConfig.MissingData != nil {
+	_, mainHasMissingData := topRawSafeOutputs["missing-data"]
+	if (hasMissingData || (result.MissingData == nil && !mainHasMissingData)) && importedConfig.MissingData != nil {
 		result.MissingData = importedConfig.MissingData
 	}
 	_, hasNoop := config["noop"]
-	if (hasNoop || result.NoOp == nil) && importedConfig.NoOp != nil {
+	_, mainHasNoop := topRawSafeOutputs["noop"]
+	if (hasNoop || (result.NoOp == nil && !mainHasNoop)) && importedConfig.NoOp != nil {
 		result.NoOp = importedConfig.NoOp
 	}
 	_, hasReportIncomplete := config["report-incomplete"]
-	if (hasReportIncomplete || result.ReportIncomplete == nil) && importedConfig.ReportIncomplete != nil {
+	_, mainHasReportIncomplete := topRawSafeOutputs["report-incomplete"]
+	if (hasReportIncomplete || (result.ReportIncomplete == nil && !mainHasReportIncomplete)) && importedConfig.ReportIncomplete != nil {
 		result.ReportIncomplete = importedConfig.ReportIncomplete
 	}
 	// ThreatDetection is also auto-defaulted by extractSafeOutputsConfig; apply the same

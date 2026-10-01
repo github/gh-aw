@@ -2055,6 +2055,52 @@ safe-outputs:
 	assert.Nil(t, workflowData.SafeOutputs.ThreatDetection, "ThreatDetection must remain nil when explicitly disabled by main workflow")
 }
 
+func TestSafeOutputsImportPreservesDisabledDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		safeOutputs string
+		noop        string
+	}{
+		{"metadata only", "messages:\n    footer: \"> custom footer\"", "{}"},
+		{"explicit handlers", "missing-tool: {}\n  missing-data: {}\n  report-incomplete: {}", "{}"},
+		{"disabled noop", "messages:\n    footer: \"> custom footer\"", "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := NewCompiler(WithVersion("1.0.0"))
+			workflowsDir := filepath.Join(t.TempDir(), ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+			shared := "---\nsafe-outputs:\n  " + tc.safeOutputs + "\n---\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "shared.md"), []byte(shared), 0644))
+			main := `---
+on: workflow_dispatch
+imports:
+  - ./shared.md
+safe-outputs:
+  missing-tool: false
+  missing-data: false
+  report-incomplete: false
+  noop: ` + tc.noop + `
+---
+Run a task.
+`
+			mainFile := filepath.Join(workflowsDir, "main.md")
+			require.NoError(t, os.WriteFile(mainFile, []byte(main), 0644))
+
+			data, err := compiler.ParseWorkflowFile(mainFile)
+			require.NoError(t, err)
+			require.NotNil(t, data.SafeOutputs)
+			assert.Nil(t, data.SafeOutputs.MissingTool)
+			assert.Nil(t, data.SafeOutputs.MissingData)
+			assert.Nil(t, data.SafeOutputs.ReportIncomplete)
+			if tc.noop == "false" {
+				assert.Nil(t, data.SafeOutputs.NoOp)
+			} else {
+				assert.NotNil(t, data.SafeOutputs.NoOp)
+			}
+		})
+	}
+}
+
 // TestSafeOutputsDifferentTypesFromImportsMerged reproduces the bug reported in
 // https://github.com/github/gh-aw/issues/<issue>:
 // When the main workflow defines one safe-outputs type (e.g. noop) and an imported
