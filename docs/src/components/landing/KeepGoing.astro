@@ -1,7 +1,111 @@
 ---
+import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
+
+const links = [
+  { title: 'Hands-on workshop', text: 'Guided exercises in the terminal, the browser or Copilot.', href: 'https://githubnext.github.io/gh-aw-workshop/', external: true },
+  { title: "Peli's Agent Factory", text: 'A tour of the agents the team runs on its own repositories.', href: '/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/' },
+  { title: 'Blog', text: 'Release notes, patterns and stories from the team.', href: '/gh-aw/blog/' },
+  { title: 'Documentation', text: 'Concepts, guides and the full reference.', href: '/gh-aw/introduction/overview/' },
+  { title: 'Slide deck (PDF, 11 MB)', text: 'The technical preview deck: concepts, security model and examples.', href: '/gh-aw/slides/github-agentic-workflows.pdf', download: true },
+  { title: 'Agentic workflows on GitHub', text: 'Source, issues and discussions.', href: 'https://github.com/github/gh-aw', external: true },
+];
+const icon = (l: { external?: boolean; download?: boolean }) =>
+  octicons[l.external ? 'link-external' : l.download ? 'download' : 'arrow-right'].toSVG({ width: 16, height: 16 });
 ---
 
 <LandingSection id="learn" title="Keep going">
-  <p class="aw-placeholder">Placeholder — slice 8</p>
+  <ul class="aw-links">
+    {links.map((l) => (
+      <li>
+        <a href={l.href} {...(l.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})} {...(l.download ? { download: '' } : {})}>
+          <span class="aw-text">
+            <span class="aw-title">{l.title}{l.external && <span class="aw-sr"> (opens in a new tab)</span>}</span>
+            <span class="aw-desc">{l.text}</span>
+          </span>
+          <span class="aw-icon" aria-hidden="true" set:html={icon(l)} />
+        </a>
+      </li>
+    ))}
+  </ul>
 </LandingSection>
+
+<style>
+  .aw-links {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 48rem) {
+    .aw-links {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 4rem;
+    }
+  }
+  li {
+    border-top: 1px solid var(--aw-color-border);
+  }
+  a {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.125rem 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .aw-text {
+    display: block;
+  }
+  .aw-title {
+    display: block;
+    font-size: var(--aw-step-1);
+    font-weight: 520;
+    letter-spacing: -0.015em;
+    color: var(--aw-color-text);
+  }
+  .aw-desc {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.5;
+    color: var(--aw-color-text-muted);
+    text-wrap: pretty;
+  }
+  .aw-icon {
+    flex: none;
+    margin-top: 0.3rem;
+    color: var(--aw-color-text-muted);
+    transition: color 0.15s, transform 0.15s;
+  }
+  .aw-icon :global(svg) {
+    display: block;
+    fill: currentColor;
+  }
+  a:hover .aw-title {
+    color: var(--aw-color-accent-text);
+  }
+  a:hover .aw-icon {
+    color: var(--aw-color-accent-text);
+    transform: translateX(2px);
+  }
+  a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .aw-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aw-icon { transition: none; }
+    a:hover .aw-icon { transform: none; }
+  }
+</style>
