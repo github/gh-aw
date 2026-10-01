@@ -83,7 +83,7 @@ body:has([data-slide-hero])::before {
   color: var(--sl-color-text-invert);
   text-decoration: none;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--aw-step-0);
   border-radius: 0.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   outline: 3px solid var(--sl-color-accent-high);
@@ -145,7 +145,7 @@ body:has([data-slide-hero])::before {
 .sidebar .top-level > li > details > summary,
 .sidebar .top-level > li > a {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--aw-step--1);
   color: var(--aw-color-text);
   letter-spacing: 0;
   border-radius: 6px;
@@ -173,7 +173,7 @@ body:has([data-slide-hero])::before {
 .sidebar .top-level li li a {
   transition: color 0.15s ease, background-color 0.15s ease;
   color: var(--aw-color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--aw-step--1);
   line-height: 1.45;
   padding: 0.3rem 0.5rem;
   border-radius: 6px;
@@ -635,7 +635,7 @@ a.button:hover {
 
 /* Table of Contents */
 starlight-toc nav {
-  font-size: 0.8125rem;
+  font-size: var(--aw-step--1);
 }
 
 starlight-toc a {
@@ -643,7 +643,7 @@ starlight-toc a {
   text-decoration: none;
   border-left: none;
   transition: color 0.15s ease;
-  font-size: 0.8125rem;
+  font-size: var(--aw-step--1);
   line-height: 1.4;
   padding-block: 0.25rem;
   font-weight: 400;
@@ -656,7 +656,7 @@ starlight-toc a[aria-current="true"] {
 }
 
 starlight-toc h2 {
-  font-size: 0.8125rem;
+  font-size: var(--aw-step--1);
   font-weight: 600;
   color: var(--aw-color-text);
   text-transform: none;
@@ -672,7 +672,7 @@ starlight-toc h2 {
 .metadata .authors .author[href] .name {
   color: var(--sl-color-text); /* Use regular text color instead of accent */
   text-decoration: none;
-  font-size: 0.875rem; /* Smaller font size to fit better */
+  font-size: var(--aw-step--1);
 }
 
 .metadata .authors .author[href]:hover .name {
@@ -718,7 +718,7 @@ starlight-toc h2 {
 }
 
 .pagination-links a .meta {
-  font-size: 0.8125rem;
+  font-size: var(--aw-step--1);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -732,7 +732,7 @@ starlight-toc h2 {
 
 .pagination-links .link-title {
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: var(--aw-step-0);
   color: var(--aw-color-text);
   transition: color 0.2s ease;
 }
@@ -757,7 +757,7 @@ starlight-toc h2 {
 
 .sl-markdown-content .starlight-aside__title {
   color: var(--aw-aside-accent);
-  font-size: 0.875rem;
+  font-size: var(--aw-step--1);
   font-weight: 600;
 }
 
@@ -802,7 +802,7 @@ html {
 
 /* Site Title */
 .site-title {
-  font-size: 1rem;
+  font-size: var(--aw-step-0);
   font-weight: 700;
   text-decoration: none;
   display: inline-flex;
@@ -977,7 +977,7 @@ table img[src*="badge.svg"] {
 }
 
 .hero h1 {
-  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-size: var(--aw-step-5);
   font-weight: 600;
   line-height: 1.2;
   color: var(--aw-color-text);
@@ -985,7 +985,7 @@ table img[src*="badge.svg"] {
 }
 
 .hero .tagline {
-  font-size: clamp(0.9375rem, 1.5vw, 1.0625rem);
+  font-size: var(--aw-step-1);
   line-height: 1.6;
   color: var(--aw-color-text-muted);
   font-weight: 400;
@@ -1050,11 +1050,11 @@ main,
   }
 }
 
-/* Mobile and tablet navigation (all viewports ≤1050px) — hamburger replaces full header nav */
-/* Upper bound raised from 900px to 1050px so that iPad Pro 12.9 (1024px portrait) uses the
-   hamburger instead of the full 7-item nav bar, which overflowed and caused pointer-target
-   overlap on that device. See: https://github.com/github/gh-aw/issues/45211 */
-@media (max-width: 1050px) {
+/* Mobile and tablet navigation (all viewports ≤1200px) — hamburger replaces full header nav */
+/* The full 7-item nav bar only fits alongside the sidebar, search and icons from ~1200px up;
+   below that it overflowed (see https://github.com/github/gh-aw/issues/45211, which first
+   raised this from 900px to 1050px for iPad Pro 12.9). */
+@media (max-width: 1200px) {
   /* Hide full nav; hamburger provides equivalent navigation on mobile and tablet */
   .custom-header-links {
     display: none !important;
@@ -1173,7 +1173,7 @@ main,
 .gh-aw-video-caption {
     margin-top: 0.75rem;
     padding: 0.5rem 1rem;
-    font-size: 0.9rem;
+    font-size: var(--aw-step--1);
     color: var(--aw-color-text-muted);
     text-align: center;
     background: var(--aw-color-bg-subtle);
