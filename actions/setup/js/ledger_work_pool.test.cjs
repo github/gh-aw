@@ -25,6 +25,18 @@ test("submission is idempotent and conflicting identity is rejected", () => {
   assert.equal(reducer.output().tables.work.rows.length, 1);
 });
 
+test("immutable Work facts are idempotent and conflicting payloads do not change state", () => {
+  const reducer = createReducer(config);
+  const fact = { operation: "work", work_id: workId(work, config), work };
+  reducer.apply(fact);
+  const expected = reducer.output();
+
+  reducer.apply({ ...fact });
+  assert.deepEqual(reducer.output(), expected);
+  assert.throws(() => reducer.apply({ ...fact, work: { ...work, title: "Changed" } }), /Conflicting work-pool fact/);
+  assert.deepEqual(reducer.output(), expected);
+});
+
 test("acquire retries reuse one Claim and ownership is enforced", () => {
   const reducer = createReducer(config);
   assert.equal(step(reducer, { operation: "acquire", work }).outcome, "acquired");
@@ -35,6 +47,25 @@ test("acquire retries reuse one Claim and ownership is enforced", () => {
   assert.equal(step(reducer, { operation: "finish" }).outcome, "already_finished");
   assert.equal(step(reducer, { operation: "acquire", work }, "other").outcome, "already_done");
   assert.equal(reducer.output().tables.claims.rows.length, 1);
+});
+
+test("contention retains losing Claims and the default claimant capacity is one", () => {
+  const reducer = createReducer(config);
+  const otherWork = { task: "b", title: "Do B" };
+  step(reducer, { operation: "submit", work });
+  step(reducer, { operation: "submit", work: otherWork });
+
+  assert.equal(step(reducer, { operation: "acquire", work }, "worker").outcome, "acquired");
+  const competing = step(reducer, { operation: "acquire", work }, "contender");
+  assert.equal(competing.facts.length, 1);
+  assert.equal(step(reducer, { operation: "acquire", work: otherWork }, "worker").outcome, "invalid");
+
+  const state = reducer.snapshot();
+  const claims = [...state.claims.values()];
+  assert.equal(claims.length, 2);
+  assert.equal(claims.filter(claim => claim.effective).length, 1);
+  assert.equal(claims.filter(claim => claim.claimant === "worker" && claim.effective).length, 1);
+  assert.equal(claims.filter(claim => claim.claimant === "contender" && claim.effective).length, 0);
 });
 
 test("release, successor generation, cancellation and no resurrection", () => {
@@ -97,24 +128,22 @@ test("selection is ordered by Work ID and independent of physical order", () => 
     { operation: "claim", work_id: workId(work, config), claimant: "a", previous_claim_id: null, claim_id: claimId(workId(work, config), "a", null) },
     { operation: "claim", work_id: workId(work, config), claimant: "b", previous_claim_id: null, claim_id: claimId(workId(work, config), "b", null) },
   ];
-  const projection = replayBuiltin(
-    config,
-    records.map(payload => ({ payload }))
-  );
+  const timestampedRecords = records.map((payload, index) => ({
+    payload,
+    timestamp: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+  }));
+  const projection = replayBuiltin(config, timestampedRecords);
   validateReplayOutput(projection);
   for (let iteration = 0; iteration < 100; iteration++) {
-    const shuffled = [...records].sort(() => Math.random() - 0.5);
+    const shuffled = [...timestampedRecords].sort(() => Math.random() - 0.5);
+    assert.deepEqual(replayBuiltin(config, shuffled), projection);
     assert.deepEqual(
       replayBuiltin(
         config,
-        shuffled.map(payload => ({ payload }))
-      ),
-      projection
-    );
-    assert.deepEqual(
-      replayBuiltin(
-        config,
-        [...shuffled, ...shuffled].map(payload => ({ payload }))
+        [...shuffled, ...shuffled].map((record, index) => ({
+          ...record,
+          timestamp: new Date(Date.UTC(2036, 0, index + 1)).toISOString(),
+        }))
       ),
       projection
     );
