@@ -3401,7 +3401,7 @@ max-tool-denials: "example-value"
 max-tool-calls: 1
 
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
-max-tool-calls: "example-value"
+max-tool-calls: "${{ inputs.max-tool-calls }}"
 
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
 # default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement

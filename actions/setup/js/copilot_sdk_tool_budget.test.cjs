@@ -38,15 +38,6 @@ describe("copilot_sdk_tool_budget.cjs", () => {
     expect(onDispatch).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "subagent" }));
   });
 
-  it("debits invocations before downstream failures or permission denials", () => {
-    const budget = buildCopilotSDKToolCallBudget("2", () => {});
-    for (const outcome of ["failed", "permission-denied"]) {
-      const allowExecutionToContinue = budget.onPreToolUse({ toolName: outcome, sessionId: "root", toolArgs: {} }, { sessionId: "root" });
-      expect(allowExecutionToContinue).toBeUndefined();
-    }
-    expect(budget.getCallCount()).toBe(2);
-  });
-
   it("does not install a hook when no limit is configured", () => {
     expect(buildCopilotSDKToolCallBudget(undefined, () => {})).toBeUndefined();
   });

@@ -314,4 +314,61 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
       stderrWriteSpy.mockRestore();
     }
   });
+
+  it("debits failed tool executions and permission denials through the SDK harness", async () => {
+    let onEvent = () => {};
+    let sessionConfig;
+    const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const session = {
+      sessionId: "session-tool-budget-outcomes",
+      on: handler => {
+        onEvent = handler;
+      },
+      sendAndWait: vi.fn().mockImplementation(async () => {
+        const onPreToolUse = sessionConfig.hooks.onPreToolUse;
+        expect(onPreToolUse({ toolName: "web_fetch", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
+        await expect(sessionConfig.tools[0].handler({ url: "https://example.com" })).rejects.toThrow("fetch failed");
+        expect(onPreToolUse({ toolName: "bash", sessionId: "root", toolArgs: {} }, { sessionId: "root" })).toBeUndefined();
+        expect(sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "git status" })).toMatchObject({ kind: "reject" });
+        onEvent({ type: "assistant.message", ephemeral: false, timestamp: new Date().toISOString(), data: { content: "done" } });
+        return { data: { content: "done" } };
+      }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = vi.fn().mockImplementation(config => {
+        sessionConfig = config;
+        return session;
+      });
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+
+    try {
+      const result = await runWithCopilotSDK({
+        sdkUri: "http://127.0.0.1:3002",
+        prompt: "test prompt",
+        logger: () => {},
+        permissionConfig: validToolConfig().permissions,
+        toolConfig: { ...validToolConfig(), maxToolCalls: 2 },
+        webFetchOptions: { fetchImpl: vi.fn().mockRejectedValue(new Error("fetch failed")) },
+        sdkModule: { ...fakeSDKTools, CopilotClient: FakeCopilotClient, RuntimeConnection: { forUri: vi.fn(() => ({})) }, approveAll: () => ({ kind: "approve-once" }) },
+      });
+
+      expect(result.exitCode).toBe(0);
+      const events = stderrWriteSpy.mock.calls
+        .map(([line]) => {
+          try {
+            return JSON.parse(line.trim());
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      expect(events).toContainEqual(expect.objectContaining({ type: "guard.tool_call_budget_debit", data: expect.objectContaining({ toolName: "web_fetch", callCount: 1 }) }));
+      expect(events).toContainEqual(expect.objectContaining({ type: "guard.tool_call_budget_debit", data: expect.objectContaining({ toolName: "bash", callCount: 2 }) }));
+    } finally {
+      stderrWriteSpy.mockRestore();
+    }
+  });
 });
