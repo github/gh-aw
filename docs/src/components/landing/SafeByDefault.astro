@@ -1,8 +1,6 @@
 ---
 import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
-import VariantGroup from './VariantGroup.astro';
-import SafeByDefaultJourney from './SafeByDefaultJourney.astro';
 import SafeByDefaultTrifecta from './SafeByDefaultTrifecta.astro';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
@@ -54,17 +52,7 @@ const layers = [
 ] as const;
 ---
 
-<VariantGroup
-  id="safety"
-  label="Safe by default"
-  variants={[
-    { key: 'a', name: 'Current: layer stack' },
-    { key: 'b', name: 'Request journey' },
-  ]}
-  defaultKey="a"
->
-<div data-variant="a">
-<LandingSection titleId="safety-a-title" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
+<LandingSection id="safety" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
   <div class="aw-safe">
     <SafeByDefaultTrifecta noun="layers" />
 
@@ -107,9 +95,6 @@ const layers = [
     </p>
   </div>
 </LandingSection>
-</div>
-<div data-variant="b"><SafeByDefaultJourney /></div>
-</VariantGroup>
 
 <style>
   .aw-safe {
@@ -133,12 +118,6 @@ const layers = [
   }
 
   .aw-defence-intro {
-    margin: clamp(2rem, 4vw, 3rem) 0 0;
-    font-size: var(--aw-step-0);
-    line-height: 1.6;
-    color: var(--aw-color-text-secondary);
-  }
-  .aw-defence-intro {
     margin: 0;
     max-width: 52ch;
     font-size: var(--aw-step-0);
@@ -146,61 +125,6 @@ const layers = [
     color: var(--aw-color-text-secondary);
     text-wrap: pretty;
   }
-  .aw-risk-list {
-    list-style: none;
-    margin: 1.25rem 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  .aw-risk-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1 1 14rem;
-    min-width: 0;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--aw-color-border);
-    border-radius: 10px;
-    background: var(--aw-color-surface);
-  }
-  .aw-risk-name {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: var(--aw-step-0);
-    font-weight: 560;
-    color: var(--aw-color-text-strong);
-  }
-  .aw-risk-name .aw-ico {
-    color: var(--aw-color-complement);
-  }
-  .aw-risk-text {
-    font-size: var(--aw-step--1);
-    line-height: 1.5;
-    color: var(--aw-color-text-secondary);
-  }
-  .aw-plus {
-    display: none;
-    align-self: center;
-    color: var(--aw-color-text-muted);
-    font-size: var(--aw-step-1);
-  }
-  @media (min-width: 52rem) {
-    .aw-risk-list {
-      flex-wrap: nowrap;
-    }
-    .aw-risk-item {
-      flex-basis: 0;
-    }
-    .aw-plus {
-      display: block;
-    }
-  }
-
-
   /* Stack */
   .aw-layout {
     position: relative;

@@ -1,9 +1,6 @@
 ---
 import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
-import VariantGroup from './VariantGroup.astro';
-import GalleryB from './GalleryB.astro';
-import GalleryD from './GalleryD.astro';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 const G = '/gh-aw/gallery/';
@@ -45,9 +42,7 @@ const more = [
 ];
 ---
 
-<VariantGroup id="gallery" label="What teams automate" defaultKey="a" variants={[{key:'a',name:'Current: 3×2 grid'},{key:'b',name:'Spotlight'},{key:'d',name:'Trigger → result log'}]}>
-  <div data-variant="a">
-    <LandingSection titleId="gallery-a-title" title="What teams automate" lede="Start from a proven workflow and adapt it to your repository.">
+    <LandingSection id="gallery" title="What teams automate" lede="Start from a proven workflow and adapt it to your repository.">
       <ul class="aw-feat" role="list">
         {featured.map((f) => (
           <li>
@@ -159,10 +154,6 @@ const more = [
         <a class="aw-all" href="/gh-aw/gallery/">Browse the full gallery <span aria-hidden="true">→</span></a>
       </div>
     </LandingSection>
-  </div>
-  <div data-variant="b"><GalleryB /></div>
-  <div data-variant="d"><GalleryD /></div>
-</VariantGroup>
 
 <style>
   /* Featured row: scrolls inside itself on mobile, 3x2 grid on desktop */
