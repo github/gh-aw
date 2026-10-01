@@ -62,6 +62,7 @@ import { noMisplacedErrorCodeDefinitionRule } from "./rules/no-misplaced-error-c
 import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
 import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
+import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
 
 const plugin = {
   meta: {
@@ -132,6 +133,7 @@ const plugin = {
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
     "no-single-char-string-replace": noSingleCharStringReplaceRule,
+    "no-async-foreach-callback": noAsyncForEachCallbackRule,
   },
 };
 
