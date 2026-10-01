@@ -37,6 +37,14 @@ function compareCanonical(left, right) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareClaims(left, right) {
+  return compareStrings(left.run_id, right.run_id) || compareStrings(left.workflow_id, right.workflow_id) || compareStrings(left.claim_id, right.claim_id);
+}
+
 function validateJSONValue(value, depth = 0) {
   if (depth > MAX_VALUE_DEPTH) throw new RangeError("Coordinator data exceeds maximum nesting depth");
   if (value === null || typeof value === "string" || typeof value === "boolean") return;
@@ -220,7 +228,7 @@ function replayTransactions(input) {
   let activeClaimCount = 0;
   let outstandingCount = 0;
   for (const [workId, transaction] of [...works.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const workClaims = (claimsByWork.get(workId) || []).slice().sort((a, b) => (a.claim_id < b.claim_id ? -1 : a.claim_id > b.claim_id ? 1 : 0));
+    const workClaims = (claimsByWork.get(workId) || []).slice().sort(compareClaims);
     const liveClaims = workClaims.filter(claim => !cancellations.has(claim.claim_id));
     const effectiveClaim = liveClaims[0];
     const completion = effectiveClaim ? completions.get(effectiveClaim.claim_id) : undefined;

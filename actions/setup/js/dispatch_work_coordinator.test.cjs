@@ -8,7 +8,7 @@ import { compactTransactions, deriveWorkId, parseTransactionLog, replayTransacti
 const work = { title: "Fix issue", payload: { priority: 2 } };
 const workId = deriveWorkId(work);
 const workTx = { type: "Work", work_id: workId, work };
-const claim = (claimId, runId = "100") => ({ type: "Claim", claim_id: claimId, work_id: workId, run_id: runId, workflow_id: "worker.yml" });
+const claim = (claimId, runId = "100", workflowId = "worker.yml") => ({ type: "Claim", claim_id: claimId, work_id: workId, run_id: runId, workflow_id: workflowId });
 
 test("empty and canonical work replay", () => {
   assert.deepEqual(replayTransactions([]).counts, {
@@ -28,7 +28,7 @@ test("empty and canonical work replay", () => {
 });
 
 test("claim arbitration is deterministic and independent of record order", () => {
-  const transactions = [workTx, claim("claim-b"), claim("claim-a", "101")];
+  const transactions = [workTx, claim("AAAA-claim", "101"), claim("claim-z", "100", "worker-z.yml"), claim("claim-b", "100", "worker-a.yml"), claim("claim-a", "100", "worker-a.yml")];
   const first = replayTransactions(transactions);
   const second = replayTransactions(transactions.slice().reverse());
   assert.deepEqual(first, second);
@@ -38,6 +38,8 @@ test("claim arbitration is deterministic and independent of record order", () =>
     [
       ["claim-a", "effective"],
       ["claim-b", "superseded"],
+      ["claim-z", "superseded"],
+      ["AAAA-claim", "superseded"],
     ]
   );
 });
