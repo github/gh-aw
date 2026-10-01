@@ -11,15 +11,53 @@ const { noun = 'layers' } = Astro.props;
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
-// Geometry (viewBox units; HTML labels are positioned with the same numbers as percentages).
-const W = 448;
-const H = 408;
-const C = { x: 224, y: 236 };
+// Geometry in viewBox units. At full size (40rem) one unit is roughly one CSS pixel, which is what
+// the pill clearances below are tuned against. HTML overlays reuse the same numbers as percentages.
+const W = 640;
+const H = 460;
+const C = { x: 320, y: 280 }; // where the three legs would meet: the agent
+const CORE_R = 34; // spokes stop short of the agent badge
+// Pill half-extents (units) used to place the coral ticks just outside each pill.
+const PILL = { hw: 90, hh: 15 };
+
 const nodes = [
-  { id: 'data', x: 224, y: 36, icon: 'lock', label: 'Private data', cut: 'Credential isolation', t: 0.5, gap: 22 },
-  { id: 'untrusted', x: 44, y: 330, icon: 'alert', label: 'Untrusted content', cut: 'Integrity filtering', t: 0.56, gap: 22 },
-  { id: 'outbound', x: 404, y: 330, icon: 'globe', label: 'Outbound access', cut: 'Sandboxed agent', t: 0.56, gap: 22 },
+  {
+    id: 'data',
+    x: 320,
+    y: 32,
+    icon: 'lock',
+    label: 'Private data',
+    sub: 'Secrets, tokens, private repos',
+    cut: 'Credential isolation',
+    t: 0.56, // wide layout: where the pill sits along the spoke
+    tc: 0.45, // compact layout: where the cut disc sits
+  },
+  {
+    id: 'untrusted',
+    x: 56,
+    y: 428,
+    icon: 'alert',
+    label: 'Untrusted content',
+    sub: 'Issues, PR comments, web pages',
+    cut: 'Integrity filtering',
+    t: 0.6,
+    tc: 0.6,
+  },
+  {
+    id: 'outbound',
+    x: 584,
+    y: 428,
+    icon: 'globe',
+    label: 'Outbound access',
+    sub: 'Network, APIs, writes',
+    cut: 'Sandboxed agent',
+    t: 0.6,
+    tc: 0.6,
+  },
 ] as const;
+
+const f = (v: number) => v.toFixed(1);
+const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
 
 const spokes = nodes.map((n) => {
   const dx = C.x - n.x;
@@ -27,20 +65,46 @@ const spokes = nodes.map((n) => {
   const len = Math.hypot(dx, dy);
   const ux = dx / len;
   const uy = dy / len;
-  const cx = n.x + dx * n.t;
-  const cy = n.y + dy * n.t;
-  const end = len - 46; // stop short of the centre label
-  const f = (v: number) => v.toFixed(1);
+  const at = (d: number) => ({ x: n.x + ux * d, y: n.y + uy * d });
+  // The apex leg stops above the "lethal trifecta" caption; the caption sits higher, in units, when compact.
+  const isApex = n.id === 'data';
+  const split = (t: number, stop: number) => {
+    const p = at(len * t);
+    return { p, before: { a: n, b: p }, after: { a: p, b: at(len - stop) } };
+  };
+  // Distance from the pill centre to where the spoke leaves the pill, plus breathing room.
+  const exit = Math.min(PILL.hw / Math.abs(ux || 1e-6), PILL.hh / Math.abs(uy || 1e-6)) + 12;
+  const tick = (d: number) => {
+    const c = at(len * n.t + d);
+    const px = -uy * 5;
+    const py = ux * 5;
+    return { x1: c.x - px, y1: c.y - py, x2: c.x + px, y2: c.y + py };
+  };
   return {
     ...n,
-    cx,
-    cy,
-    before: { x1: n.x, y1: n.y, x2: cx - ux * n.gap, y2: cy - uy * n.gap },
-    after: { x1: cx + ux * n.gap, y1: cy + uy * n.gap, x2: n.x + ux * end, y2: n.y + uy * end },
-    pct: { x: (n.x / W) * 100, y: (n.y / H) * 100, cx: (cx / W) * 100, cy: (cy / H) * 100 },
-    f,
+    wide: split(n.t, isApex ? 62 : CORE_R),
+    compact: split(n.tc, isApex ? 88 : CORE_R),
+    ticks: [tick(-exit), tick(exit)],
   };
 });
+
+// Triangle edges: an outer hairline and an inner dotted line, inset towards the incentre.
+const [A, B, Cc] = nodes;
+const side = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+const a = side(B, Cc);
+const b = side(A, Cc);
+const c = side(A, B);
+const per = a + b + c;
+const inc = { x: (a * A.x + b * B.x + c * Cc.x) / per, y: (a * A.y + b * B.y + c * Cc.y) / per };
+const s = per / 2;
+const inr = Math.sqrt(((s - a) * (s - b) * (s - c)) / s);
+const inset = (d: number) =>
+  nodes
+    .map((n) => {
+      const k = (inr - d) / inr;
+      return `${f(inc.x + (n.x - inc.x) * k)},${f(inc.y + (n.y - inc.y) * k)}`;
+    })
+    .join(' ');
 const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 ---
 
@@ -52,41 +116,80 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
   </p>
 
   <figure class="tri-fig">
-    <div class="tri-art" aria-hidden="true" style={`aspect-ratio: ${W} / ${H}`}>
-      <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
-        <polygon class="tri-outline" points={outline}></polygon>
-        {spokes.map((s, i) => (
-          <>
-            <line class="tri-line" x1={s.f(s.before.x1)} y1={s.f(s.before.y1)} x2={s.f(s.before.x2)} y2={s.f(s.before.y2)}></line>
-            <line class="tri-line tri-cut-line" style={`--i:${i}`} x1={s.f(s.after.x1)} y1={s.f(s.after.y1)} x2={s.f(s.after.x2)} y2={s.f(s.after.y2)}></line>
-          </>
+    <div class="tri-stage" aria-hidden="true">
+      <div class="tri-art" style={`aspect-ratio: ${W} / ${H}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
+          <polygon class="tri-zone" points={inset(10)}></polygon>
+          <polygon class="tri-edge" points={outline}></polygon>
+          <polygon class="tri-edge-inner" points={inset(10)}></polygon>
+          <circle class="tri-core-ring" cx={C.x} cy={C.y} r={CORE_R - 6}></circle>
+          {spokes.map((sp, i) =>
+            (['wide', 'compact'] as const).map((mode) => {
+              const g = sp[mode];
+              return (
+                <g class={`tri-spoke is-${mode}`} style={`--i:${i}`}>
+                  <line class="tri-line" x1={f(g.before.a.x)} y1={f(g.before.a.y)} x2={f(g.before.b.x)} y2={f(g.before.b.y)} />
+                  <line class="tri-line tri-live" x1={f(g.after.a.x)} y1={f(g.after.a.y)} x2={f(g.after.b.x)} y2={f(g.after.b.y)} />
+                  <line class="tri-line tri-dead" x1={f(g.after.a.x)} y1={f(g.after.a.y)} x2={f(g.after.b.x)} y2={f(g.after.b.y)} />
+                  {mode === 'wide' &&
+                    sp.ticks.map((t) => (
+                      <line class="tri-tick" x1={f(t.x1)} y1={f(t.y1)} x2={f(t.x2)} y2={f(t.y2)} />
+                    ))}
+                </g>
+              );
+            }),
+          )}
+        </svg>
+
+        {spokes.map((sp) => (
+          <span class="tri-badge" style={`left:${pct(sp.x, W)};top:${pct(sp.y, H)}`} set:html={icon(sp.icon, 20)} />
         ))}
-      </svg>
-      {spokes.map((s) => (
-        <span class={`tri-node tri-node-${s.id}`} style={`left:${s.pct.x.toFixed(2)}%;top:${s.pct.y.toFixed(2)}%`}>
-          <span class="tri-badge" set:html={icon(s.icon, 18)} />
-          <span class="tri-label">{s.label}</span>
+
+        {spokes.map((sp) => (
+          <span class={`tri-label tri-label-${sp.id}`} style={`--x:${pct(sp.x, W)};--y:${pct(sp.y, H)}`}>
+            <span class="tri-name">{sp.label}</span>
+            <span class="tri-sub">{sp.sub}</span>
+            <span class="tri-blocked"><span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />{sp.cut}</span>
+          </span>
+        ))}
+
+        {spokes.map((sp, i) => (
+          <span
+            class="tri-cut"
+            style={`--i:${i};--wx:${pct(sp.wide.p.x, W)};--wy:${pct(sp.wide.p.y, H)};--cx:${pct(sp.compact.p.x, W)};--cy:${pct(sp.compact.p.y, H)}`}
+          >
+            <span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />
+            <span class="tri-cut-name">{sp.cut}</span>
+          </span>
+        ))}
+
+        <span class="tri-core" style={`left:${pct(C.x, W)};top:${pct(C.y, H)}`}>
+          <span class="tri-core-label">the lethal trifecta</span>
+          <span class="tri-agent" set:html={icon('hubot', 20)} />
+          <span class="tri-agent-label">Agent</span>
         </span>
-      ))}
-      {spokes.map((s, i) => (
-        <span class="tri-cut" style={`--i:${i};left:${s.pct.cx.toFixed(2)}%;top:${s.pct.cy.toFixed(2)}%`}>
-          <span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />
-          <span class="tri-cut-name">{s.cut}</span>
-        </span>
-      ))}
-      <span class="tri-core" style={`left:${(C.x / W) * 100}%;top:${(C.y / H) * 100}%`}>the lethal trifecta</span>
+      </div>
     </div>
+
+    <ul class="tri-legend" aria-hidden="true">
+      <li><svg viewBox="0 0 24 6" focusable="false"><line class="tri-line" x1="1" y1="3" x2="23" y2="3" /></svg>Reaches the agent</li>
+      <li><svg viewBox="0 0 24 6" focusable="false"><line class="tri-line tri-dead" x1="1" y1="3" x2="23" y2="3" /></svg>Cut off</li>
+      <li><span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />gh-aw layer</li>
+    </ul>
+
     <figcaption class="tri-sr">
-      The lethal trifecta is private data, untrusted content and outbound access present together. gh-aw cuts each
-      side: credential isolation keeps private data away from the agent, integrity filtering screens untrusted
-      content, and the sandboxed agent restricts outbound access.
+      Diagram of the lethal trifecta: three capabilities that are dangerous when an agent holds all of them at once.
+      Private data means secrets, tokens and private repositories. Untrusted content means issues, pull request
+      comments and web pages. Outbound access means the network, APIs and writes. Each one would reach the agent at
+      the centre, but gh-aw cuts every leg: credential isolation keeps private data away from the agent, integrity
+      filtering screens untrusted content, and the sandboxed agent restricts outbound access.
     </figcaption>
   </figure>
 </div>
 
 <script>
-  // Entrance: the cut markers settle in once the diagram scrolls into view.
-  // Without JS, or with reduced motion, everything is simply shown.
+  // Entrance: each leg starts live all the way to the agent; on scroll the layer drops in and the
+  // remainder of the leg goes quiet. Without JS, or with reduced motion, the final state is shown.
   const art = document.querySelector<HTMLElement>('.tri-art');
   if (art && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     art.classList.add('is-armed');
@@ -97,7 +200,7 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
           io.disconnect();
         }
       },
-      { threshold: 0.4 },
+      { threshold: 0.5 },
     );
     io.observe(art);
   }
@@ -105,15 +208,12 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 
 <style>
   .tri {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2rem 3.5rem;
+    display: grid;
+    gap: 2.5rem;
   }
   .tri-text {
-    flex: 1 1 22rem;
     margin: 0;
-    max-width: 52ch;
+    max-width: 60ch;
     font-size: var(--aw-step-0);
     line-height: 1.6;
     color: var(--aw-color-text-secondary);
@@ -127,11 +227,17 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     outline: 2px solid var(--aw-color-accent);
     outline-offset: 2px;
   }
+
   .tri-fig {
-    margin: 0;
-    flex: 0 1 28rem;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 40rem;
     min-width: 0;
-    max-width: 100%;
+    container-type: inline-size;
+  }
+  /* Room above the apex and below the base for the HTML labels. */
+  .tri-stage {
+    padding: 4.25rem 0 4.75rem;
   }
   .tri-art {
     position: relative;
@@ -144,158 +250,330 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     height: 100%;
     overflow: visible;
   }
-  .tri-outline {
+
+  /* ---- Triangle ---- */
+  .tri-zone {
+    fill: var(--aw-color-complement-low);
+    fill-opacity: 0.45;
+  }
+  .tri-edge {
     fill: none;
-    stroke: var(--aw-color-divider);
-    stroke-width: 1.5;
+    stroke: var(--aw-color-border-strong);
+    stroke-width: 1;
     stroke-linejoin: round;
   }
-  .tri-line {
+  .tri-edge-inner {
+    fill: none;
     stroke: var(--aw-color-border-strong);
-    stroke-width: 1.5;
+    stroke-width: 1.25;
     stroke-linecap: round;
+    stroke-dasharray: 0 5;
   }
-  /* The side of the spoke beyond the cut is neutralised: dashed and quiet. */
-  .tri-cut-line {
-    stroke-dasharray: 3 4;
+  .tri-core-ring {
+    fill: none;
+    stroke: var(--aw-color-complement);
+    stroke-opacity: 0.55;
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
   }
 
-  .tri-node,
+  /* ---- Spokes ---- */
+  .tri-line {
+    stroke: var(--aw-color-text-muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  /* The leg beyond the cut is neutralised: dashed and quiet. */
+  .tri-dead {
+    stroke: var(--aw-color-border-strong);
+    stroke-dasharray: 3 4;
+  }
+  .tri-live {
+    opacity: 0;
+  }
+  .tri-tick {
+    stroke: var(--aw-color-complement);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .tri-spoke.is-compact {
+    display: none;
+  }
+
+  /* ---- Overlays ---- */
+  .tri-badge,
   .tri-cut,
   .tri-core {
     position: absolute;
     transform: translate(-50%, -50%);
   }
-  .tri-node {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.375rem;
-    width: 0;
-  }
   .tri-badge {
     display: grid;
     place-items: center;
-    flex: none;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 3rem;
+    height: 3rem;
     border-radius: 50%;
     background: var(--aw-color-surface);
     border: 1px solid var(--aw-color-border-strong);
     color: var(--aw-color-text-strong);
   }
-  .tri-badge :global(svg) {
-    fill: currentColor;
-  }
-  .tri-label {
-    white-space: nowrap;
-    font-size: var(--aw-step--1);
-    line-height: 1.2;
-    font-weight: 500;
-    color: var(--aw-color-text-strong);
-  }
-  /* Top node: label sits beside the badge. Bottom nodes: label below, kept inside the figure. */
-  .tri-node-data {
-    flex-direction: row;
-    width: auto;
-    gap: 0.625rem;
-  }
-  .tri-node-data .tri-label {
-    position: absolute;
-    left: calc(100% + 0.625rem);
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  .tri-node-data .tri-badge {
-    margin: 0;
-  }
-  .tri-node-untrusted {
-    align-items: flex-start;
-    transform: translate(-1.25rem, -1.25rem);
-    width: auto;
-  }
-  .tri-node-outbound {
-    align-items: flex-end;
-    transform: translate(calc(-100% + 1.25rem), -1.25rem);
-    width: auto;
-  }
-  .tri-node-untrusted .tri-badge {
-    margin-left: 0;
-  }
-  .tri-node-data {
-    transform: translate(-1.25rem, -1.25rem);
-  }
-
-  .tri-cut {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    white-space: nowrap;
-    padding: 0.25rem 0.625rem 0.25rem 0.5rem;
-    border-radius: 999px;
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border-strong);
-    color: var(--aw-color-text-strong);
-    font-size: var(--aw-step--1);
-    line-height: 1.15;
-    font-weight: 500;
-    width: max-content;
-  }
-  .tri-cut-icon {
-    display: inline-flex;
-    color: var(--aw-color-danger);
-  }
+  .tri-badge :global(svg),
+  .tri-agent :global(svg),
   .tri-cut-icon :global(svg) {
     fill: currentColor;
   }
-  .tri-core {
-    width: 7rem;
+
+  .tri-label {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: max-content;
+    max-width: 44%;
+  }
+  /* Apex: label centred above the badge. */
+  .tri-label-data {
+    left: var(--x);
+    bottom: calc(100% - var(--y) + 2rem);
+    transform: translateX(-50%);
+    align-items: center;
     text-align: center;
+    max-width: 90%;
+  }
+  /* Base: labels below the badges, flush with the outer badge edge. */
+  .tri-label-untrusted {
+    left: calc(var(--x) - 1.5rem);
+    top: calc(var(--y) + 2rem);
+  }
+  .tri-label-outbound {
+    right: calc(100% - var(--x) - 1.5rem);
+    top: calc(var(--y) + 2rem);
+    align-items: flex-end;
+    text-align: right;
+  }
+  .tri-name {
     font-size: var(--aw-step-0);
-    line-height: 1.25;
+    line-height: 1.3;
     font-weight: 600;
     color: var(--aw-color-text-strong);
+  }
+  .tri-sub {
+    font-size: var(--aw-step--1);
+    line-height: 1.4;
+    color: var(--aw-color-text-muted);
     text-wrap: balance;
   }
+  /* Layer name under each node: only in the compact layout, where pills don't fit. */
+  .tri-blocked {
+    display: none;
+    align-items: center;
+    gap: 0.3125rem;
+    margin-top: 0.25rem;
+    font-size: var(--aw-step--1);
+    line-height: 1.3;
+    font-weight: 500;
+    color: var(--aw-color-accent-text);
+  }
 
-  @media (max-width: 30rem) {
-    .tri-cut {
-      white-space: normal;
-      text-align: center;
-      max-width: 6.5rem;
-    }
-    .tri-cut-icon {
+  .tri-cut {
+    left: var(--wx);
+    top: var(--wy);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    width: max-content;
+    white-space: nowrap;
+    padding: 0.3125rem 0.75rem 0.3125rem 0.5625rem;
+    border-radius: 999px;
+    background: var(--aw-color-accent-low);
+    border: 1px solid var(--aw-color-accent);
+    color: var(--aw-color-accent-text);
+    font-size: var(--aw-step--1);
+    line-height: 1.15;
+    font-weight: 600;
+  }
+  .tri-cut-icon {
+    display: inline-flex;
+    flex: none;
+    color: var(--aw-color-complement);
+  }
+
+  .tri-core {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .tri-agent {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    color: var(--aw-color-text-muted);
+  }
+  .tri-core-label,
+  .tri-agent-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: var(--aw-step--1);
+    line-height: 1.2;
+  }
+  .tri-core-label {
+    bottom: calc(100% + 0.75rem);
+    font-weight: 600;
+    color: var(--aw-color-complement);
+  }
+  .tri-agent-label {
+    top: calc(100% + 0.375rem);
+    color: var(--aw-color-text-muted);
+  }
+
+  /* ---- Legend ---- */
+  .tri-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+    padding: 1.25rem 0 0;
+    list-style: none;
+    border-top: 1px solid var(--aw-color-divider);
+    font-size: var(--aw-step--1);
+    line-height: 1.3;
+    color: var(--aw-color-text-muted);
+  }
+  .tri-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+  }
+  .tri-legend svg {
+    width: 1.5rem;
+    height: 0.375rem;
+    overflow: visible;
+  }
+
+  /* ---- Compact layout: pills become cut discs, layer names move under each node ---- */
+  @container (max-width: 37.5rem) {
+    .tri-spoke.is-wide {
       display: none;
     }
-    .tri-core {
-      width: 5.5rem;
+    .tri-spoke.is-compact {
+      display: inline;
+    }
+    .tri-stage {
+      padding: 4rem 0 6rem;
+    }
+    .tri-badge {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+    .tri-badge :global(svg) {
+      width: 18px;
+      height: 18px;
+    }
+    .tri-label-data {
+      bottom: calc(100% - var(--y) + 1.75rem);
+    }
+    .tri-label-untrusted {
+      left: calc(var(--x) - 1.25rem);
+      top: calc(var(--y) + 1.75rem);
+    }
+    .tri-label-outbound {
+      right: calc(100% - var(--x) - 1.25rem);
+      top: calc(var(--y) + 1.75rem);
+    }
+    .tri-name {
       font-size: var(--aw-step--1);
-      margin-top: -0.75rem;
+    }
+    .tri-blocked {
+      display: inline-flex;
+    }
+    .tri-cut {
+      left: var(--cx);
+      top: var(--cy);
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+    }
+    .tri-cut-name {
+      display: none;
+    }
+    .tri-core-ring {
+      display: none;
+    }
+    .tri-agent {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+    .tri-agent :global(svg) {
+      width: 16px;
+      height: 16px;
+    }
+    .tri-core-label {
+      bottom: calc(100% + 0.5rem);
+    }
+    .tri-agent-label {
+      display: none;
+    }
+    .tri-legend li:nth-child(3) {
+      display: none;
+    }
+  }
+  /* The apex label's sublabel crowds the cut disc on very narrow figures. */
+  @container (max-width: 22rem) {
+    .tri-label-data .tri-sub {
+      display: none;
+    }
+    .tri-stage {
+      padding: 3.25rem 0 7.5rem;
     }
   }
 
-  /* Entrance */
+  /* ---- Entrance ---- */
   .tri-art.is-armed .tri-cut {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.92);
+    transform: translate(-50%, -50%) scale(0.85);
   }
-  .tri-art.is-armed .tri-cut-line {
+  .tri-art.is-armed .tri-tick,
+  .tri-art.is-armed .tri-dead {
     opacity: 0;
+  }
+  .tri-art.is-armed .tri-live {
+    opacity: 1;
   }
   .tri-art.is-armed.is-in .tri-cut {
     opacity: 1;
     transform: translate(-50%, -50%);
   }
-  .tri-art.is-armed.is-in .tri-cut-line {
+  .tri-art.is-armed.is-in .tri-tick,
+  .tri-art.is-armed.is-in .tri-dead {
     opacity: 1;
   }
+  .tri-art.is-armed.is-in .tri-live {
+    opacity: 0;
+  }
   .tri-art.is-in .tri-cut,
-  .tri-art.is-in .tri-cut-line {
+  .tri-art.is-in .tri-tick,
+  .tri-art.is-in .tri-dead,
+  .tri-art.is-in .tri-live {
     transition:
-      opacity 0.5s ease-out,
+      opacity 0.45s ease-out,
       transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-    transition-delay: calc(var(--i, 0) * 120ms);
+    transition-delay: calc(300ms + var(--i, 0) * 180ms);
+  }
+  .tri-art.is-in .tri-spoke .tri-tick,
+  .tri-art.is-in .tri-spoke .tri-dead,
+  .tri-art.is-in .tri-spoke .tri-live {
+    transition-delay: calc(420ms + var(--i, 0) * 180ms);
   }
 
   .tri-sr {
