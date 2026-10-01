@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.0.1  
+**Version**: 1.1.0<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -22,7 +22,7 @@ The security architecture employs defense-in-depth principles including input sa
 
 ## Status of This Document
 
-This is a Candidate Recommendation specification and represents the current state of the GitHub Agentic Workflows security architecture as implemented in version 1.0.0. This specification is subject to updates based on security research, community feedback, and operational experience. Future versions may introduce additional security controls or refine existing requirements.
+This is a Candidate Recommendation specification and represents the current state of the GitHub Agentic Workflows security architecture. This specification is subject to updates based on security research, community feedback, and operational experience. Future versions may introduce additional security controls or refine existing requirements.
 
 **Publication Date**: January 29, 2026  
 **Governance**: This specification is maintained by GitHub Next and governed by GitHub's security and research processes.
@@ -2051,6 +2051,15 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 
 ## Change Log
 
+### Version 1.1.0 (RS-05a Trust Contract Revision)
+
+**Published**: October 1, 2026
+
+- Adds a same-repository bot exception to the RS-05a permission floor for `pull_request` and `pull_request_target` `opened` or `synchronize` events when sender identity and runtime, PR head, and PR base repository IDs are verified.
+- Preserves collaborator-permission checks for forks, unverifiable metadata, comments, reviews, dispatches, and all other event actions.
+- Updates the RS-05a validation evidence and Z3 proof mapping in `security-architecture-spec-validation.md`.
+- Backed by focused unit tests for successful branch events and independent rejection of each missing or mismatched trust condition.
+
 ### Version 1.0.1 (Editorial Update, addendum: September 24, 2026)
 
 **Scoped RS-05a fork-runtime rejection to `workflow_dispatch` PR replays**:
@@ -2146,5 +2155,7 @@ The revalidation cadence **SHOULD** also include a review of `specs/security-arc
 The most recent full validation pass against this specification was completed on **2026-07-15**. The results are recorded in `specs/security-architecture-spec-validation.md`. Any changes to MUST-level requirements after this date require a new validation pass per the triggers above.
 
 Sync check on **2026-08-25** found no new minor-version bump, reported security incident, or reference-implementation change requiring a full revalidation since the 2026-07-15 pass. This maintenance pass synchronized §9/§11 prose to the existing `pkg/workflow/threat_detection_config.go` parser and `pkg/workflow/threat_detection_inline_engine.go` runtime behavior; because it clarifies MUST-level runtime sequencing text, a targeted §9/§11 revalidation is scheduled with the Security Architecture maintainers by **2026-09-01**. The known Appendix G.10 partial-coverage gaps remain tracked there.
+
+On **2026-10-01**, RS-05a was revalidated against the same-repository bot branch-event implementation, unit tests, and Z3 safety model for Version 1.1.0. Evidence is recorded in `security-architecture-spec-validation.md` §7b; this targeted revalidation does not replace the full validation pass required by the revalidation policy.
 
 *This specification is provided under the MIT License.*

@@ -343,16 +343,20 @@ If the pull request is still open, verify that:
       });
 
       it.each([
-        ["forked PR", 43, 42, "automation[bot]", "opened"],
-        ["missing repository ID", 42, undefined, "automation[bot]", "opened"],
-        ["different sender", 42, 42, "other[bot]", "opened"],
-        ["metadata-only PR event", 42, 42, "automation[bot]", "labeled"],
-      ])("should not bypass permission verification for a %s", async (_reason, headId, repositoryId, senderLogin, action) => {
+        ["forked PR", 43, 42, 42, "automation[bot]", "Bot", "opened"],
+        ["missing runtime repository ID", 42, undefined, 42, "automation[bot]", "Bot", "opened"],
+        ["different sender", 42, 42, 42, "other[bot]", "Bot", "opened"],
+        ["non-bot sender", 42, 42, 42, "automation[bot]", "User", "opened"],
+        ["metadata-only PR event", 42, 42, 42, "automation[bot]", "Bot", "labeled"],
+        ["missing base repository ID", 42, 42, undefined, "automation[bot]", "Bot", "opened"],
+        ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot", "opened"],
+      ])("should not bypass permission verification for a %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType, action) => {
         mockContext.actor = "automation[bot]";
-        mockContext.payload.sender = { login: senderLogin, type: "Bot" };
+        mockContext.payload.sender = { login: senderLogin, type: senderType };
         mockContext.payload.action = action;
         mockContext.payload.repository.id = repositoryId;
         mockContext.payload.pull_request.head.repo.id = headId;
+        mockContext.payload.pull_request.base.repo.id = baseId;
         mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
 
         await runScript();
