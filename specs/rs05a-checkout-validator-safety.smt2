@@ -50,6 +50,9 @@
 (declare-const actor_present Bool)
 (declare-const actor_is_centralized_router Bool)
 (declare-const sender_type_bot Bool)
+(declare-const sender_matches_actor Bool)
+(declare-const pr_action_proves_branch_access Bool)
+(declare-const verified_same_repository_pr Bool)
 (declare-const centralized_marker_present Bool)
 (declare-const propagated_actor_present Bool)
 (declare-const propagated_actor_is_router Bool)
@@ -98,8 +101,12 @@
 (define-fun direct_actor_trusted () Bool
   (and actor_present
        (not actor_is_centralized_router)
-       actor_permission_verifiable
-       trusted_permission))
+       (or (and actor_permission_verifiable trusted_permission)
+           (and (or (= event pull_request) (= event pull_request_target))
+                pr_action_proves_branch_access
+                sender_type_bot
+                sender_matches_actor
+                verified_same_repository_pr))))
 
 (define-fun actor_trusted () Bool
   (or centralized_dispatch_actor_trusted direct_actor_trusted))
@@ -136,11 +143,13 @@
 (check-sat)
 (pop)
 
-; EXPECT: checkout_requires_write_or_higher_permission unsat
+; EXPECT: checkout_requires_write_or_same_repo_bot_pr unsat
 (push)
 (assert checkout_executes)
 (assert (not (and actor_permission_verifiable trusted_permission)))
-(echo "checkout_requires_write_or_higher_permission")
+(assert (not (and (or (= event pull_request) (= event pull_request_target))
+                  pr_action_proves_branch_access sender_type_bot sender_matches_actor verified_same_repository_pr)))
+(echo "checkout_requires_write_or_same_repo_bot_pr")
 (check-sat)
 (pop)
 

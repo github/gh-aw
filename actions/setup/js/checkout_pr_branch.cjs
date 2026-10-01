@@ -235,10 +235,11 @@ function parsePullRequestNumber(value) {
 /**
  * Ensure checkout step only runs in trusted runtime contexts.
  * - workflow_dispatch PR replay must not run in a forked repository
- * - triggering actor must have write-or-higher repository permission
+ * - triggering actor must have write-or-higher repository permission, or be
+ *   the bot sender of a same-repository PR event
  * @param {Record<string, any> | undefined} awContext Parsed workflow_dispatch context, consulted only for github-actions bot dispatches
  */
-async function assertTrustedCheckoutRuntime(awContext) {
+async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
   if (context.eventName === "workflow_dispatch") {
     const repository = context.payload.repository;
     // Fork status can only be verified when the payload carries repository
@@ -287,10 +288,25 @@ async function assertTrustedCheckoutRuntime(awContext) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");
   }
 
-  // Bot and app actors (e.g. Copilot, dependabot[bot]) use GitHub-provided
-  // event identity (`sender.type === "Bot"`), but that signal only proves the
-  // account type. They still must satisfy the same repository permission floor
-  // below; the workflow_dispatch-only fork check above is independent.
+  // Apps are not collaborators: their permission endpoint returns "none" even
+  // when they can write to the repository. A bot that triggered a PR event for
+  // a branch in this repository can have its checkout trusted instead. Comments,
+  // reviews and dispatches do not prove the sender can write the PR branch.
+  if (
+    (context.eventName === "pull_request" || context.eventName === "pull_request_target") &&
+    (context.payload.action === "opened" || context.payload.action === "synchronize") &&
+    senderType === "Bot" &&
+    context.payload.sender?.login === actor &&
+    Number.isSafeInteger(context.payload.repository?.id) &&
+    context.payload.repository.id > 0 &&
+    pullRequest?.head?.repo?.id === context.payload.repository.id &&
+    pullRequest?.base?.repo?.id === context.payload.repository.id
+  ) {
+    core.info(`Runtime safety check passed for same-repository bot PR actor '${actor}'`);
+    return;
+  }
+
+  // All other actors must satisfy the collaborator permission floor.
   try {
     const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
       owner: context.repo.owner,
@@ -395,7 +411,7 @@ async function main() {
   }
 
   try {
-    await assertTrustedCheckoutRuntime(workflowDispatchAwContext);
+    await assertTrustedCheckoutRuntime(workflowDispatchAwContext, pullRequest);
 
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);

@@ -309,6 +309,59 @@ If the pull request is still open, verify that:
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
       });
 
+      it.each(["pull_request", "pull_request_target"])("should allow a same-repository GitHub App PR on %s despite collaborator permission 'none'", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+        mockContext.payload.action = "opened";
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.pull_request.head.repo.id = 42;
+        mockContext.payload.pull_request.base.repo.id = 42;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockExec.exec).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]));
+      });
+
+      it("should allow a same-repository GitHub App to synchronize its PR branch", async () => {
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+        mockContext.payload.action = "synchronize";
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.pull_request.head.repo.id = 42;
+        mockContext.payload.pull_request.base.repo.id = 42;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      });
+
+      it.each([
+        ["forked PR", 43, 42, "automation[bot]", "opened"],
+        ["missing repository ID", 42, undefined, "automation[bot]", "opened"],
+        ["different sender", 42, 42, "other[bot]", "opened"],
+        ["metadata-only PR event", 42, 42, "automation[bot]", "labeled"],
+      ])("should not bypass permission verification for a %s", async (_reason, headId, repositoryId, senderLogin, action) => {
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: senderLogin, type: "Bot" };
+        mockContext.payload.action = action;
+        mockContext.payload.repository.id = repositoryId;
+        mockContext.payload.pull_request.head.repo.id = headId;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]));
+      });
+
       it("should fail closed when bot/app actor repository permission cannot be verified", async () => {
         mockContext.actor = "Copilot";
         mockContext.payload.sender = { login: "Copilot", type: "Bot" };
@@ -360,6 +413,9 @@ If the pull request is still open, verify that:
         mockContext.eventName = eventName;
         mockContext.actor = "third-party-bot[bot]";
         mockContext.payload.sender = { login: "third-party-bot[bot]", type: "Bot" };
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.pull_request.head.repo.id = 42;
+        mockContext.payload.pull_request.base.repo.id = 42;
         mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({
           data: {
             permission: "read",

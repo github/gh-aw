@@ -28,7 +28,7 @@ describe("RS-05a checkout validator Z3 proof", () => {
 
     expect(expected.map(result => result.name)).toEqual([
       "workflow_dispatch_requires_verified_non_fork",
-      "checkout_requires_write_or_higher_permission",
+      "checkout_requires_write_or_same_repo_bot_pr",
       "centralized_dispatch_requires_platform_bot_identity",
       "centralized_dispatch_requires_command_or_label_marker",
       "centralized_dispatch_requires_originating_actor",
