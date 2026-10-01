@@ -15,6 +15,7 @@ describe("close_issue", () => {
       warning: () => {},
       error: () => {},
       debug: () => {},
+      debugs: [],
       messages: [],
       infos: [],
       warnings: [],
@@ -33,6 +34,10 @@ describe("close_issue", () => {
     mockCore.error = msg => {
       mockCore.errors.push(msg);
       mockCore.messages.push({ level: "error", message: msg });
+    };
+    mockCore.debug = msg => {
+      mockCore.debugs.push(msg);
+      mockCore.messages.push({ level: "debug", message: msg });
     };
 
     mockGithub = {
@@ -173,6 +178,8 @@ describe("close_issue", () => {
       expect(requestCalls[0].params.rationale).toBeUndefined();
       expect(requestCalls[0].params.confidence).toBeUndefined();
       expect(requestCalls[0].params.headers).toBeUndefined();
+      expect(mockCore.debugs).toContain("Attempting issue-intent close request");
+      expect(mockCore.debugs).toContain("Issue-intent close request succeeded");
     });
 
     it.each([403, 422, 500])("should fail without a legacy close when the intent request returns %i", async status => {
@@ -191,6 +198,8 @@ describe("close_issue", () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain("Intent rejected");
       expect(updateCalled).toBe(false);
+      expect(mockCore.debugs).toContain(`Issue-intent close request failed; legacy fallback disabled (status=${status})`);
+      expect(mockCore.debugs.join(" ")).not.toContain("Intent rejected");
     });
 
     it.each([404, 501])("should fall back to a legacy close when the intent endpoint returns %i", async status => {
@@ -208,6 +217,7 @@ describe("close_issue", () => {
 
       expect(result.success).toBe(true);
       expect(updateCalled).toBe(true);
+      expect(mockCore.warnings).toEqual([`Issue-intent close endpoint unavailable (status=${status}); falling back to legacy close path`]);
     });
 
     it("should fall back when the unavailable intent status is wrapped in the response", async () => {
@@ -225,6 +235,7 @@ describe("close_issue", () => {
 
       expect(result.success).toBe(true);
       expect(updateCalled).toBe(true);
+      expect(mockCore.warnings).toEqual(["Issue-intent close endpoint unavailable (status=404); falling back to legacy close path"]);
     });
 
     it("should skip issue-intent metadata when explicitly disabled", async () => {
