@@ -105,6 +105,66 @@ test("selection is ordered by Work ID and independent of physical order", () => 
   }
 });
 
+test("lossless compaction and replay-order fuzz preserve the same logical state", () => {
+  for (let seed = 0; seed < 50; seed++) {
+    const reducer = createReducer(config);
+    for (let index = 0; index < 4; index++) {
+      const item = { task: `${seed}-${index}`, data: { index, seed } };
+      step(reducer, { operation: "submit", work: item });
+      step(reducer, { operation: "acquire", work: item }, `run-${index}`);
+      if (index % 2 === 0) step(reducer, { operation: "abandon" }, `run-${index}`);
+      if (index === 3) step(reducer, { operation: "finish" }, `run-${index}`);
+    }
+    const facts = [
+      ...reducer
+        .snapshot()
+        .work.values()
+        .map(item => ({ operation: "work", work_id: item.work_id, work: item.payload })),
+      ...reducer
+        .snapshot()
+        .claims.values()
+        .map(claim => ({
+          operation: "claim",
+          claim_id: claim.claim_id,
+          work_id: claim.work_id,
+          claimant: claim.claimant,
+          previous_claim_id: claim.previous_claim_id,
+        })),
+      ...reducer
+        .snapshot()
+        .claims.values()
+        .filter(claim => claim.released)
+        .map(claim => ({ operation: "release", claim_id: claim.claim_id })),
+      {
+        operation: "completion",
+        claim_id: reducer
+          .snapshot()
+          .claims.values()
+          .find(claim => claim.claimant === "run-3").claim_id,
+      },
+    ];
+    const expected = reducer.output();
+    const reversed = facts.toReversed();
+    assert.deepEqual(
+      replayBuiltin(
+        config,
+        reversed.map(payload => ({ payload }))
+      ),
+      expected
+    );
+    // Lossless compaction unions records by hash, removing duplicate segment copies.
+    const overlapping = [...facts, ...facts.slice(0, 3)];
+    const compacted = [...new Map(overlapping.map(fact => [JSON.stringify(fact), fact])).values()];
+    assert.deepEqual(
+      replayBuiltin(
+        config,
+        compacted.map(payload => ({ payload }))
+      ),
+      expected
+    );
+  }
+});
+
 test("caller-provided structural fields are rejected by trusted normalization", () => {
   const options = { transactionId: "tx", ledgerNames: new Set(["pool"]), ledgers: { pool: config } };
   for (const field of ["work_id", "claim_id", "generation", "previous_claim_id", "claimant"]) {
