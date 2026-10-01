@@ -1,15 +1,25 @@
 ---
 interface Props {
-  id: string;
+  /** Anchor id. Omit when a VariantGroup wrapper owns the anchor. */
+  id?: string;
+  /** Unique id for the heading (defaults to `${id}-title`). */
+  titleId?: string;
   title: string;
   lede?: string;
+  /** Section background: page colour, a subtle tint, or a full-bleed dark band. */
+  tone?: 'default' | 'subtle' | 'dark';
 }
-const { id, title, lede } = Astro.props;
+const { id, titleId, title, lede, tone = 'default' } = Astro.props;
+const headingId = titleId ?? `${id ?? 'section'}-title`;
 ---
 
-<section id={id} class="aw-section not-content" aria-labelledby={`${id}-title`}>
+<section
+  id={id}
+  class:list={['aw-section', 'not-content', tone !== 'default' && `aw-tone-${tone}`]}
+  aria-labelledby={headingId}
+>
   <div class="aw-container">
-    <h2 id={`${id}-title`}>{title}</h2>
+    <h2 id={headingId}>{title}</h2>
     {lede && <p class="aw-lede">{lede}</p>}
     <slot />
   </div>
@@ -18,6 +28,15 @@ const { id, title, lede } = Astro.props;
 <style>
   .aw-section {
     padding-block: clamp(4rem, 8vw, 7rem);
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+  }
+  .aw-section.aw-tone-subtle {
+    background: var(--aw-color-bg-subtle);
+  }
+  /* In the dark theme the page is already near-black, so hairlines mark the band. */
+  :global([data-theme='dark']) .aw-section.aw-tone-dark {
+    border-block: 1px solid var(--aw-color-divider);
   }
   .aw-container {
     max-width: 72rem;
