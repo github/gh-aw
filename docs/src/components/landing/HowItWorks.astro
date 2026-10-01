@@ -1,7 +1,312 @@
 ---
+import octicons from '@primer/octicons';
 import LandingSection from './LandingSection.astro';
+const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+
+const engines = [
+  { name: 'GitHub Copilot', href: '/gh-aw/engines/copilot/', note: 'default' },
+  { name: 'Claude Code', href: '/gh-aw/engines/claude/' },
+  { name: 'OpenAI Codex', href: '/gh-aw/engines/codex/' },
+  { name: 'Google Gemini', href: '/gh-aw/engines/gemini/' },
+  { name: 'Pi', href: '/gh-aw/engines/pi/' },
+];
 ---
 
 <LandingSection id="how-it-works" title="How it works" lede="Write a task in Markdown. GitHub compiles it into an Actions workflow and runs your coding agent.">
-  <p class="aw-placeholder">Placeholder — slice 2</p>
+  <ol class="aw-steps">
+    <li class="aw-step">
+      <div class="aw-frag aw-file" role="img" aria-label="A file named triage.md with the lines on: issues, safe-outputs: add-labels, and the instruction Label new issues by type and priority.">
+        <div class="aw-bar"><span class="aw-ico" set:html={icon('file')} />.github/workflows/triage.md</div>
+<pre class="aw-code" aria-hidden="true"><span class="m">---</span>
+<span class="k">on:</span> issues
+<span class="k">safe-outputs:</span>
+<span class="k">  add-labels:</span>
+<span class="m">---</span>
+Label new issues by type and priority.</pre>
+      </div>
+      <h3>Write</h3>
+      <p>Describe the job in plain language, with the triggers and permissions it needs.</p>
+    </li>
+
+    <li class="aw-step">
+      <div class="aw-frag aw-term" role="img" aria-label="Terminal: running gh aw compile prints a check mark and triage.lock.yml, pinned, validated GitHub Actions YAML.">
+        <div class="aw-bar"><span class="aw-ico" set:html={icon('terminal')} />Terminal</div>
+        <div class="aw-term-body" aria-hidden="true">
+          <div class="aw-cmd"><span class="m">$</span> gh aw compile</div>
+          <div class="aw-out"><span class="aw-ok" set:html={icon('check')} />triage.lock.yml</div>
+          <div class="aw-note">Pinned, validated GitHub Actions YAML</div>
+        </div>
+      </div>
+      <h3>Compile</h3>
+      <p><code>gh aw compile</code> turns it into a hardened, pinned Actions workflow.</p>
+    </li>
+
+    <li class="aw-step">
+      <div class="aw-frag aw-run" role="img" aria-label="An Actions run: triage, agent, succeeded in 48 seconds, applied the label type: bug.">
+        <div class="aw-bar"><span class="aw-ico" set:html={icon('play')} />Actions</div>
+        <div class="aw-run-body" aria-hidden="true">
+          <div class="aw-row">
+            <span class="aw-okdot" set:html={icon('check-circle-fill')} />
+            <span class="aw-run-name">triage · agent</span>
+            <span class="aw-dur">48s</span>
+          </div>
+          <div class="aw-applied">
+            <span class="aw-applied-l">Applied label</span>
+            <span class="aw-chip">type: bug</span>
+          </div>
+        </div>
+      </div>
+      <h3>Run</h3>
+      <p>Your chosen agent runs in GitHub Actions; approved outputs are applied.</p>
+    </li>
+  </ol>
+
+  <div class="aw-engines">
+    <p class="aw-engines-l" id="aw-engines-l">Runs the coding agent you choose</p>
+    <ul class="aw-engine-list" aria-labelledby="aw-engines-l">
+      {engines.map((e) => (
+        <li>
+          <a href={e.href}>{e.name}{e.note && <span class="aw-sfx">{e.note}</span>}</a>
+        </li>
+      ))}
+      <li class="aw-byo"><a href="/gh-aw/reference/engines/#shared-imported-engines">Bring your own engine <span aria-hidden="true">→</span></a></li>
+    </ul>
+    <p class="aw-importable">Or import OpenCode, Cursor, Kiro, Aider and Crush.</p>
+  </div>
 </LandingSection>
+
+<style>
+  .aw-steps {
+    list-style: none;
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  .aw-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .aw-ico {
+    display: inline-flex;
+    flex: none;
+  }
+  .aw-ico :global(svg),
+  .aw-ok :global(svg),
+  .aw-okdot :global(svg) {
+    fill: currentColor;
+  }
+  .aw-frag {
+    min-height: 0;
+    overflow: hidden;
+    background: var(--aw-color-bg);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    box-shadow: var(--aw-shadow);
+  }
+  .aw-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--aw-color-border);
+    background: var(--aw-color-bg-subtle);
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .aw-code {
+    margin: 0;
+    padding: 0.875rem 1rem;
+    overflow: hidden;
+    white-space: pre-wrap;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    line-height: 1.6;
+    color: var(--aw-color-text);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+  .m,
+  .k {
+    color: var(--aw-color-text-muted);
+  }
+  .aw-term-body,
+  .aw-run-body {
+    padding: 0.875rem 1rem;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    line-height: 1.6;
+    color: var(--aw-color-text);
+  }
+  .aw-out {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .aw-ok,
+  .aw-okdot {
+    display: inline-flex;
+    color: var(--aw-color-success);
+  }
+  .aw-note {
+    margin-top: 0.75rem;
+    font-family: var(--aw-font-sans);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--aw-color-border);
+  }
+  .aw-run-name {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--aw-font-sans);
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-dur {
+    color: var(--aw-color-text-muted);
+  }
+  .aw-applied {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding-top: 0.75rem;
+    font-family: var(--aw-font-sans);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-chip {
+    padding: 0.0625rem 0.5rem;
+    border-radius: 999px;
+    background: var(--aw-color-complement-low);
+    color: var(--aw-color-complement);
+    font-weight: 500;
+  }
+  .aw-step h3 {
+    margin: 1.25rem 0 0;
+    font-size: var(--aw-step-0);
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    color: var(--aw-color-text-strong);
+    border: 0;
+  }
+  .aw-step p {
+    margin: 0.375rem 0 0;
+    max-width: 32ch;
+    font-size: var(--aw-step--1);
+    line-height: 1.55;
+    color: var(--aw-color-text-muted);
+    text-wrap: pretty;
+  }
+  .aw-step p code {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--aw-font-mono);
+    font-size: inherit;
+    color: var(--aw-color-text-secondary);
+  }
+
+  /* Engines */
+  .aw-engines {
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--aw-color-border);
+  }
+  .aw-engines-l,
+  .aw-importable {
+    margin: 0;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-importable {
+    margin-top: 0.75rem;
+  }
+  .aw-engine-list {
+    list-style: none;
+    margin: 0.875rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .aw-engine-list li {
+    margin: 0;
+    padding: 0;
+  }
+  .aw-engine-list a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 999px;
+    background: var(--aw-color-bg);
+    font-size: var(--aw-step-0);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--aw-color-text-strong);
+    text-decoration: none;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .aw-engine-list a:hover {
+    border-color: var(--aw-color-border-strong);
+    background: var(--aw-color-bg-subtle);
+  }
+  .aw-engine-list a:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 2px;
+  }
+  .aw-sfx {
+    font-size: var(--aw-step--1);
+    font-weight: 400;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-engine-list .aw-byo a {
+    border-color: transparent;
+    background: transparent;
+    padding-inline: 0.25rem;
+    font-weight: 450;
+    color: var(--aw-color-accent-text);
+  }
+  .aw-engine-list .aw-byo a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (min-width: 56rem) {
+    .aw-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 3rem;
+    }
+    .aw-frag {
+      height: 12rem;
+    }
+    /* hairline connector in the gutter between fragments */
+    .aw-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 6rem;
+      left: calc(100% + 0.5rem);
+      width: 2rem;
+      border-top: 1px solid var(--aw-color-border-strong);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aw-engine-list a {
+      transition: none;
+    }
+  }
+</style>
