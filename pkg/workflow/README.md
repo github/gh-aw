@@ -1611,7 +1611,37 @@ This appendix is generated from the current non-test Go source files in this pac
 
 <!-- END SOURCE-VERIFIED EXPORT COVERAGE -->
 
+### Additional Exported Types
+
+The following exported types were verified against source (`pkg/workflow/*.go`) and were not previously described in this specification.
+
+| Type | Kind | Group |
+|------|------|-------|
+| `AWFCloudHypervisorConfig`, `AWFCloudHypervisorSHA256Config`, `AWFExperimentalConfig`, `AWFFilesystemConfig`, `AWFHostedWebConfig`, `AWFHostedWebPolicy`, `AWFModelRoutingConfig`, `AWFModelRoutingObjective`, `AWFModelRoutingTask` | struct | Agent Workflow Firewall (AWF) configuration sections |
+| `CopilotModelRoutingConfig`, `HostedWebPolicy` | struct | Model routing and hosted-web policy configuration |
+| `AgentEnclaveConfig`, `AgentEnclaveGitHubConfig`, `AgentEnclaveGitHubToolConfig`, `AgentEnclaveToolsConfig`, `ScriptEnclaveConfig`, `EnclaveConfig`, `EnclaveRepository`, `DynamicEnclavePolicy`, `DynamicEnclaveQuotas` | struct | Enclave configuration |
+| `EnclavesConfig` | alias (`[]*EnclaveConfig`) | List of enclave configurations |
+| `ApproveWorkflowRunConfig`, `UploadCodeCoverageConfig` | struct | Safe-output job configurations |
+| `AssignWorkItemConfig`, `AzureDevOpsArtifactLinkConfig`, `CommentOnWorkItemConfig`, `CreateWorkItemConfig`, `LinkWorkItemsConfig`, `UpdateWorkItemConfig`, `UploadWorkItemAttachmentConfig` | struct | Azure DevOps work-item safe outputs |
+| `JiraSafeOutputConfig`, `LinearCreateIssueConfig`, `LinearTargetConfig`, `LinearUpdateIssueConfig` | struct | Jira and Linear safe outputs |
+| `CloseOlderConfig`, `SafeUpdateOptions`, `ThreatDetectionSuppression` | struct | Safe-output behavior options |
+| `SafeOutputsURLsPolicy` | alias (`string`) | URL policy for safe outputs |
+| `BuiltinGraderMeta`, `GraderDefinition` | struct | Grader definitions |
+| `ContinualExperimentConfig`, `ExperimentDecisionConfig` | struct | Experiment configuration |
+| `DriveMemoryConfig`, `DriveMemoryEntry`, `DriveMemoryToolConfig`, `MemoryValidationConfig` | struct | Drive memory and memory validation |
+| `LedgerCompactionConfig`, `LedgerConfig`, `LedgerReplayConfig`, `LedgerToolConfig`, `RepoMemoryLedgerCompactionConfig`, `RepoMemoryLedgerConfig` | struct | Ledger and repo-memory ledger configuration |
+| `EnginePluginsDefinition`, `PluginReference` | struct | Engine plugin definitions |
+| `PluginInstallationProvider` | interface | Engine-specific plugin installation |
+| `GHAWManifestMCPServer`, `GHAWManifestMemoryValidationScript` | struct | gh-aw manifest entries |
+| `MCPGatewayAgentPolicy` | struct | MCP gateway agent policy |
+| `MCPParamType`, `ReactionType`, `RunnerTopology` | alias (`string`) | String-typed enumerations |
+| `PullRequestEventTransition` | struct | Pull-request event transition description |
+| `ShellScriptResource` | struct | Embedded shell script resource |
+| `WorkflowFile`, `WorkflowFileJob`, `WorkflowFilePermissions` | struct | Parsed GitHub Actions workflow file model |
+
 ## Source Synchronization
+
+Reviewed against source on 2026-10-01: added 66 previously-undocumented exported types to the "Additional Exported Types" table above.
 
 Reviewed against recent source updates on 2026-09-20: added 14 previously-undocumented exported package-level functions (GitHub App manifest permission helpers, engine default domain sets, GitHub CLI proxy-mode detection, operational-value evaluator path helpers, grader/experiment reference rewriting, and secret/shell-env substitution) to the appendix table below. No other public-contract deltas were identified beyond the sections above.
 

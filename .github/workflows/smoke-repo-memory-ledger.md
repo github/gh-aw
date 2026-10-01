@@ -19,6 +19,8 @@ sandbox:
 tools:
   ledger:
     smoke:
+      type: table
+      key: workflow_run_id
       schema:
         type: object
         required: [record_type, workflow_run_id, result]
@@ -30,22 +32,6 @@ tools:
           result:
             enum: [passed]
         additionalProperties: false
-      replay:
-        script: |
-          return {
-            tables: {
-              runs: {
-                columns: { workflow_run_id: "text", result: "text" },
-                primaryKey: ["workflow_run_id"],
-                rows: records
-                  .filter(record => record.payload.record_type === "repo_memory_ledger_smoke")
-                  .map(({ payload }) => ({
-                    workflow_run_id: payload.workflow_run_id,
-                    result: payload.result
-                  }))
-              }
-            }
-          };
       max-record-kb: 4
       max-patch-kb: 10
 safe-outputs:
@@ -77,8 +63,8 @@ Exercise the replayed read-only SQLite projection and safe-output append without
 2. Query the projection for the current run:
 
    ```sql
-   SELECT workflow_run_id, result FROM runs
-   WHERE workflow_run_id = '${{ github.run_id }}'
+   SELECT key, value FROM state
+   WHERE key = '${{ github.run_id }}'
    LIMIT 1;
    ```
 
@@ -86,14 +72,19 @@ Exercise the replayed read-only SQLite projection and safe-output append without
 
    ```json
    {
-     "record_type": "repo_memory_ledger_smoke",
-     "workflow_run_id": "${{ github.run_id }}",
-     "result": "passed"
+     "ledger": "smoke",
+     "operation": "upsert",
+     "key": "${{ github.run_id }}",
+     "value": {
+       "record_type": "repo_memory_ledger_smoke",
+       "workflow_run_id": "${{ github.run_id }}",
+       "result": "passed"
+     }
    }
    ```
 
-4. Query `runs` for the same run ID again. Verify it contains the expected run ID
-   and result. On reruns, reuse the existing record instead of appending a duplicate.
+4. Query `state` for the same run ID again. Verify it contains the expected run ID
+   and result in the JSON value. On reruns, reuse the existing row instead of appending a duplicate.
 5. Do not inspect or modify ledger shard files directly.
 
 If every check passes, call `noop` with a brief summary. If any ledger operation

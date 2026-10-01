@@ -44,16 +44,22 @@ tools:
 
 ## Trust boundary
 
-Each compaction-enabled ledger gets two maintenance jobs that share a per-ledger
-concurrency group:
+All compaction-enabled ledgers share two maintenance jobs:
 
 | Job | Permissions | Responsibility |
 | --- | --- | --- |
-| `ledger_compaction_plan_<name>` | `contents: read` | Reads the `ledgers/<name>` branch, runs the optional selection script in an isolated Node.js process with no environment or credentials, and uploads a plan artifact |
-| `ledger_compaction_apply_<name>` | `contents: write` | Downloads the plan, validates it, checks it against the latest ledger branch, and applies it in one commit |
+| `ledger_compaction_plan` | `contents: read` | Checks each selected ledger branch, runs any optional selection script in an isolated Node.js process with no environment or credentials, and uploads the created plans in one artifact |
+| `ledger_compaction_apply` | `contents: write` | Downloads the plans, validates each one against the latest ledger branch, and applies each in one commit |
 
-The plan is only a proposal. The apply job runs no user JavaScript and treats
-the plan as hostile input. Before it writes anything, it:
+Each ledger runs in its own step. Plan steps have a 15-minute timeout, and a failed
+step does not prevent sibling ledgers from being processed. The plan job reports
+step failures after uploading any successful plans; the apply job still handles
+those plans and reports its own step failures after processing all of them. The
+jobs do not share a workflow concurrency group: apply revalidates the latest branch
+and commits only when its expected head still matches.
+
+Each plan is only a proposal. The apply job runs no user JavaScript and treats
+each plan as hostile input. Before it writes to a ledger, it:
 
 - rejects unknown keys, oversized plans, wrong ledger or branch names, and a
   `plan_id` that does not match the plan contents.

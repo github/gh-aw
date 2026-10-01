@@ -273,6 +273,29 @@ describe("push_signed_commits integration tests", () => {
   // ──────────────────────────────────────────────────────
 
   describe("GraphQL signed commits (happy path)", () => {
+    it("refuses a ledger mutation against a remote head newer than the validated base", async () => {
+      execGit(["checkout", "-b", "ledger-branch"], { cwd: workDir });
+      fs.writeFileSync(path.join(workDir, "ledger.jsonl"), "{}\n");
+      execGit(["add", "ledger.jsonl"], { cwd: workDir });
+      execGit(["commit", "-m", "Concurrent writer"], { cwd: workDir });
+      execGit(["push", "-u", "origin", "ledger-branch"], { cwd: workDir });
+      global.exec = makeRealExec(workDir);
+      const githubClient = makeMockGithubClient();
+      await expect(
+        pushSignedCommits({
+          githubClient,
+          owner: "test-owner",
+          repo: "test-repo",
+          branch: "ledger-branch",
+          baseRef: "origin/main",
+          cwd: workDir,
+          allowGitPushFallback: false,
+          requireBaseRefMatch: true,
+        })
+      ).rejects.toThrow(/ledger branch moved/);
+      expect(githubClient.graphql).not.toHaveBeenCalled();
+    });
+
     it("should call GraphQL for a single new commit", async () => {
       // Create a feature branch with one new file
       execGit(["checkout", "-b", "feature-branch"], { cwd: workDir });

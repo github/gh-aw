@@ -1,10 +1,10 @@
 package workflow
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"slices"
 	"strings"
@@ -17,12 +17,9 @@ import (
 // output dispatches the maintenance workflow with this operation and a ledger name.
 const maintenanceCompactLedgerOperation = "compact_ledger"
 
-// maintenanceLedgerCompactionPlanDir/File are where the untrusted plan job writes, and the trusted
-// apply job downloads, the compaction plan artifact.
-const (
-	maintenanceLedgerCompactionPlanDir  = "${{ runner.temp }}/gh-aw/ledger-compaction"
-	maintenanceLedgerCompactionPlanFile = "${{ runner.temp }}/gh-aw/ledger-compaction/plan.json"
-)
+// maintenanceLedgerCompactionPlanDir is where the untrusted plan job writes, and the
+// trusted apply job downloads, the per-ledger compaction plans.
+const maintenanceLedgerCompactionPlanDir = "${{ runner.temp }}/gh-aw/ledger-compaction"
 
 // collectMaintenanceCompactionLedgers returns the compaction-enabled ledgers across all
 // workflows, deduplicated by ledger name (ledgers are stored on shared ledgers/<name>
@@ -68,7 +65,7 @@ func collectMaintenanceCompactionLedgers(workflowDataList []*WorkflowData) []Led
 // ledgerCompactionPayload is the trusted per-ledger configuration consumed by
 // actions/setup/js/ledger_compaction.cjs (parseCompactionConfig).
 func ledgerCompactionPayload(ledger LedgerConfig) map[string]any {
-	return map[string]any{
+	payload := map[string]any{
 		"name":           ledger.Name,
 		"branch_name":    ledger.BranchName,
 		"max_record_kb":  ledger.MaxRecordKB,
@@ -76,94 +73,110 @@ func ledgerCompactionPayload(ledger LedgerConfig) map[string]any {
 		"max_patch_kb":   ledger.MaxPatchKB,
 		"compaction":     ledger.Compaction,
 	}
+	if ledger.Type != "" {
+		payload["type"] = ledger.Type
+		payload["key"] = ledger.Key
+		payload["schema"] = ledger.Schema
+	}
+	return payload
 }
 
-func encodeLedgerCompactionConfigBase64(ledger LedgerConfig) (string, error) {
-	encoded, err := json.Marshal(ledgerCompactionPayload(ledger))
+func encodeLedgerCompactionConfig(ledger LedgerConfig) (string, error) {
+	encoded, err := json.MarshalIndent(ledgerCompactionPayload(ledger), "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize ledger compaction configuration for %s: %w", ledger.Name, err)
 	}
-	encodedBase64 := base64.StdEncoding.EncodeToString(encoded)
-	if len(encodedBase64) > maxLedgerConfigBase64Bytes {
+	config := string(encoded)
+	if len(config) > maxLedgerConfigBase64Bytes {
 		return "", fmt.Errorf("serialized ledger compaction configuration for %s exceeds the %d-byte environment limit", ledger.Name, maxLedgerConfigBase64Bytes)
 	}
-	return encodedBase64, nil
+	return config, nil
 }
 
-// buildLedgerCompactionJobCondition selects the plan job on scheduled maintenance, on a
-// dispatch/call without an operation, or on an explicit compact_ledger request that targets
-// this ledger (or all ledgers when no ledger input is provided).
-func buildLedgerCompactionJobCondition(ledgerName string) ConditionNode {
-	return BuildAnd(
-		buildNotForkAndScheduleOnlyOrOperation(maintenanceCompactLedgerOperation),
+// buildLedgerCompactionStepCondition selects a ledger on scheduled maintenance,
+// on a dispatch/call without an operation, or on an explicit request for that ledger.
+func buildLedgerCompactionStepCondition(ledgerName string) ConditionNode {
+	return BuildOr(
+		BuildNotEquals(BuildPropertyAccess("inputs.operation"), BuildStringLiteral(maintenanceCompactLedgerOperation)),
 		BuildOr(
-			BuildNotEquals(BuildPropertyAccess("inputs.operation"), BuildStringLiteral(maintenanceCompactLedgerOperation)),
-			BuildOr(
-				BuildEquals(BuildPropertyAccess("inputs.ledger"), BuildStringLiteral("")),
-				BuildEquals(BuildPropertyAccess("inputs.ledger"), BuildStringLiteral(ledgerName)),
-			),
+			BuildEquals(BuildPropertyAccess("inputs.ledger"), BuildStringLiteral("")),
+			BuildEquals(BuildPropertyAccess("inputs.ledger"), BuildStringLiteral(ledgerName)),
 		),
 	)
 }
 
-// buildMaintenanceLedgerCompactionJobs emits one isolated plan/apply job pair per ledger.
+// buildMaintenanceLedgerCompactionJobs emits one plan/apply job pair for all ledgers.
 //
 // Trust boundary:
-//   - ledger_compaction_plan_<name> is untrusted. It has contents: read only, may run the
-//     user-configured selection script, and its only durable output is a plan artifact.
-//   - ledger_compaction_apply_<name> is trusted. It has contents: write, runs only first-party
-//     scripts, never executes the compaction script, and revalidates the hostile plan against the
-//     latest ledger state before committing atomically with an expected-head guard.
+//   - ledger_compaction_plan is untrusted. It has contents: read only, may run the
+//     user-configured selection scripts, and its only durable output is a plan artifact.
+//   - ledger_compaction_apply is trusted. It has contents: write, runs only first-party
+//     scripts, never executes the compaction scripts, and revalidates each hostile plan
+//     against the latest ledger state before committing with an expected-head guard.
 func buildMaintenanceLedgerCompactionJobs(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) (string, error) {
-	var b strings.Builder
-	for _, ledger := range opts.compactionLedgers {
-		config, err := encodeLedgerCompactionConfigBase64(ledger)
+	if len(opts.compactionLedgers) == 0 {
+		return "", nil
+	}
+	jobs := make([]ledgerCompactionJobSpec, 0, len(opts.compactionLedgers))
+	for i, ledger := range opts.compactionLedgers {
+		config, err := encodeLedgerCompactionConfig(ledger)
 		if err != nil {
 			return "", err
 		}
-		job := ledgerCompactionJobSpec{
-			ledger:       ledger.Name,
-			planJob:      "ledger_compaction_plan_" + ledger.Name,
-			applyJob:     "ledger_compaction_apply_" + ledger.Name,
-			artifactName: "ledger-compaction-plan-" + ledger.Name,
-			planFile:     maintenanceLedgerCompactionPlanFile,
-			concurrency: `    concurrency:
-      group: gh-aw-ledger-compaction-${{ github.repository }}-` + ledger.Name + `
-      cancel-in-progress: false
-`,
-			env: `          GH_AW_LEDGER_COMPACTION_CONFIG_B64: ` + config + `
+		planFile := path.Join(maintenanceLedgerCompactionPlanDir, fmt.Sprintf("plan-%d.json", i))
+		jobs = append(jobs, ledgerCompactionJobSpec{
+			ledger: ledger.Name,
+			stepID: fmt.Sprintf("plan_%d", i),
+			env: `          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            ` + strings.ReplaceAll(config, "\n", "\n            ") + `
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == '` + maintenanceCompactLedgerOperation + `' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ` + maintenanceLedgerCompactionPlanFile + `
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ` + planFile + `
 `,
-			githubScriptPin: getCachedActionPinFromResolver("actions/github-script", opts.resolver),
-		}
-		writeLedgerCompactionPlanJob(&b, opts, setupActionRef, job)
-		writeLedgerCompactionApplyJob(&b, opts, setupActionRef, job)
+		})
 	}
+	var b strings.Builder
+	writeLedgerCompactionPlanJob(&b, opts, setupActionRef, jobs)
+	writeLedgerCompactionApplyJob(&b, opts, setupActionRef, jobs)
 	return b.String(), nil
 }
 
 type ledgerCompactionJobSpec struct {
-	ledger, planJob, applyJob, artifactName, planFile, concurrency, env, githubScriptPin string
+	ledger, stepID, env string
 }
 
-func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string, job ledgerCompactionJobSpec) {
+func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string, jobs []ledgerCompactionJobSpec) {
+	created := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		created = append(created, "steps."+job.stepID+".outputs.plan_created == 'true'")
+	}
+	failed := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		failed = append(failed, "steps."+job.stepID+".outcome == 'failure'")
+	}
 	b.WriteString(`
-  ` + job.planJob + `:
-    if: ${{ ` + RenderCondition(buildLedgerCompactionJobCondition(job.ledger)) + ` }}
+  ledger_compaction_plan:
+    if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnlyOrOperation(maintenanceCompactLedgerOperation)) + ` }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
       contents: read
-` + job.concurrency + `    outputs:
-      plan_created: ${{ steps.plan.outputs.plan_created }}
-      plan_id: ${{ steps.plan.outputs.plan_id }}
-    steps:
+    outputs:
+      plan_created: ${{ ` + strings.Join(created, " || ") + ` }}
+      plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
+`)
+	for _, job := range jobs {
+		b.WriteString("      " + job.stepID + "_created: ${{ steps." + job.stepID + ".outputs.plan_created }}\n")
+	}
+	b.WriteString(`    steps:
 `)
 	writeMaintenanceConditionalActionsCheckoutStep(b, opts)
 	writeMaintenanceSetupScriptsStep(b, setupActionRef)
-	b.WriteString(`      - name: Plan ledger compaction (untrusted, read-only)
-        id: plan
-        uses: ` + job.githubScriptPin + `
+	for _, job := range jobs {
+		b.WriteString(`      - name: Plan ledger compaction (` + job.ledger + `, untrusted, read-only)
+        if: ${{ ` + RenderCondition(buildLedgerCompactionStepCondition(job.ledger)) + ` }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: ` + job.stepID + `
+        uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
         env:
           GH_TOKEN: ${{ github.token }}
 ` + job.env + `        with:
@@ -173,37 +186,55 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
             const { main } = require('${{ runner.temp }}/gh-aw/actions/ledger_compaction_plan.cjs');
             await main();
 
-      - name: Upload ledger compaction plan
-        if: ${{ steps.plan.outputs.plan_created == 'true' }}
+`)
+	}
+	b.WriteString(`      - name: Upload ledger compaction plans
+        if: ${{ ` + strings.Join(created, " || ") + ` }}
+        id: upload_plans
         uses: ` + getActionPin("actions/upload-artifact") + `
         with:
-          name: ` + job.artifactName + `
-          path: ` + job.planFile + `
+          name: ledger-compaction-plans
+          path: ` + maintenanceLedgerCompactionPlanDir + `
           retention-days: 1
           if-no-files-found: error
 `)
+	b.WriteString(`      - name: Report ledger compaction planning failures
+        if: ${{ ` + strings.Join(failed, " || ") + ` }}
+        run: exit 1
+`)
 }
 
-func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string, job ledgerCompactionJobSpec) {
+func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string, jobs []ledgerCompactionJobSpec) {
+	failed := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		applyStepID := "apply_" + strings.TrimPrefix(job.stepID, "plan_")
+		failed = append(failed, "steps."+applyStepID+".outcome == 'failure'")
+	}
 	b.WriteString(`
-  ` + job.applyJob + `:
-    needs: ` + job.planJob + `
-    if: ${{ needs.` + job.planJob + `.outputs.plan_created == 'true' }}
+  ledger_compaction_apply:
+    needs: ledger_compaction_plan
+    if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ` + opts.runsOnValue + `
     permissions:
       contents: write
-` + job.concurrency + `    steps:
+    steps:
 `)
 	writeMaintenanceConditionalActionsCheckoutStep(b, opts)
 	writeMaintenanceSetupScriptsStep(b, setupActionRef)
-	b.WriteString(`      - name: Download ledger compaction plan
+	b.WriteString(`      - name: Download ledger compaction plans
         uses: ` + getActionPin("actions/download-artifact") + `
         with:
-          name: ` + job.artifactName + `
+          name: ledger-compaction-plans
           path: ` + maintenanceLedgerCompactionPlanDir + `
-
-      - name: Validate and apply ledger compaction (trusted)
-        uses: ` + job.githubScriptPin + `
+`)
+	for _, job := range jobs {
+		applyStepID := "apply_" + strings.TrimPrefix(job.stepID, "plan_")
+		b.WriteString(`
+      - name: Validate and apply ledger compaction (` + job.ledger + `, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.` + job.stepID + `_created == 'true' }}
+        id: ` + applyStepID + `
+        continue-on-error: true
+        uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + `
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ` + job.env + `        with:
@@ -213,6 +244,11 @@ func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWork
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require('${{ runner.temp }}/gh-aw/actions/ledger_compaction_apply.cjs');
             await main();
+`)
+	}
+	b.WriteString(`      - name: Report ledger compaction application failures
+        if: ${{ ` + strings.Join(failed, " || ") + ` }}
+        run: exit 1
 `)
 }
 

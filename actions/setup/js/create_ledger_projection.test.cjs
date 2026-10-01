@@ -11,6 +11,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Ledger } from "./ledger_store.cjs";
 import { applyTransitionToDirectory, createPlan, loadSegments, parseCompactionConfig, prepareApply, selectSources, validatePlan } from "./ledger_compaction.cjs";
 import { createProjection, formatReplayPrompt, formatReplayTable } from "./create_ledger_projection.cjs";
+import { replayBuiltin } from "./ledger_builtin.cjs";
 
 test("creates a read-only SQLite projection from canonical ledger shards", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-projection-"));
@@ -38,6 +39,45 @@ test("creates a read-only SQLite projection from canonical ledger shards", () =>
       database.close();
     }
     assert.equal(fs.statSync(databasePath).mode & 0o777, 0o444);
+  } finally {
+    ledger.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("built-in table projects keyed rows alongside provenance without executing a script", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-builtin-projection-"));
+  const sourceDir = path.join(root, "source");
+  const databasePath = path.join(root, "projection", "ledger.db");
+  const ledger = new Ledger({ memoryDir: sourceDir });
+  try {
+    fs.mkdirSync(sourceDir);
+    ledger.append("ledger_append", { id: "ldg-12345678-1234-4123-8123-123456789abc", operation: "insert", value: { id: "a", score: 1 } });
+    ledger.append("ledger_append", { id: "ldg-12345678-1234-4123-8123-123456789abd", operation: "update", key: "a", patch: { score: 3 } });
+    createProjection({
+      sourceDir,
+      databasePath,
+      config: {
+        name: "items",
+        type: "table",
+        key: "id",
+        schema: { type: "object", required: ["id", "score"], properties: { id: { type: "string" }, score: { type: "number" } } },
+        max_record_kb: 32,
+        max_segment_kb: 100,
+        max_patch_kb: 10,
+      },
+    });
+    const db = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      assert.deepEqual(
+        [...db.prepare("SELECT key, value FROM state").all()].map(row => ({ ...row })),
+        [{ key: "a", value: '{"id":"a","score":3}' }]
+      );
+      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 2);
+      assert.equal(db.prepare("SELECT table_name FROM replay_metadata").get().table_name, "state");
+    } finally {
+      db.close();
+    }
   } finally {
     ledger.close();
     fs.rmSync(root, { recursive: true, force: true });
@@ -137,7 +177,7 @@ test("compaction preserves replay's ordered logical history", () => {
   const first = new Ledger({ memoryDir: sourceDir });
   const second = new Ledger({ memoryDir: sourceDir });
   const compaction = parseCompactionConfig(
-    Buffer.from(JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })).toString("base64")
+    JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })
   );
   try {
     first.append("finding", { id: "first" });
@@ -176,3 +216,57 @@ test("compaction preserves replay's ordered logical history", () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+for (const [type, transactions] of Object.entries({
+  set: [
+    { operation: "add", value: "a" },
+    { operation: "remove", value: "a" },
+    { operation: "add", value: "a" },
+  ],
+  map: [
+    { operation: "put", key: "a", value: 1 },
+    { operation: "put", key: "a", value: 2 },
+    { operation: "delete", key: "missing" },
+  ],
+  counter: [
+    { operation: "increment", name: "a", amount: 3 },
+    { operation: "increment", name: "a", amount: 5 },
+    { operation: "decrement", name: "a", amount: 2 },
+  ],
+})) {
+  test(`${type} replay is unchanged by trusted lossless compaction`, () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), `ledger-${type}-compact-`));
+    fs.mkdirSync(root, { recursive: true });
+    const config = { name: type, type };
+    const compaction = parseCompactionConfig(
+      JSON.stringify({
+        name: type,
+        branch_name: `ledgers/${type}`,
+        max_record_kb: 32,
+        max_segment_kb: 100,
+        max_patch_kb: 10,
+        compaction: { min_segments: 2, max_segments: 2 },
+      })
+    );
+    const writers = [];
+    try {
+      for (const payload of transactions) {
+        const writer = new Ledger({ memoryDir: root });
+        writers.push(writer);
+        writer.append("ledger_append", payload);
+      }
+      const original = replayBuiltin(config, writers[0].reconstruct().records);
+      const loaded = loadSegments(root, compaction);
+      const { sources } = selectSources(loaded, compaction);
+      assert.ok(sources);
+      const plan = validatePlan(createPlan({ loaded, sources, config: compaction, trigger: "scheduled", baseCommit: "a".repeat(40) }), compaction);
+      const prepared = prepareApply({ plan, sourceDir: root, config: compaction });
+      assert.equal(prepared.status, "ready");
+      applyTransitionToDirectory(root, prepared);
+      assert.deepEqual(replayBuiltin(config, writers[0].reconstruct().records), original);
+    } finally {
+      for (const writer of writers) writer.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+}

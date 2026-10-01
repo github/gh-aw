@@ -91,6 +91,7 @@ description: Safe-output reference for update, label, milestone, project, releas
       max: 5                                      # Optional: maximum number of labels (default: 5)
       target: "*"                                 # Optional: "triggering" (default), "*" (any issue/PR), or number
       target-repo: "owner/repo"                   # Optional: cross-repository
+      item-schema: { ... }                        # Optional: narrows the label item schema shown to/enforced on the agent (can only restrict, not widen, the built-in string-or-object shape)
   ```
 
 - `remove-labels:` - Safe label removal from issues or PRs

@@ -1186,3 +1186,37 @@ const branch = stdout.trim();
 - `child_process.spawn()` and `child_process.spawnSync()` — used for long-running, detached, or interactively-streamed processes (background servers, sidecars, and similar) for which `@actions/exec` has no equivalent, since `exec()` / `getExecOutput()` always wait for the command to finish before resolving
 - `exec()` / `execFile()` calls that retain the returned `ChildProcess` handle (used as a value: assigned, returned, member-accessed, passed to another call, ...) — those callers can write to `child.stdin`, stream `child.stdout`, or manage the process lifecycle, which `@actions/exec` cannot express; only calls whose result is discarded (pure callback style) are flagged
 - Calls to `exec`/`execSync`/`execFile`/`execFileSync` from any module other than `child_process` (or `node:child_process`)
+
+### `no-async-foreach-callback`
+
+Disallow `async` callbacks passed to `Array.prototype.forEach()`. `forEach()` ignores each callback's returned promise, so the work is not sequenced and rejections can go unhandled.
+
+**Flagged form:**
+```js
+items.forEach(async item => {
+  await processItem(item);
+});
+```
+
+**Safe alternatives:**
+```js
+for (const item of items) {
+  await processItem(item);
+}
+
+await Promise.all(items.map(async item => processItem(item)));
+```
+
+### `no-single-char-string-replace`
+
+Disallow `String.prototype.replace()` with a single-character string pattern, which only replaces the first occurrence. Use `replaceAll()` or a global regular expression when every occurrence should be replaced.
+
+**Flagged form:**
+```js
+const normalized = value.replace("_", "-");
+```
+
+**Safe alternative:**
+```js
+const normalized = value.replaceAll("_", "-");
+```

@@ -303,6 +303,17 @@ describe("safe_output_type_validator", () => {
   });
 
   describe("validateItem", () => {
+    it("preserves explicit JSON null for built-in ledger values", async () => {
+      const { validateItem, resetValidationConfigCache } = await import("./safe_output_type_validator.cjs");
+      process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify({
+        ledger_append: { defaultMax: 100, fields: { ledger: { type: "string" }, operation: { type: "string" }, value: { allowNull: true } } },
+      });
+      resetValidationConfigCache();
+      const result = validateItem({ type: "ledger_append", ledger: "items", operation: "add", value: null }, "ledger_append", 1);
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.value).toBeNull();
+    });
+
     it("should validate create_issue with all required fields", async () => {
       const { validateItem } = await import("./safe_output_type_validator.cjs");
 

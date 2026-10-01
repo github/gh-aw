@@ -70,6 +70,8 @@ tools:
   cache-memory: true
   ledger:
     caveman-run-history:
+      type: table
+      key: run_id
       schema:
         type: object
         required: [record_type, run_id, date, files_processed, files_optimized, planned_outcome]
@@ -89,31 +91,6 @@ tools:
           planned_outcome:
             enum: [pull_request_requested, noop]
         additionalProperties: false
-      replay:
-        script: |
-          return {
-            tables: {
-              runs: {
-                columns: {
-                  run_id: "text",
-                  date: "text",
-                  files_processed: "integer",
-                  files_optimized: "integer",
-                  planned_outcome: "text"
-                },
-                primaryKey: ["run_id"],
-                rows: records
-                  .filter(record => record.payload.record_type === "caveman_run")
-                  .map(({ payload }) => ({
-                    run_id: payload.run_id,
-                    date: payload.date,
-                    files_processed: payload.files_processed,
-                    files_optimized: payload.files_optimized,
-                    planned_outcome: payload.planned_outcome
-                  }))
-              }
-            }
-          };
       max-record-kb: 4
       max-patch-kb: 10
   github:
@@ -270,13 +247,13 @@ Use filesystem-safe format `YYYY-MM-DD` for the date (no colons, no T, no Z).
 Before requesting a PR or `noop`, query the replay projection at `/tmp/gh-aw/ledgers/caveman-run-history/ledger.db` for a run whose ID matches `${{ github.run_id }}`:
 
 ```sql
-SELECT run_id, planned_outcome FROM runs
-WHERE run_id = '${{ github.run_id }}'
+SELECT key, value FROM state
+WHERE key = '${{ github.run_id }}'
 LIMIT 1;
 ```
 
 If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
-If absent, submit one `ledger_append` record with `record_type: caveman_run`, the run ID, date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. Do not edit ledger branches directly.
+If absent, submit one `ledger_append` operation `upsert` with the run ID as `key` and a `value` containing `record_type: caveman_run`, the date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. Do not edit ledger branches directly.
 
 ## Step 6: Output
 
