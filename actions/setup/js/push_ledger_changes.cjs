@@ -4,12 +4,13 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
+const { Ledger, canonicalJSON, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { pushRepoMemoryChangesWithRetry, configureRepoMemoryMergePolicy } = require("./push_repo_memory.cjs");
 const { finalId } = require("./ledger_transactions.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { createReducer, validateOperation } = require("./ledger_builtin.cjs");
+const { validateFact } = require("./ledger_work_pool.cjs");
 
 const MAX_TRANSACTION_BYTES = 12 * 1024 * 1024;
 const LEDGER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -212,16 +213,36 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
     // Validate the entire state transition before the first append mutates this branch.
     const current = ledger.reconstruct();
     if (current.diagnostics.length) throw new TypeError("Invalid canonical ledger history");
-    if (config.type) {
+    if (config.type && config.type !== "work-pool") {
       const reducer = createReducer(config);
       for (const record of current.records) reducer.apply(record.payload);
       const existing = new Set(current.records.map(record => record.payload?.id));
       for (const append of appends) if (!existing.has(append.record.id)) reducer.apply(append.record);
+    } else if (config.type === "work-pool") {
+      const reducer = createReducer(config);
+      for (const record of current.records) reducer.apply(record.payload);
+      const generated = [];
+      const claimant = `${process.env.GITHUB_RUN_ID || "local"}:${process.env.GITHUB_RUN_ATTEMPT || "1"}`;
+      for (const append of appends) {
+        const { outcome, facts } = reducer.transition(append.record, claimant);
+        if (outcome === "invalid") throw new TypeError("Invalid work-pool transition");
+        for (const fact of facts) {
+          const id = finalId(`work-pool:${canonicalJSON(fact)}`, 0);
+          const value = { ...fact, id };
+          validateFact(value, config);
+          reducer.apply(value);
+          generated.push({ ...append, record: value });
+        }
+      }
+      reducer.output();
+      appends = generated;
     }
     let persisted = 0;
     let alreadyPresent = 0;
     for (const append of appends) {
-      const exists = current.records.some(record => record.payload?.id === append.record.id);
+      const prior = current.records.find(record => record.payload?.id === append.record.id);
+      if (prior && canonicalJSON(prior.payload) !== canonicalJSON(append.record)) throw new TypeError("Conflicting ledger record ID");
+      const exists = Boolean(prior);
       if (exists) {
         alreadyPresent++;
         continue;
@@ -254,6 +275,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
             const state = ledgerForValidation(workspaceDir, config);
             const reducer = createReducer(config);
             for (const record of state) reducer.apply(record.payload);
+            reducer.output();
           }
         : undefined,
     });

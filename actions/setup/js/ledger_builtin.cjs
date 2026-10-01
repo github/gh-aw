@@ -3,6 +3,7 @@
 
 const { canonicalJSON } = require("./ledger_store.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
+const workPool = require("./ledger_work_pool.cjs");
 
 const OPERATIONS = Object.freeze({
   log: ["append"],
@@ -10,6 +11,7 @@ const OPERATIONS = Object.freeze({
   map: ["put", "delete"],
   table: ["insert", "update", "upsert", "delete"],
   counter: ["increment", "decrement"],
+  "work-pool": workPool.OPERATIONS,
 });
 const MAX_REPLAY_CELL_BYTES = 65536;
 
@@ -20,6 +22,7 @@ function checkSchema(value, schema) {
 }
 
 function validateOperation(record, config) {
+  if (config.type === "work-pool") return workPool.validateIntent(record, config);
   const { operation } = record;
   if (!Object.hasOwn(OPERATIONS, config.type) || !OPERATIONS[config.type].includes(operation)) throw new TypeError("Unsupported ledger operation");
   const fields = {
@@ -60,6 +63,7 @@ function validateOperation(record, config) {
 }
 
 function createReducer(config) {
+  if (config.type === "work-pool") return workPool.createReducer(config);
   if (!Object.hasOwn(OPERATIONS, config.type)) throw new TypeError("Unknown built-in ledger type");
   const sequence = [];
   const state = new Map();

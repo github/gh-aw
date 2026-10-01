@@ -75,6 +75,7 @@ type ImportsResult struct {
 	MergedEngineModel             string                // First engine.model found in imports that have no engine.id (model preference without engine selection)
 	MergedMaxTurns                string                // First max-turns value found across all imports (JSON-encoded, first-wins)
 	MergedMaxToolDenials          string                // First max-tool-denials value found across all imports (JSON-encoded, first-wins)
+	MergedMaxToolCalls            string                // First max-tool-calls value found across all imports (JSON-encoded, first-wins)
 	MergedMaxRuns                 string                // First max-runs value found across all imports (JSON-encoded, first-wins)
 	MergedMaxTurnCacheMisses      string                // First max-turn-cache-misses value found across all imports (JSON-encoded, first-wins)
 	MergedMaxAICredits            string                // First max-ai-credits value found across all imports (JSON-encoded, first-wins)
