@@ -120,6 +120,12 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		builder.AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged))
 		return builder.Build()
 	},
+	"dispatch_claim_finish": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.DispatchClaimFinish == nil {
+			return nil
+		}
+		return map[string]any{}
+	},
 	"autofix_code_scanning_alert": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.AutofixCodeScanningAlert == nil {
 			return nil

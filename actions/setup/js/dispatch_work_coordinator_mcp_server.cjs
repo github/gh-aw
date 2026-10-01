@@ -3,6 +3,7 @@
 
 const { createServer, registerTool, start } = require("./mcp_server_core.cjs");
 const { DispatchWorkCoordinator } = require("./dispatch_work_coordinator_branch.cjs");
+const { createDispatchWorkCoordinatorGitHubClient } = require("./dispatch_work_coordinator_github_client.cjs");
 
 function result(value) {
   return { content: [{ type: "text", text: JSON.stringify(value ?? null) }] };
@@ -126,67 +127,8 @@ function createServerFromEnvironment() {
   }
   const [owner, repo] = repository.split("/");
   const workflowRef = process.env.GITHUB_WORKFLOW_REF;
-  const apiUrl = process.env.GITHUB_API_URL || "https://api.github.com";
-  const request = async (method, path, { query = {}, body: payload } = {}) => {
-    let url;
-    try {
-      url = new URL(path, `${apiUrl.replace(/\/$/, "")}/`);
-    } catch (error) {
-      throw new TypeError("Invalid coordinator GitHub API URL", { cause: error });
-    }
-    const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) search.set(key, String(value));
-    }
-    url.search = search.toString();
-    const body = payload === undefined ? undefined : JSON.stringify(payload);
-    let response;
-    try {
-      response = await fetch(url, {
-        method,
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: ["Bearer", token].join(" "),
-          "X-GitHub-Api-Version": "2022-11-28",
-          ...(body ? { "Content-Type": "application/json" } : {}),
-        },
-        body,
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (error) {
-      throw new Error("Coordinator GitHub API request failed", { cause: error });
-    }
-    if (!response.ok) {
-      const error = new Error(`GitHub API request failed with status ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-    if (response.status === 204) return { data: undefined };
-    try {
-      return { data: await response.json() };
-    } catch (error) {
-      throw new Error("Coordinator GitHub API response was invalid", { cause: error });
-    }
-  };
-  const repositoryPath = ({ owner, repo }, suffix = "") => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${suffix}`;
-  const githubClient = {
-    rest: {
-      git: {
-        getRef: params => request("GET", repositoryPath(params, `/git/ref/${encodeURIComponent(params.ref)}`)),
-        getCommit: params => request("GET", repositoryPath(params, `/git/commits/${params.commit_sha}`)),
-        getTree: params => request("GET", repositoryPath(params, `/git/trees/${params.tree_sha}`), { query: { recursive: params.recursive } }),
-        getBlob: params => request("GET", repositoryPath(params, `/git/blobs/${params.file_sha}`)),
-        createBlob: params => request("POST", repositoryPath(params, "/git/blobs"), { body: { content: params.content, encoding: params.encoding } }),
-        createTree: params => request("POST", repositoryPath(params, "/git/trees"), { body: { tree: params.tree } }),
-        createCommit: params => request("POST", repositoryPath(params, "/git/commits"), { body: { message: params.message, tree: params.tree, parents: params.parents } }),
-        updateRef: params => request("PATCH", repositoryPath(params, `/git/refs/${encodeURIComponent(params.ref)}`), { body: { sha: params.sha, force: params.force } }),
-        createRef: params => request("POST", repositoryPath(params, "/git/refs"), { body: { ref: params.ref, sha: params.sha } }),
-      },
-      repos: {},
-    },
-  };
   const coordinator = new DispatchWorkCoordinator({
-    githubClient,
+    githubClient: createDispatchWorkCoordinatorGitHubClient(token, process.env.GITHUB_API_URL),
     owner,
     repo,
     identity: workflowRef?.split("@", 1)[0],

@@ -600,6 +600,12 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)
 	}
 	workflowData.SafeOutputs = mergedSafeOutputs
+	if workflowData.DispatchWorkCoordinator != nil {
+		if workflowData.SafeOutputs == nil {
+			workflowData.SafeOutputs = &SafeOutputsConfig{}
+		}
+		workflowData.SafeOutputs.DispatchClaimFinish = &DispatchClaimFinishConfig{}
+	}
 	if workflowData.SafeOutputs == nil && workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {
 		workflowData.SafeOutputs = &SafeOutputsConfig{}
 	}

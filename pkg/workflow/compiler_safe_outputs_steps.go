@@ -123,6 +123,9 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 		return nil, err
 	}
 	c.addSafeOutputTokenEnvVars(&steps, data)
+	if data.DispatchWorkCoordinator != nil {
+		steps = append(steps, "          GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN: ${{ github.token }}\n")
+	}
 
 	// With section for github-token
 	// Use the standard safe-outputs token for the shared github-script client.

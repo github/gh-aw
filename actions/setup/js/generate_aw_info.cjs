@@ -10,6 +10,7 @@ const validateLockdownRequirements = require("./validate_lockdown_requirements.c
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
+const { deriveWorkId } = require("./dispatch_work_coordinator.cjs");
 
 /**
  * Generate aw_info.json with workflow run metadata.
@@ -176,6 +177,10 @@ async function main(core, ctx, githubClient) {
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         core.warning(`aw_context must be a JSON object, got: ${typeof parsed}`);
       } else {
+        if (Object.hasOwn(parsed, "dispatch_work_coordinator")) {
+          delete parsed.dispatch_work_coordinator;
+          core.warning("Ignoring workflow-supplied dispatch_work_coordinator context");
+        }
         // Validate: no nested objects (all values must be primitives)
         const nestedKeys = Object.entries(parsed)
           .filter(([, v]) => v !== null && typeof v === "object")
@@ -197,6 +202,39 @@ async function main(core, ctx, githubClient) {
     } catch {
       core.warning(`Failed to parse aw_context input as JSON: ${String(awContextRaw)}`);
     }
+  }
+
+  const coordinatorAssignmentRaw = process.env.GH_AW_INFO_DISPATCH_WORK_COORDINATOR_ASSIGNMENT || "";
+  if (coordinatorAssignmentRaw && coordinatorAssignmentRaw !== "null") {
+    let assignment;
+    try {
+      assignment = JSON.parse(coordinatorAssignmentRaw);
+      if (!assignment || typeof assignment !== "object" || Array.isArray(assignment)) {
+        throw new TypeError("assignment must be an object");
+      }
+      const keys = Object.keys(assignment).sort();
+      if (
+        keys.join(",") !== "claim_id,work,work_id" ||
+        typeof assignment.claim_id !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(assignment.claim_id) ||
+        typeof assignment.work_id !== "string" ||
+        !assignment.work ||
+        typeof assignment.work !== "object" ||
+        Array.isArray(assignment.work) ||
+        deriveWorkId(assignment.work) !== assignment.work_id
+      ) {
+        throw new TypeError("assignment is invalid");
+      }
+    } catch {
+      const message = `${ERR_CONFIG}: trusted Dispatch Work Coordinator assignment is invalid`;
+      core.setFailed(message);
+      throw new Error(message);
+    }
+
+    awInfo.context = { ...(awInfo.context || {}), dispatch_work_coordinator: assignment };
+    const outputContext = JSON.parse(expressionAwContext);
+    outputContext.dispatch_work_coordinator = assignment;
+    expressionAwContext = JSON.stringify(outputContext);
   }
   core.setOutput("aw_context", expressionAwContext);
 

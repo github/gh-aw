@@ -29,6 +29,7 @@ const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.c
 const { listCommentMemoryFiles, COMMENT_MEMORY_DIR } = require("./comment_memory_helpers.cjs");
 const { checkRateLimitHeadroom } = require("./rate_limit_helpers.cjs");
 const { redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
+const { reconcileDispatchWorkCoordinator } = require("./dispatch_work_coordinator_reconcile.cjs");
 const nodePath = require("path");
 const fs = require("fs");
 const GITHUB_TOKEN_CONFIG_KEY = "github-token";
@@ -874,7 +875,7 @@ function sortMessagesByTemporaryIdDependencies(messages) {
  * @param {((item: {type: string, url?: string, number?: number, repo?: string, temporaryId?: string}) => void)|null} [onItemCreated] - Optional callback invoked after each successful create operation (for manifest logging)
  * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, artifactUrlMap: Map<string, string>, outputsWithUnresolvedIds: Array<any>, missings: Object, codePushFailures: Array<{type: string, error: string}>}>}
  */
-async function processMessages(messageHandlers, messages, onItemCreated = null) {
+async function processMessages(messageHandlers, messages, onItemCreated = null, dispatchReconciliation = {}) {
   const processingOrder = sortMessageIndicesByTemporaryIdDependencies(messages);
   const results = [];
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
@@ -932,6 +933,21 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
 
     if (!messageType) {
       core.warning(`Skipping message ${i + 1} without type`);
+      continue;
+    }
+
+    if (messageType === "dispatch_claim_finish") {
+      if (dispatchReconciliation.finishAuthorized) {
+        results.push({ type: messageType, messageIndex: i, success: true });
+      } else {
+        results.push({
+          type: messageType,
+          messageIndex: i,
+          success: false,
+          skipped: true,
+          reason: dispatchReconciliation.reason || "Claim completion was not authorized",
+        });
+      }
       continue;
     }
 
@@ -1696,7 +1712,7 @@ function recordSafeOutputFailure(report) {
 async function main() {
   // Detect staged mode before try/finally so it's accessible in the finally block.
   // In staged mode (🎭 Staged Mode Preview) no real items are created in GitHub so no manifest should be emitted.
-  const isStaged = isStagedMode();
+  let isStaged = isStagedMode();
   /** @type {string | null} */
   let failedOutputsMessage = null;
   /** @type {Array<{type?: string, errorCode?: string, error?: string}>} */
@@ -1721,6 +1737,15 @@ async function main() {
 
     const fileBackedCommentMemoryMessages = buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
+    let dispatchReconciliation = {};
+    if (config.dispatch_claim_finish) {
+      dispatchReconciliation = await reconcileDispatchWorkCoordinator({ messages: allMessages });
+      if (dispatchReconciliation.forceStaged) {
+        process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+        isStaged = true;
+        core.warning(`Dispatch Work Coordinator limited this run to staged safe outputs: ${dispatchReconciliation.reason}`);
+      }
+    }
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");
       if (!isStaged) ensureManifestExists();
@@ -1773,7 +1798,7 @@ async function main() {
     await checkRateLimitHeadroom(github, "safe_outputs_pre_check");
 
     // Process all messages in order of appearance
-    const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
+    const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem, dispatchReconciliation);
     const ledgerAppendHandler = messageHandlers.get("ledger_append");
     if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
       ledgerAppendHandler.finalize();

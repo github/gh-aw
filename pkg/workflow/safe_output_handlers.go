@@ -632,6 +632,18 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		NewConfig:   func() any { return &CallWorkflowConfig{} },
 	},
 	{
+		Key:         "dispatch-claim-finish",
+		StructField: "DispatchClaimFinish",
+		ToolName:    "dispatch_claim_finish",
+		NewConfig:   func() any { return &DispatchClaimFinishConfig{} },
+		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
+			if safeOutputs.DispatchClaimFinish == nil {
+				return nil
+			}
+			return NewPermissionsContentsWrite()
+		},
+	},
+	{
 		Key:         "missing-tool",
 		StructField: "MissingTool",
 		ToolName:    "missing_tool",

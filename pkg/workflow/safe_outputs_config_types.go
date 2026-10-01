@@ -98,48 +98,51 @@ type SafeOutputsConfig struct {
 	DispatchWorkflow                       *DispatchWorkflowConfig                `yaml:"dispatch-workflow,omitempty"`            // Dispatch workflow_dispatch events to other workflows
 	DispatchRepository                     *DispatchRepositoryConfig              `yaml:"dispatch-repository,omitempty"`          // Dispatch repository_dispatch events to external repositories; the underscore alias remains supported via parseDispatchRepositoryConfig.
 	CallWorkflow                           *CallWorkflowConfig                    `yaml:"call-workflow,omitempty"`                // Call reusable workflows via workflow_call fan-out
-	MissingTool                            *MissingToolConfig                     `yaml:"missing-tool,omitempty"`                 // Optional for reporting missing functionality
-	MissingData                            *MissingDataConfig                     `yaml:"missing-data,omitempty"`                 // Optional for reporting missing data required to achieve goals
-	NoOp                                   *NoOpConfig                            `yaml:"noop,omitempty"`                         // No-op output for logging only (always available as fallback)
-	ReportIncomplete                       *ReportIncompleteConfig                `yaml:"report-incomplete,omitempty"`            // Signal that the task could not be completed due to a tool or infrastructure failure
-	ThreatDetection                        *ThreatDetectionConfig                 `yaml:"threat-detection,omitempty"`             // Threat detection configuration
-	Jobs                                   map[string]*SafeJobConfig              `yaml:"jobs,omitempty"`                         // Safe-jobs configuration (moved from top-level)
-	Scripts                                map[string]*SafeScriptConfig           `yaml:"scripts,omitempty"`                      // Custom inline handlers that run in the safe-output handler loop
-	GitHubApp                              *GitHubAppConfig                       `yaml:"github-app,omitempty"`                   // GitHub App credentials for token minting
-	URLs                                   SafeOutputsURLsPolicy                  `yaml:"urls,omitempty"`                         // URL sanitization policy: SafeOutputsURLsPolicyAllowedOnly (default) or SafeOutputsURLsPolicyAllowedOrCodeRegion
-	Data                                   any                                    `yaml:"data,omitempty"`                         // Structured data mode for body-based safe outputs: false/omitted (disabled), true (allow any object), object (inline schema), or GitHub Actions expression string
-	DataEnabled                            bool                                   `yaml:"-"`                                      // Internal flag controlling whether `data` is allowed for body-based safe outputs
-	NormalizedDataSchema                   map[string]any                         `yaml:"-"`                                      // Internal normalized schema derived from inline `data` object schemas
-	DataSchemaExpression                   string                                 `yaml:"-"`                                      // Internal runtime GitHub Actions expression used to provide `data` schema dynamically
-	AllowedDomains                         []string                               `yaml:"allowed-domains,omitempty"`              // Allowed domains for URL redaction, unioned with network.allowed; supports ecosystem identifiers
-	AllowGitHubReferences                  []string                               `yaml:"allowed-github-references,omitempty"`    // Allowed repositories for GitHub references (e.g., ["repo", "org/repo2"])
-	Staged                                 *TemplatableBool                       `yaml:"staged,omitempty"`                       // Templatable preview-only mode for all safe outputs
-	Env                                    map[string]string                      `yaml:"env,omitempty"`                          // Environment variables to pass to safe output jobs
-	GitHubToken                            string                                 `yaml:"github-token,omitempty"`                 // GitHub token for safe output jobs
-	LinearToken                            string                                 `yaml:"linear-token,omitempty"`                 // Linear API key for Linear safe output handlers
-	MaximumPatchSize                       int                                    `yaml:"max-patch-size,omitempty"`               // Maximum allowed patch size in KB (defaults to 4096)
-	MaximumPatchFiles                      int                                    `yaml:"max-patch-files,omitempty"`              // Maximum allowed unique files per create-pull-request patch (defaults to 100)
-	RunsOn                                 string                                 `yaml:"runs-on,omitempty"`                      // Runner configuration for safe-outputs jobs
-	Messages                               *SafeOutputMessagesConfig              `yaml:"messages,omitempty"`                     // Custom message templates for footer and notifications
-	Mentions                               *MentionsConfig                        `yaml:"mentions,omitempty"`                     // Configuration for @mention filtering in safe outputs
-	Footer                                 *bool                                  `yaml:"footer,omitempty"`                       // Global footer control - when false, omits visible footer from all safe outputs (XML markers still included)
-	BodyFooter                             string                                 `yaml:"body-footer,omitempty"`                  // Deterministic template appended to every body-producing safe output, in addition to handler-specific body footers.
-	GroupReports                           bool                                   `yaml:"group-reports,omitempty"`                // If true, create parent "Failed runs" issue for agent failures (default: false)
-	ReportFailureAsIssue                   *TemplatableBool                       `yaml:"report-failure-as-issue,omitempty"`      // Controls failure issue creation: bool or templatable expression string. Default: true. Category arrays are parsed into ReportFailureAsIssueCategories/ExcludedCategories.
-	ReportFailureAsIssueCategories         []string                               `yaml:"-"`                                      // Parsed failure categories for report-failure-as-issue (internal use only, included categories)
-	ReportFailureAsIssueExcludedCategories []string                               `yaml:"-"`                                      // Parsed excluded failure categories for report-failure-as-issue (internal use only, categories starting with "!")
-	ReportFailedJobs                       *TemplatableBool                       `yaml:"report-failed-jobs,omitempty"`           // Controls whether to report failed non-builtin jobs as issues (default: true). Supports boolean values and GitHub Actions expressions.
-	FailureIssueRepo                       string                                 `yaml:"failure-issue-repo,omitempty"`           // Repository to create failure issues in (format: "owner/repo"), defaults to current repo
-	MaxBotMentions                         *string                                `yaml:"max-bot-mentions,omitempty"`             // Maximum bot trigger references (e.g. 'fixes #123') allowed before filtering. Default: 10. Supports integer or GitHub Actions expression.
-	Steps                                  []any                                  `yaml:"steps,omitempty"`                        // User-provided steps injected after setup/checkout and before safe-output code
-	IDToken                                *string                                `yaml:"id-token,omitempty"`                     // Override id-token permission: "write" to force-add, "none" to disable auto-detection
-	ConcurrencyGroup                       string                                 `yaml:"concurrency-group,omitempty"`            // Concurrency group for the safe-outputs job (cancel-in-progress is always false)
-	Needs                                  []string                               `yaml:"needs,omitempty"`                        // Additional custom workflow jobs that safe_outputs should depend on
-	Environment                            string                                 `yaml:"environment,omitempty"`                  // Override the GitHub deployment environment for the safe-outputs job (defaults to the top-level environment: field)
-	Actions                                map[string]*SafeOutputActionConfig     `yaml:"actions,omitempty"`                      // Custom GitHub Actions mounted as safe output tools (resolved at compile time)
-	TimeoutMinutes                         int                                    `yaml:"timeout-minutes,omitempty"`              // Timeout for the safe_outputs job in minutes. Defaults to 45.
-	AutoInjectedCreateIssue                bool                                   `yaml:"-"`                                      // Internal: true when create-issues was automatically injected by the compiler (not user-configured)
+	DispatchClaimFinish                    *DispatchClaimFinishConfig             `yaml:"dispatch-claim-finish,omitempty"`
+	MissingTool                            *MissingToolConfig                     `yaml:"missing-tool,omitempty"`              // Optional for reporting missing functionality
+	MissingData                            *MissingDataConfig                     `yaml:"missing-data,omitempty"`              // Optional for reporting missing data required to achieve goals
+	NoOp                                   *NoOpConfig                            `yaml:"noop,omitempty"`                      // No-op output for logging only (always available as fallback)
+	ReportIncomplete                       *ReportIncompleteConfig                `yaml:"report-incomplete,omitempty"`         // Signal that the task could not be completed due to a tool or infrastructure failure
+	ThreatDetection                        *ThreatDetectionConfig                 `yaml:"threat-detection,omitempty"`          // Threat detection configuration
+	Jobs                                   map[string]*SafeJobConfig              `yaml:"jobs,omitempty"`                      // Safe-jobs configuration (moved from top-level)
+	Scripts                                map[string]*SafeScriptConfig           `yaml:"scripts,omitempty"`                   // Custom inline handlers that run in the safe-output handler loop
+	GitHubApp                              *GitHubAppConfig                       `yaml:"github-app,omitempty"`                // GitHub App credentials for token minting
+	URLs                                   SafeOutputsURLsPolicy                  `yaml:"urls,omitempty"`                      // URL sanitization policy: SafeOutputsURLsPolicyAllowedOnly (default) or SafeOutputsURLsPolicyAllowedOrCodeRegion
+	Data                                   any                                    `yaml:"data,omitempty"`                      // Structured data mode for body-based safe outputs: false/omitted (disabled), true (allow any object), object (inline schema), or GitHub Actions expression string
+	DataEnabled                            bool                                   `yaml:"-"`                                   // Internal flag controlling whether `data` is allowed for body-based safe outputs
+	NormalizedDataSchema                   map[string]any                         `yaml:"-"`                                   // Internal normalized schema derived from inline `data` object schemas
+	DataSchemaExpression                   string                                 `yaml:"-"`                                   // Internal runtime GitHub Actions expression used to provide `data` schema dynamically
+	AllowedDomains                         []string                               `yaml:"allowed-domains,omitempty"`           // Allowed domains for URL redaction, unioned with network.allowed; supports ecosystem identifiers
+	AllowGitHubReferences                  []string                               `yaml:"allowed-github-references,omitempty"` // Allowed repositories for GitHub references (e.g., ["repo", "org/repo2"])
+	Staged                                 *TemplatableBool                       `yaml:"staged,omitempty"`                    // Templatable preview-only mode for all safe outputs
+	Env                                    map[string]string                      `yaml:"env,omitempty"`                       // Environment variables to pass to safe output jobs
+	GitHubToken                            string                                 `yaml:"github-token,omitempty"`              // GitHub token for safe output jobs
+	LinearToken                            string                                 `yaml:"linear-token,omitempty"`              // Linear API key for Linear safe output handlers
+	MaximumPatchSize                       int                                    `yaml:"max-patch-size,omitempty"`            // Maximum allowed patch size in KB (defaults to 4096)
+	MaximumPatchFiles                      int                                    `yaml:"max-patch-files,omitempty"`           // Maximum allowed unique files per create-pull-request patch (defaults to 100)
+	RunsOn                                 string                                 `yaml:"runs-on,omitempty"`                   // Runner configuration for safe-outputs jobs
+	Messages                               *SafeOutputMessagesConfig              `yaml:"messages,omitempty"`                  // Custom message templates for footer and notifications
+	Mentions                               *MentionsConfig                        `yaml:"mentions,omitempty"`                  // Configuration for @mention filtering in safe outputs
+	Footer                                 *bool                                  `yaml:"footer,omitempty"`                    // Global footer control - when false, omits visible footer from all safe outputs (XML markers still included)
+	BodyFooter                             string                                 `yaml:"body-footer,omitempty"`               // Deterministic template appended to every body-producing safe output, in addition to handler-specific body footers.
+	GroupReports                           bool                                   `yaml:"group-reports,omitempty"`             // If true, create parent "Failed runs" issue for agent failures (default: false)
+	ReportFailureAsIssue                   *TemplatableBool                       `yaml:"report-failure-as-issue,omitempty"`   // Controls failure issue creation: bool or templatable expression string. Default: true. Category arrays are parsed into ReportFailureAsIssueCategories/ExcludedCategories.
+	ReportFailureAsIssueCategories         []string                               `yaml:"-"`                                   // Parsed failure categories for report-failure-as-issue (internal use only, included categories)
+	ReportFailureAsIssueExcludedCategories []string                               `yaml:"-"`                                   // Parsed excluded failure categories for report-failure-as-issue (internal use only, categories starting with "!")
+	ReportFailedJobs                       *TemplatableBool                       `yaml:"report-failed-jobs,omitempty"`        // Controls whether to report failed non-builtin jobs as issues (default: true). Supports boolean values and GitHub Actions expressions.
+	FailureIssueRepo                       string                                 `yaml:"failure-issue-repo,omitempty"`        // Repository to create failure issues in (format: "owner/repo"), defaults to current repo
+	MaxBotMentions                         *string                                `yaml:"max-bot-mentions,omitempty"`          // Maximum bot trigger references (e.g. 'fixes #123') allowed before filtering. Default: 10. Supports integer or GitHub Actions expression.
+	Steps                                  []any                                  `yaml:"steps,omitempty"`                     // User-provided steps injected after setup/checkout and before safe-output code
+	IDToken                                *string                                `yaml:"id-token,omitempty"`                  // Override id-token permission: "write" to force-add, "none" to disable auto-detection
+	ConcurrencyGroup                       string                                 `yaml:"concurrency-group,omitempty"`         // Concurrency group for the safe-outputs job (cancel-in-progress is always false)
+	Needs                                  []string                               `yaml:"needs,omitempty"`                     // Additional custom workflow jobs that safe_outputs should depend on
+	Environment                            string                                 `yaml:"environment,omitempty"`               // Override the GitHub deployment environment for the safe-outputs job (defaults to the top-level environment: field)
+	Actions                                map[string]*SafeOutputActionConfig     `yaml:"actions,omitempty"`                   // Custom GitHub Actions mounted as safe output tools (resolved at compile time)
+	TimeoutMinutes                         int                                    `yaml:"timeout-minutes,omitempty"`           // Timeout for the safe_outputs job in minutes. Defaults to 45.
+	AutoInjectedCreateIssue                bool                                   `yaml:"-"`                                   // Internal: true when create-issues was automatically injected by the compiler (not user-configured)
 }
+
+type DispatchClaimFinishConfig struct{}
 
 // SafeOutputMessagesConfig holds custom message templates for safe-output footer and notification messages
 type SafeOutputMessagesConfig struct {

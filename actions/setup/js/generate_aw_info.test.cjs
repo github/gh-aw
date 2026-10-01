@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
+import { deriveWorkId } from "./dispatch_work_coordinator.cjs";
 
 // Mock the global objects that GitHub Actions provides
 const mockCore = {
@@ -453,6 +454,40 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.context).toEqual(validContext);
     expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(validContext));
     expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
+  });
+
+  it("adds only the activation-provided coordinator assignment to aw_context", async () => {
+    const work = { title: "Trusted task" };
+    const assignment = { work_id: deriveWorkId(work), claim_id: "claim-123", work };
+    const validContext = { run_id: "1", repo: "owner/repo", workflow_id: "worker.yml" };
+    const contextWithInput = {
+      ...mockContext,
+      payload: {
+        inputs: {
+          aw_context: JSON.stringify({ ...validContext, dispatch_work_coordinator: "forged" }),
+        },
+      },
+    };
+    process.env.GH_AW_INFO_DISPATCH_WORK_COORDINATOR_ASSIGNMENT = JSON.stringify(assignment);
+
+    await main(mockCore, contextWithInput);
+
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    const expectedContext = { ...validContext, dispatch_work_coordinator: assignment };
+    expect(awInfo.context).toEqual(expectedContext);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(expectedContext));
+    expect(mockCore.warning).toHaveBeenCalledWith("Ignoring workflow-supplied dispatch_work_coordinator context");
+  });
+
+  it("fails closed when the activation coordinator assignment is invalid", async () => {
+    process.env.GH_AW_INFO_DISPATCH_WORK_COORDINATOR_ASSIGNMENT = JSON.stringify({
+      work_id: "work-invalid",
+      claim_id: "claim-123",
+      work: { title: "Unverified" },
+    });
+
+    await expect(main(mockCore, mockContext)).rejects.toThrow("trusted Dispatch Work Coordinator assignment is invalid");
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("trusted Dispatch Work Coordinator assignment is invalid"));
   });
 
   it("should accept aw_context object from repository_dispatch client_payload", async () => {

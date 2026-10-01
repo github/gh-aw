@@ -35,6 +35,20 @@
     }
   },
   {
+    "name": "dispatch_claim_finish",
+    "description": "Declare completion of the trusted Dispatch Work Coordinator Claim assigned to this run. The Claim identity comes from trusted activation context; do not include work_id, claim_id, claimant, or generation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "object",
+          "description": "Optional result data for the completed Work."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "linear_create_issue",
     "description": "Use this to create an issue in the Linear team fixed by safe-outputs.linear-create-issue.team-id or LINEAR_TEAM_ID and optional project fixed by project-id or LINEAR_PROJECT_ID. The Linear credential, team UUID/key/name, and project ID are trusted workflow configuration and are not agent inputs.",
     "inputSchema": {

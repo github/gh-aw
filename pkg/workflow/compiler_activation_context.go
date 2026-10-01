@@ -154,6 +154,18 @@ func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuil
 	ctx.outputs["setup-span-id"] = "${{ steps.setup.outputs.span-id }}"
 	ctx.outputs["setup-parent-span-id"] = "${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}"
 	c.addActivationWorkflowCallResolutionSteps(ctx)
+	if ctx.data.DispatchWorkCoordinator != nil {
+		ctx.steps = append(ctx.steps, buildDispatchWorkCoordinatorActivationStep())
+		ctx.outputs["dispatch_work_coordinator_assignment"] = "${{ steps.dispatch-work-coordinator.outputs.assignment }}"
+	}
+}
+
+func buildDispatchWorkCoordinatorActivationStep() string {
+	return "      - name: Claim Dispatch Work Coordinator assignment\n" +
+		"        id: dispatch-work-coordinator\n" +
+		"        env:\n" +
+		"          GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN: ${{ github.token }}\n" +
+		"        run: node \"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_activation.cjs\"\n"
 }
 
 func buildActivationSetupParentSpans(preActivationJobCreated bool) (traceID string, parentSpanID string) {

@@ -76,6 +76,12 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 	envVars["GH_AW_AIC"] = fmt.Sprintf("${{ needs.%s.outputs.aic }}", constants.AgentJobName)
 	envVars["GH_AW_AMBIENT_CONTEXT"] = fmt.Sprintf("${{ needs.%s.outputs.ambient_context }}", constants.AgentJobName)
 	envVars["GH_AW_AGENT_AIC"] = fmt.Sprintf("${{ needs.%s.outputs.aic }}", constants.AgentJobName)
+	if data.DispatchWorkCoordinator != nil {
+		envVars["GH_AW_DISPATCH_WORK_COORDINATOR_CONTEXT"] = fmt.Sprintf(
+			"${{ toJSON(fromJSON(needs.%s.outputs.aw_context || '{}').dispatch_work_coordinator || null) }}",
+			constants.ActivationJobName,
+		)
+	}
 
 	// Add slash command metadata so safe output handlers can render run-again footer hints.
 	if len(data.Command) > 0 {

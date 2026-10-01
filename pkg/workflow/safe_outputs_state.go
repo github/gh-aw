@@ -90,6 +90,7 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 		safeOutputs.DispatchWorkflow != nil ||
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
+		safeOutputs.DispatchClaimFinish != nil ||
 		safeOutputs.MissingTool != nil ||
 		safeOutputs.MissingData != nil ||
 		safeOutputs.SetIssueType != nil ||
@@ -164,6 +165,7 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 		safeOutputs.DispatchWorkflow != nil ||
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
+		safeOutputs.DispatchClaimFinish != nil ||
 		safeOutputs.SetIssueType != nil ||
 		safeOutputs.SetIssueField != nil || // non-builtin safe output field
 		hasLinearSafeOutputs(safeOutputs)

@@ -235,6 +235,36 @@ class DispatchWorkCoordinator {
     });
     return snapshot.projection.works.find(item => item.work_id === workId) || null;
   }
+
+  async finishClaim(claimId, outcome) {
+    const completion = { type: "Completion", claim_id: claimId };
+    if (outcome !== undefined) completion.outcome = outcome;
+    const snapshot = await this.mutate((transactions, projection) => {
+      const claim = projection.works.flatMap(work => work.claims).find(item => item.claim_id === claimId);
+      const work = claim && projection.works.find(item => item.claims.some(item => item.claim_id === claimId));
+      if (!claim || !work) throw new TypeError("Unknown Claim");
+      if (work.state !== "claimed" || work.effective_claim_id !== claimId || claim.state !== "effective") {
+        throw new TypeError("Claim is not currently effective");
+      }
+      return [...transactions, completion];
+    });
+    const work = snapshot.projection.works.find(item => item.claims.some(item => item.claim_id === claimId));
+    if (!work || work.state !== "completed" || work.effective_claim_id !== claimId) {
+      throw new Error("Coordinator could not verify the persisted Completion");
+    }
+    return work;
+  }
+
+  async cancelClaim(claimId) {
+    const snapshot = await this.mutate((transactions, projection) => {
+      const work = projection.works.find(item => item.claims.some(claim => claim.claim_id === claimId));
+      const claim = work?.claims.find(item => item.claim_id === claimId);
+      if (!claim || !work) throw new TypeError("Unknown Claim");
+      if (claim.state !== "effective" || work.state !== "claimed" || work.effective_claim_id !== claimId) return transactions;
+      return [...transactions, { type: "ClaimCancellation", claim_id: claimId }];
+    });
+    return snapshot.projection.works.find(item => item.claims.some(claim => claim.claim_id === claimId)) || null;
+  }
 }
 
 module.exports = {
