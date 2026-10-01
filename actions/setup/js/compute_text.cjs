@@ -9,6 +9,7 @@
 const { sanitizeIncomingText, writeRedactedDomainsLog } = require("./sanitize_incoming_text.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { parseAllowedBots, isAllowedBot } = require("./check_permissions_utils.cjs");
+const { parseInboundAwContext } = require("./aw_context.cjs");
 
 /**
  * Converts multiline content to a single line for safe workflow logging.
@@ -142,10 +143,10 @@ async function main() {
       break;
 
     case "workflow_dispatch":
-      // For workflow dispatch: check for release_url or release_id in inputs
       if (context.payload.inputs) {
         const releaseUrl = context.payload.inputs.release_url;
         const releaseId = context.payload.inputs.release_id;
+        const awContext = parseInboundAwContext(context.payload.inputs.aw_context);
 
         // If release_url is provided, extract owner/repo/tag
         if (releaseUrl) {
@@ -178,6 +179,83 @@ async function main() {
             text = `${title}\n\n${body}`;
           } catch (error) {
             core.warning(`Failed to fetch release by ID: ${getErrorMessage(error)}`);
+          }
+        } else if (awContext && (!awContext.repo || awContext.repo === `${owner}/${repo}`)) {
+          const positiveId = value => {
+            const id = typeof value === "string" && /^[1-9]\d*$/.test(value) ? Number(value) : NaN;
+            return Number.isSafeInteger(id) ? id : null;
+          };
+          const commentId = positiveId(awContext.comment_id);
+          const itemNumber = positiveId(awContext.item_number);
+          try {
+            let item;
+            if (commentId) {
+              switch (awContext.event_type) {
+                case "issue_comment":
+                  item = (await github.rest.issues.getComment({ owner, repo, comment_id: commentId })).data;
+                  break;
+                case "pull_request_review_comment":
+                  item = (await github.rest.pulls.getReviewComment({ owner, repo, comment_id: commentId })).data;
+                  break;
+                case "pull_request_review":
+                  if (itemNumber && awContext.item_type === "pull_request") {
+                    item = (await github.rest.pulls.getReview({ owner, repo, pull_number: itemNumber, review_id: commentId })).data;
+                  }
+                  break;
+                case "discussion_comment":
+                  if (typeof awContext.comment_node_id === "string" && awContext.comment_node_id && itemNumber && awContext.item_type === "discussion") {
+                    const result = await github.graphql(
+                      `query($id: ID!) {
+                        node(id: $id) {
+                          ... on DiscussionComment {
+                            body
+                            discussion { number repository { nameWithOwner } }
+                          }
+                        }
+                      }`,
+                      { id: awContext.comment_node_id }
+                    );
+                    const comment = result.node;
+                    if (comment?.discussion?.number === itemNumber && comment.discussion.repository.nameWithOwner === `${owner}/${repo}`) {
+                      item = comment;
+                    }
+                  }
+                  break;
+              }
+              if (item) {
+                body = item.body || "";
+                text = body;
+              }
+            } else if (itemNumber) {
+              switch (awContext.item_type) {
+                case "issue":
+                  if (awContext.event_type === "issues") item = (await github.rest.issues.get({ owner, repo, issue_number: itemNumber })).data;
+                  break;
+                case "pull_request":
+                  if (awContext.event_type === "pull_request") item = (await github.rest.pulls.get({ owner, repo, pull_number: itemNumber })).data;
+                  break;
+                case "discussion":
+                  if (awContext.event_type === "discussion") {
+                    const result = await github.graphql(
+                      `query($owner: String!, $repo: String!, $number: Int!) {
+                        repository(owner: $owner, name: $repo) {
+                          discussion(number: $number) { title body }
+                        }
+                      }`,
+                      { owner, repo, number: itemNumber }
+                    );
+                    item = result.repository?.discussion;
+                  }
+                  break;
+              }
+              if (item) {
+                title = item.title || "";
+                body = item.body || "";
+                text = `${title}\n\n${body}`;
+              }
+            }
+          } catch (error) {
+            core.warning(`Failed to fetch dispatched text: ${getErrorMessage(error)}`);
           }
         }
       }

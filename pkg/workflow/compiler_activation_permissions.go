@@ -210,6 +210,24 @@ func activationBlockedVersionReportAsIssueValue(ctx *activationJobBuildContext) 
 }
 
 func (c *Compiler) addCentralizedCommandActivationPermissions(permsMap map[PermissionScope]PermissionLevel, ctx *activationJobBuildContext) {
+	if ctx.data.CommandCentralized && ctx.data.NeedsTextOutput {
+		for _, event := range FilterCommentEvents(ctx.data.CommandEvents) {
+			var scope PermissionScope
+			switch GetActualGitHubEventName(event.EventName) {
+			case "issues", "issue_comment":
+				scope = PermissionIssues
+			case "pull_request", "pull_request_review", "pull_request_review_comment":
+				scope = PermissionPullRequests
+			case "discussion", "discussion_comment":
+				scope = PermissionDiscussions
+			default:
+				continue
+			}
+			if _, exists := permsMap[scope]; !exists {
+				permsMap[scope] = PermissionRead
+			}
+		}
+	}
 	// For centralized slash_command workflows, the compiled "on" section only contains
 	// workflow_dispatch, so addActivationInteractionPermissionsMap above cannot detect the
 	// original event types and skips write permissions. Supplement with a synthetic section
