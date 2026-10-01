@@ -52,14 +52,14 @@
   --aw-gray-13: #0c0a09;
 
   /* Brand accent, light → dark */
-  --aw-purple-1: #f3eefe;
-  --aw-purple-2: #ddd0fd;
-  --aw-purple-3: #c9b8ff;
-  --aw-purple-4: #b49cff;
-  --aw-purple-6: #8250df;
-  --aw-purple-7: #6f42c1;
-  --aw-purple-8: #5a32a3;
-  --aw-purple-9: #272038;
+  --aw-purple-1: #f3f0f9;
+  --aw-purple-2: #e0d8f1;
+  --aw-purple-3: #c3b5e4;
+  --aw-purple-4: #a693d4;
+  --aw-purple-6: #7458b5;
+  --aw-purple-7: #5f489a;
+  --aw-purple-8: #4b397a;
+  --aw-purple-9: #25203a;
 
   /* Complementary accent */
   --aw-coral-1: #fdebe4;
@@ -82,6 +82,28 @@
 
   --aw-font-sans: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --aw-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Fluid modular type scale (Utopia, https://utopia.fyi/type/calculator):
+     15px base × 1.125 ratio at a 360px viewport → 16px base × 1.25 ratio at 1240px.
+     Every size is a step on this scale; the one exception is --aw-text-ui for compact chrome.
+     Step −1 is the smallest; anything smaller drops below a legible floor. */
+  --aw-step--1: clamp(0.8rem, 0.847rem + -0.0606vw, 0.8333rem);   /* 13.3 → 12.8px */
+  /* Fixed UI size for compact chrome (header wordmark and nav), between step--1 and step-0. */
+  --aw-text-ui: 0.875rem;                                           /* 14px */
+  --aw-step-0: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);      /* 15 → 16px */
+  --aw-step-1: clamp(1.0547rem, 0.9748rem + 0.3551vw, 1.25rem);   /* 16.9 → 20px */
+  --aw-step-2: clamp(1.1865rem, 1.0327rem + 0.6836vw, 1.5625rem); /* 19 → 25px */
+  --aw-step-3: clamp(1.3348rem, 1.0819rem + 1.1242vw, 1.9531rem); /* 21.4 → 31.3px */
+  --aw-step-4: clamp(1.5017rem, 1.1173rem + 1.7086vw, 2.4414rem); /* 24 → 39.1px */
+  --aw-step-5: clamp(1.6894rem, 1.1321rem + 2.477vw, 3.0518rem);  /* 27 → 48.8px */
+  --aw-step-6: clamp(1.9006rem, 1.1175rem + 3.4802vw, 3.8147rem); /* 30.4 → 61px */
+
+  --aw-leading-tight: 1.15;
+  --aw-leading-snug: 1.35;
+  --aw-leading-body: 1.7;
+
+  --aw-tracking-tight: -0.025em;
+  --aw-tracking-snug: -0.015em;
 }
 
 /* 2. Semantic — dark (Starlight's default theme) ------------------------- */
@@ -93,8 +115,6 @@
   --aw-color-bg-overlay: rgba(12, 10, 9, 0.8);
   --aw-color-bg-page-end: var(--aw-gray-13);
 
-  /* Homepage-only ambient glow (shown when WorkflowHero is on the page) */
-  --aw-landing-glow: none;
 
   /* Mermaid node categories */
   --aw-diagram-tracked-fill: var(--aw-purple-7);
@@ -114,10 +134,12 @@
   --aw-color-text-strong: var(--aw-gray-0);
   --aw-color-text-invert: var(--aw-gray-13);
 
-  --aw-color-border: var(--aw-gray-10);
-  --aw-color-border-strong: var(--aw-gray-9);
-  --aw-color-hairline: var(--aw-gray-11);
-  --aw-color-hairline-light: rgba(250, 250, 249, 0.08);
+  /* One line colour for every border, divider and hairline */
+  --aw-color-divider: rgba(255, 255, 255, 0.1);
+  --aw-color-border: var(--aw-color-divider);
+  --aw-color-border-strong: rgba(255, 255, 255, 0.18);
+  --aw-color-hairline: var(--aw-color-divider);
+  --aw-color-hairline-light: var(--aw-color-divider);
 
   --aw-color-accent: var(--aw-purple-4);
   --aw-color-accent-low: var(--aw-purple-9);
@@ -148,6 +170,11 @@
 
   --aw-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
 
+  /* Raised surfaces: product-UI cards and fragments that sit above the page */
+  --aw-color-surface: var(--aw-gray-11);
+  --aw-color-surface-header: var(--aw-gray-10);
+  --aw-shadow-raised: inset 0 1px 0 rgba(250, 250, 249, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 56px -8px rgba(0, 0, 0, 0.7);
+
   /* Starlight's gray ramp runs from the text colour (gray-1) to the page colour (gray-7). */
   --aw-ramp-1: var(--aw-gray-1);
   --aw-ramp-2: var(--aw-gray-4);
@@ -167,7 +194,6 @@
   --aw-color-bg-overlay: rgba(252, 252, 251, 0.85);
   --aw-color-bg-page-end: var(--aw-gray-1);
 
-  --aw-landing-glow: none;
 
   --aw-diagram-tracked-fill: var(--aw-purple-2);
   --aw-diagram-tracked-stroke: var(--aw-purple-7);
@@ -186,10 +212,11 @@
   --aw-color-text-strong: var(--aw-gray-13);
   --aw-color-text-invert: var(--aw-gray-1);
 
-  --aw-color-border: var(--aw-gray-3);
-  --aw-color-border-strong: var(--aw-gray-4);
-  --aw-color-hairline: var(--aw-gray-3);
-  --aw-color-hairline-light: rgba(28, 25, 23, 0.07);
+  --aw-color-divider: rgba(0, 0, 0, 0.07);
+  --aw-color-border: var(--aw-color-divider);
+  --aw-color-border-strong: rgba(0, 0, 0, 0.14);
+  --aw-color-hairline: var(--aw-color-divider);
+  --aw-color-hairline-light: var(--aw-color-divider);
 
   --aw-color-accent: var(--aw-purple-6);
   --aw-color-accent-low: var(--aw-purple-1);
@@ -210,6 +237,10 @@
 
   --aw-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 12px 32px rgba(28, 25, 23, 0.06);
 
+  --aw-color-surface: var(--aw-gray-0);
+  --aw-color-surface-header: var(--aw-gray-2);
+  --aw-shadow-raised: 0 1px 2px rgba(28, 25, 23, 0.05), 0 16px 40px -8px rgba(28, 25, 23, 0.12);
+
   --aw-ramp-1: var(--aw-gray-12);
   --aw-ramp-2: var(--aw-gray-8);
   --aw-ramp-3: var(--aw-gray-7);
@@ -217,6 +248,51 @@
   --aw-ramp-5: var(--aw-gray-3);
   --aw-ramp-6: var(--aw-gray-2);
   --aw-ramp-7: var(--aw-gray-1);
+}
+
+/* Dark section tone ------------------------------------------------------
+   A near-black, full-bleed section in either theme (e.g. the video section).
+   Mirrors the dark semantic tokens so everything inside renders as dark UI. */
+.aw-tone-dark {
+  color-scheme: dark;
+  --aw-color-bg: var(--aw-gray-13);
+  --aw-color-bg-subtle: var(--aw-gray-12);
+  --aw-color-bg-raised: rgba(28, 25, 23, 0.88);
+  --aw-color-bg-overlay: rgba(12, 10, 9, 0.8);
+  --aw-color-bg-page-end: var(--aw-gray-13);
+  --aw-color-text: var(--aw-gray-1);
+  --aw-color-text-body: var(--aw-gray-4);
+  --aw-color-text-secondary: var(--aw-gray-4);
+  --aw-color-text-muted: var(--aw-gray-5);
+  --aw-color-text-strong: var(--aw-gray-0);
+  --aw-color-text-invert: var(--aw-gray-13);
+  --aw-color-divider: rgba(255, 255, 255, 0.1);
+  --aw-color-border: var(--aw-color-divider);
+  --aw-color-border-strong: rgba(255, 255, 255, 0.18);
+  --aw-color-hairline: var(--aw-color-divider);
+  --aw-color-hairline-light: var(--aw-color-divider);
+  --aw-color-accent: var(--aw-purple-4);
+  --aw-color-accent-low: var(--aw-purple-9);
+  --aw-color-accent-high: var(--aw-purple-2);
+  --aw-color-accent-text: var(--aw-purple-3);
+  --aw-accent-rgb: 180, 156, 255;
+  --aw-color-complement: var(--aw-coral-4);
+  --aw-color-complement-low: var(--aw-coral-9);
+  --aw-color-link: var(--aw-color-accent-text);
+  --aw-color-button-bg: var(--aw-gray-1);
+  --aw-color-button-bg-hover: var(--aw-gray-4);
+  --aw-color-button-text: var(--aw-gray-13);
+  --aw-color-note: var(--aw-blue-5);
+  --aw-color-success: var(--aw-green-6);
+  --aw-color-caution: var(--aw-amber-5);
+  --aw-color-danger: var(--aw-red-5);
+  --aw-color-code-bg: var(--aw-gray-11);
+  --aw-color-scrollbar: rgba(250, 250, 249, 0.12);
+  --aw-color-scrollbar-hover: rgba(250, 250, 249, 0.22);
+  --aw-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
+  --aw-color-surface: var(--aw-gray-11);
+  --aw-color-surface-header: var(--aw-gray-10);
+  --aw-shadow-raised: inset 0 1px 0 rgba(250, 250, 249, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 56px -8px rgba(0, 0, 0, 0.7);
 }
 
 /* 3. Starlight mapping --------------------------------------------------- */
@@ -243,6 +319,7 @@
 
   --sl-color-hairline: var(--aw-color-hairline);
   --sl-color-hairline-light: var(--aw-color-hairline-light);
+  --sl-color-hairline-shade: var(--aw-color-divider);
 
   --sl-color-text: var(--aw-color-text);
   --sl-color-text-invert: var(--aw-color-text-invert);
