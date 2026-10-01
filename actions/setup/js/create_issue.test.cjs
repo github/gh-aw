@@ -130,6 +130,17 @@ describe("create_issue", () => {
       );
     });
 
+    it("should pass shell metacharacters in the issue body as API data", async () => {
+      const payload = "$(touch /tmp/gh-aw-command-injection); echo safe";
+      const handler = await main({});
+
+      const result = await handler({ title: "Test Issue", body: payload });
+
+      expect(result.success).toBe(true);
+      expect(mockGithub.rest.issues.create.mock.calls[0][0].body).toContain(payload);
+      expect(JSON.stringify(mockExec.exec.mock.calls)).not.toContain(payload);
+    });
+
     it("should append the configured body footer when the generated footer is disabled", async () => {
       const handler = await main({
         footer: false,
