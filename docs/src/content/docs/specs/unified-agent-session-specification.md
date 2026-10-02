@@ -317,6 +317,16 @@ correlation-key exemptions used by display renderers MUST NOT exempt persisted
 artifact fields. Registered masks from agent stdio MUST apply even when a native
 session file is preferred.
 
+Runtime masks MUST be collected before the pre-upload secret redaction pass
+changes stdio or bootstrap removes its `::add-mask::` commands. The pass MUST
+apply these in-memory masks to all artifact sources, including decoded JSON
+strings in native sessions, MCP, firewall, and safe-output evidence, before any
+summary rendering or upload. Raw mask values MUST NOT be persisted in an
+uploaded handoff file. Conclusion consumes sanitized sources and retains its
+stdio mask scan for compatibility with unsanitized legacy inputs. A failed
+runtime-mask redaction MUST remove the affected source rather than leave it
+eligible for an `always()` artifact upload.
+
 The artifact can contain redacted user prompts, reasoning, paths, and full tool
 outputs. It is execution evidence with the workflow artifact's access and
 retention policy, not a default summary or a public log preview. Its size can

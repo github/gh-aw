@@ -107,12 +107,61 @@ function applyAddMaskRedaction(text, maskedValues) {
   return redactMaskedValues(withoutCommands, maskedValues);
 }
 
+/**
+ * Sanitize artifact sources while runtime masks are still available in memory.
+ * Decode JSON strings first so escaping cannot hide a registered value, and
+ * preserve untouched records byte-for-byte.
+ * @param {string} content
+ * @param {string[]} maskedValues
+ * @returns {string}
+ */
+function redactArtifactMaskedValues(content, maskedValues) {
+  if (!content || !maskedValues.length) return content;
+  const redactValue = value => {
+    if (typeof value === "string") return applyAddMaskRedaction(value, maskedValues);
+    if (Array.isArray(value)) return value.map(redactValue);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, nested]) => [redactMaskedValues(key, maskedValues), redactValue(nested)]));
+    return value;
+  };
+  const redactJson = text => {
+    try {
+      const value = JSON.parse(text);
+      const redacted = JSON.stringify(redactValue(value));
+      return redacted === JSON.stringify(value) ? text : text.match(/^\s*/)[0] + redacted + text.match(/\s*$/)[0];
+    } catch {
+      return undefined;
+    }
+  };
+  const json = redactJson(content);
+  if (json !== undefined) return json;
+  return content
+    .split("\n")
+    .filter(line => !isAddMaskCommandLine(line))
+    .map(line => {
+      const jsonLine = redactJson(line);
+      if (jsonLine !== undefined) return jsonLine;
+      // Mixed or malformed logs can still contain recoverable JSON strings.
+      const decoded = line.replace(/"(?:[^"\\]|\\.)*"/g, encoded => {
+        try {
+          const value = JSON.parse(encoded);
+          const redacted = redactValue(value);
+          return redacted === value ? encoded : JSON.stringify(redacted);
+        } catch {
+          return encoded;
+        }
+      });
+      return redactMaskedValues(decoded, maskedValues);
+    })
+    .join("\n");
+}
+
 module.exports = {
   ADD_MASK_COMMAND_RE,
   MASK_REPLACEMENT,
   applyAddMaskRedaction,
   collectAddMaskedValues,
   isAddMaskCommandLine,
+  redactArtifactMaskedValues,
   redactMaskedValues,
   unescapeWorkflowCommandValue,
 };
