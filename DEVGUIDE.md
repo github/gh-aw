@@ -50,6 +50,20 @@ make install
 gh aw --help
 ```
 
+### Self-hosted local telemetry in the devcontainer
+
+The devcontainer starts a local [OpenObserve](https://openobserve.ai/docs/getting-started/) instance for OpenTelemetry traces. Before opening the devcontainer, set its credentials and OTLP authorization header in the environment of the process launching your editor:
+
+```bash
+export ZO_ROOT_USER_EMAIL="you@example.com"
+read -r -s -p "OpenObserve password: " ZO_ROOT_USER_PASSWORD; echo
+export ZO_ROOT_USER_PASSWORD
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s:%s' "$ZO_ROOT_USER_EMAIL" "$ZO_ROOT_USER_PASSWORD" | base64 | tr -d '\n')"
+code .
+```
+
+Keep these values out of source control and shell history. OpenObserve stores its data in a Docker volume and exposes the UI on `http://localhost:5080` (host loopback only); sign in using the credentials above. The development container uses `OTEL_EXPORTER_OTLP_ENDPOINT=http://openobserve:5080/api/default`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_EXPORTER_OTLP_HEADERS` for Basic authentication, and `OTEL_SERVICE_NAME=gh-aw`. OTLP/HTTP clients append `/v1/traces` to the base endpoint. From the host rather than the development container, use `http://localhost:5080/api/default` as the OTLP endpoint.
+
 ## Common Development Tasks
 
 This section provides quick answers to common development scenarios. The repository has 75+ Makefile targets - this guide helps you find the right command quickly.

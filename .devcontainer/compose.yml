@@ -1,0 +1,27 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5080/api/default
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:?Set the OpenObserve Authorization header before starting the devcontainer}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: gh-aw
+    depends_on:
+      - openobserve
+
+  openobserve:
+    image: openobserve/openobserve:v1.0.4
+    environment:
+      ZO_DATA_DIR: /data
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:?Set the OpenObserve root email before starting the devcontainer}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD:?Set the OpenObserve root password before starting the devcontainer}
+    ports:
+      - "127.0.0.1:5080:5080"
+    volumes:
+      - openobserve-data:/data
+
+volumes:
+  openobserve-data:

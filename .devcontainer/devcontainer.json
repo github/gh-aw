@@ -1,8 +1,9 @@
 {
   "name": "Go",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "dockerComposeFile": "compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspaces/gh-aw",
+  "forwardPorts": [5080],
   "customizations": {
     "vscode": {
       "extensions": [
