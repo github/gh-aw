@@ -94,6 +94,7 @@ describe("Safe Outputs MCP Server - add_comment Constraint Enforcement", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     // Clean up temp directory
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -103,6 +104,80 @@ describe("Safe Outputs MCP Server - add_comment Constraint Enforcement", () => {
     delete process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH;
     delete process.env.GH_AW_SAFE_OUTPUTS_OUTPUT_PATH;
     delete process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH;
+  });
+
+  describe("Triggering target validation", () => {
+    it.each(["*", "42"])("should preserve explicit target %s without triggering context", async target => {
+      vi.stubGlobal("context", { eventName: "schedule", payload: {}, repo: { owner: "owner", repo: "repo" } });
+      const handlersModule = await import("./safe_outputs_handlers.cjs");
+      const appendModule = await import("./safe_outputs_append.cjs");
+      const handlers = handlersModule.createHandlers(server, appendModule.createAppendFunction(outputFile), {
+        "add-comment": { target },
+      });
+      registerTool(server, {
+        ...JSON.parse(fs.readFileSync(toolsFile, "utf8"))[0],
+        handler: handlers.addCommentHandler,
+      });
+
+      const response = await handleRequest(server, {
+        jsonrpc: "2.0",
+        id: 21,
+        method: "tools/call",
+        params: { name: "add_comment", arguments: { body: "Workflow results requiring a comment", item_number: 42 } },
+      });
+
+      expect(response.result.isError).not.toBe(true);
+      expect(JSON.parse(response.result.content[0].text).result).toBe("success");
+      expect(JSON.parse(fs.readFileSync(outputFile, "utf8").trim()).item_number).toBe(42);
+    });
+
+    it.each([
+      ["schedule", {}],
+      ["repository_dispatch", {}],
+      ["workflow_dispatch", { inputs: {} }],
+      ["workflow_dispatch", { inputs: { event_name: "issues" } }],
+      ["issues", { issue: {} }],
+      ["pull_request", { pull_request: {} }],
+      ["discussion_comment", { discussion: {} }],
+    ])("should return actionable MCP feedback for an unresolved %s target", async (eventName, payload) => {
+      vi.stubGlobal("context", { eventName, payload, repo: { owner: "owner", repo: "repo" } });
+
+      const response = await handleRequest(server, {
+        jsonrpc: "2.0",
+        id: 19,
+        method: "tools/call",
+        params: { name: "add_comment", arguments: { body: "Workflow results requiring a comment" } },
+      });
+
+      expect(response.result.isError).toBe(true);
+      const feedback = JSON.parse(response.result.content[0].text);
+      expect(feedback.result).toBe("error");
+      expect(feedback.error).toContain("cannot resolve");
+      expect(feedback.error).toContain('safe-outputs.add-comment.target to "*"');
+      expect(feedback.error).toContain("item_number");
+      expect(fs.existsSync(outputFile)).toBe(false);
+    });
+
+    it.each([
+      ["issues", { issue: { number: 42 } }],
+      ["pull_request", { pull_request: { number: 42 } }],
+      ["issue_comment", { issue: { number: 42, pull_request: {} } }],
+      ["discussion", { discussion: { number: 42 } }],
+      ["workflow_dispatch", { inputs: { aw_context: JSON.stringify({ event_type: "issues", item_type: "issue", item_number: 42 }) } }],
+    ])("should accept a resolvable %s triggering target", async (eventName, payload) => {
+      vi.stubGlobal("context", { eventName, payload, repo: { owner: "owner", repo: "repo" } });
+
+      const response = await handleRequest(server, {
+        jsonrpc: "2.0",
+        id: 20,
+        method: "tools/call",
+        params: { name: "add_comment", arguments: { body: "Workflow results requiring a comment" } },
+      });
+
+      expect(response.result.isError).not.toBe(true);
+      expect(JSON.parse(response.result.content[0].text).result).toBe("success");
+      expect(JSON.parse(fs.readFileSync(outputFile, "utf8").trim()).type).toBe("add_comment");
+    });
   });
 
   describe("Valid Comments", () => {

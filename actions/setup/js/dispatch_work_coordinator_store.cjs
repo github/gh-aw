@@ -47,15 +47,19 @@ function isRefConflict(error) {
 
 /**
  * Read the coordinator branch and its canonical transaction log.
- * @param {{githubClient: any, owner: string, repo: string}} options
+ * @param {{githubClient: any, owner: string, repo: string, core?: {info: (message: string) => void}}} options
  */
-async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
+async function readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+  coreApi?.info("Dispatch coordinator: reading queue branch");
   let head;
   try {
     const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${COORDINATOR_BRANCH}` });
     head = response.data.object.sha;
   } catch (error) {
-    if (isMissing(error)) return { sha: null, transactions: [] };
+    if (isMissing(error)) {
+      coreApi?.info("Dispatch coordinator: queue branch does not exist");
+      return { sha: null, transactions: [] };
+    }
     throw new Error("Failed to read dispatch coordinator branch", { cause: error });
   }
 
@@ -65,7 +69,10 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
     const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: head });
     const tree = await githubClient.rest.git.getTree({ owner, repo, tree_sha: commit.data.tree.sha });
     const entry = tree.data.tree.find(item => item.path === COORDINATOR_LOG_PATH);
-    if (!entry) return { sha: head, transactions: [] };
+    if (!entry) {
+      coreApi?.info("Dispatch coordinator: queue branch has no transaction log");
+      return { sha: head, transactions: [] };
+    }
     if (entry.type !== "blob" || typeof entry.sha !== "string") throw new TypeError("Dispatch coordinator log is not a regular file");
 
     const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: entry.sha });
@@ -74,6 +81,7 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
     }
     const contents = Buffer.from(blob.data.content, "base64").toString("utf8");
     const transactions = parseTransactionLog(contents);
+    coreApi?.info(`Dispatch coordinator: read ${transactions.length} queue transactions`);
     return { sha: head, transactions, needsUpgrade: contents !== serializeTransactionLog(transactions) };
   } catch (error) {
     throw new Error("Failed to read dispatch coordinator log", { cause: error });
@@ -82,12 +90,12 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
 
 /**
  * Activation is read-only; trusted write-capable readers publish upgrades.
- * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean}} options
+ * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean, core?: {info: (message: string) => void}}} options
  */
-async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades = true }) {
-  const current = await readCoordinatorLogRaw({ githubClient, owner, repo });
+async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades = true, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+  const current = await readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi });
   if (!current.needsUpgrade || !publishUpgrades) return current;
-  const upgraded = await applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents: [] });
+  const upgraded = await applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents: [], core: coreApi });
   return { sha: upgraded.sha, transactions: upgraded.transactions };
 }
 
@@ -100,19 +108,32 @@ async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades =
  *   repo: string,
  *   intents: CoordinatorTransaction[],
  *   maxRetries?: number,
- *   sleepFn?: (delay: number) => Promise<void>
+ *   sleepFn?: (delay: number) => Promise<void>,
+ *   core?: {info: (message: string) => void}
  * }} options
  */
-async function applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents, maxRetries = DEFAULT_MAX_RETRIES, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)) }) {
+async function applyAndPublishCoordinatorTransactions({
+  githubClient,
+  owner,
+  repo,
+  intents,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
+  core: coreApi = typeof core === "undefined" ? undefined : core,
+}) {
   if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 10) {
     throw new RangeError("Dispatch coordinator maxRetries must be an integer between 0 and 10");
   }
 
   let lastConflict;
+  coreApi?.info(`Dispatch coordinator: publishing ${intents.length} queue intents`);
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const current = await readCoordinatorLogRaw({ githubClient, owner, repo });
+    coreApi?.info(`Dispatch coordinator: queue publication attempt ${attempt + 1} of ${maxRetries + 1}`);
+    const current = await readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi });
     const applied = applyTransactions(current.transactions, intents);
+    coreApi?.info(`Dispatch coordinator: ${applied.transactions.length - current.transactions.length} new transactions, ${applied.rejected.length} rejected intents`);
     if (!current.needsUpgrade && applied.transactions.length === current.transactions.length) {
+      coreApi?.info("Dispatch coordinator: queue unchanged; publication skipped");
       return { ...applied, sha: current.sha, persisted: false };
     }
 
@@ -154,10 +175,12 @@ async function applyAndPublishCoordinatorTransactions({ githubClient, owner, rep
           sha: commit.data.sha,
         });
       }
+      coreApi?.info(`Dispatch coordinator: queue published ${applied.transactions.length} transactions`);
       return { ...applied, transactions: parseTransactionLog(contents), sha: commit.data.sha, persisted: true };
     } catch (error) {
       if (!isRefConflict(error)) throw new Error("Failed to publish dispatch coordinator log", { cause: error });
       lastConflict = error;
+      coreApi?.info(`Dispatch coordinator: queue ref conflict; ${attempt < maxRetries ? "retrying" : "retries exhausted"}`);
       if (attempt < maxRetries) await sleepFn(Math.min(1000, 50 * 2 ** attempt));
     }
   }

@@ -41,7 +41,7 @@ describe("write dispatch coordinator activation snapshot", () => {
       transactionLog: "",
       worker: null,
     });
-    expect(messages).toEqual(["Captured dispatch coordinator snapshot (0 transactions)"]);
+    expect(messages).toEqual(["Dispatch coordinator: reading queue branch", "Dispatch coordinator: queue branch does not exist", "Dispatch coordinator: worker assignment absent", "Captured dispatch coordinator snapshot (0 transactions)"]);
     expect(fs.statSync(snapshotPath).mode & 0o777).toBe(0o444);
   });
 

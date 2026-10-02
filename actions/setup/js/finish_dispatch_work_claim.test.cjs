@@ -96,14 +96,17 @@ describe("dispatch work claim reconciliation", () => {
 
   it("allows safe outputs for workflows without a worker assignment", async () => {
     const fake = setup();
+    const core = { info: vi.fn() };
     const result = await reconcileWorkerClaim({
       worker: null,
+      core,
       readCoordinatorLog: fake.readCoordinatorLog,
       applyAndPublish: fake.applyAndPublish,
       context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
     });
 
     expect(result).toEqual({ authorized: true, status: "unassigned" });
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining("no inbound worker claim"));
     expect(fake.transactions).toEqual(initialTransactions);
   });
 
