@@ -1286,7 +1286,7 @@ async function main() {
     const configuredModel = process.env.COPILOT_MODEL || "";
     const modelsJson = loadModelsJson();
 
-    const multiProvider = resolveMultiProviderFromReflect({ model: configuredModel, reflectData: awfReflectData, modelsJson, logger: log });
+    const multiProvider = resolveMultiProviderFromReflect({ model: configuredModel, wireApi: process.env.COPILOT_PROVIDER_WIRE_API, reflectData: awfReflectData, modelsJson, logger: log });
     if (!multiProvider) {
       log("copilot-sdk driver mode: BYOK provider is required but could not be resolved from awf-reflect data — aborting");
       process.exit(1);

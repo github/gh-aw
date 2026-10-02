@@ -917,9 +917,12 @@ function resolveOpenAICompatibleEndpointFromReflect(options) {
  *
  * The primary model is the first model that matches `options.model` (if set),
  * otherwise the first model across all providers.
+ * A valid `options.wireApi` overrides inference for the primary provider only,
+ * except for Anthropic providers, which do not use an OpenAI wire API.
  *
  * @param {{
  *   model?: string,
+ *   wireApi?: string,
  *   reflectData: ReflectData | null | undefined,
  *   modelsJson?: object | null,
  *   logger?: (msg: string) => void,
@@ -1026,6 +1029,14 @@ function resolveMultiProviderFromReflect(options) {
   if (!primaryModel) {
     logger("sdk-mode(multi): no models found in awf-reflect endpoints; cannot build multi-provider config");
     return null;
+  }
+
+  const primaryProviderName = models.find(m => m.id === primaryModel)?.provider;
+  const primaryProvider = providers.find(p => p.name === primaryProviderName);
+  const wireApi = options?.wireApi;
+  if (primaryProvider && primaryProvider.type !== "anthropic" && (wireApi === "responses" || wireApi === "completions")) {
+    primaryProvider.wireApi = wireApi;
+    logger(`sdk-mode(multi): primary provider="${primaryProvider.name}" wireApi="${wireApi}" selected from configured wire API`);
   }
 
   logger(`sdk-mode(multi): resolved ${providers.length} providers, ${models.length} models (primary model: ${primaryModel})`);
