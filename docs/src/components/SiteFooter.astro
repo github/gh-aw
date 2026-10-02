@@ -1,0 +1,229 @@
+---
+/**
+ * Site footer: brand + four link columns, and a bottom bar with credits and
+ * legal links. Rendered once per page by PageFrame.astro, after the main frame,
+ * so it spans the full viewport below the sidebar and TOC on every page type.
+ * Its inner content sits on the same 72rem grid as the landing sections.
+ */
+import darkLogoSvg from '../assets/agentic-workflow.svg?raw';
+import lightLogoSvg from '../assets/agentic-workflow-light.svg?raw';
+import { getFooterGroups } from './site-nav';
+
+const base = import.meta.env.BASE_URL;
+const groups = getFooterGroups(base);
+
+const toDataUrl = (svg: string) => `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+const darkLogoUrl = toDataUrl(darkLogoSvg);
+const lightLogoUrl = toDataUrl(lightLogoSvg);
+
+const legalLinks = [
+	{ href: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service', label: 'Terms' },
+	{ href: 'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', label: 'Privacy' },
+	{ href: 'https://github.com/security', label: 'Security' },
+];
+---
+
+
+<footer class="site-footer not-content print:hidden">
+	<div class="site-footer-inner">
+		<div class="site-footer-top">
+			<div class="site-footer-brand">
+				<a href={base} class="site-footer-title">
+					<img src={darkLogoUrl} alt="" width="18" height="18" class="site-footer-logo site-footer-logo--dark" />
+					<img src={lightLogoUrl} alt="" width="18" height="18" class="site-footer-logo site-footer-logo--light" />
+					<span>GitHub Agentic Workflows</span>
+				</a>
+				<p>Intelligent GitHub repository automation</p>
+			</div>
+
+			<div class="site-footer-groups">
+				{
+					groups.map((group) => (
+						<nav aria-label={group.label}>
+							<h2>{group.label}</h2>
+							<ul>
+								{group.links.map((link) => (
+									<li>
+										<a href={link.href}>{link.label}</a>
+									</li>
+								))}
+							</ul>
+						</nav>
+					))
+				}
+			</div>
+		</div>
+
+		<div class="site-footer-bottom">
+			<p>
+				Made by <a href="https://githubnext.com/">GitHub Next</a> &amp;{' '}
+				<a href="https://www.microsoft.com/en-us/research/">Microsoft Research</a>
+			</p>
+			<nav aria-label="Legal">
+				<ul>
+					{
+						legalLinks.map((link) => (
+							<li>
+								<a href={link.href}>{link.label}</a>
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+		</div>
+	</div>
+</footer>
+
+<style>
+	/* Full-bleed band; content on the same 72rem grid as the landing sections */
+	.site-footer {
+		container-type: inline-size;
+		padding-block: 4rem 2.5rem;
+		border-top: 1px solid var(--aw-color-divider);
+		background: var(--aw-color-bg);
+		font-size: var(--aw-step--1);
+		line-height: 1.5;
+		color: var(--aw-color-text-secondary);
+	}
+
+	.site-footer-inner {
+		max-width: 72rem;
+		margin-inline: auto;
+		padding-inline: clamp(1rem, 4vw, 2rem);
+	}
+
+	.site-footer a {
+		color: var(--aw-color-text-secondary);
+		text-decoration: none;
+		transition: color 0.15s ease;
+	}
+
+	.site-footer a:hover {
+		color: var(--aw-color-text-strong);
+	}
+
+	.site-footer ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.site-footer li,
+	.site-footer p {
+		margin: 0;
+	}
+
+	/* Top: brand stacked over the columns; side by side once there's room */
+	.site-footer-top {
+		display: grid;
+		gap: 2.5rem;
+	}
+
+	.site-footer-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: var(--aw-step-0);
+		font-weight: 600;
+		letter-spacing: var(--aw-tracking-snug);
+	}
+
+	.site-footer .site-footer-title {
+		color: var(--aw-color-text-strong);
+	}
+
+	.site-footer-logo {
+		display: block;
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+	}
+
+	.site-footer-logo--light {
+		display: none;
+	}
+
+	:global(:root[data-theme='light']) .site-footer-logo--light {
+		display: block;
+	}
+
+	:global(:root[data-theme='light']) .site-footer-logo--dark {
+		display: none;
+	}
+
+	.site-footer-brand p {
+		margin-top: 0.75rem;
+		max-width: 34ch;
+		color: var(--aw-color-text-muted);
+	}
+
+	.site-footer-groups {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 2rem 1.5rem;
+	}
+
+	.site-footer-groups h2 {
+		margin: 0 0 0.875rem;
+		font-size: var(--aw-step--1);
+		font-weight: 500;
+		line-height: 1.5;
+		letter-spacing: 0;
+		color: var(--aw-color-text-muted);
+	}
+
+	.site-footer-groups ul {
+		display: grid;
+		gap: 0.625rem;
+	}
+
+	/* Bottom bar */
+	.site-footer-bottom {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 2rem;
+		margin-top: 3rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--aw-color-divider);
+		color: var(--aw-color-text-muted);
+	}
+
+	.site-footer-bottom ul {
+		display: flex;
+		gap: 1.25rem;
+	}
+
+	@container (min-width: 34rem) {
+		.site-footer-groups {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+	}
+
+	@container (min-width: 60rem) {
+		.site-footer-top {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+			gap: 3rem;
+		}
+	}
+
+	/* Touch targets on phones */
+	@media (max-width: 50rem) {
+		.site-footer-groups ul {
+			gap: 0.125rem;
+		}
+
+		.site-footer-groups a,
+		.site-footer-bottom a {
+			display: inline-block;
+			padding-block: 0.375rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.site-footer a {
+			transition: none;
+		}
+	}
+</style>

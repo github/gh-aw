@@ -273,6 +273,7 @@ export default defineConfig({
         Sidebar: "./src/components/Sidebar.astro",
         ThemeSelect: "./src/components/ThemeToggle.astro",
         Footer: "./src/components/CustomFooter.astro",
+        PageFrame: "./src/components/PageFrame.astro",
         PageTitle: "./src/components/PageTitle.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
