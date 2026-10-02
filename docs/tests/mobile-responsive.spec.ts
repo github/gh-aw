@@ -387,6 +387,8 @@ test.describe('Mobile and Responsive Layout', () => {
     await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     await expect(sheet).toBeVisible();
     await expect(page.locator('.site-footer')).toHaveAttribute('inert', '');
+    // The skip link sits before the header, so Shift+Tab would reach it unless it is inert too.
+    await expect(page.locator('.skip-link')).toHaveAttribute('inert', '');
 
     const navLinks = sheet.locator('.mobile-nav a');
     await expect(navLinks).toHaveCount(3);
@@ -403,6 +405,7 @@ test.describe('Mobile and Responsive Layout', () => {
     await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
     await expect(sheet).toBeHidden();
     await expect(page.locator('.site-footer')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('.skip-link')).not.toHaveAttribute('inert', '');
 
     // Esc closes it too and returns focus to the button.
     await menuButton.click();

@@ -60,7 +60,7 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 		align-items: center;
 		justify-content: center;
 		height: 2.75rem;
-		border-radius: 999px;
+		border-radius: var(--aw-radius-pill);
 		background: var(--aw-color-button-bg);
 		color: var(--aw-color-button-text);
 		font-size: var(--aw-step-0);
@@ -71,10 +71,5 @@ const githubIcon = octicons['mark-github'].toSVG({ width: 18, height: 18, 'aria-
 	.mobile-menu-cta:hover {
 		background: var(--aw-color-button-bg-hover);
 		color: var(--aw-color-button-text);
-	}
-
-	.mobile-menu-footer a:focus-visible {
-		outline: 2px solid var(--aw-color-accent);
-		outline-offset: 2px;
 	}
 </style>

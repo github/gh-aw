@@ -1,18 +1,7 @@
-/* Docs components: prev/next pagination and aside callouts.
- *
- * Loads after custom.css (see customCss in astro.config.mjs), so these rules
- * override the older pagination and aside styles there.
+/* Docs components: prev/next pagination, aside callouts, heading links and
+ * the code-block copy button. Loads last in customCss (astro.config.mjs).
+ * Icon masks (--aw-icon-*) live in tokens.css.
  */
-
-/* Octicons (16px) as data URIs, drawn with mask + currentColor. */
-:root {
-  --aw-icon-light-bulb: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z'/%3E%3C/svg%3E");
-  --aw-icon-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E");
-  --aw-icon-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z'/%3E%3C/svg%3E");
-  --aw-icon-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E");
-  --aw-icon-arrow-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z'/%3E%3C/svg%3E");
-  --aw-icon-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z'/%3E%3C/svg%3E");
-}
 
 /* ==========================================================================
    Pagination: no boxes, two plain links under a hairline.
@@ -25,28 +14,20 @@
   border-top: 1px solid var(--aw-color-divider);
 }
 
+/* Starlight's link is a bordered card; strip it back to text */
 .pagination-links a {
   gap: 0;
   padding: 0;
   border: 0;
-  border-radius: 0;
-  background: transparent;
+  border-radius: var(--aw-radius-xs); /* rounds the focus ring */
   box-shadow: none;
   color: var(--aw-color-text-muted);
   font-size: var(--aw-step--1);
-  text-decoration: none;
-  transition: color 0.15s ease;
+  transition: color var(--aw-duration-fast) ease;
 }
 
 .pagination-links a:hover {
-  background: transparent;
   color: var(--aw-color-text-secondary);
-}
-
-.pagination-links a:focus-visible {
-  outline: 2px solid var(--aw-color-accent);
-  outline-offset: 4px;
-  border-radius: 4px;
 }
 
 .pagination-links [rel='next'] {
@@ -86,7 +67,7 @@
   background-color: currentColor;
   -webkit-mask: var(--aw-icon-arrow-left) center / contain no-repeat;
   mask: var(--aw-icon-arrow-left) center / contain no-repeat;
-  transition: transform 0.15s ease;
+  transition: transform var(--aw-duration-fast) ease;
 }
 
 .pagination-links [rel='prev'] > span::before {
@@ -117,7 +98,7 @@
   letter-spacing: var(--aw-tracking-snug);
   line-height: var(--aw-leading-snug);
   color: var(--aw-color-text);
-  transition: color 0.15s ease;
+  transition: color var(--aw-duration-fast) ease;
 }
 
 .pagination-links a:hover .link-title {
@@ -151,154 +132,115 @@
 
 /* ==========================================================================
    Asides: a faint tint of the type colour, a hairline in the same hue,
-   and an icon badge beside the type label.
-
-   Every parameter is a custom property, so it can be tuned per type and
-   per theme. Unset properties fall back to the
-   production defaults written inline below.
-
-   Per type (tip | note | caution | danger):
-     --aw-aside-{type}-color        base colour       (default: the status token)
-     --aw-aside-{type}-bg           background tint % (default: --aw-aside-bg-pct)
-     --aw-aside-{type}-border       border tint %     (default: --aw-aside-border-pct)
-     --aw-aside-{type}-ring         badge ring %      (default: 28%)
-     --aw-aside-{type}-label        label colour      (default: base colour)
-     --aw-aside-{type}-icon-color   icon colour       (default: base colour)
-   Global:
-     --aw-aside-radius, --aw-aside-pad-y, --aw-aside-pad-x, --aw-aside-border-width,
-     --aw-aside-shadow, --aw-aside-badge-size, --aw-aside-icon-size,
-     --aw-aside-label-size, --aw-aside-label-weight, --aw-aside-gap-above
+   and an icon badge beside the type label. Each type sets four variables:
+   --aw-aside-color (status colour), --aw-aside-tint (background mix),
+   --aw-aside-line (border mix) and --aw-aside-ring (badge ring mix).
    ========================================================================== */
-
-/* Per-type tint, border and badge-ring strength, tuned in the aside jig. */
-:root,
-.aw-tone-dark {
-  --aw-aside-bg-pct: 15%;
-  --aw-aside-border-pct: 10%;
-  --aw-aside-tip-ring: 23%;
-  --aw-aside-note-ring: 16%;
-  --aw-aside-caution-bg: 18%;
-  --aw-aside-caution-ring: 21%;
-  --aw-aside-danger-ring: 20%;
-  --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 3px 10px -2px rgb(0 0 0 / 0.072);
-}
-
-:root[data-theme='light'] {
-  --aw-aside-tip-bg: 5%;
-  --aw-aside-tip-border: 15%;
-  --aw-aside-tip-ring: 20%;
-  --aw-aside-note-bg: 5%;
-  --aw-aside-note-border: 12%;
-  --aw-aside-note-ring: 16%;
-  --aw-aside-caution-bg: 7.5%;
-  --aw-aside-caution-border: 15%;
-  --aw-aside-caution-ring: 15%;
-  --aw-aside-danger-bg: 4%;
-  --aw-aside-danger-border: 11%;
-  --aw-aside-danger-ring: 15%;
-  --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.01), 0 3px 10px -2px rgb(0 0 0 / 0.017);
-}
-
-/* Shape and spacing (tuned in the aside jig) */
-:root {
-  --aw-aside-radius: 12px;
-  --aw-aside-pad-y: 1.25rem;
-  --aw-aside-pad-x: 1.25rem;
-  --aw-aside-badge-size: 24px;
-  --aw-aside-icon-size: 12px;
-  --aw-aside-label-size: var(--aw-text-ui);
-  --aw-aside-label-weight: 600;
-  --aw-aside-gap-above: 1.25rem;
-}
 
 .sl-markdown-content .starlight-aside {
   position: relative;
-  padding: var(--aw-aside-pad-y, 1.125rem) var(--aw-aside-pad-x, 1.25rem);
-  border: var(--aw-aside-border-width, 1px) solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), transparent);
-  border-radius: var(--aw-aside-radius, 8px);
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), transparent);
+  border-radius: var(--aw-radius-lg);
   background: color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-tint), var(--aw-color-bg));
-  box-shadow: var(--aw-aside-shadow, var(--aw-shadow-soft));
+  box-shadow: var(--aw-shadow-soft);
 }
 
 /* More space above an aside than between ordinary blocks. */
 .sl-markdown-content .starlight-aside:not(:first-child) {
-  margin-top: var(--aw-aside-gap-above, 2rem);
+  margin-top: 1.25rem;
 }
 
+/* Dark values; light overrides follow */
 .sl-markdown-content .starlight-aside--note {
-  --aw-aside-color: var(--aw-aside-note-color, var(--aw-color-callout-note));
-  --aw-aside-tint: var(--aw-aside-note-bg, var(--aw-aside-bg-pct));
-  --aw-aside-line: var(--aw-aside-note-border, var(--aw-aside-border-pct));
-  --aw-aside-ring: var(--aw-aside-note-ring, 28%);
-  --aw-aside-label: var(--aw-aside-note-label, var(--aw-aside-color));
-  --aw-aside-icon-color: var(--aw-aside-note-icon-color, var(--aw-aside-color));
+  --aw-aside-color: var(--aw-color-callout-note);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 16%;
   --aw-aside-icon: var(--aw-icon-info);
 }
 
 .sl-markdown-content .starlight-aside--tip {
-  --aw-aside-color: var(--aw-aside-tip-color, var(--aw-color-callout-tip));
-  --aw-aside-tint: var(--aw-aside-tip-bg, var(--aw-aside-bg-pct));
-  --aw-aside-line: var(--aw-aside-tip-border, var(--aw-aside-border-pct));
-  --aw-aside-ring: var(--aw-aside-tip-ring, 28%);
-  --aw-aside-label: var(--aw-aside-tip-label, var(--aw-aside-color));
-  --aw-aside-icon-color: var(--aw-aside-tip-icon-color, var(--aw-aside-color));
+  --aw-aside-color: var(--aw-color-callout-tip);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 23%;
   --aw-aside-icon: var(--aw-icon-light-bulb);
 }
 
 .sl-markdown-content .starlight-aside--caution {
-  --aw-aside-color: var(--aw-aside-caution-color, var(--aw-color-callout-caution));
-  --aw-aside-tint: var(--aw-aside-caution-bg, var(--aw-aside-bg-pct));
-  --aw-aside-line: var(--aw-aside-caution-border, var(--aw-aside-border-pct));
-  --aw-aside-ring: var(--aw-aside-caution-ring, 28%);
-  --aw-aside-label: var(--aw-aside-caution-label, var(--aw-aside-color));
-  --aw-aside-icon-color: var(--aw-aside-caution-icon-color, var(--aw-aside-color));
+  --aw-aside-color: var(--aw-color-callout-caution);
+  --aw-aside-tint: 18%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 21%;
   --aw-aside-icon: var(--aw-icon-alert);
 }
 
 .sl-markdown-content .starlight-aside--danger {
-  --aw-aside-color: var(--aw-aside-danger-color, var(--aw-color-callout-danger));
-  --aw-aside-tint: var(--aw-aside-danger-bg, var(--aw-aside-bg-pct));
-  --aw-aside-line: var(--aw-aside-danger-border, var(--aw-aside-border-pct));
-  --aw-aside-ring: var(--aw-aside-danger-ring, 28%);
-  --aw-aside-label: var(--aw-aside-danger-label, var(--aw-aside-color));
-  --aw-aside-icon-color: var(--aw-aside-danger-icon-color, var(--aw-aside-color));
+  --aw-aside-color: var(--aw-color-callout-danger);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 20%;
   --aw-aside-icon: var(--aw-icon-stop);
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--note {
+  --aw-aside-tint: 5%;
+  --aw-aside-line: 12%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--tip {
+  --aw-aside-tint: 5%;
+  --aw-aside-line: 15%;
+  --aw-aside-ring: 20%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--caution {
+  --aw-aside-tint: 7.5%;
+  --aw-aside-line: 15%;
+  --aw-aside-ring: 15%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--danger {
+  --aw-aside-tint: 4%;
+  --aw-aside-line: 11%;
+  --aw-aside-ring: 15%;
 }
 
 .sl-markdown-content .starlight-aside .starlight-aside__icon {
   display: none;
 }
 
-:root .sl-markdown-content .starlight-aside .starlight-aside__title {
+.sl-markdown-content .starlight-aside .starlight-aside__title {
   position: relative;
   gap: 0.625rem;
-  font-size: var(--aw-aside-label-size, var(--aw-text-ui));
-  font-weight: var(--aw-aside-label-weight, 580);
+  font-size: var(--aw-text-ui);
+  font-weight: 600;
   line-height: var(--aw-leading-snug);
-  color: var(--aw-aside-label);
+  color: var(--aw-aside-color);
 }
 
 /* Badge: a surface-coloured circle with a faint ring in the type colour… */
 .sl-markdown-content .starlight-aside__title::before {
   content: '';
   flex-shrink: 0;
-  width: var(--aw-aside-badge-size, 26px);
-  height: var(--aw-aside-badge-size, 26px);
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--aw-color-surface);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-ring), transparent);
 }
 
-/* …with the icon centred on top. */
+/* …with the 12px icon centred on top. */
 .sl-markdown-content .starlight-aside__title::after {
   content: '';
   position: absolute;
   top: 50%;
-  left: calc((var(--aw-aside-badge-size, 26px) - var(--aw-aside-icon-size, 14px)) / 2);
-  width: var(--aw-aside-icon-size, 14px);
-  height: var(--aw-aside-icon-size, 14px);
+  left: 6px;
+  width: 12px;
+  height: 12px;
   transform: translateY(-50%);
-  background-color: var(--aw-aside-icon-color);
+  background-color: var(--aw-aside-color);
   -webkit-mask: var(--aw-aside-icon) center / contain no-repeat;
   mask: var(--aw-aside-icon) center / contain no-repeat;
 }
@@ -310,4 +252,264 @@
 
 .sl-markdown-content .starlight-aside .starlight-aside__content a {
   color: var(--aw-color-link);
+}
+
+/* ==========================================================================
+   Heading links (markup: Starlight's rehype-heading-links; script: heading-links.ts)
+   ========================================================================== */
+
+/* Starlight wraps each heading as .sl-heading-wrapper > h2 + a.sl-anchor-link.
+   Its chain SVG is hidden; the link draws Primer's `link` octicon with a mask and,
+   once heading-links.ts has run, copies the section URL on click and briefly shows
+   `check` plus a small "Copied" tip. Without JS it stays a plain #anchor link.
+   With a mouse on wide screens the button sits in the left gutter and fades in on
+   hover; elsewhere it follows the heading text, always faintly visible on touch. */
+.sl-markdown-content .sl-heading-wrapper {
+  --aw-anchor-box: 1.5rem;
+  --aw-anchor-lh: var(--aw-leading-snug);
+  /* Starlight's end-of-line reservation, resized for the button box */
+  --sl-anchor-icon-size: var(--aw-anchor-box);
+  --sl-anchor-icon-gap: 0.25rem;
+  position: relative;
+  line-height: var(--aw-anchor-lh);
+}
+
+/* Size the wrapper like its heading, so the line box (and the button's em-based
+   centring) follows the heading rather than Starlight's larger --sl-text-hN strut.
+   Starlight spaces wrappers at 1.5em of its own sizes; keep that spacing. */
+.sl-markdown-content .sl-heading-wrapper.level-h1 { font-size: var(--aw-step-4); --aw-anchor-lh: var(--aw-leading-tight); --aw-anchor-space: var(--sl-text-h1); }
+.sl-markdown-content .sl-heading-wrapper.level-h2 { font-size: var(--aw-step-2); --aw-anchor-space: var(--sl-text-h2); }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { font-size: var(--aw-step-1); --aw-anchor-space: var(--sl-text-h3); }
+.sl-markdown-content .sl-heading-wrapper:is(.level-h4, .level-h5, .level-h6) { font-size: var(--aw-step-0); --aw-anchor-space: var(--sl-text-h4); }
+
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper {
+  margin-top: calc(1.5 * var(--aw-anchor-space));
+}
+
+.sl-markdown-content .sl-anchor-icon {
+  display: none;
+}
+
+.sl-markdown-content .sl-anchor-link {
+  align-items: center;
+  justify-content: center;
+  width: var(--aw-anchor-box);
+  height: var(--aw-anchor-box);
+  /* Centre the box on the heading's first line */
+  vertical-align: top;
+  transform: translateY(calc((var(--aw-anchor-lh) * 1em - var(--aw-anchor-box)) / 2));
+  border-radius: var(--aw-radius-sm);
+  color: var(--aw-color-text-muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
+}
+
+.sl-markdown-content .sl-anchor-link::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-link) center / contain no-repeat;
+  mask: var(--aw-icon-link) center / contain no-repeat;
+}
+
+.sl-markdown-content .sl-heading-wrapper:hover .sl-anchor-link,
+.sl-markdown-content .sl-anchor-link:focus-visible,
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  opacity: 1;
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-bg-subtle);
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied]::before {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+/* "Copied" tip: injected by heading-links.ts here, and shared with the code-block
+   copy button's feedback label (see "Code block copy button") */
+.sl-markdown-content .aw-anchor-tip,
+.expressive-code .frame .copy .feedback {
+  padding: 0.1875rem 0.4375rem;
+  border: 1px solid var(--aw-color-divider);
+  border-radius: var(--aw-radius-sm);
+  background-color: var(--aw-color-surface);
+  font-family: var(--aw-font-sans);
+  font-size: var(--aw-step--1);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--aw-color-text);
+  pointer-events: none;
+}
+
+.sl-markdown-content .aw-anchor-tip {
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, 0.125rem);
+  transition: opacity var(--aw-duration-fast) ease, transform var(--aw-duration-fast) ease;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Touch: no hover, so keep the button faintly visible after the text */
+@media (hover: none) {
+  .sl-markdown-content .sl-anchor-link {
+    opacity: 0.45;
+  }
+}
+
+/* Mouse on wide screens: move the button into the left gutter */
+@media (hover: hover) and (min-width: 50rem) {
+  .sl-markdown-content .sl-heading-wrapper > :first-child:not([hidden]) {
+    padding-inline-end: 0;
+  }
+
+  .sl-markdown-content .sl-anchor-link {
+    position: absolute;
+    top: 0;
+    inset-inline-start: calc(-1 * (var(--aw-anchor-box) + 0.375rem));
+    margin: 0;
+  }
+
+  /* Bridge the gap to the heading so the button stays visible on the way over */
+  .sl-markdown-content .sl-anchor-link::after {
+    inset: -0.25rem -0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-markdown-content .sl-anchor-link,
+  .sl-markdown-content .aw-anchor-tip {
+    transition: none;
+  }
+
+  .sl-markdown-content .aw-anchor-tip,
+  .sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ==========================================================================
+   Code block copy button
+   ========================================================================== */
+
+/* Expressive Code's frames plugin; markup:
+   .frame > .copy > [aria-live] > .feedback + button > div). Same language as the
+   heading links: a quiet octicon button, `copy` morphing to `check`, and the shared
+   "Copied" tip beside it. EC's separate hover layer (button > div) and border layer
+   (::before) are dropped so every state shares one rounded box. EC's script adds
+   .feedback.show for 1.5s; the label text comes from src/content/i18n/en.json. */
+.expressive-code .frame .copy {
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.expressive-code .frame .copy button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: var(--aw-radius-sm);
+  background: transparent;
+  color: var(--aw-color-text-muted);
+  transition: opacity var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
+}
+
+.expressive-code .frame .copy button div,
+.expressive-code .frame .copy button::before {
+  display: none;
+}
+
+.expressive-code .frame .copy button::after {
+  inset: 50% auto auto 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-copy) center / contain no-repeat;
+  mask: var(--aw-icon-copy) center / contain no-repeat;
+}
+
+/* Touch devices: keep a 44px hit area (WCAG 2.5.5) around the compact button */
+@media (pointer: coarse) {
+  .expressive-code .frame .copy button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.expressive-code .frame .copy button:hover,
+.expressive-code .frame .copy button:focus-visible {
+  opacity: 1;
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-divider);
+}
+
+/* Copied: check icon in the neutral text colour */
+.expressive-code .frame .copy:has(.feedback.show) button {
+  opacity: 1;
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.expressive-code .frame .copy:has(.feedback.show) button::after {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+.expressive-code .frame .copy .feedback {
+  align-self: center;
+  margin: 0;
+  transform: translateX(0.125rem);
+  transition: opacity var(--aw-duration-fast) ease, transform var(--aw-duration-fast) ease;
+}
+
+.expressive-code .frame .copy .feedback.show {
+  transform: none;
+}
+
+.expressive-code .frame .copy .feedback::after {
+  content: none;
+}
+
+/* Touch: no hover, so keep the button visible */
+@media (hover: none) {
+  .expressive-code .frame .copy button {
+    opacity: 0.75;
+  }
+}
+
+/* Mouse: hidden until the block is hovered or focused (EC reveals it at 0.75) */
+@media (hover: hover) {
+  .expressive-code .frame:hover .copy button:not(:hover),
+  .expressive-code .frame:focus-within :focus-visible ~ .copy button:not(:hover) {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expressive-code .frame .copy button,
+  .expressive-code .frame .copy .feedback {
+    transition: none;
+  }
+
+  .expressive-code .frame .copy .feedback {
+    transform: none;
+  }
 }

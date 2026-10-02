@@ -40,7 +40,7 @@ const { hasSidebar } = Astro.locals.starlightRoute;
 						/** Trap keyboard focus inside the header and menu when the menu is expanded. */
 						trapFocus(shouldTrap: boolean) {
 							document
-								.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link, .site-footer')
+								.querySelectorAll<HTMLElement>('.main-frame, .skip-link, .site-footer')
 								.forEach((el) => {
 									el.toggleAttribute('inert', shouldTrap);
 								});
@@ -147,14 +147,6 @@ const { hasSidebar } = Astro.locals.starlightRoute;
 	   was the last thing inside <main> */
 	:global(body:has(.aw-hero) main) {
 		padding-bottom: 0;
-	}
-
-	/* custom.css sets overflow-x: hidden on these, which makes them scroll
-	   containers and stops the sticky sidebar and TOC from sticking. clip
-	   prevents horizontal overflow the same way without that side effect. */
-	.page,
-	.main-frame {
-		overflow-x: clip;
 	}
 
 	@media (min-width: 50rem) {

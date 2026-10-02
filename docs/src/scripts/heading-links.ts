@@ -5,7 +5,7 @@
  * Without JS that link is a plain `#id` anchor. This script turns it into a
  * "copy link to section" button: clicking copies the full URL with the hash,
  * updates the address bar without jumping, and briefly shows a "Copied" state
- * (styles in custom.css, "Heading links").
+ * (styles in docs-components.css, "Heading links").
  */
 
 const COPIED_MS = 1500;
