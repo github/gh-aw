@@ -110,7 +110,7 @@ const legalLinks = [
 	.site-footer a {
 		color: var(--aw-color-text-secondary);
 		text-decoration: none;
-		transition: color 0.15s ease;
+		transition: color var(--aw-duration-fast) ease;
 	}
 
 	.site-footer a:hover {
@@ -224,7 +224,7 @@ const legalLinks = [
 	}
 
 	/* Touch targets on phones */
-	@media (max-width: 50rem) {
+	@media (max-width: 49.99rem) {
 		.site-footer-groups ul {
 			gap: 0.125rem;
 		}

@@ -16,6 +16,14 @@ export function getNavLinks(base: string) {
 	] satisfies { href: string; label: string; section: SiteSection }[];
 }
 
+export type NavLink = ReturnType<typeof getNavLinks>[number];
+
+/** aria-current for a primary nav link: 'page' on the link's own page, 'location' elsewhere in its section. */
+export function getAriaCurrent(link: NavLink, section: SiteSection, url: URL): 'page' | 'location' | undefined {
+	if (link.section !== section) return undefined;
+	return new URL(link.href, url).pathname === url.pathname ? 'page' : 'location';
+}
+
 export type FooterLink = { href: string; label: string };
 export type FooterGroup = { label: string; links: FooterLink[] };
 

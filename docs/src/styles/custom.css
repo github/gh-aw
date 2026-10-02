@@ -1,4 +1,7 @@
-/* Site styles. Tokens (colours, fonts, Starlight mapping) live in tokens.css. */
+/* Base and docs reading styles: page basics, markdown typography, code, tables,
+ * links, blog metadata and media. Tokens live in tokens.css, site chrome (frame,
+ * header, sidebar, TOC, mobile menu) in chrome.css, and docs components
+ * (pager, asides, heading links, code copy) in docs-components.css. */
 
 :root {
   /* Prevent Android Chrome from automatically inflating text sizes when the user
@@ -18,109 +21,6 @@
 body {
   background: var(--aw-color-bg);
   font-family: var(--sl-font);
-}
-
-/* Landing page only: lift Starlight's splash width/padding so landing
-   sections control their own 72rem container (see components/landing). */
-body:has(.aw-hero) .content-panel {
-  padding: 0;
-}
-
-body:has(.aw-hero) .sl-container {
-  max-width: none;
-}
-
-/* Let the page background show through Starlight's frames on desktop */
-@media (min-width: 50rem) {
-  .page,
-  .main-frame,
-  main,
-  .content-panel,
-  #starlight__sidebar,
-  .sidebar,
-  .sidebar-content,
-  .sidebar-pane {
-    background: transparent;
-  }
-}
-
-/* Desktop sidebar: same background and hairline as the header, so the
-   top-left corner joins cleanly */
-@media (min-width: 50rem) {
-  #starlight__sidebar {
-    background: var(--aw-color-bg);
-    border-inline-end: 1px solid var(--aw-color-divider);
-  }
-}
-
-/* === Docs page layout (components: Starlight's TwoColumnContent, ContentPanel) ===
-   Starlight puts the title in its own .content-panel with a hairline under it,
-   and centres the content column in the space left by the sidebars. Here the
-   title and body read as one unit, and the column sits left-aligned a fixed
-   gutter from the sidebar, with a narrower "On this page" column on the right.
-   The landing page (splash, .aw-hero) keeps its own rules above. */
-:root {
-  --aw-toc-width: 15rem;
-  --aw-content-gutter: 3.5rem;
-}
-
-.content-panel + .content-panel {
-  border-top: 0;
-}
-
-/* Title panel: no bottom padding; the body follows at heading-to-body rhythm */
-main > .content-panel:has(h1#_top) {
-  padding-top: 2rem;
-  padding-bottom: 0;
-}
-
-@media (min-width: 50rem) {
-  main > .content-panel:has(h1#_top) {
-    padding-top: 3.5rem;
-  }
-}
-
-main > .content-panel:has(h1#_top) + .content-panel {
-  padding-top: 1.75rem;
-}
-
-@media (min-width: 50rem) {
-  [data-has-sidebar] .content-panel {
-    padding-inline-start: var(--aw-content-gutter);
-  }
-
-  [data-has-sidebar] .main-pane {
-    --sl-content-margin-inline: 0 auto;
-  }
-}
-
-@media (min-width: 50rem) and (max-width: 71.99rem) {
-  :root {
-    --aw-content-gutter: 2.5rem;
-  }
-}
-
-@media (min-width: 72rem) {
-  .right-sidebar-container,
-  .right-sidebar {
-    width: var(--aw-toc-width);
-  }
-
-  /* Starlight sizes the TOC list from --sl-sidebar-width (the left sidebar's
-     width); let it fill the narrower column instead */
-  .right-sidebar-panel {
-    padding-inline: 0 1.5rem;
-  }
-
-  .right-sidebar-panel .sl-container {
-    width: auto;
-    max-width: none;
-  }
-
-  [data-has-sidebar][data-has-toc] .main-pane {
-    --sl-content-margin-inline: 0 auto;
-    width: calc(100% - var(--aw-toc-width));
-  }
 }
 
 
@@ -193,98 +93,6 @@ main > .content-panel:has(h1#_top) + .content-panel {
   fill: var(--aw-diagram-text);
 }
 
-
-/* Sidebar Navigation Styling */
-.sidebar .top-level > li > details > summary,
-.sidebar .top-level > li > a {
-  font-weight: 600;
-  font-size: var(--aw-text-ui);
-  line-height: 1.45;
-  color: var(--aw-color-text);
-  letter-spacing: 0;
-  border-radius: 6px;
-  background: none;
-  transition: color 0.15s ease;
-}
-
-.sidebar .top-level > li > details > summary .large,
-.sidebar .top-level > li > a .large {
-  font-size: inherit;
-  font-weight: inherit;
-  color: inherit;
-}
-
-.sidebar .top-level > li > details > summary svg,
-.sidebar .top-level > li > details > summary .caret {
-  color: var(--aw-color-text-muted);
-}
-
-/* Breathing room between groups */
-.sidebar .top-level > li + li {
-  margin-top: 0.5rem;
-}
-
-.sidebar .top-level li li a {
-  transition: color 0.15s ease, background-color 0.15s ease;
-  color: var(--aw-color-text-muted);
-  font-size: var(--aw-text-ui);
-  line-height: 1.45;
-  padding: 0.375rem 0.625rem;
-  border-radius: 6px;
-  border: none;
-  font-weight: 400;
-  background: transparent;
-}
-
-/* Mobile menu sheet: Increase touch targets for sidebar navigation */
-@media (max-width: 49.99rem) {
-  .sidebar .top-level > li > details > summary,
-  .sidebar .top-level > li > a,
-  .sidebar .top-level li li a {
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 1rem;
-  }
-  /* Denser sheet: groups sit close so more of the tree fits on screen */
-  .sidebar .top-level > li + li {
-    margin-top: 0.125rem;
-  }
-
-  /* Group labels align with the sheet's nav rows and heading; nested links keep their indent */
-  .sidebar .top-level > li > details > summary,
-  .sidebar .top-level > li > a {
-    padding-inline: 0;
-  }
-}
-
-.sidebar .top-level li li a:hover {
-  color: var(--aw-color-text);
-}
-
-.sidebar .top-level li li a[aria-current="page"] {
-  color: var(--aw-color-text);
-  font-weight: 500;
-  background: var(--aw-color-bg-subtle);
-}
-
-/* Top-level page links (e.g. "All posts"): same quiet pill, not Starlight's accent fill */
-.sidebar .top-level > li > a[aria-current="page"] {
-  color: var(--aw-color-text-strong);
-  background: var(--aw-color-bg-subtle);
-}
-
-
-/* Site header (component: SiteHeader.astro). Solid page background, hairline rule. */
-:root {
-  --sl-nav-height: 3.75rem;
-}
-
-header.header {
-  background: var(--aw-color-bg);
-  border-bottom: 1px solid var(--aw-color-divider);
-}
-
 /* Markdown Content Typography */
 .sl-markdown-content {
   color: var(--aw-color-text);
@@ -316,7 +124,7 @@ header.header {
   margin-bottom: 0.75rem;
 }
 
-/* Page title: spacing comes from the panels (see Docs page layout) */
+/* Page title: spacing comes from the panels (see chrome.css, "Frame and docs layout") */
 .content-panel h1#_top {
   margin-bottom: 0;
 }
@@ -325,159 +133,6 @@ header.header {
 @media (max-width: 30rem) {
   .content-panel h1#_top {
     font-size: var(--aw-step-5);
-  }
-}
-
-/* === Heading links (markup: Starlight's rehype-heading-links; script: heading-links.ts) ===
-   Starlight wraps each heading as .sl-heading-wrapper > h2 + a.sl-anchor-link.
-   Its chain SVG is hidden; the link draws Primer's `link` octicon with a mask and,
-   once heading-links.ts has run, copies the section URL on click and briefly shows
-   `check` plus a small "Copied" tip. Without JS it stays a plain #anchor link.
-   With a mouse on wide screens the button sits in the left gutter and fades in on
-   hover; elsewhere it follows the heading text, always faintly visible on touch. */
-.sl-markdown-content .sl-heading-wrapper {
-  --aw-anchor-box: 1.5rem;
-  --aw-anchor-lh: var(--aw-leading-snug);
-  /* Starlight's end-of-line reservation, resized for the button box */
-  --sl-anchor-icon-size: var(--aw-anchor-box);
-  --sl-anchor-icon-gap: 0.25rem;
-  position: relative;
-  line-height: var(--aw-anchor-lh);
-}
-
-/* Size the wrapper like its heading, so the line box (and the button's em-based
-   centring) follows the heading rather than Starlight's larger --sl-text-hN strut.
-   Starlight spaces wrappers at 1.5em of its own sizes; keep that spacing. */
-.sl-markdown-content .sl-heading-wrapper.level-h1 { font-size: var(--aw-step-4); --aw-anchor-lh: var(--aw-leading-tight); --aw-anchor-space: var(--sl-text-h1); }
-.sl-markdown-content .sl-heading-wrapper.level-h2 { font-size: var(--aw-step-2); --aw-anchor-space: var(--sl-text-h2); }
-.sl-markdown-content .sl-heading-wrapper.level-h3 { font-size: var(--aw-step-1); --aw-anchor-space: var(--sl-text-h3); }
-.sl-markdown-content .sl-heading-wrapper:is(.level-h4, .level-h5, .level-h6) { font-size: var(--aw-step-0); --aw-anchor-space: var(--sl-text-h4); }
-
-.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper {
-  margin-top: calc(1.5 * var(--aw-anchor-space));
-}
-
-.sl-markdown-content .sl-anchor-icon {
-  display: none;
-}
-
-.sl-markdown-content .sl-anchor-link {
-  align-items: center;
-  justify-content: center;
-  width: var(--aw-anchor-box);
-  height: var(--aw-anchor-box);
-  /* Centre the box on the heading's first line */
-  vertical-align: top;
-  transform: translateY(calc((var(--aw-anchor-lh) * 1em - var(--aw-anchor-box)) / 2));
-  border-radius: 6px;
-  color: var(--aw-color-text-muted);
-  text-decoration: none;
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-}
-
-.sl-markdown-content .sl-anchor-link::before {
-  content: "";
-  width: 1rem;
-  height: 1rem;
-  background-color: currentColor;
-  -webkit-mask: var(--aw-icon-link) center / contain no-repeat;
-  mask: var(--aw-icon-link) center / contain no-repeat;
-}
-
-.sl-markdown-content .sl-heading-wrapper:hover .sl-anchor-link,
-.sl-markdown-content .sl-anchor-link:focus-visible,
-.sl-markdown-content .sl-anchor-link[data-copied] {
-  opacity: 1;
-}
-
-.sl-markdown-content .sl-anchor-link:hover {
-  color: var(--aw-color-text);
-  background-color: var(--aw-color-bg-subtle);
-}
-
-.sl-markdown-content .sl-anchor-link:focus-visible {
-  outline-offset: 1px;
-  border-radius: 6px;
-}
-
-.sl-markdown-content .sl-anchor-link[data-copied] {
-  color: var(--aw-color-text);
-  background-color: transparent;
-}
-
-.sl-markdown-content .sl-anchor-link[data-copied]::before {
-  -webkit-mask-image: var(--aw-icon-check);
-  mask-image: var(--aw-icon-check);
-}
-
-/* "Copied" tip: injected by heading-links.ts here, and shared with the code-block
-   copy button's feedback label (see "Code block copy button") */
-.sl-markdown-content .aw-anchor-tip,
-.expressive-code .frame .copy .feedback {
-  padding: 0.1875rem 0.4375rem;
-  border: 1px solid var(--aw-color-divider);
-  border-radius: 6px;
-  background-color: var(--aw-color-surface);
-  font-family: var(--aw-font-sans);
-  font-size: var(--aw-step--1);
-  font-weight: 500;
-  line-height: 1.3;
-  letter-spacing: 0;
-  white-space: nowrap;
-  color: var(--aw-color-text);
-  pointer-events: none;
-}
-
-.sl-markdown-content .aw-anchor-tip {
-  position: absolute;
-  bottom: calc(100% + 0.25rem);
-  left: 50%;
-  opacity: 0;
-  transform: translate(-50%, 0.125rem);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-/* Touch: no hover, so keep the button faintly visible after the text */
-@media (hover: none) {
-  .sl-markdown-content .sl-anchor-link {
-    opacity: 0.45;
-  }
-}
-
-/* Mouse on wide screens: move the button into the left gutter */
-@media (hover: hover) and (min-width: 50rem) {
-  .sl-markdown-content .sl-heading-wrapper > :first-child:not([hidden]) {
-    padding-inline-end: 0;
-  }
-
-  .sl-markdown-content .sl-anchor-link {
-    position: absolute;
-    top: 0;
-    inset-inline-start: calc(-1 * (var(--aw-anchor-box) + 0.375rem));
-    margin: 0;
-  }
-
-  /* Bridge the gap to the heading so the button stays visible on the way over */
-  .sl-markdown-content .sl-anchor-link::after {
-    inset: -0.25rem -0.5rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sl-markdown-content .sl-anchor-link,
-  .sl-markdown-content .aw-anchor-tip {
-    transition: none;
-  }
-
-  .sl-markdown-content .aw-anchor-tip,
-  .sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
-    transform: translate(-50%, 0);
   }
 }
 
@@ -522,116 +177,6 @@ header.header {
 /* Starlight's frame rule reads --code-background rather than EC's codeBackground override */
 .expressive-code .frame {
   --code-background: var(--aw-color-bg-subtle);
-}
-
-/* Code block copy button (Expressive Code's frames plugin; markup:
-   .frame > .copy > [aria-live] > .feedback + button > div). Same language as the
-   heading links: a quiet octicon button, `copy` morphing to `check`, and the shared
-   "Copied" tip beside it. EC's separate hover layer (button > div) and border layer
-   (::before) are dropped so every state shares one rounded box. EC's script adds
-   .feedback.show for 1.5s; the label text comes from src/content/i18n/en.json. */
-.expressive-code .frame .copy {
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.expressive-code .frame .copy button {
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--aw-color-text-muted);
-  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
-}
-
-.expressive-code .frame .copy button div,
-.expressive-code .frame .copy button::before {
-  display: none;
-}
-
-.expressive-code .frame .copy button::after {
-  inset: 50% auto auto 50%;
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  transform: translate(-50%, -50%);
-  background-color: currentColor;
-  -webkit-mask: var(--aw-icon-copy) center / contain no-repeat;
-  mask: var(--aw-icon-copy) center / contain no-repeat;
-}
-
-/* Touch devices: keep a 44px hit area (WCAG 2.5.5) around the compact button */
-@media (pointer: coarse) {
-  .expressive-code .frame .copy button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-}
-
-.expressive-code .frame .copy button:hover,
-.expressive-code .frame .copy button:focus-visible {
-  opacity: 1;
-  color: var(--aw-color-text);
-  background-color: var(--aw-color-divider);
-}
-
-.expressive-code .frame .copy button:focus-visible {
-  outline: 2px solid var(--aw-color-accent-text);
-  outline-offset: 1px;
-}
-
-/* Copied: check icon in the neutral text colour */
-.expressive-code .frame .copy:has(.feedback.show) button {
-  opacity: 1;
-  color: var(--aw-color-text);
-  background-color: transparent;
-}
-
-.expressive-code .frame .copy:has(.feedback.show) button::after {
-  -webkit-mask-image: var(--aw-icon-check);
-  mask-image: var(--aw-icon-check);
-}
-
-.expressive-code .frame .copy .feedback {
-  align-self: center;
-  margin: 0;
-  transform: translateX(0.125rem);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.expressive-code .frame .copy .feedback.show {
-  transform: none;
-}
-
-.expressive-code .frame .copy .feedback::after {
-  content: none;
-}
-
-/* Touch: no hover, so keep the button visible */
-@media (hover: none) {
-  .expressive-code .frame .copy button {
-    opacity: 0.75;
-  }
-}
-
-/* Mouse: hidden until the block is hovered or focused (EC reveals it at 0.75) */
-@media (hover: hover) {
-  .expressive-code .frame:hover .copy button:not(:hover),
-  .expressive-code .frame:focus-within :focus-visible ~ .copy button:not(:hover) {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .expressive-code .frame .copy button,
-  .expressive-code .frame .copy .feedback {
-    transition: none;
-  }
-
-  .expressive-code .frame .copy .feedback {
-    transform: none;
-  }
 }
 
 /* Inline code */
@@ -875,148 +420,6 @@ a.button:hover {
   scrollbar-color: var(--aw-color-scrollbar) transparent;
 }
 
-/* === On this page (component: Starlight's TableOfContents / MobileTableOfContents) ===
-   Starlight's styles sit in @layer starlight.core, so these unlayered rules win.
-   Both lists share one look: muted items on a 1px rail, the current section in
-   strong text with a 1px accent segment over the rail. Starlight sets
-   aria-current="true" on the link as you scroll. --depth comes from Starlight. */
-.right-sidebar {
-  border-inline-start: 0; /* no rule between content and TOC; the list keeps its own rail */
-}
-
-.right-sidebar-panel {
-  padding-top: 1.25rem; /* heading lines up with the sidebar's first group label */
-}
-
-/* Heading matches the sidebar's group labels */
-starlight-toc h2 {
-  margin-bottom: 0.75rem;
-  font-size: var(--aw-text-ui);
-  font-weight: 600;
-  line-height: 1.45;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--aw-color-text);
-}
-
-starlight-toc nav > ul,
-mobile-starlight-toc .dropdown > ul {
-  margin: 0;
-  border-inline-start: 1px solid var(--aw-color-divider);
-}
-
-:is(starlight-toc, mobile-starlight-toc) a {
-  position: relative;
-  display: block;
-  padding-block: 0.375rem;
-  padding-inline: calc(0.875rem + 0.75rem * var(--depth, 0)) 0.5rem;
-  border-radius: 0;
-  font-size: var(--aw-text-ui);
-  font-weight: 400;
-  line-height: 1.45;
-  color: var(--aw-color-text-muted);
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-:is(starlight-toc, mobile-starlight-toc) a:hover {
-  color: var(--aw-color-text);
-  background: none;
-}
-
-:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"],
-:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"]:hover {
-  color: var(--aw-color-text-strong);
-  background: none;
-}
-
-:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"]::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: -1px;
-  width: 1px;
-  background: var(--aw-color-accent);
-}
-
-:is(starlight-toc, mobile-starlight-toc) a:focus-visible {
-  outline: 2px solid var(--aw-color-accent);
-  outline-offset: -2px;
-  border-radius: 4px;
-}
-
-/* Below 72rem: the "On this page" bar sticks under the header. Page background,
-   one hairline below, a quiet text button and the current section in muted text.
-   Its height stays --sl-mobile-toc-height so Starlight's scroll-padding-top
-   (header + bar + 1.5rem) keeps anchored headings clear of both. */
-mobile-starlight-toc nav {
-  top: var(--sl-nav-height);
-  border-top: 0;
-  background-color: var(--aw-color-bg);
-}
-
-mobile-starlight-toc summary {
-  gap: 0.625rem;
-  padding: 0 var(--sl-nav-pad-x);
-  border-bottom: 1px solid var(--aw-color-divider);
-  font-size: var(--aw-text-ui);
-  cursor: pointer;
-}
-
-mobile-starlight-toc summary:focus-visible {
-  outline: 2px solid var(--aw-color-accent);
-  outline-offset: -2px;
-  border-radius: 0;
-}
-
-mobile-starlight-toc .toggle,
-mobile-starlight-toc details[open] .toggle,
-mobile-starlight-toc details .toggle:hover {
-  gap: 0.25rem;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-weight: 500;
-  line-height: 1.4;
-  color: var(--aw-color-text-strong);
-}
-
-mobile-starlight-toc .caret {
-  color: var(--aw-color-text-muted);
-  transition: transform 0.15s ease;
-}
-
-mobile-starlight-toc .display-current {
-  color: var(--aw-color-text-muted);
-}
-
-mobile-starlight-toc .dropdown {
-  margin: 0.375rem var(--sl-nav-pad-x) 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--aw-color-divider);
-  border-radius: 0.5rem;
-  background-color: var(--aw-color-surface);
-  box-shadow: var(--aw-shadow-raised);
-}
-
-/* Starlight's mobile list has row dividers and a checkmark; use the TOC's look instead */
-mobile-starlight-toc .isMobile a {
-  display: block;
-  border-top: 0;
-  padding-block: 0.5rem;
-}
-
-mobile-starlight-toc .isMobile a[aria-current="true"]::after {
-  content: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :is(starlight-toc, mobile-starlight-toc) a,
-  mobile-starlight-toc .caret {
-    transition: none;
-  }
-}
-
 /* Hide blog plugin's card-grid pagination (uses reverse chronological order) */
 .post-footer .pagination.astro-q3jscx35 {
   display: none;
@@ -1052,92 +455,6 @@ mobile-starlight-toc .isMobile a[aria-current="true"]::after {
   margin-bottom: 2.5rem; /* Increased from default for cleaner look */
 }
 
-/* Docs footer: edit link / last updated, then prev/next. Flat cards that sit
-   above the site footer (CustomFooter.astro) without competing with it. */
-.content-panel footer.sl-flex .meta {
-  font-size: var(--aw-step--1);
-  color: var(--aw-color-text-muted);
-}
-
-.content-panel footer.sl-flex .meta a {
-  color: var(--aw-color-text-secondary);
-}
-
-.content-panel footer.sl-flex .meta a:hover {
-  color: var(--aw-color-text-strong);
-}
-
-.pagination-links a {
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--aw-color-border-strong);
-  border-radius: 0.5rem;
-  background: transparent;
-  box-shadow: none;
-  color: var(--aw-color-text-muted);
-  font-size: var(--aw-step--1);
-  text-decoration: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.pagination-links a:hover {
-  border-color: var(--aw-color-accent);
-  background: var(--aw-color-bg-subtle);
-}
-
-.pagination-links a svg {
-  color: var(--aw-color-text-muted);
-  transition: color 0.15s ease;
-}
-
-.pagination-links a:hover svg {
-  color: var(--aw-color-accent);
-}
-
-.pagination-links .link-title {
-  display: inline-block;
-  margin-top: 0.125rem;
-  font-weight: 500;
-  font-size: var(--aw-step-0);
-  line-height: var(--aw-leading-snug);
-  color: var(--aw-color-text-strong);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pagination-links a,
-  .pagination-links a svg {
-    transition: none;
-  }
-}
-
-/* Aside/Callout Blocks */
-.sl-markdown-content .starlight-aside {
-  --aw-aside-accent: var(--aw-color-note);
-  background: color-mix(in srgb, var(--aw-aside-accent) 5%, var(--aw-color-bg-subtle));
-  border: 1px solid color-mix(in srgb, var(--aw-aside-accent) 22%, var(--aw-color-border));
-  border-radius: 8px;
-  padding: 0.875rem 1rem;
-}
-
-.sl-markdown-content .starlight-aside--note { --aw-aside-accent: var(--aw-color-note); }
-.sl-markdown-content .starlight-aside--tip { --aw-aside-accent: var(--aw-color-success); }
-.sl-markdown-content .starlight-aside--caution { --aw-aside-accent: var(--aw-color-caution); }
-.sl-markdown-content .starlight-aside--danger { --aw-aside-accent: var(--aw-color-danger); }
-
-.sl-markdown-content .starlight-aside__title {
-  color: var(--aw-aside-accent);
-  font-size: var(--aw-step--1);
-  font-weight: 600;
-}
-
-.sl-markdown-content .starlight-aside__content {
-  color: var(--aw-color-text-body);
-}
-
-:root[data-theme='light'] .sl-markdown-content .starlight-aside__title {
-  color: color-mix(in srgb, var(--aw-aside-accent) 45%, var(--aw-color-text));
-}
-
 /* Horizontal Rules */
 .sl-markdown-content hr {
   border: none;
@@ -1166,40 +483,6 @@ mobile-starlight-toc .isMobile a[aria-current="true"]::after {
 html {
   scroll-behavior: auto;
   scrollbar-gutter: stable;
-}
-
-/* Site Title */
-.site-title {
-  font-size: var(--aw-text-ui);
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.site-title:hover {
-  text-decoration: none;
-}
-
-.site-title span {
-  color: var(--aw-color-text);
-}
-
-.site-title img {
-  display: block;
-}
-
-/* Mobile-specific: Ensure site title has adequate touch target */
-@media (max-width: 768px) {
-  .site-title {
-    min-height: 44px;
-    min-width: 44px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem;
-    margin-inline-start: -0.5rem;
-  }
 }
 
 /* Link buttons (hero actions and <LinkButton>) */
@@ -1268,7 +551,7 @@ table img[src*="badge.svg"] {
   box-sizing: border-box;
 }
 
-/* Ensure body and main containers don't overflow.
+/* Ensure the body doesn't overflow (the frame containers: see chrome.css).
    NOTE: overflow-x is intentionally set ONLY on body, not on html.
    Setting overflow-x:hidden on the html element breaks position:fixed overlays
    (e.g. the mobile sidebar drawer) on Android Chrome with large user fonts.
@@ -1280,14 +563,6 @@ html {
 body {
   overflow-x: hidden;
   max-width: 100vw;
-}
-
-.page,
-.main-frame,
-main,
-.content-panel {
-  max-width: 100%;
-  overflow-x: hidden;
 }
 
 /* Ensure all content respects container width */
@@ -1313,52 +588,6 @@ main,
 .sl-markdown-content pre[class*="language-"] {
   overflow-x: auto;
   max-width: 100%;
-}
-
-/* === Mobile menu sheet ===
-   Below 50rem (Starlight's own sidebar breakpoint, which also drives its popover JS)
-   the header's menu button (SiteMenuToggle) opens one sheet: Starlight's sidebar
-   popover on pages with a sidebar, or #site-menu (SiteHeader) on the landing page.
-   Sidebar.astro puts the site links on top; MobileMenuFooter sits pinned at the bottom. */
-@media (max-width: 49.99rem) {
-  /* The menu button is in the header row now, so drop Starlight's reserved space */
-  [data-has-sidebar] header.header {
-    padding-inline-end: var(--sl-nav-pad-x);
-  }
-
-  body:has(#starlight__sidebar:popover-open),
-  body:has(#site-menu:popover-open) {
-    overflow: hidden;
-  }
-
-  #starlight__sidebar {
-    background-color: var(--aw-color-bg);
-    border-right: 0;
-    overscroll-behavior: contain;
-  }
-
-  .sidebar-pane .sidebar-content {
-    gap: 1.25rem;
-  }
-
-  /* starlight-blog adds a mobile-only "Blog" link to the docs tree; Blog is already a nav row */
-  .sidebar .top-level > li:has(> .sl-blog-mobile-link) {
-    display: none;
-  }
-
-  .sidebar .top-level > li:has(> .sl-blog-mobile-link) + li {
-    margin-top: 0;
-  }
-
-  /* Pin the footer row (GitHub, theme, Get started) to the bottom of the sheet */
-  .sidebar-content > :has(> .mobile-menu-footer) {
-    position: sticky;
-    bottom: 0;
-    margin-top: auto;
-    margin-inline: calc(-1 * var(--sl-sidebar-pad-x));
-    padding-inline: var(--sl-sidebar-pad-x);
-    background-color: var(--aw-color-bg);
-  }
 }
 
 /* Mobile-specific: Additional touch target improvements for remaining elements */
@@ -1443,38 +672,13 @@ main,
   :focus-visible {
     outline-width: 3px;
   }
-
-  .site-title span {
-    text-decoration: underline;
-  }
 }
 
 @media (forced-colors: active) {
-  .site-title,
   .gh-aw-video-container,
   .gh-aw-video-caption {
     border: 1px solid CanvasText;
     background: Canvas;
     color: CanvasText;
   }
-
-  .site-title:hover {
-    forced-color-adjust: auto;
-  }
 }
-
-/* Sidebar links that leave the docs (e.g. the hosted Creation Wizard): trailing link-external octicon */
-.sidebar-external::after {
-  content: '';
-  display: inline-block;
-  flex: none;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-inline-start: 0.375rem;
-  vertical-align: -0.05em;
-  background-color: currentColor;
-  opacity: 0.7;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-

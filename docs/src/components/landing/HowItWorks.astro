@@ -1,25 +1,25 @@
 ---
-import octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 import LandingSection from './LandingSection.astro';
 import { engineLogos } from './HowItWorksEngineLogos';
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const engines = [
-  { id: 'copilot', name: 'GitHub Copilot', maker: 'GitHub', href: '/gh-aw/engines/copilot/' },
-  { id: 'claude', name: 'Claude Code', maker: 'Anthropic', href: '/gh-aw/engines/claude/' },
-  { id: 'codex', name: 'Codex', maker: 'OpenAI', href: '/gh-aw/engines/codex/' },
-  { id: 'gemini', name: 'Gemini CLI', maker: 'Google', href: '/gh-aw/engines/gemini/' },
-  { id: 'pi', name: 'Pi', maker: 'Multi-provider', href: '/gh-aw/engines/pi/' },
+  { id: 'copilot', name: 'GitHub Copilot', maker: 'GitHub' },
+  { id: 'claude', name: 'Claude Code', maker: 'Anthropic' },
+  { id: 'codex', name: 'Codex', maker: 'OpenAI' },
+  { id: 'gemini', name: 'Gemini CLI', maker: 'Google' },
+  { id: 'pi', name: 'Pi', maker: 'Multi-provider' },
 ];
 ---
 
 <LandingSection id="how-it-works" title="How it works" lede="Prompt your coding agent to create a workflow. GitHub compiles it into an Actions workflow and runs it.">
   <ol class="aw-steps">
     <li class="aw-step">
-      <div class="aw-frag aw-prompt-card" role="img" aria-label="A GitHub Copilot prompt: slash agentic workflows, create a daily status workflow. Followed by slash agentic workflow, optimize it.">
+      <div class="aw-frag aw-card" role="img" aria-label="A GitHub Copilot prompt: slash agentic workflows, create a daily status workflow. Followed by slash agentic workflow, optimize it.">
         <div class="aw-bar">GitHub Copilot</div>
         <div class="aw-prompt-body" aria-hidden="true">
-          <p class="aw-prompt-command">/agentic-workflows</p>
+          <p class="aw-prompt-command aw-pill">/agentic-workflows</p>
           <p class="aw-prompt-text">Create a daily status workflow.</p>
           <p class="aw-prompt-followup">/agentic-workflow optimize it</p>
         </div>
@@ -29,11 +29,11 @@ const engines = [
     </li>
 
     <li class="aw-step">
-      <div class="aw-frag aw-term" role="img" aria-label="Terminal: running gh aw compile prints a check mark and triage.lock.yml, pinned, validated GitHub Actions YAML.">
-        <div class="aw-bar"><span class="aw-ico" set:html={icon('terminal')} />Terminal</div>
+      <div class="aw-frag aw-card" role="img" aria-label="Terminal: running gh aw compile prints a check mark and triage.lock.yml, pinned, validated GitHub Actions YAML.">
+        <div class="aw-bar"><Octicon name="terminal" />Terminal</div>
         <div class="aw-term-body" aria-hidden="true">
           <div class="aw-cmd"><span class="m">$</span> gh aw compile</div>
-          <div class="aw-out"><span class="aw-ok" set:html={icon('check')} />triage.lock.yml</div>
+          <div class="aw-out"><Octicon name="check" class="aw-ok" />triage.lock.yml</div>
           <div class="aw-note">Pinned, validated GitHub Actions YAML</div>
         </div>
       </div>
@@ -42,17 +42,17 @@ const engines = [
     </li>
 
     <li class="aw-step">
-      <div class="aw-frag aw-run" role="img" aria-label="An Actions run: triage, agent, succeeded in 48 seconds, applied the label type: bug.">
-        <div class="aw-bar"><span class="aw-ico" set:html={icon('play')} />Actions</div>
+      <div class="aw-frag aw-card" role="img" aria-label="An Actions run: triage, agent, succeeded in 48 seconds, applied the label type: bug.">
+        <div class="aw-bar"><Octicon name="play" />Actions</div>
         <div class="aw-run-body" aria-hidden="true">
           <div class="aw-row">
-            <span class="aw-okdot" set:html={icon('check-circle-fill')} />
+            <Octicon name="check-circle-fill" class="aw-ok" />
             <span class="aw-run-name">triage · agent</span>
             <span class="aw-dur">48s</span>
           </div>
           <div class="aw-applied">
             <span class="aw-applied-l">Applied label</span>
-            <span class="aw-chip">type: bug</span>
+            <span class="aw-pill">type: bug</span>
           </div>
         </div>
       </div>
@@ -68,7 +68,7 @@ const engines = [
         const logo = engineLogos[e.id];
         return (
           <li>
-            <a href={e.href}>
+            <a href={`${base}/engines/${e.id}/`}>
               <svg class="aw-logo" viewBox={logo.viewBox} aria-hidden="true" focusable="false">
                 {logo.paths.map((d) => <path d={d} />)}
               </svg>
@@ -80,7 +80,7 @@ const engines = [
       })}
     </ul>
     <p class="aw-importable">
-      <a href="/gh-aw/reference/engines/#shared-imported-engines">Bring your own engine <span aria-hidden="true">→</span></a>
+      <a class="aw-link" href={`${base}/reference/engines/#shared-imported-engines`}>Bring your own engine <span aria-hidden="true">→</span></a>
       <span>Import OpenCode, Cursor, Kiro, Aider, Crush or your own definition.</span>
     </p>
   </div>
@@ -103,22 +103,9 @@ const engines = [
     margin: 0;
     padding: 0;
   }
-  .aw-ico {
-    display: inline-flex;
-    flex: none;
-  }
-  .aw-ico :global(svg),
-  .aw-ok :global(svg),
-  .aw-okdot :global(svg) {
-    fill: currentColor;
-  }
   .aw-frag {
     min-height: 0;
     overflow: hidden;
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
-    border-radius: 12px;
-    box-shadow: var(--aw-shadow-raised);
   }
   .aw-bar {
     display: flex;
@@ -145,11 +132,9 @@ const engines = [
   }
   .aw-prompt-command {
     width: fit-content;
-    padding: 0.125rem 0.5rem;
-    border-radius: 999px;
-    background: var(--aw-color-complement-low);
-    color: var(--aw-color-complement);
+    padding-block: 0.125rem;
     font-family: var(--aw-font-mono);
+    font-weight: 400;
   }
   .aw-prompt-text {
     color: var(--aw-color-text-strong);
@@ -174,9 +159,7 @@ const engines = [
     align-items: center;
     gap: 0.5rem;
   }
-  .aw-ok,
-  .aw-okdot {
-    display: inline-flex;
+  .aw-ok {
     color: var(--aw-color-success);
   }
   .aw-note {
@@ -209,20 +192,12 @@ const engines = [
     font-family: var(--aw-font-sans);
     color: var(--aw-color-text-muted);
   }
-  .aw-chip {
-    padding: 0.0625rem 0.5rem;
-    border-radius: 999px;
-    background: var(--aw-color-complement-low);
-    color: var(--aw-color-complement);
-    font-weight: 500;
-  }
   .aw-step h3 {
     margin: 1.25rem 0 0;
     font-size: var(--aw-step-0);
     font-weight: 550;
     letter-spacing: -0.01em;
     color: var(--aw-color-text-strong);
-    border: 0;
   }
   .aw-step p {
     margin: 0.375rem 0 0;
@@ -254,9 +229,6 @@ const engines = [
     font-size: var(--aw-step-0);
     color: var(--aw-color-text-muted);
   }
-  .aw-importable {
-    margin-top: 0.75rem;
-  }
   .aw-engine-list {
     list-style: none;
     max-width: 54rem;
@@ -282,13 +254,13 @@ const engines = [
     color: var(--aw-color-text-secondary);
     text-align: center;
     text-decoration: none;
-    transition: background-color 0.15s, color 0.15s;
+    transition: background-color var(--aw-duration-fast), color var(--aw-duration-fast);
   }
   .aw-engine-list a:hover {
     color: var(--aw-color-text-strong);
   }
+  /* Inset ring: the links tile edge to edge. */
   .aw-engine-list a:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
     outline-offset: -2px;
   }
   .aw-logo {
@@ -317,13 +289,7 @@ const engines = [
     margin-top: 1rem;
   }
   .aw-importable a {
-    color: var(--aw-color-accent-text);
     font-weight: 500;
-    text-decoration: none;
-  }
-  .aw-importable a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
   }
   @media (min-width: 48rem) {
     .aw-engine-list {

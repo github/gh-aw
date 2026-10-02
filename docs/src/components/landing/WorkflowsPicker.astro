@@ -1,6 +1,6 @@
 ---
-/** Variant C: a segmented control picks one workflow; its output mock and install sit in focus. */
-import octicons from '@primer/octicons';
+/** Ready-made workflows: a segmented control picks one; its copy, setup prompt and output mock sit in focus. */
+import Octicon from '../Octicon.astro';
 import LandingSection from './LandingSection.astro';
 import CopyPrompt from './CopyPrompt.astro';
 import WorkflowsMock from './WorkflowsMock.astro';
@@ -10,10 +10,9 @@ interface Workflow {
   id: 'repo-assist' | 'ci-doctor' | 'repo-status' | 'test-improver';
   name: string;
   trigger: string;
-  triggerIcon: string;
+  triggerIcon: 'clock' | 'zap';
   outcome: string;
   detail: string;
-  install: string;
   prompt: string;
   href: string;
 }
@@ -23,8 +22,7 @@ interface Props {
   lede: string;
 }
 const { workflows, title, lede } = Astro.props;
-const tabIcon: Record<string, string> = { 'repo-assist': 'copilot', 'ci-doctor': 'pulse', 'repo-status': 'graph', 'test-improver': 'beaker' };
-const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: object) => string }>)[n].toSVG({ width: s, height: s });
+const tabIcon = { 'repo-assist': 'copilot', 'ci-doctor': 'pulse', 'repo-status': 'graph', 'test-improver': 'beaker' } as const;
 ---
 
 <LandingSection id="gallery" titleId="workflows-title" title={title} lede={lede}>
@@ -39,7 +37,7 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
           aria-selected={i === 0 ? 'true' : 'false'}
           tabindex={i === 0 ? 0 : -1}
         >
-          <span class="wf-tab-tile" aria-hidden="true" set:html={icon(tabIcon[w.id], 16)} />
+          <Octicon name={tabIcon[w.id]} class="wf-tab-tile" />
           <span class="wf-tab-text">
             <span class="wf-tab-name">{w.name}</span>
             <span class="wf-tab-trig">{w.trigger}</span>
@@ -58,7 +56,7 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
       >
         <div class="wf-copy">
           <h3>{w.name}</h3>
-          <span class="wf-trigger"><span set:html={icon(w.triggerIcon, 14)} />{w.trigger}</span>
+          <span class="wf-trigger"><Octicon name={w.triggerIcon} size={14} />{w.trigger}</span>
           <p class="wf-outcome">{w.outcome}</p>
           <p class="wf-detail">{w.detail}</p>
           {w.id === 'repo-assist' && (
@@ -66,11 +64,11 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
           )}
           <div class="wf-actions">
             <CopyPrompt label="Copy setup prompt" text={w.prompt} />
-            <a class="wf-link" href={w.href} aria-label={`Read more about ${w.name}`}>Read more <span aria-hidden="true">→</span></a>
+            <a class="wf-link aw-link" href={w.href} aria-label={`Read more about ${w.name}`}>Read more <span aria-hidden="true">→</span></a>
           </div>
         </div>
         <div class="wf-visual">
-          <WorkflowsMock kind={w.id === 'repo-assist' ? 'repo-assist-week' : w.id} size="lg" />
+          <WorkflowsMock kind={w.id} />
         </div>
       </div>
     ))}
@@ -114,7 +112,7 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
     text-align: left;
     color: var(--aw-color-text-secondary);
     cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease, box-shadow var(--aw-duration-fast) ease;
   }
   .wf-tabs [role='tab']:hover {
     color: var(--aw-color-text-strong);
@@ -123,10 +121,6 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
     background: var(--aw-color-surface);
     box-shadow: var(--aw-shadow-raised);
     color: var(--aw-color-text-strong);
-  }
-  .wf-tabs [role='tab']:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
   }
   .wf-tab-text {
     display: flex;
@@ -137,16 +131,14 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
   }
   /* Same icon tiles as the spotlight list; Copilot stands for the agent */
   .wf-tab-tile {
-    display: inline-flex;
-    flex: none;
     align-items: center;
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border-radius: 8px;
+    border-radius: var(--aw-radius-md);
     background: var(--aw-color-surface);
     color: var(--aw-color-text-muted);
-    transition: color 0.15s ease, background-color 0.15s ease;
+    transition: color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
   }
   /* Two-up tabs on phones are too narrow for a tile */
   @media (max-width: 47.99rem) {
@@ -155,10 +147,6 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
   .wf-tabs [role='tab'][aria-selected='true'] .wf-tab-tile {
     background: var(--aw-color-accent-low);
     color: var(--aw-color-accent-text);
-  }
-  .wf-tab-tile :global(svg) {
-    display: block;
-    fill: currentColor;
   }
   .wf-tab-name {
     font-size: var(--aw-step-0);
@@ -201,7 +189,6 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
     letter-spacing: -0.02em;
     line-height: 1.25;
     color: var(--aw-color-text-strong);
-    border: 0;
   }
   .wf-trigger {
     display: inline-flex;
@@ -210,10 +197,6 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
     margin-top: 0.5rem;
     font-size: var(--aw-text-ui);
     color: var(--aw-color-text-muted);
-  }
-  .wf-trigger :global(svg) {
-    display: block;
-    fill: currentColor;
   }
   .wf-outcome {
     margin: 1rem 0 0;
@@ -253,17 +236,6 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
   }
   .wf-link {
     font-size: var(--aw-step-0);
-    color: var(--aw-color-accent-text);
-    text-decoration: none;
-    border-radius: 4px;
-  }
-  .wf-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .wf-link:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 3px;
   }
   .wf-visual {
     min-width: 0;
@@ -272,7 +244,7 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
   @media (prefers-reduced-motion: no-preference) {
     .wf-panel[data-entering] .wf-copy,
     .wf-panel[data-entering] .wf-visual {
-      animation: wf-enter 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      animation: wf-enter 0.28s var(--aw-ease-emphasized) both;
     }
     .wf-panel[data-entering] .wf-visual {
       animation-delay: 0.04s;
@@ -292,47 +264,26 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
 </style>
 
 <script>
+  import { setupTabs } from '../../scripts/tabs';
+
   let cleanup = () => {};
 
   function initialize() {
     cleanup();
     const controller = new AbortController();
-    const { signal } = controller;
 
     document.querySelectorAll<HTMLElement>('[data-wf-picker]').forEach((root) => {
-      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-      const select = (next: HTMLButtonElement, focus: boolean) => {
-        tabs.forEach((tab) => {
-          const on = tab === next;
-          tab.setAttribute('aria-selected', String(on));
-          tab.tabIndex = on ? 0 : -1;
-          const panel = root.querySelector<HTMLElement>(`#${tab.getAttribute('aria-controls')}`);
-          if (!panel) return;
-          if (on && panel.hidden) {
-            panel.hidden = false;
-            panel.removeAttribute('data-entering');
-            void panel.offsetWidth;
-            panel.setAttribute('data-entering', '');
-          } else if (!on) {
-            panel.hidden = true;
-          }
-        });
-        if (focus) next.focus();
-      };
-      tabs.forEach((tab, i) => {
-        tab.addEventListener('click', () => select(tab, false), { signal });
-        tab.addEventListener('keydown', (e) => {
-          const last = tabs.length - 1;
-          let j = -1;
-          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = i === last ? 0 : i + 1;
-          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = i === 0 ? last : i - 1;
-          else if (e.key === 'Home') j = 0;
-          else if (e.key === 'End') j = last;
-          if (j < 0) return;
-          e.preventDefault();
-          select(tabs[j], true);
-        }, { signal });
-      });
+      setupTabs(root, (panel, on) => {
+        if (on && panel.hidden) {
+          // Replay the entrance animation on the newly shown panel.
+          panel.hidden = false;
+          panel.removeAttribute('data-entering');
+          void panel.offsetWidth;
+          panel.setAttribute('data-entering', '');
+        } else if (!on) {
+          panel.hidden = true;
+        }
+      }, controller.signal);
     });
 
     cleanup = () => controller.abort();

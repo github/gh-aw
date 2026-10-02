@@ -1,7 +1,6 @@
 ---
 /** Hero C visual: a morning feed of what agents did overnight. */
-import octicons from '@primer/octicons';
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+import Octicon from '../Octicon.astro';
 
 type Kind = 'issue' | 'pr' | 'report';
 const events: { time: string; agent: string; action: string; kind: Kind; title: string; num: string; meta?: string }[] = [
@@ -9,28 +8,28 @@ const events: { time: string; agent: string; action: string; kind: Kind; title: 
   { time: '04:30', agent: 'Test Improver', action: 'opened a pull request', kind: 'pr', title: 'Add tests for parser edge cases', num: '#231', meta: 'Coverage +3.1%' },
   { time: '07:00', agent: 'Repo Status', action: 'posted the daily report', kind: 'report', title: 'Daily status — Oct 2', num: '#233', meta: '12 issues triaged · 4 PRs merged' },
 ];
-const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', pr: 'git-pull-request', report: 'issue-opened' };
+const kindIcon = { issue: 'issue-opened', pr: 'git-pull-request', report: 'issue-opened' } as const;
 ---
 
-<div class="vc" aria-hidden="true">
+<div class="vc aw-card" aria-hidden="true">
   <div class="vc-head">
-    <span class="vc-head-ico" set:html={icon('moon', 16)} />
+    <Octicon name="moon" class="vc-head-ico" />
     <span class="vc-head-t">While you slept</span>
     <span class="vc-repo">octo-org/app</span>
   </div>
   <div class="vc-greet">
-    <span set:html={icon('sun', 16)} />
+    <Octicon name="sun" class="vc-sun" />
     <span>Good morning — 3 updates awaiting your review.</span>
   </div>
   <ol class="vc-feed" role="list">
     {events.map((e, i) => (
       <li class="vc-ev" style={`--i:${i}`}>
         <span class="vc-time">{e.time}</span>
-        <span class="vc-dot" set:html={icon(kindIcon[e.kind], 14)} />
+        <Octicon name={kindIcon[e.kind]} size={14} class="vc-dot" />
         <div class="vc-body">
           <p class="vc-line"><span class="vc-time-sm">{e.time}</span><b>{e.agent}</b> {e.action}</p>
           <div class="vc-item">
-            <span class:list={['vc-kind', `vc-${e.kind}`]} set:html={icon(kindIcon[e.kind], 16)} />
+            <Octicon name={kindIcon[e.kind]} class:list={['vc-kind', `vc-${e.kind}`]} />
             <div class="vc-item-text">
               <span class="vc-title">{e.title} <span class="vc-num">{e.num}</span></span>
               {e.meta && (
@@ -48,16 +47,9 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
 
 <style>
   .vc {
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
     border-radius: 14px;
-    box-shadow: var(--aw-shadow-raised);
     overflow: hidden;
     min-width: 0;
-  }
-  .vc :global(svg) {
-    fill: currentColor;
-    flex: none;
   }
   .vc-head {
     display: flex;
@@ -69,7 +61,6 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
     font-size: var(--aw-text-ui);
   }
   .vc-head-ico {
-    display: inline-flex;
     color: var(--aw-color-accent);
   }
   .vc-head-t {
@@ -95,7 +86,7 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
     column-gap: 0.75rem;
     margin: 0;
     padding-bottom: 1.25rem;
-    animation: vc-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation: vc-in 0.5s var(--aw-ease-out) backwards;
     animation-delay: calc(0.25s + var(--i) * 0.18s);
   }
   /* Timeline line through the dots. */
@@ -118,7 +109,6 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
     color: var(--aw-color-text-muted);
   }
   .vc-dot {
-    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 28px;
@@ -146,10 +136,9 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
     gap: 0.625rem;
     padding: 0.625rem 0.75rem;
     border: 1px solid var(--aw-color-border);
-    border-radius: 8px;
+    border-radius: var(--aw-radius-md);
   }
   .vc-kind {
-    display: inline-flex;
     padding-top: 0.125rem;
   }
   .vc-issue,
@@ -191,12 +180,7 @@ const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', p
     font-size: var(--aw-text-ui);
     color: var(--aw-color-text-secondary);
   }
-  .vc-greet > span:first-child {
-    display: inline-flex;
-    flex: none;
-  }
-  .vc-greet :global(svg) {
-    display: block;
+  .vc-sun {
     color: var(--aw-color-complement);
   }
   .vc-time-sm {

@@ -1,57 +1,33 @@
 ---
 /**
- * GitHub-faithful product shots of what each ready-made workflow produces.
- * Shared by the Workflows* variants. `size="lg"` shows extra detail for the
- * larger stages; `kind="repo-assist-week"` is the Repo Assist activity summary.
+ * GitHub-faithful product shots of what each ready-made workflow produces,
+ * shown beside the workflow in WorkflowsPicker. Repo Assist shows its activity summary.
  */
-import octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 
 interface Props {
-  kind: 'repo-assist' | 'repo-assist-week' | 'ci-doctor' | 'repo-status' | 'test-improver';
-  size?: 'sm' | 'md' | 'lg';
+  kind: 'repo-assist' | 'ci-doctor' | 'repo-status' | 'test-improver';
 }
-const { kind, size = 'md' } = Astro.props;
-const lg = size === 'lg';
-const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s, height: s });
+const { kind } = Astro.props;
 ---
 
-<div class="wf-stage" data-size={size} aria-hidden="true">
+<div class="wf-stage" aria-hidden="true">
   <div class={`gh gh-${kind}`}>
     {kind === 'repo-assist' && (<>
       <div class="gh-head">
-        <div class="gh-title">Parser drops trailing comments <span class="gh-num">#311</span></div>
-        <span class="gh-row"><span class="gh-state gh-state-done"><span set:html={icon('issue-closed', 14)} />Closed</span><span class="gh-lbl gh-lbl-red">bug</span><span class="gh-lbl gh-lbl-blue">parser</span></span>
-      </div>
-      <div class="gh-tl">
-        <div class="gh-cm">
-          <span class="gh-av" set:html={icon('mark-github', 16)} />
-          <div class="gh-box">
-            <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented</span></div>
-            <div class="gh-box-body"><p>Reproduced on <code>main</code>. Fixed in #318.</p></div>
-          </div>
-        </div>
-        <div class="gh-ev">
-          <span class="gh-badge gh-badge-done" set:html={icon('issue-closed', 16)} />
-          <span class="gh-ev-t"><b>github-actions</b> closed this as completed in <b>#318</b></span>
-        </div>
-      </div>
-    </>)}
-
-    {kind === 'repo-assist-week' && (<>
-      <div class="gh-head">
         <div class="gh-title">[Repo Assist] Monthly activity, October <span class="gh-num">#300</span></div>
-        <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+        <span class="gh-state"><Octicon name="issue-opened" size={14} />Open</span>
       </div>
       <div class="gh-cm">
-        <span class="gh-av" set:html={icon('mark-github', 16)} />
+        <Octicon name="mark-github" class="gh-av" />
         <div class="gh-box">
           <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented · this week</span></div>
           <ul class="gh-log" role="list">
-            <li><span class="gh-muted" set:html={icon('tag', 16)} /><span>Labelled <b>14</b> new issues</span></li>
-            <li><span class="gh-ok" set:html={icon('git-pull-request', 16)} /><span>Opened <b>#318</b> Fix trailing comment handling</span></li>
-            <li><span class="gh-done" set:html={icon('git-merge', 16)} /><span><b>#309</b> Speed up config loading was merged</span></li>
-            <li><span class="gh-done" set:html={icon('issue-closed', 16)} /><span>Closed <b>#297</b> as a duplicate of #284</span></li>
-            <li><span class="gh-ok" set:html={icon('git-pull-request', 16)} /><span>Opened <b>#322</b> Add tests for the config loader</span></li>
+            <li><Octicon name="tag" class="gh-muted" /><span>Labelled <b>14</b> new issues</span></li>
+            <li><Octicon name="git-pull-request" class="gh-ok" /><span>Opened <b>#318</b> Fix trailing comment handling</span></li>
+            <li><Octicon name="git-merge" class="gh-done" /><span><b>#309</b> Speed up config loading was merged</span></li>
+            <li><Octicon name="issue-closed" class="gh-done" /><span>Closed <b>#297</b> as a duplicate of #284</span></li>
+            <li><Octicon name="git-pull-request" class="gh-ok" /><span>Opened <b>#322</b> Add tests for the config loader</span></li>
           </ul>
         </div>
       </div>
@@ -60,36 +36,34 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     {kind === 'ci-doctor' && (<>
       <div class="gh-box gh-merge">
         <div class="gh-merge-head">
-          <span class="gh-merge-ico" set:html={icon('x', 16)} />
+          <Octicon name="x" class="gh-merge-ico" />
           <span><b>Some checks were not successful</b><br /><span class="gh-muted">1 failing and 1 successful check</span></span>
         </div>
-        <div class="gh-run"><span class="gh-bad" set:html={icon('x-circle-fill', 16)} /><b>CI / test</b><span class="gh-muted">Failing after 2m</span></div>
-        <div class="gh-run"><span class="gh-ok" set:html={icon('check-circle-fill', 16)} /><b>CI / lint</b><span class="gh-muted">Successful in 12s</span></div>
+        <div class="gh-run"><Octicon name="x-circle-fill" class="gh-bad" /><b>CI / test</b><span class="gh-muted">Failing after 2m</span></div>
+        <div class="gh-run"><Octicon name="check-circle-fill" class="gh-ok" /><b>CI / lint</b><span class="gh-muted">Successful in 12s</span></div>
       </div>
       <div class="gh-tl">
         <div class="gh-ev">
-          <span class="gh-badge gh-badge-ok" set:html={icon('issue-opened', 16)} />
+          <Octicon name="issue-opened" class="gh-badge gh-badge-ok" />
           <span class="gh-ev-t"><b>github-actions</b> opened <b>test job times out on db setup</b> <span class="gh-num">#519</span></span>
         </div>
-        {lg && (
-          <div class="gh-cm">
-            <span class="gh-av" set:html={icon('mark-github', 16)} />
-            <div class="gh-box">
-              <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented</span></div>
-              <div class="gh-box-body"><p><b>Likely cause:</b> <code>DB_HOST</code> is unset since the runner image update in #512. <b>Next step:</b> set the service hostname in <code>ci.yml</code>.</p></div>
-            </div>
+        <div class="gh-cm">
+          <Octicon name="mark-github" class="gh-av" />
+          <div class="gh-box">
+            <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented</span></div>
+            <div class="gh-box-body"><p><b>Likely cause:</b> <code>DB_HOST</code> is unset since the runner image update in #512. <b>Next step:</b> set the service hostname in <code>ci.yml</code>.</p></div>
           </div>
-        )}
+        </div>
       </div>
     </>)}
 
     {kind === 'repo-status' && (<>
       <div class="gh-head">
         <div class="gh-title">Daily status, 2 October <span class="gh-num">#507</span></div>
-        <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+        <span class="gh-state"><Octicon name="issue-opened" size={14} />Open</span>
       </div>
       <div class="gh-cm">
-        <span class="gh-av" set:html={icon('mark-github', 16)} />
+        <Octicon name="mark-github" class="gh-av" />
         <div class="gh-box">
           <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> opened this issue</span></div>
           <div class="gh-box-body">
@@ -99,13 +73,11 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
               <span><b>4</b><span class="gh-muted">issues opened</span></span>
               <span><b>9</b><span class="gh-muted">issues closed</span></span>
             </div>
-            {lg && (
-              <ul class="gh-bullets" role="list">
-                <li><b>#309</b> made config loading 3X faster</li>
-                <li>CI is green on <code>main</code> after #521</li>
-                <li><b>#301</b> needs a maintainer decision</li>
-              </ul>
-            )}
+            <ul class="gh-bullets" role="list">
+              <li><b>#309</b> made config loading 3X faster</li>
+              <li>CI is green on <code>main</code> after #521</li>
+              <li><b>#301</b> needs a maintainer decision</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -114,7 +86,7 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     {kind === 'test-improver' && (<>
       <div class="gh-head">
         <div class="gh-title">Add tests for the config loader <span class="gh-num">#322</span></div>
-        <span class="gh-state"><span set:html={icon('git-pull-request', 14)} />Open</span>
+        <span class="gh-state"><Octicon name="git-pull-request" size={14} />Open</span>
       </div>
       <div class="gh-box gh-files">
         <div class="gh-frow"><span class="gh-mono">test/config.test.ts</span><span class="gh-add-n">+64</span><span class="gh-del-n">−0</span><span class="gh-stat"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></span></div>
@@ -122,13 +94,11 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
       </div>
       <div class="gh-cov">
         <span class="gh-muted">Coverage for <span class="gh-mono">src/config.ts</span></span>
-        <span class="gh-cov-n"><span class="gh-muted">41%</span><span class="gh-muted" set:html={icon('arrow-right', 14)} /><b class="gh-ok">88%</b></span>
+        <span class="gh-cov-n"><span class="gh-muted">41%</span><Octicon name="arrow-right" size={14} class="gh-muted" /><b class="gh-ok">88%</b></span>
       </div>
-      {lg && (
-        <div class="gh-box">
-          <div class="gh-run"><span class="gh-ok" set:html={icon('check-circle-fill', 16)} /><b>All checks have passed</b><span class="gh-muted">212 tests</span></div>
-        </div>
-      )}
+      <div class="gh-box">
+        <div class="gh-run"><Octicon name="check-circle-fill" class="gh-ok" /><b>All checks have passed</b><span class="gh-muted">212 tests</span></div>
+      </div>
     </>)}
   </div>
 </div>
@@ -137,30 +107,13 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
   .wf-stage {
     position: relative;
     overflow: hidden;
-    height: 17rem;
+    height: 25rem;
     background: var(--aw-color-bg-subtle);
     border: 1px solid var(--aw-color-divider);
     border-radius: 16px;
   }
-  .wf-stage[data-size='lg'] {
-    height: 25rem;
-  }
-  /* Small: a scaled-down shot with more air around it. */
-  .wf-stage[data-size='sm'] {
-    height: 15rem;
-    border-color: transparent;
-  }
-  .wf-stage[data-size='sm'] .gh {
-    top: 2.5rem;
-    left: 2.5rem;
-    transform: scale(0.88);
-    transform-origin: top left;
-  }
   @media (max-width: 47.99rem) {
-    .wf-stage { height: 16rem; }
-    .wf-stage[data-size='sm'] { height: 15rem; }
-    .wf-stage[data-size='sm'] .gh { top: 1.75rem; left: 1.75rem; }
-    .wf-stage[data-size='lg'] { height: 20rem; }
+    .wf-stage { height: 20rem; }
   }
 
   /* GitHub UI mocks: Primer-style neutrals and functional colours from site tokens. Dark first. */
@@ -175,7 +128,6 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     --gh-success: color-mix(in srgb, var(--aw-green-6) 85%, var(--gh-fg));
     --gh-success-em: color-mix(in srgb, var(--aw-green-6) 85%, var(--aw-gray-13));
     --gh-done: var(--aw-purple-4);
-    --gh-done-em: var(--aw-purple-7);
     --gh-danger: var(--aw-red-5);
     --gh-r: 8px;
 
@@ -191,7 +143,7 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     gap: 1.25rem;
     background: var(--gh-canvas);
     border: 1px solid var(--gh-border);
-    border-radius: 12px;
+    border-radius: var(--aw-radius-lg);
     box-shadow: var(--aw-shadow-raised);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
     font-size: var(--aw-step--1);
@@ -209,12 +161,7 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     --gh-neutral: var(--aw-gray-3);
     --gh-success: color-mix(in srgb, var(--aw-green-6) 80%, var(--aw-gray-13));
     --gh-done: var(--aw-purple-7);
-    --gh-done-em: var(--aw-purple-7);
     --gh-danger: color-mix(in srgb, var(--aw-red-5) 82%, var(--aw-gray-13));
-  }
-  .gh :global(svg) {
-    display: block;
-    fill: currentColor;
   }
   .gh b {
     font-weight: 600;
@@ -242,7 +189,7 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
   .gh code {
     padding: 0.05em 0.3em;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--aw-radius-sm);
     background: color-mix(in srgb, var(--gh-muted) 18%, transparent);
     color: var(--gh-fg);
   }
@@ -277,21 +224,11 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     padding: 0 0.625rem 0 0.5rem;
     border-radius: 2em;
     background: var(--gh-success-em);
-    color: var(--aw-gray-0);
+    color: var(--aw-color-text-on-status);
     font-weight: 500;
-  }
-  .gh-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .gh-state-done {
-    background: var(--gh-done-em);
   }
 
   .gh-av {
-    display: inline-flex;
-    flex: none;
     align-items: center;
     justify-content: center;
     width: 2rem;
@@ -328,8 +265,6 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
   }
   .gh-ev-t { line-height: 1.75; }
   .gh-badge {
-    display: inline-flex;
-    flex: none;
     align-items: center;
     justify-content: center;
     width: 2rem;
@@ -341,29 +276,6 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     color: var(--gh-muted);
   }
   .gh-badge-ok { color: var(--gh-success); }
-  .gh-badge-done {
-    background: var(--gh-done-em);
-    color: var(--aw-gray-0);
-  }
-  .gh-lbl {
-    white-space: nowrap;
-    padding: 0.0625rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--lbl) 30%, transparent);
-    border-radius: 2em;
-    background: color-mix(in srgb, var(--lbl) 18%, transparent);
-    color: color-mix(in srgb, var(--lbl) 55%, var(--gh-fg));
-    font-weight: 500;
-  }
-  .gh-lbl-red { --lbl: var(--aw-red-5); }
-  .gh-lbl-blue { --lbl: var(--aw-blue-6); }
-  :global(:root[data-theme='light']) .gh-lbl {
-    background: var(--lbl);
-    border-color: transparent;
-    color: var(--aw-gray-0);
-  }
-  :global(:root[data-theme='light']) .gh-lbl-red {
-    --lbl: color-mix(in srgb, var(--aw-red-5) 88%, var(--aw-gray-13));
-  }
 
   /* Boxes: comments, merge box, file list */
   .gh-box {
@@ -405,7 +317,6 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     padding: 0.5rem 0.875rem;
   }
   .gh-log li + li { border-top: 1px solid var(--gh-border); }
-  .gh-log li > span:first-child { flex: none; }
 
   /* Repo Status figures */
   .gh-stats {
@@ -447,15 +358,13 @@ const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s,
     line-height: 1.4;
   }
   .gh-merge-ico {
-    display: inline-flex;
-    flex: none;
     align-items: center;
     justify-content: center;
     width: 2rem;
     height: 2rem;
     border-radius: var(--gh-r);
     background: var(--gh-danger);
-    color: var(--aw-gray-0);
+    color: var(--aw-color-text-on-status);
   }
   .gh-run {
     display: flex;

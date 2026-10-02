@@ -277,7 +277,7 @@ export default defineConfig({
         PageTitle: "./src/components/PageTitle.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
-      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css", "./src/styles/docs-components.css"],
+      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css", "./src/styles/landing.css", "./src/styles/chrome.css", "./src/styles/docs-components.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/github/gh-aw" }],
       tableOfContents: {
         minHeadingLevel: 2,
@@ -378,7 +378,7 @@ export default defineConfig({
             { label: "Quick Start", link: "/setup/quick-start/" },
             { label: "Creating New Workflows", link: "/setup/creating-workflows/" },
             { label: "Working with Workflows", link: "/guides/working-with-workflows/" },
-            { label: "Creation Wizard", link: "/wizard/", attrs: { class: "sidebar-external", target: "_blank", rel: "noopener" } },
+            { label: "Creation Wizard", link: "/wizard/", attrs: { class: "sidebar-external", target: "_blank", rel: "noopener", "aria-label": "Creation Wizard (opens in a new tab)" } },
             { label: "CLI Commands", link: "/setup/cli/" },
           ],
         },
