@@ -21,13 +21,22 @@ tools:
 safe-outputs:
   steps:
     - name: Verify coordinator finish intent artifact
-      run: |
-        if grep -Eq '"type"[[:space:]]*:[[:space:]]*"create_issue"' /tmp/gh-aw/safeoutputs.jsonl; then
-          echo 'Dispatch coordinator smoke failure reported; processing the failure issue'
-        else
-          test -s /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
-          grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
-        fi
+      uses: actions/github-script@v9.0.0
+      env:
+        GH_AW_VERIFY_CONFIG: '{"safeOutputsPath":"/tmp/gh-aw/safeoutputs.jsonl","finishIntentPath":"/tmp/gh-aw/dispatch-work-coordinator.finish.jsonl"}'
+      with:
+        script: |
+          const fs = require('node:fs');
+          const { safeOutputsPath, finishIntentPath } = JSON.parse(process.env.GH_AW_VERIFY_CONFIG);
+          const records = (path) => fs.readFileSync(path, 'utf8')
+            .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+
+          if (records(safeOutputsPath).some((record) => record?.type === 'create_issue')) {
+            core.info('Dispatch coordinator smoke failure reported; processing the failure issue');
+          } else if (!fs.statSync(finishIntentPath).size ||
+                     !records(finishIntentPath).some((record) => record?.outcome === 'completed')) {
+            throw new Error('Dispatch coordinator finish intent artifact is missing or incomplete');
+          }
   create-issue:
     max: 1
     title-prefix: "[smoke-dispatch-work-coordinator] "
