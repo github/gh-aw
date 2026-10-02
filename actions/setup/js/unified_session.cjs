@@ -325,14 +325,19 @@ function writeUnifiedSession(options = {}) {
   }
 }
 
-if (require.main === module) {
-  require("./shim.cjs");
-  try {
-    writeUnifiedSession();
-  } catch (error) {
-    console.error(`Failed to collect unified session: ${getErrorMessage(error)}`);
-    process.exitCode = 1;
-  }
+/** @param {{rootDir?: string, engine?: string, outputPath?: string}} [options] @returns {Promise<void>} */
+async function main(options = {}) {
+  writeUnifiedSession(options);
+  const { publishUnifiedSessionSummary } = require("./unified_session_render.cjs");
+  await publishUnifiedSessionSummary(options.outputPath ?? path.join(options.rootDir ?? "/tmp/gh-aw", "usage/aw_session.jsonl"));
 }
 
-module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, writeUnifiedSession };
+if (require.main === module) {
+  require("./shim.cjs");
+  main().catch(error => {
+    console.error(`Failed to collect unified session: ${getErrorMessage(error)}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { SESSION_FILE_FORMAT_VERSION, sessionTimestamp, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, collectUnifiedSession, writeUnifiedSession, main };

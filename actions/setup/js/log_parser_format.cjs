@@ -3,6 +3,7 @@
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
 const { sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
 const { escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
+const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
 
 /**
  * Minimal dependency contract injected from log_parser_shared.cjs.
@@ -35,7 +36,7 @@ const { escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryL
  * @property {(logEntries: Array<any>, options: {formatToolCallback: Function, formatInitCallback: Function, summaryTracker?: any, includeInformation?: boolean}) => {markdown: string, commandSummary: Array<string>, sizeLimitReached: boolean}} generateConversationMarkdown
  * @property {(toolUse: any, toolResult: any, options?: {includeDetailedParameters?: boolean}) => string} formatToolUse
  * @property {(logEntries: Array<any>, options?: {model?: string, parserName?: string}) => string} generatePlainTextSummary
- * @property {(logEntries: Array<any>, options?: {model?: string, parserName?: string}) => string} generateCopilotCliStyleSummary
+ * @property {(logEntries: Array<any>, options?: {model?: string, parserName?: string, maxBytes?: number}) => string} generateCopilotCliStyleSummary
  */
 
 /**
@@ -114,6 +115,14 @@ function createLogParserFormatters(deps) {
    * @returns {{markdown: string, commandSummary: Array<string>, sizeLimitReached: boolean}} Generated markdown, command summary, and size limit status
    */
   function generateConversationMarkdown(logEntries, options) {
+    if (isUnifiedSessionTrace(logEntries)) {
+      const markdown = unifiedSummary(logEntries, true);
+      return {
+        markdown,
+        commandSummary: publicationAgentSessions(logEntries).flatMap(group => generateConversationMarkdown(group.events, options).commandSummary),
+        sizeLimitReached: markdown.includes("summary truncated:") || markdown.includes("byte limit reached"),
+      };
+    }
     const standard = isCopilotEventLogEntries(logEntries);
     const { formatToolCallback, formatInitCallback } = options;
     const summaryTracker = options.summaryTracker ?? (standard ? createSummaryTracker() : undefined);
@@ -707,6 +716,7 @@ function createLogParserFormatters(deps) {
    * @returns {string} Plain text summary for console output
    */
   function generatePlainTextSummary(logEntries, options = {}) {
+    if (isUnifiedSessionTrace(logEntries)) return unifiedSummary(logEntries, false);
     const { parserName = "Agent" } = options;
     const model = options.model ?? observedSessionModel(logEntries);
     const lines = [];
@@ -732,9 +742,11 @@ function createLogParserFormatters(deps) {
    * @param {Object} options - Configuration options
    * @param {string} [options.model] - Model name to include in the header
    * @param {string} [options.parserName] - Name of the parser (e.g., "Copilot", "Claude")
+   * @param {number} [options.maxBytes] - Remaining publication budget for a unified trace
    * @returns {string} Markdown-formatted summary for step summary rendering
    */
   function generateCopilotCliStyleSummary(logEntries, options = {}) {
+    if (isUnifiedSessionTrace(logEntries)) return unifiedSummary(logEntries, true, options.maxBytes);
     const lines = [];
     const standard = isCopilotEventLogEntries(logEntries);
     const model = options.model ?? observedSessionModel(logEntries);
@@ -760,6 +772,22 @@ function createLogParserFormatters(deps) {
     lines.push(fence);
 
     return preamble + lines.join("\n") + tail;
+  }
+
+  /** @param {Array<any>} events @param {boolean} markdown @param {number} [maxBytes] @returns {string} */
+  function unifiedSummary(events, markdown, maxBytes = MAX_STEP_SUMMARY_SIZE) {
+    return renderUnifiedSession(events, {
+      markdown,
+      maxBytes: Math.min(maxBytes, MAX_STEP_SUMMARY_SIZE),
+      maxLineBytes: 4 * MAX_AGENT_TEXT_LENGTH + 128,
+      agentStatistics: entries => {
+        const projected = normalizeEntriesForRendering(entries);
+        const model = observedSessionModel(entries);
+        const lines = [...(model ? [`Model: ${model}`] : []), ...renderInitializationLines(projected.find(entry => entry.type === "system" && entry.subtype === "init"))];
+        appendStatistics(lines, projected, collectToolUsePairs(projected), true);
+        return lines;
+      },
+    });
   }
 
   return {

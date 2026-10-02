@@ -691,6 +691,51 @@ limits remain in effect. `agent_session_render.test.cjs` exercises field coverag
 tool states, namespace and ID handling, payload fences, and the measured byte
 limit; bootstrap tests verify pre-truncation redaction in both publication sinks.
 
+### 8.5 Unified-file publication views
+
+**T-UAS-065 — Unified trace rendering.** Actions step summaries and action output
+logs MUST support the runtime observation types in Section 4.7 in addition to
+agent events. A full-file reader MUST validate the leading format header before
+rendering. Format metadata MUST appear separately from timed observations.
+Rendering MUST preserve file order, label each observation's component and phase,
+and mark unavailable timestamps as untimed rather than fabricate a clock value.
+
+**T-UAS-066 — Scoped agent statistics.** Readers of the unified file MUST scope
+agent initialization, tool pairing, and accounting selection by provenance phase
+and source path. They MUST restore source-local event order before deriving those
+statistics. Coincident tool IDs in different source files MUST NOT pair across
+sources. Gateway, firewall, accounting, grader, and eval observations MUST NOT
+be added to agent snapshots as additional session usage. Private correlation
+keys MAY remain internal until projection, but MUST NOT bypass final publication
+redaction.
+
+The conclusion collector publishes the already-redacted `aw_session.jsonl` to
+both sinks after writing it. `generatePlainTextSummary`,
+`generateCopilotCliStyleSummary`, and `generateConversationMarkdown` recognize
+unified events. Their unified view shows file version, per-component record
+counts, per-source agent statistics, and a chronological trace. Existing
+agent-only inputs retain their earlier rendering behavior.
+
+| Observation | Unified display projection |
+| --- | --- |
+| Agent messages and tool lifecycle | Assistant/reasoning text, tool name, correlation ID, observed outcome, and scoped accounting. User prompt records remain omitted. |
+| MCPG | Method, server, RPC ID, tool name, observed responses/errors, and filter/block diagnostics. Raw RPC arguments and response bodies are omitted. |
+| AWF | Network host/method/status/decision, observed token usage, steering messages, and tracker event names. |
+| Safe outputs | Requested versus execution-recorded operations, target metadata, and structured error counts. Requests are not displayed as successes. |
+| Experiments, graders, evals | Assignments/state, grader value/unit/outcome, and eval ID/answer/model. Grader scripts and raw evaluation questions are omitted. |
+| Execution, detection, collection | Recorded outcomes/verdict flags, source coverage, warnings, untimed counts, and absent components. |
+| Unknown extensions | Type and provenance only; opaque payloads are not dumped. |
+
+Redaction operates on decoded publication copies before preview clipping.
+Untrusted text cannot close the Actions view's generated code fence or disclosure
+container, and cannot inject workflow commands into output log lines. Both views
+retain the measured byte budget and explicit truncation notices. Appending the
+conclusion view also respects the remaining budget of an existing step-summary
+file; if no space remains, logs still receive the view and publication emits a
+warning. The complete compact JSONL artifact is not truncated or rewritten by
+rendering. `unified_session_render.test.cjs` covers these projections, scopes,
+privacy boundaries, version failures, and end-to-end publication.
+
 ## 9. Compliance Testing (Normative)
 
 ### 9.1 Test procedure and coverage
@@ -732,6 +777,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-049, T-UAS-050 | Hostile HTML/fences, mask values, oversized display, partial parse boundary | Safe/redacted publication, explicit truncation, canonical source remains unchanged. |
 | T-UAS-051, T-UAS-052, T-UAS-053 | Conformance report and isolated test harness | Applicable IDs covered; structural/round-trip/purity assertions; no real production I/O. |
 | T-UAS-054–T-UAS-064 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; leading numeric format version; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete compact `aw_session.jsonl`, pinned format header, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
+| T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -836,8 +882,9 @@ separately from the historical parser gap inventory above.
 
 Remaining boundaries are intentional: unobserved execution times are not
 reconstructed, clocks are not corrected, binary threat-detection runs do not
-become fabricated agent conversations, and legacy display/CLI readers are not
-automatically changed to consume the richer artifact. Evals contribute recorded
+become fabricated agent conversations, and Go CLI readers are not automatically
+changed to consume the richer artifact. Actions step-summary and action-output
+renderers consume the unified file as defined in Section 8.5. Evals contribute recorded
 results/accounting, not an invented conversation transcript. Current collection
 loads selected files and the merged array into memory; streaming external sort
 for exceptionally large sessions remains future work.
@@ -1109,11 +1156,12 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 
 ### Version 1.1.0 — Draft (2026-10-02)
 
-- Added the artifact-merger conformance class and requirements T-UAS-054 through T-UAS-064.
+- Added the artifact-merger conformance class and requirements T-UAS-054 through T-UAS-066.
 - Defined complete MCPG/AWF and downstream observation payloads, source provenance, timestamp units, deterministic ties, and untimed retention.
 - Specified canonical bootstrap persistence, conclusion-job usage publication, coverage diagnostics, replica precedence, and artifact redaction.
 - Required compact single-record-per-line JSONL while preserving escaped payload whitespace and native metadata.
 - Named the unified artifact file `aw_session.jsonl` and required a leading numeric `session.format` version entry, independent of document and engine versions.
+- Added unified-file views to Actions step summaries and output logs, with source-scoped agent accounting and privacy-preserving runtime projections.
 - Recorded the conclusion pipeline review, empirical multi-engine merger execution, and remaining boundaries.
 
 ### Version 1.0.0 — Draft (2026-10-02)
