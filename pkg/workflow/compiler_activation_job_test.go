@@ -45,6 +45,9 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	uploadStep := extractWorkflowStepByName(t, steps, "Upload activation artifact")
 	assert.Contains(t, uploadStep, "if: success() || failure()")
 	assert.NotContains(t, uploadStep, "if: always()")
+	for _, filename := range []string{"system.txt", "user.txt", "prompt.txt"} {
+		assert.Contains(t, uploadStep, "/tmp/gh-aw/aw-prompts/"+filename)
+	}
 }
 
 func TestActivationInfoArtifactUpload(t *testing.T) {

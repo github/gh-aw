@@ -252,6 +252,7 @@ describe("interpolate_prompt", () => {
         }));
     }),
     describe("main function integration", () => {
+      const { main } = require("./interpolate_prompt.cjs");
       let tmpDir, promptPath, originalEnv;
       /**
        * Apply the STEP 2.5 experiment condition substitution logic from main().
@@ -296,6 +297,28 @@ describe("interpolate_prompt", () => {
           if (!mainMatch) throw new Error("Could not extract main function");
           const main = eval(`(${mainMatch[0]})`);
           (main(), expect(core.setFailed).toHaveBeenCalledWith(`${ERR_CONFIG}: GH_AW_PROMPT environment variable is not set`));
+        }),
+        it("should fail when split prompt files do not match the combined prompt", async () => {
+          fs.writeFileSync(path.join(tmpDir, "system.txt"), "System");
+          fs.writeFileSync(path.join(tmpDir, "user.txt"), "User");
+          fs.writeFileSync(promptPath, "Different");
+
+          await main();
+
+          expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Split prompt files do not match the combined prompt"));
+          expect(fs.readFileSync(promptPath, "utf8")).toBe("Different");
+        }),
+        it("should fail when template rendering removes the split boundary", async () => {
+          const system = "{{#if false}}\nHidden\n";
+          const user = "{{/if}}\nVisible\n";
+          fs.writeFileSync(path.join(tmpDir, "system.txt"), system);
+          fs.writeFileSync(path.join(tmpDir, "user.txt"), user);
+          fs.writeFileSync(promptPath, system + user);
+
+          await main();
+
+          expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Prompt split boundary was lost during processing"));
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(system + user);
         }),
         it("should not corrupt condition when experiment value contains $1 (STEP 2.5)", () => {
           // Regression: GH_AW_EXPERIMENTS_* value containing $1 must not be interpreted as a
@@ -348,6 +371,65 @@ describe("interpolate_prompt", () => {
           expect(fs.readFileSync(templatePath, "utf8")).toBe(templateContent);
           // The prompt.txt should have the interpolated value
           expect(fs.readFileSync(promptPath, "utf8")).toContain("Process: 123");
+        }),
+        it("keeps split prompts synchronized through imports, rendering, and placeholder substitution", async () => {
+          const systemPath = path.join(tmpDir, "system.txt");
+          const userPath = path.join(tmpDir, "user.txt");
+          const system = "<system>\nRepo: ${GH_AW_EXPR_REPO}\n__ACTOR__\n</system>\n";
+          const user = "Task:\n{{#runtime-import .github/workflows/helper.md}}\n{{#if false}}\nHidden\n{{/if}}\n__ACTOR__\n";
+          fs.mkdirSync(path.join(tmpDir, ".github", "workflows"), { recursive: true });
+          fs.writeFileSync(path.join(tmpDir, ".github", "workflows", "helper.md"), "Imported task");
+          fs.writeFileSync(systemPath, system);
+          fs.writeFileSync(userPath, user);
+          fs.writeFileSync(promptPath, system + user);
+          process.env.GH_AW_EXPR_REPO = "github/gh-aw";
+
+          await main();
+          expect(core.setFailed).not.toHaveBeenCalled();
+          expect(fs.readFileSync(path.join(tmpDir, "prompt-template.txt"), "utf8")).toBe(system + user);
+          const importTree = JSON.parse(fs.readFileSync(path.join(tmpDir, "prompt-import-tree.json"), "utf8"));
+          expect(importTree.template).toBe(system + user);
+          expect(importTree.template).not.toContain("\x00GH_AW_PROMPT_SPLIT_");
+          const substitutePlaceholders = require("./substitute_placeholders.cjs");
+          await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
+
+          const finalSystem = fs.readFileSync(systemPath, "utf8");
+          const finalUser = fs.readFileSync(userPath, "utf8");
+          expect(finalSystem).toBe("<system>\nRepo: github/gh-aw\ndeveloper\n</system>\n");
+          expect(finalUser).toContain("Imported task");
+          expect(finalUser).not.toContain("runtime-import");
+          expect(finalUser).not.toContain("Hidden");
+          expect(finalUser).toContain("developer");
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(finalSystem + finalUser);
+        }),
+        it("extracts inline agent and skill headings at the start of the split user prompt", async () => {
+          const systemPath = path.join(tmpDir, "system.txt");
+          const userPath = path.join(tmpDir, "user.txt");
+          const system = "<system>\nRules\n</system>";
+          const user = "## agent: `helper`\nAgent body\n## end agent: `helper`\n## skill: `tool`\nSkill body\n## end skill: `tool`\n{{#if false}}\nHidden\n{{/if}}\nTask\n";
+          fs.writeFileSync(systemPath, system);
+          fs.writeFileSync(userPath, user);
+          fs.writeFileSync(promptPath, system + user);
+          const realWriteFileSync = fs.writeFileSync;
+          const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation((file, ...args) => {
+            if (String(file).startsWith(tmpDir)) realWriteFileSync(file, ...args);
+          });
+
+          await main();
+
+          expect(core.setFailed).not.toHaveBeenCalled();
+          const writtenPaths = writeSpy.mock.calls.map(call => String(call[0]));
+          writeSpy.mockRestore();
+          expect(writtenPaths.some(p => p.includes("helper") && !p.startsWith(tmpDir))).toBe(true);
+          expect(writtenPaths.some(p => p.includes("tool") && !p.startsWith(tmpDir))).toBe(true);
+          const finalSystem = fs.readFileSync(systemPath, "utf8");
+          const finalUser = fs.readFileSync(userPath, "utf8");
+          expect(finalSystem).toBe(system);
+          expect(finalUser).not.toContain("Agent body");
+          expect(finalUser).not.toContain("Skill body");
+          expect(finalUser).not.toContain("Hidden");
+          expect(finalUser).toContain("Task");
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(finalSystem + finalUser);
         }),
         it("should write prompt-import-tree.json with version and empty children when no imports", async () => {
           const templateContent = "Hello World";

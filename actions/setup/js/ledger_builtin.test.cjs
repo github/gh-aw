@@ -4,7 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { CLAIM_STATE_VIEW, createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
+import { NOTE_STATE_VIEW, createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
 import { normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { finalId } from "./ledger_transactions.cjs";
 import { validateTransactions } from "./push_ledger_changes.cjs";
@@ -152,13 +152,21 @@ test("counter rejects coercion, nonfinite and unsafe arithmetic without changing
   assert.equal(reducer.output().tables.state.rows[0].value, Number.MAX_SAFE_INTEGER);
 });
 
-test("claims projection retains assertions, ordered citations, and every independent vote", () => {
-  const config = { type: "claims" };
-  const claimId = finalId("envelope", 2);
-  const claim = {
-    operation: "claim",
+test("notes rejects the former claims type, operations, and fields", () => {
+  const note = { operation: "note", subject: "README", note: "Documented", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] };
+  assert.throws(() => createReducer({ type: "claims" }), /Unknown built-in ledger type/);
+  assert.throws(() => validateOperation({ ...note, operation: "claim" }, { type: "notes" }), /Unsupported ledger operation/);
+  assert.throws(() => validateOperation({ ...note, claim: "Documented" }, { type: "notes" }), /Invalid ledger operation fields/);
+  assert.throws(() => validateOperation({ operation: "vote", claim_id: "old", vote: "up" }, { type: "notes" }), /Invalid ledger operation fields/);
+});
+
+test("notes projection retains assertions, ordered citations, and every independent vote", () => {
+  const config = { type: "notes" };
+  const noteId = finalId("envelope", 2);
+  const note = {
+    operation: "note",
     subject: "README",
-    claim: "Documented",
+    note: "Documented",
     reason: "Checked source",
     citations: [
       { type: "repository", path: "README.md", start_line: 1 },
@@ -167,17 +175,17 @@ test("claims projection retains assertions, ordered citations, and every indepen
       { type: "repository", path: "LICENSE", end_line: 10 },
     ],
   };
-  const up = { operation: "vote", claim_id: claimId, vote: "up", reason: "Confirmed" };
-  const down = { operation: "vote", claim_id: claimId, vote: "down", reason: "Disputed" };
-  const records = [down, up, claim].map((payload, index) => ({ id: finalId("envelope", index), timestamp: "2026-01-01T00:00:00.000Z", sha: `sha256:${"a".repeat(64)}`, payload }));
+  const up = { operation: "vote", note_id: noteId, vote: "up", reason: "Confirmed" };
+  const down = { operation: "vote", note_id: noteId, vote: "down", reason: "Disputed" };
+  const records = [down, up, note].map((payload, index) => ({ id: finalId("envelope", index), timestamp: "2026-01-01T00:00:00.000Z", sha: `sha256:${"a".repeat(64)}`, payload }));
   const output = replayBuiltin(config, records);
-  assert.deepEqual(output.tables.claims.rows, [{ id: claimId, subject: "README", claim: "Documented", reason: "Checked source", created_at: records[2].timestamp, record_sha: records[2].sha }]);
+  assert.deepEqual(output.tables.notes.rows, [{ id: noteId, subject: "README", note: "Documented", reason: "Checked source", created_at: records[2].timestamp, record_sha: records[2].sha }]);
   assert.deepEqual(
-    output.tables.claim_citations.rows,
-    claim.citations.map((citation, ordinal) => ({ claim_id: claimId, ordinal, citation_type: citation.type, path: citation.path, start_line: citation.start_line ?? null, end_line: citation.end_line ?? null }))
+    output.tables.note_citations.rows,
+    note.citations.map((citation, ordinal) => ({ note_id: noteId, ordinal, citation_type: citation.type, path: citation.path, start_line: citation.start_line ?? null, end_line: citation.end_line ?? null }))
   );
   assert.deepEqual(
-    output.tables.claim_votes.rows.map(row => row.record_id),
+    output.tables.note_votes.rows.map(row => row.record_id),
     records
       .filter(record => record.payload.operation === "vote")
       .sort((a, b) => a.id.localeCompare(b.id))
@@ -185,25 +193,25 @@ test("claims projection retains assertions, ordered citations, and every indepen
   );
   assert.deepEqual(replayBuiltin(config, [...records].reverse()), output);
   assert.doesNotThrow(() => validateReplayOutput(output));
-  assert.throws(() => replayBuiltin(config, [{ ...records[2], payload: { ...claim, id: claimId } }]), /must not duplicate/);
+  assert.throws(() => replayBuiltin(config, [{ ...records[2], payload: { ...note, id: noteId } }]), /must not duplicate/);
 });
 
-test("claims projection rejects malformed records and missing vote targets", () => {
-  const config = { type: "claims" };
-  const claim = { id: finalId("claims", 0), operation: "claim", subject: "Source", claim: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
-  assert.throws(() => validateOperation({ ...claim, citations: "README" }, config), /citations/);
-  assert.throws(() => validateOperation({ ...claim, citations: [] }, config), /at least one/);
-  assert.throws(() => validateOperation({ ...claim, citations: [{}] }, config), /valid citation/);
-  assert.throws(() => validateOperation({ ...claim, unknown: 1 }, config), /fields/);
-  assert.throws(() => validateOperation({ ...claim, subject: "" }, config), /subject/);
-  assert.throws(() => validateOperation({ ...claim, subject: "a".repeat(513) }, config), /bounded/);
-  assert.throws(() => validateOperation({ ...claim, claim: "a".repeat(4097) }, config), /bounded/);
-  assert.doesNotThrow(() => validateOperation({ ...claim, reason: "é".repeat(1024) }, config));
-  assert.throws(() => validateOperation({ ...claim, reason: "é".repeat(1025) }, config), /bounded/);
-  assert.throws(() => validateOperation({ ...claim, reason: "a".repeat(4097) }, config), /bounded/);
-  assert.throws(() => validateOperation({ ...claim, citations: Array.from({ length: 33 }, () => ({ type: "repository", path: "README.md", start_line: 1 })) }, config), /valid citation/);
-  assert.doesNotThrow(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "README.md" }] }, config));
-  assert.doesNotThrow(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "README.md", end_line: 3 }] }, config));
+test("notes projection rejects malformed records and missing vote targets", () => {
+  const config = { type: "notes" };
+  const note = { id: finalId("notes", 0), operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
+  assert.throws(() => validateOperation({ ...note, citations: "README" }, config), /citations/);
+  assert.throws(() => validateOperation({ ...note, citations: [] }, config), /at least one/);
+  assert.throws(() => validateOperation({ ...note, citations: [{}] }, config), /valid citation/);
+  assert.throws(() => validateOperation({ ...note, unknown: 1 }, config), /fields/);
+  assert.throws(() => validateOperation({ ...note, subject: "" }, config), /subject/);
+  assert.throws(() => validateOperation({ ...note, subject: "a".repeat(513) }, config), /bounded/);
+  assert.throws(() => validateOperation({ ...note, note: "a".repeat(4097) }, config), /bounded/);
+  assert.doesNotThrow(() => validateOperation({ ...note, reason: "é".repeat(1024) }, config));
+  assert.throws(() => validateOperation({ ...note, reason: "é".repeat(1025) }, config), /bounded/);
+  assert.throws(() => validateOperation({ ...note, reason: "a".repeat(4097) }, config), /bounded/);
+  assert.throws(() => validateOperation({ ...note, citations: Array.from({ length: 33 }, () => ({ type: "repository", path: "README.md", start_line: 1 })) }, config), /valid citation/);
+  assert.doesNotThrow(() => validateOperation({ ...note, citations: [{ type: "repository", path: "README.md" }] }, config));
+  assert.doesNotThrow(() => validateOperation({ ...note, citations: [{ type: "repository", path: "README.md", end_line: 3 }] }, config));
   for (const citation of [
     { type: "url", path: "README.md", start_line: 1 },
     { type: "repository", path: "../README.md", start_line: 1 },
@@ -216,37 +224,37 @@ test("claims projection rejects malformed records and missing vote targets", () 
     { type: "repository", path: "README.md", end_line: 0 },
     { type: "repository", path: "README.md", start_line: 1, unexpected: true },
   ]) {
-    assert.throws(() => validateOperation({ ...claim, citations: [citation] }, config), /valid citation/);
+    assert.throws(() => validateOperation({ ...note, citations: [citation] }, config), /valid citation/);
   }
   assert.throws(
-    () => replayBuiltin(config, [{ id: finalId("envelope", 0), payload: { operation: "claim", subject: claim.subject, claim: claim.claim, reason: claim.reason, citations: [{ type: "repository", path: "../README.md", start_line: 1 }] } }]),
+    () => replayBuiltin(config, [{ id: finalId("envelope", 0), payload: { operation: "note", subject: note.subject, note: note.note, reason: note.reason, citations: [{ type: "repository", path: "../README.md", start_line: 1 }] } }]),
     /valid citation/
   );
-  assert.throws(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "README.md", start_line: 3, end_line: 2 }] }, config), /valid citation/);
-  assert.throws(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "a".repeat(2048), start_line: 1 }] }, config), /size limit/);
-  assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "maybe", reason: "No" }, config), /up or down/);
-  assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "up", reason: "é".repeat(1025) }, config), /bounded/);
-  assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "up", reason: "a".repeat(4097) }, config), /bounded/);
-  assert.throws(() => replayBuiltin(config, [{ id: finalId("envelope", 1), payload: { operation: "vote", claim_id: claim.id, vote: "up", reason: "Confirmed" } }]), /missing claim/);
+  assert.throws(() => validateOperation({ ...note, citations: [{ type: "repository", path: "README.md", start_line: 3, end_line: 2 }] }, config), /valid citation/);
+  assert.throws(() => validateOperation({ ...note, citations: [{ type: "repository", path: "a".repeat(2048), start_line: 1 }] }, config), /size limit/);
+  assert.throws(() => validateOperation({ operation: "vote", note_id: note.id, vote: "maybe", reason: "No" }, config), /up or down/);
+  assert.throws(() => validateOperation({ operation: "vote", note_id: note.id, vote: "up", reason: "é".repeat(1025) }, config), /bounded/);
+  assert.throws(() => validateOperation({ operation: "vote", note_id: note.id, vote: "up", reason: "a".repeat(4097) }, config), /bounded/);
+  assert.throws(() => replayBuiltin(config, [{ id: finalId("envelope", 1), payload: { operation: "vote", note_id: note.id, vote: "up", reason: "Confirmed" } }]), /missing note/);
   const reducer = createReducer(config);
-  assert.throws(() => reducer.apply({ id: finalId("claims", 1), operation: "vote", claim_id: claim.id, vote: "up", reason: "Confirmed" }), /missing claim/);
-  reducer.apply(claim);
-  reducer.apply({ id: finalId("claims", 1), operation: "vote", claim_id: claim.id, vote: "up" });
-  assert.equal(reducer.output().tables.claim_votes.rows[0].reason, null);
-  assert.throws(() => reducer.apply({ id: finalId("claims", 3), operation: "vote", claim_id: finalId("claims", 1), vote: "down", reason: "Not a claim" }), /missing claim/);
-  assert.throws(() => reducer.apply(claim), /Duplicate claim/);
-  assert.throws(() => reducer.apply(claim, { id: "" }), /canonical record ID/);
+  assert.throws(() => reducer.apply({ id: finalId("notes", 1), operation: "vote", note_id: note.id, vote: "up", reason: "Confirmed" }), /missing note/);
+  reducer.apply(note);
+  reducer.apply({ id: finalId("notes", 1), operation: "vote", note_id: note.id, vote: "up" });
+  assert.equal(reducer.output().tables.note_votes.rows[0].reason, null);
+  assert.throws(() => reducer.apply({ id: finalId("notes", 3), operation: "vote", note_id: finalId("notes", 1), vote: "down", reason: "Not a note" }), /missing note/);
+  assert.throws(() => reducer.apply(note), /Duplicate note/);
+  assert.throws(() => reducer.apply(note, { id: "" }), /canonical record ID/);
 });
 
-test("claim_state derives zero votes and null last-vote timestamps", () => {
-  const payload = { operation: "claim", subject: "Source", claim: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
+test("note_state derives zero votes and null last-vote timestamps", () => {
+  const payload = { operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
   const records = [{ id: finalId("envelope", 0), timestamp: "2026-01-01T00:00:00.000Z", sha: `sha256:${"a".repeat(64)}`, payload }];
-  const output = replayBuiltin({ type: "claims" }, records);
+  const output = replayBuiltin({ type: "notes" }, records);
   const db = new DatabaseSync(":memory:");
   try {
-    materializeReplay(db, "claims", "builtin:claims", records, output, 2);
-    db.exec(CLAIM_STATE_VIEW);
-    assert.deepEqual({ ...db.prepare("SELECT * FROM claim_state").get() }, { claim_id: records[0].id, upvotes: 0, downvotes: 0, net_votes: 0, last_vote_at: null, last_positive_vote_at: null });
+    materializeReplay(db, "notes", "builtin:notes", records, output, 2);
+    db.exec(NOTE_STATE_VIEW);
+    assert.deepEqual({ ...db.prepare("SELECT * FROM note_state").get() }, { note_id: records[0].id, upvotes: 0, downvotes: 0, net_votes: 0, last_vote_at: null, last_positive_vote_at: null });
   } finally {
     db.close();
   }

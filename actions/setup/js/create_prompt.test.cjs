@@ -78,6 +78,9 @@ describe("create_prompt", () => {
 
   it("rejects malformed configuration and missing content", () => {
     expect(() => parseConfig("{}")).toThrow("items array");
+    expect(() => parseConfig('{"items":[],"system_item_count":-1}')).toThrow("invalid system_item_count");
+    expect(() => parseConfig('{"items":[],"system_item_count":1}')).toThrow("invalid system_item_count");
+    expect(() => parseConfig('{"items":[],"system_item_count":0.5}')).toThrow("invalid system_item_count");
     expect(() => renderPrompt({ items: [null] }, {}, tempDir)).toThrow("must be an object");
     expect(() => renderPrompt({ items: [{}] }, {}, tempDir)).toThrow("exactly one");
     expect(() => renderPrompt({ items: [{ content_env: "TEXT", file: "system.md" }] }, { TEXT: "x" }, tempDir)).toThrow("exactly one");
@@ -119,6 +122,8 @@ describe("create_prompt", () => {
 
     expect(core.setFailed).not.toHaveBeenCalled();
     expect(fs.readFileSync(promptPath, "utf8")).toBe(process.env.PAYLOAD);
+    expect(fs.readFileSync(path.join(path.dirname(promptPath), "system.txt"), "utf8")).toBe("");
+    expect(fs.readFileSync(path.join(path.dirname(promptPath), "user.txt"), "utf8")).toBe(process.env.PAYLOAD);
     expect(fs.existsSync(canaryPath)).toBe(false);
   });
 

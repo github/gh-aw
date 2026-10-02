@@ -111,6 +111,10 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected --print flag in step: %s", stepContent)
 	}
 
+	if !strings.Contains(stepContent, "--strict-mcp-config") {
+		t.Errorf("Expected --strict-mcp-config in CLI args even without MCP servers: %s", stepContent)
+	}
+
 	if !strings.Contains(stepContent, "--permission-mode acceptEdits") {
 		t.Errorf("Expected --permission-mode acceptEdits in CLI args: %s", stepContent)
 	}
@@ -654,6 +658,10 @@ func TestClaudeEngineWithMCPServers(t *testing.T) {
 		t.Errorf("Expected --mcp-config in CLI args when MCP servers are configured: %s", stepContent)
 	}
 
+	if !strings.Contains(stepContent, "--strict-mcp-config") {
+		t.Errorf("Expected --strict-mcp-config in CLI args when MCP servers are configured: %s", stepContent)
+	}
+
 	// When MCP servers are configured, GH_AW_MCP_CONFIG SHOULD be present
 	if !strings.Contains(stepContent, "GH_AW_MCP_CONFIG: ${{ runner.temp }}/gh-aw/mcp-config/mcp-servers.json") {
 		t.Errorf("Expected GH_AW_MCP_CONFIG environment variable when MCP servers are configured: %s", stepContent)
@@ -686,6 +694,10 @@ func TestClaudeEngineWithSafeOutputs(t *testing.T) {
 	// When safe-outputs is configured, --mcp-config flag SHOULD be present
 	if !strings.Contains(stepContent, `--mcp-config "${RUNNER_TEMP}/gh-aw/mcp-config/mcp-servers.json"`) {
 		t.Errorf("Expected --mcp-config in CLI args when safe-outputs are configured: %s", stepContent)
+	}
+
+	if !strings.Contains(stepContent, "--strict-mcp-config") {
+		t.Errorf("Expected --strict-mcp-config in CLI args when safe-outputs are configured: %s", stepContent)
 	}
 
 	// When safe-outputs is configured, GH_AW_MCP_CONFIG SHOULD be present

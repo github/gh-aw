@@ -80,8 +80,8 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 				"inputSchema": map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false},
 			})
 		}
-		if claimLedgers := ledgerNamesByType["claims"]; len(claimLedgers) > 0 {
-			dynamicTools = append(dynamicTools, generateClaimLedgerTools(claimLedgers)...)
+		if noteLedgers := ledgerNamesByType["notes"]; len(noteLedgers) > 0 {
+			dynamicTools = append(dynamicTools, generateNoteLedgerTools(noteLedgers)...)
 		}
 	}
 
@@ -253,10 +253,10 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 	return dynamicTools, nil
 }
 
-func generateClaimLedgerTools(ledgerNames []string) []map[string]any {
+func generateNoteLedgerTools(ledgerNames []string) []map[string]any {
 	ledger := map[string]any{
 		"type": "string", "enum": ledgerNames,
-		"description": "Target claims ledger; optional when only one claims ledger exists, required otherwise.",
+		"description": "Target notes ledger; optional when only one notes ledger exists, required otherwise.",
 	}
 	fields := []struct {
 		name, operation string
@@ -264,11 +264,11 @@ func generateClaimLedgerTools(ledgerNames []string) []map[string]any {
 		required        []string
 	}{
 		{
-			name: "ledger_claim_add", operation: "claim",
+			name: "ledger_note_add", operation: "note",
 			properties: map[string]any{
 				"temp_id": map[string]any{"type": "string", "description": "Optional temporary ID for same-batch references."},
 				"subject": map[string]any{"type": "string", "minLength": 1, "maxLength": 512},
-				"claim":   map[string]any{"type": "string", "minLength": 1, "maxLength": 4096},
+				"note":    map[string]any{"type": "string", "minLength": 1, "maxLength": 4096},
 				"reason":  map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},
 				"citations": map[string]any{
 					"type": "array", "minItems": 1, "maxItems": 32,
@@ -283,19 +283,20 @@ func generateClaimLedgerTools(ledgerNames []string) []map[string]any {
 					},
 				},
 			},
-			required: []string{"subject", "claim", "reason", "citations"},
+			required: []string{"subject", "note", "reason", "citations"},
 		},
 		{
-			name: "ledger_claim_vote", operation: "vote",
+			name: "ledger_note_vote", operation: "vote",
 			properties: map[string]any{
-				"claim_id": map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
-				"vote":     map[string]any{"type": "string", "enum": []string{"up", "down"}},
-				"reason":   map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},
+				"note_id": map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+				"vote":    map[string]any{"type": "string", "enum": []string{"up", "down"}},
+				"reason":  map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},
 			},
-			required: []string{"claim_id", "vote"},
+			required: []string{"note_id", "vote"},
 		},
 	}
 	tools := make([]map[string]any, 0, len(fields))
+	actions := map[string]string{"note": "Add", "vote": "Vote on"}
 	for _, field := range fields {
 		properties := field.properties
 		properties["ledger"] = ledger
@@ -305,8 +306,8 @@ func generateClaimLedgerTools(ledgerNames []string) []map[string]any {
 		}
 		tools = append(tools, map[string]any{
 			"name":         field.name,
-			"description":  field.operation + " a claim in a claims ledger. Persistence follows trusted validation.",
-			"_ledger_type": "claims", "_ledger_operation": field.operation,
+			"description":  actions[field.operation] + " a note in a notes ledger. Persistence follows trusted validation.",
+			"_ledger_type": "notes", "_ledger_operation": field.operation,
 			"inputSchema": map[string]any{
 				"type": "object", "properties": properties, "required": required, "additionalProperties": false,
 			},

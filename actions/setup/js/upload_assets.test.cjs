@@ -358,7 +358,7 @@ describe("upload_assets.cjs", () => {
       expect(pushCalled).toBe(false);
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(
-        expect.stringContaining("### Assets\n\nStaged mode: **1** asset ready for publication to branch `assets/test-workflow` (not pushed).\n\n<details>\n<summary>View 1 asset</summary>\n\n")
+        expect.stringContaining("### Assets\n\n🎭 Staged mode: **1** asset ready for publication to branch `assets/test-workflow` (not pushed).\n\n<details>\n<summary>View 1 asset</summary>\n\n")
       );
       expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("\n\n</details>\n");
     });

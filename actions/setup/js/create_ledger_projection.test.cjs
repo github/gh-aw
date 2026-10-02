@@ -168,13 +168,13 @@ test("compaction preserves replay's ordered logical history", () => {
   }
 });
 
-test("claims projection derives vote state from canonical records across compaction", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-compaction-"));
+test("notes projection derives vote state from canonical records across compaction", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-notes-compaction-"));
   const sourceDir = path.join(root, "source");
   fs.mkdirSync(sourceDir);
-  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const config = { name: "knowledge", type: "notes", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
   const compaction = parseCompactionConfig(JSON.stringify({ ...config, branch_name: "ledgers/knowledge", compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } }));
-  const claimId = finalId("knowledge", 0);
+  const noteId = finalId("knowledge", 0);
   const voteId = finalId("knowledge", 1);
   const dissentId = finalId("knowledge", 2);
   const first = new Ledger({ memoryDir: sourceDir });
@@ -183,9 +183,9 @@ test("claims projection derives vote state from canonical records across compact
     first.append(
       "ledger_append",
       {
-        operation: "claim",
+        operation: "note",
         subject: "README",
-        claim: "Contains instructions",
+        note: "Contains instructions",
         reason: "Read the source",
         citations: [
           { type: "repository", path: "README.md", start_line: 1 },
@@ -193,12 +193,12 @@ test("claims projection derives vote state from canonical records across compact
           { type: "repository", path: "LICENSE", end_line: 10 },
         ],
       },
-      claimId
+      noteId
     );
-    second.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, voteId);
-    first.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "down" }, dissentId);
+    second.append("ledger_append", { operation: "vote", note_id: noteId, vote: "up", reason: "Verified" }, voteId);
+    first.append("ledger_append", { operation: "vote", note_id: noteId, vote: "down" }, dissentId);
     const envelopes = new Map(first.reconstruct().records.map(record => [record.id, record]));
-    assert.deepEqual([...envelopes.keys()].sort(), [claimId, voteId, dissentId].sort());
+    assert.deepEqual([...envelopes.keys()].sort(), [noteId, voteId, dissentId].sort());
     assert.ok([...envelopes.values()].every(record => !Object.hasOwn(record.payload, "id")));
     const before = path.join(root, "before.db");
     const after = path.join(root, "after.db");
@@ -215,20 +215,20 @@ test("claims projection derives vote state from canonical records across compact
       const db = new DatabaseSync(file, { readOnly: true });
       try {
         return {
-          claims: db
-            .prepare("SELECT * FROM claims ORDER BY id")
+          notes: db
+            .prepare("SELECT * FROM notes ORDER BY id")
             .all()
             .map(row => ({ ...row })),
           citations: db
-            .prepare("SELECT * FROM claim_citations ORDER BY claim_id, ordinal")
+            .prepare("SELECT * FROM note_citations ORDER BY note_id, ordinal")
             .all()
             .map(row => ({ ...row })),
           votes: db
-            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .prepare("SELECT * FROM note_votes ORDER BY record_id")
             .all()
             .map(row => ({ ...row })),
           state: db
-            .prepare("SELECT * FROM claim_state ORDER BY claim_id")
+            .prepare("SELECT * FROM note_state ORDER BY note_id")
             .all()
             .map(row => ({ ...row })),
           metadata: db
@@ -242,22 +242,22 @@ test("claims projection derives vote state from canonical records across compact
     };
     const projected = inspect(before);
     assert.deepEqual(inspect(after), projected);
-    assert.deepEqual(projected.claims, [{ id: claimId, subject: "README", claim: "Contains instructions", reason: "Read the source", created_at: envelopes.get(claimId).timestamp, record_sha: envelopes.get(claimId).sha }]);
+    assert.deepEqual(projected.notes, [{ id: noteId, subject: "README", note: "Contains instructions", reason: "Read the source", created_at: envelopes.get(noteId).timestamp, record_sha: envelopes.get(noteId).sha }]);
     assert.deepEqual(projected.citations, [
-      { claim_id: claimId, ordinal: 0, citation_type: "repository", path: "README.md", start_line: 1, end_line: null },
-      { claim_id: claimId, ordinal: 1, citation_type: "repository", path: "CONTRIBUTING.md", start_line: null, end_line: null },
-      { claim_id: claimId, ordinal: 2, citation_type: "repository", path: "LICENSE", start_line: null, end_line: 10 },
+      { note_id: noteId, ordinal: 0, citation_type: "repository", path: "README.md", start_line: 1, end_line: null },
+      { note_id: noteId, ordinal: 1, citation_type: "repository", path: "CONTRIBUTING.md", start_line: null, end_line: null },
+      { note_id: noteId, ordinal: 2, citation_type: "repository", path: "LICENSE", start_line: null, end_line: 10 },
     ]);
     assert.deepEqual(
       projected.votes,
       [
-        { record_id: envelopes.get(voteId).id, claim_id: claimId, vote: "up", reason: "Verified", created_at: envelopes.get(voteId).timestamp },
-        { record_id: envelopes.get(dissentId).id, claim_id: claimId, vote: "down", reason: null, created_at: envelopes.get(dissentId).timestamp },
+        { record_id: envelopes.get(voteId).id, note_id: noteId, vote: "up", reason: "Verified", created_at: envelopes.get(voteId).timestamp },
+        { record_id: envelopes.get(dissentId).id, note_id: noteId, vote: "down", reason: null, created_at: envelopes.get(dissentId).timestamp },
       ].sort((a, b) => a.record_id.localeCompare(b.record_id))
     );
     assert.deepEqual(projected.state, [
       {
-        claim_id: claimId,
+        note_id: noteId,
         upvotes: 1,
         downvotes: 1,
         net_votes: 0,
@@ -265,7 +265,7 @@ test("claims projection derives vote state from canonical records across compact
         last_positive_vote_at: envelopes.get(voteId).timestamp,
       },
     ]);
-    assert.deepEqual(projected.metadata, ["claim_citations", "claim_state", "claim_votes", "claims"]);
+    assert.deepEqual(projected.metadata, ["note_citations", "note_state", "note_votes", "notes"]);
   } finally {
     first.close();
     second.close();
@@ -273,15 +273,15 @@ test("claims projection derives vote state from canonical records across compact
   }
 });
 
-test("independent votes reconcile to identical immutable rows and claim state in either arrival order", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-concurrent-"));
+test("independent votes reconcile to identical immutable rows and note state in either arrival order", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-notes-concurrent-"));
   const base = path.join(root, "base");
   const branchA = path.join(root, "branch-a");
   const branchB = path.join(root, "branch-b");
-  const claimId = finalId("claims-concurrent", 0);
-  const upId = finalId("claims-concurrent", 1);
-  const downId = finalId("claims-concurrent", 2);
-  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const noteId = finalId("notes-concurrent", 0);
+  const upId = finalId("notes-concurrent", 1);
+  const downId = finalId("notes-concurrent", 2);
+  const config = { name: "knowledge", type: "notes", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
   const append = (dir, time, payload, id) => {
     const ledger = new Ledger({ memoryDir: dir, clock: () => new Date(time) });
     try {
@@ -292,11 +292,11 @@ test("independent votes reconcile to identical immutable rows and claim state in
   };
   try {
     fs.mkdirSync(base);
-    append(base, "2026-01-01T00:00:00.000Z", { operation: "claim", subject: "README", claim: "Documented", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] }, claimId);
+    append(base, "2026-01-01T00:00:00.000Z", { operation: "note", subject: "README", note: "Documented", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] }, noteId);
     fs.cpSync(base, branchA, { recursive: true });
     fs.cpSync(base, branchB, { recursive: true });
-    append(branchA, "2026-01-02T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, upId);
-    append(branchB, "2026-01-03T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "down" }, downId);
+    append(branchA, "2026-01-02T00:00:00.000Z", { operation: "vote", note_id: noteId, vote: "up", reason: "Verified" }, upId);
+    append(branchB, "2026-01-03T00:00:00.000Z", { operation: "vote", note_id: noteId, vote: "down" }, downId);
     const a = new Ledger({ memoryDir: branchA });
     const b = new Ledger({ memoryDir: branchB });
     try {
@@ -332,11 +332,11 @@ test("independent votes reconcile to identical immutable rows and claim state in
             .all()
             .map(row => ({ ...row })),
           votes: db
-            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .prepare("SELECT * FROM note_votes ORDER BY record_id")
             .all()
             .map(row => ({ ...row })),
           state: db
-            .prepare("SELECT * FROM claim_state")
+            .prepare("SELECT * FROM note_state")
             .all()
             .map(row => ({ ...row })),
         });
@@ -349,11 +349,11 @@ test("independent votes reconcile to identical immutable rows and claim state in
     assert.deepEqual(
       snapshots[0].votes,
       [
-        { record_id: upId, claim_id: claimId, vote: "up", reason: "Verified", created_at: "2026-01-02T00:00:00.000Z" },
-        { record_id: downId, claim_id: claimId, vote: "down", reason: null, created_at: "2026-01-03T00:00:00.000Z" },
+        { record_id: upId, note_id: noteId, vote: "up", reason: "Verified", created_at: "2026-01-02T00:00:00.000Z" },
+        { record_id: downId, note_id: noteId, vote: "down", reason: null, created_at: "2026-01-03T00:00:00.000Z" },
       ].sort((a, b) => a.record_id.localeCompare(b.record_id))
     );
-    assert.deepEqual(snapshots[0].state, [{ claim_id: claimId, upvotes: 1, downvotes: 1, net_votes: 0, last_vote_at: "2026-01-03T00:00:00.000Z", last_positive_vote_at: "2026-01-02T00:00:00.000Z" }]);
+    assert.deepEqual(snapshots[0].state, [{ note_id: noteId, upvotes: 1, downvotes: 1, net_votes: 0, last_vote_at: "2026-01-03T00:00:00.000Z", last_positive_vote_at: "2026-01-02T00:00:00.000Z" }]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

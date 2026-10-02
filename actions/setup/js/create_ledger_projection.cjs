@@ -8,7 +8,7 @@ const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { materializeReplay } = require("./ledger_replay.cjs");
-const { CLAIM_STATE_COLUMNS, CLAIM_STATE_VIEW, replayBuiltin } = require("./ledger_builtin.cjs");
+const { NOTE_STATE_COLUMNS, NOTE_STATE_VIEW, replayBuiltin } = require("./ledger_builtin.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -111,15 +111,15 @@ function createProjection({ sourceDir, databasePath, config }) {
     let tables = null;
     if (config.type) {
       const output = replayBuiltin(config, state.records);
-      const maxRows = config.type === "claims" ? Object.values(output.tables).reduce((count, table) => count + table.rows.length, 0) : state.records.length;
+      const maxRows = config.type === "notes" ? Object.values(output.tables).reduce((count, table) => count + table.rows.length, 0) : state.records.length;
       materializeReplay(database, config.name, `builtin:${config.type}`, state.records, output, maxRows);
       tables = output.tables;
-      if (config.type === "claims") {
-        database.exec(CLAIM_STATE_VIEW);
+      if (config.type === "notes") {
+        database.exec(NOTE_STATE_VIEW);
         database
-          .prepare("INSERT INTO replay_metadata SELECT ledger_name, projection_version, record_count, script_sha256, output_version, ?, ? FROM replay_metadata WHERE table_name = 'claims'")
-          .run("claim_state", JSON.stringify(CLAIM_STATE_COLUMNS));
-        tables = { ...output.tables, claim_state: { columns: CLAIM_STATE_COLUMNS } };
+          .prepare("INSERT INTO replay_metadata SELECT ledger_name, projection_version, record_count, script_sha256, output_version, ?, ? FROM replay_metadata WHERE table_name = 'notes'")
+          .run("note_state", JSON.stringify(NOTE_STATE_COLUMNS));
+        tables = { ...output.tables, note_state: { columns: NOTE_STATE_COLUMNS } };
       }
     }
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
