@@ -66,6 +66,12 @@ const headingId = titleId ?? `${id ?? 'section'}-title`;
   .aw-split-aside {
     min-width: 0;
   }
+  @media (min-width: 64rem) {
+    /* Nudge the text down so it sits level with the visual beside it. */
+    .aw-split-main {
+      margin-top: 2rem;
+    }
+  }
   .aw-container {
     max-width: 72rem;
     margin-inline: auto;
