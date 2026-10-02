@@ -36,7 +36,7 @@ COPILOT_TOOLCACHE_MAX_DEPTH=4
 # argument nor a GH_AW_COMPILED_VERSION-backed compat.json lookup is available.
 # It is the last resort (priority 3) after engine.version (priority 1) and
 # compat.json toolcache lookup (priority 2).
-DEFAULT_COPILOT_VERSION="1.0.89"
+DEFAULT_COPILOT_VERSION="1.0.90"
 COMPAT_URL="${COPILOT_COMPAT_URL:-https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json}"
 COMPILED_GH_AW_VERSION="${GH_AW_COMPILED_VERSION:-}"
 COPILOT_MIN_VERSION_OVERRIDE="${GH_AW_COPILOT_MIN_VERSION:-}"
