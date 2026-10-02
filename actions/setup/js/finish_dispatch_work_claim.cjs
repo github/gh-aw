@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const { applyAndPublishCoordinatorTransactions, readCoordinatorLog } = require("./dispatch_work_coordinator_store.cjs");
+const { CURRENT_VERSION } = require("./dispatch_work_coordinator_codemods.cjs");
 const { replayTransactions } = require("./dispatch_work_coordinator_replay.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
 
@@ -101,7 +102,9 @@ async function reconcileWorkerClaim(options = {}) {
   }
 
   const cancel = finishIntent === null || finishIntent === "cancelled";
-  const intent = cancel ? { kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null } : { kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
+  const intent = cancel
+    ? { version: CURRENT_VERSION, kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null }
+    : { version: CURRENT_VERSION, kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
   const publish = options.applyAndPublish || applyAndPublishCoordinatorTransactions;
   coreApi?.info(`Dispatch coordinator: publishing worker ${cancel ? "cancellation" : "completion"}`);
   await publish({ githubClient, owner, repo, intents: [intent], core: coreApi });

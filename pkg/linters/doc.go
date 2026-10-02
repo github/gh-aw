@@ -21,7 +21,7 @@
 //   - execcommandwithoutcontext — flags exec.Command calls inside functions that already receive context.Context
 //   - fileclosenotdeferred — flags file Close() calls that are not deferred
 //   - fmterrorfnoverbs — flags fmt.Errorf calls with no format verbs, recommending errors.New
-//   - fprintferrorunchecked — flags fmt.Fprintf/Fprint/Fprintln assignments that discard both return values with blank identifiers
+//   - fprintferrorunchecked — flags fmt.Fprintf/Fprint/Fprintln assignments that explicitly discard all return values
 //   - fprintlnsprintf — flags fmt.Fprintln(..., fmt.Sprintf(...)) patterns
 //   - generatedyamlheredoc — flags shell heredocs embedded in generated workflow YAML and directs callers to JavaScript rendering
 //   - globwalkignorederror — flags filepath.Glob and os.ReadDir calls where the error return is discarded with _

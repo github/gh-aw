@@ -55,6 +55,7 @@ async function main(options = {}) {
     githubClient,
     owner: repositoryContext.repo.owner,
     repo: repositoryContext.repo.repo,
+    publishUpgrades: false,
     core: logger,
   });
   const worker = resolveWorkerAssignment(repositoryContext.payload, transactions);

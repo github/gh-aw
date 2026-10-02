@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ kind: "Claim", work: workId, claim: id, attempt: null });
-const cancelClaim = (workId, id) => ({ kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
-const complete = (workId, claimId, attempt) => ({ kind: "Completion", work: workId, claim: claimId, attempt });
-const cancelWork = id => ({ kind: "WorkCancellation", work: id, claim: null, attempt: null });
+const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const cancelClaim = (workId, id) => ({ version: 1, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
+const complete = (workId, claimId, attempt) => ({ version: 1, kind: "Completion", work: workId, claim: claimId, attempt });
+const cancelWork = id => ({ version: 1, kind: "WorkCancellation", work: id, claim: null, attempt: null });
 
 function permutations(items) {
   if (items.length < 2) return [items];
@@ -112,6 +112,22 @@ describe("dispatch work coordinator replay", () => {
     expect(log).toBe(`${JSON.stringify(claim("w", "c"))}\n${JSON.stringify(work("w"))}\n`);
     expect(parseTransactionLog(log)).toEqual([claim("w", "c"), work("w")]);
     expect(parseTransactionLog("")).toEqual([]);
+  });
+
+  it("upgrades unversioned and version-zero records to the current protocol", () => {
+    const oldWork = { kind: "Work", work: "w", claim: null, attempt: null };
+    const oldClaim = { version: 0, kind: "Claim", work: "w", claim: "c", attempt: null };
+    const upgraded = parseTransactionLog(`${JSON.stringify(oldWork)}\n${JSON.stringify(oldClaim)}\n`);
+    expect(upgraded).toEqual([work("w"), claim("w", "c")]);
+    expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog([work("w"), claim("w", "c")]));
+    expect(() => validateTransaction(oldWork)).toThrow("exactly version");
+  });
+
+  it("rejects unknown or malformed message versions and never accepts partial upgrades", () => {
+    for (const version of [-1, 1.5, "1", 2, null]) {
+      expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify({ ...claim("w", "c"), version })}\n`)).toThrow("unsupported dispatch coordinator transaction version");
+    }
+    expect(() => parseTransactionLog(`${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null, extra: true })}\n`)).toThrow("exactly version");
   });
 
   it("rejects malformed JSONL records and blank lines", () => {
