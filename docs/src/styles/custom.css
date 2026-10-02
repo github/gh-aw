@@ -21,37 +21,6 @@ body {
   font-family: var(--sl-font);
 }
 
-/* Homepage glow. WorkflowHero exposes [data-slide-hero] as the trigger contract. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: var(--aw-landing-glow);
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-}
-
-body:has([data-slide-hero])::before {
-  animation: glow-move 24s ease-in-out infinite;
-  opacity: 1;
-}
-
-@keyframes glow-move {
-  0%, 100% {
-    background-position: 0% 0%, 100% 100%, 50% 100%, 0% 0%;
-  }
-  25% {
-    background-position: 10% 20%, 90% 80%, 40% 90%, 0% 0%;
-  }
-  50% {
-    background-position: 20% 30%, 80% 70%, 60% 80%, 0% 0%;
-  }
-  75% {
-    background-position: 10% 40%, 90% 60%, 50% 90%, 0% 0%;
-  }
-}
-
 /* Let the page background show through Starlight's frames on desktop */
 @media (min-width: 769px) {
   .page,
@@ -785,7 +754,7 @@ starlight-toc h2 {
 
 /* Keyboard Keys */
 .sl-markdown-content kbd {
-  font-size: 0.875em;
+  font-size: var(--aw-text-code);
   line-height: 1;
   color: var(--aw-color-text);
   background-color: var(--aw-color-bg-subtle);
@@ -797,9 +766,8 @@ starlight-toc h2 {
 
 /* Focus Visible State */
 :focus-visible {
-  outline: 2px solid var(--aw-color-accent-text);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: var(--aw-focus-ring);
+  outline-offset: var(--aw-focus-offset);
 }
 
 /* Scroll Behavior */
