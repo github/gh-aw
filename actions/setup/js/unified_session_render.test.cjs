@@ -72,15 +72,15 @@ describe("unified session publication views", () => {
         if (type !== "user.message") expect(output).toContain(type);
       }
       expect(output).toContain("list_issues");
-      expect(output).toContain("id=0");
+      expect(output).toContain("rpcId=0");
       expect(output).toContain("TCP_DENIED");
       expect(output).toContain("budget warning");
       expect(output).toContain("[requested, not executed]");
       expect(output).toContain("[execution recorded]");
       expect(output).toContain("value=0 unit=ratio passed=false");
       expect(output).toContain("answer=no");
-      expect(output).toContain("duration_ms=0");
-      expect(output).toContain("secret_leak=false");
+      expect(output).toContain("durationMs=0");
+      expect(output).toContain("secretLeak=false");
       expect(output).toContain("untimedEvents=10");
       expect(output).toContain("malformed_jsonl");
       expect(output).not.toContain("PRIVATE_");

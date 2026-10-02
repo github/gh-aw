@@ -5,6 +5,7 @@ const { sessionOutputText } = require("./agent_session.cjs");
 const { boundSummaryLines, escapeSummaryText, redactSessionForPublication } = require("./agent_session_render.cjs");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 
 const RUNTIME_TYPES = new Set([
   "session.format",
@@ -61,7 +62,7 @@ function fields(value, keys) {
 
 /** @param {any} event @returns {string | undefined} */
 function eventDetail(event) {
-  const data = event.data ?? {};
+  const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
   switch (event.type) {
     case "session.format":
       return `version=${inline(data.version)}`;
@@ -82,34 +83,34 @@ function eventDetail(event) {
     case "session.result":
       return fields(data, ["numTurns", "durationMs", "totalCostUsd"]);
     case "mcp.rpc.request":
-      return fields(data, ["server_id", "server_name", "direction", "method"]) + " " + fields(data.payload, ["id", "method"]) + " " + fields(data.payload?.params, ["name"]);
+      return fields(data, ["serverName", "direction", "rpcId", "method", "toolName"]);
     case "mcp.rpc.response":
-      return fields(data, ["server_id", "server_name", "direction"]) + " " + fields(data.payload, ["id"]) + (data.payload?.error !== undefined ? ` [error] ${fields(data.payload.error, ["code", "message"])}` : " [response observed]");
+      return fields(data, ["serverName", "direction", "rpcId"]) + (data.error !== undefined ? ` [error] ${fields(data.error, ["code", "message"])}` : " [response observed]");
     case "mcp.difc.filtered":
     case "mcp.guard.blocked":
-      return `[blocked/filtered] ${fields(data, ["server_id", "server_name", "tool_name", "reason"])}`;
+      return `[blocked/filtered] ${fields(data, ["serverName", "toolName", "reason"])}`;
     case "mcp.tool_call":
-      return fields(data, ["server_id", "server_name", "tool_name", "duration", "status", "error"]);
+      return fields(data, ["serverName", "toolName", "durationMs", "status", "error"]);
     case "firewall.http_access":
-      return fields(data, ["host", "domain", "method", "status", "http_status", "decision", "squid_request_status"]);
+      return fields(data, ["host", "method", "status", "decision"]);
     case "firewall.steering":
-      return fields(data, ["event", "type", "event_name", "eventName", "message", "reason"]);
+      return fields(data, ["event", "message", "reason"]);
     case "firewall.token_usage":
     case "usage.report":
-      return fields(data, ["provider", "model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "ai_credits_this_response", "ai_credits_total", "aic", "duration_ms"]);
+      return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]);
     case "mcp.event":
     case "firewall.event":
-      return fields(data, ["event", "type", "event_name", "eventName", "level", "status"]);
+      return fields(data, ["event", "level", "status"]);
     case "safe_output.request":
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":
       return `${fields(data, ["type", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
     case "safe_output.error":
-      return `${fields(data, ["type", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length}` : ""}`;
+      return `${fields(data, ["type", "status", "errorCode", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length} [${data.errors.map(error => fields(error, ["type", "errorCode"])).join("; ")}]` : ""}`;
     case "experiment.assignment":
       return `assignments=${inline(data.assignments ?? data)}`;
     case "experiment.state":
-      return fields(data, ["run_id", "assignments", "counts"]);
+      return fields(data, ["runId", "assignments", "counts"]);
     case "grader.manifest":
       return `graders=${Array.isArray(data.graders) ? data.graders.length : "unavailable"}`;
     case "grader.result":
@@ -119,11 +120,11 @@ function eventDetail(event) {
     case "eval.result":
       return fields(data, ["id", "answer", "model", "error"]);
     case "execution.result":
-      return fields(data, ["outcome", "conclusion", "exit_code", "duration_ms", "started_at", "finished_at"]);
+      return fields(data, ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"]);
     case "detection.result":
-      return fields(data, ["job_result", "conclusion", "prompt_injection", "secret_leak", "malicious_patch"]);
+      return fields(data, ["jobResult", "conclusion", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
-      return fields(data, ["engine_id", "model", "workflow_name", "repository", "run_id"]);
+      return fields(data, ["engine", "model", "workflow", "repository", "runId"]);
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":

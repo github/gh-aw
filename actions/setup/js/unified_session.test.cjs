@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { collectUnifiedSession, mergeSessionSources, normalizeRuntimeEvent, parseEngineSession, sessionTimestamp, writeUnifiedSession } from "./unified_session.cjs";
 import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifact.cjs";
+import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 
 const req = require;
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
@@ -33,7 +34,7 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
-  it("merges every required component with complete payloads and timestamp ordering", () => {
+  it("merges every required component with essential payloads and timestamp ordering", () => {
     const message = { type: "assistant.message", id: "same-id", timestamp: "2026-10-02T00:00:03Z", data: { content: "Done.\n", extra: [0, false, null] }, nativeField: "preserved" };
     const rpc = { timestamp: "2026-10-02T00:00:02+00:00", event: "rpc_response", payload: { jsonrpc: "2.0", id: 0, result: { content: [{ text: "response" }] } }, server_id: "github", direction: "IN" };
     const audit = { ts: 1790899201.25, host: "example.com", decision: "TCP_DENIED", status: 403, extra: false };
@@ -63,11 +64,12 @@ describe("Unified conclusion session", () => {
     });
     expect(persisted.filter(event => event.type === "session.format")).toHaveLength(1);
     expect(new Set(events.map(event => event.provenance.component))).toEqual(new Set(["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "execution", "detection", "collector"]));
-    expect(events.find(event => event.type === "assistant.message")).toMatchObject(message);
-    expect(events.find(event => event.type === "mcp.rpc.response").data).toEqual(rpc);
-    expect(events.find(event => event.type === "firewall.http_access").data).toEqual(audit);
+    expect(events.find(event => event.type === "assistant.message")).toMatchObject(normalizeUnifiedSessionEvent(message));
+    expect(events.find(event => event.type === "assistant.message")).not.toHaveProperty("nativeField");
+    expect(events.find(event => event.type === "mcp.rpc.response").data).toEqual({ serverName: "github", direction: "IN", rpcId: 0 });
+    expect(events.find(event => event.type === "firewall.http_access").data).toEqual({ host: "example.com", decision: "TCP_DENIED", status: 403 });
     expect(events.find(event => event.type === "firewall.http_access").provenance.timestampMs).toBe(1790899201250);
-    expect(events.find(event => event.data.rid === "request").provenance.timestampMs).toBe(1790899203600);
+    expect(events.find(event => event.data.requestId === "request").provenance.timestampMs).toBe(1790899203600);
     expect(events.filter(event => event.provenance.phase === "detection")).toHaveLength(2);
     expect(events.find(event => event.type === "grader.result").data.results[0]).toEqual({ id: "quality", score: 0, passed: false });
     const times = events.slice(1).map(event => event.provenance.timestampMs ?? Infinity);
@@ -118,7 +120,7 @@ describe("Unified conclusion session", () => {
     const lines = content.trimEnd().split("\n");
     for (const line of lines) expect(line).toBe(JSON.stringify(JSON.parse(line)));
     const agent = lines.map(JSON.parse).filter(event => event.provenance.component === "agent");
-    expect(agent.map(({ provenance, ...event }) => event)).toEqual(native);
+    expect(agent.map(({ provenance, ...event }) => event)).toEqual(native.map(normalizeUnifiedSessionEvent));
     expect(lines.some(line => line.includes("\\nsecond line\\t\\n"))).toBe(true);
   });
 
@@ -177,16 +179,16 @@ describe("Unified conclusion session", () => {
     ["evals/execution.json", "usage/evals/execution.json"],
     ["threat-detection/detection_result.json", "usage/detection/detection_result.json"],
   ])("prefers original provenance from %s and retains the %s mirror fallback", (original, mirror) => {
-    const observation = { value: "source" };
+    const observation = { value: "source", id: "source", type: "source", status: "source", model: "source", assignments: { experiment: "source" }, outcome: "source", conclusion: "source", run_id: "source" };
     const record = file => (file.endsWith(".json") ? observation : [observation]);
     const source = write(original, record(original));
     write(mirror, record(mirror));
     const { events } = collectUnifiedSession({ rootDir: root });
-    const observed = events.filter(event => event.data.value === "source");
+    const observed = events.filter(event => event.provenance.path === original || event.provenance.path === mirror);
     expect(observed).toHaveLength(1);
     expect(observed[0].provenance.path).toBe(original);
     fs.unlinkSync(source);
-    const fallback = collectUnifiedSession({ rootDir: root }).events.filter(event => event.data.value === "source");
+    const fallback = collectUnifiedSession({ rootDir: root }).events.filter(event => event.provenance.path === original || event.provenance.path === mirror);
     expect(fallback).toHaveLength(1);
     expect(fallback[0].provenance.path).toBe(mirror);
   });
@@ -317,7 +319,7 @@ describe("Unified conclusion session", () => {
       .filter(event => event.provenance.component === "agent")
       .sort((a, b) => a.provenance.index - b.provenance.index)
       .map(({ provenance, ...event }) => event);
-    expect(actual).toEqual(JSON.parse(JSON.stringify(expected)));
+    expect(actual).toEqual(JSON.parse(JSON.stringify(expected.map(normalizeUnifiedSessionEvent))));
     expect(events.some(event => event.type === "mcp.tool_call")).toBe(true);
     expect(events.every(event => event.type.includes(".") && event.data && typeof event.data === "object")).toBe(true);
   });

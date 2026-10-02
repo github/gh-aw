@@ -1,9 +1,9 @@
 ---
 title: Unified Agent Session Specification
-description: Draft contract for loss-preserving session traces across gh-aw engines, MCP gateway, firewall, safe outputs, experiments, graders, and evals.
+description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.1.0"
+version: "1.2.0"
 status: Draft
 publication_date: "2026-10-02"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.1.0<br>
+**Version**: 1.2.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-02<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -24,13 +24,13 @@ editors:
 
 ## Abstract
 
-This specification defines the unified session trace used by GitHub Agentic Workflows: an ordered array of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving normalization contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job merger that enriches the trace with MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval observations. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Existing renderers and accounting artifacts remain compatibility projections, not replacements for the trace.
+This specification defines the session traces used by GitHub Agentic Workflows: ordered arrays of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving parser contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job projection of essential agent, MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval payloads. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Native evidence, canonical parser traces, and existing accounting artifacts remain available separately.
 
 ## Status of This Document
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.1.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.2.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -198,12 +198,45 @@ line MUST be one canonical event, without a session wrapper, display truncation,
 or a bare legacy accounting result. Serialization MUST use compact JSONL:
 exactly one unindented JSON object per physical line, no pretty-print whitespace
 outside string values, no blank separator lines, and a trailing newline after
-the final record. Embedded line breaks in payload strings MUST be JSON-escaped,
-not trimmed, removed, or emitted as additional physical lines. Compactness MUST
-NOT remove metadata, payload fields, or significant source text. Existing usage
-files MUST remain compatible.
+the final record. Embedded line breaks in retained payload strings MUST be
+JSON-escaped, not trimmed or emitted as additional physical lines. Existing
+usage files MUST remain compatible.
 Collection MUST follow available downstream result downloads and conclusion
 handlers; setup cleanup MUST follow publication.
+
+The loss-preserving parser requirements apply to `logEntries` and
+`agent-session.jsonl`. The unified artifact is an essential-payload projection:
+it MUST retain the event type, supplied `id` and `parentId`, observed timestamp,
+source provenance, and the essential fields below. It MUST omit duplicated
+engine envelopes and nonessential fields from known payloads. Retained strings
+MUST NOT be trimmed or truncated. Unknown native extension `data` MUST remain
+opaque because its essential fields are not defined by this specification.
+
+| Payload family | Essential fields |
+| --- | --- |
+| Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
+| Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
+| Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
+| Agent accounting | Turns, duration, cost, normalized `usage`, errors, and permission denials. |
+| MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message; no RPC arguments, response bodies, or error context. |
+| Firewall | Host, method, status, decision, byte count, duration; steering/tracker event, level, message, reason, and request ID. |
+| Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
+| Experiments | Run ID, assignments, and counts. |
+| Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
+| Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
+| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
+
+Known payload aliases MUST use one canonical key, preferring an explicitly
+present canonical value even when it is `false`, `0`, `null`, or empty.
+`parameters` maps to `input`; `result` maps to `output` when `output` is absent.
+Safe-output `failures` maps to `errors`, retaining operation types, error codes,
+and messages. Copilot checkpoint `ai_credits` maps to `totalAic` and
+`premium_requests` maps to `premiumRequests`.
+Explicit failure signals MUST survive alias compaction even when another
+source field claims success. Runtime keys use camelCase, such as `serverName`, `rpcId`, `durationMs`, and
+`secretLeak`. Accounting uses a nested `usage` object with the snake_case token
+keys from Section 6. The numeric file-format version remains `1`: the
+`type`/`data`/`provenance` envelope and JSONL framing are unchanged.
 
 **T-UAS-055 — Source provenance.** Every merged event MUST have a `provenance`
 object with `component`, `phase`, `path`, and `index`. `path` MUST be relative to
@@ -381,24 +414,27 @@ Legacy mappings include `num_turns` → `numTurns`, `duration_ms` → `durationM
 
 ### 4.7 Runtime observation vocabulary
 
-**T-UAS-061 — Loss-preserving runtime payloads.** Non-agent source records MUST
-use namespaced event types with the complete decoded source object in `data`.
-Normalizers MUST retain transport envelopes, RPC IDs, requests and responses,
-filter/block decisions, network statuses, provider accounting, steering messages,
-unknown fields, and false/zero/null values. They MUST NOT store only the truncated
-`detail`/`status` projection used by the existing unified timeline renderer.
-Unknown runtime kinds MUST remain `<component>.event` observations.
+**T-UAS-061 — Essential runtime payloads.** Non-agent source records MUST use
+namespaced event types and the essential `data` fields defined in Section 3.5.
+RPC IDs, filter/block decisions, network statuses, provider accounting, and
+steering messages MUST survive projection, including observed false/zero/null
+values. RPC transport wrappers, opaque arguments/response bodies, and duplicated
+timestamp fields MUST NOT be copied into known payloads. Projection MUST NOT
+truncate retained values into display previews. Unknown runtime kinds MUST
+remain `<component>.event` observations with their event kind, level, status,
+message, reason, and request ID when supplied; native runtime logs remain the
+source for opaque fields.
 
 | Event type | Source observation |
 | --- | --- |
-| `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, including complete JSON-RPC payloads. |
+| `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, with flat RPC metadata and error code/message. |
 | `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
 | `mcp.tool_call`, `mcp.event` | Structured gateway calls or other gateway log messages. |
 | `firewall.http_access` | AWF network audit observations, including operational entries without a host. |
 | `firewall.token_usage`, `firewall.steering`, `firewall.event` | API proxy accounting, token/time steering, tracker and other firewall messages. |
-| `safe_output.request`, `safe_output.result`, `safe_output.error` | Raw requested operations, executed items manifest, and available structured errors. Requests are not execution results. |
+| `safe_output.request`, `safe_output.result`, `safe_output.error` | Requested operation identities, executed item identities, and available errors. Requests are not execution results. |
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
-| `grader.manifest`, `grader.result` | Complete deterministic grader manifest/results; grading does not invent event time. |
+| `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |

@@ -5,6 +5,7 @@ const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -40,7 +41,7 @@ function mergeSessionSources(sources) {
     source.events.map((event, index) => {
       const timestampMs = sessionTimestamp(event, source.timestampUnit);
       return {
-        ...structuredClone(event),
+        ...normalizeUnifiedSessionEvent(event),
         provenance: {
           component: source.component,
           phase: source.phase,
