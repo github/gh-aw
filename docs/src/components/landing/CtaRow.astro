@@ -1,5 +1,5 @@
 ---
-import CopyCommand from './CopyCommand.astro';
+import CopyPrompt from './CopyPrompt.astro';
 interface Props {
   align?: 'start' | 'center';
 }
@@ -9,7 +9,7 @@ const { align = 'start' } = Astro.props;
 <div class:list={['aw-cta', align === 'center' && 'is-center']}>
   <div class="aw-cta-row">
     <a class="aw-btn" href="/gh-aw/setup/creating-workflows/">Create a workflow</a>
-    <CopyCommand command="/agentic-workflows create a daily status" />
+    <CopyPrompt label="Copy installation prompt" text="Initialize this repository for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/install.md" align={align === 'center' ? 'center' : 'start'} />
   </div>
   <p class="aw-cta-note">
     Prefer a guided form?{' '}
