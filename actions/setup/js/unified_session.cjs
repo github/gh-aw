@@ -179,7 +179,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
    * @param {"seconds" | "milliseconds"} [timestampUnit]
    */
   const add = (file, component, phase, type, timestampUnit = "milliseconds") => {
-    if (!exists(file)) return;
+    if (!exists(file)) return 0;
     const events = [];
     for (const record of records(file)) {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
@@ -195,6 +195,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       else throw new Error(`Missing event mapping for ${component}`);
     }
     sources.push({ component, phase, path: path.relative(rootDir, file), events, timestampUnit });
+    return events.length;
   };
   const walk = (directory, depth = 0) => {
     if (!fs.existsSync(directory)) return [];
@@ -237,10 +238,11 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   if (exists(stdio)) read(stdio);
   const canonical = path.join(rootDir, "agent-session.jsonl");
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
-  if (exists(canonical)) add(canonical, "agent", "agent", undefined);
-  else if (native.length) {
-    for (const file of native) add(file, "agent", "agent", undefined);
-  } else {
+  let agentEvents = add(canonical, "agent", "agent", undefined);
+  if (!agentEvents) {
+    for (const file of native) agentEvents += add(file, "agent", "agent", undefined);
+  }
+  if (!agentEvents) {
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
       const content = read(file);
@@ -271,19 +273,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     [["safeoutputs.jsonl"], "safe_output", "agent", "safe_output.request"],
     [["safe-output-items.jsonl"], "safe_output", "safe_outputs", "safe_output.result"],
     [["safe-output-errors.json"], "safe_output", "safe_outputs", "safe_output.error"],
-    [["usage/experiment/state.jsonl", "experiments/state.jsonl"], "experiment", "activation", "experiment.state"],
-    [["usage/experiment/state.json", "experiments/state.json"], "experiment", "activation", "experiment.state"],
-    [["usage/experiment/assignments.json", "experiments/assignments.json"], "experiment", "activation", "experiment.assignment"],
-    [["usage/graders/grader_manifest.json", "agent/graders/grader_manifest.json"], "grader", "agent", "grader.manifest"],
-    [["usage/graders/grader_results.json", "agent/graders/grader_results.json"], "grader", "agent", "grader.result"],
-    [["usage/evals.jsonl", "evals/evals.jsonl"], "eval", "evals", "eval.result"],
-    [["usage/agent_usage.jsonl", "agent_usage.jsonl"], "usage", "agent", "usage.report"],
-    [["usage/detection_usage.jsonl", "threat-detection/detection_usage.jsonl"], "usage", "detection", "usage.report"],
-    [["usage/evals/token_usage.jsonl", "evals/evals_token_usage.jsonl"], "usage", "evals", "usage.report"],
-    [["usage/agent/execution.json", "agent_execution.json"], "execution", "agent", "execution.result"],
-    [["usage/detection/execution.json", "threat-detection/execution.json"], "execution", "detection", "execution.result"],
-    [["usage/evals/execution.json", "evals/evals/execution.json", "evals/execution.json"], "execution", "evals", "execution.result"],
-    [["usage/detection/detection_result.json", "threat-detection/detection_result.json"], "detection", "detection", "detection.result"],
+    [["experiments/state.jsonl", "usage/experiment/state.jsonl"], "experiment", "activation", "experiment.state"],
+    [["experiments/state.json", "usage/experiment/state.json"], "experiment", "activation", "experiment.state"],
+    [["experiments/assignments.json", "usage/experiment/assignments.json"], "experiment", "activation", "experiment.assignment"],
+    [["agent/graders/grader_manifest.json", "usage/graders/grader_manifest.json"], "grader", "agent", "grader.manifest"],
+    [["agent/graders/grader_results.json", "usage/graders/grader_results.json"], "grader", "agent", "grader.result"],
+    [["evals/evals.jsonl", "usage/evals.jsonl"], "eval", "evals", "eval.result"],
+    [["agent_usage.jsonl", "usage/agent_usage.jsonl"], "usage", "agent", "usage.report"],
+    [["threat-detection/detection_usage.jsonl", "detection_usage.jsonl", "usage/detection_usage.jsonl"], "usage", "detection", "usage.report"],
+    [["evals/evals_token_usage.jsonl", "usage/evals/token_usage.jsonl"], "usage", "evals", "usage.report"],
+    [["agent_execution.json", "usage/agent/execution.json"], "execution", "agent", "execution.result"],
+    [["threat-detection/execution.json", "usage/detection/execution.json"], "execution", "detection", "execution.result"],
+    [["evals/evals/execution.json", "evals/execution.json", "usage/evals/execution.json"], "execution", "evals", "execution.result"],
+    [["threat-detection/detection_result.json", "usage/detection/detection_result.json"], "detection", "detection", "detection.result"],
   ];
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);

@@ -142,6 +142,55 @@ describe("Unified conclusion session", () => {
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
   });
 
+  it.each(["", "{bad\n", '{"type":"result","usage":{}}\n'])("falls back from an unusable canonical session (%j) to native events", content => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
+    write("agent-session.jsonl", content);
+    write(nativePath, [{ type: "assistant.message", data: { content: "recovered" } }]);
+    write("agent-stdio.log", "not a session");
+    const { events } = collectUnifiedSession({ rootDir: root, warn: vi.fn() });
+    expect(events.filter(event => event.provenance.component === "agent")).toEqual([expect.objectContaining({ type: "assistant.message", data: { content: "recovered" }, provenance: expect.objectContaining({ path: nativePath }) })]);
+    expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "agent-session.jsonl", events: 0 }));
+  });
+
+  it.each([false, true])("falls back to raw logs when canonical and native events are unusable (native present: %j)", nativePresent => {
+    write("agent-session.jsonl", "");
+    if (nativePresent) write("sandbox/agent/logs/copilot-session-state/uuid/events.jsonl", "{bad\n");
+    write("agent-stdio.log", JSON.stringify([{ type: "assistant.message", data: { content: "raw fallback" } }]));
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "custom", warn: vi.fn() });
+    expect(events.filter(event => event.provenance.component === "agent")).toEqual([expect.objectContaining({ data: { content: "raw fallback" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) })]);
+  });
+
+  it.each([
+    ["experiments/state.jsonl", "usage/experiment/state.jsonl"],
+    ["experiments/state.json", "usage/experiment/state.json"],
+    ["experiments/assignments.json", "usage/experiment/assignments.json"],
+    ["agent/graders/grader_manifest.json", "usage/graders/grader_manifest.json"],
+    ["agent/graders/grader_results.json", "usage/graders/grader_results.json"],
+    ["evals/evals.jsonl", "usage/evals.jsonl"],
+    ["agent_usage.jsonl", "usage/agent_usage.jsonl"],
+    ["threat-detection/detection_usage.jsonl", "usage/detection_usage.jsonl"],
+    ["detection_usage.jsonl", "usage/detection_usage.jsonl"],
+    ["evals/evals_token_usage.jsonl", "usage/evals/token_usage.jsonl"],
+    ["agent_execution.json", "usage/agent/execution.json"],
+    ["threat-detection/execution.json", "usage/detection/execution.json"],
+    ["evals/evals/execution.json", "usage/evals/execution.json"],
+    ["evals/execution.json", "usage/evals/execution.json"],
+    ["threat-detection/detection_result.json", "usage/detection/detection_result.json"],
+  ])("prefers original provenance from %s and retains the %s mirror fallback", (original, mirror) => {
+    const observation = { value: "source" };
+    const record = file => (file.endsWith(".json") ? observation : [observation]);
+    const source = write(original, record(original));
+    write(mirror, record(mirror));
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const observed = events.filter(event => event.data.value === "source");
+    expect(observed).toHaveLength(1);
+    expect(observed[0].provenance.path).toBe(original);
+    fs.unlinkSync(source);
+    const fallback = collectUnifiedSession({ rootDir: root }).events.filter(event => event.data.value === "source");
+    expect(fallback).toHaveLength(1);
+    expect(fallback[0].provenance.path).toBe(mirror);
+  });
+
   it("recovers adjacent valid records, records malformed/partial coverage and skips symlinks", () => {
     const warn = vi.fn();
     write("agent-session.jsonl", '{"type":"assistant.message","data":{"content":"first"}}\n{bad\nnull\n{"type":"vendor.after","data":{}}\n');
