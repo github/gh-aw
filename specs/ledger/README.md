@@ -43,9 +43,28 @@ durable records. TLC 2026.10.01 completed exhaustive exploration without
 invariant violations (distinct states: raw **4,637**, log **4,637**, set
 **19,097**, map **19,241**, table **111,795**, counter **26,009**, notes
 **203,331**). The state counts may change with TLC version or model changes.
-`actions/setup/js/ledger_protocol_model.test.cjs` exercises concrete
-corresponding traces through transaction normalization, trusted artifact
-validation, and the production built-in reducers/replay.
+`actions/setup/js/ledger_protocol_model.test.cjs` exercises hand-selected
+concrete witnesses. The generated vectors in
+`actions/setup/js/ledger_protocol_vectors.json` cover every declared
+operation. Regenerate them after editing the model or its configurations:
+
+```sh
+TLA2TOOLS_JAR=/path/to/tla2tools.jar \
+  node actions/setup/js/generate_ledger_protocol_vectors.cjs
+cd actions/setup/js
+npm run test:js -- ledger_protocol_generated.test.cjs
+```
+
+`LedgerProtocolWitness.tla` adds one deliberately violated coverage invariant
+per operation. TLC's shortest JSON counterexample supplies the sequence of
+model states and actions; the generator checks each trace and writes the
+resulting test vectors. The JavaScript tests translate the abstract events into
+real transaction artifacts and built-in operations, then compare every
+intermediate replay result to the TLA+ projection. They also check that
+queuing and validation do not persist records. The source digest fails tests
+if the TLA+ model or its bounds change without regenerating vectors. TLC
+returns exit code 12 for the intentional witness invariant violations; this
+is distinct from the passing safety checks above.
 
 ## Abstraction boundary
 
@@ -54,7 +73,9 @@ a proof of the implementation. A value denotes a canonical-JSON equality
 class, a table row has a primary key and one non-key field, a counter operation
 has amount one, and a note has a valid citation represented abstractly. IDs
 distinguish transactions but do not model hashes or duplicate-ID retries. One
-artifact contains one operation at a time; batch temporary-ID rewriting,
+artifact contains one operation at a time; the generated traces are shortest
+operation witnesses, **not** exhaustive conformance tests for every reachable
+state. Batch temporary-ID rewriting,
 forward references in a batch, SHA-256 collision resistance, JSON schemas,
 record/shard byte limits, Git authentication, failed network pushes, DAG
 topological ordering, and real SQLite are not modeled. In particular,
