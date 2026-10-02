@@ -234,24 +234,84 @@ if [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)$ ]]; then
         fi
 
         RELEASE_RECORDS=$(printf '%s\n' "$RELEASES_RESPONSE" | awk '
-            /^[[:space:]]*"tag_name"[[:space:]]*:/ {
-                tag = $0
-                sub(/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"/, "", tag)
-                sub(/".*$/, "", tag)
+            function parse_field(    value) {
+                value = field
+                if (match(value, /^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"/)) {
+                    value = substr(value, 1, RLENGTH)
+                    sub(/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"/, "", value)
+                    sub(/"$/, "", value)
+                    release_tag = value
+                } else if (match(value, /^[[:space:]]*"draft"[[:space:]]*:[[:space:]]*(true|false)/)) {
+                    sub(/^[[:space:]]*"draft"[[:space:]]*:[[:space:]]*/, "", value)
+                    sub(/[[:space:]]+$/, "", value)
+                    release_draft = value
+                } else if (match(value, /^[[:space:]]*"prerelease"[[:space:]]*:[[:space:]]*(true|false)/)) {
+                    sub(/^[[:space:]]*"prerelease"[[:space:]]*:[[:space:]]*/, "", value)
+                    sub(/[[:space:]]+$/, "", value)
+                    release_prerelease = value
+                }
             }
-            /^[[:space:]]*"draft"[[:space:]]*:/ {
-                draft = $0
-                sub(/^[[:space:]]*"draft"[[:space:]]*:[[:space:]]*/, "", draft)
-                sub(/[,[:space:]].*$/, "", draft)
+            function emit_release() {
+                if (release_tag != "" && release_draft != "" && release_prerelease != "") {
+                    print release_tag, release_draft, release_prerelease
+                }
             }
-            /^[[:space:]]*"prerelease"[[:space:]]*:/ {
-                prerelease = $0
-                sub(/^[[:space:]]*"prerelease"[[:space:]]*:[[:space:]]*/, "", prerelease)
-                sub(/[,[:space:]].*$/, "", prerelease)
-                if (tag != "") {
-                    print tag, draft, prerelease
-                    tag = ""
-                    draft = ""
+            {
+                for (i = 1; i <= length($0); i++) {
+                    char = substr($0, i, 1)
+                    if (in_string) {
+                        field = field char
+                        if (escaped) {
+                            escaped = 0
+                        } else if (char == "\\") {
+                            escaped = 1
+                        } else if (char == "\"") {
+                            in_string = 0
+                        }
+                        continue
+                    }
+
+                    if (char == "\"" && depth > 0) {
+                        field = field char
+                        in_string = 1
+                        continue
+                    }
+
+                    if (depth == 1 && array_depth == object_array_depth && char == ",") {
+                        parse_field()
+                        field = ""
+                        continue
+                    }
+                    if (depth == 1 && array_depth == object_array_depth && char == "}") {
+                        parse_field()
+                        emit_release()
+                        depth--
+                        field = ""
+                        release_tag = ""
+                        release_draft = ""
+                        release_prerelease = ""
+                        continue
+                    }
+
+                    if (depth > 0) {
+                        field = field char
+                    }
+                    if (char == "{") {
+                        if (depth == 0) {
+                            object_array_depth = array_depth
+                            field = ""
+                            release_tag = ""
+                            release_draft = ""
+                            release_prerelease = ""
+                        }
+                        depth++
+                    } else if (char == "}") {
+                        depth--
+                    } else if (char == "[") {
+                        array_depth++
+                    } else if (char == "]") {
+                        array_depth--
+                    }
                 }
             }
         ')

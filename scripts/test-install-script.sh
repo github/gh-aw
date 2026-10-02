@@ -205,7 +205,8 @@ EOF
 )
 
 emit_release() {
-    printf '  {\n    "tag_name": "%s",\n    "draft": %s,\n    "prerelease": %s\n  }' "$1" "${3:-false}" "$2"
+    printf '{"tag_name":"%s","body":"release notes mention %s true, %s true","draft":%s,"prerelease":%s}' \
+        "$1" '\"draft\":' '\"prerelease\":' "${3:-false}" "$2"
 }
 
 test_version_resolution() (
@@ -228,40 +229,40 @@ test_version_resolution() (
             requested_version="v0"
             expected_tag="v0.10.0"
             {
-                printf '[\n'
+                printf '['
                 separator=""
                 for i in $(seq 0 96); do
                     printf '%s' "$separator"
                     emit_release "v1.0.$i" false
-                    separator=$',\n'
+                    separator=','
                 done
                 printf '%s' "$separator"
                 emit_release "v0.9.0" false
-                printf ',\n'
+                printf ','
                 emit_release "v0.99.0-rc.1" true
-                printf ',\n'
+                printf ','
                 emit_release "v0.20.0" false true
-                printf '\n]\n'
+                printf ']'
             } > "$case_root/releases/page-1.json"
             {
-                printf '[\n'
+                printf '['
                 emit_release "v0.10.0" false
-                printf '\n]\n'
+                printf ']'
             } > "$case_root/releases/page-2.json"
             ;;
         channel-no-v1-release)
             requested_version="v1"
             expected_tag=""
             {
-                printf '[\n'
+                printf '['
                 emit_release "v0.37.18" false
-                printf ',\n'
+                printf ','
                 emit_release "v1.0.0-rc.1" true
-                printf ',\n'
+                printf ','
                 emit_release "v1.99.0" false true
-                printf ',\n'
+                printf ','
                 emit_release "v2.0.0" false
-                printf '\n]\n'
+                printf ']'
             } > "$case_root/releases/page-1.json"
             ;;
         exact-tag)
