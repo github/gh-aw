@@ -175,17 +175,33 @@
 .aw-tone-dark {
   --aw-aside-bg-pct: 4%;
   --aw-aside-border-pct: 10%;
+  --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 3px 10px -2px rgb(0 0 0 / 0.072);
 }
 
 :root[data-theme='light'] {
   --aw-aside-bg-pct: 2.5%;
   --aw-aside-border-pct: 7%;
+  --aw-aside-tip-bg: 5%;
+  --aw-aside-tip-border: 6%;
+  --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.01), 0 3px 10px -2px rgb(0 0 0 / 0.017);
+}
+
+/* Shape and spacing (tuned in the aside jig) */
+:root {
+  --aw-aside-radius: 12px;
+  --aw-aside-pad-y: 1.25rem;
+  --aw-aside-pad-x: 1.25rem;
+  --aw-aside-badge-size: 24px;
+  --aw-aside-icon-size: 12px;
+  --aw-aside-label-size: var(--aw-step-0);
+  --aw-aside-label-weight: 600;
+  --aw-aside-gap-above: 1.25rem;
 }
 
 .sl-markdown-content .starlight-aside {
   position: relative;
   padding: var(--aw-aside-pad-y, 1.125rem) var(--aw-aside-pad-x, 1.25rem);
-  border: var(--aw-aside-border-width, 1px) solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), var(--aw-color-border-strong));
+  border: var(--aw-aside-border-width, 1px) solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), transparent);
   border-radius: var(--aw-aside-radius, 8px);
   background: color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-tint), var(--aw-color-bg));
   box-shadow: var(--aw-aside-shadow, var(--aw-shadow-soft));
