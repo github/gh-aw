@@ -19,8 +19,21 @@ const headingId = titleId ?? `${id ?? 'section'}-title`;
   aria-labelledby={headingId}
 >
   <div class="aw-container">
-    <h2 id={headingId}>{title}</h2>
-    {lede && <p class="aw-lede">{lede}</p>}
+    {Astro.slots.has('aside') ? (
+      <div class="aw-split">
+        <div class="aw-split-main">
+          <h2 id={headingId}>{title}</h2>
+          {lede && <p class="aw-lede">{lede}</p>}
+          <slot name="intro" />
+        </div>
+        <div class="aw-split-aside"><slot name="aside" /></div>
+      </div>
+    ) : (
+      <>
+        <h2 id={headingId}>{title}</h2>
+        {lede && <p class="aw-lede">{lede}</p>}
+      </>
+    )}
     <slot />
   </div>
 </section>
@@ -37,6 +50,21 @@ const headingId = titleId ?? `${id ?? 'section'}-title`;
   /* In the dark theme the page is already near-black, so hairlines mark the band. */
   :global([data-theme='dark']) .aw-section.aw-tone-dark {
     border-block: 1px solid var(--aw-color-divider);
+  }
+  /* Optional two-column head: heading, lede and intro on the left, a visual on the right. */
+  .aw-split {
+    display: grid;
+    gap: 2.5rem;
+  }
+  @media (min-width: 64rem) {
+    .aw-split {
+      grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+      gap: 3rem;
+      align-items: start;
+    }
+  }
+  .aw-split-aside {
+    min-width: 0;
   }
   .aw-container {
     max-width: 72rem;

@@ -6,8 +6,12 @@ const TRIFECTA_URL = 'https://simonw.substack.com/p/the-lethal-trifecta-for-ai-a
 interface Props {
   /** What gh-aw puts between the agent and the repository, e.g. "layers" or "gates". */
   noun?: string;
+  /** Render the intro paragraph, the diagram, or both (stacked). */
+  part?: 'text' | 'figure' | 'both';
 }
-const { noun = 'layers' } = Astro.props;
+const { noun = 'layers', part = 'both' } = Astro.props;
+const showText = part !== 'figure';
+const showFigure = part !== 'text';
 
 const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
 
@@ -98,13 +102,13 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 ---
 
 <div class="tri">
-  <p class="tri-text">
+  {showText && <p class="tri-text">
     An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
     Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six {noun} between
     the agent and your repository, and three of them each block one leg of it.
-  </p>
+  </p>}
 
-  <figure class="tri-fig">
+  {showFigure && <figure class="tri-fig">
     <div class="tri-stage" aria-hidden="true">
       <div class="tri-art" style={`aspect-ratio: ${W} / ${H}`}>
         <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
@@ -163,7 +167,7 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
       the centre, but gh-aw cuts every leg: credential isolation keeps private data away from the agent, integrity
       filtering screens untrusted content, and the sandboxed agent restricts outbound access.
     </figcaption>
-  </figure>
+  </figure>}
 </div>
 
 <script>
@@ -190,19 +194,8 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     display: grid;
     gap: 2.5rem;
   }
-  /* Wide screens: paragraph on the left, diagram on the right. */
-  @media (min-width: 64rem) {
-    .tri {
-      grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
-      gap: 3rem;
-      align-items: start;
-    }
-    .tri-fig {
-      margin-right: 0;
-    }
-  }
   .tri-text {
-    margin: 0;
+    margin: 1.5rem 0 0;
     max-width: 60ch;
     font-size: var(--aw-step-0);
     line-height: 1.6;
