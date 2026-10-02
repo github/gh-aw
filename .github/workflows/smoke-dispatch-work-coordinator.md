@@ -26,17 +26,12 @@ safe-outputs:
         GH_AW_VERIFY_CONFIG: '{"safeOutputsPath":"/tmp/gh-aw/safeoutputs.jsonl","finishIntentPath":"/tmp/gh-aw/dispatch-work-coordinator.finish.jsonl"}'
       with:
         script: |
-          const fs = require('node:fs');
-          const { safeOutputsPath, finishIntentPath } = JSON.parse(process.env.GH_AW_VERIFY_CONFIG);
-          const records = (path) => fs.readFileSync(path, 'utf8')
-            .split('\n').filter(Boolean).map((line) => JSON.parse(line));
-
-          if (records(safeOutputsPath).some((record) => record?.type === 'create_issue')) {
-            core.info('Dispatch coordinator smoke failure reported; processing the failure issue');
-          } else if (!fs.statSync(finishIntentPath).size ||
-                     !records(finishIntentPath).some((record) => record?.outcome === 'completed')) {
-            throw new Error('Dispatch coordinator finish intent artifact is missing or incomplete');
-          }
+          const path = require('node:path');
+          const { verifyCoordinatorFinishIntent } = require(path.join(
+            process.env.GITHUB_WORKSPACE || process.cwd(),
+            'actions/setup/js/verify_dispatch_work_coordinator.cjs',
+          ));
+          verifyCoordinatorFinishIntent(JSON.parse(process.env.GH_AW_VERIFY_CONFIG));
   create-issue:
     max: 1
     title-prefix: "[smoke-dispatch-work-coordinator] "
