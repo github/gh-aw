@@ -486,6 +486,22 @@ describe("close_issue", () => {
       expect(commentCalls[0].body).not.toContain("Default comment from config");
     });
 
+    it("should pass shell metacharacters in a comment as API data", async () => {
+      const payload = "$(touch /tmp/gh-aw-command-injection); echo safe";
+      const handler = await main({ max: 10 });
+      const commentCalls = [];
+      mockGithub.rest.issues.createComment = async params => {
+        commentCalls.push(params);
+        return { data: { id: 999, html_url: "https://github.com/test-owner/test-repo/issues/100#issuecomment-999" } };
+      };
+
+      const result = await handler({ issue_number: 100, body: payload }, {});
+
+      expect(result.success).toBe(true);
+      expect(commentCalls).toHaveLength(1);
+      expect(commentCalls[0].body).toContain(payload);
+    });
+
     it("should require body field when no config comment is set", async () => {
       const handler = await main({ max: 10 });
 

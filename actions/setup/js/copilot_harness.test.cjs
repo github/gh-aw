@@ -178,6 +178,49 @@ describe("copilot_harness.cjs", () => {
       expect(applyCopilotRoutingArgs(args, { wire_model: "claude-haiku-4.5", effort: null })).toEqual(["--silent", "--model", "claude-haiku-4.5"]);
     });
 
+    it.each(["none", "max"])("accepts router-selected reasoning effort %s", effort => {
+      const result = resolveAWFModelRoutingSelection(
+        {
+          routing: {
+            status: "selected",
+            selection: { provider: "copilot", model: "github-copilot/gpt-6-astra", wire_model: "gpt-6-astra", effort: ` ${effort.toUpperCase()} `, endpoint: "/responses" },
+          },
+          endpoints: [{ configured: true, models: ["gpt-6-astra"] }],
+        },
+        true
+      );
+      expect(result.error).toBeNull();
+      expect(result.selection?.effort).toBe(effort);
+      const messages = [];
+      applyCopilotRoutingSelection(result.selection, message => messages.push(message));
+      expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBe(effort);
+      expect(messages[0]).toContain(`effort=${effort}`);
+      expect(applyCopilotRoutingArgs(["--model", "small", "--reasoning-effort", "high"], { wire_model: "gpt-6-astra", effort })).toEqual(["--model", "gpt-6-astra", "--reasoning-effort", effort]);
+    });
+
+    it("rejects unknown router-selected reasoning efforts", () => {
+      const result = resolveAWFModelRoutingSelection(
+        {
+          routing: {
+            status: "selected",
+            selection: { provider: "copilot", model: "github-copilot/gpt-6-astra", wire_model: "gpt-6-astra", effort: "extreme", endpoint: "/responses" },
+          },
+          endpoints: [{ configured: true, models: ["gpt-6-astra"] }],
+        },
+        true
+      );
+      expect(result.selection).toBeNull();
+      expect(result.error).toContain("unsupported reasoning effort extreme");
+    });
+
+    it("does not set a routing effort when the route has no effort", () => {
+      process.env.GH_AW_COPILOT_ROUTING_EFFORT = "high";
+      const messages = [];
+      applyCopilotRoutingSelection({ wire_model: "gpt-6-astra", effort: null, endpoint: "/responses" }, message => messages.push(message));
+      expect(process.env.GH_AW_COPILOT_ROUTING_EFFORT).toBeUndefined();
+      expect(messages[0]).toContain("effort=(unset)");
+    });
+
     it("classifies routing exit 78 as terminal", () => {
       expect(classifyCopilotFailure({ hasOutput: true, isModelRoutingFailure: true })).toBe("model_routing_failed");
       expect(shouldRetryFailedExecution({ exitCode: 78, hasOutput: true, output: "router failed", attempt: 0, maxRetries: 3, isModelRoutingFailure: true })).toBe(false);
