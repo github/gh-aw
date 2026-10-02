@@ -156,6 +156,26 @@ The earlier model revision completed both positive searches on 2026-10-02, check
 
 `Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
 
+## Inspect execution traces
+
+Generate bounded textual traces of the guarded `Spec` and three reachable counterexamples to deliberately false *witness* invariants:
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar \
+TLC_TRACE_DEPTH=16 TLC_TRACE_COUNT=3 \
+bash specs/dispatch-work-coordinator/traces.sh
+```
+
+The script prints a temporary results directory (or uses `TLC_RESULTS_DIR` when set). `simulation_*` files are TLC's textual TLA+ state traces, with at most `TLC_TRACE_DEPTH` states each; `TLC_TRACE_COUNT` sets the number of seeded random simulations. These samples illustrate possible schedules, not exhaustive coverage or guaranteed occurrences of a particular action. The `*Witness.log` files contain model-checked textual counterexample states and action names. Each witness configuration also checks `Safety`; the script accepts only the named witness violation, not a safety violation or a TLC failure.
+
+| Witness | What to inspect in its counterexample |
+|---|---|
+| `NoCompetingClaims` | Two Claims for one nonterminal Work are persisted; replay still selects one effective winner. |
+| `NoRecoveredOrphan` | A run terminates, then recovery prepares and publishes its ClaimCancellation. |
+| `NoExternalEffect` | A worker finalizes, commits Completion, verifies it, and enters its output batch. |
+
+These invariants are intentionally **not** protocol requirements: their violation demonstrates reachability of legitimate behavior under the existing guarded `Spec`. Unlike `BrokenCAS.cfg` and `BrokenTerminal.cfg`, the witness configurations do not add unsafe actions. Inspect the preceding states, not just the final state, to verify the ordering claimed by the ADR. Witnesses show that the model permits these paths; they do not establish that a runtime implementation follows them or that progress is guaranteed.
+
 ## Runtime smoke coverage
 
 The private `.github/workflows/smoke-dispatch-work-coordinator.md` workflow
