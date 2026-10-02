@@ -47,7 +47,7 @@ function isRefConflict(error) {
 
 /**
  * Read the coordinator branch and its canonical transaction log.
- * @param {{githubClient: any, owner: string, repo: string}} options
+ * @param {{githubClient: any, owner: string, repo: string, core?: {info: (message: string) => void}}} options
  */
 async function readCoordinatorLog({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
   coreApi?.info("Dispatch coordinator: reading queue branch");
@@ -97,7 +97,8 @@ async function readCoordinatorLog({ githubClient, owner, repo, core: coreApi = t
  *   repo: string,
  *   intents: CoordinatorTransaction[],
  *   maxRetries?: number,
- *   sleepFn?: (delay: number) => Promise<void>
+ *   sleepFn?: (delay: number) => Promise<void>,
+ *   core?: {info: (message: string) => void}
  * }} options
  */
 async function applyAndPublishCoordinatorTransactions({
