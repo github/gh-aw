@@ -6,12 +6,12 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { Ledger } from "./ledger_store.cjs";
 import { applyTransitionToDirectory, createPlan, loadSegments, parseCompactionConfig, prepareApply, selectSources, validatePlan } from "./ledger_compaction.cjs";
 import { createProjection, formatReplayPrompt, formatReplayTable } from "./create_ledger_projection.cjs";
 import { replayBuiltin } from "./ledger_builtin.cjs";
+import { finalId } from "./ledger_transactions.cjs";
 
 test("creates a read-only SQLite projection from canonical ledger shards", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-projection-"));
@@ -96,71 +96,24 @@ test("replay table guidance includes column types", () => {
   assert.equal(formatReplayTable("items", { columns: { id: "text", count: "integer", data: "json" } }), "- items(id: text, count: integer, data: json)");
 });
 
-test("replay materializes state alongside immutable records and trusted metadata", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-"));
-  const sourceDir = path.join(root, "source");
-  const databasePath = path.join(root, "projection", "ledger.db");
-  const script = `const items = new Map();
-    for (const record of records) {
-      if (record.payload.kind === "created") items.set(record.payload.id, { id: record.payload.id, status: "open" });
-      if (record.payload.kind === "closed") items.get(record.payload.id).status = "closed";
-    }
-    return { version: 1, tables: { items: { columns: { id: "text", status: "text" }, primaryKey: ["id"], rows: [...items.values()] },
-      totals: { columns: { count: "integer" }, primaryKey: ["count"], rows: [{ count: items.size }] } } };`;
-  const ledger = new Ledger({ memoryDir: sourceDir });
-  try {
-    fs.mkdirSync(sourceDir);
-    ledger.append("finding", { kind: "created", id: "123", version: 1 });
-    ledger.append("finding", { kind: "closed", id: "123", version: 2 });
-    createProjection({ sourceDir, databasePath, config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script } } });
-    const db = new DatabaseSync(databasePath, { readOnly: true });
-    try {
-      assert.deepEqual(
-        [...db.prepare("SELECT id, status FROM items").all()].map(row => ({ ...row })),
-        [{ id: "123", status: "closed" }]
-      );
-      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 2);
-      assert.equal(db.prepare("SELECT count FROM totals").get().count, 1);
-      const meta = db.prepare("SELECT * FROM replay_metadata WHERE table_name = 'items'").get();
-      assert.equal(meta.ledger_name, "findings");
-      assert.equal(meta.record_count, 2);
-      assert.match(meta.script_sha256, /^[a-f0-9]{64}$/);
-      assert.equal(meta.script_sha256, createHash("sha256").update(script).digest("hex"));
-      assert.equal(meta.output_version, 1);
-      assert.throws(() => db.exec("UPDATE items SET status = 'open'"));
-    } finally {
-      db.close();
-    }
-  } finally {
-    ledger.close();
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("invalid replay preserves generic records without partial tables", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-fallback-"));
+test("custom replay is rejected instead of silently falling back to generic records", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-rejected-"));
   const sourceDir = path.join(root, "source");
   const databasePath = path.join(root, "projection", "ledger.db");
   const ledger = new Ledger({ memoryDir: sourceDir });
-  const warnings = [];
   try {
     fs.mkdirSync(sourceDir);
     ledger.append("finding", { id: "a" });
-    createProjection({
-      sourceDir,
-      databasePath,
-      config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script: `return { tables: { items: { columns: { id: "text" }, primaryKey: ["id"], rows: [{ id: "a" }, { id: "a" }] } } }` } },
-      onReplayError: message => warnings.push(message),
-    });
-
-    assert.equal(warnings.length, 1);
-    const db = new DatabaseSync(databasePath, { readOnly: true });
-    try {
-      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 1);
-      assert.equal(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'items'").get().n, 0);
-    } finally {
-      db.close();
-    }
+    assert.throws(
+      () =>
+        createProjection({
+          sourceDir,
+          databasePath,
+          config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script: `return { tables: { items: { columns: { id: "text" }, primaryKey: ["id"], rows: [{ id: "a" }, { id: "a" }] } } }` } },
+        }),
+      /Custom ledger replay is no longer supported/
+    );
+    assert.equal(fs.existsSync(databasePath), false);
   } finally {
     ledger.close();
     fs.rmSync(root, { recursive: true, force: true });
@@ -171,17 +124,15 @@ test("compaction preserves replay's ordered logical history", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-compaction-"));
   const sourceDir = path.join(root, "source");
   fs.mkdirSync(sourceDir);
-  const script = `return { tables: { history: { columns: { position: "integer", id: "text" },
-    primaryKey: ["position"], rows: records.map((record, position) => ({ position, id: record.payload.id })) } } }`;
-  const config = { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script } };
+  const config = { name: "findings", type: "log", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
   const first = new Ledger({ memoryDir: sourceDir });
   const second = new Ledger({ memoryDir: sourceDir });
   const compaction = parseCompactionConfig(
     JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })
   );
   try {
-    first.append("finding", { id: "first" });
-    second.append("finding", { id: "second" });
+    first.append("ledger_append", { operation: "append", value: "first" });
+    second.append("ledger_append", { operation: "append", value: "second" });
     const before = path.join(root, "before.db");
     const after = path.join(root, "after.db");
     createProjection({ sourceDir, databasePath: before, config });
@@ -198,13 +149,13 @@ test("compaction preserves replay's ordered logical history", () => {
     try {
       assert.deepEqual(
         oldDb
-          .prepare("SELECT id FROM history ORDER BY position")
+          .prepare("SELECT value FROM state ORDER BY position")
           .all()
-          .map(row => row.id),
+          .map(row => row.value),
         newDb
-          .prepare("SELECT id FROM history ORDER BY position")
+          .prepare("SELECT value FROM state ORDER BY position")
           .all()
-          .map(row => row.id)
+          .map(row => row.value)
       );
     } finally {
       oldDb.close();
@@ -213,6 +164,197 @@ test("compaction preserves replay's ordered logical history", () => {
   } finally {
     first.close();
     second.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("claims projection derives vote state from canonical records across compaction", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-compaction-"));
+  const sourceDir = path.join(root, "source");
+  fs.mkdirSync(sourceDir);
+  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const compaction = parseCompactionConfig(JSON.stringify({ ...config, branch_name: "ledgers/knowledge", compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } }));
+  const claimId = finalId("knowledge", 0);
+  const voteId = finalId("knowledge", 1);
+  const dissentId = finalId("knowledge", 2);
+  const first = new Ledger({ memoryDir: sourceDir });
+  const second = new Ledger({ memoryDir: sourceDir });
+  try {
+    first.append(
+      "ledger_append",
+      {
+        operation: "claim",
+        subject: "README",
+        claim: "Contains instructions",
+        reason: "Read the source",
+        citations: [
+          { type: "repository", path: "README.md", start_line: 1 },
+          { type: "repository", path: "CONTRIBUTING.md" },
+          { type: "repository", path: "LICENSE", end_line: 10 },
+        ],
+      },
+      claimId
+    );
+    second.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, voteId);
+    first.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "down" }, dissentId);
+    const envelopes = new Map(first.reconstruct().records.map(record => [record.id, record]));
+    assert.deepEqual([...envelopes.keys()].sort(), [claimId, voteId, dissentId].sort());
+    assert.ok([...envelopes.values()].every(record => !Object.hasOwn(record.payload, "id")));
+    const before = path.join(root, "before.db");
+    const after = path.join(root, "after.db");
+    createProjection({ sourceDir, databasePath: before, config });
+    const loaded = loadSegments(sourceDir, compaction);
+    const { sources } = selectSources(loaded, compaction);
+    assert.ok(sources);
+    const plan = validatePlan(createPlan({ loaded, sources, config: compaction, trigger: "scheduled", baseCommit: "a".repeat(40) }), compaction);
+    const prepared = prepareApply({ plan, sourceDir, config: compaction });
+    assert.equal(prepared.status, "ready");
+    applyTransitionToDirectory(sourceDir, prepared);
+    createProjection({ sourceDir, databasePath: after, config });
+    const inspect = file => {
+      const db = new DatabaseSync(file, { readOnly: true });
+      try {
+        return {
+          claims: db
+            .prepare("SELECT * FROM claims ORDER BY id")
+            .all()
+            .map(row => ({ ...row })),
+          citations: db
+            .prepare("SELECT * FROM claim_citations ORDER BY claim_id, ordinal")
+            .all()
+            .map(row => ({ ...row })),
+          votes: db
+            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .all()
+            .map(row => ({ ...row })),
+          state: db
+            .prepare("SELECT * FROM claim_state ORDER BY claim_id")
+            .all()
+            .map(row => ({ ...row })),
+          metadata: db
+            .prepare("SELECT table_name FROM replay_metadata ORDER BY table_name")
+            .all()
+            .map(row => row.table_name),
+        };
+      } finally {
+        db.close();
+      }
+    };
+    const projected = inspect(before);
+    assert.deepEqual(inspect(after), projected);
+    assert.deepEqual(projected.claims, [{ id: claimId, subject: "README", claim: "Contains instructions", reason: "Read the source", created_at: envelopes.get(claimId).timestamp, record_sha: envelopes.get(claimId).sha }]);
+    assert.deepEqual(projected.citations, [
+      { claim_id: claimId, ordinal: 0, citation_type: "repository", path: "README.md", start_line: 1, end_line: null },
+      { claim_id: claimId, ordinal: 1, citation_type: "repository", path: "CONTRIBUTING.md", start_line: null, end_line: null },
+      { claim_id: claimId, ordinal: 2, citation_type: "repository", path: "LICENSE", start_line: null, end_line: 10 },
+    ]);
+    assert.deepEqual(
+      projected.votes,
+      [
+        { record_id: envelopes.get(voteId).id, claim_id: claimId, vote: "up", reason: "Verified", created_at: envelopes.get(voteId).timestamp },
+        { record_id: envelopes.get(dissentId).id, claim_id: claimId, vote: "down", reason: null, created_at: envelopes.get(dissentId).timestamp },
+      ].sort((a, b) => a.record_id.localeCompare(b.record_id))
+    );
+    assert.deepEqual(projected.state, [
+      {
+        claim_id: claimId,
+        upvotes: 1,
+        downvotes: 1,
+        net_votes: 0,
+        last_vote_at: [envelopes.get(voteId).timestamp, envelopes.get(dissentId).timestamp].sort().at(-1),
+        last_positive_vote_at: envelopes.get(voteId).timestamp,
+      },
+    ]);
+    assert.deepEqual(projected.metadata, ["claim_citations", "claim_state", "claim_votes", "claims"]);
+  } finally {
+    first.close();
+    second.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("independent votes reconcile to identical immutable rows and claim state in either arrival order", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-concurrent-"));
+  const base = path.join(root, "base");
+  const branchA = path.join(root, "branch-a");
+  const branchB = path.join(root, "branch-b");
+  const claimId = finalId("claims-concurrent", 0);
+  const upId = finalId("claims-concurrent", 1);
+  const downId = finalId("claims-concurrent", 2);
+  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const append = (dir, time, payload, id) => {
+    const ledger = new Ledger({ memoryDir: dir, clock: () => new Date(time) });
+    try {
+      ledger.append("ledger_append", payload, id);
+    } finally {
+      ledger.close();
+    }
+  };
+  try {
+    fs.mkdirSync(base);
+    append(base, "2026-01-01T00:00:00.000Z", { operation: "claim", subject: "README", claim: "Documented", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] }, claimId);
+    fs.cpSync(base, branchA, { recursive: true });
+    fs.cpSync(base, branchB, { recursive: true });
+    append(branchA, "2026-01-02T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, upId);
+    append(branchB, "2026-01-03T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "down" }, downId);
+    const a = new Ledger({ memoryDir: branchA });
+    const b = new Ledger({ memoryDir: branchB });
+    try {
+      const up = a.reconstruct().records.find(record => record.id === upId);
+      const down = b.reconstruct().records.find(record => record.id === downId);
+      assert.deepEqual(up.parents, down.parents);
+      assert.notEqual(up.sha, down.sha);
+    } finally {
+      a.close();
+      b.close();
+    }
+
+    const snapshots = [];
+    for (const [index, order] of [
+      [branchA, branchB],
+      [branchB, branchA],
+    ].entries()) {
+      const merged = path.join(root, `merged-${index}`);
+      const shardDir = path.join(merged, "ledger", "shards");
+      fs.mkdirSync(shardDir, { recursive: true });
+      for (const branch of order) {
+        for (const file of fs.readdirSync(path.join(branch, "ledger", "shards"))) {
+          fs.copyFileSync(path.join(branch, "ledger", "shards", file), path.join(shardDir, file));
+        }
+      }
+      const databasePath = path.join(root, `merged-${index}.db`);
+      createProjection({ sourceDir: merged, databasePath, config });
+      const db = new DatabaseSync(databasePath, { readOnly: true });
+      try {
+        snapshots.push({
+          records: db
+            .prepare("SELECT id, payload FROM records ORDER BY id")
+            .all()
+            .map(row => ({ ...row })),
+          votes: db
+            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .all()
+            .map(row => ({ ...row })),
+          state: db
+            .prepare("SELECT * FROM claim_state")
+            .all()
+            .map(row => ({ ...row })),
+        });
+      } finally {
+        db.close();
+      }
+    }
+    assert.deepEqual(snapshots[0], snapshots[1]);
+    assert.equal(snapshots[0].records.length, 3);
+    assert.deepEqual(
+      snapshots[0].votes,
+      [
+        { record_id: upId, claim_id: claimId, vote: "up", reason: "Verified", created_at: "2026-01-02T00:00:00.000Z" },
+        { record_id: downId, claim_id: claimId, vote: "down", reason: null, created_at: "2026-01-03T00:00:00.000Z" },
+      ].sort((a, b) => a.record_id.localeCompare(b.record_id))
+    );
+    assert.deepEqual(snapshots[0].state, [{ claim_id: claimId, upvotes: 1, downvotes: 1, net_votes: 0, last_vote_at: "2026-01-03T00:00:00.000Z", last_positive_vote_at: "2026-01-02T00:00:00.000Z" }]);
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

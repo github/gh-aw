@@ -531,6 +531,11 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"filter":    {Type: "object"},
 			"result":    {AllowNull: true},
 			"reason":    {Type: "string", MaxLength: 1024},
+			"subject":   {Type: "string", MaxLength: 512},
+			"claim":     {Type: "string", MaxLength: 4096},
+			"citations": {Type: "array", ItemType: "object"},
+			"claim_id":  {Type: "string", MaxLength: 128},
+			"vote":      {Type: "string", Enum: []string{"up", "down"}},
 		},
 	},
 	"ledger_request_compaction": {

@@ -48,45 +48,72 @@ tools:
 ## Structured Ledger
 
 :::caution[Experimental]
-The repo-memory ledger is experimental and its configuration or behavior may change. Enabling it emits a compile-time warning.
+Ledgers are experimental and their configuration or behavior may change.
 :::
 
-Enable an optional, domain-neutral ledger within repo memory:
+Ledgers use `tools.ledger`, independently of repo-memory file storage. The legacy
+`tools.repo-memory.ledger` declaration is no longer supported. For built-in
+state models, declare `log`, `set`, `map`, `table`, `counter`, or `claims`:
 
 ```aw wrap
 ---
 tools:
-  repo-memory:
-    ledger:
+  ledger:
+    findings:
+      type: table
+      key: id
+      schema:
+        type: object
+        required: [id, status]
+        properties:
+          id: { type: string }
+          status: { type: string }
 ---
 ```
 
-The ledger tools append immutable structured records and retrieve or query them without exposing storage paths or SQL to the agent. Queries return records in stable SHA order and support bounded cursor pagination: pass the previous response's `nextCursor` as `after` and continue while `hasMore` is true. A cursor is exclusive and applies to the same query filters; concurrent writes may change the matching set between pages, so pagination is not a snapshot. Repo memory persists the append-only records in Git; an ephemeral local index is reconstructed from those records on each run. Independent concurrent writers can append records, and their histories converge when repo memory merges them. A missing parent is reported as incomplete rather than discarding its record; malformed records are isolated and reported in ledger status.
+Each ledger persists immutable records on its own `ledgers/<name>` Git branch.
+Trusted preparation reconstructs a disposable, read-only SQLite database at
+`/tmp/gh-aw/ledgers/<name>/ledger.db`. Query `state` for the built-in current
+state and `records` for immutable history. Schemas validate operation values,
+not operation envelopes; `table` requires a string primary-key field.
 
-To validate application records as well as the built-in envelope, specify a repository-relative local schema using the supported simplified JSON Schema vocabulary:
+Configure bounded storage limits and maintenance cadence per ledger:
 
 ```yaml
 tools:
-  repo-memory:
-    ledger:
+  ledger:
+    findings:
+      type: log
       schema: .github/schemas/ledger.schema.json
-      max-shards: 256       # default 1024
-      max-segment-kb: 100   # default 100 KiB (repo-memory max-file-size default)
+      max-segment-kb: 100   # default 100 KiB
       max-record-kb: 32     # default 32 KiB
-      max-patch-kb: 10      # default 10 KiB (repo-memory max-patch-size default)
+      max-patch-kb: 10      # default 10 KiB
+      compaction:
+        schedule: weekly
+        min-segments: 32
+        max-segments: 128
 ```
 
-The ledger is an eventually convergent append-only store, not a distributed transactional database. Applications must define their own deterministic conflict resolution for concurrent records.
-
-Ledger segment and record limits should stay within repo-memory's `max-file-size` limit, and the per-run ledger patch limit should stay within `max-patch-size`. If a ledger limit exceeds its corresponding repo-memory limit, compilation emits a warning because persistence may reject the ledger files or patch.
+Agents submit mutations only through the configured ledger safe-output tools.
+Map ledgers expose `ledger_map_put` and `ledger_map_delete`; claims expose
+`ledger_claim_add` and `ledger_claim_vote`. Other built-in types use typed
+`ledger_append` operations. Writes are deferred: the immediate
+response confirms queuing, not durability. The trusted `push_ledger_changes`
+job validates and reconciles accepted requests against the latest branch state
+before pushing. Queued writes are not immediately visible in the run's projection.
 
 Ledger compaction never runs in the agent or persistence job. Standalone `tools.ledger` ledgers are compacted by Agentic Maintenance through an untrusted plan job and a trusted apply job; see [Ledger compaction](/gh-aw/experimental/ledger-compaction/).
 
-Ledger workflows require AWF's Cloud Hypervisor runtime. The compiler withholds repo-memory ledger paths from `filesystem.allowWrite` and rejects allow-write paths that overlap the ledger directory; agents append only through ledger MCP tools. The persistence job also ignores agent artifacts that overwrite existing trusted shards or supply coverage declarations. Record SHA-256 values detect accidental corruption, not malicious forgery, so do not treat the ledger as tamper-proof if its write boundary is bypassed. Cloud Hypervisor is a preview runtime and is limited to supported GitHub-hosted Linux x86_64 runners.
+Custom `replay.script`, `replay.config`, and `compaction.script` settings are
+rejected. Use schemas for domain-specific values and the built-in compaction
+policy for segment selection. Ordinary repo-memory `validation.script`
+remains supported; it is a separate file-storage validator.
 
-After each durable agent append, the server attempts to emit a redacted `ledger_mutation` audit entry (operation, record ID and type, timestamp, parent hashes, record SHA, payload SHA) to a dedicated ledger transaction log. An audit-write failure is reported separately and does not turn a committed append into a failed one; audit logs may therefore have gaps. A trusted post-agent step revalidates, redacts, deduplicates, and bounds those entries before merging them into the safe-output file, where threat detection can review them. The matching safe-output handler is log-only: it reports the audit metadata and performs no side effects, because the append is already durable and the transaction log alone does not prove which writer produced an entry.
-
-Concurrent/retried appends are at-least-once, not exactly-once: record UUIDs are not application idempotency keys, and the ledger does not provide transactions or uniqueness constraints. Include stable application keys and resolve duplicates/conflicts deterministically. SHA-256 is an unkeyed integrity checksum, not authentication.
+Existing raw-record ledgers can retain their generic projection by omitting
+`type` and querying `records.payload` with SQLite JSON functions. Adding a
+built-in type does not convert historical raw payloads into operations.
+See [Ledger replay projections](/gh-aw/experimental/ledger-replay/) for type
+semantics and migration guidance.
 
 **File Glob Matching Rules**:
 

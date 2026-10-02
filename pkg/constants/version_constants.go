@@ -7,7 +7,7 @@ package constants
 //
 // Example usage:
 //
-//	const DefaultCopilotVersion Version = "1.0.89"
+//	const DefaultCopilotVersion Version = "1.0.90"
 //	func InstallTool(name string, version Version) error { ... }
 type Version string
 
@@ -32,30 +32,30 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.285"
+const DefaultClaudeCodeVersion Version = "2.1.286"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.89"
+const DefaultCopilotVersion Version = "1.0.90"
 
 // CopilotWebSearchMinVersion is the first known Copilot CLI version that
 // exposes the built-in web_search tool.
 const CopilotWebSearchMinVersion Version = "1.0.87"
 
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
-const DefaultCopilotSDKVersion Version = "1.0.13"
+const DefaultCopilotSDKVersion Version = "1.0.16"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.159.2"
+const DefaultCodexVersion Version = "0.159.3"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.62.0"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "0.99.1"
+const DefaultPiVersion Version = "0.99.2"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v1.12.2"

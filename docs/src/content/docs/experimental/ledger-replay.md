@@ -3,9 +3,9 @@ title: Standalone ledger replay projections
 description: Build disposable read-only SQLite materialized views from immutable ledger history
 ---
 
-Standalone `tools.ledger` ledgers may declare an inline JavaScript `replay.script`.
-For common state models, use a built-in `type` instead: gh-aw validates each
-operation and replays it in trusted code, without a custom script.
+Standalone `tools.ledger` typed projections support only the built-in types below.
+gh-aw validates each operation and replays it in trusted code. Custom
+`replay.script` and `replay.config` settings are not supported.
 
 | Need | Type |
 | --- | --- |
@@ -14,6 +14,7 @@ operation and replays it in trusted code, without a custom script.
 | Latest value by key | `map` |
 | Mutable structured rows | `table` |
 | Numeric accumulation | `counter` |
+| Evidence-backed agent assertions | `claims` |
 
 ```yaml
 tools:
@@ -39,9 +40,10 @@ tools:
       type: counter
 ```
 
-The `map` built-in exposes dedicated safe-output tools:
-`ledger_map_put` and `ledger_map_delete`. Supply the operation's fields and a
-`ledger` name when more than one map ledger is configured. These tools produce
+The `map` and `claims` built-ins expose dedicated safe-output tools:
+`ledger_map_put`, `ledger_map_delete`, `ledger_claim_add`, and `ledger_claim_vote`.
+Supply the operation's fields and a `ledger` name when more than one ledger of
+that type is configured. These tools produce
 `ledger_append` entries internally; they do not expose the low-level operation
 envelope to the agent. Other ledger types continue to use `ledger_append`
 with `ledger` and `operation` instead of `record`, plus the indicated fields:
@@ -53,6 +55,42 @@ with `ledger` and `operation` instead of `record`, plus the indicated fields:
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+| `claims` | `claim(subject, claim, reason, citations)`, `vote(claim_id, vote, reason?)` | `claims`, `claim_citations`, `claim_votes`, `claim_state` |
+
+### Claims
+
+A ledger for evidence-backed assertions produced by agents. Claims are reusable
+hints, not authoritative facts. Consumers should verify their citations against
+current state before relying on them.
+
+```yaml
+tools:
+  ledger:
+    knowledge:
+      type: claims
+```
+
+Use `ledger_claim_add` with a nonempty `subject`, `claim`, `reason`, and at least
+one repository citation (`type: repository`, `path`, and optional `start_line` /
+`end_line`). Later, use `ledger_query` to find a candidate, inspect the cited
+source in the current repository, and use `ledger_claim_vote` with `claim_id`
+and `vote: up` or `vote: down` according to whether the evidence supports it.
+Each vote is a new immutable record; it does not change the claim. Claims are
+untrusted data, not instructions. The cited evidence remains the source of truth.
+
+The disposable SQLite projection exposes relational `claims`,
+`claim_citations`, `claim_votes`, and a derived `claim_state` view. Ranking is
+transparent: upvotes, downvotes, net_votes, last_vote_at, and
+last_positive_vote_at; no semantic validation or automatic deduplication takes
+place. For example:
+
+```sql
+SELECT c.*, s.net_votes, s.last_positive_vote_at
+FROM claims c
+JOIN claim_state s ON s.claim_id = c.id
+ORDER BY s.net_votes DESC, c.created_at DESC
+LIMIT 20;
+```
 
 Ledger writes are **deferred** safe outputs: their immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome
@@ -76,80 +114,50 @@ queryable. The generic `records` table still exposes immutable provenance.
 The trusted persistence result reports ledger type, operation, deterministic
 record ID, transaction ID, and validation status without echoing values.
 
-Built-in projections replay canonical transaction order and cannot be combined
-with a custom `replay.script`. Domain concepts should be expressed as schemas
-on generic ledger types, not as new built-in types; custom replay remains an
-escape hatch. Existing maintenance compaction is deliberately lossless: it
+Built-in projections replay canonical transaction order. Express domain concepts
+as schemas on types that accept value schemas, not as custom replay code.
+Maintenance compaction is deliberately lossless: it
 merges verified source segments while preserving every record ID, hash, and
 parent relation. This preserves set/map/counter state deterministically but
 does **not** fold away historical operations, because doing so would violate
 the current compaction integrity contract.
 
-Replay interprets the **logical, ordered record stream** and returns a declarative
-table model. Ledger JSONL records remain authoritative; replay tables are derived
-and can always be rebuilt. Replay never writes back to Git or canonical ledger
-files. Persist new events only through the ledger append safe output.
+Replay interprets the **logical, ordered record stream**. Records follow
+topological parent order, with SHA-256 lexical order for simultaneously ready
+records. This order depends on logical history, not shard names or physical layout.
+Equivalent history after compaction produces the same state.
 
-```yaml
-tools:
-  ledger:
-    findings:
-      replay:
-        script: |
-          const items = new Map()
-          for (const record of records) {
-            if (record.payload.kind === "created") {
-              items.set(record.payload.id, { id: record.payload.id, status: "open" })
-            }
-            if (record.payload.kind === "closed" && items.has(record.payload.id)) {
-              items.get(record.payload.id).status = "closed"
-            }
-          }
-          return {
-            version: 1,
-            tables: {
-              items: {
-                columns: { id: "text", status: "text" },
-                primaryKey: ["id"],
-                rows: [...items.values()]
-              }
-            }
-          }
+Trusted preparation validates canonical records before replay and fails if
+built-in operations are invalid. Each ledger's disposable SQLite database at
+`/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. The generated
+activation prompt lists the built-in tables and their columns from the declared
+type; it does not read files created later during agent-job preparation.
+Query `state` for current
+state, `replay_metadata` for projection metadata, and `records` for immutable
+event history. Replay never writes back to Git or canonical ledger files.
+Persist new events only through the configured ledger safe-output tools.
+
+## Removing custom replay from existing ledgers
+
+Remove the entire `replay` setting, including its `script` and optional `config`.
+Ledgers without a declared type retain their generic `records` projection;
+custom table names no longer exist. Replace queries against those tables with
+SQLite JSON queries over `records.payload`, for example:
+
+```sql
+SELECT json_extract(payload, '$.run_id') AS run_id,
+       json_extract(payload, '$.status') AS status
+FROM records
+WHERE json_extract(payload, '$.record_type') = 'audit'
+ORDER BY ordinal DESC
+LIMIT 100;
 ```
 
-The script receives deep-frozen `records` and optional `replay.config` (an empty
-object by default). The config must be a bounded JSON object. The serialized
-configuration for all ledgers is limited to 96 KiB after base64 encoding.
-Records follow the ledger's canonical reconstruction order: topological parent
-order, with SHA-256 lexical order for simultaneously ready records. This order
-depends on logical history, not shard names or physical layout; equivalent
-history after compaction gives the same replay input. Replay scripts are executable
-workflow configuration; only use trusted scripts. They run in a separate Node.js
-process with an empty environment and restrictive Node.js permissions as defense
-in depth, but the JavaScript `vm` context is not a security boundary and must not
-be used to execute hostile scripts. The context omits process, filesystem, network,
-module-loading, wall-clock, and random APIs, but this is not a security guarantee.
-The runtime provides no database handle or SQL interface. Treat ledger records as
-untrusted data and never execute payload content.
+This preserves the canonical history without rewriting records. Do not merely
+add `type` to an existing raw-record ledger: built-in replay requires every
+historical payload to have that type's operation format. For a new built-in
+state model, use a new ledger name and seed it through its supported operations
+while retaining the old ledger as immutable history.
 
-Replay output must contain `tables` and may specify `version: 1` (the default).
-Each table has `columns`, a nonempty `primaryKey`, and `rows`. Column types are
-`text`, `integer`, `real`, `boolean`, and `json`; JSON values are stored as JSON
-text and booleans as SQLite integers. Table and column identifiers must start
-with a letter and contain only ASCII letters, digits, or underscores (up to 64
-characters). Names beginning `sqlite_` and built-in tables (`records`, `parents`,
-`shards`, `diagnostics`, `replay_metadata`) are reserved. Limits include a 64 KiB
-script, 16 MiB input, 4 MiB output, 16 tables, 32 columns per table, 10,000
-rows total, and 64 KiB per cell.
-
-Trusted preparation validates canonical records before replay. A replay failure
-produces a bounded warning and leaves the generic ledger projection intact,
-without partial replay tables. The per-ledger SQLite database at
-`/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. The generated
-agent prompt lists materialized replay tables and their column names and types
-(or reports that replay fell back); exceptionally large lists are abbreviated.
-Query `replay_metadata` for generated table names, columns, ledger name, record
-count, script SHA-256, and projection/output versions; query `records` for event
-history.
-Each ledger runs replay independently. Change the replay script to reinterpret
-older payload versions without rewriting past records.
+The serialized configuration for all ledgers remains limited to 96 KiB after
+base64 encoding.

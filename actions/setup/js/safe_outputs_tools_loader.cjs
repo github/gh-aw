@@ -218,6 +218,9 @@ function attachHandlers(tools, handlers, logger) {
     if (tool._ledger_type && tool._ledger_operation && typeof handlers.ledgerBuiltinHandler === "function") {
       tool.handler = handlers.ledgerBuiltinHandler(tool._ledger_type, tool._ledger_operation);
     }
+    if (normalizeConfiguredToolName(tool.name) === "ledger_append" && typeof handlers.ledgerAgentAppendHandler === "function") {
+      tool.handler = handlers.ledgerAgentAppendHandler;
+    }
 
     // Check if this is a dispatch_workflow tool (dynamic tool with workflow metadata)
     if (hasValidWorkflowMetadataName(tool._workflow_name)) {
