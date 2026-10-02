@@ -148,10 +148,10 @@
       "version": "v4.38.2",
       "sha": "2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2"
     },
-    "github/stale-repos@v9.0.19": {
+    "github/stale-repos@v9.0.18": {
       "repo": "github/stale-repos",
-      "version": "v9.0.19",
-      "sha": "cd662591ad9d5d8967f84431eb94a45f828c1db3"
+      "version": "v9.0.18",
+      "sha": "c42a2821e3ef0cee1b1bc20b7eecbb2bfa7a83b4"
     },
     "haskell-actions/setup@v2.12.1": {
       "repo": "haskell-actions/setup",
@@ -173,10 +173,10 @@
       "version": "v1",
       "sha": "5ac0f275b83d9d5a9342c6aae977ec32fa330daa"
     },
-    "super-linter/super-linter@v9.0.0": {
+    "super-linter/super-linter@v8.7.0": {
       "repo": "super-linter/super-linter",
-      "version": "v9.0.0",
-      "sha": "2da136927bd4a73596db63044b504547c62cb854"
+      "version": "v8.7.0",
+      "sha": "4ce20838b8ab83717e78138c5b3a1407148e0918"
     }
   },
   "containers": {
