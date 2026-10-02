@@ -33,6 +33,7 @@ const heading = section === 'blog' ? 'Blog posts' : 'Documentation';
 		pane.scrollTop += box.top - paneBox.top - (paneBox.height - box.height) / 2;
 	};
 	scrollCurrentIntoView();
+	document.addEventListener('astro:page-load', scrollCurrentIntoView);
 </script>
 
 <style>

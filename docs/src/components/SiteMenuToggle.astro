@@ -31,40 +31,66 @@ const closeIcon = octicons.x.toSVG({ width: 20, height: 20, 'aria-hidden': 'true
 
 <script>
 	const desktop = matchMedia('(min-width: 50rem)');
+	const initialized = new WeakSet<HTMLButtonElement>();
+	const cleanups = new Set<() => void>();
 
-	document.querySelectorAll<HTMLButtonElement>('.site-menu-toggle').forEach((button) => {
-		const sheet = document.getElementById(button.getAttribute('aria-controls') ?? '');
-		if (!sheet) return;
+	function setPageInert(inert: boolean) {
+		document
+			.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link, .site-footer')
+			.forEach((element) => element.toggleAttribute('inert', inert));
+	}
 
-		const isOpen = () => sheet.matches(':popover-open');
-		const close = () => {
-			if (isOpen()) sheet.hidePopover();
-		};
+	function initialize() {
+		document.querySelectorAll<HTMLButtonElement>('.site-menu-toggle').forEach((button) => {
+			if (initialized.has(button)) return;
+			const sheet = document.getElementById(button.getAttribute('aria-controls') ?? '');
+			if (!sheet) return;
+			initialized.add(button);
 
-		sheet.addEventListener('toggle', (event) => {
-			const open = (event as ToggleEvent).newState === 'open';
-			button.setAttribute('aria-expanded', String(open));
-			// Starlight already inerts the page behind its own sidebar; do the same for ours.
-			if (sheet.id !== 'starlight__sidebar') {
-				document.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link').forEach((el) => {
-					el.toggleAttribute('inert', open);
-				});
-			}
-			if (!open && !desktop.matches) {
-				const active = document.activeElement;
-				if (!active || active === document.body || sheet.contains(active)) {
-					button.focus({ preventScroll: true });
+			const isOpen = () => sheet.matches(':popover-open');
+			const close = () => {
+				if (isOpen()) sheet.hidePopover();
+			};
+			const onToggle = (event: Event) => {
+				const open = (event as ToggleEvent).newState === 'open';
+				button.setAttribute('aria-expanded', String(open));
+				// Starlight already inerts the page behind its own sidebar; do the same for ours.
+				if (sheet.id !== 'starlight__sidebar') setPageInert(open);
+				if (!open && !desktop.matches) {
+					const active = document.activeElement;
+					if (!active || active === document.body || sheet.contains(active)) {
+						button.focus({ preventScroll: true });
+					}
 				}
-			}
-		});
+			};
+			const onSheetClick = (event: MouseEvent) => {
+				if ((event.target as Element).closest('a[href]')) close();
+			};
+			const cleanup = () => {
+				sheet.removeEventListener('toggle', onToggle);
+				sheet.removeEventListener('click', onSheetClick);
+				desktop.removeEventListener('change', close);
+				if (isOpen()) sheet.hidePopover();
+				button.setAttribute('aria-expanded', 'false');
+				if (sheet.id === 'starlight__sidebar' || sheet.id === 'site-menu') setPageInert(false);
+				initialized.delete(button);
+				cleanups.delete(cleanup);
+			};
 
-		// Close on link tap so in-page links don't leave the sheet open.
-		sheet.addEventListener('click', (event) => {
-			if ((event.target as Element).closest('a[href]')) close();
+			sheet.addEventListener('toggle', onToggle);
+			sheet.addEventListener('click', onSheetClick);
+			desktop.addEventListener('change', close);
+			cleanups.add(cleanup);
 		});
+	}
 
-		desktop.addEventListener('change', close);
-	});
+	function cleanup() {
+		for (const dispose of cleanups) dispose();
+	}
+
+	document.addEventListener('astro:before-swap', cleanup);
+	document.addEventListener('astro:page-load', initialize);
+	initialize();
 </script>
 
 <style>

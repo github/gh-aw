@@ -4,6 +4,7 @@ import { getNavLinks, getSection } from './site-nav';
 
 const section = getSection(Astro.locals.starlightRoute.id);
 const links = getNavLinks(import.meta.env.BASE_URL);
+const isCurrentPage = (href: string) => new URL(href, Astro.url).pathname === Astro.url.pathname;
 ---
 
 <nav class="mobile-nav" aria-label="Main">
@@ -11,7 +12,12 @@ const links = getNavLinks(import.meta.env.BASE_URL);
 		{
 			links.map((link) => (
 				<li>
-					<a href={link.href} aria-current={link.section === section ? 'page' : undefined}>
+					<a
+						href={link.href}
+						aria-current={
+							link.section === section ? (isCurrentPage(link.href) ? 'page' : 'location') : undefined
+						}
+					>
 						{link.label}
 					</a>
 				</li>
@@ -47,13 +53,15 @@ const links = getNavLinks(import.meta.env.BASE_URL);
 
 	/* `li a` outranks the sidebar's current-page fill, which this sits inside on docs pages */
 	.mobile-nav li a:hover,
-	.mobile-nav li a[aria-current='page'] {
+	.mobile-nav li a[aria-current='page'],
+	.mobile-nav li a[aria-current='location'] {
 		background: none;
 		color: var(--aw-color-text-strong);
 	}
 
 	/* Current section: a small accent dot after the label */
-	.mobile-nav a[aria-current='page']::after {
+	.mobile-nav a[aria-current='page']::after,
+	.mobile-nav a[aria-current='location']::after {
 		content: '';
 		width: 0.375rem;
 		height: 0.375rem;

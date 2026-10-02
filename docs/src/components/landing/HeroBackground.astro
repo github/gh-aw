@@ -181,6 +181,8 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
 
   const CELL = 3; // CSS px per dither cell
   const FRAME_MS = 1000 / 30;
+  const cleanups = new Set<() => void>();
+  const initialized = new WeakSet<HTMLElement>();
 
   function parseColor(ctx: CanvasRenderingContext2D, value: string): [number, number, number] {
     ctx.clearRect(0, 0, 1, 1);
@@ -204,6 +206,7 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
   }
 
   function init(root: HTMLElement) {
+    if (initialized.has(root)) return;
     const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-a-canvas');
     if (!canvas) return;
     const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
@@ -318,24 +321,48 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
       if (!raf) raf = requestAnimationFrame(tick);
     }
 
-    readColors();
-
-    new ResizeObserver(update).observe(root);
-
-    new IntersectionObserver((entries) => {
+    const resizeObserver = new ResizeObserver(update);
+    const intersectionObserver = new IntersectionObserver((entries) => {
       onScreen = entries.some((e) => e.isIntersecting);
       update();
-    }).observe(root);
-
-    new MutationObserver(() => {
+    });
+    const themeObserver = new MutationObserver(() => {
       readColors();
       if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    });
+    const onVisibilityChange = () => update();
+    const onMotionChange = () => update();
+    const cleanup = () => {
+      if (raf) cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+      themeObserver.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      reduceMotion.removeEventListener('change', onMotionChange);
+      initialized.delete(root);
+      cleanups.delete(cleanup);
+    };
 
-    document.addEventListener('visibilitychange', update);
-    reduceMotion.addEventListener('change', update);
+    initialized.add(root);
+    readColors();
+    resizeObserver.observe(root);
+    intersectionObserver.observe(root);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    reduceMotion.addEventListener('change', onMotionChange);
+    cleanups.add(cleanup);
     update();
   }
 
-  document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach(init);
+  function initialize() {
+    document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach(init);
+  }
+
+  function cleanup() {
+    for (const dispose of cleanups) dispose();
+  }
+
+  document.addEventListener('astro:before-swap', cleanup);
+  document.addEventListener('astro:page-load', initialize);
+  initialize();
 </script>

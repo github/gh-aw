@@ -368,7 +368,7 @@ test.describe('Mobile and Responsive Layout', () => {
     });
     const page = await context.newPage();
 
-    await page.goto('/gh-aw/introduction/overview/');
+    await page.goto('/gh-aw/introduction/how-they-work/');
     await page.waitForLoadState('networkidle');
 
     // The menu button must be present and focusable on a narrow mobile viewport.
@@ -386,19 +386,23 @@ test.describe('Mobile and Responsive Layout', () => {
     await menuButton.click();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     await expect(sheet).toBeVisible();
+    await expect(page.locator('.site-footer')).toHaveAttribute('inert', '');
 
     const navLinks = sheet.locator('.mobile-nav a');
     await expect(navLinks).toHaveCount(3);
     for (const link of await navLinks.all()) {
       await expect(link).toBeVisible();
     }
-    await expect(sheet.locator('.mobile-nav a[aria-current="page"]')).toHaveText('Docs');
+    await expect(sheet.locator('.mobile-nav a[aria-current="location"]')).toHaveText('Docs');
+    await expect(page.locator('.site-header-nav a[aria-current="location"]')).toHaveText('Docs');
+    await expect(page.locator('.site-header-nav a[aria-current="page"]')).toHaveCount(0);
     await expect(sheet.locator('ul.top-level').first()).toBeVisible();
 
     // A second click must close the sheet.
     await menuButton.click();
     await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
     await expect(sheet).toBeHidden();
+    await expect(page.locator('.site-footer')).not.toHaveAttribute('inert', '');
 
     // Esc closes it too and returns focus to the button.
     await menuButton.click();
