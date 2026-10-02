@@ -764,7 +764,7 @@ starlight-toc h2 {
 
 /* Keyboard Keys */
 .sl-markdown-content kbd {
-  font-size: 0.875em;
+  font-size: var(--aw-text-code);
   line-height: 1;
   color: var(--aw-color-text);
   background-color: var(--aw-color-bg-subtle);
@@ -776,9 +776,8 @@ starlight-toc h2 {
 
 /* Focus Visible State */
 :focus-visible {
-  outline: 2px solid var(--aw-color-accent-text);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: var(--aw-focus-ring);
+  outline-offset: var(--aw-focus-offset);
 }
 
 /* Scroll Behavior */
