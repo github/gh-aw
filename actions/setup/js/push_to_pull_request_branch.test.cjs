@@ -475,6 +475,22 @@ index 0000000..abc1234
       expect(result.error).toContain("pull request context");
     });
 
+    it('should identify an explicit PR number that cannot override target "triggering"', async () => {
+      mockContext.eventName = "schedule";
+      delete mockContext.payload.pull_request;
+      delete mockContext.payload.issue;
+      createPatchFile("should-identify-explicit-pr-number-with-triggering-target");
+
+      const module = await loadModule();
+      const handler = await module.main({ target: "triggering" });
+      const result = await handler({ pull_request_number: 456, branch: "should-identify-explicit-pr-number-with-triggering-target" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("456");
+      expect(result.error).toContain('target: "*"');
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+    });
+
     it('should fail gracefully with target "triggering" when context is undefined (MCP daemon mode)', async () => {
       delete global.context;
 

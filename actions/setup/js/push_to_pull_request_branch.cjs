@@ -608,6 +608,14 @@ async function main(config = {}) {
       }
 
       if (!pullNumber) {
+        if (message.pull_request_number != null) {
+          const suppliedNumber = Number(message.pull_request_number);
+          const suppliedTarget = Number.isSafeInteger(suppliedNumber) && suppliedNumber > 0 ? `pull_request_number ${suppliedNumber}` : "an invalid pull_request_number";
+          return {
+            success: false,
+            error: `push-to-pull-request-branch received ${suppliedTarget}, but target "triggering" requires pull request context. To target an explicit pull request, configure push-to-pull-request-branch with target: "*" and supply pull_request_number.`,
+          };
+        }
         return { success: false, error: 'push-to-pull-request-branch with target "triggering" requires pull request context' };
       }
     } else if (target === "*") {
