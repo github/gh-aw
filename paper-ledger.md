@@ -147,3 +147,28 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 | 2609.40303v1 | How Much of a Harness Does a Strong Agent Need for Autonomous ML Engineering? | 2026-09-30 | Y | | |
 | 2609.39982v1 | Mid-Harness: Scaling Actions Between Model and Harness for Terminal Agents | 2026-09-30 | Y | | |
 | 2609.40027v1 | Who Verifies the Graph? Misspecification Attacks on Causal Action Verification | 2026-09-30 | Y | | |
+| 2610.02206v1 | KaliBench: A Fine-Grained Benchmark for Cybersecurity Tool Use on Kali Linux with Runtime-Free Verifiable Rewards | 2026-10-01 | N | | |
+| 2610.02204v1 | Reconstruct, Practice, Go Real: Guided Self-Improvement for Embodied Agents | 2026-10-01 | N | | |
+| 2610.02202v1 | ScholarCatalyst: A Benchmark for Retrieving Papers That Inspire New Research | 2026-10-01 | N | | |
+| 2610.02200v1 | VISTA: A Visual Harness for Reasoning in an Interactive World | 2026-10-01 | N | | |
+| 2610.02161v1 | DuoMind: Enabling Distributed Multi-Robot Coordination with Semantic Communication | 2026-10-01 | N | | |
+| 2610.02159v1 | When Do Intrinsic Rewards Lead to Exploration? | 2026-10-01 | N | | |
+| 2610.02150v1 | From Knowledge Access to Source Learning: Developing Source-Specific Competence | 2026-10-01 | N | | |
+| 2610.02122v1 | Argo-Bench: Evaluating Data Agents on Enterprise-Scale Workflows | 2026-10-01 | N | | |
+| 2610.02074v1 | Homomorphic Advantage Operator: Stabilizing Reinforcement Learning Under Fully Homomorphic Encryption Constraints | 2026-10-01 | N | | |
+| 2610.02039v1 | CARM: Cancellation-Aware Response Masking for LLM Reinforcement Learning | 2026-10-01 | N | | |
+| 2610.02038v1 | Mimir: Physics-Grounded LLM Agents for Long-Horizon Irrigation Control | 2026-10-01 | N | | |
+| 2610.02036v1 | Global Coherence: When Every Agent Is Right and the Team Is Still Wrong - A Local-to-Global Semantic Foundation for Multi-Agent Collaboration | 2026-10-01 | N | | |
+| 2610.02012v1 | Bellman Meets Lyapunov: Unsupervised Reinforcement Learning via Mastering Chaos | 2026-10-01 | N | | |
+| 2610.02005v1 | Counting Moves, Weighing Voices: Bayesian Dialectical Argumentation for Calibrated Multi-LLM Councils under Persistent Adversaries | 2026-10-01 | N | | |
+| 2610.02002v1 | Mem++: Non-Destructive Memory for Long-Term Organizational LLM Agents | 2026-10-01 | Y | x | y |
+| 2610.02001v1 | Mingbird: A Local-First Agent Harness Enabling Small Open Models to Complete Real Tasks | 2026-10-01 | Y | x | y |
+| 2610.01959v1 | Training-Free Diffusion Planning with Analytical Local Scores | 2026-10-01 | N | | |
+| 2610.01955v1 | Do Your Own Research: Learning to Forecast by Learning to Search | 2026-10-01 | N | | |
+| 2610.01892v1 | Selection-Based Structured Reasoning: Toward Efficient Multimodal Search Agents | 2026-10-01 | N | | |
+| 2610.01887v1 | TRACE: Tackling Real-World Resource Assignment Problems via Agentic Heuristic Design | 2026-10-01 | N | | |
+| 2610.01882v1 | Flowing Faster to Coordinate: One-Step Online Multi-Agent Flow Policies | 2026-10-01 | N | | |
+| 2610.01845v1 | Temporal-Difference Learning for Dragonchess | 2026-10-01 | N | | |
+| 2610.01834v1 | Code Owns the Simulation, Jev Owns the Evaluation | 2026-10-01 | N | | |
+| 2610.01833v1 | Continuous Process-Level Evaluation for Evolving Enterprise AI Agent Skills | 2026-10-01 | Y | x | y |
+| 2610.01827v1 | Scientific Discovery under Validation Congestion via Multi-Fidelity Pairwise Rankings | 2026-10-01 | N | | |

@@ -839,6 +839,181 @@
       "published": "2026-09-15",
       "relevant": false,
       "analyzed_at": "2026-09-16-08-41-00"
+    },
+    {
+      "id": "2610.02206v1",
+      "title": "KaliBench: A Fine-Grained Benchmark for Cybersecurity Tool Use on Kali Linux with Runtime-Free Verifiable Rewards",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02204v1",
+      "title": "Reconstruct, Practice, Go Real: Guided Self-Improvement for Embodied Agents",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02202v1",
+      "title": "ScholarCatalyst: A Benchmark for Retrieving Papers That Inspire New Research",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02200v1",
+      "title": "VISTA: A Visual Harness for Reasoning in an Interactive World",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02161v1",
+      "title": "DuoMind: Enabling Distributed Multi-Robot Coordination with Semantic Communication",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02159v1",
+      "title": "When Do Intrinsic Rewards Lead to Exploration?",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02150v1",
+      "title": "From Knowledge Access to Source Learning: Developing Source-Specific Competence",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02122v1",
+      "title": "Argo-Bench: Evaluating Data Agents on Enterprise-Scale Workflows",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02074v1",
+      "title": "Homomorphic Advantage Operator: Stabilizing Reinforcement Learning Under Fully Homomorphic Encryption Constraints",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02039v1",
+      "title": "CARM: Cancellation-Aware Response Masking for LLM Reinforcement Learning",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02038v1",
+      "title": "Mimir: Physics-Grounded LLM Agents for Long-Horizon Irrigation Control",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02036v1",
+      "title": "Global Coherence: When Every Agent Is Right and the Team Is Still Wrong - A Local-to-Global Semantic Foundation for Multi-Agent Collaboration",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02012v1",
+      "title": "Bellman Meets Lyapunov: Unsupervised Reinforcement Learning via Mastering Chaos",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02005v1",
+      "title": "Counting Moves, Weighing Voices: Bayesian Dialectical Argumentation for Calibrated Multi-LLM Councils under Persistent Adversaries",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02002v1",
+      "title": "Mem++: Non-Destructive Memory for Long-Term Organizational LLM Agents",
+      "published": "2026-10-01",
+      "relevant": true,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.02001v1",
+      "title": "Mingbird: A Local-First Agent Harness Enabling Small Open Models to Complete Real Tasks",
+      "published": "2026-10-01",
+      "relevant": true,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01959v1",
+      "title": "Training-Free Diffusion Planning with Analytical Local Scores",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01955v1",
+      "title": "Do Your Own Research: Learning to Forecast by Learning to Search",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01892v1",
+      "title": "Selection-Based Structured Reasoning: Toward Efficient Multimodal Search Agents",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01887v1",
+      "title": "TRACE: Tackling Real-World Resource Assignment Problems via Agentic Heuristic Design",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01882v1",
+      "title": "Flowing Faster to Coordinate: One-Step Online Multi-Agent Flow Policies",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01845v1",
+      "title": "Temporal-Difference Learning for Dragonchess",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01834v1",
+      "title": "Code Owns the Simulation, Jev Owns the Evaluation",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01833v1",
+      "title": "Continuous Process-Level Evaluation for Evolving Enterprise AI Agent Skills",
+      "published": "2026-10-01",
+      "relevant": true,
+      "analyzed_at": "2026-10-02-08-41-00"
+    },
+    {
+      "id": "2610.01827v1",
+      "title": "Scientific Discovery under Validation Congestion via Multi-Fidelity Pairwise Rankings",
+      "published": "2026-10-01",
+      "relevant": false,
+      "analyzed_at": "2026-10-02-08-41-00"
     }
   ]
 }
