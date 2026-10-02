@@ -125,6 +125,10 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	c.addSafeOutputTokenEnvVars(&steps, data)
 	if data.DispatchWorkCoordinator != nil {
 		steps = append(steps, "          GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN: ${{ github.token }}\n")
+		steps = append(steps, "          GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: "+quoteYAMLEnvValue(data.DispatchWorkCoordinator.SchemaJSON)+"\n")
+		if data.DispatchWorkCoordinator.ID != "" {
+			steps = append(steps, "          GH_AW_DISPATCH_WORK_COORDINATOR_ID: "+quoteYAMLEnvValue(data.DispatchWorkCoordinator.ID)+"\n")
+		}
 	}
 
 	// With section for github-token

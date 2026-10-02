@@ -3,7 +3,7 @@
 
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { DispatchWorkCoordinator, coordinatorBranchName } from "./dispatch_work_coordinator_branch.cjs";
+import { DispatchWorkCoordinator, coordinatorBranchName, coordinatorIdentity } from "./dispatch_work_coordinator_branch.cjs";
 import { deriveWorkId, parseTransactionLog, replayTransactions, serializeTransactions } from "./dispatch_work_coordinator.cjs";
 
 function apiError(status, message) {
@@ -128,6 +128,34 @@ test("coordinator branch identity is stable and does not expose workflow identif
   assert.equal(branch, coordinatorBranchName("octo/repo/.github/workflows/dispatch.yml"));
   assert.match(branch, /^gh-aw\/dispatch-work\/[a-f0-9]{32}$/);
   assert.throws(() => coordinatorBranchName(""), /identity/);
+});
+
+test("shared coordinator IDs produce the same repository-scoped identity", () => {
+  const shared = coordinatorIdentity({
+    owner: "octo",
+    repo: "repo",
+    workflowRef: "octo/repo/.github/workflows/worker.yml@refs/heads/main",
+    coordinatorId: "shared-queue",
+  });
+  assert.equal(shared, "octo/repo/dispatch-work/shared-queue");
+  assert.equal(
+    coordinatorIdentity({
+      owner: "octo",
+      repo: "repo",
+      workflowRef: "octo/repo/.github/workflows/dispatcher.yml@refs/heads/main",
+      coordinatorId: "shared-queue",
+    }),
+    shared
+  );
+  assert.notEqual(
+    coordinatorIdentity({
+      owner: "octo",
+      repo: "repo",
+      workflowRef: "octo/repo/.github/workflows/worker.yml@refs/heads/main",
+    }),
+    shared
+  );
+  assert.throws(() => coordinatorIdentity({ owner: "octo", repo: "repo", workflowRef: "worker.yml", coordinatorId: "../queue" }), /Invalid coordinator ID/);
 });
 
 test("submit initializes an isolated branch with one canonical transaction log and is idempotent", async () => {

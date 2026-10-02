@@ -13,6 +13,8 @@ permissions:
 
 tools:
   dispatch-work-coordinator:
+    id: issue-remediation
+    role: worker
     schema:
       type: object
       properties:
@@ -26,7 +28,7 @@ tools:
 
 The root schema type must be `object`. The compiler validates supported JSON Schema keywords and rejects schemas containing GitHub Actions expressions. The same schema validates Work when it is submitted and whenever coordinator state is replayed.
 
-The coordinator uses a dedicated branch derived from the workflow identity. That branch contains one authoritative file, `dispatch-work-coordinator.jsonl`, with immutable `Work`, `Claim`, `ClaimCancellation`, `Completion`, and `WorkCancellation` transactions. Each operation fetches the current branch and derives its projection through deterministic replay; a runner's cached projection is never authoritative.
+Workflows with the same optional `id` and schema share a coordinator branch; without an ID, the branch is derived from the workflow identity. Use `role: dispatcher` for producers, `role: worker` for consumers that must claim Work before running, or omit `role` for workflows that both submit and claim. The branch contains one authoritative file, `dispatch-work-coordinator.jsonl`, with immutable `Work`, `Claim`, `ClaimCancellation`, `Completion`, and `WorkCancellation` transactions. Each operation fetches the current branch and derives its projection through deterministic replay; a runner's cached projection is never authoritative.
 
 ## MCP tools
 

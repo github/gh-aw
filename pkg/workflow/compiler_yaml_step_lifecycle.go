@@ -184,7 +184,7 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	fmt.Fprintf(yaml, "          GH_AW_INFO_EXPERIMENTAL: \"%t\"\n", engine.IsExperimental())
 	fmt.Fprintf(yaml, "          GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST: \"%t\"\n", engine.GetCapabilities().ToolsAllowlist)
 	fmt.Fprintf(yaml, "          GH_AW_INFO_STAGED: \"%s\"\n", stagedValue)
-	if data.DispatchWorkCoordinator != nil {
+	if data.DispatchWorkCoordinator.claimsWork() {
 		yaml.WriteString("          GH_AW_INFO_DISPATCH_WORK_COORDINATOR_ASSIGNMENT: ${{ steps.dispatch-work-coordinator.outputs.assignment }}\n")
 	}
 	fmt.Fprintf(yaml, "          GH_AW_INFO_ALLOWED_DOMAINS: '%s'\n", domainsJSON)

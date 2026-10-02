@@ -498,7 +498,7 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 	ensureRepoMemoryWritePaths(workflowData.SandboxConfig, repoMemoryConfig)
 	workflowData.LedgerConfig = toolsConfig.Ledger
 	workflowData.DispatchWorkCoordinator = toolsConfig.DispatchWorkCoordinator
-	if workflowData.DispatchWorkCoordinator != nil {
+	if workflowData.DispatchWorkCoordinator.claimsWork() {
 		if err := validateDispatchWorkCoordinatorPermissions(workflowData); err != nil {
 			return err
 		}

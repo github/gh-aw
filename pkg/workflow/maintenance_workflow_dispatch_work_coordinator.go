@@ -43,10 +43,14 @@ func collectMaintenanceDispatchWorkCoordinators(workflowDataList []*WorkflowData
 			return nil, fmt.Errorf("dispatch work coordinator for workflow %s requires an object schema", workflowData.WorkflowID)
 		}
 		identity := path.Join(constants.WorkflowsDir, workflowData.WorkflowID+".lock.yml")
-		config, err := json.Marshal(map[string]any{
+		if coordinatorID := workflowData.DispatchWorkCoordinator.ID; coordinatorID != "" {
+			identity = path.Join("dispatch-work", coordinatorID)
+		}
+		configValues := map[string]any{
 			"identity": identity,
 			"schema":   workflowData.DispatchWorkCoordinator.Schema,
-		})
+		}
+		config, err := json.Marshal(configValues)
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize Dispatch Work Coordinator configuration for %s: %w", workflowData.WorkflowID, err)
 		}

@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
 const maxDispatchWorkSchemaBytes = 16 * 1024
+
+var dispatchWorkCoordinatorIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 var dispatchWorkSchemaKeywords = map[string]struct{}{
 	"type": {}, "enum": {}, "required": {}, "properties": {},
@@ -17,6 +20,8 @@ var dispatchWorkSchemaKeywords = map[string]struct{}{
 
 // DispatchWorkCoordinatorConfig enables the built-in durable Work queue.
 type DispatchWorkCoordinatorConfig struct {
+	ID         string         `json:"id,omitempty" yaml:"id,omitempty"`
+	Role       string         `json:"role,omitempty" yaml:"role,omitempty"`
 	Schema     map[string]any `json:"schema" yaml:"schema"`
 	SchemaJSON string         `json:"-" yaml:"-"`
 }
@@ -31,8 +36,24 @@ func parseDispatchWorkCoordinatorConfig(raw any) (*DispatchWorkCoordinatorConfig
 		return nil, errors.New("tools.dispatch-work-coordinator.schema must be a JSON Schema object")
 	}
 	for key := range config {
-		if key != "schema" {
+		if key != "id" && key != "role" && key != "schema" {
 			return nil, fmt.Errorf("tools.dispatch-work-coordinator has unsupported property %q", key)
+		}
+	}
+	id := ""
+	if rawID, exists := config["id"]; exists {
+		var valid bool
+		id, valid = rawID.(string)
+		if !valid || !dispatchWorkCoordinatorIDPattern.MatchString(id) {
+			return nil, errors.New("tools.dispatch-work-coordinator.id must be 1-64 alphanumeric, dot, underscore, or hyphen characters and start with an alphanumeric character")
+		}
+	}
+	role := ""
+	if rawRole, exists := config["role"]; exists {
+		var valid bool
+		role, valid = rawRole.(string)
+		if !valid || (role != "dispatcher" && role != "worker") {
+			return nil, errors.New("tools.dispatch-work-coordinator.role must be dispatcher or worker")
 		}
 	}
 	encoded, err := json.Marshal(schema)
@@ -51,7 +72,15 @@ func parseDispatchWorkCoordinatorConfig(raw any) (*DispatchWorkCoordinatorConfig
 	if _, err := compileSchema(string(encoded), "https://github.com/github/gh-aw/dispatch-work.schema.json"); err != nil {
 		return nil, fmt.Errorf("tools.dispatch-work-coordinator.schema is invalid: %w", err)
 	}
-	return &DispatchWorkCoordinatorConfig{Schema: schema, SchemaJSON: string(encoded)}, nil
+	return &DispatchWorkCoordinatorConfig{ID: id, Role: role, Schema: schema, SchemaJSON: string(encoded)}, nil
+}
+
+func (config *DispatchWorkCoordinatorConfig) claimsWork() bool {
+	return config != nil && config.Role != "dispatcher"
+}
+
+func (config *DispatchWorkCoordinatorConfig) requiresWorkAssignment() bool {
+	return config != nil && config.Role == "worker"
 }
 
 func validateDispatchWorkSchemaExpressions(value any, depth int) error {

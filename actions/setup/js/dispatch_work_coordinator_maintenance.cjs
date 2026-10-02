@@ -14,16 +14,19 @@ function parseMaintenanceConfig(raw) {
   } catch (error) {
     throw new TypeError("Dispatch Work Coordinator maintenance configuration is invalid", { cause: error });
   }
+  const workflowIdentity =
+    typeof config?.identity === "string" &&
+    config.identity.startsWith(".github/workflows/") &&
+    config.identity.endsWith(".lock.yml") &&
+    !config.identity.slice(".github/workflows/".length).includes("/") &&
+    !config.identity.slice(".github/workflows/".length).includes("\\") &&
+    !/[\0-\x1f\x7f]/.test(config.identity);
+  const namedIdentity = typeof config?.identity === "string" && /^dispatch-work\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(config.identity);
   if (
     !config ||
     typeof config !== "object" ||
     Array.isArray(config) ||
-    typeof config.identity !== "string" ||
-    !config.identity.startsWith(".github/workflows/") ||
-    !config.identity.endsWith(".lock.yml") ||
-    config.identity.slice(".github/workflows/".length).includes("/") ||
-    config.identity.slice(".github/workflows/".length).includes("\\") ||
-    /[\0-\x1f\x7f]/.test(config.identity) ||
+    (!workflowIdentity && !namedIdentity) ||
     !config.schema ||
     typeof config.schema !== "object" ||
     Array.isArray(config.schema) ||

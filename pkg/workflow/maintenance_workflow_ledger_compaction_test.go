@@ -236,6 +236,17 @@ func TestGenerateMaintenanceWorkflow_DispatchWorkCoordinatorMaintenance(t *testi
 	assert.Contains(t, jobs["run_operation"], "inputs.operation != 'dispatch_work_coordinator_compaction'")
 }
 
+func TestCollectMaintenanceDispatchWorkCoordinatorsSharesNamedQueue(t *testing.T) {
+	schema := map[string]any{"type": "object", "properties": map[string]any{"task": map[string]any{"type": "string"}}}
+	coordinators, err := collectMaintenanceDispatchWorkCoordinators([]*WorkflowData{
+		{WorkflowID: "dispatcher", DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{ID: "shared-queue", Role: "dispatcher", Schema: schema}},
+		{WorkflowID: "worker", DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{ID: "shared-queue", Role: "worker", Schema: schema}},
+	})
+	require.NoError(t, err)
+	require.Len(t, coordinators, 1)
+	assert.Contains(t, coordinators[0].config, `"identity":"dispatch-work/shared-queue"`)
+}
+
 func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing.T) {
 	fooLedger, err := parseLedgerToolConfig(map[string]any{"foo": map[string]any{}})
 	require.NoError(t, err)

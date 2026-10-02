@@ -2,7 +2,7 @@
 "use strict";
 
 const fs = require("node:fs");
-const { DispatchWorkCoordinator } = require("./dispatch_work_coordinator_branch.cjs");
+const { DispatchWorkCoordinator, coordinatorIdentity } = require("./dispatch_work_coordinator_branch.cjs");
 const { createDispatchWorkCoordinatorGitHubClient } = require("./dispatch_work_coordinator_github_client.cjs");
 
 async function runDispatchWorkCoordinatorActivation(env = process.env) {
@@ -25,12 +25,15 @@ async function runDispatchWorkCoordinatorActivation(env = process.env) {
     githubClient: createDispatchWorkCoordinatorGitHubClient(env.GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN, env.GITHUB_API_URL),
     owner,
     repo,
-    identity: workflowRef.split("@", 1)[0],
+    identity: coordinatorIdentity({ owner, repo, workflowRef, coordinatorId: env.GH_AW_DISPATCH_WORK_COORDINATOR_ID }),
     runId: env.GITHUB_RUN_ID,
     workflowId: workflowRef,
     workSchema,
   });
   const assignment = await coordinator.claimNext();
+  if (env.GH_AW_DISPATCH_WORK_COORDINATOR_REQUIRE_ASSIGNMENT === "true" && !assignment?.assigned) {
+    throw new Error("Dispatch Work Coordinator worker has no available assignment");
+  }
   const trustedAssignment = assignment?.assigned ? { work_id: assignment.work_id, claim_id: assignment.claim_id, work: assignment.work } : null;
   fs.appendFileSync(env.GITHUB_OUTPUT, `assignment=${JSON.stringify(trustedAssignment)}\n`, { encoding: "utf8", mode: 0o600 });
   return trustedAssignment;

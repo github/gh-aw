@@ -138,7 +138,7 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	permsMap := map[PermissionScope]PermissionLevel{
 		PermissionContents: PermissionRead,
 	}
-	if ctx.data.DispatchWorkCoordinator != nil {
+	if ctx.data.DispatchWorkCoordinator.claimsWork() {
 		permsMap[PermissionContents] = PermissionWrite
 	}
 	if !ctx.data.StaleCheckDisabled || hasMaxDailyAICGuardrail(ctx.data) || operationalValueGraderEnabled(ctx.data) {

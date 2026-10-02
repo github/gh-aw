@@ -178,6 +178,9 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	if workflowData.DispatchWorkCoordinator != nil {
 		envVars["GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
 		envVars["GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA"] = workflowData.DispatchWorkCoordinator.SchemaJSON
+		if workflowData.DispatchWorkCoordinator.ID != "" {
+			envVars["GH_AW_DISPATCH_WORK_COORDINATOR_ID"] = workflowData.DispatchWorkCoordinator.ID
+		}
 	}
 
 	// Check for mcp-scripts env vars

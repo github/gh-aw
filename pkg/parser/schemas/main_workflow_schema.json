@@ -5506,12 +5506,24 @@
           "additionalProperties": true
         },
         "dispatch-work-coordinator": {
-          "description": "Enable the durable Dispatch Work Coordinator MCP tools. Define the JSON Schema for Work payloads in `schema`; supported keywords are type, enum, required, properties, additionalProperties: false, items, oneOf, and anyOf.",
+          "description": "Enable the durable Dispatch Work Coordinator MCP tools. Define the JSON Schema for Work payloads in `schema`; use a shared `id` and `role` to configure dispatcher/worker workflows.",
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+              "description": "Optional shared coordinator identity. Workflows using the same ID and schema share a queue."
+            },
+            "role": {
+              "type": "string",
+              "enum": ["dispatcher", "worker"],
+              "description": "Optional workflow role. Dispatchers do not claim Work; workers require an available Work assignment."
+            },
             "schema": {
               "type": "object",
-              "description": "Required JSON Schema object describing the Work payload. The root type must be object.",
+              "description": "Required JSON Schema object describing the Work payload. The root type must be object. Supported keywords are type, enum, required, properties, additionalProperties: false, items, oneOf, and anyOf.",
               "examples": [
                 {
                   "type": "object",
