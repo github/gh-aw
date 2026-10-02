@@ -909,6 +909,61 @@ describe("mcp_cli_bridge.cjs", () => {
     });
   });
 
+  describe("stdin JSON reads", () => {
+    it("treats an empty implicit pipe as no input", () => {
+      const readSyncSpy = vi.spyOn(fs, "readSync").mockImplementation(() => {
+        throw Object.assign(new Error("resource temporarily unavailable"), { code: "EAGAIN" });
+      });
+      try {
+        expect(readStdinSync()).toBe("");
+      } finally {
+        readSyncSpy.mockRestore();
+      }
+    });
+
+    it.each([0, 1, 1543, 4004, 65537, 1024 * 1024, 10 * 1024 * 1024 - 32])("reads a %i-byte body completely", bodySize => {
+      const payload = JSON.stringify({ body: "x".repeat(bodySize) });
+      const bytes = Buffer.from(payload);
+      let offset = 0;
+      const readSyncSpy = vi.spyOn(fs, "readSync").mockImplementation((_fd, buf, _offset, length) => {
+        const count = Math.min(length, bytes.length - offset, offset === 0 ? 997 : 8191);
+        bytes.copy(buf, 0, offset, offset + count);
+        offset += count;
+        return count;
+      });
+
+      try {
+        expect(parseToolArgs(["."], { body: { type: "string" } }, readStdinSync()).args.body).toBe("x".repeat(bodySize));
+        expect(offset).toBe(Buffer.byteLength(payload));
+      } finally {
+        readSyncSpy.mockRestore();
+      }
+    });
+
+    it("waits for the rest of a JSON payload after a transient nonblocking read", () => {
+      const payload = Buffer.from(JSON.stringify({ body: "x".repeat(4004) }));
+      let offset = 0;
+      let paused = false;
+      const readSyncSpy = vi.spyOn(fs, "readSync").mockImplementation((_fd, buf, _offset, length) => {
+        if (offset === 1543 && !paused) {
+          paused = true;
+          throw Object.assign(new Error("resource temporarily unavailable"), { code: "EAGAIN" });
+        }
+        const count = Math.min(length, payload.length - offset, offset === 0 ? 1543 : length);
+        payload.copy(buf, 0, offset, offset + count);
+        offset += count;
+        return count;
+      });
+
+      try {
+        expect(parseToolArgs(["."], { body: { type: "string" } }, readStdinSync()).args.body).toBe("x".repeat(4004));
+        expect(paused).toBe(true);
+      } finally {
+        readSyncSpy.mockRestore();
+      }
+    });
+  });
+
   describe("inline JSON payload argument", () => {
     it("detects a single JSON object argument", () => {
       expect(findInlineJsonPayloadArg(['{"message":"done"}'])).toBe('{"message":"done"}');
