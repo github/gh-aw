@@ -31,6 +31,17 @@ body:has(.aw-hero) .sl-container {
   max-width: none;
 }
 
+/* Shared icon wrappers used by landing components. */
+.aw-ico {
+  display: inline-flex;
+  flex: none;
+}
+
+.aw-ico svg,
+.aw-icon svg {
+  fill: currentColor;
+}
+
 /* Let the page background show through Starlight's frames on desktop */
 @media (min-width: 769px) {
   .page,
