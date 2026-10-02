@@ -107,7 +107,7 @@ MUST result in no compaction.
 ### 4.3 Built-in replay
 
 The only supported declared types are `log`, `set`, `map`, `table`,
-`counter`, and `claims`. Unknown types and any `replay` configuration MUST be rejected.
+`counter`, and `notes`. Unknown types and any `replay` configuration MUST be rejected.
 
 | Type | Supported operations | Derived `state` columns |
 | --- | --- | --- |
@@ -116,7 +116,7 @@ The only supported declared types are `log`, `set`, `map`, `table`,
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
-| `claims` | `claim(subject, claim, reason, citations)`, `vote(claim_id, vote, reason?)` | `claims`, `claim_citations`, `claim_votes`, `claim_state` |
+| `notes` | `note(subject, note, reason, citations)`, `vote(note_id, vote, reason?)` | `notes`, `note_citations`, `note_votes`, `note_state` |
 
 Replay MUST apply canonical topological record order, breaking ties between
 simultaneously ready records by SHA-256 lexical order. The `state` table MUST
@@ -130,15 +130,15 @@ declare `key`. Table inserts MUST reject duplicate keys, updates MUST require
 an existing key and preserve the primary key, and upserts MUST replace the
 entire row. Set membership MUST use canonical JSON equality. Counter amounts
 MUST be nonnegative safe integers, and resulting arithmetic MUST remain within
-the safe-integer range. Counters and claims MUST NOT accept value schemas.
+the safe-integer range. Counters and notes MUST NOT accept value schemas.
 
-Claims MUST include at least one valid repository citation. Claims and votes
-MUST remain immutable records; the derived `claim_state` view reports vote
+Notes MUST include at least one valid repository citation. Notes and votes
+MUST remain immutable records; the derived `note_state` view reports vote
 counts and timestamps, not truth or authority. Consumers MUST verify cited
-evidence against current repository state before relying on a claim.
+evidence against current repository state before relying on a note.
 
-The `map` type exposes `ledger_map_put` and `ledger_map_delete`; `claims`
-exposes `ledger_claim_add` and `ledger_claim_vote`. Other types use typed
+The `map` type exposes `ledger_map_put` and `ledger_map_delete`; `notes`
+exposes `ledger_note_add` and `ledger_note_vote`. Other types use typed
 `ledger_append` operations. Ledgers without a declared type
 retain the generic records projection and raw-record append interface. They
 MUST NOT execute custom replay code.

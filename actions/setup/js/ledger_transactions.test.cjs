@@ -71,16 +71,16 @@ test("rewrites temporary IDs only within the selected ledger and only for explic
   assert.equal(result.appends[3].record.parent, result.appends[1].record.id);
 });
 
-test("claims transactions resolve vote targets without rewriting assertion text", () => {
-  const options = { transactionId: "claims-run", ledgerNames: new Set(["knowledge"]), ledgers: { knowledge: { type: "claims" } } };
+test("notes transactions resolve vote targets without rewriting assertion text", () => {
+  const options = { transactionId: "notes-run", ledgerNames: new Set(["knowledge"]), ledgers: { knowledge: { type: "notes" } } };
   const result = normalizeLedgerAppends(
     [
-      { ledger: "knowledge", temp_id: "finding", operation: "claim", subject: "#finding", claim: "#finding", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] },
-      { ledger: "knowledge", operation: "vote", claim_id: "#finding", vote: "up", reason: "Verified" },
+      { ledger: "knowledge", temp_id: "finding", operation: "note", subject: "#finding", note: "#finding", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] },
+      { ledger: "knowledge", operation: "vote", note_id: "#finding", vote: "up", reason: "Verified" },
     ],
     options
   );
   assert.equal(result.appends[0].record.subject, "#finding");
-  assert.equal(result.appends[0].record.claim, "#finding");
-  assert.equal(result.appends[1].record.claim_id, result.appends[0].record.id);
+  assert.equal(result.appends[0].record.note, "#finding");
+  assert.equal(result.appends[1].record.note_id, result.appends[0].record.id);
 });

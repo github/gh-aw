@@ -17,8 +17,7 @@ describe("substitutePlaceholders", () => {
   });
 
   afterEach(() => {
-    if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
-    if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("should substitute a single placeholder", async () => {
@@ -96,5 +95,43 @@ describe("substitutePlaceholders", () => {
       substitutions: { REPO: "test/repo", COMMENT: undefined, ISSUE: null },
     });
     expect(fs.readFileSync(testFile, "utf8")).toBe("Repo: test/repo\nComment: \nIssue: ");
+  });
+
+  it("preserves legacy prompt substitution when split files are absent", async () => {
+    const promptPath = path.join(tempDir, "prompt.txt");
+    fs.writeFileSync(promptPath, "__ACTOR__");
+    await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
+    expect(fs.readFileSync(promptPath, "utf8")).toBe("developer");
+  });
+
+  it("substitutes split files for a custom combined prompt filename", async () => {
+    const systemPath = path.join(tempDir, "system.txt");
+    const userPath = path.join(tempDir, "user.txt");
+    const system = "System: __ACTOR__\n";
+    const user = "User: __ACTOR__";
+    fs.writeFileSync(systemPath, system);
+    fs.writeFileSync(userPath, user);
+    fs.writeFileSync(testFile, system + user);
+
+    await substitutePlaceholders({ file: testFile, substitutions: { ACTOR: "developer" } });
+
+    const finalSystem = fs.readFileSync(systemPath, "utf8");
+    const finalUser = fs.readFileSync(userPath, "utf8");
+    expect(finalSystem).toBe("System: developer\n");
+    expect(finalUser).toBe("User: developer");
+    expect(fs.readFileSync(testFile, "utf8")).toBe(finalSystem + finalUser);
+  });
+
+  it("rejects split files that do not match the combined prompt after substitution", async () => {
+    const systemPath = path.join(tempDir, "system.txt");
+    const userPath = path.join(tempDir, "user.txt");
+    fs.writeFileSync(systemPath, "System __ACTOR__");
+    fs.writeFileSync(userPath, "User");
+    fs.writeFileSync(testFile, "Different __ACTOR__");
+
+    await expect(substitutePlaceholders({ file: testFile, substitutions: { ACTOR: "developer" } })).rejects.toThrow("ERR_VALIDATION: Split prompt files do not match the combined prompt after substitution");
+    expect(fs.readFileSync(systemPath, "utf8")).toBe("System __ACTOR__");
+    expect(fs.readFileSync(userPath, "utf8")).toBe("User");
+    expect(fs.readFileSync(testFile, "utf8")).toBe("Different __ACTOR__");
   });
 });

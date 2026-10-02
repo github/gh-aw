@@ -334,6 +334,20 @@ describe("resolveAllowedMentionsFromPayload", () => {
     expect(mockGithub.rest.repos.listCollaborators).not.toHaveBeenCalledWith(expect.objectContaining({ owner: "workflow-org", repo: "workflow-repo" }));
   });
 
+  it("does not fetch team members without a caller-resolved target repository", async () => {
+    const context = {
+      eventName: "issues",
+      payload: {},
+      repo: { owner: "workflow-org", repo: "workflow-repo" },
+    };
+    const listMembersInOrg = vi.fn();
+    mockGithub.rest = { teams: { listMembersInOrg } };
+
+    await resolveAllowedMentionsFromPayload(context, mockGithub, mockCore, { allowedTeams: ["engineering"] });
+
+    expect(listMembersInOrg).not.toHaveBeenCalled();
+  });
+
   it("includes extra known authors", async () => {
     const context = {
       eventName: "issues",

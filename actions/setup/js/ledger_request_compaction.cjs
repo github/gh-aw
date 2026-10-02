@@ -15,6 +15,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
+const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "ledger_request_compaction";
@@ -24,7 +25,7 @@ const MAINTENANCE_WORKFLOW = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.ya?ml$/;
 /** @type {HandlerFactoryFunction} */
 async function main(config = {}) {
   const ledgers = Array.isArray(config.ledgers) ? config.ledgers.filter(name => typeof name === "string" && LEDGER_NAME.test(name)) : [];
-  if (!ledgers.length) throw new TypeError("ledger_request_compaction has no compaction-enabled ledgers");
+  if (!ledgers.length) throw new TypeError(`${SAFE_OUTPUT_E001}: ledger_request_compaction has no compaction-enabled ledgers`);
   const workflow = typeof config.workflow === "string" && MAINTENANCE_WORKFLOW.test(config.workflow) ? config.workflow : "agentics-maintenance.yml";
   const maxCount = typeof config.max === "number" && Number.isSafeInteger(config.max) && config.max > 0 ? config.max : 1;
   const isStaged = isStagedMode(config);

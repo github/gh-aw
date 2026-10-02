@@ -4,6 +4,7 @@
 // Ensures global.core is available when running outside github-script context
 require("./shim.cjs");
 const fs = require("fs");
+const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
@@ -25,29 +26,43 @@ const substitutePlaceholders = async ({ file, substitutions }) => {
 
   core.info(`[substitutePlaceholders] ${file} (${Object.keys(substitutions).length} substitution(s))`);
 
-  // Read the file
-  let content;
-  try {
-    content = fs.readFileSync(file, "utf8");
-  } catch (error) {
-    const errorMessage = getErrorMessage(error);
-    throw new Error(`${ERR_SYSTEM}: Failed to read file ${file}: ${errorMessage}`);
+  const splitPaths = ["system.txt", "user.txt"].map(name => path.join(path.dirname(file), name));
+  const hasSplit = !splitPaths.some(splitPath => path.resolve(splitPath) === path.resolve(file)) && splitPaths.every(splitPath => fs.existsSync(splitPath));
+  const files = hasSplit ? [file, ...splitPaths] : [file];
+
+  // Read the files
+  const contents = [];
+  for (const target of files) {
+    let content;
+    try {
+      content = fs.readFileSync(target, "utf8");
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      throw new Error(`${ERR_SYSTEM}: Failed to read file ${target}: ${errorMessage}`);
+    }
+
+    // Perform substitutions
+    for (const [key, value] of Object.entries(substitutions)) {
+      const placeholder = `__${key}__`;
+      // Convert undefined/null to empty string to avoid leaving "undefined" or "null" in the output
+      const safeValue = value == null ? "" : value;
+      content = content.split(placeholder).join(safeValue);
+    }
+
+    contents.push(content);
+  }
+  if (hasSplit && contents[0] !== contents[1] + contents[2]) {
+    throw new Error(`${ERR_VALIDATION}: Split prompt files do not match the combined prompt after substitution`);
   }
 
-  // Perform substitutions
-  for (const [key, value] of Object.entries(substitutions)) {
-    const placeholder = `__${key}__`;
-    // Convert undefined/null to empty string to avoid leaving "undefined" or "null" in the output
-    const safeValue = value == null ? "" : value;
-    content = content.split(placeholder).join(safeValue);
-  }
-
-  // Write back to the file
-  try {
-    fs.writeFileSync(file, content, "utf8");
-  } catch (error) {
-    const errorMessage = getErrorMessage(error);
-    throw new Error(`${ERR_SYSTEM}: Failed to write file ${file}: ${errorMessage}`);
+  // Write back to the files
+  for (const [index, target] of files.entries()) {
+    try {
+      fs.writeFileSync(target, contents[index], "utf8");
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      throw new Error(`${ERR_SYSTEM}: Failed to write file ${target}: ${errorMessage}`);
+    }
   }
 
   return `Successfully substituted ${Object.keys(substitutions).length} placeholder(s) in ${file}`;

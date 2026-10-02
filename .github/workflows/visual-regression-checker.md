@@ -34,6 +34,7 @@ network:
     - playwright
     - local
     - node
+    - host.docker.internal
 jobs:
   agent:
     timeout-minutes: 15

@@ -38,12 +38,12 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
     const record = sanitizeRecord(
       options.type
         ? Object.fromEntries(
-            ["operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "claim", "citations", "claim_id", "vote"].filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]])
+            ["operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]])
           )
         : request.record
     );
     if (options.type) {
-      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "claim", "citations", "claim_id", "vote"].includes(key)))
+      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].includes(key)))
         throw new TypeError("Invalid built-in transaction fields");
       validateOperation(record, options);
     } else if (options.schema) {
@@ -76,7 +76,7 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
   const patchBytes = new Map();
   for (const item of normalized) {
     const config = ledgers[item.ledger] || {};
-    item.record = config.type === "claims" ? { ...item.record, ...(item.record.operation === "vote" ? { claim_id: rewrite(item.record.claim_id, item.ledger) } : {}) } : rewrite(item.record, item.ledger);
+    item.record = config.type === "notes" ? { ...item.record, ...(item.record.operation === "vote" ? { note_id: rewrite(item.record.note_id, item.ledger) } : {}) } : rewrite(item.record, item.ledger);
     if (config.type) validateOperation(item.record, config);
     const recordBytes = Buffer.byteLength(JSON.stringify(item.record), "utf8");
     if (recordBytes > (config.max_record_kb || 32) * 1024) throw new RangeError("Ledger record exceeds max-record-kb");

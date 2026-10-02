@@ -212,7 +212,7 @@ async function main() {
       }
 
       const status = isStaged
-        ? `Staged mode: **${uploadCount}** asset${uploadCount === 1 ? "" : "s"} ready for publication to branch \`${normalizedBranchName}\` (not pushed).`
+        ? `🎭 Staged mode: **${uploadCount}** asset${uploadCount === 1 ? "" : "s"} ready for publication to branch \`${normalizedBranchName}\` (not pushed).`
         : `Successfully uploaded **${uploadCount}** asset${uploadCount === 1 ? "" : "s"} to branch \`${normalizedBranchName}\`.`;
       const assetList = processedAssets.map(asset => `- [\`${asset.fileName}\`](${asset.url}) → \`${asset.targetFileName}\` (${asset.size} bytes)`).join("\n");
       await core.summary.addRaw(`### Assets\n\n${status}\n\n<details>\n<summary>View ${processedAssets.length} asset${processedAssets.length === 1 ? "" : "s"}</summary>\n\n${assetList}\n\n</details>\n`).write();
