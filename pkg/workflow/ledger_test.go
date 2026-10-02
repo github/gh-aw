@@ -118,8 +118,12 @@ func TestClaimsLedgerToolConfiguration(t *testing.T) {
 			if name == "ledger_claim_add" {
 				for _, field := range []string{"subject", "claim", "reason", "citations"} {
 					require.Contains(t, required, field)
+				}
+				require.NotContains(t, required, "temp_id")
+				for _, field := range []string{"subject", "claim", "reason", "citations", "temp_id"} {
 					require.Contains(t, properties, field)
 				}
+				require.Equal(t, "string", properties["temp_id"].(map[string]any)["type"])
 				itemSchema := properties["citations"].(map[string]any)["items"].(map[string]any)
 				require.Equal(t, "object", itemSchema["type"])
 				require.Equal(t, []any{"type", "path"}, itemSchema["required"])

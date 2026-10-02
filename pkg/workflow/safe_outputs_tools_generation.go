@@ -266,6 +266,7 @@ func generateClaimLedgerTools(ledgerNames []string) []map[string]any {
 		{
 			name: "ledger_claim_add", operation: "claim",
 			properties: map[string]any{
+				"temp_id": map[string]any{"type": "string", "description": "Optional temporary ID for same-batch references."},
 				"subject": map[string]any{"type": "string", "minLength": 1, "maxLength": 512},
 				"claim":   map[string]any{"type": "string", "minLength": 1, "maxLength": 4096},
 				"reason":  map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},

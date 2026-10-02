@@ -198,6 +198,8 @@ test("claims projection rejects malformed records and missing vote targets", () 
   assert.throws(() => validateOperation({ ...claim, subject: "" }, config), /subject/);
   assert.throws(() => validateOperation({ ...claim, subject: "a".repeat(513) }, config), /bounded/);
   assert.throws(() => validateOperation({ ...claim, claim: "a".repeat(4097) }, config), /bounded/);
+  assert.doesNotThrow(() => validateOperation({ ...claim, reason: "é".repeat(1024) }, config));
+  assert.throws(() => validateOperation({ ...claim, reason: "é".repeat(1025) }, config), /bounded/);
   assert.throws(() => validateOperation({ ...claim, reason: "a".repeat(4097) }, config), /bounded/);
   assert.throws(() => validateOperation({ ...claim, citations: Array.from({ length: 33 }, () => ({ type: "repository", path: "README.md", start_line: 1 })) }, config), /valid citation/);
   assert.doesNotThrow(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "README.md" }] }, config));
@@ -223,6 +225,7 @@ test("claims projection rejects malformed records and missing vote targets", () 
   assert.throws(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "README.md", start_line: 3, end_line: 2 }] }, config), /valid citation/);
   assert.throws(() => validateOperation({ ...claim, citations: [{ type: "repository", path: "a".repeat(2048), start_line: 1 }] }, config), /size limit/);
   assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "maybe", reason: "No" }, config), /up or down/);
+  assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "up", reason: "é".repeat(1025) }, config), /bounded/);
   assert.throws(() => validateOperation({ operation: "vote", claim_id: claim.id, vote: "up", reason: "a".repeat(4097) }, config), /bounded/);
   assert.throws(() => replayBuiltin(config, [{ id: finalId("envelope", 1), payload: { operation: "vote", claim_id: claim.id, vote: "up", reason: "Confirmed" } }]), /missing claim/);
   const reducer = createReducer(config);

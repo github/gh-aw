@@ -13,7 +13,7 @@ const OPERATIONS = Object.freeze({
   claims: ["claim", "vote"],
 });
 const MAX_REPLAY_CELL_BYTES = 65536;
-const CLAIM_LIMITS = { subject: 512, claim: 4096, reason: 4096, citations: 32, citationBytes: 2048 };
+const CLAIM_LIMITS = { subject: 512, claim: 4096, reason: 1024, citations: 32, citationBytes: 2048 };
 const CLAIM_STATE_COLUMNS = { claim_id: "text", upvotes: "integer", downvotes: "integer", net_votes: "integer", last_vote_at: "text", last_positive_vote_at: "text" };
 const CLAIM_STATE_VIEW = `CREATE VIEW claim_state AS
   WITH vote_state AS (
@@ -67,7 +67,7 @@ function validateOperation(record, config) {
     const expected = new Set(["operation", ...fields, ...(operation === "vote" ? ["reason"] : []), ...(record.id === undefined ? [] : ["id"])]);
     if (Object.keys(record).some(key => !expected.has(key)) || fields.some(key => !Object.hasOwn(record, key))) throw new TypeError("Invalid ledger operation fields");
     if (record.id !== undefined && (typeof record.id !== "string" || !record.id || Buffer.byteLength(record.id) > 128)) throw new TypeError("Invalid claim record ID");
-    if ((operation === "claim" || Object.hasOwn(record, "reason")) && (typeof record.reason !== "string" || !record.reason.trim() || Buffer.byteLength(record.reason) > CLAIM_LIMITS.reason))
+    if ((operation === "claim" || Object.hasOwn(record, "reason")) && (typeof record.reason !== "string" || !record.reason.trim() || [...record.reason].length > CLAIM_LIMITS.reason))
       throw new TypeError("Claim reason must be a nonempty bounded string");
     if (operation === "claim") {
       if (
