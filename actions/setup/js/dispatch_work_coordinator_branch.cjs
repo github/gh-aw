@@ -3,7 +3,7 @@
 
 const crypto = require("node:crypto");
 const { TextDecoder } = require("node:util");
-const { deriveWorkId, parseTransactionLog, replayTransactions, serializeTransactions } = require("./dispatch_work_coordinator.cjs");
+const { compactTransactions, deriveWorkId, parseTransactionLog, replayTransactions, serializeTransactions } = require("./dispatch_work_coordinator.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 
 const COORDINATOR_FILE = "dispatch-work-coordinator.jsonl";
@@ -62,13 +62,14 @@ async function readSnapshot({ githubClient, owner, repo, branchName, workSchema 
     throw new TypeError("Coordinator branch must contain only the canonical transaction log");
   }
   const { data: content } = await githubClient.rest.git.getBlob({ owner, repo, file_sha: entries[0].sha });
-  const transactions = parseTransactionLog(decodeContent(content));
+  const rawContent = decodeContent(content);
+  const transactions = parseTransactionLog(rawContent);
   for (const transaction of transactions) {
     if (transaction.type === "Work" && validateValueAgainstSchema(transaction.work, workSchema)) {
       throw new TypeError("Coordinator branch contains Work that violates its configured schema");
     }
   }
-  return { headSha, transactions, projection: replayTransactions(transactions) };
+  return { headSha, rawContent, transactions, projection: replayTransactions(transactions) };
 }
 
 async function writeSnapshot({ githubClient, owner, repo, branchName, headSha, transactions }) {
@@ -167,6 +168,33 @@ class DispatchWorkCoordinator {
       }
     }
     throw new Error("Coordinator update failed after bounded concurrency retries");
+  }
+
+  async compact() {
+    for (let attempt = 0; attempt < this.maxAttempts; attempt++) {
+      const snapshot = await this.read();
+      if (!snapshot.headSha) return snapshot.projection;
+      const compacted = compactTransactions(snapshot.transactions);
+      if (snapshot.rawContent === serializeTransactions(compacted)) return snapshot.projection;
+
+      try {
+        await writeSnapshot({
+          githubClient: this.githubClient,
+          owner: this.owner,
+          repo: this.repo,
+          branchName: this.branchName,
+          headSha: snapshot.headSha,
+          transactions: compacted,
+        });
+        return (await this.read()).projection;
+      } catch (error) {
+        if (!isConflict(error)) throw error;
+        if (attempt + 1 === this.maxAttempts) throw new Error("Coordinator compaction failed after bounded concurrency retries", { cause: error });
+        const exponentialDelay = Math.min(1000, 50 * 2 ** attempt);
+        await this.sleep(exponentialDelay + Math.floor(this.random() * exponentialDelay));
+      }
+    }
+    throw new Error("Coordinator compaction failed after bounded concurrency retries");
   }
 
   async submit(work) {
