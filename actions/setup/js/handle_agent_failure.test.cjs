@@ -3976,6 +3976,16 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("Model Not Supported");
     });
 
+    it("explains a previously available model may require provider investigation", () => {
+      const template = fs.readFileSync(new URL("../md/model_not_supported_error.md", import.meta.url), "utf8");
+      fs.writeFileSync(path.join(promptsDir, "model_not_supported_error.md"), template);
+      const result = buildModelNotSupportedErrorContext(true);
+      expect(result).toContain("compare the successful and failing runs' model catalogs");
+      expect(result).toContain("Copilot service request IDs");
+      expect(result).toContain("Do not share tokens");
+      expect(result).not.toContain("This is a **configuration issue**");
+    });
+
     it("throws when template is missing", () => {
       expect(() => buildModelNotSupportedErrorContext(true)).toThrow(/ENOENT|no such file/i);
     });
