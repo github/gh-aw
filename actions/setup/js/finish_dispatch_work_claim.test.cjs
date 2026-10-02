@@ -8,8 +8,8 @@ import { main, readFinishIntent, reconcileWorkerClaim, renderSummary } from "./f
 
 const worker = { work_id: "w", claim_id: "claim-a" };
 const initialTransactions = [
-  { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
-  { version: 1, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
+  { version: 2, kind: "Work", work_id: "w", work: {}, sequence: 1 },
+  { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-a", run_id: "run-a" },
 ];
 
 let tempDirectory;
@@ -56,11 +56,11 @@ describe("dispatch work claim reconciliation", () => {
 
     expect(result).toEqual({ authorized: true, status: "completed" });
     expect(fake.transactions).toContainEqual({
-      version: 1,
+      version: 2,
       kind: "Completion",
-      work: "w",
-      claim: "claim-a",
-      attempt: "123-2:owner/repo/.github/workflows/worker.yml@refs/heads/main",
+      work_id: "w",
+      claim_id: "claim-a",
+      attempt_id: "123-2:owner/repo/.github/workflows/worker.yml@refs/heads/main",
     });
   });
 
@@ -75,11 +75,11 @@ describe("dispatch work claim reconciliation", () => {
     });
 
     expect(result).toEqual({ authorized: false, status: "cancelled" });
-    expect(fake.transactions).toContainEqual({ version: 1, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
+    expect(fake.transactions).toContainEqual({ version: 2, kind: "ClaimCancellation", work_id: "w", claim_id: "claim-a" });
   });
 
   it("does not publish or authorize a superseded claim", async () => {
-    const fake = setup([...initialTransactions, { version: 1, kind: "Claim", work: "w", claim: "claim-0", attempt: null }]);
+    const fake = setup([...initialTransactions, { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-0", run_id: "run-0" }]);
     const publish = vi.fn(fake.applyAndPublish);
     const result = await reconcileWorkerClaim({
       worker,
@@ -133,5 +133,25 @@ describe("dispatch work claim reconciliation", () => {
     ).rejects.toThrow(/ordinary safe outputs are blocked/);
     expect(core.setOutput).toHaveBeenCalledWith("authorized", "false");
     expect(summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("<details>"));
+  });
+
+  it("does not publish queue mutations in staged mode", async () => {
+    const fake = setup();
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
+    fs.writeFileSync(fake.finishIntentPath, '{"outcome":"completed"}\n');
+    const publish = vi.fn(fake.applyAndPublish);
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn(() => ({ write: vi.fn() })) } };
+    expect(
+      await main({
+        worker,
+        finishIntentPath: fake.finishIntentPath,
+        applyAndPublish: publish,
+        readCoordinatorLog: fake.readCoordinatorLog,
+        context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
+        core,
+      })
+    ).toEqual({ authorized: true, status: "staged" });
+    expect(publish).not.toHaveBeenCalled();
+    expect(fake.transactions).toEqual(initialTransactions);
   });
 });

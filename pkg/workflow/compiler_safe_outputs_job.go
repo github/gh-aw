@@ -149,6 +149,11 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 
 	// Combine the setup steps with the handler steps
 	steps := append(setupSteps, handlerSteps...)
+	if isDispatchWorkCoordinatorEnabled(data) {
+		steps = injectProcessorStepEnv(steps, map[string]string{
+			"GH_AW_DISPATCH_CLAIMS_VERIFIED": "${{ steps.dispatch_claim_reconciliation.outputs.claims_verified }}",
+		})
+	}
 
 	// Phase 3: App-token insertion, finalization, job condition/deps, and job construction
 	return c.buildSafeOutputsJobFromParts(buildSafeOutputsJobFromPartsOptions{
@@ -286,15 +291,25 @@ func (c *Compiler) buildDispatchClaimReconciliationStep(data *WorkflowData) []st
 	if !isDispatchWorkCoordinatorEnabled(data) {
 		return nil
 	}
-	return []string{
+	steps := []string{
 		"      - name: Reconcile dispatch work claim\n",
 		"        id: dispatch_claim_reconciliation\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+	}
+	var staged *TemplatableBool
+	if data.SafeOutputs != nil {
+		staged = data.SafeOutputs.Staged
+	}
+	if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
+		steps = append(steps, "        env:\n")
+		steps = append(steps, buildTemplatableBoolEnvVar("GH_AW_SAFE_OUTPUTS_STAGED", value)...)
+	}
+	return append(steps,
 		"        with:\n",
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/finish_dispatch_work_claim.cjs');\n",
 		"            await main({ core, github, context });\n",
-	}
+	)
 }
 
 // buildSafeOutputsUserProvidedSteps converts the user-provided safe-outputs.steps

@@ -15,7 +15,15 @@ const { resolveTargetRepoConfig, parseRepoSlug, validateTargetRepo } = require("
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildAwContext } = require("./aw_context.cjs");
+const { readPublishedAssignment } = require("./publish_dispatch_work_claims.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+
+function buildDispatchAwContext(claimID, staged, readAssignment = readPublishedAssignment) {
+  return {
+    ...buildAwContext(),
+    ...(claimID !== undefined && !staged ? { dispatch_work_coordinator: readAssignment(claimID) } : {}),
+  };
+}
 
 /**
  * Main handler factory for dispatch_workflow
@@ -248,6 +256,7 @@ async function main(config = {}) {
         const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
         for (const [key, value] of Object.entries(message.inputs)) {
+          if (key === "work_queue_claim_id") continue;
           // Convert value to string
           let strValue;
           if (value === null || value === undefined) {
@@ -286,8 +295,16 @@ async function main(config = {}) {
 
       // Inject aw_context if the target workflow declares it as an input.
       // Only workflows listed in aw_context_workflows (populated at compile time) support this.
+      const queueClaimID = message.inputs?.work_queue_claim_id;
+      if (queueClaimID !== undefined && !isStaged && process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED !== "true") {
+        throw new Error("work_queue_claim_id requires verified publication by tools.work-queue");
+      }
+      if (queueClaimID !== undefined && (typeof queueClaimID !== "string" || !queueClaimID || isCrossRepoDispatch || !awContextWorkflows.has(workflowName))) {
+        throw new Error("work_queue_claim_id requires a same-repository worker workflow with aw_context support");
+      }
       if (awContextWorkflows.has(workflowName)) {
-        inputs["aw_context"] = JSON.stringify(buildAwContext());
+        const awContext = buildDispatchAwContext(queueClaimID, isStaged);
+        inputs["aw_context"] = JSON.stringify(awContext);
       }
 
       // Get the workflow file extension from compile-time resolution
@@ -430,4 +447,4 @@ function normalizeRefPattern(pattern) {
   return `refs/heads/${pattern}`;
 }
 
-module.exports = { main };
+module.exports = { main, buildDispatchAwContext };

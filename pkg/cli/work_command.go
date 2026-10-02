@@ -25,8 +25,54 @@ func NewWorkCommand() *cobra.Command {
 	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, "Coordinator branch")
 	cmd.PersistentFlags().Bool("json", false, "Output JSON")
 	cmd.AddCommand(workReplayCommand(), workCompactCommand(), workStatsCommand(),
-		workSubmitCommand(), workClaimCommand(), workFinishCommand(),
+		workSubmitCommand(), workClaimCommand(), workClaimNextCommand(), workFinishCommand(),
 		workCancelCommand(), workCancelClaimCommand())
+	return cmd
+}
+
+func workClaimNextCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "claim-next", Short: "Claim the next available work (FIFO unless selection objectives are provided)",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			runID, _ := cmd.Flags().GetString("run-id")
+			if runID == "" {
+				return errors.New("--run-id is required")
+			}
+			selection := workqueue.Selection{}
+			path, _ := cmd.Flags().GetString("selection")
+			if path != "" {
+				var data []byte
+				var err error
+				if path == "-" {
+					data, err = io.ReadAll(cmd.InOrStdin())
+				} else {
+					data, err = os.ReadFile(path)
+				}
+				if err != nil {
+					return err
+				}
+				selection, err = workqueue.ParseSelection(data)
+				if err != nil {
+					return err
+				}
+			}
+			id, err := workID()
+			if err != nil {
+				return err
+			}
+			result, err := workBranch(cmd).ClaimNext(cmd.Context(), selection, id, runID)
+			if err != nil {
+				return err
+			}
+			if result == nil {
+				return workPrint(cmd, nil, "No eligible work")
+			}
+			return workPrint(cmd, result, fmt.Sprintf("Claim %s added to Work %s", result.Claim.ClaimID, result.Work.WorkID))
+		},
+	}
+	cmd.Flags().String("run-id", "", "Owning workflow run identity")
+	cmd.Flags().String("selection", "", "Declarative JSON selection policy path (- for stdin)")
 	return cmd
 }
 

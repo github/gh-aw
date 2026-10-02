@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
-const cancelClaim = (workId, id) => ({ version: 1, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
-const complete = (workId, claimId, attempt) => ({ version: 1, kind: "Completion", work: workId, claim: claimId, attempt });
-const cancelWork = id => ({ version: 1, kind: "WorkCancellation", work: id, claim: null, attempt: null });
+const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
+const cancelClaim = (workId, id) => ({ claim_id: id, kind: "ClaimCancellation", version: 2, work_id: workId });
+const complete = (workId, claimId, attempt) => ({ attempt_id: attempt, claim_id: claimId, kind: "Completion", version: 2, work_id: workId });
+const cancelWork = id => ({ kind: "WorkCancellation", version: 2, work_id: id });
 
 function permutations(items) {
   if (items.length < 2) return [items];
@@ -101,7 +101,7 @@ describe("dispatch work coordinator replay", () => {
   it("returns immutable normalized facts instead of retaining caller-owned objects", () => {
     const submittedWork = work("w");
     const applied = applyTransactions([], [submittedWork]);
-    submittedWork.work = "tampered";
+    submittedWork.work.legacy_work_id = "tampered";
 
     expect(replayTransactions(applied.transactions).work).toEqual({ w: "available" });
     expect(Object.isFrozen(applied.transactions[0])).toBe(true);
@@ -120,11 +120,11 @@ describe("dispatch work coordinator replay", () => {
     const upgraded = parseTransactionLog(`${JSON.stringify(oldWork)}\n${JSON.stringify(oldClaim)}\n`);
     expect(upgraded).toEqual([work("w"), claim("w", "c")]);
     expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog([work("w"), claim("w", "c")]));
-    expect(() => validateTransaction(oldWork)).toThrow("exactly version");
+    expect(() => validateTransaction(oldWork)).toThrow("unsupported");
   });
 
   it("rejects unknown or malformed message versions and never accepts partial upgrades", () => {
-    for (const version of [-1, 1.5, "1", 2, null]) {
+    for (const version of [-1, 1.5, "1", 3, null]) {
       expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify({ ...claim("w", "c"), version })}\n`)).toThrow("unsupported dispatch coordinator transaction version");
     }
     expect(() => parseTransactionLog(`${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null, extra: true })}\n`)).toThrow("exactly version");
@@ -140,6 +140,13 @@ describe("dispatch work coordinator replay", () => {
     for (const transaction of [null, [], { ...work("w"), unexpected: true }, { ...work(""), kind: "Claim" }, { ...claim("w", "c"), attempt: "run" }, { ...complete("w", "c", "run"), attempt: null }, { ...work("w"), kind: "Unknown" }]) {
       expect(() => validateTransaction(transaction)).toThrow(TypeError);
     }
+  });
+
+  it("rejects payload numbers that cannot cross runtimes safely", () => {
+    for (const payload of [{ nested: [9007199254740992] }, { nested: { number: -9007199254740992 } }, { number: Infinity }]) {
+      expect(() => validateTransaction({ ...work("w"), work: payload })).toThrow("JavaScript-safe range");
+    }
+    expect(() => validateTransaction({ ...work("w"), work: { min: -9007199254740991, max: 9007199254740991, fraction: 1.5 } })).not.toThrow();
   });
 
   it("rejects missing references and references to a different work item", () => {

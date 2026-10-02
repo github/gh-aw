@@ -3,6 +3,7 @@
   "$id": "CompletionTransaction.json",
   "type": "object",
   "properties": {
+    "version": { "type": "integer", "const": 2 },
     "kind": {
       "type": "string",
       "const": "Completion"

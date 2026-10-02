@@ -33,7 +33,7 @@ func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Bu
 	yaml.WriteString("              \"" + serverName + "\": {\n")
 	if r.options.IncludeCopilotFields {
 		yaml.WriteString("                \"type\": \"stdio\",\n")
-		yaml.WriteString("                \"tools\": [\"dispatch_work_coordinator_read\", \"dispatch_claim_finish\"],\n")
+		yaml.WriteString("                \"tools\": [\"dispatch_work_coordinator_read\", \"dispatch_claim_next\", \"dispatch_claim_finish\"],\n")
 	}
 	yaml.WriteString("                \"container\": \"" + image + "\",\n")
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")

@@ -3,14 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishCoordinatorTransactions, COORDINATOR_BRANCH, COORDINATOR_LOG_PATH, readCoordinatorLog } from "./dispatch_work_coordinator_store.cjs";
 import { parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
 
 function createFakeGitHub() {
   const blobs = new Map();
   const trees = new Map();
   const commits = new Map();
-  const state = { sha: null, transactions: [], rawContents: null, conflictOnce: false, updateCalls: 0 };
+  const state = { sha: null, legacySha: null, transactions: [], rawContents: null, conflictOnce: false, updateCalls: 0 };
   let nextId = 0;
 
   const makeId = prefix => `${prefix}-${++nextId}`;
@@ -19,15 +19,17 @@ function createFakeGitHub() {
 
   const githubClient = {
     rest: {
+      repos: { get: async () => ({ data: {} }) },
       git: {
-        getRef: async () => {
+        getRef: async ({ ref }) => {
+          if (ref === "heads/dispatch-coordinator" && state.legacySha) return { data: { object: { sha: state.legacySha } } };
           if (!state.sha) throw branchMissing();
           return { data: { object: { sha: state.sha } } };
         },
         getCommit: async ({ commit_sha: sha }) => ({ data: { tree: { sha: `tree-${sha}` } } }),
         getTree: async () => ({
           data: {
-            tree: state.transactions.length ? [{ path: COORDINATOR_LOG_PATH, type: "blob", sha: "coordinator-log" }] : [],
+            tree: state.transactions.length ? [{ path: COORDINATOR_LOG_PATH, mode: "100644", type: "blob", sha: "coordinator-log" }] : [],
           },
         }),
         getBlob: async () => ({
@@ -79,10 +81,41 @@ function createFakeGitHub() {
     },
   };
 
-  return { githubClient, state, blobs };
+  return { githubClient, state, blobs, commits };
 }
 
 describe("dispatch work coordinator Git store", () => {
+  it("does not treat an unavailable repository as an empty queue", async () => {
+    const fake = createFakeGitHub();
+    fake.githubClient.rest.repos.get = async () => {
+      throw Object.assign(new Error("Not Found"), { status: 404 });
+    };
+    await expect(readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).rejects.toThrow("repository");
+    expect(fake.blobs.size).toBe(0);
+  });
+
+  it("rejects truncated trees and non-regular logs before publication", async () => {
+    for (const data of [{ truncated: true, tree: [] }, { tree: [{ path: COORDINATOR_LOG_PATH, mode: "120000", type: "blob", sha: "coordinator-log" }] }]) {
+      const fake = createFakeGitHub();
+      fake.state.sha = "head";
+      fake.githubClient.rest.git.getTree = async () => ({ data });
+      await expect(readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).rejects.toThrow("Failed to read dispatch coordinator log");
+      expect(fake.blobs.size).toBe(0);
+    }
+  });
+  it("migrates the historical runtime branch without changing its ref", async () => {
+    const fake = createFakeGitHub();
+    fake.state.legacySha = "legacy-head";
+    fake.state.transactions = [work("w")];
+    fake.state.rawContents = '{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null}\n';
+    const readonly = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo", publishUpgrades: false });
+    expect(readonly.sha).toBe("legacy-head");
+    expect(fake.state.sha).toBeNull();
+    const migrated = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+    expect(fake.state.sha).toBe(migrated.sha);
+    expect(fake.commits.get(migrated.sha).parents).toEqual(["legacy-head"]);
+    expect(fake.state.legacySha).toBe("legacy-head");
+  });
   it("creates the dedicated branch and writes the canonical transaction log", async () => {
     const fake = createFakeGitHub();
     const result = await applyAndPublishCoordinatorTransactions({

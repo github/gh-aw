@@ -12,7 +12,8 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 ## Queue inspection and operator commands
 
 `gh aw work-queue` operates on a dedicated branch without using the current checkout. Supply
-`--repo owner/repo`; use `--branch` to select a different
+`--repo owner/repo`; the default branch is `gh-aw-dispatch-work-coordinator`.
+Use `--branch` to select a different
 coordinator branch. The experimental command uses authenticated GitHub Git APIs to
 read and validate `dispatch-work-coordinator.jsonl`, create trees and commits, and
 publish changes with non-force reference updates. It needs neither a checkout nor
@@ -25,7 +26,8 @@ Authentication uses the GitHub
 CLI configuration or `GH_TOKEN`/`GITHUB_TOKEN`, with repository contents write
 permission required for mutations.
 All subcommands support `--json` for machine-readable output. Workflows enable the
-read-only snapshot MCP server with `tools.work-queue: true`.
+snapshot-backed MCP server with `tools.work-queue: true`. The MCP process has no
+Git credentials; its writes are pending intents published by trusted safe outputs.
 
 | Command | Arguments |
 |---|---|
@@ -34,6 +36,7 @@ read-only snapshot MCP server with `tools.work-queue: true`.
 | `compact` | Canonically order facts and remove only identical duplicates |
 | `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
 | `claim` | `--work-id ID --run-id RUN` |
+| `claim-next` | `--run-id RUN [--selection policy.json]`; defaults to available Work in FIFO order |
 | `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
 | `cancel-work` | `--work-id ID` |
 | `cancel-claim` | `--claim-id ID` |
@@ -41,8 +44,57 @@ read-only snapshot MCP server with `tools.work-queue: true`.
 These are **operator** commands; `finish` writes a Completion fact, but is not a
 worker safe-output authorization mechanism and does not execute external effects.
 The caller must independently establish the provenance of `--run-id` and
-`--attempt-id`. Worker authorization and MCP/safe-output integration remain
-separate implementation obligations described in the ADR.
+`--attempt-id`. Workflow MCP claims instead obtain run provenance from trusted
+safe-output context. Their pending results are revalidated against the current
+queue before publication and dispatch.
+
+## FIFO and declarative selection
+
+New Work receives a monotonically increasing `sequence` in the trusted submission
+transaction, recalculated on a publication retry. FIFO uses that immutable
+sequence, not physical log order, timestamps, or the payload hash; compaction
+therefore preserves selection. Available work alone is eligible. Explicit
+objectives precede FIFO, with work ID as the final deterministic tie-break.
+
+The CLI's `--selection` accepts a JSON file (or `-` for stdin). MCP
+`dispatch_claim_next` accepts the same policy as `selection`. Filters, ordered sort
+objectives, and per-group concurrency limits operate on payload JSON Pointers;
+see the [work-queue tool reference](../../docs/src/content/docs/reference/tools.md#work-queue-work-queue--experimental).
+The [shared fixtures](selection-fixtures.json) exercise Go and JavaScript selection
+semantics, including missing/null distinctions and claimed work outside filters.
+Group policies apply to each selection call; explicit operator Claims can bypass
+them, and dispatchers sharing a concurrency limit must use the same grouping policy.
+
+CLI `ClaimNext` retries selection against the latest branch state. The MCP
+equivalent stages a selected Work and Claim identity so a later dispatch can
+reference that exact payload. Trusted publication reruns selection on every retry
+and fails closed if that identity is no longer the next eligible Work; it never
+substitutes a different payload after the agent has inspected the pending result.
+Session-local pending claims count toward group occupancy without granting
+durable authority. All pending claims in a dispatcher batch must validate before
+any are published. Dispatch inputs use the reserved `work_queue_claim_id` key,
+which the trusted handler replaces with a verified `aw_context` assignment.
+
+## Unified ledger and historical upgrades
+
+Both runtimes write version 2 records using `work_id`, `claim_id`, `run_id`, and
+`attempt_id` as appropriate; Work carries its JSON object and FIFO `sequence`.
+Claims use the same lexicographic arbitration and terminal guards as before.
+The original runtime's unversioned/version-1 `work`/`claim`/`attempt` records and
+the CLI's unversioned payload-aware records upgrade before replay. Missing
+sequences use first-seen Work order in the historical log and are persisted before
+compaction. Submission order already erased by historical compaction cannot be
+recovered. Legacy runtime records had no payload or provenance: retain their
+opaque identities, use `{"legacy_work_id": ID}` as the payload, and mark run
+provenance as `legacy:CLAIM_ID`; this is not trusted workflow-run evidence.
+
+When the default branch is absent, readers recognize the historical runtime branch
+`dispatch-coordinator`. Activation is read-only. A trusted mutation or upgrade
+publishes the unified branch with the historical head as parent, retaining the
+old branch. **Stop older writers before upgrading**; afterwards all writers must
+use the unified default branch (or the same explicit CLI `--branch`). Automatic
+orphan recovery is not implemented; operators can cancel an unresolved Claim if
+publication succeeded but its downstream dispatch did not.
 
 The transaction wire format is defined in [`transactions.tsp`](transactions.tsp).
 The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate

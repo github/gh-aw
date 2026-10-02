@@ -390,6 +390,8 @@ SAFE_OUTPUTS_FILES=(
   "dispatch_work_coordinator_store.cjs"
   "dispatch_work_coordinator_replay.cjs"
   "dispatch_work_coordinator_codemods.cjs"
+  "dispatch_work_coordinator_selection.cjs"
+  "publish_dispatch_work_claims.cjs"
 )
 
 SAFE_OUTPUTS_COUNT=0

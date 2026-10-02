@@ -18,6 +18,8 @@ import (
 
 const FileName = "dispatch-work-coordinator.jsonl"
 const DefaultBranch = "gh-aw-dispatch-work-coordinator"
+const CurrentVersion = 2
+const MaxSequence int64 = 9007199254740991
 
 //go:embed schema/*.json
 var schemas embed.FS
@@ -50,6 +52,7 @@ var transactionSchemas = sync.OnceValues(func() (map[string]*jsonschema.Schema, 
 })
 
 type Transaction struct {
+	Version   int             `json:"version,omitempty"`
 	Kind      string          `json:"kind"`
 	WorkID    string          `json:"work_id"`
 	Work      json.RawMessage `json:"work,omitempty"`
@@ -57,15 +60,17 @@ type Transaction struct {
 	RunID     string          `json:"run_id,omitempty"`
 	AttemptID string          `json:"attempt_id,omitempty"`
 	Outcome   string          `json:"outcome,omitempty"`
+	Sequence  int64           `json:"sequence,omitempty"`
 }
 
 type WorkState struct {
-	WorkID  string          `json:"work_id"`
-	Work    json.RawMessage `json:"work"`
-	State   string          `json:"state"`
-	Winner  string          `json:"winner,omitempty"`
-	Claims  []ClaimState    `json:"claims"`
-	Outcome string          `json:"outcome,omitempty"`
+	WorkID   string          `json:"work_id"`
+	Work     json.RawMessage `json:"work"`
+	State    string          `json:"state"`
+	Winner   string          `json:"winner,omitempty"`
+	Claims   []ClaimState    `json:"claims"`
+	Outcome  string          `json:"outcome,omitempty"`
+	Sequence int64           `json:"sequence"`
 }
 
 type ClaimState struct {
@@ -99,6 +104,9 @@ func WorkID(payload []byte) (string, json.RawMessage, error) {
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return "", nil, errors.New("work payload must be a JSON object")
 	}
+	if err := validatePayloadNumbers(value); err != nil {
+		return "", nil, err
+	}
 	canonical, err := json.Marshal(value)
 	if err != nil {
 		return "", nil, err
@@ -108,6 +116,9 @@ func WorkID(payload []byte) (string, json.RawMessage, error) {
 }
 
 func validateTransaction(tx Transaction) error {
+	if tx.Version != 0 && tx.Version != CurrentVersion {
+		return errors.New("unsupported dispatch coordinator transaction version")
+	}
 	schemas, err := transactionSchemas()
 	if err != nil {
 		return err
@@ -135,53 +146,49 @@ func validateTransaction(tx Transaction) error {
 	}
 	if tx.Kind == "Work" {
 		id, _, err := WorkID(tx.Work)
-		if err != nil || id != tx.WorkID {
+		if err != nil {
+			return fmt.Errorf("invalid work payload: %w", err)
+		}
+		if tx.Version == 0 && id != tx.WorkID {
 			return errors.New("work_id does not match canonical work payload")
+		}
+		if tx.Version == CurrentVersion && (tx.Sequence < 1 || tx.Sequence > MaxSequence) {
+			return errors.New("work sequence must be a positive safe integer")
 		}
 	}
 	return nil
 }
 
 func Parse(data []byte) ([]Transaction, error) {
-	var transactions []Transaction
-	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	var records []parsedRecord
+	for i, line := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
 		if strings.TrimSpace(line) == "" {
-			continue
+			return nil, fmt.Errorf("line %d: blank lines are not allowed", i+1)
 		}
-		var raw map[string]any
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		var tx Transaction
-		if err := json.Unmarshal([]byte(line), &tx); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		schemas, err := transactionSchemas()
+		record, err := parseRecord([]byte(line))
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+1, err)
 		}
-		schema, ok := schemas[tx.Kind]
-		if !ok {
-			return nil, fmt.Errorf("line %d: unknown transaction kind %q", i+1, tx.Kind)
-		}
-		if err := schema.Validate(raw); err != nil {
-			return nil, fmt.Errorf("line %d: invalid %s transaction: %w", i+1, tx.Kind, err)
-		}
-		if err := validateTransaction(tx); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		transactions = append(transactions, tx)
+		records = append(records, record)
 	}
-	return transactions, nil
+	return assignHistoricalSequences(records)
 }
 
 func Serialize(transactions []Transaction) ([]byte, error) {
+	var err error
+	transactions, err = normalizeTransactions(transactions)
+	if err != nil {
+		return nil, err
+	}
 	var b strings.Builder
 	for _, tx := range transactions {
 		if err := validateTransaction(tx); err != nil {
 			return nil, err
 		}
-		line, err := json.Marshal(tx)
+		line, err := canonicalTransaction(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -206,6 +213,7 @@ func collectFacts(transactions []Transaction) (replayFacts, int, error) {
 		completions: map[string]Transaction{},
 	}
 	facts := map[string]struct{}{}
+	attempts := map[string]struct{}{}
 	for _, tx := range transactions {
 		if err := validateTransaction(tx); err != nil {
 			return f, 0, err
@@ -245,6 +253,10 @@ func collectFacts(transactions []Transaction) (replayFacts, int, error) {
 				return f, 0, fmt.Errorf("multiple completions for %s", tx.WorkID)
 			}
 			f.completions[tx.WorkID] = tx
+			if _, exists := attempts[tx.AttemptID]; exists {
+				return f, 0, fmt.Errorf("attempt %s has multiple completions", tx.AttemptID)
+			}
+			attempts[tx.AttemptID] = struct{}{}
 		}
 	}
 	return f, len(facts), validateReferences(f, transactions)
@@ -269,13 +281,18 @@ func validateReferences(f replayFacts, transactions []Transaction) error {
 
 func Replay(transactions []Transaction) (Projection, error) {
 	result := Projection{Works: []WorkState{}}
+	var err error
+	transactions, err = normalizeTransactions(transactions)
+	if err != nil {
+		return result, err
+	}
 	f, count, err := collectFacts(transactions)
 	if err != nil {
 		return result, err
 	}
 	result.Stats.Transactions = count
 	for id, tx := range f.works {
-		state := WorkState{WorkID: id, Work: tx.Work, State: "available", Claims: []ClaimState{}}
+		state := WorkState{WorkID: id, Work: tx.Work, Sequence: tx.Sequence, State: "available", Claims: []ClaimState{}}
 		for _, claim := range f.claims {
 			if claim.WorkID != id {
 				continue
@@ -300,14 +317,7 @@ func Replay(transactions []Transaction) (Projection, error) {
 		} else if state.Winner != "" {
 			state.State = "claimed"
 		}
-		updatedClaims := make([]ClaimState, 0, len(state.Claims))
-		for _, claim := range state.Claims {
-			if claim.ClaimID == state.Winner {
-				claim.State = "effective"
-			}
-			updatedClaims = append(updatedClaims, claim)
-		}
-		state.Claims = updatedClaims
+		state.Claims = projectedClaims(state)
 		result.Works = append(result.Works, state)
 		switch state.State {
 		case "available":
@@ -326,9 +336,21 @@ func Replay(transactions []Transaction) (Projection, error) {
 }
 
 func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, error) {
+	var err error
+	transactions, err = normalizeTransactions(transactions)
+	if err != nil {
+		return nil, false, err
+	}
 	current, err := Replay(transactions)
 	if err != nil {
 		return nil, false, err
+	}
+	tx, duplicate, err := prepareIntent(transactions, tx)
+	if err != nil {
+		return nil, false, err
+	}
+	if duplicate {
+		return transactions, false, nil
 	}
 	if err := validateTransaction(tx); err != nil {
 		return nil, false, err
@@ -346,35 +368,8 @@ func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, err
 			return transactions, false, nil
 		}
 	}
-	var state *WorkState
-	for _, work := range current.Works {
-		if work.WorkID == tx.WorkID {
-			state = &work
-			break
-		}
-	}
-	if tx.Kind == "Work" {
-		if state != nil {
-			return nil, false, fmt.Errorf("work %s already exists", tx.WorkID)
-		}
-	} else if state == nil {
-		return nil, false, fmt.Errorf("work %s does not exist", tx.WorkID)
-	} else if state.State == "cancelled" || state.State == "completed" {
-		return nil, false, fmt.Errorf("work %s is terminal", tx.WorkID)
-	}
-	if tx.Kind == "ClaimCancellation" || tx.Kind == "Completion" {
-		found := false
-		for _, claim := range state.Claims {
-			if claim.ClaimID == tx.ClaimID {
-				found = true
-			}
-		}
-		if !found {
-			return nil, false, fmt.Errorf("claim %s does not exist on work %s", tx.ClaimID, tx.WorkID)
-		}
-	}
-	if tx.Kind == "Completion" && state.Winner != tx.ClaimID {
-		return nil, false, fmt.Errorf("claim %s is not effective", tx.ClaimID)
+	if err := validateIntentState(current, tx); err != nil {
+		return nil, false, err
 	}
 	next := append(append([]Transaction(nil), transactions...), tx)
 	if _, err := Replay(next); err != nil {
@@ -384,12 +379,17 @@ func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, err
 }
 
 func Compact(transactions []Transaction) ([]Transaction, error) {
+	var err error
+	transactions, err = normalizeTransactions(transactions)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := Replay(transactions); err != nil {
 		return nil, err
 	}
 	unique := map[string]Transaction{}
 	for _, tx := range transactions {
-		data, err := json.Marshal(tx)
+		data, err := canonicalTransaction(tx)
 		if err != nil {
 			return nil, err
 		}

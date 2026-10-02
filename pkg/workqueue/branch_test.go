@@ -21,6 +21,7 @@ type queueCommit struct {
 
 type queueAPI struct {
 	head       string
+	legacyHead string
 	logs       map[string]string
 	bases      map[string]string
 	commits    map[string]queueCommit
@@ -30,6 +31,7 @@ type queueAPI struct {
 	conflicts  int
 	mode       string
 	truncated  bool
+	onConflict func()
 }
 
 func newQueueAPI(t *testing.T) (Branch, *queueAPI) {
@@ -81,6 +83,12 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		return
 	}
 	switch {
+	case r.Method == http.MethodGet && path == "git/ref/heads/dispatch-coordinator":
+		if mock.legacyHead == "" {
+			fail(http.StatusNotFound)
+		} else {
+			respond(map[string]any{"ref": "refs/heads/dispatch-coordinator", "object": map[string]string{"sha": mock.legacyHead}})
+		}
 	case r.Method == http.MethodGet && path == "git/ref/heads/"+DefaultBranch:
 		if mock.head == "" {
 			fail(http.StatusNotFound)
@@ -164,13 +172,20 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 		}
 		if mock.conflicts > 0 {
 			mock.conflicts--
+			if mock.onConflict != nil {
+				mock.onConflict()
+			}
 			fail(http.StatusUnprocessableEntity)
 			return
 		}
 		sha, _ := body["sha"].(string)
 		commit := mock.commits[sha]
 		if r.Method == http.MethodPost {
-			if body["ref"] != "refs/heads/"+DefaultBranch || len(commit.Parents) != 0 {
+			expectedParents := 0
+			if mock.legacyHead != "" {
+				expectedParents = 1
+			}
+			if body["ref"] != "refs/heads/"+DefaultBranch || len(commit.Parents) != expectedParents {
 				t.Error("invalid orphan branch creation")
 			}
 			if mock.head != "" {
@@ -204,6 +219,24 @@ func (mock *queueAPI) serve(t *testing.T, w http.ResponseWriter, r *http.Request
 
 func appendTransaction(tx Transaction) func([]Transaction) ([]Transaction, bool, error) {
 	return func(current []Transaction) ([]Transaction, bool, error) { return Apply(current, tx) }
+}
+
+func TestBranchMigratesLegacyRuntimeBranch(t *testing.T) {
+	branch, mock := newQueueAPI(t)
+	mock.legacyHead = "legacy-head"
+	mock.commits["legacy-head"] = queueCommit{Tree: "legacy-tree", Parents: []string{}}
+	mock.logs["legacy-tree"] = "{\"version\":1,\"kind\":\"Work\",\"work\":\"old\",\"claim\":null,\"attempt\":null}\n"
+	current, err := branch.Read(context.Background())
+	if err != nil || len(current) != 1 || mock.refWrites != 0 {
+		t.Fatalf("legacy read mutated or failed: %+v, %v", current, err)
+	}
+	result, err := branch.ClaimNext(context.Background(), Selection{}, "new-claim", "new-run")
+	if err != nil || result == nil || result.Work.WorkID != "old" {
+		t.Fatalf("legacy claim failed: %+v, %v", result, err)
+	}
+	if mock.legacyHead != "legacy-head" || mock.commits[mock.head].Parents[0] != mock.legacyHead {
+		t.Fatal("migration did not preserve historical branch and ancestry")
+	}
 }
 
 func TestBranchWithoutCheckoutAndConflictRetry(t *testing.T) {

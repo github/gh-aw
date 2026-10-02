@@ -42,6 +42,9 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 		status := http.StatusOK
 		var result any
 		switch {
+		case r.Method == http.MethodGet && path == "git/ref/heads/dispatch-coordinator":
+			status = http.StatusNotFound
+			result = map[string]string{"message": "Not Found"}
 		case r.Method == http.MethodGet && path == "git/ref/heads/"+workqueue.DefaultBranch:
 			if head == 0 {
 				status = http.StatusNotFound
@@ -159,6 +162,21 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 	}
 	if run("stats")["cancelled"] != float64(1) {
 		t.Fatal("stats did not reflect cancellation")
+	}
+	if result := run("claim-next", "--run-id", "empty-run"); result != nil {
+		t.Fatalf("empty queue returned work: %v", result)
+	}
+	if err := os.WriteFile(payload, []byte(`{"task":"next","priority":10}`), constants.FilePermSensitive); err != nil {
+		t.Fatal(err)
+	}
+	nextID := run("submit-work", "--file", payload)["work_id"].(string)
+	selection := filepath.Join(t.TempDir(), "selection.json")
+	if err := os.WriteFile(selection, []byte(`{"filter":[{"field":"/task","op":"eq","value":"next"}],"sort":[{"field":"/priority","direction":"desc"}],"group":{"fields":["/task"]}}`), constants.FilePermSensitive); err != nil {
+		t.Fatal(err)
+	}
+	next := run("claim-next", "--run-id", "next-run", "--selection", selection)
+	if next["claim"].(map[string]any)["work_id"] != nextID || next["work"].(map[string]any)["state"] != "claimed" {
+		t.Fatalf("claim-next did not publish selected work: %v", next)
 	}
 	command := NewWorkCommand()
 	command.SetArgs([]string{"--repo", remote, "cancel-work", "--work-id", workID})

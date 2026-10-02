@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { main } from "./dispatch_workflow.cjs";
+import { main, buildDispatchAwContext } from "./dispatch_workflow.cjs";
 
 // Mock dependencies
 global.core = {
@@ -45,6 +45,7 @@ describe("dispatch_workflow handler factory", () => {
     vi.clearAllMocks();
     process.env.GITHUB_REF = "refs/heads/main";
     delete process.env.GITHUB_HEAD_REF; // Clean up PR environment variable
+    delete process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED;
     // Reset shared context to a known baseline so tests are order-independent
     global.context.ref = "refs/heads/main";
     global.context.payload = { repository: { default_branch: "main" } };
@@ -53,6 +54,43 @@ describe("dispatch_workflow handler factory", () => {
   it("should create a handler function", async () => {
     const handler = await main({});
     expect(typeof handler).toBe("function");
+  });
+
+  it("builds worker context from published assignment data, never agent-selected authority", () => {
+    const assignment = { work_id: "trusted-work", claim_id: "published", work: { task: "review" } };
+    const readAssignment = vi.fn(() => assignment);
+    expect(buildDispatchAwContext("published", false, readAssignment).dispatch_work_coordinator).toEqual(assignment);
+    expect(readAssignment).toHaveBeenCalledWith("published");
+    readAssignment.mockClear();
+    expect(buildDispatchAwContext("published", true, readAssignment)).not.toHaveProperty("dispatch_work_coordinator");
+    expect(readAssignment).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch claims to workers that lack aw_context support", async () => {
+    process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED = "true";
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" } });
+    const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "untrusted" } }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("aw_context");
+    expect(github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects claim dispatches without a trusted publication gate", async () => {
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"] });
+    const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "forged" } }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("verified publication");
+    expect(github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
+  it("removes the reserved claim input from staged worker dispatches", async () => {
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], staged: true });
+    const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "pending", task: "review" } }, {});
+    expect(result.success).toBe(true);
+    expect(result.staged).toBe(true);
+    expect(result.inputs).not.toHaveProperty("work_queue_claim_id");
+    expect(result.inputs.task).toBe("review");
+    expect(github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
   it("should dispatch workflows with valid configuration", async () => {

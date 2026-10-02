@@ -13,6 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDispatchCoordinatorReconciliationPreservesStagedConfiguration(t *testing.T) {
+	compiler := NewCompiler()
+	staged := TemplatableBool("${{ inputs.staged }}")
+	data := &WorkflowData{Tools: map[string]any{"work-queue": true}, SafeOutputs: &SafeOutputsConfig{Staged: &staged}}
+	step := strings.Join(compiler.buildDispatchClaimReconciliationStep(data), "")
+	require.Contains(t, step, "GH_AW_SAFE_OUTPUTS_STAGED: ${{ inputs.staged }}")
+}
+
 func TestDispatchCoordinatorCompilationPhases(t *testing.T) {
 	dir := testutil.TempDir(t, "dispatch-coordinator-compilation-")
 	workflowPath := filepath.Join(dir, "dispatch-coordinator-worker.md")
@@ -50,6 +58,8 @@ Compile each dispatch-coordinator workflow phase.
 	require.Contains(t, agent, `"work-queue"`)
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentMount)
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentPath)
+	require.Contains(t, agent, constants.DispatchCoordinatorClaimIntentPath)
+	require.Contains(t, agent, `"dispatch_claim_next"`)
 
 	safeOutputs := extractJobSection(compiled, string(constants.SafeOutputsJobName))
 	require.Contains(t, safeOutputs, "contents: write")
@@ -63,6 +73,7 @@ Compile each dispatch-coordinator workflow phase.
 		"claim reconciliation must precede user safe-output steps",
 	)
 	require.Contains(t, safeOutputs, "id: process_safe_outputs")
+	require.Contains(t, safeOutputs, "GH_AW_DISPATCH_CLAIMS_VERIFIED: ${{ steps.dispatch_claim_reconciliation.outputs.claims_verified }}")
 	require.Less(t,
 		strings.Index(safeOutputs, "Reconcile dispatch work claim"),
 		strings.Index(safeOutputs, "id: process_safe_outputs"),

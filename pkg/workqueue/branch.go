@@ -83,8 +83,10 @@ func hasStatus(err error, status int) bool {
 }
 
 type branchSnapshot struct {
-	head string
-	tree string
+	head         string
+	tree         string
+	legacy       bool
+	needsUpgrade bool
 }
 
 func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error) {
@@ -96,6 +98,16 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 	}
 	if err := b.request(ctx, http.MethodGet, "git/ref/heads/"+b.Name, nil, &ref); err != nil {
 		if hasStatus(err, http.StatusNotFound) {
+			if b.Name == DefaultBranch {
+				legacyBranch := b
+				legacyBranch.Name = "dispatch-coordinator"
+				transactions, snapshot, err := legacyBranch.read(ctx)
+				if snapshot.head != "" {
+					snapshot.legacy = true
+					snapshot.needsUpgrade = true
+				}
+				return transactions, snapshot, err
+			}
 			// A missing repository or missing read permission is not an empty queue.
 			var repository any
 			err = b.client.DoWithContext(ctx, http.MethodGet, "repos/"+b.Remote, nil, &repository)
@@ -119,11 +131,11 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 	if snapshot.tree == "" {
 		return nil, snapshot, errors.New("coordinator commit has no tree")
 	}
-	transactions, err := b.readLog(ctx, snapshot.tree)
+	transactions, err := b.readLog(ctx, &snapshot)
 	return transactions, snapshot, err
 }
 
-func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, error) {
+func (b Branch) readLog(ctx context.Context, snapshot *branchSnapshot) ([]Transaction, error) {
 	var tree struct {
 		Truncated bool `json:"truncated"`
 		Tree      []struct {
@@ -133,7 +145,7 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 			SHA  string `json:"sha"`
 		} `json:"tree"`
 	}
-	if err := b.request(ctx, http.MethodGet, "git/trees/"+treeSHA, nil, &tree); err != nil {
+	if err := b.request(ctx, http.MethodGet, "git/trees/"+snapshot.tree, nil, &tree); err != nil {
 		return nil, err
 	}
 	if tree.Truncated {
@@ -165,6 +177,13 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 			return nil, err
 		}
 		_, err = Replay(transactions)
+		if err == nil {
+			canonical, serializeErr := Serialize(transactions)
+			if serializeErr != nil {
+				return nil, serializeErr
+			}
+			snapshot.needsUpgrade = !bytes.Equal(data, canonical)
+		}
 		return transactions, err
 	}
 	return nil, errors.New("coordinator branch is missing " + FileName)
@@ -209,7 +228,7 @@ func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []Tra
 	}, &commit); err != nil {
 		return false, err
 	}
-	if snapshot.head == "" {
+	if snapshot.head == "" || snapshot.legacy {
 		err = b.request(ctx, http.MethodPost, "git/refs", map[string]any{
 			"ref": "refs/heads/" + b.Name, "sha": commit.SHA,
 		}, new(any))
@@ -233,8 +252,11 @@ func (b Branch) Update(ctx context.Context, change func([]Transaction) ([]Transa
 			return nil, false, err
 		}
 		next, changed, err := change(transactions)
-		if err != nil || !changed {
-			return next, changed, err
+		if err != nil {
+			return nil, false, err
+		}
+		if !changed && !snapshot.needsUpgrade {
+			return next, false, nil
 		}
 		conflict, err := b.publish(ctx, snapshot, next)
 		if err == nil {

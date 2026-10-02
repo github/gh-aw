@@ -3,18 +3,12 @@
 
 const { applyTransactions, parseTransactionLog, serializeTransactionLog } = require("./dispatch_work_coordinator_replay.cjs");
 
-const COORDINATOR_BRANCH = "dispatch-coordinator";
+const COORDINATOR_BRANCH = "gh-aw-dispatch-work-coordinator";
 const COORDINATOR_LOG_PATH = "dispatch-work-coordinator.jsonl";
 const DEFAULT_MAX_RETRIES = 5;
 
 /**
- * @typedef {
- *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
- *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
- *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
- *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
- *   | {version: number, kind: "WorkCancellation", work: string, claim: null, attempt: null}
- * } CoordinatorTransaction
+ * @typedef {import("./dispatch_work_coordinator_replay.cjs").DispatchWorkTransaction} CoordinatorTransaction
  */
 
 /**
@@ -52,15 +46,29 @@ function isRefConflict(error) {
 async function readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
   coreApi?.info("Dispatch coordinator: reading queue branch");
   let head;
+  let legacyBranch = false;
   try {
     const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${COORDINATOR_BRANCH}` });
     head = response.data.object.sha;
   } catch (error) {
     if (isMissing(error)) {
-      coreApi?.info("Dispatch coordinator: queue branch does not exist");
-      return { sha: null, transactions: [] };
+      try {
+        const legacy = await githubClient.rest.git.getRef({ owner, repo, ref: "heads/dispatch-coordinator" });
+        head = legacy.data.object.sha;
+        legacyBranch = true;
+      } catch (legacyError) {
+        if (!isMissing(legacyError)) throw new Error("Failed to read legacy dispatch coordinator branch", { cause: legacyError });
+        try {
+          await githubClient.rest.repos.get({ owner, repo });
+        } catch (repositoryError) {
+          throw new Error("Failed to read dispatch coordinator repository", { cause: repositoryError });
+        }
+        coreApi?.info("Dispatch coordinator: queue branch does not exist");
+        return { sha: null, transactions: [] };
+      }
+    } else {
+      throw new Error("Failed to read dispatch coordinator branch", { cause: error });
     }
-    throw new Error("Failed to read dispatch coordinator branch", { cause: error });
   }
 
   if (typeof head !== "string" || !head) throw new TypeError("Dispatch coordinator branch returned an invalid commit");
@@ -68,12 +76,13 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi 
   try {
     const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: head });
     const tree = await githubClient.rest.git.getTree({ owner, repo, tree_sha: commit.data.tree.sha });
+    if (tree.data.truncated) throw new TypeError("Dispatch coordinator tree is truncated");
     const entry = tree.data.tree.find(item => item.path === COORDINATOR_LOG_PATH);
     if (!entry) {
       coreApi?.info("Dispatch coordinator: queue branch has no transaction log");
-      return { sha: head, transactions: [] };
+      throw new TypeError("Dispatch coordinator branch has no transaction log");
     }
-    if (entry.type !== "blob" || typeof entry.sha !== "string") throw new TypeError("Dispatch coordinator log is not a regular file");
+    if (entry.type !== "blob" || !["100644", "100755"].includes(entry.mode) || typeof entry.sha !== "string") throw new TypeError("Dispatch coordinator log is not a regular file");
 
     const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: entry.sha });
     if (blob.data.encoding !== "base64" || typeof blob.data.content !== "string") {
@@ -82,7 +91,7 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi 
     const contents = Buffer.from(blob.data.content, "base64").toString("utf8");
     const transactions = parseTransactionLog(contents);
     coreApi?.info(`Dispatch coordinator: read ${transactions.length} queue transactions`);
-    return { sha: head, transactions, needsUpgrade: contents !== serializeTransactionLog(transactions) };
+    return { sha: head, transactions, legacyBranch, needsUpgrade: legacyBranch || contents !== serializeTransactionLog(transactions) };
   } catch (error) {
     throw new Error("Failed to read dispatch coordinator log", { cause: error });
   }
@@ -107,6 +116,7 @@ async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades =
  *   owner: string,
  *   repo: string,
  *   intents: CoordinatorTransaction[],
+ *   deriveIntents?: (transactions: CoordinatorTransaction[]) => CoordinatorTransaction[],
  *   maxRetries?: number,
  *   sleepFn?: (delay: number) => Promise<void>,
  *   core?: {info: (message: string) => void}
@@ -117,6 +127,7 @@ async function applyAndPublishCoordinatorTransactions({
   owner,
   repo,
   intents,
+  deriveIntents,
   maxRetries = DEFAULT_MAX_RETRIES,
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   core: coreApi = typeof core === "undefined" ? undefined : core,
@@ -130,7 +141,7 @@ async function applyAndPublishCoordinatorTransactions({
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     coreApi?.info(`Dispatch coordinator: queue publication attempt ${attempt + 1} of ${maxRetries + 1}`);
     const current = await readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi });
-    const applied = applyTransactions(current.transactions, intents);
+    const applied = applyTransactions(current.transactions, deriveIntents ? deriveIntents(current.transactions) : intents);
     coreApi?.info(`Dispatch coordinator: ${applied.transactions.length - current.transactions.length} new transactions, ${applied.rejected.length} rejected intents`);
     if (!current.needsUpgrade && applied.transactions.length === current.transactions.length) {
       coreApi?.info("Dispatch coordinator: queue unchanged; publication skipped");
@@ -159,7 +170,7 @@ async function applyAndPublishCoordinatorTransactions({
         parents: current.sha ? [current.sha] : [],
       });
 
-      if (current.sha) {
+      if (current.sha && !current.legacyBranch) {
         await githubClient.rest.git.updateRef({
           owner,
           repo,

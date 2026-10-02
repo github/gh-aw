@@ -81,6 +81,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	}
 	if isDispatchWorkCoordinatorEnabled(data) {
 		paths = append(paths, constants.DispatchCoordinatorFinishIntentPath)
+		paths = append(paths, constants.DispatchCoordinatorClaimIntentPath)
 	}
 
 	// Collect git patch path if safe-outputs with PR operations is configured.

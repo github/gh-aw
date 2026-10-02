@@ -1,9 +1,14 @@
 // @ts-check
 
-const { CURRENT_VERSION, upgradeTransaction } = require("./dispatch_work_coordinator_codemods.cjs");
+const { CURRENT_VERSION, upgradeTransactions } = require("./dispatch_work_coordinator_codemods.cjs");
 const TRANSACTION_KINDS = new Set(["Work", "Claim", "ClaimCancellation", "Completion", "WorkCancellation"]);
-const TRANSACTION_FIELDS = ["version", "kind", "work", "claim", "attempt"];
-const SORTED_TRANSACTION_FIELDS = [...TRANSACTION_FIELDS].sort();
+const TRANSACTION_FIELDS = {
+  Work: ["version", "kind", "work_id", "work", "sequence"],
+  Claim: ["version", "kind", "work_id", "claim_id", "run_id"],
+  ClaimCancellation: ["version", "kind", "work_id", "claim_id"],
+  Completion: ["version", "kind", "work_id", "claim_id", "attempt_id"],
+  WorkCancellation: ["version", "kind", "work_id"],
+};
 
 /**
  * Log coordinator diagnostics when DEBUG enables this module. Transaction
@@ -19,13 +24,8 @@ function debugLog(message, details = {}) {
 }
 
 /**
- * @typedef {
- *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
- *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
- *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
- *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
- *   | {version: number, kind: "WorkCancellation", work: string, claim: null, attempt: null}
- * } DispatchWorkTransaction
+ * @typedef {{version: number, kind: string, work_id: string, work?: Record<string, unknown>,
+ *    sequence?: number, claim_id?: string, run_id?: string, attempt_id?: string, outcome?: string}} DispatchWorkTransaction
  */
 
 /**
@@ -39,47 +39,39 @@ function validateTransaction(transaction) {
 
   /** @type {Record<string, unknown>} */
   const candidate = Object.assign(Object.create(null), transaction);
-  const fields = Object.keys(candidate).sort();
-  if (fields.length !== SORTED_TRANSACTION_FIELDS.length || fields.some((field, index) => field !== SORTED_TRANSACTION_FIELDS[index])) {
-    throw new TypeError("transaction must contain exactly version, kind, work, claim, and attempt");
-  }
   if (candidate.version !== CURRENT_VERSION) {
     throw new TypeError("unsupported dispatch coordinator transaction version");
   }
   if (typeof candidate.kind !== "string" || !TRANSACTION_KINDS.has(candidate.kind)) {
     throw new TypeError("transaction kind is invalid");
   }
-  if (typeof candidate.work !== "string" || candidate.work.length === 0) {
+  const required = TRANSACTION_FIELDS[candidate.kind];
+  if (required.some(field => !Object.hasOwn(candidate, field)) || Object.keys(candidate).some(field => !required.includes(field) && !(candidate.kind === "Completion" && field === "outcome"))) {
+    throw new TypeError(`transaction must contain exactly ${required.join(", ")}${candidate.kind === "Completion" ? " and optional outcome" : ""}`);
+  }
+  if (typeof candidate.work_id !== "string" || candidate.work_id.length === 0) {
     throw new TypeError("transaction work must be a non-empty string");
   }
-  for (const field of ["claim", "attempt"]) {
+  for (const field of ["claim_id", "attempt_id", "run_id"]) {
     const value = candidate[field];
-    if (value !== null && (typeof value !== "string" || value.length === 0)) {
+    if (required.includes(field) && (typeof value !== "string" || value.length === 0)) {
       throw new TypeError(`transaction ${field} must be a non-empty string or null`);
     }
   }
 
-  const hasClaim = candidate.claim !== null;
-  const hasAttempt = candidate.attempt !== null;
-  switch (candidate.kind) {
-    case "Work":
-    case "WorkCancellation":
-      if (hasClaim || hasAttempt) {
-        throw new TypeError(`${candidate.kind} must not include a claim or attempt`);
-      }
-      break;
-    case "Claim":
-    case "ClaimCancellation":
-      if (!hasClaim || hasAttempt) {
-        throw new TypeError(`${candidate.kind} must include a claim and must not include an attempt`);
-      }
-      break;
-    case "Completion":
-      if (!hasClaim || !hasAttempt) {
-        throw new TypeError("Completion must include a claim and attempt");
-      }
-      break;
+  if (candidate.kind === "Work") {
+    if (!candidate.work || typeof candidate.work !== "object" || Array.isArray(candidate.work)) throw new TypeError("work payload must be a JSON object");
+    validatePayloadNumbers(candidate.work);
+    if (typeof candidate.sequence !== "number" || !Number.isSafeInteger(candidate.sequence) || candidate.sequence < 1) throw new TypeError("work sequence must be a positive safe integer");
   }
+  if (Object.hasOwn(candidate, "outcome") && typeof candidate.outcome !== "string") throw new TypeError("outcome must be a string");
+}
+
+function validatePayloadNumbers(value) {
+  if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER)) {
+    throw new TypeError("work payload numbers must be finite and within the JavaScript-safe range; encode larger values as strings");
+  }
+  if (value && typeof value === "object") Object.values(value).forEach(validatePayloadNumbers);
 }
 
 /**
@@ -87,7 +79,17 @@ function validateTransaction(transaction) {
  * @returns {string}
  */
 function transactionKey(transaction) {
-  return JSON.stringify([transaction.version, transaction.kind, transaction.work, transaction.claim, transaction.attempt]);
+  return canonicalJSON(transaction);
+}
+
+function canonicalJSON(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(",")}]`;
+  if (value !== null && typeof value === "object")
+    return `{${Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${canonicalJSON(value[key])}`)
+      .join(",")}}`;
+  return JSON.stringify(value);
 }
 
 /**
@@ -95,13 +97,20 @@ function transactionKey(transaction) {
  * @returns {DispatchWorkTransaction}
  */
 function copyTransaction(transaction) {
-  return Object.freeze({
-    version: transaction.version,
-    kind: transaction.kind,
-    work: transaction.work,
-    claim: transaction.claim,
-    attempt: transaction.attempt,
-  });
+  const copy = structuredClone(transaction);
+  const freeze = value => {
+    if (Array.isArray(value)) return Object.freeze(value.map(freeze));
+    if (value && typeof value === "object")
+      return Object.freeze(
+        Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map(key => [key, freeze(value[key])])
+        )
+      );
+    return value;
+  };
+  return freeze(copy);
 }
 
 /**
@@ -115,7 +124,7 @@ function collectFacts(transactions) {
 
   /** @type {Map<string, DispatchWorkTransaction>} */
   const facts = new Map();
-  transactions.forEach((transaction, index) => {
+  upgradeTransactions(transactions).forEach((transaction, index) => {
     try {
       validateTransaction(transaction);
     } catch (error) {
@@ -135,46 +144,47 @@ function collectFacts(transactions) {
   for (const transaction of facts.values()) {
     switch (transaction.kind) {
       case "Work":
-        works.add(transaction.work);
+        if (works.has(transaction.work_id)) throw new TypeError(`work ${transaction.work_id} has conflicting transactions`);
+        works.add(transaction.work_id);
         break;
       case "Claim":
-        if (claims.has(transaction.claim)) {
-          throw new TypeError(`claim ${transaction.claim} has conflicting transactions`);
+        if (claims.has(transaction.claim_id)) {
+          throw new TypeError(`claim ${transaction.claim_id} has conflicting transactions`);
         }
-        claims.set(transaction.claim, transaction.work);
+        claims.set(transaction.claim_id, transaction.work_id);
         break;
       case "ClaimCancellation":
-        cancellations.add(transaction.claim);
+        cancellations.add(transaction.claim_id);
         break;
       case "Completion":
-        if (completions.has(transaction.work)) {
-          throw new TypeError(`work ${transaction.work} has multiple terminal transactions`);
+        if (completions.has(transaction.work_id)) {
+          throw new TypeError(`work ${transaction.work_id} has multiple terminal transactions`);
         }
-        if (attempts.has(transaction.attempt)) {
-          throw new TypeError(`attempt ${transaction.attempt} has multiple completions`);
+        if (attempts.has(transaction.attempt_id)) {
+          throw new TypeError(`attempt ${transaction.attempt_id} has multiple completions`);
         }
-        completions.set(transaction.work, transaction);
-        attempts.add(transaction.attempt);
+        completions.set(transaction.work_id, transaction);
+        attempts.add(transaction.attempt_id);
         break;
       case "WorkCancellation":
-        if (completions.has(transaction.work) || workCancellations.has(transaction.work)) {
-          throw new TypeError(`work ${transaction.work} has multiple terminal transactions`);
+        if (completions.has(transaction.work_id) || workCancellations.has(transaction.work_id)) {
+          throw new TypeError(`work ${transaction.work_id} has multiple terminal transactions`);
         }
-        workCancellations.add(transaction.work);
+        workCancellations.add(transaction.work_id);
         break;
     }
   }
 
   for (const transaction of facts.values()) {
-    if (transaction.kind !== "Work" && !works.has(transaction.work)) {
-      throw new TypeError(`${transaction.kind} references missing work ${transaction.work}`);
+    if (transaction.kind !== "Work" && !works.has(transaction.work_id)) {
+      throw new TypeError(`${transaction.kind} references missing work ${transaction.work_id}`);
     }
     if (transaction.kind === "ClaimCancellation" || transaction.kind === "Completion") {
-      if (!claims.has(transaction.claim)) {
-        throw new TypeError(`${transaction.kind} references missing claim ${transaction.claim}`);
+      if (!claims.has(transaction.claim_id)) {
+        throw new TypeError(`${transaction.kind} references missing claim ${transaction.claim_id}`);
       }
-      if (claims.get(transaction.claim) !== transaction.work) {
-        throw new TypeError(`${transaction.kind} references claim ${transaction.claim} for different work`);
+      if (claims.get(transaction.claim_id) !== transaction.work_id) {
+        throw new TypeError(`${transaction.kind} references claim ${transaction.claim_id} for different work`);
       }
     }
   }
@@ -187,7 +197,7 @@ function collectFacts(transactions) {
       .filter(([claim, claimWork]) => claimWork === work && !cancellations.has(claim))
       .map(([claim]) => claim)
       .sort();
-    if (activeClaims[0] !== completion.claim) {
+    if (activeClaims[0] !== completion.claim_id) {
       throw new TypeError(`completion for work ${work} does not belong to its winning claim`);
     }
   }
@@ -212,19 +222,19 @@ function replayTransactions(transactions) {
   for (const transaction of facts.values()) {
     switch (transaction.kind) {
       case "Work":
-        works.add(transaction.work);
+        works.add(transaction.work_id);
         break;
       case "Claim":
-        claims.set(transaction.claim, transaction.work);
+        claims.set(transaction.claim_id, transaction.work_id);
         break;
       case "ClaimCancellation":
-        cancellations.add(transaction.claim);
+        cancellations.add(transaction.claim_id);
         break;
       case "Completion":
-        completions.set(transaction.work, transaction);
+        completions.set(transaction.work_id, transaction);
         break;
       case "WorkCancellation":
-        workCancellations.add(transaction.work);
+        workCancellations.add(transaction.work_id);
         break;
     }
   }
@@ -238,7 +248,7 @@ function replayTransactions(transactions) {
         .filter(([claim, claimWork]) => claimWork === work && !cancellations.has(claim))
         .map(([claim]) => claim)
         .sort();
-      const winner = completion ? completion.claim : workCancellations.has(work) ? null : (activeClaims[0] ?? null);
+      const winner = completion ? completion.claim_id : workCancellations.has(work) ? null : (activeClaims[0] ?? null);
       const state = completion ? "completed" : workCancellations.has(work) ? "cancelled" : winner ? "claimed" : "available";
       return [work, { state, winner }];
     })
@@ -287,7 +297,7 @@ function applyTransactions(transactions, intents) {
   const rejected = [];
 
   debugLog("applying intents", { existing: facts.size, intents: intents.length });
-  intents.forEach((transaction, index) => {
+  upgradeTransactions(intents).forEach((transaction, index) => {
     try {
       validateTransaction(transaction);
     } catch (error) {
@@ -300,11 +310,11 @@ function applyTransactions(transactions, intents) {
     }
 
     const projection = replayTransactions(accepted);
-    const hasWork = Object.hasOwn(projection.work, transaction.work);
-    const hasClaimState = transaction.claim !== null && Object.hasOwn(projection.claim, transaction.claim);
-    const claimState = hasClaimState ? projection.claim[transaction.claim] : undefined;
-    const terminal = hasWork && ["completed", "cancelled"].includes(projection.work[transaction.work]);
-    const existingClaim = accepted.find(existing => existing.kind === "Claim" && existing.claim === transaction.claim);
+    const hasWork = Object.hasOwn(projection.work, transaction.work_id);
+    const hasClaimState = transaction.claim_id !== undefined && Object.hasOwn(projection.claim, transaction.claim_id);
+    const claimState = typeof transaction.claim_id === "string" ? projection.claim[transaction.claim_id] : undefined;
+    const terminal = hasWork && ["completed", "cancelled"].includes(projection.work[transaction.work_id]);
+    const existingClaim = accepted.find(existing => existing.kind === "Claim" && existing.claim_id === transaction.claim_id);
     let reason = "";
     switch (transaction.kind) {
       case "Work":
@@ -317,7 +327,7 @@ function applyTransactions(transactions, intents) {
         break;
       case "ClaimCancellation":
         if (!existingClaim) reason = "claim does not exist";
-        else if (existingClaim.work !== transaction.work) reason = "claim belongs to different work";
+        else if (existingClaim.work_id !== transaction.work_id) reason = "claim belongs to different work";
         else if (terminal) reason = "work is terminal";
         else if (hasClaimState && claimState === "cancelled") reason = "claim is already cancelled";
         break;
@@ -325,9 +335,9 @@ function applyTransactions(transactions, intents) {
         if (!hasWork) reason = "work does not exist";
         else if (terminal) reason = "work is terminal";
         else if (!existingClaim) reason = "claim does not exist";
-        else if (existingClaim.work !== transaction.work) reason = "claim belongs to different work";
+        else if (existingClaim.work_id !== transaction.work_id) reason = "claim belongs to different work";
         else if (!hasClaimState || claimState !== "effective") reason = "claim is not effective";
-        else if (accepted.some(existing => existing.kind === "Completion" && existing.attempt === transaction.attempt)) reason = "attempt already completed work";
+        else if (accepted.some(existing => existing.kind === "Completion" && existing.attempt_id === transaction.attempt_id)) reason = "attempt already completed work";
         break;
       case "WorkCancellation":
         if (!hasWork) reason = "work does not exist";
@@ -375,7 +385,7 @@ function parseTransactionLog(contents) {
   if (lines[lines.length - 1] === "") {
     lines.pop();
   }
-  const transactions = lines.map((line, index) => {
+  const messages = lines.map((line, index) => {
     if (!line.trim()) {
       throw new TypeError(`invalid transaction log line ${index + 1}: blank lines are not allowed`);
     }
@@ -386,13 +396,21 @@ function parseTransactionLog(contents) {
       throw new TypeError(`invalid transaction log line ${index + 1}: malformed JSON`);
     }
     try {
-      transaction = upgradeTransaction(transaction);
-      validateTransaction(transaction);
+      if (!transaction || typeof transaction !== "object" || Array.isArray(transaction)) throw new TypeError("transaction must be an object");
     } catch (error) {
       throw new TypeError(`invalid transaction log line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    return copyTransaction(transaction);
+    return transaction;
   });
+  let transactions;
+  try {
+    transactions = upgradeTransactions(messages).map(transaction => {
+      validateTransaction(transaction);
+      return copyTransaction(transaction);
+    });
+  } catch (error) {
+    throw new TypeError(`invalid transaction log: ${error instanceof Error ? error.message : String(error)}`);
+  }
   replayTransactions(transactions);
   return transactions;
 }
@@ -403,10 +421,11 @@ function parseTransactionLog(contents) {
  */
 function serializeTransactionLog(transactions) {
   const compacted = compactTransactions(transactions);
-  return compacted.length ? `${compacted.map(transaction => JSON.stringify(transaction)).join("\n")}\n` : "";
+  return compacted.length ? `${compacted.map(canonicalJSON).join("\n")}\n` : "";
 }
 
 module.exports = {
+  canonicalJSON,
   applyTransactions,
   compactTransactions,
   parseTransactionLog,

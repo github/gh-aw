@@ -136,6 +136,9 @@ func TestRenderDispatchCoordinatorMCPUsesSnapshotAndFinishIntentMounts(t *testin
 		if !strings.Contains(rendered, `"dispatch_work_coordinator_read"`) {
 			t.Fatalf("expected the read tool to be exposed: %s", rendered)
 		}
+		if !strings.Contains(rendered, `"dispatch_claim_next"`) {
+			t.Fatalf("expected the declarative claim-next tool to be exposed: %s", rendered)
+		}
 		if !strings.Contains(rendered, constants.DispatchCoordinatorSnapshotMount) {
 			t.Fatalf("expected a read-only snapshot mount: %s", rendered)
 		}
@@ -176,8 +179,8 @@ func TestDispatchCoordinatorMCPIsRegisteredInManifest(t *testing.T) {
 	if len(servers) != 1 || servers[0].Name != "work-queue" {
 		t.Fatalf("expected coordinator server in manifest, got %#v", servers)
 	}
-	if len(servers[0].Tools) != 2 || servers[0].Tools[0] != "dispatch_claim_finish" || servers[0].Tools[1] != "dispatch_work_coordinator_read" {
-		t.Fatalf("expected read and finish tools in the manifest, got %#v", servers[0].Tools)
+	if len(servers[0].Tools) != 3 || servers[0].Tools[0] != "dispatch_claim_finish" || servers[0].Tools[1] != "dispatch_claim_next" || servers[0].Tools[2] != "dispatch_work_coordinator_read" {
+		t.Fatalf("expected read, claim-next, and finish tools in the manifest, got %#v", servers[0].Tools)
 	}
 }
 

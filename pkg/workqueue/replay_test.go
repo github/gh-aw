@@ -18,6 +18,37 @@ func fixture(t *testing.T) (Transaction, Transaction, Transaction) {
 		Transaction{Kind: "Claim", WorkID: id, ClaimID: "b", RunID: "run-b"}
 }
 
+func TestSubmissionRemainsIdempotentAcrossRuntimeNumberNormalization(t *testing.T) {
+	id, payload, err := WorkID([]byte(`{"number":1.0}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := Transaction{Kind: "Work", WorkID: id, Work: payload}
+	current, _, err := Apply(nil, work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current[0].Work = json.RawMessage(`{"number":1}`)
+	if _, changed, err := Apply(current, work); err != nil || changed {
+		t.Fatalf("number normalization broke idempotency: %v, %t", err, changed)
+	}
+	invalid := append(current, Transaction{Version: CurrentVersion, Kind: "Claim", WorkID: "missing", ClaimID: "c", RunID: "run"})
+	if _, _, err := Apply(invalid, work); err == nil {
+		t.Fatal("duplicate submission bypassed ledger validation")
+	}
+}
+
+func TestWorkPayloadNumberInteroperability(t *testing.T) {
+	for _, payload := range []string{`{"nested":[9007199254740992]}`, `{"nested":{"number":-9007199254740992}}`, `{"number":1e309}`} {
+		if _, _, err := WorkID([]byte(payload)); err == nil {
+			t.Fatalf("accepted unsafe interoperable payload: %s", payload)
+		}
+	}
+	if _, _, err := WorkID([]byte(`{"min":-9007199254740991,"max":9007199254740991,"fraction":1.5}`)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReplayOrderAndCompaction(t *testing.T) {
 	work, a, b := fixture(t)
 	cancel := Transaction{Kind: "ClaimCancellation", WorkID: work.WorkID, ClaimID: a.ClaimID}

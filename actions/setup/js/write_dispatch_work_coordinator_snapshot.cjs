@@ -4,7 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readCoordinatorLog } = require("./dispatch_work_coordinator_store.cjs");
-const { replayTransactions, serializeTransactionLog } = require("./dispatch_work_coordinator_replay.cjs");
+const { canonicalJSON, replayTransactions, serializeTransactionLog } = require("./dispatch_work_coordinator_replay.cjs");
 const { parseInboundAwContext } = require("./aw_context.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/dispatch-work-coordinator.snapshot.json";
@@ -38,11 +38,21 @@ function resolveWorkerAssignment(payload, transactions) {
   }
 
   const projection = replayTransactions(transactions);
-  const claim = projection.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === assignment.claim_id);
-  if (!claim || claim.work !== assignment.work_id || !Object.hasOwn(projection.work, assignment.work_id) || projection.claim[assignment.claim_id] !== "effective" || ["completed", "cancelled"].includes(projection.work[assignment.work_id])) {
+  const claim = projection.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim_id === assignment.claim_id);
+  if (
+    !claim ||
+    claim.work_id !== assignment.work_id ||
+    !Object.hasOwn(projection.work, assignment.work_id) ||
+    projection.claim[assignment.claim_id] !== "effective" ||
+    ["completed", "cancelled"].includes(projection.work[assignment.work_id])
+  ) {
     throw new Error("dispatch work coordinator assignment is not currently effective");
   }
 
+  const work = projection.transactions.find(transaction => transaction.kind === "Work" && transaction.work_id === assignment.work_id);
+  if (!work || canonicalJSON(work.work) !== canonicalJSON(assignment.work)) {
+    throw new Error("dispatch work coordinator assignment payload does not match queued Work");
+  }
   return { work_id: assignment.work_id, claim_id: assignment.claim_id };
 }
 

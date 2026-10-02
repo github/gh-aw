@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { createDispatchCoordinatorFinishTool, createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
+import { createDispatchCoordinatorClaimNextTool, createDispatchCoordinatorFinishTool, createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
 import { serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
 
 const tempFiles = [];
 
@@ -35,7 +35,7 @@ describe("dispatch work coordinator MCP snapshot", () => {
 
     expect(readDispatchCoordinatorState(snapshot)).toEqual({
       snapshot_sha: "activation-head",
-      works: [{ id: "w", state: "claimed", winner: "c", claims: [{ id: "c", state: "effective" }] }],
+      works: [{ id: "w", work: { legacy_work_id: "w" }, sequence: 1, state: "claimed", winner: "c", claims: [{ id: "c", state: "effective" }] }],
     });
     expect(createDispatchCoordinatorStateTool(snapshot).handler({ work: "missing" })).toEqual({
       snapshot_sha: "activation-head",
@@ -53,7 +53,7 @@ describe("dispatch work coordinator MCP snapshot", () => {
 
     expect(readDispatchCoordinatorState(loadDispatchCoordinatorSnapshot(snapshotPath), { work: "constructor" })).toEqual({
       snapshot_sha: null,
-      works: [{ id: "constructor", state: "claimed", winner: "toString", claims: [{ id: "toString", state: "effective" }] }],
+      works: [{ id: "constructor", work: { legacy_work_id: "constructor" }, sequence: 1, state: "claimed", winner: "toString", claims: [{ id: "toString", state: "effective" }] }],
     });
   });
 
@@ -72,5 +72,28 @@ describe("dispatch work coordinator MCP snapshot", () => {
     expect(tool.inputSchema.additionalProperties).toBe(false);
     expect(tool.handler({ outcome: "completed", work_id: "untrusted" })).toEqual({ recorded: true, outcome: "completed" });
     expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
+  });
+
+  it("stages FIFO claims, tracks local reservations across restarts, and enforces group limits", () => {
+    const transactions = [
+      { version: 2, kind: "Work", work_id: "z", work: { repo: "a", priority: 1 }, sequence: 1 },
+      { version: 2, kind: "Work", work_id: "a", work: { repo: "a", priority: 2 }, sequence: 2 },
+      { version: 2, kind: "Work", work_id: "b", work: { repo: "b", priority: 3 }, sequence: 3 },
+    ];
+    const snapshotPath = writeSnapshot({ version: 2, sha: "head", worker: null, transactionLog: serializeTransactionLog(transactions) });
+    const snapshot = loadDispatchCoordinatorSnapshot(snapshotPath);
+    const claimIntentPath = path.join(path.dirname(snapshotPath), "claims.jsonl");
+    const tool = createDispatchCoordinatorClaimNextTool(snapshot, { claimIntentPath });
+    const first = tool.handler({});
+    expect(first).toMatchObject({ work_id: "z", pending: true, work: { repo: "a", priority: 1 } });
+    expect(first.claim_id).toBeTruthy();
+    const restarted = createDispatchCoordinatorClaimNextTool(snapshot, { claimIntentPath });
+    expect(restarted.handler({ selection: { group: { fields: ["/repo"] } } })).toMatchObject({ work_id: "b", pending: true });
+    expect(restarted.handler({})).toMatchObject({ work_id: "a", pending: true });
+    expect(restarted.handler({})).toEqual({ snapshot_sha: "head", work: null, pending: false });
+    expect(fs.readFileSync(claimIntentPath, "utf8").trim().split("\n")).toHaveLength(3);
+    expect(() => tool.handler({ work_id: "untrusted" })).toThrow("only selection");
+    expect(Object.keys(tool.inputSchema.properties)).toEqual(["selection"]);
+    expect(snapshot.projection.work).toEqual({ a: "available", b: "available", z: "available" });
   });
 });

@@ -1,0 +1,82 @@
+{
+  "transactions": [
+    { "version": 2, "kind": "Work", "work_id": "oldest", "work": { "kind": "review", "repo": "a", "priority": 1, "effort": 5, "a/b": { "~key": true } }, "sequence": 1 },
+    { "version": 2, "kind": "Work", "work_id": "fast", "work": { "kind": "review", "repo": "b", "priority": 10, "effort": 2, "tags": ["ready"] }, "sequence": 2 },
+    { "version": 2, "kind": "Work", "work_id": "later", "work": { "kind": "scan", "repo": "a", "priority": 5, "effort": 1 }, "sequence": 3 },
+    { "version": 2, "kind": "Work", "work_id": "busy", "work": { "kind": "scan", "repo": "c", "priority": 99 }, "sequence": 4 },
+    { "version": 2, "kind": "Claim", "work_id": "busy", "claim_id": "busy-claim", "run_id": "run-busy" },
+    { "version": 2, "kind": "Work", "work_id": "blocked", "work": { "kind": "review", "repo": "c", "priority": 100 }, "sequence": 5 },
+    { "version": 2, "kind": "Work", "work_id": "done", "work": { "kind": "review", "repo": "d", "priority": 999 }, "sequence": 6 },
+    { "version": 2, "kind": "Claim", "work_id": "done", "claim_id": "done-claim", "run_id": "run-done" },
+    { "version": 2, "kind": "Completion", "work_id": "done", "claim_id": "done-claim", "attempt_id": "done-attempt" },
+    { "version": 2, "kind": "Work", "work_id": "cancelled", "work": { "kind": "review", "repo": "e", "priority": 999 }, "sequence": 7 },
+    { "version": 2, "kind": "WorkCancellation", "work_id": "cancelled" },
+    { "version": 2, "kind": "Work", "work_id": "missing", "work": { "repo": "c", "priority": null }, "sequence": 8 }
+  ],
+  "cases": [
+    { "name": "default FIFO", "selection": {}, "expected": "oldest" },
+    { "name": "priority descending", "selection": { "sort": [{ "field": "/priority", "direction": "desc" }] }, "expected": "blocked" },
+    {
+      "name": "group limit includes filtered-out active work",
+      "selection": { "filter": [{ "field": "/kind", "op": "eq", "value": "review" }], "sort": [{ "field": "/priority", "direction": "desc" }], "group": { "fields": ["/repo"] } },
+      "expected": "fast"
+    },
+    { "name": "higher group cap", "selection": { "sort": [{ "field": "/priority", "direction": "desc" }], "group": { "fields": ["/repo"], "max_active": 2 } }, "expected": "blocked" },
+    { "name": "compound objectives", "selection": { "sort": [{ "field": "/effort" }, { "field": "/priority", "direction": "desc" }] }, "expected": "later" },
+    { "name": "escaped pointer", "selection": { "filter": [{ "field": "/a~1b/~0key", "op": "eq", "value": true }] }, "expected": "oldest" },
+    { "name": "array pointer", "selection": { "filter": [{ "field": "/tags/0", "op": "eq", "value": "ready" }] }, "expected": "fast" },
+    {
+      "name": "missing is not null",
+      "selection": {
+        "filter": [
+          { "field": "/kind", "op": "exists", "value": false },
+          { "field": "/priority", "op": "eq", "value": null }
+        ]
+      },
+      "expected": "missing"
+    },
+    { "name": "membership", "selection": { "filter": [{ "field": "/kind", "op": "in", "value": ["scan"] }] }, "expected": "later" },
+    {
+      "name": "numeric range",
+      "selection": {
+        "filter": [
+          { "field": "/priority", "op": "gte", "value": 5 },
+          { "field": "/priority", "op": "lte", "value": 10 }
+        ]
+      },
+      "expected": "fast"
+    },
+    {
+      "name": "strict numeric range",
+      "selection": {
+        "filter": [
+          { "field": "/priority", "op": "gt", "value": 5 },
+          { "field": "/priority", "op": "lt", "value": 100 }
+        ]
+      },
+      "expected": "fast"
+    },
+    { "name": "not equal requires present field", "selection": { "filter": [{ "field": "/kind", "op": "ne", "value": "review" }] }, "expected": "later" },
+    { "name": "type mismatch is not coerced", "selection": { "filter": [{ "field": "/priority", "op": "eq", "value": "10" }] }, "expected": null },
+    { "name": "no eligible group", "selection": { "filter": [{ "field": "/repo", "op": "eq", "value": "c" }], "group": { "fields": ["/repo"] } }, "expected": null },
+    { "name": "terminal and claimed excluded", "selection": { "filter": [{ "field": "/priority", "op": "eq", "value": 999 }] }, "expected": null }
+  ],
+  "invalid": [
+    null,
+    { "unknown": true },
+    { "filter": null },
+    { "sort": null },
+    { "group": null },
+    { "filter": [{ "field": "priority", "op": "eq", "value": 1 }] },
+    { "filter": [{ "field": "/bad~escape", "op": "eq", "value": 1 }] },
+    { "filter": [{ "field": "/priority", "op": "eval", "value": "code" }] },
+    { "filter": [{ "field": "/priority", "op": "eq" }] },
+    { "filter": [{ "field": "/priority", "op": "in", "value": [] }] },
+    { "filter": [{ "field": "/priority", "op": "exists", "value": 1 }] },
+    { "sort": [{ "field": "/priority", "direction": "" }] },
+    { "sort": [{ "field": "/priority", "direction": "random" }] },
+    { "group": { "fields": [] } },
+    { "group": { "fields": ["/repo"], "max_active": 0 } },
+    { "group": { "fields": ["/repo"], "max_active": 101 } }
+  ]
+}

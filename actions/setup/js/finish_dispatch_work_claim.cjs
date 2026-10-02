@@ -6,6 +6,8 @@ const { applyAndPublishCoordinatorTransactions, readCoordinatorLog } = require("
 const { CURRENT_VERSION } = require("./dispatch_work_coordinator_codemods.cjs");
 const { replayTransactions } = require("./dispatch_work_coordinator_replay.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
+const { publishDispatcherClaims } = require("./publish_dispatch_work_claims.cjs");
+const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/dispatch-work-coordinator.snapshot.json";
 const FINISH_INTENT_PATH = "/tmp/gh-aw/dispatch-work-coordinator.finish.jsonl";
@@ -34,8 +36,8 @@ function readFinishIntent(finishIntentPath = process.env.GH_AW_DISPATCH_COORDINA
     let intent;
     try {
       intent = JSON.parse(line);
-    } catch {
-      throw new TypeError(`dispatch claim finish intent line ${index + 1} is malformed`);
+    } catch (error) {
+      throw new TypeError(`dispatch claim finish intent line ${index + 1} is malformed`, { cause: error });
     }
     if (!intent || typeof intent !== "object" || Array.isArray(intent) || Object.keys(intent).length !== 1 || !Object.hasOwn(intent, "outcome") || !["completed", "cancelled"].includes(intent.outcome)) {
       throw new TypeError(`dispatch claim finish intent line ${index + 1} is invalid`);
@@ -48,6 +50,7 @@ function readFinishIntent(finishIntentPath = process.env.GH_AW_DISPATCH_COORDINA
 
 function renderSummary(status) {
   const labels = {
+    staged: "Queue mutations are staged only; no claims or completions were published.",
     unassigned: "No worker claim was assigned; safe outputs may proceed.",
     completed: "The effective worker claim was durably completed and verified; safe outputs may proceed.",
     cancelled: "The worker claim was cancelled; ordinary safe outputs were skipped.",
@@ -79,8 +82,8 @@ async function reconcileWorkerClaim(options = {}) {
   const initial = await readLog({ githubClient, owner, repo, core: coreApi });
   const projection = replayTransactions(initial.transactions);
   coreApi?.info(`Dispatch coordinator: rechecking worker against ${initial.transactions.length} queue transactions`);
-  const claim = initial.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === worker.claim_id);
-  if (!claim || claim.work !== worker.work_id || !Object.hasOwn(projection.work, worker.work_id) || !Object.hasOwn(projection.claim, worker.claim_id)) {
+  const claim = initial.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim_id === worker.claim_id);
+  if (!claim || claim.work_id !== worker.work_id || !Object.hasOwn(projection.work, worker.work_id) || !Object.hasOwn(projection.claim, worker.claim_id)) {
     coreApi?.info("Dispatch coordinator: worker claim is no longer present in the queue");
     return { authorized: false, status: "superseded" };
   }
@@ -89,7 +92,7 @@ async function reconcileWorkerClaim(options = {}) {
   const attempt = buildWorkflowCallId(runId, process.env.GITHUB_RUN_ATTEMPT || "1", process.env.GITHUB_WORKFLOW_REF || "");
   if (!attempt) throw new Error("current workflow attempt identity is unavailable");
 
-  const existingCompletion = initial.transactions.find(transaction => transaction.kind === "Completion" && transaction.work === worker.work_id && transaction.claim === worker.claim_id && transaction.attempt === attempt);
+  const existingCompletion = initial.transactions.find(transaction => transaction.kind === "Completion" && transaction.work_id === worker.work_id && transaction.claim_id === worker.claim_id && transaction.attempt_id === attempt);
   if (existingCompletion && projection.work[worker.work_id] === "completed" && projection.winner[worker.work_id] === worker.claim_id) {
     coreApi?.info("Dispatch coordinator: worker completion already verified");
     return { authorized: true, status: "completed" };
@@ -103,8 +106,8 @@ async function reconcileWorkerClaim(options = {}) {
 
   const cancel = finishIntent === null || finishIntent === "cancelled";
   const intent = cancel
-    ? { version: CURRENT_VERSION, kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null }
-    : { version: CURRENT_VERSION, kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
+    ? { version: CURRENT_VERSION, kind: "ClaimCancellation", work_id: worker.work_id, claim_id: worker.claim_id }
+    : { version: CURRENT_VERSION, kind: "Completion", work_id: worker.work_id, claim_id: worker.claim_id, attempt_id: attempt };
   const publish = options.applyAndPublish || applyAndPublishCoordinatorTransactions;
   coreApi?.info(`Dispatch coordinator: publishing worker ${cancel ? "cancellation" : "completion"}`);
   await publish({ githubClient, owner, repo, intents: [intent], core: coreApi });
@@ -114,14 +117,14 @@ async function reconcileWorkerClaim(options = {}) {
   coreApi?.info(`Dispatch coordinator: verifying worker against ${latest.transactions.length} queue transactions`);
   if (
     !cancel &&
-    latest.transactions.some(transaction => transaction.kind === "Completion" && transaction.work === worker.work_id && transaction.claim === worker.claim_id && transaction.attempt === attempt) &&
+    latest.transactions.some(transaction => transaction.kind === "Completion" && transaction.work_id === worker.work_id && transaction.claim_id === worker.claim_id && transaction.attempt_id === attempt) &&
     verified.work[worker.work_id] === "completed" &&
     verified.winner[worker.work_id] === worker.claim_id
   ) {
     coreApi?.info("Dispatch coordinator: worker completion verified");
     return { authorized: true, status: "completed" };
   }
-  if (cancel && latest.transactions.some(transaction => transaction.kind === "ClaimCancellation" && transaction.work === worker.work_id && transaction.claim === worker.claim_id) && verified.claim[worker.claim_id] === "cancelled") {
+  if (cancel && latest.transactions.some(transaction => transaction.kind === "ClaimCancellation" && transaction.work_id === worker.work_id && transaction.claim_id === worker.claim_id) && verified.claim[worker.claim_id] === "cancelled") {
     coreApi?.info("Dispatch coordinator: worker cancellation verified");
     return { authorized: false, status: "cancelled" };
   }
@@ -132,16 +135,26 @@ async function reconcileWorkerClaim(options = {}) {
 async function main(options = {}) {
   const coreApi = options.core || core;
   try {
-    const result = await reconcileWorkerClaim(options);
+    const result = isStagedMode() ? { authorized: true, status: "staged" } : await reconcileWorkerClaim(options);
+    if (result.authorized && !isStagedMode()) {
+      await publishDispatcherClaims({
+        ...options,
+        githubClient: options.githubClient || (typeof github === "undefined" ? undefined : github),
+        context: options.context || (typeof context === "undefined" ? undefined : context),
+        core: coreApi,
+      });
+    }
     coreApi.setOutput("authorized", String(result.authorized));
+    coreApi.setOutput("claims_verified", String(result.authorized && !isStagedMode()));
     coreApi.info(`Dispatch work claim reconciliation: ${result.status}`);
     await coreApi.summary.addRaw(renderSummary(result.status)).write();
     return result;
-  } catch {
+  } catch (error) {
     coreApi.setOutput("authorized", "false");
+    coreApi.setOutput("claims_verified", "false");
     coreApi.info("Dispatch work claim reconciliation failed; ordinary safe outputs are blocked.");
     await coreApi.summary.addRaw(renderSummary("failed")).write();
-    throw new Error("Dispatch work claim reconciliation failed; ordinary safe outputs are blocked");
+    throw new Error("Dispatch work claim reconciliation failed; ordinary safe outputs are blocked", { cause: error });
   }
 }
 

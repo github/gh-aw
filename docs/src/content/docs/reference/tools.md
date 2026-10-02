@@ -198,6 +198,70 @@ tools:
 
 See [GH-AW as an MCP Server](/gh-aw/reference/gh-aw-as-mcp-server/) for available operations.
 
+### Work Queue (`work-queue:`) — Experimental
+
+Expose a Git-backed work queue shared by dispatchers and worker workflows:
+
+```yaml wrap
+tools:
+  work-queue: true
+```
+
+The queue uses `dispatch-work-coordinator.jsonl` on the
+`gh-aw-dispatch-work-coordinator` branch. The activation job captures an immutable
+snapshot; the MCP server receives that snapshot without repository credentials.
+Trusted safe-output processing publishes mutations before ordinary handlers and
+user-provided safe-output steps.
+
+| MCP tool | Behavior |
+|---|---|
+| `dispatch_work_coordinator_read` | Read work payloads, FIFO sequences, states, winners, and claims from the activation snapshot; optionally select one `work` ID. |
+| `dispatch_claim_next` | Stage a claim for available work. Defaults to FIFO; accepts a declarative `selection` with `filter`, `sort`, and `group`. Returns payload, `work_id`, `claim_id`, and `pending: true`, or `work: null` when no work is eligible. |
+| `dispatch_claim_finish` | Record `outcome: completed` (default) or `cancelled` for the immutable inbound worker assignment, without accepting authority parameters. |
+
+For example, prioritize review tasks while allowing one active work item per
+repository:
+
+```json
+{
+  "selection": {
+    "filter": [{"field": "/kind", "op": "eq", "value": "review"}],
+    "sort": [{"field": "/priority", "direction": "desc"}, {"field": "/effort"}],
+    "group": {"fields": ["/repo"], "max_active": 1}
+  }
+}
+```
+
+Payload numbers must be finite and within the JavaScript-safe range
+(`-9007199254740991` through `9007199254740991`); encode larger values as strings
+to avoid cross-runtime rounding. Historical payloads outside this range fail
+validation rather than being silently rewritten.
+
+Fields are JSON Pointers into the work payload. Filters are combined with AND;
+operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, and `exists`. Comparisons do
+not coerce types. Sorting is ascending unless `direction: desc` is specified;
+missing fields sort last. Sort and group fields must contain scalar values.
+Mixed scalar types sort as null, boolean, number, then string in ascending order.
+Policies support up to 32 filters, 32 sort objectives, and 8 group fields;
+`max_active` accepts integers from 1 through 100 and defaults to 1.
+Objectives fall back to the durable submission sequence, then work ID. Group
+limits count all currently claimed work in the group, including work excluded by
+filters; missing and explicit-null group fields are distinct.
+
+Pass a pending `claim_id` to `dispatch-workflow` as
+`inputs.work_queue_claim_id`. The handler removes this reserved input and inserts
+the verified assignment into the worker's `aw_context`. The target must be in the
+same repository and declare `aw_context`. Claims from stale selections block
+ordinary safe outputs rather than dispatch different work; subsequent scheduled
+dispatcher runs can retry. Staged mode does not publish queue mutations.
+
+Operators submit work with `gh aw work-queue submit-work --repo OWNER/REPO --file
+work.json`, and claim with `gh aw work-queue claim-next --repo OWNER/REPO --run-id
+RUN [--selection selection.json]`. `--json` returns the persisted `work` and `claim`,
+or JSON `null` when no work is eligible. The CLI reselects from current state after
+a publication conflict. Explicit `claim --work-id` remains an operator override,
+not a queue-policy operation.
+
 ### MCP CLI Mounting (`cli-proxy:`)
 
 Set `tools.cli-proxy: true` to mount each user-facing MCP server as a standalone CLI tool on `PATH`, so the agent can invoke it from shell instead of through the MCP protocol:

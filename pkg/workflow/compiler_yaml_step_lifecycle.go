@@ -284,6 +284,7 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 		yaml.WriteString("          else\n")
 		yaml.WriteString("            echo 'Dispatch coordinator: no finish intent to copy (tool not called or file unavailable)'\n")
 		yaml.WriteString("          fi\n")
+		fmt.Fprintf(yaml, "          if [ -f \"$finish_intent_dir/dispatch-work-coordinator.claims.jsonl\" ]; then cp \"$finish_intent_dir/dispatch-work-coordinator.claims.jsonl\" %s; fi\n", constants.DispatchCoordinatorClaimIntentPath)
 	}
 
 	yaml.WriteString("      - name: Ingest agent output\n")
