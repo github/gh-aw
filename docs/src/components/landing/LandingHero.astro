@@ -1,0 +1,95 @@
+---
+import HeroBackground from './HeroBackground.astro';
+import VariantGroup from './VariantGroup.astro';
+import HeroVA from './HeroVA.astro';
+import HeroVC from './HeroVC.astro';
+import HeroVD from './HeroVD.astro';
+
+const variants = [
+  { key: 'a', name: 'Prompt to result' },
+  { key: 'c', name: 'Better every morning' },
+  { key: 'd', name: 'Continuous AI' },
+];
+---
+
+<section class="aw-hero not-content">
+  <div class="aw-hero-bg" aria-hidden="true">
+    <HeroBackground />
+  </div>
+  <VariantGroup id="hero" defaultKey="a" label="Hero" variants={variants}>
+    <div data-variant="a"><HeroVA /></div>
+    <div data-variant="c"><HeroVC /></div>
+    <div data-variant="d"><HeroVD /></div>
+  </VariantGroup>
+</section>
+
+<style>
+  .aw-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding-block: clamp(3rem, 8vw, 7rem);
+  }
+  /* Hero C ("better every morning") gets more room above and below. */
+  @media (min-width: 64rem) {
+    .aw-hero:has([data-variant-group='hero'][data-active='c']) {
+      padding-block: 8.25rem;
+    }
+    /* Hero D's content sits high; give it 48px more room on top. */
+    .aw-hero:has([data-variant-group='hero'][data-active='d']) {
+      padding-top: calc(clamp(3rem, 8vw, 7rem) + 3rem);
+    }
+  }
+  /* Decorative background layer; each variant fills it edge to edge. */
+  .aw-hero-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Shared layout bones for every hero variant (HeroV*.astro). */
+  .aw-hero :global(.aw-hero-inner) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2.5rem, 5vw, 3.5rem);
+    align-items: center;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 2rem);
+  }
+  @media (min-width: 1024px) {
+    .aw-hero :global(.aw-hero-inner) {
+      grid-template-columns: minmax(0, 11fr) minmax(0, 10fr);
+    }
+  }
+  .aw-hero :global(h1) {
+    margin: 0;
+    font-size: var(--aw-step-5);
+    font-weight: 460;
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+    text-wrap: balance;
+    color: var(--aw-color-text);
+  }
+  /* Deliberate line breaks on wider screens; natural wrapping on phones. */
+  @media (min-width: 640px) {
+    .aw-hero :global(.aw-line) {
+      display: block;
+    }
+  }
+  .aw-hero :global(.aw-muted) {
+    color: var(--aw-color-text-muted);
+  }
+  .aw-hero :global(.aw-hero-sub) {
+    margin: 1.25rem 0 0;
+    max-width: 42ch;
+    font-size: var(--aw-step-1);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-hero :global(.aw-hero-cta) {
+    margin-top: 2rem;
+  }
+</style>

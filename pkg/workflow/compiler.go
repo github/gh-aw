@@ -192,7 +192,8 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	// used when schema validation is disabled (skipValidation=true), where targeted
 	// fast-path checks avoid an unnecessary yaml.Unmarshal.
 	needsSchemaCheck := !c.skipValidation
-	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners
+	needsAppTokenCheck := strings.Contains(strings.ToLower(yamlContent), "actions/create-github-app-token@")
+	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners || needsAppTokenCheck
 
 	var parsedWorkflow map[string]any
 	if needsWorkflowParse {
@@ -200,9 +201,13 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 		// parsed representation with the template injection validator below.
 		workflowLog.Print("Parsing compiled YAML for validation")
 		if parseErr := yaml.Unmarshal([]byte(yamlContent), &parsedWorkflow); parseErr != nil {
-			if requireSelfHostedRunners {
+			if requireSelfHostedRunners || needsAppTokenCheck {
+				reason := "could not inspect compiled workflow"
+				if requireSelfHostedRunners {
+					reason = "self-hosted runner policy could not inspect compiled workflow"
+				}
 				return "", nil, nil, formatCompilerError(markdownPath, "error",
-					fmt.Sprintf("self-hosted runner policy could not inspect compiled workflow: %v", parseErr), parseErr)
+					fmt.Sprintf("%s: %v", reason, parseErr), parseErr)
 			}
 			// If parsing fails here the subsequent validators would also fail; keep going
 			// so we surface the root error from the right validator.
@@ -212,6 +217,12 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 
 	if requireSelfHostedRunners {
 		if err := validateSelfHostedRunners(parsedWorkflow); err != nil {
+			return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		}
+	}
+
+	if needsAppTokenCheck {
+		if err := c.validateAppTokenPermissions(parsedWorkflow, c.effectiveStrictMode(workflowData.RawFrontmatter)); err != nil {
 			return "", nil, nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 		}
 	}

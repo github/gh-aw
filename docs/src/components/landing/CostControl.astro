@@ -1,0 +1,548 @@
+---
+import LandingSection from './LandingSection.astro';
+import LandingPoints from './LandingPoints.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+/*
+ * An imagined cost dashboard for one workflow. gh-aw doesn't ship this UI;
+ * the numbers mirror the fields `gh aw logs` reports per run (AIC, tokens,
+ * turns, duration, status) and the real guardrails `max-ai-credits` and
+ * `max-daily-ai-credits`.
+ */
+const cap = 100; // max-ai-credits
+const dailyCap = 5000; // max-daily-ai-credits default
+const yMax = 120;
+const yTicks = [0, 25, 50, 75];
+
+// Oldest → newest
+const runs = [
+  { id: '18409322715', date: 'Sep 25', aic: 28.1, turns: 11, dur: '2.6m', tokens: 198340 },
+  { id: '18409951280', date: 'Sep 26', aic: 33.2, turns: 13, dur: '3.1m', tokens: 233871 },
+  { id: '18410763311', date: 'Sep 28', aic: 24.9, turns: 9, dur: '2.2m', tokens: 176204 },
+  { id: '18411520968', date: 'Sep 29', aic: 100.6, turns: 44, dur: '9.8m', tokens: 912455, capped: true },
+  { id: '18411877042', date: 'Oct 1', aic: 38.7, turns: 15, dur: '3.4m', tokens: 268903 },
+  { id: '18412093317', date: 'Oct 1', aic: 31.4, turns: 12, dur: '2.9m', tokens: 214512 },
+];
+
+const totalAic = runs.reduce((s, r) => s + r.aic, 0);
+const totalTokens = runs.reduce((s, r) => s + r.tokens, 0);
+const totalTurns = runs.reduce((s, r) => s + r.turns, 0);
+const today = runs.filter((r) => r.date === 'Oct 1').reduce((s, r) => s + r.aic, 0);
+const top = [...runs].sort((a, b) => b.aic - a.aic).slice(0, 3);
+
+const pct = (v: number) => `${(v / yMax) * 100}%`;
+const fmt1 = (n: number) => n.toFixed(1);
+
+const kpis = [
+  { label: 'AI credits', value: fmt1(totalAic), unit: 'AIC', note: `≈ $${(totalAic / 100).toFixed(2)}` },
+  { label: 'Runs', value: String(runs.length), note: '1 stopped at cap' },
+  { label: 'Tokens', value: `${(totalTokens / 1e6).toFixed(1)}M`, note: `${Math.round(totalTokens / runs.length / 1000)}K per run` },
+  { label: 'Avg turns', value: fmt1(totalTurns / runs.length), note: `max ${Math.max(...runs.map((r) => r.turns))}` },
+];
+
+const code = (c: string) => `<code class="aw-code">${c}</code>`;
+const points = [
+  {
+    title: 'Cap every run',
+    text: `${code('max-ai-credits')} and ${code('max-turns')} stop a run that runs away. On by default: 1,000 AI Credits per run.`,
+    href: `${base}/reference/cost-management/#cap-ai-credits-per-run`,
+    label: 'Set a budget',
+  },
+  {
+    title: 'Cap every day',
+    text: `${code('max-daily-ai-credits')} limits a workflow across 24 hours, 5,000 AIC by default. Over budget, the agent is skipped.`,
+    href: `${base}/reference/cost-management/#cap-daily-ai-credits-per-workflow`,
+    label: 'Daily limits',
+  },
+  {
+    title: 'Find the expensive runs',
+    text: `${code('gh aw logs')} lists tokens, AIC and turns per run. ${code('gh aw audit')} breaks one down. 1 AIC is $0.01.`,
+    href: `${base}/reference/cost-management/#monitoring-costs-with-gh-aw-logs`,
+    label: 'Monitor cost',
+  },
+];
+---
+
+<LandingSection id="cost" title="Cost under control" lede="Set a budget per run and see where every credit goes.">
+  <figure class="aw-dash aw-card" aria-label="Cost dashboard for the issue-triage workflow over the last 7 days">
+    <header class="aw-dash-head">
+      <div class="aw-wf">
+        <span class="aw-wf-name">issue-triage</span>
+        <span class="aw-engine">Copilot</span>
+      </div>
+      <div class="aw-period" aria-hidden="true">
+        <span>24h</span>
+        <span class="is-on">7 days</span>
+        <span>30 days</span>
+      </div>
+    </header>
+
+    <dl class="aw-kpis">
+      {kpis.map((k) => (
+        <div class="aw-kpi">
+          <dt>{k.label}</dt>
+          <dd>
+            <span class="aw-kpi-val">{k.value}{k.unit && <span class="aw-kpi-unit"> {k.unit}</span>}</span>
+            <span class="aw-kpi-note">{k.note}</span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+
+    <div class="aw-dash-body">
+      <section class="aw-chart" aria-labelledby="aw-chart-title">
+        <h3 id="aw-chart-title" class="aw-panel-title">AI credits per run</h3>
+        <div class="aw-plot">
+          <div class="aw-yaxis" aria-hidden="true">
+            {yTicks.map((t) => <span class="aw-ytick" style={`bottom:${pct(t)}`}>{t}</span>)}
+          </div>
+          <div class="aw-area">
+            {yTicks.map((t) => <span class="aw-grid" style={`bottom:${pct(t)}`} aria-hidden="true"></span>)}
+            <span class="aw-cap" style={`bottom:${pct(cap)}`} aria-hidden="true">
+              <span class="aw-cap-label"><code>max-ai-credits</code> {cap}</span>
+            </span>
+            <ol class="aw-bars">
+              {runs.map((r) => (
+                <li class:list={['aw-col', r.capped && 'is-capped']}>
+                  <span class="sr-only">{`Run ${r.id}, ${r.date}: ${fmt1(r.aic)} AIC, ${r.turns} turns, ${r.dur}${r.capped ? ', stopped at cap' : ''}`}</span>
+                  <span class="aw-bar" style={`height:${pct(Math.min(r.aic, yMax))}`}>
+                    <span class="aw-bar-val" aria-hidden="true">{fmt1(r.aic)}</span>
+                  </span>
+                  <span class="aw-tip aw-card" aria-hidden="true">
+                    <span class="aw-tip-id">#{r.id}</span>
+                    <span><b>{fmt1(r.aic)}</b> AIC · {r.turns} turns · {r.dur}</span>
+                  </span>
+                  <span class="aw-x" aria-hidden="true">{r.date}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <aside class="aw-side">
+        <section class="aw-daily" aria-labelledby="aw-daily-title">
+          <h3 id="aw-daily-title" class="aw-panel-title">Today</h3>
+          <p class="aw-daily-val"><span class="aw-kpi-val">{fmt1(today)}</span> <span class="aw-daily-of">/ {dailyCap.toLocaleString('en-US')} AIC</span></p>
+          <span class="aw-meter" role="meter" aria-valuemin="0" aria-valuemax={dailyCap} aria-valuenow={today} aria-label={`AI credits used today: ${fmt1(today)} of ${dailyCap}`}>
+            <span class="aw-meter-fill" style={`width:${(today / dailyCap) * 100}%`}></span>
+          </span>
+          <p class="aw-daily-note"><code>max-daily-ai-credits</code></p>
+        </section>
+
+        <section class="aw-top" aria-labelledby="aw-top-title">
+          <h3 id="aw-top-title" class="aw-panel-title">Most expensive runs</h3>
+          <ol>
+            {top.map((r) => (
+              <li>
+                <span class="aw-top-id">#{r.id}</span>
+                {r.capped && <span class="aw-pill aw-top-pill">Stopped at cap</span>}
+                <span class="aw-top-aic">{fmt1(r.aic)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </aside>
+    </div>
+  </figure>
+
+  <LandingPoints points={points} layout="row" />
+  <p class="aw-more">Send traces to any OTLP backend with <a class="aw-link" href={`${base}/reference/open-telemetry/`}>OpenTelemetry</a>, and compare cost with <a class="aw-link" href={`${base}/reference/outcomes/`}>outcomes</a>.</p>
+</LandingSection>
+
+<style>
+  .aw-dash {
+    margin: 2.5rem 0 3rem;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .aw-dash-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--aw-color-divider);
+  }
+  .aw-wf {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .aw-wf-name {
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-engine {
+    padding: 0.0625rem 0.5rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-pill);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+  }
+  .aw-period {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--aw-radius-md);
+    background: var(--aw-color-surface-header);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-period span {
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--aw-radius-sm);
+  }
+  .aw-period .is-on {
+    background: var(--aw-color-surface);
+    box-shadow: 0 0 0 1px var(--aw-color-border);
+    color: var(--aw-color-text);
+  }
+
+  /* KPIs */
+  .aw-kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    border-bottom: 1px solid var(--aw-color-divider);
+  }
+  @media (min-width: 50rem) {
+    .aw-kpis {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .aw-kpi {
+    padding: 1.25rem 1.5rem;
+    border-right: 1px solid var(--aw-color-divider);
+  }
+  .aw-kpi:nth-child(2n) {
+    border-right: 0;
+  }
+  .aw-kpi:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--aw-color-divider);
+  }
+  @media (min-width: 50rem) {
+    .aw-kpi:nth-child(2n) {
+      border-right: 1px solid var(--aw-color-divider);
+    }
+    .aw-kpi:last-child {
+      border-right: 0;
+    }
+    .aw-kpi:nth-child(-n + 2) {
+      border-bottom: 0;
+    }
+  }
+  .aw-kpi dt {
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-kpi dd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0.375rem 0 0;
+  }
+  .aw-kpi-val {
+    font-size: var(--aw-step-3);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-kpi-unit {
+    font-size: var(--aw-step--1);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-kpi-note {
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+  }
+
+  /* Body */
+  .aw-dash-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 50rem) {
+    .aw-dash-body {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+    .aw-side {
+      border-left: 1px solid var(--aw-color-divider);
+      border-top: 0;
+    }
+  }
+  .aw-chart,
+  .aw-side > section {
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+  .aw-side {
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .aw-side > section + section {
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .aw-panel-title {
+    margin: 0;
+    font-size: var(--aw-step--1);
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--aw-color-text-secondary);
+  }
+
+  /* Chart */
+  .aw-plot {
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+    margin-top: 2rem;
+  }
+  .aw-yaxis,
+  .aw-area {
+    position: relative;
+    height: 13rem;
+  }
+  .aw-ytick {
+    position: absolute;
+    left: 0;
+    transform: translateY(50%);
+    font-size: var(--aw-step--1);
+    line-height: 1;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .aw-grid:first-child {
+    border-top-color: var(--aw-color-border-strong);
+  }
+  .aw-cap {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    border-top: 1px dashed var(--aw-color-text-muted);
+    pointer-events: none;
+  }
+  .aw-cap-label {
+    position: absolute;
+    right: 0;
+    bottom: 0.25rem;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-secondary);
+    white-space: nowrap;
+  }
+  .aw-cap-label code {
+    padding: 0;
+    background: none;
+    font-family: var(--aw-font-mono);
+    font-size: inherit;
+    color: var(--aw-color-text-secondary);
+  }
+  .aw-bars {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .aw-col {
+    position: relative;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    margin: 0;
+    cursor: default;
+  }
+  .aw-bar {
+    position: relative;
+    width: min(2.5rem, 55%);
+    border-radius: var(--aw-radius-xs) var(--aw-radius-xs) 0 0;
+    background: var(--aw-color-accent);
+  }
+  .aw-col.is-capped .aw-bar {
+    background: var(--aw-color-complement);
+  }
+  .aw-col:hover .aw-bar {
+    opacity: 0.85;
+  }
+  .aw-bar-val {
+    position: absolute;
+    bottom: calc(100% + 0.25rem);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--aw-step--1);
+    line-height: 1;
+    color: var(--aw-color-text-secondary);
+    white-space: nowrap;
+  }
+  .aw-col.is-capped .aw-bar-val {
+    color: var(--aw-color-complement);
+    font-weight: 500;
+  }
+  .aw-x {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+    white-space: nowrap;
+  }
+  .aw-tip {
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    z-index: 2;
+    display: none;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem 0.625rem;
+    transform: translateX(-50%);
+    border-radius: var(--aw-radius-md);
+    font-size: var(--aw-step--1);
+    line-height: 1.4;
+    color: var(--aw-color-text-secondary);
+    white-space: nowrap;
+  }
+  .aw-tip b {
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-tip-id {
+    font-family: var(--aw-font-mono);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-col:hover .aw-tip {
+    display: flex;
+  }
+  .aw-col:first-child .aw-tip {
+    left: 0;
+    transform: none;
+  }
+  .aw-col:last-child .aw-tip {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .aw-chart {
+    padding-bottom: 2.75rem;
+  }
+
+  /* Daily meter */
+  .aw-daily-val {
+    margin: 0.75rem 0 0.75rem;
+    line-height: 1;
+  }
+  .aw-daily-val .aw-kpi-val {
+    font-size: var(--aw-step-2);
+  }
+  .aw-daily-of {
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-meter {
+    position: relative;
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--aw-color-surface-header);
+    box-shadow: inset 0 0 0 1px var(--aw-color-divider);
+    overflow: hidden;
+  }
+  .aw-meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 4px;
+    border-radius: 3px;
+    background: var(--aw-color-accent);
+  }
+  .aw-daily-note {
+    margin: 0.625rem 0 0;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .aw-daily-note code {
+    padding: 0;
+    background: none;
+    font-family: var(--aw-font-mono);
+    font-size: inherit;
+    color: var(--aw-color-text-muted);
+  }
+
+  /* Top runs */
+  .aw-top ol {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .aw-top li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--aw-color-divider);
+    font-size: var(--aw-step--1);
+  }
+  .aw-top li:first-child {
+    border-top: 0;
+  }
+  .aw-top-id {
+    font-family: var(--aw-font-mono);
+    color: var(--aw-color-text);
+  }
+  .aw-top-pill {
+    padding: 0 0.4375rem;
+  }
+  .aw-top-aic {
+    margin-left: auto;
+    color: var(--aw-color-text-strong);
+    font-weight: 500;
+  }
+
+  @media (max-width: 40rem) {
+    .aw-dash-head,
+    .aw-kpi,
+    .aw-chart,
+    .aw-side > section {
+      padding-inline: 1rem;
+    }
+    .aw-ytick:nth-child(even),
+    .aw-col:nth-child(even) .aw-x {
+      display: none;
+    }
+    .aw-bar-val {
+      display: none;
+    }
+    .aw-cap-label {
+      right: auto;
+      bottom: auto;
+      top: 0.375rem;
+      left: 0.25rem;
+    }
+    .aw-col.is-capped .aw-bar-val {
+      display: block;
+    }
+  }
+
+  .aw-more {
+    margin: 1.5rem 0 0;
+    font-size: var(--aw-step--1);
+    line-height: 1.55;
+    color: var(--aw-color-text-muted);
+  }
+</style>

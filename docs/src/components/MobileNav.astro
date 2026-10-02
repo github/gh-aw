@@ -1,0 +1,70 @@
+---
+/** Primary site links as large rows, shown at the top of the mobile menu sheet. */
+import { getAriaCurrent, getNavLinks, getSection } from './site-nav';
+
+const section = getSection(Astro.locals.starlightRoute.id);
+const links = getNavLinks(import.meta.env.BASE_URL);
+---
+
+<nav class="mobile-nav" aria-label="Main">
+	<ul>
+		{
+			links.map((link) => (
+				<li>
+					<a href={link.href} aria-current={getAriaCurrent(link, section, Astro.url)}>
+						{link.label}
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>
+
+<style>
+	.mobile-nav ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.mobile-nav li + li {
+		border-top: 1px solid var(--aw-color-divider);
+	}
+
+	.mobile-nav a {
+		display: flex;
+		align-items: center;
+		min-height: 2.75rem;
+		padding: 0;
+		border-radius: 0;
+		background: none;
+		font-size: var(--aw-step-1);
+		font-weight: 500;
+		letter-spacing: var(--aw-tracking-tight);
+		color: var(--aw-color-text-muted);
+		text-decoration: none;
+	}
+
+	/* `li a` outranks the sidebar's current-page fill, which this sits inside on docs pages */
+	.mobile-nav li a:hover,
+	.mobile-nav li a[aria-current] {
+		background: none;
+		color: var(--aw-color-text-strong);
+	}
+
+	/* Current section: a small accent dot after the label */
+	.mobile-nav a[aria-current]::after {
+		content: '';
+		width: 0.375rem;
+		height: 0.375rem;
+		margin-inline-start: 0.625rem;
+		border-radius: var(--aw-radius-pill);
+		background: var(--aw-color-accent);
+	}
+
+	/* Inset ring: the rows run edge to edge */
+	.mobile-nav a:focus-visible {
+		outline-offset: -2px;
+		border-radius: var(--aw-radius-sm);
+	}
+</style>

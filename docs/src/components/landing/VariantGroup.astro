@@ -1,0 +1,41 @@
+---
+/**
+ * Design-exploration wrapper: holds several alternative layouts for one landing
+ * section. Each direct child must be `<div data-variant="key">…</div>`.
+ * The server renders only the default variant visibly; VariantSwitcher swaps
+ * between them in the browser. Remove once a variant is chosen.
+ */
+interface Props {
+  /** Anchor id for the section (e.g. "gallery"); variants inside must not reuse it. */
+  id: string;
+  /** Label shown in the switcher. */
+  label: string;
+  /** Variants in display order: key + short name. */
+  variants: { key: string; name: string }[];
+  /** Key rendered by default (and in production). */
+  defaultKey?: string;
+}
+const { id, label, variants, defaultKey = variants[0]?.key } = Astro.props;
+---
+
+<div
+  id={id}
+  class="aw-variant-group"
+  data-variant-group={id}
+  data-variant-label={label}
+  data-variants={JSON.stringify(variants)}
+  data-active={defaultKey}
+>
+  <slot />
+</div>
+
+<style>
+  .aw-variant-group > :global([data-variant]) {
+    display: none;
+  }
+  .aw-variant-group[data-active='a'] > :global([data-variant='a']),
+  .aw-variant-group[data-active='c'] > :global([data-variant='c']),
+  .aw-variant-group[data-active='d'] > :global([data-variant='d']) {
+    display: block;
+  }
+</style>

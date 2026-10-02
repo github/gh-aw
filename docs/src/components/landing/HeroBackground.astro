@@ -1,0 +1,377 @@
+---
+// Hero background: "dithered field".
+// Domain-warped fbm noise across the top band (heavier on the right),
+// quantised with an 8x8 Bayer ordered dither into a few purple steps, with
+// small sparse coral clusters drifting through the denser cloud. Rendered at low resolution and scaled up with
+// `image-rendering: pixelated` so each dither cell reads as a deliberate dot.
+//
+// Props let other sections reuse it as a quieter accent:
+// - placement: "hero" (default, top-right anchored), "top-band" (a shallow
+//   band across the full top edge, fading downward), or "footer" (rises from
+//   the bottom-left corner, fading up and to the right).
+// - strength: multiplier on the field's intensity (1 = hero).
+// - forceDark: always use the dark palette, for bands that stay dark in
+//   light theme. Ignores data-theme.
+interface Props {
+  placement?: 'hero' | 'top-band' | 'footer';
+  strength?: number;
+  forceDark?: boolean;
+}
+const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
+---
+
+<div
+  class="hero-bg-a"
+  data-hero-bg-a
+  data-placement={placement}
+  data-strength={strength}
+  data-force-dark={forceDark ? '' : undefined}
+>
+  <canvas class="hero-bg-a-canvas"></canvas>
+</div>
+
+<style>
+  .hero-bg-a {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .hero-bg-a-canvas {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    opacity: 0;
+    transition: opacity 900ms ease-out;
+  }
+  .hero-bg-a-canvas.is-ready {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-bg-a-canvas {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const VERT = `
+    attribute vec2 a_pos;
+    void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+  `;
+
+  const FRAG = `
+    precision highp float;
+    uniform vec2 u_res;      // canvas size in cells
+    uniform float u_cell;    // CSS px per cell
+    uniform float u_time;
+    uniform float u_strength;
+    uniform vec3 u_p1;
+    uniform vec3 u_p2;
+    uniform vec3 u_p3;
+    uniform vec3 u_p4;
+    uniform vec3 u_coral;
+    uniform float u_band;       // 0 = hero, 1 = shallow top band, 2 = footer corner
+    uniform float u_coralRate;  // multiplier on coral cluster frequency
+
+    float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+    float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    float bayer8(vec2 a) { return bayer4(0.5 * a) * 0.25 + bayer2(a); }
+
+    float hash(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      float a = hash(i);
+      float b = hash(i + vec2(1.0, 0.0));
+      float c = hash(i + vec2(0.0, 1.0));
+      float d = hash(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    }
+    float fbm(vec2 p) {
+      float s = 0.0;
+      float a = 0.5;
+      mat2 r = mat2(0.8, -0.6, 0.6, 0.8);
+      for (int i = 0; i < 5; i++) {
+        s += a * vnoise(p);
+        p = r * p * 2.03 + 11.7;
+        a *= 0.5;
+      }
+      return s;
+    }
+
+    void main() {
+      vec2 cell = gl_FragCoord.xy;            // cell coords, y up
+      vec2 px = cell * u_cell;                // CSS px, y up
+      vec2 size = u_res * u_cell;
+      float fromTop = size.y - px.y;          // CSS px below the top edge
+      float xn = px.x / size.x;               // 0 left .. 1 right
+
+      // Noise space: ~260 CSS px per unit, drifting slowly leftward.
+      float t = u_time;
+      vec2 p = vec2(size.x - px.x, fromTop) / 260.0;
+      p += vec2(t * 0.018, t * 0.012);
+      vec2 q = vec2(
+        fbm(p + vec2(0.0, t * 0.035)),
+        fbm(p + vec2(5.2, 1.3) - vec2(t * 0.028, 0.0))
+      );
+      vec2 r = vec2(
+        fbm(p + 2.2 * q + vec2(1.7, 9.2) + t * 0.02),
+        fbm(p + 2.2 * q + vec2(8.3, 2.8) - t * 0.015)
+      );
+      float n = fbm(p + 2.0 * r);
+      n = smoothstep(0.32, 0.82, n);
+
+      // Falloff: originates top-right, deep behind the hero visual, thinning
+      // to a soft shallow wisp across the top-left so the headline stays calm. Narrow screens get a thinner cap.
+      bool narrow = size.x < 720.0;
+      bool band = u_band > 0.5 && u_band < 1.5;
+      bool footer = u_band > 1.5;
+      float depth = band
+        ? (narrow ? 110.0 : 150.0)
+        : narrow
+        ? mix(30.0, 160.0, smoothstep(0.5, 1.0, xn))
+        : mix(80.0, 440.0, smoothstep(0.1, 1.0, xn));
+      // Wobble the lower edge so it never reads as a straight gradient.
+      depth *= 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, 3.1));
+      float m = 1.0 - smoothstep(0.0, depth, fromTop);
+      if (footer) {
+        // Elliptical falloff from the bottom-left corner (px.y is up from
+        // the bottom), under the brand block and credits and fading out
+        // before the link columns. On narrow screens the columns stack, so
+        // the field stays a low cap. Same wobble so the edge never looks drawn.
+        vec2 reach = narrow
+          ? vec2(size.x * 0.75, min(size.y, 340.0))
+          : vec2(clamp(size.x * 0.4, 360.0, 620.0), size.y * 1.1);
+        vec2 d = px / reach;
+        float edge = 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, px.y / 180.0));
+        m = 1.0 - smoothstep(0.3, edge, length(d));
+      } else if (!band) m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
+      m = m * (0.55 + 0.45 * m);
+
+      float v = n * m * u_strength;
+      float th = bayer8(cell);
+
+      // Coral: small, sparse clusters (a few cells each) that drift across
+      // the cloud as rigid shapes. Cells are grouped into 3x3 blocks; a rare
+      // block is "lit", and inside it each cell is lit with ~45% chance.
+      vec2 drift = cell + vec2(t * 2.4, -t * 0.7);
+      vec2 dc = floor(drift);
+      vec2 blk = floor(dc / 3.0);
+      float hot = n * m;
+      if (hot > 0.14 && hash(blk + 17.3) < 0.03 * u_coralRate * smoothstep(0.14, 0.4, hot)
+          && hash(dc + 4.1) < 0.45) {
+        gl_FragColor = vec4(u_coral, 1.0);
+        return;
+      }
+
+      float level = floor(v * 4.0 + th);
+      if (level < 1.0) { gl_FragColor = vec4(0.0); return; }
+      vec3 col = level < 2.0 ? u_p1 : level < 3.0 ? u_p2 : level < 4.0 ? u_p3 : u_p4;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  const CELL = 3; // CSS px per dither cell
+  const FRAME_MS = 1000 / 30;
+  const initialized = new WeakSet<HTMLElement>();
+
+  function parseColor(ctx: CanvasRenderingContext2D, value: string): [number, number, number] {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = value.trim() || '#000';
+    ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0] / 255, d[1] / 255, d[2] / 255];
+  }
+
+  function compile(gl: WebGLRenderingContext, type: number, src: string) {
+    const s = gl.createShader(type);
+    if (!s) return null;
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      gl.deleteShader(s);
+      return null;
+    }
+    return s;
+  }
+
+  function init(root: HTMLElement) {
+    if (initialized.has(root)) return;
+    const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-a-canvas');
+    if (!canvas) return;
+    const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
+    if (!gl) return;
+
+    const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+    const prog = gl.createProgram();
+    if (!prog) return;
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a_pos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    const u = (name: string) => gl.getUniformLocation(prog, name);
+    const uRes = u('u_res');
+    const uCell = u('u_cell');
+    const uTime = u('u_time');
+    const uStrength = u('u_strength');
+    const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
+    const uCoral = u('u_coral');
+    const mode = root.dataset.placement === 'top-band' ? 1 : root.dataset.placement === 'footer' ? 2 : 0;
+    const strength = Number(root.dataset.strength) || 1;
+    const forceDark = root.hasAttribute('data-force-dark');
+    gl.uniform1f(uCell, CELL);
+    gl.uniform1f(u('u_band'), mode);
+    gl.uniform1f(u('u_coralRate'), mode === 0 ? 1 : 0.35);
+
+    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+
+    function readColors() {
+      if (!probe || !gl) return;
+      const cs = getComputedStyle(document.documentElement);
+      const dark = forceDark || document.documentElement.getAttribute('data-theme') !== 'light';
+      const steps = dark
+        ? ['--aw-purple-9', '--aw-purple-8', '--aw-purple-7', '--aw-purple-6']
+        : ['--aw-purple-2', '--aw-purple-3', '--aw-purple-4', '--aw-purple-6'];
+      steps.forEach((name, i) => gl.uniform3fv(uP[i], parseColor(probe, cs.getPropertyValue(name))));
+      gl.uniform3fv(uCoral, parseColor(probe, cs.getPropertyValue('--aw-coral-4')));
+      gl.uniform1f(uStrength, (dark ? 0.9 : 0.86) * strength);
+    }
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Random phase so the field doesn't always start from the same shape.
+    const t0 = performance.now() - Math.random() * 60000;
+    let raf = 0;
+    let last = 0;
+    // The IntersectionObserver fires once on observe, so offscreen instances
+    // (footer, lower bands) never draw until scrolled near.
+    let onScreen = false;
+
+    function visible() {
+      return onScreen && !document.hidden && root.offsetParent !== null && root.clientWidth > 0;
+    }
+
+    function resize() {
+      const w = root.clientWidth;
+      const h = root.clientHeight;
+      if (!w || !h || !gl || !canvas) return false;
+      const cw = Math.ceil(w / CELL);
+      const ch = Math.ceil(h / CELL);
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+        canvas.style.width = `${cw * CELL}px`;
+        canvas.style.height = `${ch * CELL}px`;
+        gl.viewport(0, 0, cw, ch);
+        gl.uniform2f(uRes, cw, ch);
+      }
+      return true;
+    }
+
+    function draw(now: number) {
+      if (!gl || !canvas) return;
+      gl.uniform1f(uTime, (now - t0) / 1000);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      canvas.classList.add('is-ready');
+    }
+
+    function tick(now: number) {
+      raf = 0;
+      if (!visible()) return;
+      if (now - last >= FRAME_MS) {
+        last = now;
+        draw(now);
+      }
+      raf = requestAnimationFrame(tick);
+    }
+
+    function update() {
+      if (!visible()) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        return;
+      }
+      if (!resize()) return;
+      if (reduceMotion.matches) {
+        draw(t0 + 20000);
+        return;
+      }
+      if (!raf) raf = requestAnimationFrame(tick);
+    }
+
+    readColors();
+
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(root);
+
+    const intersectionObserver = new IntersectionObserver((entries) => {
+      onScreen = entries.some((e) => e.isIntersecting);
+      update();
+    });
+    intersectionObserver.observe(root);
+
+    const mutationObserver = new MutationObserver(() => {
+      readColors();
+      if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
+    });
+    mutationObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const onVisibilityChange = () => update();
+    const onMotionChange = () => update();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    reduceMotion.addEventListener('change', onMotionChange);
+    initialized.add(root);
+    update();
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+      mutationObserver.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      reduceMotion.removeEventListener('change', onMotionChange);
+      initialized.delete(root);
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    };
+  }
+
+  let cleanups: (() => void)[] = [];
+  function cleanup() {
+    cleanups.forEach((dispose) => dispose());
+    cleanups = [];
+  }
+  function initialize() {
+    cleanup();
+    document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach((root) => {
+      const dispose = init(root);
+      if (dispose) cleanups.push(dispose);
+    });
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', cleanup);
+  initialize();
+</script>
