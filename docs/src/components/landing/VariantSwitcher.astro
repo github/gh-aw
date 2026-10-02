@@ -14,12 +14,20 @@ const enabledByDefault = import.meta.env.DEV;
 
 <script>
   const KEY = 'aw-variant-choices';
-  const root = document.querySelector<HTMLElement>('.aw-switcher');
-  const params = new URLSearchParams(location.search);
-  if (root && (root.dataset.enabled === 'true' || params.has('variants'))) {
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const root = document.querySelector<HTMLElement>('.aw-switcher');
+    const params = new URLSearchParams(location.search);
+    if (!root || !(root.dataset.enabled === 'true' || params.has('variants'))) return;
+
+    const controller = new AbortController();
+    const { signal } = controller;
     root.hidden = false;
     const body = root.querySelector<HTMLElement>('.aw-switcher-body')!;
     const toggle = root.querySelector<HTMLButtonElement>('.aw-switcher-toggle')!;
+    body.replaceChildren();
     let saved: Record<string, string> = {};
     try {
       saved = JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -63,7 +71,7 @@ const enabledByDefault = import.meta.env.DEV;
           seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
           name.textContent = v.name;
           group.dispatchEvent(new CustomEvent('variantchange', { detail: v.key, bubbles: true }));
-        });
+        }, { signal });
         seg.append(b);
       });
       row.append(seg);
@@ -79,8 +87,17 @@ const enabledByDefault = import.meta.env.DEV;
       const open = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', String(!open));
       body.hidden = open;
-    });
+    }, { signal });
+
+    cleanup = () => {
+      controller.abort();
+      body.replaceChildren();
+    };
   }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>
 
 <style>
