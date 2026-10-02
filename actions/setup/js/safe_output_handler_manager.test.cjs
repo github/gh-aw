@@ -90,6 +90,19 @@ describe("Safe Output Handler Manager", () => {
         expect(global.core.info).toHaveBeenCalledWith("Staged mode is active; Dispatch Work Coordinator persistence is skipped.");
       });
 
+      it("skips coordinator persistence when staged mode is configured", async () => {
+        process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ dispatch_claim_finish: {}, staged: true });
+        const outputFile = "/tmp/gh-aw/config-staged-coordinator-agent-output.json";
+        fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "dispatch_claim_finish" }] }));
+        process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+        await main();
+
+        expect(global.core.setFailed).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith("Staged mode is active; Dispatch Work Coordinator persistence is skipped.");
+      });
+
       it("writes safe-output-errors.json when message processing has fatal failures", async () => {
         process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "{}";
         process.env.GH_AW_SAFE_OUTPUT_SCRIPTS = JSON.stringify({ custom_fail: "custom_fail_handler.cjs" });
@@ -988,7 +1001,7 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[1].success).toBe(true);
     });
 
-    it.each(["set_issue_type", "set_issue_field", "jira_add_label", "add_labels", "remove_labels", "replace_label", "dispatch_repository", "call_workflow", "upload_artifact"])(
+    it.each(["set_issue_type", "set_issue_field", "jira_add_label", "add_labels", "remove_labels", "replace_label", "dispatch_repository", "call_workflow", "upload_artifact", "dispatch_claim_finish"])(
       "should abort %s in detection warning mode",
       async messageType => {
         process.env.GH_AW_DETECTION_CONCLUSION = "warning";
@@ -1008,6 +1021,20 @@ describe("Safe Output Handler Manager", () => {
         });
       }
     );
+
+    it.each(["warning", "failure"])("does not persist coordinator completion when detection concludes %s", async conclusion => {
+      process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ dispatch_claim_finish: {} });
+      const outputFile = `/tmp/gh-aw/coordinator-detection-${conclusion}-agent-output.json`;
+      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+      fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "dispatch_claim_finish", outcome: { result: "done" } }] }));
+      process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+      await main();
+
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(global.core.info).toHaveBeenCalledWith(`Threat detection ${conclusion} is active; Dispatch Work Coordinator persistence is skipped.`);
+    });
 
     it("should log conversion requirement for push_to_pull_request_branch in detection warning mode", async () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";

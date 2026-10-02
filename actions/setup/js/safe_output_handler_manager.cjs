@@ -228,6 +228,7 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "call_workflow",
   "autofix_code_scanning_alert",
   "create_agent_session",
+  "dispatch_claim_finish",
   "ado_update_work_item",
   "ado_assign_work_item",
   "ado_link_work_items",
@@ -936,21 +937,6 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       continue;
     }
 
-    if (messageType === "dispatch_claim_finish") {
-      if (dispatchReconciliation.finishAuthorized) {
-        results.push({ type: messageType, messageIndex: i, success: true });
-      } else {
-        results.push({
-          type: messageType,
-          messageIndex: i,
-          success: false,
-          skipped: true,
-          reason: dispatchReconciliation.reason || "Claim completion was not authorized",
-        });
-      }
-      continue;
-    }
-
     if (detectionConclusion === "warning") {
       const threatPolicy = getThreatWarningPolicy(messageType);
       if (threatPolicy.policy === "abort") {
@@ -977,6 +963,21 @@ async function processMessages(messageHandlers, messages, onItemCreated = null, 
       } else if (threatPolicy.policy === "none") {
         core.warning(`Threat-detection warn policy has no explicit classification for "${messageType}"; allowing handler execution by default`);
       }
+    }
+
+    if (messageType === "dispatch_claim_finish") {
+      if (dispatchReconciliation.finishAuthorized) {
+        results.push({ type: messageType, messageIndex: i, success: true });
+      } else {
+        results.push({
+          type: messageType,
+          messageIndex: i,
+          success: false,
+          skipped: true,
+          reason: dispatchReconciliation.reason || "Claim completion was not authorized",
+        });
+      }
+      continue;
     }
 
     const messageHandler = messageHandlers.get(messageType);
@@ -1724,6 +1725,7 @@ async function main() {
 
     // Load configuration
     const config = loadConfig();
+    isStaged = isStagedMode(config);
     core.debug(`Configuration: ${JSON.stringify(Object.keys(config))}`);
 
     // Load agent output
@@ -1738,13 +1740,21 @@ async function main() {
     const fileBackedCommentMemoryMessages = buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
     let dispatchReconciliation = {};
-    if (config.dispatch_claim_finish && !isStaged) {
+    const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
+    const detectionBlocksCoordinator = detectionConclusion === "warning" || detectionConclusion === "failure";
+    if (config.dispatch_claim_finish && !isStaged && !detectionBlocksCoordinator) {
       dispatchReconciliation = await reconcileDispatchWorkCoordinator({ messages: allMessages });
       if (dispatchReconciliation.forceStaged) {
         process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
         isStaged = true;
         core.warning(`Dispatch Work Coordinator limited this run to staged safe outputs: ${dispatchReconciliation.reason}`);
       }
+    } else if (config.dispatch_claim_finish && detectionBlocksCoordinator) {
+      dispatchReconciliation = {
+        finishAuthorized: false,
+        reason: `Threat detection ${detectionConclusion} prevents Dispatch Work Coordinator persistence`,
+      };
+      core.info(`Threat detection ${detectionConclusion} is active; Dispatch Work Coordinator persistence is skipped.`);
     } else if (config.dispatch_claim_finish) {
       core.info("Staged mode is active; Dispatch Work Coordinator persistence is skipped.");
     }
