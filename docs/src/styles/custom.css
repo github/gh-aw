@@ -359,6 +359,13 @@ header::after {
   color: var(--aw-color-text-muted);
 }
 
+@media (pointer: coarse) {
+  .expressive-code .copy button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .expressive-code .copy button:hover,
 .expressive-code .copy button:focus-visible {
   color: var(--aw-color-text);
@@ -477,6 +484,7 @@ header::after {
   /* Display each cell as a row within the card */
   .sl-markdown-content td {
     display: block;
+    min-height: 44px;
     padding: 0.5rem 0;
     border: none;
     text-align: left;
@@ -505,7 +513,7 @@ header::after {
     font-size: var(--aw-step--1);
     font-weight: 600;
     text-align: left;
-    color: var(--aw-color-text-muted);
+    color: var(--aw-color-text-secondary);
   }
 
   /* Fallback: if data-label is not present, just display cells stacked */
