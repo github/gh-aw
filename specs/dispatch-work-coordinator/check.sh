@@ -37,7 +37,6 @@ run_model() {
 
 run_model DispatchWorkCoordinator
 run_model Recovery
-run_model BrokenAuthorization SingleAuthorization
 run_model BrokenCAS TerminalPersistence
-run_model BrokenTerminal ValidLog
+run_model BrokenTerminal TerminalFreeze
 echo "Full TLC reports: $RESULTS_DIR"

@@ -32,6 +32,7 @@ AllFacts == {Work(w) : w \in Works}
 Intents == {t \in AllFacts : t.kind \in {"Work", "Claim", "WorkCancellation"}}
 Facts(s) == {s[i] : i \in 1..Len(s)}
 Terminals(f) == {t \in f : t.kind \in {"Completion", "WorkCancellation"}}
+WorkFacts(f, w) == {t \in f : t.work = w}
 Terminal(f, w) == \E t \in Terminals(f) : t.work = w
 Completed(f, w) == {t \in f : t.kind = "Completion" /\ t.work = w}
 Active(f, w) == {c \in Claims : WorkOf(c) = w /\ Claim(c) \in f
@@ -60,14 +61,13 @@ Replay(s) == Projection(Facts(s))
 
 Allowed(f, t) ==
     /\ t \in AllFacts /\ t \notin f
+    /\ ~Terminal(f, t.work)
     /\ CASE t.kind = "Work" -> Work(t.work) \notin f
-         [] t.kind = "Claim" -> Work(t.work) \in f /\ ~Terminal(f, t.work)
-         [] t.kind = "WorkCancellation" ->
-                Work(t.work) \in f /\ ~Terminal(f, t.work)
-         [] t.kind = "ClaimCancellation" ->
-                Claim(t.claim) \in f /\ ~Terminal(f, t.work)
+         [] t.kind = "Claim" -> Work(t.work) \in f
+         [] t.kind = "WorkCancellation" -> Work(t.work) \in f
+         [] t.kind = "ClaimCancellation" -> Claim(t.claim) \in f
          [] t.kind = "Completion" ->
-                /\ Work(t.work) \in f /\ ~Terminal(f, t.work)
+                /\ Work(t.work) \in f
                 /\ t.claim = Winner(f, t.work)
                 /\ t = Completion(t.attempt)
          [] OTHER -> FALSE
@@ -88,24 +88,31 @@ VARIABLES log, head, dispatch, workers, compact, recovery, deadRuns,
 vars == <<log, head, dispatch, workers, compact, recovery, deadRuns,
           terminalHistory, authorizations, effects>>
 
-Snapshot == [phase |-> "idle", base |-> 0, candidate |-> <<>>, retries |-> 0]
+Snapshot == [phase |-> "idle", base |-> 0, source |-> <<>>,
+             candidate |-> <<>>, observedRuns |-> {}, retries |-> 0]
 Init ==
     /\ log = <<>> /\ head = 0 /\ deadRuns = {}
-    /\ terminalHistory = {} /\ authorizations = <<>> /\ effects = <<>>
+    /\ terminalHistory = [w \in Works |-> {}]
+    /\ authorizations = <<>> /\ effects = <<>>
     /\ dispatch = [d \in Dispatchers |->
          [phase |-> "agent", local |-> <<>>, serialized |-> <<>>,
-          base |-> 0, candidate |-> <<>>, retries |-> 0]]
+          base |-> 0, source |-> <<>>, candidate |-> <<>>, retries |-> 0]]
     /\ workers = [a \in Workers |->
          [phase |-> "waiting", finish |-> FALSE,
-          base |-> 0, candidate |-> <<>>, retries |-> 0]]
+          base |-> 0, source |-> <<>>, candidate |-> <<>>, retries |-> 0]]
     /\ compact = Snapshot /\ recovery = Snapshot
 
 Commit(candidate) ==
     /\ log' = candidate /\ head' = head + 1
-    /\ terminalHistory' = terminalHistory \cup Terminals(Facts(candidate))
+    /\ terminalHistory' = [w \in Works |->
+         IF terminalHistory[w] = {} /\ Terminal(Facts(candidate), w)
+         THEN WorkFacts(Facts(candidate), w) ELSE terminalHistory[w]]
 Write(candidate) ==
     IF candidate = log THEN UNCHANGED <<log, head, terminalHistory>>
     ELSE Commit(candidate)
+Publish(snapshot) ==
+    /\ snapshot.base = head /\ snapshot.source = log
+    /\ Write(snapshot.candidate)
 
 LocalView(d) == Apply(log, dispatch[d].local)
 Stage(d, t) ==
@@ -120,14 +127,13 @@ Stage(d, t) ==
 PrepareDispatch(d) ==
     /\ dispatch[d].phase = "agent"
     /\ dispatch' = [dispatch EXCEPT
-         ![d].phase = "prepared", ![d].base = head,
+         ![d].phase = "prepared", ![d].base = head, ![d].source = log,
          ![d].candidate = Apply(log, dispatch[d].serialized)]
     /\ UNCHANGED <<log, head, workers, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
 PushDispatch(d) ==
-    /\ dispatch[d].phase = "prepared" /\ dispatch[d].base = head
-    /\ Write(dispatch[d].candidate)
+    /\ dispatch[d].phase = "prepared" /\ Publish(dispatch[d])
     /\ dispatch' = [dispatch EXCEPT ![d].phase = "done"]
     /\ UNCHANGED <<workers, compact, recovery, deadRuns, authorizations, effects>>
 
@@ -135,7 +141,7 @@ RetryDispatch(d) ==
     /\ dispatch[d].phase = "prepared" /\ dispatch[d].base # head
     /\ dispatch' = IF dispatch[d].retries = RetryLimit
          THEN [dispatch EXCEPT ![d].phase = "failed"]
-         ELSE [dispatch EXCEPT ![d].base = head,
+         ELSE [dispatch EXCEPT ![d].base = head, ![d].source = log,
                ![d].candidate = Apply(log, dispatch[d].serialized),
                ![d].retries = @ + 1]
     /\ UNCHANGED <<log, head, workers, compact, recovery, deadRuns,
@@ -156,23 +162,22 @@ EndAgent(a, finalize) ==
     /\ UNCHANGED <<log, head, dispatch, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
-WorkerCandidate(a) ==
+WorkerCandidate(source, a) ==
     LET c == Inbound(a) IN
-    IF ~Terminal(Facts(log), WorkOf(c)) /\ Winner(Facts(log), WorkOf(c)) = c
-    THEN Apply(log, <<IF workers[a].finish THEN Completion(a)
+    IF ~Terminal(Facts(source), WorkOf(c)) /\ Winner(Facts(source), WorkOf(c)) = c
+    THEN Apply(source, <<IF workers[a].finish THEN Completion(a)
                        ELSE ClaimCancellation(c)>>)
-    ELSE log
+    ELSE source
 
 PrepareWorker(a) ==
     /\ workers[a].phase = "ready"
     /\ workers' = [workers EXCEPT ![a].phase = "prepared", ![a].base = head,
-                   ![a].candidate = WorkerCandidate(a)]
+                   ![a].source = log, ![a].candidate = WorkerCandidate(log, a)]
     /\ UNCHANGED <<log, head, dispatch, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
 PushWorker(a) ==
-    /\ workers[a].phase = "prepared" /\ workers[a].base = head
-    /\ Write(workers[a].candidate)
+    /\ workers[a].phase = "prepared" /\ Publish(workers[a])
     /\ workers' = [workers EXCEPT ![a].phase =
          IF Completion(a) \in Facts(workers[a].candidate) \ Facts(log)
          THEN "committed" ELSE "stopped"]
@@ -182,8 +187,8 @@ RetryWorker(a) ==
     /\ workers[a].phase = "prepared" /\ workers[a].base # head
     /\ workers' = IF workers[a].retries = RetryLimit
          THEN [workers EXCEPT ![a].phase = "failed"]
-         ELSE [workers EXCEPT ![a].base = head,
-               ![a].candidate = WorkerCandidate(a), ![a].retries = @ + 1]
+         ELSE [workers EXCEPT ![a].base = head, ![a].source = log,
+               ![a].candidate = WorkerCandidate(log, a), ![a].retries = @ + 1]
     /\ UNCHANGED <<log, head, dispatch, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
@@ -211,12 +216,13 @@ RunTerminates(c) ==
     /\ UNCHANGED <<log, head, dispatch, compact, recovery,
                    terminalHistory, authorizations, effects>>
 
-Orphans == {ClaimCancellation(c) : c \in
-    {c \in deadRuns : Claim(c) \in Facts(log) /\ ~Terminal(Facts(log), WorkOf(c))
-                     /\ ClaimCancellation(c) \notin Facts(log)}}
-MaintenanceCandidate(kind) ==
-    IF kind = "compact" THEN Canonical(Facts(log))
-    ELSE Apply(log, Canonical(Orphans))
+Orphans(source, observedRuns) == {ClaimCancellation(c) : c \in
+    {c \in observedRuns : Claim(c) \in Facts(source)
+                         /\ ~Terminal(Facts(source), WorkOf(c))
+                         /\ ClaimCancellation(c) \notin Facts(source)}}
+MaintenanceCandidate(kind, source, observedRuns) ==
+    IF kind = "compact" THEN Canonical(Facts(source))
+    ELSE Apply(source, Canonical(Orphans(source, observedRuns)))
 Maintenance(kind) == IF kind = "compact" THEN compact ELSE recovery
 
 SetMaintenance(kind, value) ==
@@ -224,31 +230,35 @@ SetMaintenance(kind, value) ==
     /\ recovery' = IF kind = "recovery" THEN value ELSE recovery
 
 PrepareMaintenance(kind) ==
+    LET observed == IF kind = "compact" THEN {} ELSE deadRuns IN
     /\ Maintenance(kind).phase \in {"idle", "done"}
-    /\ MaintenanceCandidate(kind) # log
-    /\ SetMaintenance(kind, [phase |-> "prepared", base |-> head,
-                             candidate |-> MaintenanceCandidate(kind), retries |-> 0])
+    /\ MaintenanceCandidate(kind, log, observed) # log
+    /\ SetMaintenance(kind, [phase |-> "prepared", base |-> head, source |-> log,
+         candidate |-> MaintenanceCandidate(kind, log, observed),
+         observedRuns |-> observed, retries |-> 0])
     /\ UNCHANGED <<log, head, dispatch, workers, deadRuns,
                    terminalHistory, authorizations, effects>>
 
 PushMaintenance(kind) ==
-    /\ Maintenance(kind).phase = "prepared" /\ Maintenance(kind).base = head
-    /\ Write(Maintenance(kind).candidate)
+    /\ Maintenance(kind).phase = "prepared" /\ Publish(Maintenance(kind))
     /\ SetMaintenance(kind, [Maintenance(kind) EXCEPT !.phase = "done"])
     /\ UNCHANGED <<dispatch, workers, deadRuns, authorizations, effects>>
 
 RetryMaintenance(kind) ==
+    LET observed == IF kind = "compact" THEN {} ELSE deadRuns IN
     /\ Maintenance(kind).phase = "prepared" /\ Maintenance(kind).base # head
     /\ SetMaintenance(kind,
          IF Maintenance(kind).retries = RetryLimit
          THEN [Maintenance(kind) EXCEPT !.phase = "failed"]
-         ELSE [Maintenance(kind) EXCEPT !.base = head,
-               !.candidate = MaintenanceCandidate(kind), !.retries = @ + 1])
+         ELSE [Maintenance(kind) EXCEPT !.base = head, !.source = log,
+               !.candidate = MaintenanceCandidate(kind, log, observed),
+               !.observedRuns = observed, !.retries = @ + 1])
     /\ UNCHANGED <<log, head, dispatch, workers, deadRuns,
                    terminalHistory, authorizations, effects>>
 
 DuplicateRecord(t) ==
-    /\ t \in Facts(log) /\ Commit(Append(log, t))
+    /\ t \in Facts(log)
+    /\ Publish([base |-> head, source |-> log, candidate |-> Append(log, t)])
     /\ UNCHANGED <<dispatch, workers, compact, recovery, deadRuns,
                    authorizations, effects>>
 
@@ -265,6 +275,10 @@ Next ==
          PrepareMaintenance(kind) \/ PushMaintenance(kind) \/ RetryMaintenance(kind)
     \/ \E t \in AllFacts : DuplicateRecord(t)
 Spec == Init /\ [][Next]_vars
+WorkerOneShot ==
+    [] [\A a \in Workers :
+         workers[a].phase \in {"done", "stopped", "failed"} =>
+              workers'[a].phase = workers[a].phase]_vars
 
 ValidFacts(f) ==
     /\ f \subseteq AllFacts
@@ -278,24 +292,28 @@ ValidLog == ValidFacts(Facts(log))
 
 TypeOK ==
     /\ log \in Seq(AllFacts) /\ head \in Nat /\ deadRuns \subseteq Claims
-    /\ terminalHistory \subseteq Terminals(AllFacts)
+    /\ terminalHistory \in [Works -> SUBSET AllFacts]
     /\ authorizations \in Seq({Completion(a) : a \in Workers})
     /\ effects \in Seq({Completion(a) : a \in Workers})
     /\ dispatch \in [Dispatchers ->
          [phase : {"agent", "prepared", "done", "failed"},
           local : Seq(Intents), serialized : Seq(Intents), base : Nat,
-          candidate : Seq(AllFacts), retries : 0..RetryLimit]]
+          source : Seq(AllFacts), candidate : Seq(AllFacts), retries : 0..RetryLimit]]
     /\ workers \in [Workers ->
          [phase : {"waiting", "running", "ready", "prepared", "committed",
                    "authorized", "done", "stopped", "failed"},
-          finish : BOOLEAN, base : Nat, candidate : Seq(AllFacts), retries : 0..RetryLimit]]
+          finish : BOOLEAN, base : Nat, source : Seq(AllFacts),
+          candidate : Seq(AllFacts), retries : 0..RetryLimit]]
     /\ compact \in [phase : {"idle", "prepared", "done", "failed"}, base : Nat,
-                   candidate : Seq(AllFacts), retries : 0..RetryLimit]
+                   source : Seq(AllFacts), candidate : Seq(AllFacts),
+                   observedRuns : SUBSET Claims, retries : 0..RetryLimit]
     /\ recovery \in [phase : {"idle", "prepared", "done", "failed"}, base : Nat,
-                    candidate : Seq(AllFacts), retries : 0..RetryLimit]
+                    source : Seq(AllFacts), candidate : Seq(AllFacts),
+                    observedRuns : SUBSET Claims, retries : 0..RetryLimit]
 
 PreparedExtension(record) ==
     record.phase = "prepared" /\ record.base = head =>
+         /\ record.source = log
          /\ Facts(log) \subseteq Facts(record.candidate)
          /\ ValidFacts(Facts(record.candidate))
 SnapshotValidity ==
@@ -303,13 +321,34 @@ SnapshotValidity ==
     /\ \A a \in Workers : PreparedExtension(workers[a])
     /\ PreparedExtension(recovery)
     /\ (compact.phase = "prepared" /\ compact.base = head =>
-         Facts(compact.candidate) = Facts(log))
+         compact.source = log /\ Facts(compact.candidate) = Facts(log))
+CandidateDerivation ==
+    /\ \A d \in Dispatchers : dispatch[d].phase = "prepared" =>
+         dispatch[d].candidate = Apply(dispatch[d].source, dispatch[d].serialized)
+    /\ \A a \in Workers : workers[a].phase = "prepared" =>
+         workers[a].candidate = WorkerCandidate(workers[a].source, a)
+    /\ compact.phase = "prepared" =>
+         compact.candidate = Canonical(Facts(compact.source))
+    /\ recovery.phase = "prepared" =>
+         recovery.candidate = MaintenanceCandidate("recovery",
+             recovery.source, recovery.observedRuns)
 SnapshotVersions ==
     /\ \A d \in Dispatchers : dispatch[d].base <= head
     /\ \A a \in Workers : workers[a].base <= head
     /\ compact.base <= head /\ recovery.base <= head
 Serialization == \A d \in Dispatchers : dispatch[d].local = dispatch[d].serialized
-TerminalPersistence == terminalHistory \subseteq Facts(log)
+TerminalHistoryValid ==
+    \A w \in Works : terminalHistory[w] # {} =>
+         Terminal(terminalHistory[w], w)
+         /\ terminalHistory[w] = WorkFacts(terminalHistory[w], w)
+TerminalPersistence ==
+    \A w \in Works : Terminals(terminalHistory[w]) \subseteq Facts(log)
+TerminalFreeze ==
+    \A w \in Works : terminalHistory[w] # {} =>
+         WorkFacts(Facts(log), w) = terminalHistory[w]
+SingleCompletionPerWorker ==
+    \A a \in Workers : Cardinality({t \in Facts(log) :
+         t.kind = "Completion" /\ t.attempt = a}) <= 1
 SingleEffectiveClaim ==
     \A w \in Works : Cardinality({c \in Active(Facts(log), w) :
                                   c = Winner(Facts(log), w)}) <= 1
@@ -347,20 +386,14 @@ SingleEffect ==
     \A w \in Works : Cardinality({i \in 1..Len(effects) : effects[i].work = w}) <= 1
 Safety ==
     /\ TypeOK /\ ValidLog /\ SnapshotValidity /\ SnapshotVersions /\ Serialization
-    /\ TerminalPersistence /\ SingleEffectiveClaim /\ AuthorizationSoundness
+    /\ CandidateDerivation /\ TerminalHistoryValid /\ TerminalPersistence /\ TerminalFreeze
+    /\ SingleCompletionPerWorker /\ SingleEffectiveClaim /\ AuthorizationSoundness
     /\ EffectSoundness /\ WorkerOrigin /\ FinishRequired
     /\ LifecycleAccounting /\ SingleAuthorization /\ SingleEffect
 
 Bound == head <= MaxHead /\ Len(log) <= MaxLog
 
 \* Negative controls are deliberately excluded from Next.
-UnsafeReauthorize(a) ==
-    /\ workers[a].phase \in {"ready", "done", "stopped"} /\ workers[a].finish
-    /\ \E t \in Completed(Facts(log), WorkOf(Inbound(a))) : t.claim = Inbound(a)
-    /\ authorizations' = Append(authorizations, Completion(a))
-    /\ workers' = [workers EXCEPT ![a].phase = "authorized"]
-    /\ UNCHANGED <<log, head, dispatch, compact, recovery, deadRuns,
-                   terminalHistory, effects>>
 UnsafeStalePush(d) ==
     /\ dispatch[d].phase = "prepared" /\ dispatch[d].base # head
     /\ Commit(dispatch[d].candidate)
@@ -372,8 +405,6 @@ UnsafeLateClaim(c) ==
     /\ UNCHANGED <<dispatch, workers, compact, recovery, deadRuns,
                    authorizations, effects>>
 
-BrokenAuthorizationSpec ==
-    Init /\ [][Next \/ (\E a \in Workers : UnsafeReauthorize(a))]_vars
 BrokenCASSpec ==
     Init /\ [][Next \/ (\E d \in Dispatchers : UnsafeStalePush(d))]_vars
 BrokenTerminalSpec ==
@@ -384,4 +415,5 @@ THEOREM ReplayDeterminism ==
 THEOREM CompactionEquivalence ==
     \A s \in Seq(AllFacts) : Replay(s) = Replay(Canonical(Facts(s)))
 THEOREM ProtocolSafety == Spec => []Safety
+THEOREM WorkerCannotRestart == Spec => WorkerOneShot
 =============================================================================
