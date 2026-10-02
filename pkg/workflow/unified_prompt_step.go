@@ -369,7 +369,8 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 		ConditionEnvVar string `json:"condition_env,omitempty"`
 	}
 	type promptRenderConfig struct {
-		Items []promptRenderItem `json:"items"`
+		Items           []promptRenderItem `json:"items"`
+		SystemItemCount int                `json:"system_item_count"`
 	}
 
 	renderConfig := promptRenderConfig{}
@@ -415,6 +416,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	if len(builtinSections) > 0 {
 		appendContent("</system>\n", "")
 	}
+	renderConfig.SystemItemCount = len(renderConfig.Items)
 
 	userBlankRun := 0
 	for chunkIdx, chunk := range userPromptChunks {
