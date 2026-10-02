@@ -80,7 +80,7 @@ test.describe('Mobile and Responsive Layout', () => {
     await context.close();
   });
 
-  test('should have WCAG 2.5.5-compliant touch target size for mobile table cells', async ({ browser }) => {
+  test('should preserve minimum stacked-card height for mobile table cells', async ({ browser }) => {
     const context = await browser.newContext({
       javaScriptEnabled: true,
       viewport: { width: 390, height: 844 },
@@ -91,9 +91,8 @@ test.describe('Mobile and Responsive Layout', () => {
     await page.waitForLoadState('networkidle');
 
     // On mobile (<=640px), table cells are rendered as stacked cards (label above value).
-    // Each cell's rendered height must meet the WCAG 2.5.5 AAA minimum touch target of 44 px.
-    // Measure the rendered height rather than min-height: the stacked layout reaches it through
-    // its label, line height and padding, so no explicit min-height is needed.
+    // This checks the stacked-card layout height, not interactive touch-target sizing.
+    // Measure rendered height because the layout reaches 44 px through its label, line height and padding.
     const shortestCell = await page.evaluate(() => {
       const cells = Array.from(document.querySelectorAll('.sl-markdown-content table tbody td'));
       if (cells.length === 0) return 0;
