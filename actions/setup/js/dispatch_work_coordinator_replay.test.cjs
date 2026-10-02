@@ -1,12 +1,17 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { applyTransactions, compactTransactions, replayTransactions, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
+import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
 const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
 const claim = (workId, id) => ({ kind: "Claim", work: workId, claim: id, attempt: null });
 const cancelClaim = (workId, id) => ({ kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
 const complete = (workId, claimId, attempt) => ({ kind: "Completion", work: workId, claim: claimId, attempt });
 const cancelWork = id => ({ kind: "WorkCancellation", work: id, claim: null, attempt: null });
+
+function permutations(items) {
+  if (items.length < 2) return [items];
+  return items.flatMap((item, index) => permutations([...items.slice(0, index), ...items.slice(index + 1)]).map(permutation => [item, ...permutation]));
+}
 
 describe("dispatch work coordinator replay", () => {
   it("projects work and claim states from the transaction facts", () => {
@@ -19,11 +24,13 @@ describe("dispatch work coordinator replay", () => {
   });
 
   it("produces the same projection for every ordering of a valid fact set", () => {
-    const transactions = [work("w"), claim("w", "z"), claim("w", "a"), cancelClaim("w", "a")];
+    const transactions = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), work("other")];
     const expected = replayTransactions(transactions);
-    for (const permutation of [[...transactions].reverse(), [transactions[1], transactions[3], transactions[0], transactions[2]], [transactions[2], transactions[0], transactions[3], transactions[1]]]) {
+    for (const permutation of permutations(transactions)) {
       expect(replayTransactions(permutation)).toEqual(expected);
     }
+    expect(expected.winner.w).toBe("b");
+    expect(expected.work.other).toBe("available");
   });
 
   it("uses lexicographic claim identity for deterministic arbitration", () => {
@@ -39,9 +46,9 @@ describe("dispatch work coordinator replay", () => {
   });
 
   it("fixes the winner when a valid completion exists", () => {
-    const projection = replayTransactions([work("w"), claim("w", "a"), complete("w", "a", "run-1")]);
-    expect(projection.work.w).toBe("completed");
-    expect(projection.winner.w).toBe("a");
+    const transactions = [work("w"), claim("w", "a"), claim("w", "z"), complete("w", "a", "run-1")];
+    const projections = permutations(transactions).map(replayTransactions);
+    expect(projections.every(projection => projection.work.w === "completed" && projection.winner.w === "a")).toBe(true);
   });
 
   it("cancels work and all its claims", () => {
@@ -61,6 +68,7 @@ describe("dispatch work coordinator replay", () => {
     const applied = applyTransactions(compacted, [claim("w", "c")]);
     expect(applied.rejected).toEqual([]);
     expect(applied.transactions).toHaveLength(2);
+    expect(replayTransactions(applyTransactions(transactions, [claim("w", "later")]).transactions)).toEqual(replayTransactions(applyTransactions(compacted, [claim("w", "later")]).transactions));
   });
 
   it("returns immutable normalized facts instead of retaining caller-owned objects", () => {
@@ -70,6 +78,19 @@ describe("dispatch work coordinator replay", () => {
 
     expect(replayTransactions(applied.transactions).work).toEqual({ w: "available" });
     expect(Object.isFrozen(applied.transactions[0])).toBe(true);
+  });
+
+  it("parses and serializes a canonical JSONL transaction log", () => {
+    const log = serializeTransactionLog([claim("w", "c"), work("w"), claim("w", "c")]);
+    expect(log).toBe(`${JSON.stringify(claim("w", "c"))}\n${JSON.stringify(work("w"))}\n`);
+    expect(parseTransactionLog(log)).toEqual([claim("w", "c"), work("w")]);
+    expect(parseTransactionLog("")).toEqual([]);
+  });
+
+  it("rejects malformed JSONL records and blank lines", () => {
+    expect(() => parseTransactionLog("{")).toThrow("malformed JSON");
+    expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n\n`)).toThrow("blank lines");
+    expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify(claim("missing", "c"))}\n`)).toThrow("missing work");
   });
 
   it("rejects malformed transaction shapes and identifiers", () => {

@@ -324,9 +324,57 @@ function compactTransactions(transactions) {
   return replayTransactions(transactions).transactions;
 }
 
+/**
+ * @param {string} contents
+ * @returns {DispatchWorkTransaction[]}
+ */
+function parseTransactionLog(contents) {
+  if (typeof contents !== "string") {
+    throw new TypeError("transaction log must be a string");
+  }
+  if (contents === "") {
+    return [];
+  }
+
+  const lines = contents.split("\n");
+  if (lines[lines.length - 1] === "") {
+    lines.pop();
+  }
+  const transactions = lines.map((line, index) => {
+    if (!line.trim()) {
+      throw new TypeError(`invalid transaction log line ${index + 1}: blank lines are not allowed`);
+    }
+    let transaction;
+    try {
+      transaction = JSON.parse(line);
+    } catch (error) {
+      throw new TypeError(`invalid transaction log line ${index + 1}: malformed JSON`);
+    }
+    try {
+      validateTransaction(transaction);
+    } catch (error) {
+      throw new TypeError(`invalid transaction log line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return copyTransaction(transaction);
+  });
+  replayTransactions(transactions);
+  return transactions;
+}
+
+/**
+ * @param {DispatchWorkTransaction[]} transactions
+ * @returns {string}
+ */
+function serializeTransactionLog(transactions) {
+  const compacted = compactTransactions(transactions);
+  return compacted.length ? `${compacted.map(transaction => JSON.stringify(transaction)).join("\n")}\n` : "";
+}
+
 module.exports = {
   applyTransactions,
   compactTransactions,
+  parseTransactionLog,
   replayTransactions,
+  serializeTransactionLog,
   validateTransaction,
 };
