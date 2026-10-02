@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-06-15",
-    "workflow_name": "Repository Quality Improvement Agent",
-    "workflow_file": "repository-quality-improver",
-    "total_aic_analyzed": 609.10326,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 350
-  },
-  {
     "date": "2026-06-16",
     "workflow_name": "Package Specification Librarian",
     "workflow_file": "spec-librarian",
@@ -287,5 +277,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 60
+  },
+  {
+    "date": "2026-10-02",
+    "workflow_name": "Impeccable Skills Reviewer",
+    "workflow_file": "impeccable-skills-reviewer",
+    "total_aic_analyzed": 72.55,
+    "runs_audited": 3,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
   }
 ]
