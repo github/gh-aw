@@ -167,17 +167,17 @@ func TestValidateSafeOutputsMax(t *testing.T) {
 
 // TestValidateSafeOutputsMaxFieldCoverage verifies that validateSafeOutputsMax detects
 // invalid max values for every field listed in safeOutputFieldMapping (except
-// DispatchRepository, which has a different map-of-tools structure and is validated
-// separately). This acts as a regression guard to ensure that when a new safe output
+// DispatchRepository, which has a different map-of-tools structure, and
+// DispatchClaimFinish, an implicit control message with no configurable max). This acts as
+// a regression guard to ensure that when a new safe output
 // type is added to safeOutputFieldMapping the developer also adds a direct-access
 // check to validateSafeOutputsMax.
 func TestValidateSafeOutputsMaxFieldCoverage(t *testing.T) {
 	invalidMax := strPtr("0") // 0 is always an invalid max value
 
 	for fieldName, toolName := range safeOutputFieldMapping {
-		if fieldName == "DispatchRepository" {
-			// DispatchRepository uses a map-of-tools structure and is validated
-			// separately at the end of validateSafeOutputsMax.
+		if fieldName == "DispatchRepository" || fieldName == "DispatchClaimFinish" {
+			// These special safe outputs do not expose a per-type BaseSafeOutputConfig max.
 			continue
 		}
 
