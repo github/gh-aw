@@ -17,7 +17,7 @@ sandbox:
     id: awf
     runtime: cloud-hypervisor
 tools:
-  dispatch-work-coordinator: true
+  work-queue: true
 safe-outputs:
   steps:
     - name: Verify coordinator finish intent artifact

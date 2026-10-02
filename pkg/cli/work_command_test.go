@@ -23,6 +23,9 @@ func (f workAPIRoundTripper) RoundTrip(request *http.Request) (*http.Response, e
 }
 
 func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
+	if name := NewWorkCommand().Name(); name != "work-queue" {
+		t.Fatalf("unexpected command name: %s", name)
+	}
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("GH_HOST", "github.com")
 	t.Setenv("GH_TOKEN", "test-token")
@@ -100,7 +103,7 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 		command.SetErr(&output)
 		command.SetArgs(append([]string{"--repo", remote, "--json"}, args...))
 		if err := command.Execute(); err != nil {
-			t.Fatalf("work %v: %v (%s)", args, err, output.String())
+			t.Fatalf("work-queue %v: %v (%s)", args, err, output.String())
 		}
 		var result map[string]any
 		if err := json.Unmarshal(output.Bytes(), &result); err != nil {

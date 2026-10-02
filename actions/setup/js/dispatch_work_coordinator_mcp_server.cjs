@@ -112,7 +112,7 @@ function createDispatchCoordinatorFinishTool(options = {}) {
 function startDispatchCoordinatorServer(options = {}) {
   const snapshot = loadDispatchCoordinatorSnapshot(options.snapshotPath);
   console.error(`[dispatch-work-coordinator] Loaded queue snapshot with ${snapshot.projection.transactions.length} transactions; worker ${snapshot.worker ? "assigned" : "absent"}`);
-  const server = createServer({ name: "dispatch-work-coordinator", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
+  const server = createServer({ name: "work-queue", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
   registerTool(server, createDispatchCoordinatorStateTool(snapshot));
   registerTool(server, createDispatchCoordinatorFinishTool(options));
   start(server);

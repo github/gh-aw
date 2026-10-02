@@ -3024,7 +3024,7 @@ describe("safe_outputs_handlers", () => {
       }
     });
 
-    it("should write entry when explicit item_number bypasses context check in non-issue/PR event", () => {
+    it("should reject explicit item_number when triggering context cannot be resolved", () => {
       const savedContext = global.context;
       global.context = { ...global.context, eventName: "push", payload: {} };
       try {
@@ -3032,10 +3032,11 @@ describe("safe_outputs_handlers", () => {
           body: "A real comment body that is substantive enough",
           item_number: 42,
         });
-        expect(result.isError).toBeUndefined();
+        expect(result.isError).toBe(true);
         const responseData = JSON.parse(result.content[0].text);
-        expect(responseData.result).toBe("success");
-        expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "add_comment", item_number: 42 }));
+        expect(responseData.result).toBe("error");
+        expect(responseData.error).toContain('safe-outputs.add-comment.target to "*"');
+        expect(mockAppendSafeOutput).not.toHaveBeenCalled();
       } finally {
         global.context = savedContext;
       }

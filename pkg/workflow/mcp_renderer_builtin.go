@@ -16,7 +16,7 @@ const dispatchCoordinatorMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/dis
 // the finish-intent directory writable; the server has no Git client or credentials.
 func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
-	serverName := "dispatch-work-coordinator"
+	serverName := "work-queue"
 	mounts := []string{constants.DefaultGhAwMount, constants.DispatchCoordinatorSnapshotMount, constants.DispatchCoordinatorFinishIntentMount}
 
 	if r.options.Format == "toml" {

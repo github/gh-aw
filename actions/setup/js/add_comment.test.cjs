@@ -443,40 +443,35 @@ describe("add_comment", () => {
       expect(collaboratorLookups).toEqual([expect.objectContaining({ owner: "target-org", repo: "target-repo" })]);
     });
 
-    it("should return skipped (not failed) when target is 'triggering' but running in schedule context", async () => {
+    it.each([
+      ["schedule", { target: "triggering" }],
+      ["repository_dispatch", {}],
+      ["workflow_dispatch", {}],
+    ])("should fail when triggering target has no issue/PR context in %s", async (eventName, config) => {
       const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
 
-      let infoCalls = [];
-      let warningCalls = [];
-      mockCore.info = msg => {
-        infoCalls.push(msg);
-      };
+      const warningCalls = [];
       mockCore.warning = msg => {
         warningCalls.push(msg);
       };
 
-      // Simulate a schedule run — no issue or PR in context
-      mockContext.eventName = "schedule";
+      mockContext.eventName = eventName;
       mockContext.payload = {};
 
-      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main(${JSON.stringify(config)}); })()`);
 
       const message = {
         type: "add_comment",
-        body: "Status comment from scheduled run",
+        body: "Status comment",
       };
 
       const result = await handler(message, {});
 
-      // Should be skipped, not failed — schedule runs have no triggering issue/PR
       expect(result.success).toBe(false);
-      expect(result.skipped).toBe(true);
-      expect(result.error).toContain("triggering");
-
-      // Should use core.info, not core.warning, since this is an expected non-failure skip
-      const skipInfo = infoCalls.find(msg => msg.includes("triggering"));
-      expect(skipInfo).toBeTruthy();
-      expect(warningCalls.filter(msg => msg.includes("triggering")).length).toBe(0);
+      expect(result.skipped).not.toBe(true);
+      expect(result.error).toContain('target "triggering"');
+      expect(result.error).toContain('target to "*"');
+      expect(warningCalls).toContain(result.error);
     });
 
     it("should reply inline to triggering PR review comment when item_number is not provided", async () => {

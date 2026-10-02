@@ -673,26 +673,9 @@ async function main(config = {}) {
         });
 
         if (!targetResult.success) {
-          if (targetResult.shouldFail) {
-            const hasExplicitWildcardTargetField = WILDCARD_TARGET_FIELDS.some(field => message[field] != null);
-            const missingWildcardTarget = commentTarget === "*" && !hasExplicitWildcardTargetField;
-            if (missingWildcardTarget) {
-              core.info(targetResult.error);
-              return {
-                success: false,
-                skipped: true,
-                reasonCode: "NO_CONTEXT",
-                reason: "No target context available",
-                error: targetResult.error,
-              };
-            }
-            core.warning(targetResult.error);
-            return {
-              success: false,
-              error: targetResult.error,
-            };
-          } else {
-            // No triggering context (e.g. schedule run) — silently skip rather than fail
+          const hasExplicitWildcardTargetField = WILDCARD_TARGET_FIELDS.some(field => message[field] != null);
+          const missingWildcardTarget = commentTarget === "*" && !hasExplicitWildcardTargetField;
+          if (missingWildcardTarget) {
             core.info(targetResult.error);
             return {
               success: false,
@@ -702,6 +685,11 @@ async function main(config = {}) {
               error: targetResult.error,
             };
           }
+          const error = targetResult.shouldFail
+            ? targetResult.error
+            : 'Cannot resolve add_comment target "triggering" without an issue, pull request, or discussion context; set safe-outputs.add-comment.target to "*" and provide an item_number';
+          core.warning(error);
+          return { success: false, error };
         }
 
         itemNumber = targetResult.number;
