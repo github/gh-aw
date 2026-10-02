@@ -18,6 +18,7 @@ fi
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${TLC_RESULTS_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/dispatch-work-traces.XXXXXX")}"
 mkdir -p "$RESULTS_DIR"
+RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 
 "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
     -workers 1 -seed 1 -fp 0 -simulate "file=$RESULTS_DIR/simulation,num=$TRACE_COUNT" \

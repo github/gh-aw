@@ -396,8 +396,9 @@ NoCompetingClaims ==
     \A w \in Works : Cardinality({c \in Claims : Claim(c) \in Facts(log)
                                                /\ WorkOf(c) = w}) < 2
 NoRecoveredOrphan ==
-    ~(recovery.phase = "done" /\ \E c \in deadRuns :
-          ClaimCancellation(c) \in Facts(log))
+    ~(recovery.phase = "done" /\ \E c \in recovery.observedRuns :
+          ClaimCancellation(c) \in Facts(recovery.candidate) \ Facts(recovery.source)
+          /\ ClaimCancellation(c) \in Facts(log))
 NoExternalEffect == effects = <<>>
 
 Bound == head <= MaxHead /\ Len(log) <= MaxLog
