@@ -202,6 +202,7 @@ class DispatchWorkCoordinator {
       const work = projection.works.find(item => item.work_id === workId);
       if (!work) throw new TypeError("Unknown Work item");
       if (TERMINAL_STATES.has(work.state)) throw new TypeError("Work is terminal and cannot be claimed");
+      if (work.state !== "available") throw new TypeError("Work is already claimed and cannot be claimed again");
       return [...transactions, assignment];
     });
     const work = snapshot.projection.works.find(item => item.work_id === workId);

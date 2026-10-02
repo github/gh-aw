@@ -8,8 +8,18 @@ const { createDispatchWorkCoordinatorGitHubClient } = require("./dispatch_work_c
 async function runDispatchWorkCoordinatorActivation(env = process.env) {
   const [owner, repo] = (env.GITHUB_REPOSITORY || "").split("/");
   const workflowRef = env.GITHUB_WORKFLOW_REF || "";
-  if (!owner || !repo || !env.GITHUB_RUN_ID || !workflowRef || !env.GITHUB_OUTPUT) {
+  const schemaJSON = env.GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA;
+  if (!owner || !repo || !env.GITHUB_RUN_ID || !workflowRef || !env.GITHUB_OUTPUT || typeof schemaJSON !== "string" || Buffer.byteLength(schemaJSON, "utf8") > 16 * 1024) {
     throw new TypeError("Dispatch Work Coordinator activation configuration is incomplete");
+  }
+  let workSchema;
+  try {
+    workSchema = JSON.parse(schemaJSON);
+  } catch (error) {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid", { cause: error });
+  }
+  if (!workSchema || typeof workSchema !== "object" || Array.isArray(workSchema) || workSchema.type !== "object") {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid");
   }
   const coordinator = new DispatchWorkCoordinator({
     githubClient: createDispatchWorkCoordinatorGitHubClient(env.GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN, env.GITHUB_API_URL),
@@ -18,6 +28,7 @@ async function runDispatchWorkCoordinatorActivation(env = process.env) {
     identity: workflowRef.split("@", 1)[0],
     runId: env.GITHUB_RUN_ID,
     workflowId: workflowRef,
+    workSchema,
   });
   const assignment = await coordinator.claimNext();
   const trustedAssignment = assignment?.assigned ? { work_id: assignment.work_id, claim_id: assignment.claim_id, work: assignment.work } : null;

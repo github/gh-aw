@@ -44,6 +44,7 @@ describe("Safe Output Handler Manager", () => {
     // Clean up environment variables
     delete process.env.GH_AW_AGENT_OUTPUT;
     delete process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG;
+    delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
     delete process.env.GH_AW_TRACKER_LABEL;
     delete process.env.GH_AW_SAFE_OUTPUT_JOBS;
     delete process.env.GH_AW_SAFE_OUTPUT_SCRIPTS;
@@ -75,6 +76,20 @@ describe("Safe Output Handler Manager", () => {
     });
 
     describe("main failure diagnostics artifact", () => {
+      it("skips coordinator reconciliation mutations in staged mode", async () => {
+        process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+        process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({ dispatch_claim_finish: {} });
+        const outputFile = "/tmp/gh-aw/staged-coordinator-agent-output.json";
+        fs.mkdirSync("/tmp/gh-aw", { recursive: true });
+        fs.writeFileSync(outputFile, JSON.stringify({ items: [{ type: "dispatch_claim_finish" }] }));
+        process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+        await main();
+
+        expect(global.core.setFailed).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith("Staged mode is active; Dispatch Work Coordinator persistence is skipped.");
+      });
+
       it("writes safe-output-errors.json when message processing has fatal failures", async () => {
         process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = "{}";
         process.env.GH_AW_SAFE_OUTPUT_SCRIPTS = JSON.stringify({ custom_fail: "custom_fail_handler.cjs" });

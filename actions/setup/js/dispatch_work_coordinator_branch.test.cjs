@@ -186,6 +186,20 @@ test("claim and claim_next persist trusted provenance and expose the replay resu
   assert.equal(claimRecord.workflow_id, "octo/repo/.github/workflows/dispatch.yml@refs/heads/main");
 });
 
+test("claim cannot displace an active Claim but can reclaim Work after cancellation", async () => {
+  const client = mockGitHub();
+  const instance = coordinator(client);
+  const work = await instance.submit({ title: "Stable claim" });
+  const first = await instance.claim(work.work_id);
+
+  await assert.rejects(instance.claim(work.work_id), /already claimed/);
+  assert.equal((await client.getTransactions(instance.branchName)).filter(tx => tx.type === "Claim").length, 1);
+
+  await instance.cancelClaim(first.claim_id);
+  const replacement = await instance.claim(work.work_id);
+  assert.equal(replacement.claim_state, "effective");
+});
+
 test("work cancellation is idempotent and rejects completed work", async () => {
   const client = mockGitHub();
   const instance = coordinator(client);

@@ -1738,13 +1738,15 @@ async function main() {
     const fileBackedCommentMemoryMessages = buildCommentMemoryMessagesFromFiles(agentOutputItems, config);
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
     let dispatchReconciliation = {};
-    if (config.dispatch_claim_finish) {
+    if (config.dispatch_claim_finish && !isStaged) {
       dispatchReconciliation = await reconcileDispatchWorkCoordinator({ messages: allMessages });
       if (dispatchReconciliation.forceStaged) {
         process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
         isStaged = true;
         core.warning(`Dispatch Work Coordinator limited this run to staged safe outputs: ${dispatchReconciliation.reason}`);
       }
+    } else if (config.dispatch_claim_finish) {
+      core.info("Staged mode is active; Dispatch Work Coordinator persistence is skipped.");
     }
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");

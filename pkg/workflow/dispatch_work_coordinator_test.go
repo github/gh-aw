@@ -101,3 +101,9 @@ func TestDispatchWorkCoordinatorEnvironmentDoesNotRequireRepoMemory(t *testing.T
 	}, nil, nil, nil, "")
 	assert.Contains(t, rendered.String(), `GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: "{\"type\":\"object\"}"`)
 }
+
+func TestDispatchWorkCoordinatorActivationPassesWorkSchema(t *testing.T) {
+	schema := `{"type":"object","required":["title"]}`
+	step := buildDispatchWorkCoordinatorActivationStep(schema)
+	assert.Contains(t, step, `GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: '{"type":"object","required":["title"]}'`)
+}

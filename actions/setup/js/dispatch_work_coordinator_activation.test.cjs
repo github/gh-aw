@@ -12,6 +12,7 @@ describe("Dispatch Work Coordinator activation", () => {
       GITHUB_RUN_ID: "123",
       GITHUB_OUTPUT: output,
       GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN: "test-token",
+      GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: JSON.stringify({ type: "object" }),
     };
     const originalClient = global.fetch;
     global.fetch = vi.fn(async () => ({ ok: false, status: 404 }));
