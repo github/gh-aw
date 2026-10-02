@@ -1132,6 +1132,15 @@ describe("awf_reflect.cjs", () => {
       expect(result.providers[0].wireApi).toBe("completions");
     });
 
+    it.each(["Responses", " responses "])("normalizes explicit wire API overrides (%s)", wireApi => {
+      const result = resolveMultiProviderFromReflect({
+        model: "gpt-6-luna",
+        wireApi,
+        reflectData: { endpoints: [{ provider: "copilot", port: 10002, configured: true, models: ["gpt-6-luna"] }] },
+      });
+      expect(result.providers[0].wireApi).toBe("responses");
+    });
+
     it("applies the wire API override to the fallback primary model", () => {
       const result = resolveMultiProviderFromReflect({
         model: "nonexistent-model",

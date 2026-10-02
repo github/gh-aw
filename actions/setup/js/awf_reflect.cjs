@@ -1033,7 +1033,9 @@ function resolveMultiProviderFromReflect(options) {
 
   const primaryProviderName = models.find(m => m.id === primaryModel)?.provider;
   const primaryProvider = providers.find(p => p.name === primaryProviderName);
-  const wireApi = options?.wireApi;
+  const wireApi = String(options?.wireApi || "")
+    .toLowerCase()
+    .trim();
   if (primaryProvider && primaryProvider.type !== "anthropic" && (wireApi === "responses" || wireApi === "completions")) {
     primaryProvider.wireApi = wireApi;
     logger(`sdk-mode(multi): primary provider="${primaryProvider.name}" wireApi="${wireApi}" selected from configured wire API`);
