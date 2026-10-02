@@ -19,7 +19,7 @@ var prLog = logger.New("workflow:pr")
 // checkout_pr_branch.cjs fetches refs/pull/<n>/head (the untrusted PR head),
 // which replaces any safe base-SHA checkout and is inaccessible for fork PRs.
 func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
-	if data.CheckoutDisabled || data.IsPullRequestTarget {
+	if data.CheckoutDisabled || data.IsPullRequestTarget || isPRCheckoutDisabled(data) {
 		return false
 	}
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
@@ -28,7 +28,10 @@ func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
 	// checkout_pr_branch and the subsequent base-folder restore operate on the
 	// workspace root, so neither may run when it belongs to another repository.
 	for _, checkout := range data.CheckoutConfigs {
-		if checkout == nil || (path.Clean(strings.ReplaceAll(checkout.Path, "\\", "/")) != "." && !strings.Contains(checkout.Path, "${{")) {
+		if checkout == nil {
+			continue
+		}
+		if path.Clean(strings.ReplaceAll(checkout.Path, "\\", "/")) != "." && !strings.Contains(checkout.Path, "${{") {
 			continue
 		}
 		repository := strings.TrimSpace(checkout.Repository)
@@ -41,6 +44,18 @@ func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
 	}
 	permParser := NewPermissionsParser(data.Permissions)
 	return permParser.HasContentsReadAccess()
+}
+
+func isPRCheckoutDisabled(data *WorkflowData) bool {
+	if data == nil {
+		return false
+	}
+	for _, checkout := range data.CheckoutConfigs {
+		if checkout != nil && checkout.PullRequest != nil && !*checkout.PullRequest {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveAgentManifestPaths(registry *EngineRegistry, data *WorkflowData) (folders, files []string) {

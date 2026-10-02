@@ -108,6 +108,18 @@ func TestShouldGeneratePRCheckoutStep_CheckoutDisabled(t *testing.T) {
 	})
 }
 
+func TestShouldGeneratePRCheckoutStep_PullRequestDisabled(t *testing.T) {
+	disabled := false
+	data := &WorkflowData{
+		Permissions: "contents: read",
+		CheckoutConfigs: []*CheckoutConfig{
+			{PullRequest: &disabled},
+		},
+	}
+
+	assert.False(t, ShouldGeneratePRCheckoutStep(data))
+}
+
 func TestShouldGeneratePRCheckoutStep_MultiCheckout(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -243,6 +255,37 @@ Test workflow.
 	}
 	assert.NotContains(t, string(lock), "- name: Checkout PR branch")
 	assert.NotContains(t, string(lock), "- name: Restore agent config folders from base branch")
+}
+
+func TestPRCheckoutRestoreCanBeDisabled(t *testing.T) {
+	dir := t.TempDir()
+	source := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+checkout:
+  pull-request: false
+strict: false
+---
+Test workflow.
+`
+	path := filepath.Join(dir, "test.md")
+	if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "test.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(lock)
+	assert.Contains(t, rendered, "uses: actions/checkout@")
+	assert.NotContains(t, rendered, "- name: Checkout PR branch")
+	assert.NotContains(t, rendered, "- name: Save agent config folders for base branch restoration")
+	assert.NotContains(t, rendered, "- name: Restore agent config folders from base branch")
 }
 
 func TestResolveAgentManifestPaths(t *testing.T) {
