@@ -10,6 +10,41 @@ import (
 
 var mcpRendererBuiltinLog = logger.New("workflow:mcp_renderer_builtin")
 
+const dispatchCoordinatorMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs"
+
+// RenderDispatchCoordinatorMCP mounts only the activation snapshot; the server
+// has no Git client or repository credentials.
+func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Builder, workflowData *WorkflowData) {
+	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
+	serverName := "dispatch-work-coordinator"
+	mounts := []string{constants.DefaultGhAwMount, constants.DispatchCoordinatorSnapshotMount}
+
+	if r.options.Format == "toml" {
+		yaml.WriteString("          \n")
+		yaml.WriteString("          [mcp_servers." + serverName + "]\n")
+		yaml.WriteString("          container = \"" + image + "\"\n")
+		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
+		yaml.WriteString("          entrypoint = \"node\"\n")
+		yaml.WriteString("          entrypointArgs = [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+		return
+	}
+
+	yaml.WriteString("              \"" + serverName + "\": {\n")
+	if r.options.IncludeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+		yaml.WriteString("                \"tools\": [\"dispatch_work_coordinator_read\"],\n")
+	}
+	yaml.WriteString("                \"container\": \"" + image + "\",\n")
+	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
+	yaml.WriteString("                \"entrypoint\": \"node\",\n")
+	yaml.WriteString("                \"entrypointArgs\": [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+	if r.options.IsLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}
+
 // RenderSafeOutputsMCP generates the Safe Outputs MCP server configuration
 func (r *MCPConfigRendererUnified) RenderSafeOutputsMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	mcpRendererLog.Printf("Rendering Safe Outputs MCP: format=%s", r.options.Format)

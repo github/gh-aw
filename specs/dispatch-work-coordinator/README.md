@@ -19,7 +19,7 @@ The model fixes arbitration and makes the worker lifecycle, publication guards, 
 |---|---|
 | Arbitration | The least stable, uncancelled Claim identity wins on nonterminal Work. A persisted Completion fixes the winner; WorkCancellation removes authority. |
 | Terminal Work | Reject new state-changing transactions for completed/cancelled Work. Identical physical records may be duplicated without changing the fact set. |
-| Dispatcher | Append each intent to both local and serialized logs. Rebase/revalidate the batch in `safe_outputs`; never push from the agent job. Pending competing Claims may become durable on nonterminal Work. |
+| Dispatcher | The activation job reads the coordinator branch and packages its log and branch version into the activation artifact. The coordinator MCP server reads only that immutable snapshot and never accesses Git; the view may be stale while the agent runs. Mutations are revalidated and published only by trusted `safe_outputs`; pending competing Claims may become durable on nonterminal Work. |
 | Worker | Each worker has one immutable inbound Claim and one pass through safe-output processing; it records at most one distinct Completion. Finalize carries no authority parameters. |
 | Authorization | The winning worker verifies its newly committed Completion before outputs. Finished, stopped, and failed workers cannot restart or receive authorization again. |
 | Compaction | Canonicalize order and remove identical duplicate records only. Preserve the entire fact set, including cancelled/superseded Claim history. More aggressive compaction needs a separate proof. |
@@ -32,9 +32,9 @@ These are protocol refinements, not claims that an implementation already enforc
 
 `log` is the only authoritative durable state. `head` abstracts an opaque, non-reused Git branch version. Branch creation is a version-checked write against the initial absent-branch token. All successful mutations change that version; no force-push or reuse of an old version is permitted.
 
-`dispatch[d].local` and `.serialized` are append-only session logs. MCP reads evaluate current remote facts plus pending intents. Every writer records both the source log and its branch version; `CandidateDerivation` verifies that the candidate was generated from that source, not a different cached projection.
+The activation artifact is an immutable snapshot of the coordinator log and branch version read during activation. The MCP server mounts that snapshot read-only and derives its query results with shared replay; it has no Git client or repository credentials. The snapshot is only an early view and can be stale by the time the agent asks a question or submits work. Any future local pending-intent view remains non-authoritative. Every trusted writer records both the source log and its branch version; `CandidateDerivation` verifies that the candidate was generated from that latest source, not from the activation snapshot.
 
-Workers progress through admission, execution, finalize/no-finalize, preparation, push, verification, and effects. Admission is not retained authority: `WorkerCandidate` checks current ownership again. A stale candidate must be regenerated. Missing finalize cancels an effective Claim without permitting outputs; losing attempts stop without effects.
+Workers progress through activation snapshot capture/admission, execution, finalize/no-finalize, preparation, push, verification, and effects. Admission reads the immutable activation snapshot and is not retained authority: `WorkerCandidate` checks current ownership against the latest log again. A stale candidate must be regenerated. Missing finalize cancels an effective Claim without permitting outputs; losing attempts stop without effects.
 
 Each worker's inbound Claim is fixed by `Inbound`. `SingleCompletionPerWorker` bounds its distinct Completion facts, and `WorkerOneShot` makes finished, stopped, and failed phases absorbing. The former reauthorization example added an impossible restart transition; it was not a reachable protocol failure and has been removed.
 
@@ -45,6 +45,8 @@ Compaction and recovery have independent prepared snapshots and bounded retries.
 `Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. Implementations must report rejected intents; the abstraction does not prescribe silently treating errors as success.
 
 ## Required protections
+
+**Activation snapshot:** the activation job reads the coordinator branch before uploading the activation artifact. The coordinator MCP process receives only a read-only mount of the packed snapshot; it does not receive a Git client or repository token. Snapshot queries are informative, not authority, and may be stale.
 
 **Publication:** publish only if the branch still matches the version originally read. Otherwise fetch the latest log, replay it, and regenerate the proposed changes.
 
@@ -59,7 +61,7 @@ All dispatcher, worker, recovery, and compaction pushes use `Publish`. It requir
 | Predicate | Guarantee |
 |---|---|
 | `TypeOK`, `ValidLog` | Valid identities/references; at most one terminal transaction per Work; Completion belongs to the trusted inbound Claim and the selected claimant. |
-| `SnapshotValidity`, `SnapshotVersions`, `CandidateDerivation` | A matching-version snapshot contains the current source log and an exactly regenerated candidate; no snapshot is based on a future version. |
+| `SnapshotValidity`, `SnapshotVersions`, `ActivationSnapshotValidity`, `CandidateDerivation` | A matching writer snapshot contains the current source log and an exactly regenerated candidate; activation admission reflects its immutable artifact snapshot; no snapshot is based on a future version. |
 | `Serialization` | Every locally proposed dispatcher transaction is serialized identically for safe-output processing. |
 | `TerminalPersistence` | Previously committed Completion/WorkCancellation facts remain durable. |
 | `TerminalHistoryValid`, `TerminalFreeze` | All facts for a terminal Work item are frozen; neither late Claims nor other new transactions can change the decision. |
@@ -97,7 +99,7 @@ Duplicate records preserve the fact set. Induction over the serialized batch giv
 
 The empty log, empty histories, zero HEAD/bases, and initial phases satisfy `Safety`.
 
-Preparing or retrying a dispatcher/worker/recovery candidate applies the accepted-extension lemma to the current log. Preparing a compaction uses the canonicalization lemma. Both the source log and its version are captured, and `CandidateDerivation` records their exact relationship to the regenerated candidate. Recovery also captures the observed terminated runs.
+The activation artifact contains the then-current branch version and full replayable transaction log. The finite model abstracts this to the version and admission result for the worker's inbound Claim. `Activate` derives admission from the captured log and stores the snapshot version only for admitted workers; no later action changes that field. Consequently `ActivationSnapshotValidity` and the bound on activation snapshot versions are inductive, while later execution can observe a stale version. Worker preparation derives its candidate from the latest log, never the artifact. Preparing or retrying a dispatcher/worker/recovery candidate applies the accepted-extension lemma to the current log. Preparing a compaction uses the canonicalization lemma. Both the source log and its version are captured, and `CandidateDerivation` records their exact relationship to the regenerated candidate. Recovery also captures the observed terminated runs.
 
 A local/read/lifecycle step does not change remote facts or HEAD. A successful write either leaves the log unchanged or increases HEAD. Existing snapshot versions cannot equal the new HEAD because `SnapshotVersions` bounds them by the old HEAD. Their matching-source implications become false. Newly prepared snapshots again satisfy those implications. Therefore snapshot validity is inductive.
 
@@ -123,7 +125,7 @@ Only `ExternalEffect` extends effect history. It requires `authorized`, then mov
 
 ### Remaining actions
 
-Agent staging changes only equal local/serialized logs. Admission and agent execution do not grant authorization. Retry exhaustion changes phase to `failed` without writing or emitting effects. Run termination can stop a worker but neither invents nor removes a terminal fact or authorization. Maintenance uses the same guarded write lemmas. Every action in `Next`, and stuttering, therefore preserves the strengthened `Safety` predicate.
+Agent staging changes only equal local/serialized logs. Activation snapshot capture and admission do not grant authorization; execution-time worker preparation rechecks current Git facts. Retry exhaustion changes phase to `failed` without writing or emitting effects. Run termination can stop a worker but neither invents nor removes a terminal fact or authorization. Maintenance uses the same guarded write lemmas. Every action in `Next`, and stuttering, therefore preserves the strengthened `Safety` predicate.
 
 By induction on execution length, `Spec => []Safety` follows under the modeled assumptions. This is a reviewable proof argument, not a TLAPS proof certificate.
 
@@ -150,12 +152,12 @@ The runner checks both positive configurations and the one-shot worker property 
 | `BrokenCAS.cfg` | Bypass the branch-version check and overwrite with a stale snapshot; `TerminalPersistence` fails. |
 | `BrokenTerminal.cfg` | Bypass terminal protection and append a competing Claim after Completion; `TerminalFreeze` fails. |
 
-Verification on 2026-10-02 completed both positive searches, checking `Safety` and `WorkerOneShot`: 3,626,825 distinct states at graph depth 33 for concurrency, and 218,926 distinct states at depth 23 for recovery. The two remaining negative controls produced the expected violations at depths 7 and 10. These results replace the earlier model's counts.
+The earlier model revision completed both positive searches on 2026-10-02, checking `Safety` and `WorkerOneShot`: 3,626,825 distinct states at graph depth 33 for concurrency, and 218,926 distinct states at depth 23 for recovery. The two remaining negative controls produced the expected violations at depths 7 and 10. These counts predate the activation snapshot fields and do not constitute exhaustive verification of the current revision; rerun `check.sh` to verify the current model.
 
 `Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
 
 ## Limits
 
-Safety does not imply eventual dispatch, successful external effects, or eventual orphan recovery. Those require fairness, available workflows, and successful retries. A crash after Completion but before outputs can leave completed Work with no output; recovering that gap requires an additional idempotent effect-delivery protocol.
+Safety does not imply eventual dispatch, successful external effects, or eventual orphan recovery. Those require fairness, available workflows, and successful retries. A crash after Completion but before outputs can leave completed Work with no output; recovering that gap requires an additional idempotent effect-delivery protocol. The activation artifact is a snapshot, not a live subscription; reads can be stale and are never used as final authority.
 
 The model does not prove GitHub authentication, `aw_context` provenance validation, payload canonicalization, parser behavior, transport errors, or the implementation's refinement of these abstract actions. These remain implementation obligations. It does not make arbitrary external API batches atomic or exactly-once.
