@@ -116,6 +116,34 @@ func TestGenerateUnifiedPromptCreationStep_TreatsUserContentAsData(t *testing.T)
 	}
 }
 
+func TestGenerateUnifiedPromptCreationStep_SplitsSystemAndUserItems(t *testing.T) {
+	compiler := &Compiler{}
+	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+	var output strings.Builder
+	compiler.generateUnifiedPromptCreationStep(&output, []PromptSection{{Content: "System instructions"}}, []string{"User instructions"}, nil, data)
+
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+output.String()), &workflow))
+	var config struct {
+		Items []struct {
+			ContentEnv string `json:"content_env"`
+		} `json:"items"`
+		SystemItemCount int `json:"system_item_count"`
+	}
+	env := workflow.Jobs["test"].Steps[0].Env
+	require.NoError(t, json.Unmarshal([]byte(env["GH_AW_PROMPT_CONFIG"]), &config))
+	require.Len(t, config.Items, 4)
+	assert.Equal(t, 3, config.SystemItemCount)
+	assert.Equal(t, "<system>\nSystem instructions\n</system>\n", env[config.Items[0].ContentEnv]+env[config.Items[1].ContentEnv]+env[config.Items[2].ContentEnv])
+	assert.Equal(t, "User instructions\n", env[config.Items[3].ContentEnv])
+}
+
 // TestGenerateUnifiedPromptCreationStep_OrderingBuiltinFirst tests that built-in prompts
 // are prepended (written first) before user prompt content
 func TestGenerateUnifiedPromptCreationStep_OrderingBuiltinFirst(t *testing.T) {
