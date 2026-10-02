@@ -14,6 +14,8 @@ The [dispatch coordinator ledger](64955-git-backed-dispatch-work-coordination.md
 
 Every ledger message has an integer version. Define declarative codemods for successive protocol versions and keep their files in the gh-aw repository under `actions/setup/js/`. On load, apply the codemods in version order to older messages, then compact and validate the resulting ledger before writing it back through the coordinator's version-checked publication path. Reject unknown versions or messages that cannot be upgraded or validated; do not publish a partial upgrade.
 
+The original unversioned messages (and explicit version 0 messages) upgrade to version 1, which retains the existing transaction fields and adds `version: 1`. New intents use version 1. Reading the Git-backed log publishes a canonical upgraded log using the same fast-forward-only, retrying path as other coordinator writes; immutable activation snapshots are produced from that upgraded read.
+
 ### Alternatives Considered
 
 #### Imperative migrations
@@ -38,4 +40,4 @@ Rewriting every ledger immediately would require coordinated deployment and risk
 
 #### Neutral
 
-- This extends the coordinator's replay and version-checked publication commitments; it does not implement runtime migration.
+- This extends the coordinator's replay and version-checked publication commitments without changing the authority model.

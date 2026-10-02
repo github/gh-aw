@@ -47,9 +47,9 @@ describe("write dispatch coordinator activation snapshot", () => {
 
   it("admits only a trusted inbound assignment that is the current effective claim", () => {
     const transactions = [
-      { kind: "Work", work: "w", claim: null, attempt: null },
-      { kind: "Claim", work: "w", claim: "claim-b", attempt: null },
-      { kind: "Claim", work: "w", claim: "claim-a", attempt: null },
+      { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
+      { version: 1, kind: "Claim", work: "w", claim: "claim-b", attempt: null },
+      { version: 1, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
     ];
     const payload = {
       inputs: {

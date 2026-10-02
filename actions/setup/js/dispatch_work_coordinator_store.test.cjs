@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { applyAndPublishCoordinatorTransactions, COORDINATOR_BRANCH, COORDINATOR_LOG_PATH, readCoordinatorLog } from "./dispatch_work_coordinator_store.cjs";
 import { parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
 
 function createFakeGitHub() {
   const blobs = new Map();
   const trees = new Map();
   const commits = new Map();
-  const state = { sha: null, transactions: [], conflictOnce: false, updateCalls: 0 };
+  const state = { sha: null, transactions: [], rawContents: null, conflictOnce: false, updateCalls: 0 };
   let nextId = 0;
 
   const makeId = prefix => `${prefix}-${++nextId}`;
@@ -33,7 +33,7 @@ function createFakeGitHub() {
         getBlob: async () => ({
           data: {
             encoding: "base64",
-            content: Buffer.from(serializeTransactionLog(state.transactions), "utf8").toString("base64"),
+            content: Buffer.from(state.rawContents ?? serializeTransactionLog(state.transactions), "utf8").toString("base64"),
           },
         }),
         createBlob: async ({ content }) => {
@@ -56,6 +56,7 @@ function createFakeGitHub() {
           if (state.sha) throw Object.assign(new Error("Reference already exists"), { status: 422 });
           state.sha = sha;
           state.transactions = parseTransactionLog(blobs.get(trees.get(commits.get(sha).tree)));
+          state.rawContents = null;
           return { data: {} };
         },
         updateRef: async ({ sha, force }) => {
@@ -65,11 +66,13 @@ function createFakeGitHub() {
             state.conflictOnce = false;
             state.sha = "competing-commit";
             state.transactions = [...state.transactions, work("remote-work")];
+            state.rawContents = null;
             throw staleRef();
           }
           if (!commits.get(sha).parents.includes(state.sha)) throw staleRef();
           state.sha = sha;
           state.transactions = parseTransactionLog(blobs.get(trees.get(commits.get(sha).tree)));
+          state.rawContents = null;
           return { data: {} };
         },
       },
@@ -140,5 +143,42 @@ describe("dispatch work coordinator Git store", () => {
     expect(result.persisted).toBe(false);
     expect(result.sha).toBe(first.sha);
     expect(fake.state.updateCalls).toBe(0);
+  });
+
+  it("upgrades and compacts legacy messages through the checked ref update on read", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "legacy-head";
+    const legacy = { kind: "Work", work: "w", claim: null, attempt: null };
+    fake.state.rawContents = `${JSON.stringify(legacy)}\n${JSON.stringify(legacy)}\n`;
+    fake.state.transactions = [work("w")];
+
+    const result = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+    expect(result.sha).not.toBe("legacy-head");
+    expect(result.transactions).toEqual([work("w")]);
+    expect(fake.state.updateCalls).toBe(1);
+    expect([...fake.blobs.values()]).toEqual([serializeTransactionLog([work("w")])]);
+  });
+
+  it("retries a concurrent upgrade against the new head", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "legacy-head";
+    fake.state.transactions = [work("w")];
+    fake.state.rawContents = `${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null })}\n`;
+    fake.state.conflictOnce = true;
+
+    const result = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+    expect(result.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work")])));
+    expect(fake.state.updateCalls).toBe(1);
+    expect(fake.state.sha).toBe("competing-commit");
+  });
+
+  it("never publishes an invalid or unsupported mixed-version log", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "invalid-head";
+    fake.state.transactions = [work("w")];
+    fake.state.rawContents = `${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null })}\n${JSON.stringify({ ...claim("w", "c"), version: 99 })}\n`;
+    await expect(readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).rejects.toThrow("Failed to read dispatch coordinator log");
+    expect(fake.state.updateCalls).toBe(0);
+    expect(fake.blobs.size).toBe(0);
   });
 });

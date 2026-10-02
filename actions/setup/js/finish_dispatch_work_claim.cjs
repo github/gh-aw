@@ -92,7 +92,7 @@ async function reconcileWorkerClaim(options = {}) {
   }
 
   const cancel = finishIntent === null || finishIntent === "cancelled";
-  const intent = cancel ? { kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null } : { kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
+  const intent = cancel ? { version: 1, kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null } : { version: 1, kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
   const publish = options.applyAndPublish || applyAndPublishCoordinatorTransactions;
   await publish({ githubClient, owner, repo, intents: [intent] });
 

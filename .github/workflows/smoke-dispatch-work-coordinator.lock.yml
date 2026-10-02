@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       actions: read
-      contents: read
+      contents: write
     env:
       GH_AW_MAX_DAILY_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_DAILY_AI_CREDITS || '5000' }}
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}

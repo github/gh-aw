@@ -9,11 +9,11 @@ const DEFAULT_MAX_RETRIES = 5;
 
 /**
  * @typedef {
- *   | {kind: "Work", work: string, claim: null, attempt: null}
- *   | {kind: "Claim", work: string, claim: string, attempt: null}
- *   | {kind: "ClaimCancellation", work: string, claim: string, attempt: null}
- *   | {kind: "Completion", work: string, claim: string, attempt: string}
- *   | {kind: "WorkCancellation", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
+ *   | {version: number, kind: "WorkCancellation", work: string, claim: null, attempt: null}
  * } CoordinatorTransaction
  */
 
@@ -49,7 +49,7 @@ function isRefConflict(error) {
  * Read the coordinator branch and its canonical transaction log.
  * @param {{githubClient: any, owner: string, repo: string}} options
  */
-async function readCoordinatorLog({ githubClient, owner, repo }) {
+async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
   let head;
   try {
     const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${COORDINATOR_BRANCH}` });
@@ -73,10 +73,18 @@ async function readCoordinatorLog({ githubClient, owner, repo }) {
       throw new TypeError("Dispatch coordinator log has an unsupported blob encoding");
     }
     const contents = Buffer.from(blob.data.content, "base64").toString("utf8");
-    return { sha: head, transactions: parseTransactionLog(contents) };
+    const transactions = parseTransactionLog(contents);
+    return { sha: head, transactions, needsUpgrade: contents !== serializeTransactionLog(transactions) };
   } catch (error) {
     throw new Error("Failed to read dispatch coordinator log", { cause: error });
   }
+}
+
+async function readCoordinatorLog({ githubClient, owner, repo }) {
+  const current = await readCoordinatorLogRaw({ githubClient, owner, repo });
+  if (!current.needsUpgrade) return current;
+  const upgraded = await applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents: [] });
+  return { sha: upgraded.sha, transactions: upgraded.transactions };
 }
 
 /**
@@ -98,17 +106,18 @@ async function applyAndPublishCoordinatorTransactions({ githubClient, owner, rep
 
   let lastConflict;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const current = await readCoordinatorLog({ githubClient, owner, repo });
+    const current = await readCoordinatorLogRaw({ githubClient, owner, repo });
     const applied = applyTransactions(current.transactions, intents);
-    if (applied.transactions.length === current.transactions.length) {
+    if (!current.needsUpgrade && applied.transactions.length === current.transactions.length) {
       return { ...applied, sha: current.sha, persisted: false };
     }
 
     try {
+      const contents = serializeTransactionLog(applied.transactions);
       const blob = await githubClient.rest.git.createBlob({
         owner,
         repo,
-        content: serializeTransactionLog(applied.transactions),
+        content: contents,
         encoding: "utf-8",
       });
       const tree = await githubClient.rest.git.createTree({
@@ -141,7 +150,7 @@ async function applyAndPublishCoordinatorTransactions({ githubClient, owner, rep
           sha: commit.data.sha,
         });
       }
-      return { ...applied, sha: commit.data.sha, persisted: true };
+      return { ...applied, transactions: parseTransactionLog(contents), sha: commit.data.sha, persisted: true };
     } catch (error) {
       if (!isRefConflict(error)) throw new Error("Failed to publish dispatch coordinator log", { cause: error });
       lastConflict = error;
