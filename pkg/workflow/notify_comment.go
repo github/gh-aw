@@ -96,6 +96,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		})...)
 	}
 	steps = append(steps, c.buildConclusionSteeringIssueStep(data, mainJobName, steeringToken)...)
+	steps = append(steps, buildUsageArtifactPublishSteps(artifactPrefixExprForDownstreamJob(data), IsDetectionJobEnabled(data.SafeOutputs), c.getActionPin)...)
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
@@ -240,14 +241,19 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
 func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, hasDetection bool, pinAction func(string) string) []string {
-	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
-	steps = append(steps, buildUsageArtifactCollectionStep(hasDetection)...)
+	return append(steps, buildUsageArtifactPublishSteps(prefix, hasDetection, pinAction)...)
+}
+
+func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction func(string) string) []string {
+	usageArtifactName := prefix + "usage"
+	steps := buildUsageArtifactCollectionStep(hasDetection)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", usageArtifactName),
 		"          path: |\n",
+		"            /tmp/gh-aw/usage/session.jsonl\n",
 		"            /tmp/gh-aw/usage/aw_info.json\n",
 		"            /tmp/gh-aw/usage/aw-info.jsonl\n",
 		"            /tmp/gh-aw/usage/agent_usage.json\n",

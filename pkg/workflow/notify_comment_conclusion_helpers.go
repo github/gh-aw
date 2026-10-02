@@ -54,7 +54,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
-	steps = append(steps, buildUsageArtifactUploadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), IsDetectionJobEnabled(data.SafeOutputs), c.getActionPin)...)
+	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)
 	return steps
 }
 

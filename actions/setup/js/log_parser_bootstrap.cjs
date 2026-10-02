@@ -8,6 +8,7 @@ const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
 const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
+const { writeSessionArtifact } = require("./session_artifact.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -362,6 +363,15 @@ async function runLogParser(options) {
       }
     } catch (err) {
       core.warning(`[log-parser] Failed to redact add-mask values in agent-stdio.log: ${getErrorMessage(err)}`);
+    }
+
+    if (Array.isArray(logEntries)) {
+      try {
+        writeSessionArtifact("/tmp/gh-aw/agent-session.jsonl", logEntries, [...publicationMasks]);
+        core.info(`[log-parser] Persisted ${logEntries.length} canonical session events`);
+      } catch (err) {
+        core.warning(`[log-parser] Failed to persist canonical agent session: ${getErrorMessage(err)}`);
+      }
     }
 
     // Read safe outputs file if available

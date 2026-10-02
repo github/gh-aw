@@ -1,4 +1,4 @@
-import type { CoreSessionEvent, SessionEventDataMap, ToolExecutionCompleteEvent } from "./agent_session";
+import type { CoreSessionEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
 import { createSessionEvent } from "../agent_session.cjs";
 
 const messages: CoreSessionEvent[] = [
@@ -35,3 +35,23 @@ createSessionEvent({}, "tool.execution_complete", { success: "yes" });
 // @ts-expect-error Legacy record types are not canonical event signatures.
 createSessionEvent({}, "result", {});
 createSessionEvent({}, "vendor.progress", { nativeValue: false });
+
+const mergedEvent: UnifiedSessionEvent = {
+  type: "mcp.rpc.response",
+  data: { payload: { id: 0, result: false } },
+  provenance: { component: "mcp", phase: "agent", path: "mcp-logs/rpc-messages.jsonl", index: 0, timestampMs: 0 },
+};
+void mergedEvent;
+
+const invalidProvenance: UnifiedSessionEvent = {
+  type: "firewall.event",
+  data: {},
+  provenance: {
+    component: "firewall",
+    phase: "agent",
+    path: "sandbox/firewall/logs/audit.jsonl",
+    // @ts-expect-error Source position is numeric.
+    index: "1",
+  },
+};
+void invalidProvenance;

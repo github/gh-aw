@@ -33,6 +33,10 @@ describe("Unified session bootstrap telemetry conformance", () => {
     vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     vi.spyOn(fs, "appendFileSync").mockImplementation((file, content) => files.set(String(file), (files.get(String(file)) ?? "") + content));
     vi.spyOn(fs, "writeFileSync").mockImplementation((file, content) => files.set(String(file), String(content)));
+    vi.spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      files.set(String(to), files.get(String(from)));
+      files.delete(String(from));
+    });
   });
 
   afterEach(() => {
@@ -60,6 +64,17 @@ describe("Unified session bootstrap telemetry conformance", () => {
   it("T-UAS-047: zero is retained and absent output tokens/turns stay absent", async () => {
     await parse([{ type: "session.result", data: { usage: { input_tokens: 0 } } }]);
     expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", usage: { input_tokens: 0 } });
+  });
+
+  it("persists canonical events for conclusion without a legacy telemetry result or input mutation", async () => {
+    const events = [
+      { type: "assistant.message", timestamp: "2026-10-02T00:00:01Z", data: { content: "complete" } },
+      { type: "session.result", data: { numTurns: 0 } },
+      { type: "vendor.extension", data: { available: false } },
+    ];
+    await parse(events);
+    expect(files.get("/tmp/gh-aw/agent-session.jsonl").trimEnd().split("\n").map(JSON.parse)).toEqual(events);
+    expect(events.some(event => event.type === "result")).toBe(false);
   });
 
   it("T-UAS-047: a turn-only result does not fabricate an empty usage report", async () => {

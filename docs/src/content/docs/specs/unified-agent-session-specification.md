@@ -1,9 +1,9 @@
 ---
 title: Unified Agent Session Specification
-description: Draft contract for loss-preserving Copilot-compatible JavaScript session traces across gh-aw engines, renderers, and telemetry.
+description: Draft contract for loss-preserving session traces across gh-aw engines, MCP gateway, firewall, safe outputs, experiments, graders, and evals.
 sidebar:
   order: 1365
-version: "1.0.0"
+version: "1.1.0"
 status: Draft
 publication_date: "2026-10-02"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.0.0<br>
+**Version**: 1.1.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-02<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -24,13 +24,13 @@ editors:
 
 ## Abstract
 
-This specification defines the unified agent session trace used by the GitHub Agentic Workflows JavaScript log parsers: an ordered array of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving normalization contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines; defines common message, reasoning, tool, initialization, and accounting events; and specifies compatibility with summary renderers and bootstrap telemetry. The contract preserves source text, identifiers, structured values, extensions, and explicit failures while accommodating incomplete logs and engine-specific accounting. It formalizes the existing representation rather than introducing a session wrapper, an event version field, or a new runtime protocol.
+This specification defines the unified session trace used by GitHub Agentic Workflows: an ordered array of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving normalization contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job merger that enriches the trace with MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval observations. The serialized `usage/session.jsonl` contains timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Existing renderers and accounting artifacts remain compatibility projections, not replacements for the trace.
 
 ## Status of This Document
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.0.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.1.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. It does not prescribe a version property in trace records.
 
@@ -58,7 +58,7 @@ The specification version belongs to this document. It does not prescribe a vers
 
 The parsers in `actions/setup/js/` translate different engine logs into a shared conversation model. `log_parser_shared.cjs` exposes `convertLegacyLogEntriesToCopilotEvents` and `convertCopilotEventsToLegacyLogEntries`; the first establishes the canonical event representation, while the second supports existing legacy renderers.
 
-This specification covers parsing supported input records, canonical conversion, usage aggregation, tool correlation, compatibility projections, and the use of normalized results by `log_parser_bootstrap.cjs`. It does not specify engine execution, workflow frontmatter, model behavior, transport protocols, or a cross-language storage API. JSON and JSON Lines are serialization forms, not different session models.
+This specification covers parsing supported input records, canonical conversion, usage aggregation, tool correlation, compatibility projections, bootstrap telemetry, and conclusion-job artifact merging. It does not specify engine execution, workflow frontmatter, model behavior, transport protocols, or a cross-language storage API. JSON and JSON Lines are serialization forms, not different session models.
 
 ### 1.2 Data flow
 
@@ -76,6 +76,16 @@ projection           for existing metric readers
 ```
 
 The parser's existing return object can contain `markdown`, `logEntries`, `mcpFailures`, and `maxTurnsHit`. The session trace is the `logEntries` array, not that return object.
+
+The agent artifact already contains native session evidence: Copilot session
+`events.jsonl`, Pi `pi-streaming.jsonl`, and other engine logs such as
+`agent-stdio.log`. The bootstrap additionally persists its redacted, normalized
+`logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
+without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
+and eval evidence, the conclusion job merges these observations into
+`usage/session.jsonl`. Graders arrive in the agent artifact. Collection and upload
+run after conclusion handlers, before setup cleanup. The existing usage JSON,
+JSONL accounting, activity summary, and result files remain available.
 
 ### 1.3 Terminology
 
@@ -110,7 +120,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | P — Parser/normalizer | Parse source records and produce canonical traces; shared conversion helpers are included. | 3–7 and applicable tests in 9 |
 | R — Reader/renderer | Read canonical events and produce truthful, privacy-preserving summaries or compatibility views. | 3–6, 8.1, 8.3, and applicable tests in 9 |
 | B — Bootstrap telemetry adapter | Consume canonical results and derive legacy telemetry without altering the trace. | 3, 6, 8.2–8.3, and applicable tests in 9 |
-| F — Full pipeline | Satisfy P for all six engines, R for all shared summary renderers, and B. | All normative requirements |
+| M — Artifact merger | Combine canonical agent and runtime observations into the conclusion usage artifact. | 3.5, 4.7, 8.3, and applicable tests in 9 |
+| F — Full pipeline | Satisfy P for all six engines, R for all shared summary renderers, B, and M. | All normative requirements |
 
 A parser supporting fewer engines can conform for its declared engines. Omitting an OPTIONAL field because the source did not expose it is full conformance, not partial conformance. An implementation failing a mandatory requirement is nonconforming for the affected class; “partial implementation” is a progress description, not a weaker compliance level.
 
@@ -176,6 +187,85 @@ The generic `createSessionEvent` factory checks known event payload signatures.
 `types/agent_session.type-test.ts` checks valid signatures and rejects incorrect
 outcome types, metric types, and legacy event names during `npm run typecheck`.
 Numeric range checks remain runtime responsibilities.
+
+### 3.5 Conclusion session artifact
+
+**T-UAS-054 — Single-file serialization.** The conclusion job MUST publish the
+unified trace as `session.jsonl` in the existing `usage` artifact. Each nonblank
+line MUST be one canonical event, without a session wrapper, display truncation,
+or a bare legacy accounting result. Serialization MUST use compact JSONL:
+exactly one unindented JSON object per physical line, no pretty-print whitespace
+outside string values, no blank separator lines, and a trailing newline after
+the final record. Embedded line breaks in payload strings MUST be JSON-escaped,
+not trimmed, removed, or emitted as additional physical lines. Compactness MUST
+NOT remove metadata, payload fields, or significant source text. Existing usage
+files MUST remain compatible.
+Collection MUST follow available downstream result downloads and conclusion
+handlers; setup cleanup MUST follow publication.
+
+**T-UAS-055 — Source provenance.** Every merged event MUST have a `provenance`
+object with `component`, `phase`, `path`, and `index`. `path` MUST be relative to
+the downloaded runtime root. `index` MUST identify the position in that source's
+normalized event array, not claim to be a raw line number. Native engine event
+IDs and tool correlation IDs MUST NOT become global IDs or be rewritten to
+disambiguate sources. A preexisting native `provenance` field MUST survive under
+`provenance.native`. Merge operations MUST NOT mutate source observations.
+
+The TypeScript `SessionProvenance`, `UnifiedSessionEvent`, and `UnifiedSession`
+types describe this additive envelope. Components include `agent`, `mcp`,
+`firewall`, `safe_output`, `experiment`, `grader`, `eval`, `usage`, `execution`,
+`detection`, `workflow`, and `collector`. Phases distinguish agent and detection
+traffic, activation snapshots, evals, safe-output execution, and conclusion
+collection. A component is not an engine name or a success claim.
+
+**T-UAS-056 — Timestamp ordering.** Events with a supported source timestamp
+MUST sort ascending by `provenance.timestampMs`. The merger MUST preserve native
+timestamp values and MUST derive its ordering key using the source schema's
+units, not an epoch-magnitude heuristic. ISO timestamps MUST carry a timezone.
+Numeric Squid audit timestamps use Unix seconds; native agent timestamps and
+token-tracker audit `ts` values use milliseconds. Pi's observed
+`message.timestamp` is also a supported source timestamp. Timestamp precision is
+limited to the JavaScript ordering key; original source precision remains
+preserved.
+
+**T-UAS-057 — Untimed and tied observations.** Missing or invalid timestamps
+MUST NOT cause observations to be discarded. Untimed observations MUST follow
+all timed events. Equal-time events and untimed events MUST preserve the
+deterministic source enumeration and source-local array order. The merger MUST
+NOT substitute file modification time, collection time, a neighboring event's
+time, or an inferred tool duration for absent evidence. Wall-clock ordering
+does not establish causality or correct cross-process clock skew.
+
+**T-UAS-058 — Authoritative source selection.** A persisted canonical agent
+stream MUST take precedence over its raw engine logs. Without it, the merger
+MUST use available native Copilot sessions or the existing engine parser for
+supported raw logs. It MUST NOT combine these equivalent agent representations
+and count them as separate observations. Replicated firewall paths MUST select
+`sandbox/firewall/logs` before `sandbox/firewall/audit`, then supported legacy
+layouts; an existing empty authoritative file MUST suppress its older copy.
+Distinct gateway streams and events MUST remain separate observations.
+
+**T-UAS-059 — Partial collection.** Missing optional sources MUST be reported
+by component availability, not fabricated empty results. Malformed JSONL
+records MUST produce explicit collection warnings while preserving valid
+adjacent records. Filesystem read/write failures MUST be surfaced; a failed
+collection MUST NOT leave a stale or partially written unified output eligible
+for upload. Artifact paths MUST NOT follow symbolic links. Any source traversal
+limit MUST produce a coverage warning.
+
+**T-UAS-060 — Publication boundary.** Both persisted canonical agent events and
+the unified session MUST apply the artifact secret/add-mask policy before JSON
+serialization. Redaction MUST process decoded string values, including native
+IDs and nested structured payloads, without mutating internal traces. Private
+correlation-key exemptions used by display renderers MUST NOT exempt persisted
+artifact fields. Registered masks from agent stdio MUST apply even when a native
+session file is preferred.
+
+The artifact can contain redacted user prompts, reasoning, paths, and full tool
+outputs. It is execution evidence with the workflow artifact's access and
+retention policy, not a default summary or a public log preview. Its size can
+exceed the former telemetry-only usage artifact; summary display budgets do not
+truncate this file.
 
 ## 4. Core Event Vocabulary (Normative)
 
@@ -265,6 +355,45 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `permissionDenials` | Source-dependent array of native permission-denial records, including an explicitly empty array. |
 
 Legacy mappings include `num_turns` → `numTurns`, `duration_ms` → `durationMs`, `total_cost_usd` → `totalCostUsd`, and `permission_denials` → `permissionDenials`. Other native result metadata remains supported. A result reports evidence; it does not assert that the task or session succeeded.
+
+### 4.7 Runtime observation vocabulary
+
+**T-UAS-061 — Loss-preserving runtime payloads.** Non-agent source records MUST
+use namespaced event types with the complete decoded source object in `data`.
+Normalizers MUST retain transport envelopes, RPC IDs, requests and responses,
+filter/block decisions, network statuses, provider accounting, steering messages,
+unknown fields, and false/zero/null values. They MUST NOT store only the truncated
+`detail`/`status` projection used by the existing unified timeline renderer.
+Unknown runtime kinds MUST remain `<component>.event` observations.
+
+| Event type | Source observation |
+| --- | --- |
+| `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, including complete JSON-RPC payloads. |
+| `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
+| `mcp.tool_call`, `mcp.event` | Structured gateway calls or other gateway log messages. |
+| `firewall.http_access` | AWF network audit observations, including operational entries without a host. |
+| `firewall.token_usage`, `firewall.steering`, `firewall.event` | API proxy accounting, token/time steering, tracker and other firewall messages. |
+| `safe_output.request`, `safe_output.result`, `safe_output.error` | Raw requested operations, executed items manifest, and available structured errors. Requests are not execution results. |
+| `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
+| `grader.manifest`, `grader.result` | Complete deterministic grader manifest/results; grading does not invent event time. |
+| `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
+| `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
+
+**T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
+firewall, or accounting observations to produce another session total. Readers
+MUST scope tool correlation, result selection, and accounting by provenance
+before applying agent-only accounting rules. A state snapshot or historical
+experiment record is evidence of that snapshot, not a new action executed by
+this run. A missing timestamp, grader result, eval result, or safe-output result
+MUST remain unavailable rather than become success or zero cost.
+
+**T-UAS-063 — Collection coverage.** The merger MUST append a
+`session.collection` observation recording selected source paths, components,
+phases, event counts, warning count, untimed source-event count, and absent
+required-vocabulary components. Source absence and a present empty source MUST
+remain distinguishable. Warnings MUST identify the source and cause without
+printing malformed payloads or unredacted source text.
 
 ## 5. Parsing and Normalization (Normative)
 
@@ -576,6 +705,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-046, T-UAS-047, T-UAS-048 | Canonical snapshots, alias usage, zero/missing metrics, existing telemetry, no trailing newline, failed append | Correct single projection; no double counting/defaults; safe line boundary; best-effort failure; activity not success. |
 | T-UAS-049, T-UAS-050 | Hostile HTML/fences, mask values, oversized display, partial parse boundary | Safe/redacted publication, explicit truncation, canonical source remains unchanged. |
 | T-UAS-051, T-UAS-052, T-UAS-053 | Conformance report and isolated test harness | Applicable IDs covered; structural/round-trip/purity assertions; no real production I/O. |
+| T-UAS-054–T-UAS-063 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete single JSONL artifact, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -625,6 +755,26 @@ and custom engines. `agent_session_telemetry.test.cjs` uses a mocked filesystem 
 canonical-result telemetry. `npm run typecheck` checks both runtime JSDoc imports
 and positive/negative TypeScript signature tests.
 
+### 9.5 Merger verification (Informative)
+
+The artifact-merger implementation loads the same existing Claude, Codex,
+Copilot-failure, and Pi-success runs identified in Section 9.4. It executes
+`writeUnifiedSession` locally against their downloaded agent artifacts and
+available usage/safe-output evidence. It does not launch engines or trigger
+workflows. Chronology, canonical event shapes, retained agent counts, and source
+coverage are checked independently of rendered markdown.
+
+`unified_session.test.cjs` exercises all six adapters with sanitized existing
+fixtures and synthetic supplemental inputs. Integration cases combine all
+requested components in one persisted file, compare full nested payloads and
+source-native IDs, test timestamp units and Pi message timestamps, retain unknown
+extensions, and verify byte-identical repeated collection. Missing sources,
+malformed adjacent records, empty authoritative files, read/write failure,
+symlinks, and decoded-secret/add-mask redaction have separate cases.
+`agent_session_telemetry.test.cjs` verifies canonical bootstrap persistence.
+Compiler tests cover engine artifact paths, conclusion ordering, and the usage
+upload path.
+
 ## 10. Implementation Gap Matrix (Informative)
 
 These observations record the code **before** the implementation accompanying this
@@ -643,6 +793,27 @@ the behavior implemented and verified by this change.
 | Pi transformations and stats | v3 sums input/output per finalized turn and retains provider-error text, but reconstruction depends on `turn_end`, reorders indexed results, omits orphan/unfinished observations and cache accounting, defaults duration to zero, and appends a bare legacy result. | Retain existing accumulation/error behavior while preserving streaming order/partiality, exposed cache fields, missing metrics, and canonical results (T-UAS-019, T-UAS-028, T-UAS-032–T-UAS-035, T-UAS-040). |
 | Custom fallback selection | Claude success is based on nonempty normalized entries; Codex fallback success is based on nonempty markdown, even when a recognized input signature is absent. | Signature-based deterministic recognition and empty/unrecognized handling (T-UAS-017, T-UAS-041). |
 | Shared formatters and bootstrap | Summary tool rows/statistics count missing results as success; numeric display paths use truthiness. Bootstrap enrichment finds bare `result`, defaults absent metrics to zero, and does not project canonical `session.result`; several paths assume the last entry has statistics. | Truthful summaries, known-zero handling, canonical result selection, canonical-derived telemetry projection (T-UAS-042–T-UAS-048). |
+
+### 10.1 Conclusion artifact review
+
+The following observations describe the state reviewed for version 1.1.0,
+separately from the historical parser gap inventory above.
+
+| Area | Reviewed gap | Implemented design |
+| --- | --- | --- |
+| Canonical engine trace | Raw native session files were already bundled in the agent artifact, but normalized `logEntries` existed only in memory. | Reuse existing native evidence; also persist redacted compact `agent-session.jsonl` for every engine to avoid repeated parsing. |
+| Unified timeline | Display-only rows omitted payloads and untimed events; agent collector was Copilot-only. | Separate loss-preserving merger, using the established event model across six engine adapters. Existing display views remain unchanged. |
+| MCPG and AWF | Raw logs remained in separate agent/detection artifacts with different timestamp units and layouts. | Preserve all selected JSONL records, normalize namespaces, attach provenance, select authoritative replicas, and sort observed timestamps. |
+| Safe outputs and evaluations | Results were separate files or counts; usage upload preceded conclusion handlers. | Include requested/executed/error observations, experiment state, deterministic graders, evals, and accounting; publish usage after handlers. |
+| Missing evidence | No unified coverage record distinguished missing, empty, untimed, or malformed sources. | Append explicit collection coverage and warnings; preserve untimed observations and fail visibly on I/O errors. |
+
+Remaining boundaries are intentional: unobserved execution times are not
+reconstructed, clocks are not corrected, binary threat-detection runs do not
+become fabricated agent conversations, and legacy display/CLI readers are not
+automatically changed to consume the richer artifact. Evals contribute recorded
+results/accounting, not an invented conversation transcript. Current collection
+loads selected files and the merged array into memory; streaming external sort
+for exceptionally large sessions remains future work.
 
 ## 11. References
 
@@ -664,6 +835,7 @@ These links identify inspected implementation surfaces. They are not external en
 - **[Custom]** [`actions/setup/js/parse_custom_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_custom_log.cjs).
 - **[Formatters]** [`actions/setup/js/log_parser_format.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/log_parser_format.cjs).
 - **[Bootstrap]** [`actions/setup/js/log_parser_bootstrap.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/log_parser_bootstrap.cjs).
+- **[Merger]** [`actions/setup/js/unified_session.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/unified_session.cjs), [`session_artifact.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/session_artifact.cjs), and [`collect_usage_artifact_files.sh`](https://github.com/github/gh-aw/blob/main/actions/setup/sh/collect_usage_artifact_files.sh).
 - **[Driver]** [Copilot SDK Driver Specification](/gh-aw/specs/copilot-sdk-driver-specification/), related runtime logging context.
 - **[SemVer]** [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html), document-version change classification.
 - **[Tests]** Colocated `log_parser_shared.test.cjs`, `log_parser_bootstrap.test.cjs`, and the six `parse_*_log.test.cjs` files provide existing fixture/test integration points.
@@ -907,6 +1079,14 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.1.0 — Draft (2026-10-02)
+
+- Added the artifact-merger conformance class and requirements T-UAS-054 through T-UAS-063.
+- Defined complete MCPG/AWF and downstream observation payloads, source provenance, timestamp units, deterministic ties, and untimed retention.
+- Specified canonical bootstrap persistence, conclusion-job usage publication, coverage diagnostics, replica precedence, and artifact redaction.
+- Required compact single-record-per-line JSONL while preserving escaped payload whitespace and native metadata.
+- Recorded the conclusion pipeline review, empirical multi-engine merger execution, and remaining boundaries.
 
 ### Version 1.0.0 — Draft (2026-10-02)
 
