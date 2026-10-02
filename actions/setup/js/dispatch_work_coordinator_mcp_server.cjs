@@ -73,7 +73,10 @@ function createDispatchCoordinatorStateTool(snapshot) {
       },
       additionalProperties: false,
     },
-    handler: args => readDispatchCoordinatorState(snapshot, args),
+    handler: args => {
+      console.error("[dispatch-work-coordinator] Reading queue snapshot");
+      return readDispatchCoordinatorState(snapshot, args);
+    },
   };
 }
 
@@ -100,6 +103,7 @@ function createDispatchCoordinatorFinishTool(options = {}) {
       }
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8", mode: 0o600 });
+      console.error(`[dispatch-work-coordinator] Recorded ${outcome} finish intent`);
       return { recorded: true, outcome };
     },
   };
@@ -107,7 +111,8 @@ function createDispatchCoordinatorFinishTool(options = {}) {
 
 function startDispatchCoordinatorServer(options = {}) {
   const snapshot = loadDispatchCoordinatorSnapshot(options.snapshotPath);
-  const server = createServer({ name: "dispatch-work-coordinator", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
+  console.error(`[dispatch-work-coordinator] Loaded queue snapshot with ${snapshot.projection.transactions.length} transactions; worker ${snapshot.worker ? "assigned" : "absent"}`);
+  const server = createServer({ name: "work-queue", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
   registerTool(server, createDispatchCoordinatorStateTool(snapshot));
   registerTool(server, createDispatchCoordinatorFinishTool(options));
   start(server);

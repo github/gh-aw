@@ -59,6 +59,7 @@ function renderSummary(status) {
 }
 
 async function reconcileWorkerClaim(options = {}) {
+  const coreApi = options.core || (typeof core === "undefined" ? undefined : core);
   const worker = options.worker === undefined ? readWorkerSnapshot(options.snapshotPath) : options.worker;
   const githubClient = options.githubClient || (typeof github === "undefined" ? undefined : github);
   const repositoryContext = options.context || (typeof context === "undefined" ? undefined : context);
@@ -67,13 +68,19 @@ async function reconcileWorkerClaim(options = {}) {
   const repo = repositoryContext.repo.repo;
   const readLog = options.readCoordinatorLog || readCoordinatorLog;
 
-  if (!worker) return { authorized: true, status: "unassigned" };
+  if (!worker) {
+    coreApi?.info("Dispatch coordinator: no inbound worker claim; skipping queue reconciliation");
+    return { authorized: true, status: "unassigned" };
+  }
 
   const finishIntent = readFinishIntent(options.finishIntentPath);
-  const initial = await readLog({ githubClient, owner, repo });
+  coreApi?.info(`Dispatch coordinator: worker finish intent ${finishIntent || "absent"}`);
+  const initial = await readLog({ githubClient, owner, repo, core: coreApi });
   const projection = replayTransactions(initial.transactions);
+  coreApi?.info(`Dispatch coordinator: rechecking worker against ${initial.transactions.length} queue transactions`);
   const claim = initial.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === worker.claim_id);
   if (!claim || claim.work !== worker.work_id || !Object.hasOwn(projection.work, worker.work_id) || !Object.hasOwn(projection.claim, worker.claim_id)) {
+    coreApi?.info("Dispatch coordinator: worker claim is no longer present in the queue");
     return { authorized: false, status: "superseded" };
   }
 
@@ -83,10 +90,12 @@ async function reconcileWorkerClaim(options = {}) {
 
   const existingCompletion = initial.transactions.find(transaction => transaction.kind === "Completion" && transaction.work === worker.work_id && transaction.claim === worker.claim_id && transaction.attempt === attempt);
   if (existingCompletion && projection.work[worker.work_id] === "completed" && projection.winner[worker.work_id] === worker.claim_id) {
+    coreApi?.info("Dispatch coordinator: worker completion already verified");
     return { authorized: true, status: "completed" };
   }
 
   if (projection.claim[worker.claim_id] !== "effective") {
+    coreApi?.info(`Dispatch coordinator: worker claim is ${projection.claim[worker.claim_id]}`);
     if (projection.claim[worker.claim_id] === "cancelled") return { authorized: false, status: "cancelled" };
     return { authorized: false, status: ["completed", "cancelled"].includes(projection.work[worker.work_id]) ? "terminal" : "superseded" };
   }
@@ -94,21 +103,26 @@ async function reconcileWorkerClaim(options = {}) {
   const cancel = finishIntent === null || finishIntent === "cancelled";
   const intent = cancel ? { kind: "ClaimCancellation", work: worker.work_id, claim: worker.claim_id, attempt: null } : { kind: "Completion", work: worker.work_id, claim: worker.claim_id, attempt };
   const publish = options.applyAndPublish || applyAndPublishCoordinatorTransactions;
-  await publish({ githubClient, owner, repo, intents: [intent] });
+  coreApi?.info(`Dispatch coordinator: publishing worker ${cancel ? "cancellation" : "completion"}`);
+  await publish({ githubClient, owner, repo, intents: [intent], core: coreApi });
 
-  const latest = await readLog({ githubClient, owner, repo });
+  const latest = await readLog({ githubClient, owner, repo, core: coreApi });
   const verified = replayTransactions(latest.transactions);
+  coreApi?.info(`Dispatch coordinator: verifying worker against ${latest.transactions.length} queue transactions`);
   if (
     !cancel &&
     latest.transactions.some(transaction => transaction.kind === "Completion" && transaction.work === worker.work_id && transaction.claim === worker.claim_id && transaction.attempt === attempt) &&
     verified.work[worker.work_id] === "completed" &&
     verified.winner[worker.work_id] === worker.claim_id
   ) {
+    coreApi?.info("Dispatch coordinator: worker completion verified");
     return { authorized: true, status: "completed" };
   }
   if (cancel && latest.transactions.some(transaction => transaction.kind === "ClaimCancellation" && transaction.work === worker.work_id && transaction.claim === worker.claim_id) && verified.claim[worker.claim_id] === "cancelled") {
+    coreApi?.info("Dispatch coordinator: worker cancellation verified");
     return { authorized: false, status: "cancelled" };
   }
+  coreApi?.info("Dispatch coordinator: worker reconciliation did not verify the intended queue state");
   return { authorized: false, status: ["completed", "cancelled"].includes(verified.work[worker.work_id]) ? "terminal" : "superseded" };
 }
 

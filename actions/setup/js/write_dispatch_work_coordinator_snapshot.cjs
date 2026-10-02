@@ -55,8 +55,10 @@ async function main(options = {}) {
     githubClient,
     owner: repositoryContext.repo.owner,
     repo: repositoryContext.repo.repo,
+    core: logger,
   });
   const worker = resolveWorkerAssignment(repositoryContext.payload, transactions);
+  logger.info(`Dispatch coordinator: worker assignment ${worker ? "admitted" : "absent"}`);
   const snapshot = {
     version: 2,
     sha,

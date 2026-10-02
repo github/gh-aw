@@ -21,7 +21,7 @@ on: workflow_dispatch
 name: Dispatch Coordinator Worker Integration
 engine: claude
 tools:
-  dispatch-work-coordinator: true
+  work-queue: true
 safe-outputs:
   create-issue:
     max: 1
@@ -47,7 +47,7 @@ Compile each dispatch-coordinator workflow phase.
 	require.Contains(t, activation, constants.DispatchCoordinatorSnapshotPath)
 
 	agent := extractJobSection(compiled, string(constants.AgentJobName))
-	require.Contains(t, agent, "dispatch-work-coordinator")
+	require.Contains(t, agent, `"work-queue"`)
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentMount)
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentPath)
 

@@ -1,9 +1,9 @@
 ---
-title: Dispatch Work Coordinator protocol model
-description: TLA+ model, safety proof argument, and bounded verification for the dispatch-work coordinator.
+title: Work Queue protocol model
+description: TLA+ model, safety proof argument, and bounded verification for the work queue.
 ---
 
-# Dispatch Work Coordinator protocol model
+# Work Queue protocol model
 
 This TLA+ model formalizes the proposal in [issue #64852](https://github.com/github/gh-aw/issues/64852): deferred dispatcher transactions, trusted worker finalization, optimistic branch writes, orphan recovery, and compaction.
 
@@ -11,7 +11,7 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 ## Queue inspection and operator commands
 
-`gh aw work` operates on a dedicated branch without using the current checkout. Supply
+`gh aw work-queue` operates on a dedicated branch without using the current checkout. Supply
 `--repo owner/repo`; use `--branch` to select a different
 coordinator branch. The experimental command uses authenticated GitHub Git APIs to
 read and validate `dispatch-work-coordinator.jsonl`, create trees and commits, and
@@ -24,7 +24,8 @@ GitHub Git APIs cannot create the first reference in an entirely empty repositor
 Authentication uses the GitHub
 CLI configuration or `GH_TOKEN`/`GITHUB_TOKEN`, with repository contents write
 permission required for mutations.
-All subcommands support `--json` for machine-readable output.
+All subcommands support `--json` for machine-readable output. Workflows enable the
+read-only snapshot MCP server with `tools.work-queue: true`.
 
 | Command | Arguments |
 |---|---|
@@ -62,7 +63,7 @@ The model fixes arbitration and makes the worker lifecycle, publication guards, 
 |---|---|
 | Arbitration | The least stable, uncancelled Claim identity wins on nonterminal Work. A persisted Completion fixes the winner; WorkCancellation removes authority. |
 | Terminal Work | Reject new state-changing transactions for completed/cancelled Work. Identical physical records may be duplicated without changing the fact set. |
-| Dispatcher | The activation job reads the coordinator branch and packages its log and branch version into the activation artifact. The coordinator MCP server reads only that immutable snapshot and never accesses Git; the view may be stale while the agent runs. Mutations are revalidated and published only by trusted `safe_outputs`; pending competing Claims may become durable on nonterminal Work. |
+| Dispatcher | The activation job reads the coordinator branch and packages its log and branch version into the activation artifact. The work-queue MCP server reads only that immutable snapshot and never accesses Git; the view may be stale while the agent runs. Mutations are revalidated and published only by trusted `safe_outputs`; pending competing Claims may become durable on nonterminal Work. |
 | Worker | Each worker has one immutable inbound Claim and one pass through safe-output processing; it records at most one distinct Completion. Finalize carries no authority parameters. |
 | Authorization | The winning worker verifies its newly committed Completion before outputs. Finished, stopped, and failed workers cannot restart or receive authorization again. |
 | Compaction | Canonicalize order and remove identical duplicate records only. Preserve the entire fact set, including cancelled/superseded Claim history. More aggressive compaction needs a separate proof. |

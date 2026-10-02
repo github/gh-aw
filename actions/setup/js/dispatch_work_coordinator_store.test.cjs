@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishCoordinatorTransactions, COORDINATOR_BRANCH, COORDINATOR_LOG_PATH, readCoordinatorLog } from "./dispatch_work_coordinator_store.cjs";
 import { parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
@@ -105,6 +105,7 @@ describe("dispatch work coordinator Git store", () => {
     });
     fake.state.conflictOnce = true;
     const delays = [];
+    const core = { info: vi.fn() };
 
     const result = await applyAndPublishCoordinatorTransactions({
       githubClient: fake.githubClient,
@@ -112,12 +113,16 @@ describe("dispatch work coordinator Git store", () => {
       repo: "repo",
       intents: [claim("w", "c")],
       sleepFn: async delay => delays.push(delay),
+      core,
     });
 
     expect(result.persisted).toBe(true);
     expect(result.rejected).toEqual([]);
     expect(fake.state.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work"), claim("w", "c")])));
     expect(fake.state.updateCalls).toBe(2);
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining("queue ref conflict"));
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining("queue published"));
+    expect(core.info.mock.calls.flat().join("\n")).not.toContain("remote-work");
     expect(delays).toEqual([50]);
   });
 
