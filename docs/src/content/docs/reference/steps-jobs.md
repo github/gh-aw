@@ -27,7 +27,14 @@ pre-steps:
   - name: Mint checkout token
     id: checkout_app
     uses: actions/create-github-app-token@v2
+    with:
+      app-id: ${{ vars.APP_ID }}
+      private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      repositories: ${{ github.repository }}
+      permission-contents: read
 ```
+
+Set an explicit `repositories` input and `permission-*` inputs for every `actions/create-github-app-token` step; otherwise the installation token can inherit access across the App installation. To scope a token to the current repository, use `repositories: ${{ github.repository }}`. The action accepts the fully qualified `owner/repository` value from this trusted context. If you set `owner` to a different installation owner, explicitly list repositories belonging to that owner instead. The compiler warns when either is missing and rejects the workflow in strict mode. Job-level `permissions:` does not scope the App token.
 
 Use pre-steps when later checkout or setup must consume outputs from a step in the same job.
 

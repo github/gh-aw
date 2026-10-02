@@ -259,3 +259,23 @@ func TestBootstrapGitHubAppManifestHelpers(t *testing.T) {
 		t.Fatalf("registration page did not contain escaped action URL: %s", page)
 	}
 }
+
+func TestRenderBootstrapGitHubAppRegistrationPageEscapesUntrustedValues(t *testing.T) {
+	t.Parallel()
+
+	registrationURL := `<script>alert(1)</script>`
+	manifest := map[string]any{"name": `<script>alert(1)</script>`}
+	page, err := renderBootstrapGitHubAppRegistrationPage(registrationURL, manifest)
+	if err != nil {
+		t.Fatalf("renderBootstrapGitHubAppRegistrationPage returned error: %v", err)
+	}
+	if !strings.Contains(page, `action="%3cscript%3ealert%281%29%3c/script%3e"`) {
+		t.Fatalf("registration URL was not escaped: %s", page)
+	}
+	if !strings.Contains(page, `\u003cscript\u003ealert(1)\u003c/script\u003e`) {
+		t.Fatalf("manifest value was not safely encoded: %s", page)
+	}
+	if strings.Contains(page, `<script>alert(1)</script>`) {
+		t.Fatalf("untrusted input was rendered as markup: %s", page)
+	}
+}
