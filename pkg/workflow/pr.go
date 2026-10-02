@@ -22,6 +22,9 @@ func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
 	if data.CheckoutDisabled || data.IsPullRequestTarget {
 		return false
 	}
+	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
+		return false
+	}
 	// checkout_pr_branch and the subsequent base-folder restore operate on the
 	// workspace root, so neither may run when it belongs to another repository.
 	for _, checkout := range data.CheckoutConfigs {

@@ -208,6 +208,37 @@ Test workflow.
 	}
 }
 
+func TestPRCheckoutRestoreWithCustomCheckout(t *testing.T) {
+	dir := t.TempDir()
+	source := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+steps:
+  - name: Checkout target repository
+    uses: actions/checkout@v4
+    with:
+      repository: other/project
+strict: false
+---
+Test workflow.
+`
+	path := filepath.Join(dir, "test.md")
+	if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "test.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotContains(t, string(lock), "- name: Checkout PR branch")
+	assert.NotContains(t, string(lock), "- name: Restore agent config folders from base branch")
+}
+
 func TestResolveAgentManifestPaths(t *testing.T) {
 	t.Run("includes defaults and only the selected engine", func(t *testing.T) {
 		folders, files := resolveAgentManifestPaths(NewEngineRegistry(), &WorkflowData{
