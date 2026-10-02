@@ -153,8 +153,8 @@
    Asides: a faint tint of the type colour, a hairline in the same hue,
    and an icon badge beside the type label.
 
-   Every parameter is a custom property, so it can be tuned from outside
-   (see /design-jig/asides/ in dev). Unset properties fall back to the
+   Every parameter is a custom property, so it can be tuned per type and
+   per theme. Unset properties fall back to the
    production defaults written inline below.
 
    Per type (tip | note | caution | danger):
