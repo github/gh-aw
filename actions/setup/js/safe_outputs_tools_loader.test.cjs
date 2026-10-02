@@ -53,7 +53,7 @@ describe("safe_outputs_tools_loader", () => {
     expect(handler).toHaveBeenCalledWith({ key: "k" });
   });
 
-  it("attaches the claims-aware agent handler to the generic append tool", () => {
+  it("attaches the notes-aware agent handler to the generic append tool", () => {
     const ledgerAgentAppendHandler = vi.fn();
     const tools = attachHandlers([{ name: "ledger_append" }], { defaultHandler: vi.fn(() => vi.fn()), ledgerAgentAppendHandler }, mockServer);
     tools[0].handler({ ledger: "history", operation: "append", value: "ok" });

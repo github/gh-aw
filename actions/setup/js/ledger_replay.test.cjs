@@ -4,34 +4,11 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { executeReplay, materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
+import { materializeReplay, validateReplayOutput } from "./ledger_replay.cjs";
+import { replayBuiltin } from "./ledger_builtin.cjs";
 
 const table = (rows = [{ id: "a" }]) => ({ columns: { id: "text" }, primaryKey: ["id"], rows });
 const output = tables => ({ version: 1, tables });
-
-test("replay receives frozen logical order and can interpret historical versions", () => {
-  const records = [{ payload: { id: "a", version: 1, state: "open" } }, { payload: { id: "a", version: 2, status: "closed" } }];
-  const script = `if (!Object.isFrozen(records) || !Object.isFrozen(records[0].payload)) throw Error("mutable input");
-    const states = new Map();
-    for (const record of records) states.set(record.payload.id, {
-      id: record.payload.id, status: record.payload.version === 1 ? record.payload.state : record.payload.status
-    });
-    return { version: 1, tables: { items: { columns: { id: "text", status: "text" },
-      primaryKey: ["id"], rows: [...states.values()] } } };`;
-  const first = executeReplay(script, records, { mode: "latest" });
-  assert.deepEqual(first.tables.items.rows, [{ id: "a", status: "closed" }]);
-  assert.deepEqual(executeReplay(script, records, { mode: "latest" }), first);
-  assert.equal(executeReplay("return {tables: {items: {columns: {id: 'text'}, primaryKey: ['id'], rows: [{id: String(Object.isFrozen(config))}]}}}", [], { mode: "latest" }).tables.items.rows[0].id, "true");
-});
-
-test("replay denies host capabilities, randomness and wall clock", () => {
-  for (const expression of ["process", "require", "fetch", "Date", "Intl", "performance", "crypto", "Math.random", "globalThis.Math.random", "Function", "eval"]) {
-    const result = executeReplay(`return {tables: {items: {columns: {id: "text"}, primaryKey: ["id"], rows: [{id: typeof ${expression}}]}}}`, []);
-    assert.equal(result.tables.items.rows[0].id, "undefined", expression);
-  }
-  assert.throws(() => executeReplay("while (true) {}", []), /timed out|failed/i);
-  assert.throws(() => executeReplay("return {tables: {items: {columns: {id: 'real'}, primaryKey: ['id'], rows: [{id: Infinity}]}}}", []));
-});
 
 test("replay rejects malformed and excessive output", () => {
   for (const bad of [
@@ -50,18 +27,15 @@ test("replay rejects malformed and excessive output", () => {
     output({ items: { ...table(), rows: Array.from({ length: 10001 }, (_, i) => ({ id: String(i) })) } }),
   ])
     assert.throws(() => validateReplayOutput(bad));
-  assert.throws(() => executeReplay("return undefined", []));
-  assert.throws(() => executeReplay("return {tables: {items: {columns: {id: 'text'}, primaryKey: ['id'], rows: [{id: 'a'.repeat(5_000_000)}]}}}", []));
 });
 
 test("multiple ledger replay databases are independent", () => {
-  const script = "return {tables: {items: {columns: {id: 'text'}, primaryKey: ['id'], rows: [{id: records[0].payload.id}]}}}";
   for (const name of ["findings", "experiments"]) {
     const db = new DatabaseSync(":memory:");
     try {
-      const records = [{ payload: { id: name } }];
-      materializeReplay(db, name, script, records, executeReplay(script, records));
-      assert.equal(db.prepare("SELECT id FROM items").get().id, name);
+      const records = [{ type: "ledger_append", payload: { operation: "append", value: name } }];
+      materializeReplay(db, name, "builtin:log", records, replayBuiltin({ type: "log" }, records));
+      assert.equal(db.prepare("SELECT value FROM state").get().value, JSON.stringify(name));
       assert.equal(db.prepare("SELECT ledger_name FROM replay_metadata").get().ledger_name, name);
     } finally {
       db.close();

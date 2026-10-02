@@ -5,8 +5,8 @@
  * Ledger compaction core shared by the Agentic Maintenance plan and apply jobs.
  *
  * Trust model:
- * - The plan job is untrusted. It runs without repository write credentials, may execute a
- *   user-configured selection script, and emits a compaction plan artifact.
+ * - The plan job is untrusted. It runs without repository write credentials, uses built-in
+ *   segment selection, and emits a compaction plan artifact.
  * - The apply job is trusted. It never executes user JavaScript. It treats the plan as hostile
  *   input, validates it with a strict schema, revalidates every referenced segment against the
  *   latest ledger branch state, rebuilds the replacement segment from the branch's own records,
@@ -17,7 +17,6 @@
  */
 
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const cp = require("node:child_process");
 const crypto = require("node:crypto");
@@ -33,10 +32,8 @@ const MAX_PLAN_SOURCES = 256;
 const MAX_PLAN_RECORDS = 100000;
 const MAX_STATE_BYTES = 64 * 1024;
 const MAX_RECENT_PLANS = 20;
-const MAX_SCRIPT_BYTES = 64 * 1024;
 const MAX_SNAPSHOT_FILES = 8192;
 const MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024;
-const MAX_WORKER_INPUT_BYTES = 16 * 1024 * 1024;
 const DEFAULT_MIN_SEGMENTS = 32;
 const DEFAULT_MAX_SEGMENTS = 128;
 const HOUR_MS = 60 * 60 * 1000;
@@ -47,7 +44,6 @@ const LEDGER_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
-const WORKER = path.join(__dirname, "ledger_compaction_worker.cjs");
 
 const PLAN_KEYS = ["base_commit", "branch", "created_at", "ledger", "plan_id", "replacement", "sources", "trigger", "version"];
 const SOURCE_KEYS = ["bytes", "records", "segment", "sha256"];
@@ -130,11 +126,10 @@ function parseCompactionConfig(value = process.env.GH_AW_LEDGER_COMPACTION_CONFI
   const minSegments = compaction.min_segments ?? DEFAULT_MIN_SEGMENTS;
   const maxSegments = compaction.max_segments ?? Math.max(DEFAULT_MAX_SEGMENTS, minSegments);
   if (
-    Object.keys(compaction).some(key => !["max_segments", "min_segments", "schedule", "script"].includes(key)) ||
+    Object.keys(compaction).some(key => !["max_segments", "min_segments", "schedule"].includes(key)) ||
     !Object.hasOwn(SCHEDULE_INTERVALS_MS, schedule) ||
     !isIntegerInRange(minSegments, 2, MAX_PLAN_SOURCES) ||
-    !isIntegerInRange(maxSegments, minSegments, MAX_PLAN_SOURCES) ||
-    (compaction.script !== undefined && (typeof compaction.script !== "string" || !compaction.script.trim() || Buffer.byteLength(compaction.script) > MAX_SCRIPT_BYTES))
+    !isIntegerInRange(maxSegments, minSegments, MAX_PLAN_SOURCES)
   ) {
     throw new TypeError("Invalid ledger compaction policy");
   }
@@ -148,7 +143,6 @@ function parseCompactionConfig(value = process.env.GH_AW_LEDGER_COMPACTION_CONFI
     schedule,
     minSegments,
     maxSegments,
-    script: compaction.script,
   };
 }
 
@@ -308,41 +302,6 @@ function isCompactionDue({ config, trigger, state, now = new Date() }) {
 }
 
 /**
- * Run the optional user-configured selection script in an isolated worker without credentials.
- * @param {string} script
- * @param {any[]} candidates
- * @param {ReturnType<typeof parseCompactionConfig>} config
- * @returns {string[]}
- */
-function runSelectionScript(script, candidates, config) {
-  const input = JSON.stringify({
-    script,
-    segments: candidates.map(segment => ({ id: segment.id, bytes: segment.bytes, records: segment.records })),
-    options: { ledger: config.name, minSegments: config.minSegments, maxSegments: config.maxSegments, maxSegmentBytes: config.maxSegmentBytes },
-  });
-  if (Buffer.byteLength(input) > MAX_WORKER_INPUT_BYTES) throw new RangeError("Ledger compaction script input exceeds size limit");
-  const proc = cp.spawnSync(process.execPath, ["--permission", "--max-old-space-size=256", `--allow-fs-read=${WORKER}`, WORKER], {
-    input,
-    encoding: "utf8",
-    timeout: 30000,
-    maxBuffer: 1024 * 1024,
-    env: {},
-    cwd: os.tmpdir(),
-  });
-  if (proc.error || proc.status !== 0) {
-    throw new Error(proc.error && Reflect.get(proc.error, "code") === "ETIMEDOUT" ? "Ledger compaction script timed out" : "Ledger compaction script failed");
-  }
-  let output;
-  try {
-    output = JSON.parse(proc.stdout);
-  } catch {
-    throw new TypeError("Malformed ledger compaction script output");
-  }
-  if (!hasExactKeys(output, ["sources"]) || !Array.isArray(output.sources)) throw new TypeError("Ledger compaction script must return { sources: string[] }");
-  return output.sources;
-}
-
-/**
  * Select the source segments to compact.
  * @param {{segments: Map<string, any>}} loaded
  * @param {ReturnType<typeof parseCompactionConfig>} config
@@ -352,16 +311,6 @@ function selectSources(loaded, config) {
   const candidates = [...loaded.segments.values()].filter(segment => segment.bytes < config.maxSegmentBytes).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   if (candidates.length < config.minSegments) {
     return { sources: null, reason: `${candidates.length} eligible segment(s); compaction needs at least ${config.minSegments}` };
-  }
-  if (config.script) {
-    const requested = runSelectionScript(config.script, candidates, config);
-    const known = new Set(candidates.map(segment => segment.id));
-    if (requested.length === 0) return { sources: null, reason: "compaction script selected no segments" };
-    if (requested.length < 2 || requested.length > config.maxSegments || new Set(requested).size !== requested.length || !requested.every(id => typeof id === "string" && known.has(id))) {
-      throw new TypeError("Ledger compaction script selected an invalid set of segments");
-    }
-    unionRecords(loaded, requested, config);
-    return { sources: [...requested].sort() };
   }
   const selected = [];
   const seen = new Set();

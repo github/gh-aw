@@ -1629,7 +1629,7 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `BuiltinGraderMeta`, `GraderDefinition` | struct | Grader definitions |
 | `ContinualExperimentConfig`, `ExperimentDecisionConfig` | struct | Experiment configuration |
 | `DriveMemoryConfig`, `DriveMemoryEntry`, `DriveMemoryToolConfig`, `MemoryValidationConfig` | struct | Drive memory and memory validation |
-| `LedgerCompactionConfig`, `LedgerConfig`, `LedgerReplayConfig`, `LedgerToolConfig`, `RepoMemoryLedgerCompactionConfig`, `RepoMemoryLedgerConfig` | struct | Ledger and repo-memory ledger configuration |
+| `LedgerCompactionConfig`, `LedgerConfig`, `LedgerToolConfig`, `RepoMemoryLedgerCompactionConfig`, `RepoMemoryLedgerConfig` | struct | Ledger and repo-memory ledger configuration |
 | `EnginePluginsDefinition`, `PluginReference` | struct | Engine plugin definitions |
 | `PluginInstallationProvider` | interface | Engine-specific plugin installation |
 | `GHAWManifestMCPServer`, `GHAWManifestMemoryValidationScript` | struct | gh-aw manifest entries |
