@@ -174,6 +174,7 @@ async function fetchTeamMembers(teamEntry, defaultOrg, github, core) {
  * @param {any} [mentionsConfig] - Mentions configuration from safe-outputs
  * @param {string[]} [extraKnownAuthors] - Additional known authors to allow (e.g. pre-fetched target issue authors)
  * @param {{ owner: string, repo: string }} [targetRepo] - Repository receiving the safe output
+ * @safe-outputs-exempt SEC-005: targetRepo is the caller-resolved destination or a resolveAndValidateRepo result; item overrides are checked before this helper is called.
  * @returns {Promise<string[]>} Array of allowed mention usernames
  */
 async function resolveAllowedMentionsFromPayload(context, github, core, mentionsConfig, extraKnownAuthors, targetRepo) {

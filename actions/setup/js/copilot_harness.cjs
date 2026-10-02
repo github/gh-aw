@@ -473,7 +473,7 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
     return;
   }
 
-  if (modelName.split("?")[0].toLowerCase().startsWith("gpt-")) {
+  if (/^gpt-(?:[5-9]|\d{2,})(?:[.-]|$)/i.test(modelName.split("?")[0])) {
     logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=responses for GPT model ${modelName}`);
     process.env.COPILOT_PROVIDER_WIRE_API = "responses";
   }
@@ -1258,7 +1258,9 @@ async function main() {
         return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
       },
     });
-    applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+    if (!copilotSDKMode) {
+      applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+    }
   }
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
@@ -1286,7 +1288,7 @@ async function main() {
     const configuredModel = process.env.COPILOT_MODEL || "";
     const modelsJson = loadModelsJson();
 
-    const multiProvider = resolveMultiProviderFromReflect({ model: configuredModel, reflectData: awfReflectData, modelsJson, logger: log });
+    const multiProvider = resolveMultiProviderFromReflect({ model: configuredModel, wireApi: process.env.COPILOT_PROVIDER_WIRE_API, reflectData: awfReflectData, modelsJson, logger: log });
     if (!multiProvider) {
       log("copilot-sdk driver mode: BYOK provider is required but could not be resolved from awf-reflect data — aborting");
       process.exit(1);

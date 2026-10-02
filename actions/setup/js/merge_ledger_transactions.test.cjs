@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -40,6 +40,7 @@ describe("merge_ledger_transactions", () => {
 
   afterEach(() => {
     fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
     delete global.core;
     delete process.env.GH_AW_SAFE_OUTPUTS;
     delete process.env.GH_AW_LEDGER_TRANSACTION_LOG;
@@ -74,6 +75,15 @@ describe("merge_ledger_transactions", () => {
 
   it("returns nothing when the log is missing", () => {
     expect(readAuditEntries(path.join(dir, "absent.jsonl"))).toEqual([]);
+  });
+
+  it("prefixes ledger transaction log read errors with ERR_SYSTEM", () => {
+    const logPath = path.join(dir, "ledger-transactions.jsonl");
+    fs.writeFileSync(logPath, "");
+    vi.spyOn(fs, "readFileSync").mockImplementationOnce(() => {
+      throw new Error("permission denied");
+    });
+    expect(() => readAuditEntries(logPath)).toThrow("ERR_SYSTEM: Failed to read ledger transaction log: permission denied");
   });
 
   it("appends validated entries to the safe-output file", async () => {

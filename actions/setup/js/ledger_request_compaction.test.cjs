@@ -57,6 +57,6 @@ describe("ledger_request_compaction", () => {
   });
 
   it("rejects configuration without compaction-enabled ledgers", async () => {
-    await expect(main({ ledgers: [] })).rejects.toThrow("no compaction-enabled ledgers");
+    await expect(main({ ledgers: [] })).rejects.toThrow("E001: ledger_request_compaction has no compaction-enabled ledgers");
   });
 });
