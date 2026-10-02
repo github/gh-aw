@@ -221,7 +221,7 @@ main > .content-panel:has(h1#_top) + .content-panel {
 
 /* Breathing room between groups */
 .sidebar .top-level > li + li {
-  margin-top: 1.375rem;
+  margin-top: 1rem;
 }
 
 .sidebar .top-level li li a {
