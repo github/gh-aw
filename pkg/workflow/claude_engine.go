@@ -232,6 +232,7 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 // the --mcp-config argument (kept outside shellJoinArgs for runtime ${RUNNER_TEMP} expansion),
 // and the allowed-tools string (reused for the comment annotation).
 func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithMountedCLIs map[string]any, logFile string) (claudeArgs []string, mcpConfigArg string, allowedTools string) {
+	// Always disable ambient MCP config; gh-aw passes any configured servers explicitly below.
 	claudeArgs = append(claudeArgs, "--print", "--no-chrome", "--strict-mcp-config")
 
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.MaxTurns != "" {

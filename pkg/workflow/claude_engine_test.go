@@ -115,6 +115,12 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected --strict-mcp-config in CLI args even without MCP servers: %s", stepContent)
 	}
 
+	strictMCPConfigIndex := strings.Index(stepContent, "--strict-mcp-config")
+	allowedToolsIndex := strings.Index(stepContent, "--allowed-tools")
+	if strictMCPConfigIndex == -1 || allowedToolsIndex == -1 || strictMCPConfigIndex >= allowedToolsIndex {
+		t.Errorf("Expected --strict-mcp-config before --allowed-tools in CLI args: %s", stepContent)
+	}
+
 	if !strings.Contains(stepContent, "--permission-mode acceptEdits") {
 		t.Errorf("Expected --permission-mode acceptEdits in CLI args: %s", stepContent)
 	}
