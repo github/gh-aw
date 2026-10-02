@@ -1,0 +1,141 @@
+---
+/**
+ * Mobile menu button for the site header. Opens a popover sheet: Starlight's
+ * sidebar (`#starlight__sidebar`) on pages that have one, otherwise the
+ * header's own `#site-menu` sheet. The popover API gives us Esc, light dismiss
+ * and focus return; this adds aria-expanded, inert page content, and
+ * close-on-link-tap.
+ */
+import octicons from '@primer/octicons';
+
+interface Props {
+	target: string;
+}
+
+const { target } = Astro.props;
+const barsIcon = octicons['three-bars'].toSVG({ width: 20, height: 20, 'aria-hidden': 'true' });
+const closeIcon = octicons.x.toSVG({ width: 20, height: 20, 'aria-hidden': 'true' });
+---
+
+<button
+	type="button"
+	class="site-menu-toggle"
+	popovertarget={target}
+	aria-controls={target}
+	aria-expanded="false"
+	aria-label="Menu"
+>
+	<span class="site-menu-toggle-open" set:html={barsIcon} />
+	<span class="site-menu-toggle-close" set:html={closeIcon} />
+</button>
+
+<script>
+	const desktop = matchMedia('(min-width: 50rem)');
+	const initialized = new WeakSet<HTMLButtonElement>();
+	const cleanups = new Set<() => void>();
+
+	function setPageInert(inert: boolean) {
+		document
+			.querySelectorAll<HTMLElement>('.main-frame, .skip-link, .site-footer')
+			.forEach((element) => element.toggleAttribute('inert', inert));
+	}
+
+	function initialize() {
+		document.querySelectorAll<HTMLButtonElement>('.site-menu-toggle').forEach((button) => {
+			if (initialized.has(button)) return;
+			const sheet = document.getElementById(button.getAttribute('aria-controls') ?? '');
+			if (!sheet) return;
+			initialized.add(button);
+
+			const isOpen = () => sheet.matches(':popover-open');
+			const close = () => {
+				if (isOpen()) sheet.hidePopover();
+			};
+			const onToggle = (event: Event) => {
+				const open = (event as ToggleEvent).newState === 'open';
+				button.setAttribute('aria-expanded', String(open));
+				// Starlight already inerts the page behind its own sidebar; do the same for ours.
+				if (sheet.id !== 'starlight__sidebar') setPageInert(open);
+				if (!open && !desktop.matches) {
+					const active = document.activeElement;
+					if (!active || active === document.body || sheet.contains(active)) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			};
+			const onSheetClick = (event: MouseEvent) => {
+				if ((event.target as Element).closest('a[href]')) close();
+			};
+			const cleanup = () => {
+				sheet.removeEventListener('toggle', onToggle);
+				sheet.removeEventListener('click', onSheetClick);
+				desktop.removeEventListener('change', close);
+				if (isOpen()) sheet.hidePopover();
+				button.setAttribute('aria-expanded', 'false');
+				if (sheet.id === 'starlight__sidebar' || sheet.id === 'site-menu') setPageInert(false);
+				initialized.delete(button);
+				cleanups.delete(cleanup);
+			};
+
+			sheet.addEventListener('toggle', onToggle);
+			sheet.addEventListener('click', onSheetClick);
+			desktop.addEventListener('change', close);
+			cleanups.add(cleanup);
+		});
+	}
+
+	function cleanup() {
+		for (const dispose of cleanups) dispose();
+	}
+
+	document.addEventListener('astro:before-swap', cleanup);
+	document.addEventListener('astro:page-load', initialize);
+	initialize();
+</script>
+
+<style>
+	.site-menu-toggle {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		padding: 0;
+		border: 0;
+		border-radius: var(--aw-radius-sm);
+		background: transparent;
+		color: var(--aw-color-text-muted);
+		cursor: pointer;
+		transition: color var(--aw-duration-fast) ease;
+	}
+
+	.site-menu-toggle:hover,
+	.site-menu-toggle[aria-expanded='true'] {
+		color: var(--aw-color-text-strong);
+	}
+
+	.site-menu-toggle span {
+		display: flex;
+	}
+
+	.site-menu-toggle :global(svg) {
+		fill: currentColor;
+	}
+
+	.site-menu-toggle[aria-expanded='true'] .site-menu-toggle-open,
+	.site-menu-toggle:not([aria-expanded='true']) .site-menu-toggle-close {
+		display: none;
+	}
+
+	@media (max-width: 49.99rem) {
+		.site-menu-toggle {
+			display: inline-flex;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.site-menu-toggle {
+			transition: none;
+		}
+	}
+</style>
