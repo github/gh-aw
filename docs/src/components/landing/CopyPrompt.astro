@@ -182,31 +182,50 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
 </style>
 
 <script>
-  document.querySelectorAll<HTMLElement>('[data-copy-prompt]').forEach((root) => {
-    const btn = root.querySelector('button');
-    const label = root.querySelector('.aw-cp-label');
-    const status = root.querySelector('[role="status"]');
-    const original = root.dataset.label ?? '';
-    let timer: number | undefined;
-    btn?.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(root.dataset.copyPrompt ?? '');
-      } catch {
-        if (status) status.textContent = 'Copy failed';
-        return;
-      }
-      // Hold the width so the shorter "Copied" label doesn't shift the layout.
-      if (btn && !root.hasAttribute('data-copied')) btn.style.minWidth = `${btn.offsetWidth}px`;
-      root.setAttribute('data-copied', '');
-      if (label) label.textContent = 'Copied';
-      if (status) status.textContent = 'Copied to clipboard';
-      clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        root.removeAttribute('data-copied');
-        if (label) label.textContent = original;
-        if (btn) btn.style.minWidth = '';
-        if (status) status.textContent = '';
-      }, 1800);
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+    const { signal } = controller;
+    const timers: number[] = [];
+
+    document.querySelectorAll<HTMLElement>('[data-copy-prompt]').forEach((root) => {
+      const btn = root.querySelector('button');
+      const label = root.querySelector('.aw-cp-label');
+      const status = root.querySelector('[role="status"]');
+      const original = root.dataset.label ?? '';
+      let timer: number | undefined;
+      btn?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(root.dataset.copyPrompt ?? '');
+        } catch {
+          if (status) status.textContent = 'Copy failed';
+          return;
+        }
+        // Hold the width so the shorter "Copied" label doesn't shift the layout.
+        if (btn && !root.hasAttribute('data-copied')) btn.style.minWidth = `${btn.offsetWidth}px`;
+        root.setAttribute('data-copied', '');
+        if (label) label.textContent = 'Copied';
+        if (status) status.textContent = 'Copied to clipboard';
+        clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          root.removeAttribute('data-copied');
+          if (label) label.textContent = original;
+          if (btn) btn.style.minWidth = '';
+          if (status) status.textContent = '';
+        }, 1800);
+        timers.push(timer);
+      }, { signal });
     });
-  });
+
+    cleanup = () => {
+      controller.abort();
+      timers.forEach(clearTimeout);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>

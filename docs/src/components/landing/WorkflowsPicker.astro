@@ -292,39 +292,53 @@ const icon = (n: string, s = 16) => (octicons as Record<string, { toSVG: (o: obj
 </style>
 
 <script>
-  document.querySelectorAll<HTMLElement>('[data-wf-picker]').forEach((root) => {
-    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    const select = (next: HTMLButtonElement, focus: boolean) => {
-      tabs.forEach((tab) => {
-        const on = tab === next;
-        tab.setAttribute('aria-selected', String(on));
-        tab.tabIndex = on ? 0 : -1;
-        const panel = root.querySelector<HTMLElement>(`#${tab.getAttribute('aria-controls')}`);
-        if (!panel) return;
-        if (on && panel.hidden) {
-          panel.hidden = false;
-          panel.removeAttribute('data-entering');
-          void panel.offsetWidth;
-          panel.setAttribute('data-entering', '');
-        } else if (!on) {
-          panel.hidden = true;
-        }
-      });
-      if (focus) next.focus();
-    };
-    tabs.forEach((tab, i) => {
-      tab.addEventListener('click', () => select(tab, false));
-      tab.addEventListener('keydown', (e) => {
-        const last = tabs.length - 1;
-        let j = -1;
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = i === last ? 0 : i + 1;
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = i === 0 ? last : i - 1;
-        else if (e.key === 'Home') j = 0;
-        else if (e.key === 'End') j = last;
-        if (j < 0) return;
-        e.preventDefault();
-        select(tabs[j], true);
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    document.querySelectorAll<HTMLElement>('[data-wf-picker]').forEach((root) => {
+      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+      const select = (next: HTMLButtonElement, focus: boolean) => {
+        tabs.forEach((tab) => {
+          const on = tab === next;
+          tab.setAttribute('aria-selected', String(on));
+          tab.tabIndex = on ? 0 : -1;
+          const panel = root.querySelector<HTMLElement>(`#${tab.getAttribute('aria-controls')}`);
+          if (!panel) return;
+          if (on && panel.hidden) {
+            panel.hidden = false;
+            panel.removeAttribute('data-entering');
+            void panel.offsetWidth;
+            panel.setAttribute('data-entering', '');
+          } else if (!on) {
+            panel.hidden = true;
+          }
+        });
+        if (focus) next.focus();
+      };
+      tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(tab, false), { signal });
+        tab.addEventListener('keydown', (e) => {
+          const last = tabs.length - 1;
+          let j = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = i === last ? 0 : i + 1;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = i === 0 ? last : i - 1;
+          else if (e.key === 'Home') j = 0;
+          else if (e.key === 'End') j = last;
+          if (j < 0) return;
+          e.preventDefault();
+          select(tabs[j], true);
+        }, { signal });
       });
     });
-  });
+
+    cleanup = () => controller.abort();
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>

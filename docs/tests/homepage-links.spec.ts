@@ -1,4 +1,27 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+const INSTALL_PROMPT =
+  "Initialize this repository for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/install.md";
+
+async function expectHeroPromptCopies(page: Page) {
+  const prompt = page.locator(".aw-hero [data-copy-prompt]:visible").first();
+  await prompt.getByRole("button", { name: "Copy installation prompt" }).click();
+  await expect(prompt).toHaveAttribute("data-copied", "");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(INSTALL_PROMPT);
+}
+
+async function expectWorkflowsInteractive(page: Page) {
+  const tabs = page.locator('[data-wf-picker] [role="tab"]');
+  await expect(tabs.first()).toBeVisible();
+  await tabs.nth(1).click();
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "false");
+
+  const more = page.locator("[data-ma]").first();
+  await more.locator("summary").click();
+  await expect(more).toHaveAttribute("data-expanded", "");
+  await expect(more).toHaveJSProperty("open", true);
+}
 
 test.describe("Homepage Links", () => {
   test.beforeEach(async ({ page }) => {
@@ -6,9 +29,11 @@ test.describe("Homepage Links", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("should feature the agentic prompt and link to workflow creation", async ({ page }) => {
-    const command = page.locator(".aw-hero .aw-copy-text");
-    await expect(command).toHaveText("$ /agentic-workflows create a daily status");
+  test("should feature the installation prompt and link to workflow creation", async ({ page }) => {
+    // The page holds several hero variants; only the active one is visible.
+    const prompt = page.locator(".aw-hero [data-copy-prompt]:visible").first();
+    await expect(prompt).toHaveAttribute("data-copy-prompt", INSTALL_PROMPT);
+    await expect(prompt.getByRole("button", { name: "Copy installation prompt" })).toBeVisible();
 
     const createWorkflow = page.getByRole("link", { name: "Create a workflow" }).first();
     await expect(createWorkflow).toBeVisible();
@@ -41,7 +66,7 @@ test.describe("Homepage Links", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.evaluate(() => {
       document.dispatchEvent(new Event("astro:before-swap"));
-      for (const selector of [".aw-hero", "[data-watch]", "[data-safe-root]"]) {
+      for (const selector of [".aw-hero", "[data-watch]", "[data-safe-root]", "[data-wf-picker]", "[data-ma]"]) {
         const element = document.querySelector(selector);
         if (element) {
           const replacement = element.cloneNode(true);
@@ -62,8 +87,25 @@ test.describe("Homepage Links", () => {
     await watchTabs.nth(1).click();
     await expect(watchTabs.nth(1)).toHaveAttribute("aria-selected", "true");
 
-    const copyButton = page.locator(".aw-hero .aw-copy-btn");
-    await copyButton.click();
-    await expect(page.locator(".aw-hero [data-copy-command]")).toHaveAttribute("data-copied", "");
+    await expectHeroPromptCopies(page);
+    await expectWorkflowsInteractive(page);
+  });
+
+  test("should keep landing interactions working after real client-side navigation away and back", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    page.on("console", message => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+
+    await page.getByRole("link", { name: "Create a workflow" }).first().click();
+    await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/gh-aw\/$/);
+
+    await expectHeroPromptCopies(page);
+    await expectWorkflowsInteractive(page);
+    expect(errors).toEqual([]);
   });
 });

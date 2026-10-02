@@ -227,26 +227,46 @@ const docsLink = '/gh-aw/gallery/';
 </style>
 
 <script>
-  document.querySelectorAll<HTMLDetailsElement>('[data-ma]').forEach((d) => {
-    const summary = d.querySelector('summary')!;
-    const body = d.querySelector<HTMLElement>('.ma-body')!;
-    d.setAttribute('data-enhanced', '');
-    const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-    summary.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!d.hasAttribute('data-expanded')) {
-        d.open = true;
-        requestAnimationFrame(() => requestAnimationFrame(() => d.setAttribute('data-expanded', '')));
-      } else {
-        d.removeAttribute('data-expanded');
-        if (reduce()) { d.open = false; return; }
-        const done = (ev: TransitionEvent) => {
-          if (ev.propertyName !== 'grid-template-rows') return;
-          body.removeEventListener('transitionend', done);
-          if (!d.hasAttribute('data-expanded')) d.open = false;
-        };
-        body.addEventListener('transitionend', done);
-      }
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+    const { signal } = controller;
+    const rafs: number[] = [];
+
+    document.querySelectorAll<HTMLDetailsElement>('[data-ma]').forEach((d) => {
+      const summary = d.querySelector('summary')!;
+      const body = d.querySelector<HTMLElement>('.ma-body')!;
+      d.setAttribute('data-enhanced', '');
+      const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+      summary.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!d.hasAttribute('data-expanded')) {
+          d.open = true;
+          rafs.push(requestAnimationFrame(() => {
+            rafs.push(requestAnimationFrame(() => d.setAttribute('data-expanded', '')));
+          }));
+        } else {
+          d.removeAttribute('data-expanded');
+          if (reduce()) { d.open = false; return; }
+          const done = (ev: TransitionEvent) => {
+            if (ev.propertyName !== 'grid-template-rows') return;
+            body.removeEventListener('transitionend', done);
+            if (!d.hasAttribute('data-expanded')) d.open = false;
+          };
+          body.addEventListener('transitionend', done, { signal });
+        }
+      }, { signal });
     });
-  });
+
+    cleanup = () => {
+      controller.abort();
+      rafs.forEach(cancelAnimationFrame);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>
