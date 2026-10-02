@@ -216,26 +216,26 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
     if (config.type) {
       const reducer = createReducer(config);
       for (const record of current.records) reducer.apply(record.payload, record);
-      const existing = new Set(current.records.map(record => (config.type === "claims" ? record.id : record.payload?.id)));
+      const existing = new Set(current.records.map(record => (config.type === "notes" ? record.id : record.payload?.id)));
       for (const append of appends)
         if (!existing.has(append.record.id)) {
-          const record = config.type === "claims" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
-          reducer.apply(record, config.type === "claims" ? { id: append.record.id } : undefined);
+          const record = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
+          reducer.apply(record, config.type === "notes" ? { id: append.record.id } : undefined);
         }
     }
     let persisted = 0;
     let alreadyPresent = 0;
     const persistedIds = [];
     for (const append of appends) {
-      const payload = config.type === "claims" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
-      const prior = current.records.find(record => (config.type === "claims" ? record.id === append.record.id : record.payload?.id === append.record.id));
+      const payload = config.type === "notes" ? Object.fromEntries(Object.entries(append.record).filter(([key]) => key !== "id")) : append.record;
+      const prior = current.records.find(record => (config.type === "notes" ? record.id === append.record.id : record.payload?.id === append.record.id));
       if (prior && canonicalJSON(prior.payload) !== canonicalJSON(payload)) throw new TypeError("Conflicting ledger record ID");
       const exists = Boolean(prior);
       if (exists) {
         alreadyPresent++;
         continue;
       }
-      ledger.append("ledger_append", payload, config.type === "claims" ? append.record.id : undefined);
+      ledger.append("ledger_append", payload, config.type === "notes" ? append.record.id : undefined);
       persisted++;
       persistedIds.push(append.record.id);
     }
@@ -263,9 +263,9 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
         ? () => {
             const state = ledgerForValidation(workspaceDir, config);
             const reducer = createReducer(config);
-            if (config.type === "claims") {
-              for (const record of state) if (record.payload.operation === "claim") reducer.apply(record.payload, record);
-              for (const record of state) if (record.payload.operation !== "claim") reducer.apply(record.payload, record);
+            if (config.type === "notes") {
+              for (const record of state) if (record.payload.operation === "note") reducer.apply(record.payload, record);
+              for (const record of state) if (record.payload.operation !== "note") reducer.apply(record.payload, record);
             } else {
               for (const record of state) reducer.apply(record.payload);
             }
@@ -325,7 +325,7 @@ async function main(options = {}) {
           })
         : { persisted: 0, already_present: 0, reconciled: 0 };
     } catch (error) {
-      if (config.type === "claims" && error instanceof TypeError && error.message === "Vote references a missing claim") {
+      if (config.type === "notes" && error instanceof TypeError && error.message === "Vote references a missing note") {
         result.ledgers[config.name] = { requested: appends.length, persisted: 0, rejected: 1, invalid_vote_requests: 1 };
         const output = options.outputFile === undefined ? process.env.GITHUB_OUTPUT : options.outputFile;
         if (output) {
@@ -338,7 +338,7 @@ async function main(options = {}) {
       }
       throw error;
     }
-    const addedClaims = config.type === "claims" ? appends.filter(append => persisted.persisted_ids?.includes(append.record.id) || (persisted.persisted === appends.length && !persisted.persisted_ids)) : [];
+    const addedNotes = config.type === "notes" ? appends.filter(append => persisted.persisted_ids?.includes(append.record.id) || (persisted.persisted === appends.length && !persisted.persisted_ids)) : [];
     result.ledgers[config.name] = {
       requested: appends.length,
       validated: appends.length,
@@ -350,12 +350,12 @@ async function main(options = {}) {
       ...(config.type
         ? {
             type: config.type,
-            ...(config.type === "claims"
+            ...(config.type === "notes"
               ? {
-                  claims_added: addedClaims.filter(append => append.record.operation === "claim").length,
-                  claim_votes_added: addedClaims.filter(append => append.record.operation === "vote").length,
-                  upvotes: addedClaims.filter(append => append.record.operation === "vote" && append.record.vote === "up").length,
-                  downvotes: addedClaims.filter(append => append.record.operation === "vote" && append.record.vote === "down").length,
+                  notes_added: addedNotes.filter(append => append.record.operation === "note").length,
+                  note_votes_added: addedNotes.filter(append => append.record.operation === "vote").length,
+                  upvotes: addedNotes.filter(append => append.record.operation === "vote" && append.record.vote === "up").length,
+                  downvotes: addedNotes.filter(append => append.record.operation === "vote" && append.record.vote === "down").length,
                   invalid_vote_requests: 0,
                 }
               : {}),

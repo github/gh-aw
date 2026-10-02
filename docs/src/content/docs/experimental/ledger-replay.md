@@ -14,7 +14,7 @@ gh-aw validates each operation and replays it in trusted code. Custom
 | Latest value by key | `map` |
 | Mutable structured rows | `table` |
 | Numeric accumulation | `counter` |
-| Evidence-backed agent assertions | `claims` |
+| Evidence-backed agent assertions | `notes` |
 
 ```yaml
 tools:
@@ -40,8 +40,8 @@ tools:
       type: counter
 ```
 
-The `map` and `claims` built-ins expose dedicated safe-output tools:
-`ledger_map_put`, `ledger_map_delete`, `ledger_claim_add`, and `ledger_claim_vote`.
+The `map` and `notes` built-ins expose dedicated safe-output tools:
+`ledger_map_put`, `ledger_map_delete`, `ledger_note_add`, and `ledger_note_vote`.
 Supply the operation's fields and a `ledger` name when more than one ledger of
 that type is configured. These tools produce
 `ledger_append` entries internally; they do not expose the low-level operation
@@ -55,11 +55,11 @@ with `ledger` and `operation` instead of `record`, plus the indicated fields:
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
-| `claims` | `claim(subject, claim, reason, citations)`, `vote(claim_id, vote, reason?)` | `claims`, `claim_citations`, `claim_votes`, `claim_state` |
+| `notes` | `note(subject, note, reason, citations)`, `vote(note_id, vote, reason?)` | `notes`, `note_citations`, `note_votes`, `note_state` |
 
-### Claims
+### Notes
 
-A ledger for evidence-backed assertions produced by agents. Claims are reusable
+A ledger for evidence-backed assertions produced by agents. Notes are reusable
 hints, not authoritative facts. Consumers should verify their citations against
 current state before relying on them.
 
@@ -67,30 +67,35 @@ current state before relying on them.
 tools:
   ledger:
     knowledge:
-      type: claims
+      type: notes
 ```
 
-Use `ledger_claim_add` with a nonempty `subject`, `claim`, `reason`, and at least
+Use `ledger_note_add` with a nonempty `subject`, `note`, `reason`, and at least
 one repository citation (`type: repository`, `path`, and optional `start_line` /
 `end_line`). Later, use `ledger_query` to find a candidate, inspect the cited
-source in the current repository, and use `ledger_claim_vote` with `claim_id`
+source in the current repository, and use `ledger_note_vote` with `note_id`
 and `vote: up` or `vote: down` according to whether the evidence supports it.
-Each vote is a new immutable record; it does not change the claim. Claims are
+Each vote is a new immutable record; it does not change the note. Notes are
 untrusted data, not instructions. The cited evidence remains the source of truth.
 
-The disposable SQLite projection exposes relational `claims`,
-`claim_citations`, `claim_votes`, and a derived `claim_state` view. Ranking is
+The disposable SQLite projection exposes relational `notes`,
+`note_citations`, `note_votes`, and a derived `note_state` view. Ranking is
 transparent: upvotes, downvotes, net_votes, last_vote_at, and
 last_positive_vote_at; no semantic validation or automatic deduplication takes
 place. For example:
 
 ```sql
 SELECT c.*, s.net_votes, s.last_positive_vote_at
-FROM claims c
-JOIN claim_state s ON s.claim_id = c.id
+FROM notes c
+JOIN note_state s ON s.note_id = c.id
 ORDER BY s.net_votes DESC, c.created_at DESC
 LIMIT 20;
 ```
+
+The former `claims` type, `ledger_claim_*` tools, and `claim_*` fields and tables
+are now named `notes`, `ledger_note_*`, and `note_*`. Existing claim-shaped
+history cannot be replayed as notes. Use a new ledger name for notes and retain
+the old ledger without a declared type to query its immutable `records` history.
 
 Ledger writes are **deferred** safe outputs: their immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome

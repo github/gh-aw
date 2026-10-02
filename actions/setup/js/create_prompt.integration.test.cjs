@@ -68,6 +68,7 @@ GH_AW_PROMPT_TEST_EOF
       RUNNER_TEMP: tempDir,
       GH_AW_PROMPT: javascriptPromptPath,
       GH_AW_PROMPT_CONFIG: JSON.stringify({
+        system_item_count: 4,
         items: [{ content_env: "INLINE_CONTEXT" }, { file: "system.md" }, { file: "conditional.md", condition_env: "GH_AW_INCLUDE_CONTEXT" }, { content_env: "SYSTEM_CLOSE" }, { content_env: "USER_PROMPT" }],
       }),
       GH_AW_INCLUDE_CONTEXT: includeContext,
@@ -80,5 +81,10 @@ GH_AW_PROMPT_TEST_EOF
 
     expect(core.setFailed).not.toHaveBeenCalled();
     expect(fs.readFileSync(javascriptPromptPath)).toEqual(fs.readFileSync(legacyPromptPath));
+    const system = fs.readFileSync(path.join(path.dirname(javascriptPromptPath), "system.txt"), "utf8");
+    const user = fs.readFileSync(path.join(path.dirname(javascriptPromptPath), "user.txt"), "utf8");
+    expect(system).toBe(`<system>\nInline context\nFile context\n${includeContext === "true" ? "Conditional context\n" : ""}</system>\n`);
+    expect(user).toBe(userPrompt);
+    expect(fs.readFileSync(javascriptPromptPath, "utf8")).toBe(system + user);
   });
 });

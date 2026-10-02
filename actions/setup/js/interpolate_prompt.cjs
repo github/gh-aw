@@ -10,6 +10,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { randomUUID } = require("crypto");
 const { processRuntimeImports } = require("./runtime_import.cjs");
 const { writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = require("./extract_inline_skills.cjs");
@@ -102,6 +103,22 @@ async function main() {
     core.info(`[main] Writing raw template to: ${templatePath}`);
     fs.writeFileSync(templatePath, content, "utf8");
 
+    const systemPath = path.join(promptDir, "system.txt");
+    const userPath = path.join(promptDir, "user.txt");
+    let splitMarker;
+    if (fs.existsSync(systemPath) && fs.existsSync(userPath)) {
+      const system = fs.readFileSync(systemPath, "utf8");
+      const user = fs.readFileSync(userPath, "utf8");
+      if (content !== system + user) {
+        throw new Error(`${ERR_VALIDATION}: Split prompt files do not match the combined prompt`);
+      }
+      // Keep the marker on its own line so line-anchored processing (inline
+      // agent/skill headings, template blocks) sees the same line starts.
+      const leadingNewline = system === "" || system.endsWith("\n") ? "" : "\n";
+      splitMarker = `${leadingNewline}\x00GH_AW_PROMPT_SPLIT_${randomUUID()}\x00\n`;
+      content = system + splitMarker + user;
+    }
+
     // Step 1: Process runtime imports (files and URLs)
     core.info("\n========================================");
     core.info("[main] STEP 1: Runtime Imports");
@@ -112,7 +129,7 @@ async function main() {
     // can identify which parts of the rendered prompt originated from which source files.
     const importTree = {
       version: 1,
-      template: content,
+      template: splitMarker ? content.replace(splitMarker, "") : content,
       children: /** @type {ImportTreeNode[]} */ [],
     };
 
@@ -279,6 +296,15 @@ async function main() {
     core.info(`Final content length: ${content.length} characters`);
     core.info(`Total length change: ${originalLength} -> ${content.length} (${content.length > originalLength ? "+" : ""}${content.length - originalLength})`);
 
+    if (splitMarker) {
+      const parts = content.split(splitMarker);
+      if (parts.length !== 2) {
+        throw new Error(`${ERR_VALIDATION}: Prompt split boundary was lost during processing`);
+      }
+      fs.writeFileSync(systemPath, parts[0], "utf8");
+      fs.writeFileSync(userPath, parts[1], "utf8");
+      content = parts.join("");
+    }
     fs.writeFileSync(promptPath, content, "utf8");
 
     core.info(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);

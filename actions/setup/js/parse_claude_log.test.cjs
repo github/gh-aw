@@ -321,6 +321,21 @@ describe("parse_claude_log.cjs", () => {
       expect(result.maxTurnsHit).toBe(false);
     });
 
+    it("should use canonical result accounting even when native metadata follows it", () => {
+      process.env.GH_AW_MAX_TURNS = "5";
+      const result = parseClaudeLog(
+        JSON.stringify([
+          { type: "result", num_turns: 5, total_cost_usd: 0, usage: { input_tokens: 0, output_tokens: 0 } },
+          { type: "claude.observation", id: "native-last", data: { details: false } },
+        ])
+      );
+      expect(result.maxTurnsHit).toBe(true);
+      expect(result.markdown).toContain("**Turns:** 5");
+      expect(result.markdown).toContain("**Total Cost:** $0.0000");
+      expect(result.logEntries.map(event => event.type)).toEqual(["session.result", "claude.observation"]);
+      expect(result.logEntries.at(-1).id).toBe("native-last");
+    });
+
     it("should render error messages from errors array", () => {
       const logWithErrors = JSON.stringify([
         { type: "system", subtype: "init", session_id: "test-errors", tools: ["Bash"], model: "claude-sonnet-4-20250514" },

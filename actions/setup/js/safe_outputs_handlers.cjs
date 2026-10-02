@@ -613,7 +613,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
   const ledgerAgentAppendHandler = args => {
     const ledgers = config.ledger_append?.ledgers || [];
     const target = ledgers.find(ledger => ledger.name === args?.ledger) || (args?.ledger === undefined && ledgers.length === 1 ? ledgers[0] : null);
-    if (target?.type === "claims") return buildIntentErrorResponse("Use ledger_claim_add or ledger_claim_vote for claims ledgers.");
+    if (target?.type === "notes") return buildIntentErrorResponse("Use ledger_note_add or ledger_note_vote for notes ledgers.");
     return defaultHandler("ledger_append")(args);
   };
 

@@ -68,7 +68,7 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.30"
+const DefaultFirewallVersion Version = "v0.28.31"
 
 // AWFModelRoutingMinVersion is the first AWF version that exposes task routing
 // selections through /reflect and accepts apiProxy.routing.
@@ -219,7 +219,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.27"
+const DefaultMCPGatewayVersion Version = "v0.4.28"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

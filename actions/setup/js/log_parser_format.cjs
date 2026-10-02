@@ -1,6 +1,8 @@
 // @ts-check
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
+const { sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
+const { escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 
 /**
  * Minimal dependency contract injected from log_parser_shared.cjs.
@@ -19,6 +21,9 @@ const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_bu
  * @property {(text: string) => string} unfenceMarkdown
  * @property {(entries: Array<any>) => boolean} isCopilotEventLogEntries
  * @property {(entries: Array<any>) => Array<any>} convertCopilotEventsToLegacyLogEntries
+ * @property {(entry: any) => string} generateInformationSection
+ * @property {() => any} createSummaryTracker
+ * @property {number} MAX_STEP_SUMMARY_SIZE
  * @property {number} MAX_AGENT_TEXT_LENGTH
  * @property {string} SIZE_LIMIT_WARNING
  */
@@ -27,7 +32,7 @@ const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_bu
  * Public formatter API returned by createLogParserFormatters().
  *
  * @typedef {Object} LogParserFormatters
- * @property {(logEntries: Array<any>, options: {formatToolCallback: Function, formatInitCallback: Function, summaryTracker?: any}) => {markdown: string, commandSummary: Array<string>, sizeLimitReached: boolean}} generateConversationMarkdown
+ * @property {(logEntries: Array<any>, options: {formatToolCallback: Function, formatInitCallback: Function, summaryTracker?: any, includeInformation?: boolean}) => {markdown: string, commandSummary: Array<string>, sizeLimitReached: boolean}} generateConversationMarkdown
  * @property {(toolUse: any, toolResult: any, options?: {includeDetailedParameters?: boolean}) => string} formatToolUse
  * @property {(logEntries: Array<any>, options?: {model?: string, parserName?: string}) => string} generatePlainTextSummary
  * @property {(logEntries: Array<any>, options?: {model?: string, parserName?: string}) => string} generateCopilotCliStyleSummary
@@ -54,6 +59,9 @@ function createLogParserFormatters(deps) {
     unfenceMarkdown,
     isCopilotEventLogEntries,
     convertCopilotEventsToLegacyLogEntries,
+    generateInformationSection,
+    createSummaryTracker,
+    MAX_STEP_SUMMARY_SIZE,
     MAX_AGENT_TEXT_LENGTH,
     SIZE_LIMIT_WARNING,
   } = deps;
@@ -83,10 +91,11 @@ function createLogParserFormatters(deps) {
   }
 
   function normalizeEntriesForRendering(logEntries) {
+    if (!Array.isArray(logEntries)) return [];
     if (isCopilotEventLogEntries(logEntries)) {
       return convertCopilotEventsToLegacyLogEntries(logEntries);
     }
-    return logEntries;
+    return logEntries.filter(entry => entry && typeof entry === "object");
   }
 
   /**
@@ -101,10 +110,13 @@ function createLogParserFormatters(deps) {
    * @param {Function} options.formatToolCallback - Callback function to format tool use (content, toolResult) => string
    * @param {Function} options.formatInitCallback - Callback function to format initialization (initEntry) => string or {markdown: string, mcpFailures: string[]}
    * @param {any} [options.summaryTracker] - Optional tracker for step summary size limits
+   * @param {boolean} [options.includeInformation] - Include accounting for canonical traces by default
    * @returns {{markdown: string, commandSummary: Array<string>, sizeLimitReached: boolean}} Generated markdown, command summary, and size limit status
    */
   function generateConversationMarkdown(logEntries, options) {
-    const { formatToolCallback, formatInitCallback, summaryTracker } = options;
+    const standard = isCopilotEventLogEntries(logEntries);
+    const { formatToolCallback, formatInitCallback } = options;
+    const summaryTracker = options.summaryTracker ?? (standard ? createSummaryTracker() : undefined);
     const renderEntries = normalizeEntriesForRendering(logEntries);
     const toolUsePairs = collectToolUsePairs(renderEntries);
 
@@ -130,9 +142,10 @@ function createLogParserFormatters(deps) {
      */
     function addDetailsSectionFitting(title, body) {
       const fullSection = buildStepSummaryDetailsSection(title, body);
-      if (addContent(fullSection)) {
-        return true;
+      if (!summaryTracker || Buffer.byteLength(fullSection, "utf8") <= summaryTracker.remaining()) {
+        return addContent(fullSection);
       }
+      sizeLimitReached = true;
 
       // Full section doesn't fit — try truncating the body to use what remains.
       if (!summaryTracker) {
@@ -174,6 +187,13 @@ function createLogParserFormatters(deps) {
         return { markdown, commandSummary: [], sizeLimitReached };
       }
     }
+    const observedModel = observedSessionModel(logEntries);
+    if (observedModel && observedModel !== initEntry?.model) {
+      if (!addDetailsSectionFitting("Model", `**Observed Model:** ${escapeSummaryText(observedModel)}\n`)) {
+        markdown += SIZE_LIMIT_WARNING;
+        return { markdown, commandSummary: [], sizeLimitReached };
+      }
+    }
 
     let reasoningBody = "";
     let commandDetailsBody = "";
@@ -190,12 +210,14 @@ function createLogParserFormatters(deps) {
         if (content.type === "text" && content.text) {
           let text = content.text.trim();
           text = unfenceMarkdown(text);
+          if (standard) text = escapeSummaryText(text);
           if (text) {
             reasoningBody += text + "\n\n";
           }
         } else if (content.type === "thinking" && content.thinking) {
           let text = content.thinking.trim();
           text = unfenceMarkdown(text);
+          if (standard) text = escapeSummaryText(text);
           if (text) {
             reasoningBody += `<sub><em>${text.replace(/\n/g, "<br>")}</em></sub>\n\n`;
           }
@@ -228,26 +250,33 @@ function createLogParserFormatters(deps) {
           continue;
         }
 
-        const toolName = content.name;
-        const input = content.input || {};
-        if (INTERNAL_TOOLS.includes(toolName)) {
+        const toolName = typeof content.name === "string" ? content.name : "unknown";
+        const input = content.input === undefined ? {} : content.input;
+        const fields = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+        if (!standard && INTERNAL_TOOLS.includes(toolName)) {
           continue;
         }
 
         const toolResult = toolUsePairs.get(content.id);
         let statusIcon = "❓";
         if (toolResult) {
-          statusIcon = toolResult.is_error === true ? "❌" : "✅";
+          statusIcon = toolResult.is_error === true ? "❌" : toolResult.is_error === false ? "✅" : "❓";
         }
 
         if (toolName === "Bash") {
-          const formattedCommand = formatBashCommand(input.command || "");
-          commandSummary.push(`* ${statusIcon} \`${formattedCommand}\``);
+          const command = typeof fields.command === "string" ? fields.command : typeof content.command === "string" ? content.command : undefined;
+          if (command === undefined) commandSummary.push(`* ${statusIcon} ${escapeSummaryText(formatToolDisplayName(toolName, input))}`);
+          else {
+            const formattedCommand = formatBashCommand(command);
+            const fence = formattedCommand.includes("`") ? buildSafeOuterCodeFence([formattedCommand]) : "`";
+            commandSummary.push(`* ${statusIcon} ${fence}${formattedCommand}${fence}`);
+          }
         } else if (toolName.startsWith("mcp__")) {
           const mcpName = formatMcpName(toolName);
-          commandSummary.push(`* ${statusIcon} \`${mcpName}(...)\``);
+          const fence = mcpName.includes("`") ? buildSafeOuterCodeFence([mcpName]) : "`";
+          commandSummary.push(`* ${statusIcon} ${fence}${mcpName}(...)${fence}`);
         } else {
-          commandSummary.push(`* ${statusIcon} ${toolName}`);
+          commandSummary.push(`* ${statusIcon} ${escapeSummaryText(toolName)}`);
         }
       }
     }
@@ -266,6 +295,13 @@ function createLogParserFormatters(deps) {
       markdown += SIZE_LIMIT_WARNING;
       return { markdown, commandSummary, sizeLimitReached: true };
     }
+    if (options.includeInformation ?? standard) {
+      const info = generateInformationSection(projectSessionResult(logEntries));
+      if (!addContent(info)) {
+        markdown += SIZE_LIMIT_WARNING;
+        return { markdown, commandSummary, sizeLimitReached: true };
+      }
+    }
 
     return { markdown, commandSummary, sizeLimitReached };
   }
@@ -280,39 +316,34 @@ function createLogParserFormatters(deps) {
    */
   function formatToolUse(toolUse, toolResult, options = {}) {
     const { includeDetailedParameters = false } = options;
-    const toolName = toolUse.name;
-    const input = toolUse.input || {};
+    const toolName = typeof toolUse.name === "string" ? toolUse.name : "unknown";
+    const input = toolUse.input === undefined ? {} : toolUse.input;
+    const fields = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const standard = toolUse.standard_trace === true;
 
-    if (toolName === "TodoWrite") {
+    if (toolName === "TodoWrite" && !standard) {
       return "";
     }
 
     function getStatusIcon() {
-      if (toolResult) {
-        return toolResult.is_error === true ? "❌" : "✅";
-      }
-      return "❓";
+      return { failed: "❌", succeeded: "✅", pending: "❓", unknown: "❓" }[toolOutcome(toolResult)];
     }
 
     const statusIcon = getStatusIcon();
     let summary = "";
     let details = "";
 
-    if (toolResult && toolResult.content) {
-      if (typeof toolResult.content === "string") {
-        details = toolResult.content;
-      } else if (Array.isArray(toolResult.content)) {
-        details = toolResult.content.map(c => (typeof c === "string" ? c : c.text || "")).join("\n");
-      }
-    }
+    const outputPresent = toolResult && (toolResult.has_output ?? toolResult.content !== undefined);
+    if (outputPresent) details = sessionOutputText(toolResult.content);
+    const errorText = toolResult?.error != null ? sessionOutputText(toolResult.error) : "";
 
     const inputText = JSON.stringify(input);
     const outputText = details;
     const totalTokens = estimateTokens(inputText) + estimateTokens(outputText);
 
     let metadata = "";
-    if (toolResult && toolResult.duration_ms) {
-      metadata += `<code>${formatDuration(toolResult.duration_ms)}</code> `;
+    if (toolResult && toolResult.duration_ms !== undefined) {
+      metadata += `<code>${toolResult.duration_ms === 0 ? "0s" : formatDuration(toolResult.duration_ms)}</code> `;
     }
     if (totalTokens > 0) {
       metadata += `<code>~${totalTokens}t</code>`;
@@ -321,45 +352,49 @@ function createLogParserFormatters(deps) {
 
     switch (toolName) {
       case "Bash": {
-        const command = input.command || "";
-        const description = input.description || "";
+        const command = typeof fields.command === "string" ? fields.command : typeof toolUse.command === "string" ? toolUse.command : undefined;
+        const description = typeof fields.description === "string" ? fields.description : "";
+        if (command === undefined) {
+          summary = escapeSummaryText(formatToolDisplayName(toolName, input));
+          break;
+        }
         const formattedCommand = formatBashCommand(command);
 
         if (description) {
-          summary = `${description}: <code>${formattedCommand}</code>`;
+          summary = `${escapeSummaryText(description)}: <code>${escapeSummaryText(formattedCommand)}</code>`;
         } else {
-          summary = `<code>${formattedCommand}</code>`;
+          summary = `<code>${escapeSummaryText(formattedCommand)}</code>`;
         }
         break;
       }
 
       case "Read": {
-        const filePath = input.file_path || input.path || "";
+        const filePath = typeof fields.file_path === "string" ? fields.file_path : typeof fields.path === "string" ? fields.path : "";
         const relativePath = filePath.replace(/^\/[^\/]*\/[^\/]*\/[^\/]*\/[^\/]*\//, "");
-        summary = `Read <code>${relativePath}</code>`;
+        summary = filePath ? `Read <code>${escapeSummaryText(relativePath)}</code>` : escapeSummaryText(formatToolDisplayName(toolName, input));
         break;
       }
 
       case "Write":
       case "Edit":
       case "MultiEdit": {
-        const writeFilePath = input.file_path || input.path || "";
+        const writeFilePath = typeof fields.file_path === "string" ? fields.file_path : typeof fields.path === "string" ? fields.path : "";
         const writeRelativePath = writeFilePath.replace(/^\/[^\/]*\/[^\/]*\/[^\/]*\/[^\/]*\//, "");
-        summary = `Write <code>${writeRelativePath}</code>`;
+        summary = writeFilePath ? `Write <code>${escapeSummaryText(writeRelativePath)}</code>` : escapeSummaryText(formatToolDisplayName(toolName, input));
         break;
       }
 
       case "Grep":
       case "Glob": {
-        const query = input.query || input.pattern || "";
-        summary = `Search for <code>${truncateString(query, 80)}</code>`;
+        const query = typeof fields.query === "string" ? fields.query : typeof fields.pattern === "string" ? fields.pattern : "";
+        summary = query ? `Search for <code>${escapeSummaryText(truncateString(query, 80))}</code>` : escapeSummaryText(formatToolDisplayName(toolName, input));
         break;
       }
 
       case "LS": {
-        const lsPath = input.path || "";
+        const lsPath = typeof fields.path === "string" ? fields.path : "";
         const lsRelativePath = lsPath.replace(/^\/[^\/]*\/[^\/]*\/[^\/]*\/[^\/]*\//, "");
-        summary = `LS: ${lsRelativePath || lsPath}`;
+        summary = lsPath ? `LS: ${escapeSummaryText(lsRelativePath || lsPath)}` : escapeSummaryText(formatToolDisplayName(toolName, input));
         break;
       }
 
@@ -367,20 +402,20 @@ function createLogParserFormatters(deps) {
         if (toolName.startsWith("mcp__")) {
           const mcpName = formatMcpName(toolName);
           const params = formatMcpParameters(input);
-          summary = `${mcpName}(${params})`;
+          summary = escapeSummaryText(`${mcpName}(${params})`);
         } else {
-          const keys = Object.keys(input);
+          const keys = Object.keys(fields);
           if (keys.length > 0) {
             const mainParam = keys.find(k => ["query", "command", "path", "file_path", "content"].includes(k)) || keys[0];
-            const value = String(input[mainParam] || "");
+            const value = sessionOutputText(fields[mainParam]);
 
             if (value) {
-              summary = `${toolName}: ${truncateString(value, 100)}`;
+              summary = escapeSummaryText(`${toolName}: ${truncateString(value, 100)}`);
             } else {
-              summary = toolName;
+              summary = escapeSummaryText(toolName);
             }
           } else {
-            summary = toolName;
+            summary = escapeSummaryText(standard && toolUse.has_input && input && typeof input === "object" && !Array.isArray(input) ? `${toolName}({})` : formatToolDisplayName(toolName, input));
           }
         }
     }
@@ -389,8 +424,7 @@ function createLogParserFormatters(deps) {
     const sections = [];
 
     if (includeDetailedParameters) {
-      const inputKeys = Object.keys(input);
-      if (inputKeys.length > 0) {
+      if (Object.keys(fields).length > 0 || input === null || typeof input !== "object" || Array.isArray(input) || toolUse.has_input) {
         sections.push({
           label: "Parameters",
           content: JSON.stringify(input, null, 2),
@@ -399,11 +433,17 @@ function createLogParserFormatters(deps) {
       }
     }
 
-    if (details && details.trim()) {
+    if (outputPresent) {
       sections.push({
         label: includeDetailedParameters ? "Response" : "Output",
-        content: details,
+        content: details || "[empty output]",
       });
+    }
+    if (errorText) sections.push({ label: "Error", content: errorText });
+    if (standard) {
+      if (toolUse.orphaned) summary += " [start unavailable]";
+      if (!toolResult) summary += " [pending]";
+      else if (toolOutcome(toolResult) === "unknown") summary += " [outcome unknown]";
     }
 
     return formatToolCallAsDetails({
@@ -419,7 +459,7 @@ function createLogParserFormatters(deps) {
     for (const entry of logEntries) {
       if (entry.type === "user" && entry.message?.content) {
         for (const content of entry.message.content) {
-          if (content.type === "tool_result" && content.tool_use_id) {
+          if (content.type === "tool_result" && content.tool_use_id !== undefined) {
             toolUsePairs.set(content.tool_use_id, content);
           }
         }
@@ -477,43 +517,35 @@ function createLogParserFormatters(deps) {
   }
 
   function appendToolExecutionLine(lines, content, toolUsePairs, state) {
-    const toolName = content.name;
-    const input = content.input || {};
+    const toolName = typeof content.name === "string" ? content.name : "unknown";
+    const input = content.input === undefined ? {} : content.input;
+    const fields = input && typeof input === "object" && !Array.isArray(input) ? input : {};
 
-    if (INTERNAL_TOOLS.includes(toolName)) {
+    if (!state.standard && INTERNAL_TOOLS.includes(toolName)) {
       return;
     }
 
     const toolResult = toolUsePairs.get(content.id);
-    const isError = toolResult?.is_error === true;
-    const statusIcon = isError ? "✗" : "✓";
+    const outcome = toolOutcome(toolResult);
+    const statusIcon = outcome === "failed" ? "✗" : outcome === "succeeded" ? "✓" : "?";
 
     let displayName;
-    let resultPreview = "";
 
     if (toolName === "Bash") {
-      const cmd = formatBashCommand(input.command || "");
-      displayName = `$ ${cmd}`;
-
-      if (toolResult && toolResult.content) {
-        const resultText = typeof toolResult.content === "string" ? toolResult.content : String(toolResult.content);
-        resultPreview = formatResultPreview(resultText);
-      }
+      const command = typeof fields.command === "string" ? fields.command : typeof content.command === "string" ? content.command : undefined;
+      displayName = command === undefined ? formatToolDisplayName(toolName, input) : `$ ${formatBashCommand(command)}`;
     } else if (toolName.startsWith("mcp__")) {
       const formattedName = formatMcpName(toolName).replace("::", "-");
       displayName = formatToolDisplayName(formattedName, input);
-
-      if (toolResult && toolResult.content) {
-        const resultText = typeof toolResult.content === "string" ? toolResult.content : JSON.stringify(toolResult.content);
-        resultPreview = formatResultPreview(resultText);
-      }
     } else {
       displayName = formatToolDisplayName(toolName, input);
-
-      if (toolResult && toolResult.content) {
-        const resultText = typeof toolResult.content === "string" ? toolResult.content : String(toolResult.content);
-        resultPreview = formatResultPreview(resultText);
-      }
+    }
+    if (state.standard) {
+      if (content.has_input && input && typeof input === "object" && !Array.isArray(input) && Object.keys(input).length === 0) displayName += " [input: {}]";
+      if (content.orphaned) displayName += " [start unavailable]";
+      if (outcome === "pending") displayName += " [pending]";
+      if (outcome === "unknown") displayName += " [outcome unknown]";
+      if (toolResult?.duration_ms !== undefined) displayName += ` [${toolResult.duration_ms === 0 ? "0s" : formatDuration(toolResult.duration_ms)}]`;
     }
 
     state.traceEventCount += 1;
@@ -521,47 +553,56 @@ function createLogParserFormatters(deps) {
       return;
     }
 
-    if (resultPreview) {
-      for (const previewLine of resultPreview.split("\n")) {
+    if (state.standard && toolName === "Bash" && content.has_input && (Object.keys(fields).length > 1 || input === null || typeof input !== "object" || Array.isArray(input))) {
+      if (!appendConversationLine(lines, `   Arguments: ${formatMcpParameters(input)}`, state)) return;
+    }
+    if (toolResult && (toolResult.has_output ?? toolResult.content !== undefined)) {
+      const resultText = sessionOutputText(toolResult.content) || "[empty output]";
+      for (const previewLine of formatResultPreview(resultText).split("\n")) {
         if (!appendConversationLine(lines, previewLine, state)) {
           return;
         }
+      }
+    }
+    if (toolResult?.error != null) {
+      for (const errorLine of formatResultPreview(sessionOutputText(toolResult.error)).split("\n")) {
+        if (!appendConversationLine(lines, `   Error: ${errorLine.trimStart()}`, state)) return;
       }
     }
 
     appendConversationLine(lines, "", state);
   }
 
-  function appendStatistics(lines, logEntries, toolUsePairs) {
-    const lastEntry = logEntries[logEntries.length - 1];
+  function appendStatistics(lines, logEntries, toolUsePairs, standard) {
+    const lastEntry = logEntries.findLast(entry => entry.type === "result");
     lines.push("Statistics:");
-    if (lastEntry?.num_turns) {
+    if (lastEntry?.num_turns !== undefined) {
       lines.push(`  Turns: ${lastEntry.num_turns}`);
     }
-    if (lastEntry?.duration_ms) {
-      const duration = formatDuration(lastEntry.duration_ms);
+    if (lastEntry?.duration_ms !== undefined) {
+      const duration = lastEntry.duration_ms === 0 ? "0s" : formatDuration(lastEntry.duration_ms);
       if (duration) {
         lines.push(`  Duration: ${duration}`);
       }
     }
 
-    let toolCounts = { total: 0, success: 0, error: 0 };
+    let toolCounts = { total: 0, success: 0, error: 0, pending: 0, unknown: 0 };
     for (const entry of logEntries) {
       if (entry.type === "assistant" && entry.message?.content) {
         for (const content of entry.message.content) {
           if (content.type === "tool_use") {
             const toolName = content.name;
-            if (INTERNAL_TOOLS.includes(toolName)) {
+            if (!standard && INTERNAL_TOOLS.includes(toolName)) {
               continue;
             }
             toolCounts.total++;
             const toolResult = toolUsePairs.get(content.id);
-            const isError = toolResult?.is_error === true;
-            if (isError) {
+            const outcome = toolOutcome(toolResult);
+            if (outcome === "failed") {
               toolCounts.error++;
-            } else {
+            } else if (outcome === "succeeded") {
               toolCounts.success++;
-            }
+            } else toolCounts[outcome]++;
           }
         }
       }
@@ -569,27 +610,36 @@ function createLogParserFormatters(deps) {
 
     if (toolCounts.total > 0) {
       lines.push(`  Tools: ${toolCounts.success}/${toolCounts.total} succeeded`);
+      if (standard) {
+        if (toolCounts.error) lines.push(`  Failed Tools: ${toolCounts.error}`);
+        if (toolCounts.pending) lines.push(`  Pending Tools: ${toolCounts.pending}`);
+        if (toolCounts.unknown) lines.push(`  Unknown Outcomes: ${toolCounts.unknown}`);
+      }
     }
     if (lastEntry?.usage) {
       const usage = lastEntry.usage;
-      if (usage.input_tokens || usage.output_tokens) {
-        const inputTokens = usage.input_tokens || 0;
-        const outputTokens = usage.output_tokens || 0;
-        const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
-        const cacheReadTokens = usage.cache_read_input_tokens || 0;
-        const totalTokens = inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
-
-        lines.push(`  Tokens: ${totalTokens.toLocaleString()} total (${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)`);
+      const totalTokens = sessionTokenTotal(usage);
+      if (totalTokens !== undefined) {
+        const inputTokens = usage.input_tokens === undefined ? "unknown" : usage.input_tokens.toLocaleString();
+        const outputTokens = usage.output_tokens === undefined ? "unknown" : usage.output_tokens.toLocaleString();
+        const complete = usage.total_tokens !== undefined || (usage.input_tokens !== undefined && usage.output_tokens !== undefined);
+        lines.push(`  Tokens: ${totalTokens.toLocaleString()} ${complete ? "total" : "observed"} (${inputTokens} in / ${outputTokens} out)`);
       }
+      if (usage.cache_read_input_tokens !== undefined) lines.push(`  Cache Read Tokens: ${usage.cache_read_input_tokens.toLocaleString()}`);
+      if (usage.cache_creation_input_tokens !== undefined) lines.push(`  Cache Creation Tokens: ${usage.cache_creation_input_tokens.toLocaleString()}`);
     }
-    if (lastEntry?.total_cost_usd) {
+    if (lastEntry?.total_cost_usd !== undefined) {
       lines.push(`  Cost: $${lastEntry.total_cost_usd.toFixed(4)}`);
     }
     if (lastEntry?.errors && Array.isArray(lastEntry.errors) && lastEntry.errors.length > 0) {
       lines.push("  Errors:");
       for (const error of lastEntry.errors) {
-        lines.push(`    ${error}`);
+        lines.push(`    ${sessionOutputText(error)}`);
       }
+    }
+    if (Array.isArray(lastEntry?.permission_denials)) {
+      lines.push(`  Permission Denials: ${lastEntry.permission_denials.length}`);
+      for (const denial of lastEntry.permission_denials) lines.push(`    ${sessionOutputText(denial)}`);
     }
   }
 
@@ -603,6 +653,7 @@ function createLogParserFormatters(deps) {
       maxConversationLines: 5000,
       conversationTruncated: false,
       traceEventCount: 0,
+      standard: isCopilotEventLogEntries(logEntries),
     };
 
     for (const entry of renderEntries) {
@@ -642,7 +693,7 @@ function createLogParserFormatters(deps) {
       lines.push("");
     }
 
-    appendStatistics(lines, renderEntries, toolUsePairs);
+    appendStatistics(lines, renderEntries, toolUsePairs, state.standard);
 
     return lines;
   }
@@ -656,13 +707,15 @@ function createLogParserFormatters(deps) {
    * @returns {string} Plain text summary for console output
    */
   function generatePlainTextSummary(logEntries, options = {}) {
-    const { model, parserName = "Agent" } = options;
+    const { parserName = "Agent" } = options;
+    const model = options.model ?? observedSessionModel(logEntries);
     const lines = [];
 
     lines.push(`=== ${parserName} Execution Summary ===`);
     if (model) {
       lines.push(`Model: ${model}`);
     }
+    if (isCopilotEventLogEntries(logEntries)) lines.push(...renderInitializationLines(normalizeEntriesForRendering(logEntries).find(entry => entry.type === "system" && entry.subtype === "init")));
     lines.push("");
 
     lines.push("Conversation:");
@@ -670,7 +723,7 @@ function createLogParserFormatters(deps) {
 
     lines.push(...generateSummaryLines(logEntries));
 
-    return lines.join("\n");
+    return boundSummaryLines(lines, MAX_STEP_SUMMARY_SIZE, 4 * MAX_AGENT_TEXT_LENGTH + 128).join("\n");
   }
 
   /**
@@ -683,14 +736,30 @@ function createLogParserFormatters(deps) {
    */
   function generateCopilotCliStyleSummary(logEntries, options = {}) {
     const lines = [];
-    const bodyLines = ["Conversation:", "", ...generateSummaryLines(logEntries)];
+    const standard = isCopilotEventLogEntries(logEntries);
+    const model = options.model ?? observedSessionModel(logEntries);
+    const initialization = isCopilotEventLogEntries(logEntries) ? renderInitializationLines(normalizeEntriesForRendering(logEntries).find(entry => entry.type === "system" && entry.subtype === "init")) : [];
+    const fullBody = [...(model ? [`Model: ${model}`, ""] : []), ...initialization, "Conversation:", "", ...generateSummaryLines(logEntries)];
+    const maxLineBytes = 4 * MAX_AGENT_TEXT_LENGTH + 128;
+    let preamble = "";
+    if (standard) {
+      const entries = normalizeEntriesForRendering(logEntries);
+      const statistics = [];
+      appendStatistics(statistics, entries, collectToolUsePairs(entries), true);
+      const visibleStats = boundSummaryLines(statistics, 16 * 1024, maxLineBytes);
+      const statsFence = buildSafeOuterCodeFence(visibleStats);
+      preamble = `### Agent session\n\n${statsFence}\n${visibleStats.join("\n")}\n${statsFence}\n\n<details><summary>Trace details</summary>\n\n`;
+    }
+    const tail = standard ? "\n\n</details>" : "";
+    const budget = MAX_STEP_SUMMARY_SIZE - Buffer.byteLength(preamble + tail, "utf8") - 2 * (maxLineBytes + 1) - 3;
+    const bodyLines = boundSummaryLines(fullBody, budget, maxLineBytes);
     const fence = buildSafeOuterCodeFence(bodyLines);
 
     lines.push(fence);
     lines.push(...bodyLines);
     lines.push(fence);
 
-    return lines.join("\n");
+    return preamble + lines.join("\n") + tail;
   }
 
   return {

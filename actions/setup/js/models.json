@@ -790,7 +790,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-chat-latest": {
           "cost": {
@@ -798,7 +799,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-codex": {
           "cost": {
@@ -806,7 +808,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-mini": {
           "cost": {
@@ -814,7 +817,8 @@
             "output": "2e-06",
             "cache_read": "2.5000000000000002e-08"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-nano": {
           "cost": {
@@ -822,14 +826,16 @@
             "output": "4.0000000000000003e-07",
             "cache_read": "5e-09"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-pro": {
           "cost": {
             "input": "1.5e-05",
             "output": "0.00012"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5-search-api": {
           "cost": {
@@ -837,7 +843,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.1": {
           "cost": {
@@ -845,7 +852,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.1-chat-latest": {
           "cost": {
@@ -853,7 +861,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.1-codex": {
           "cost": {
@@ -861,7 +870,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.1-codex-max": {
           "cost": {
@@ -869,7 +879,8 @@
             "output": "1e-05",
             "cache_read": "1.25e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.1-codex-mini": {
           "cost": {
@@ -877,7 +888,8 @@
             "output": "2e-06",
             "cache_read": "2.5000000000000002e-08"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.2": {
           "cost": {
@@ -885,7 +897,8 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.2-chat-latest": {
           "cost": {
@@ -893,7 +906,8 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.2-codex": {
           "cost": {
@@ -901,14 +915,16 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.2-pro": {
           "cost": {
             "input": "2.1e-05",
             "output": "0.000168"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.3-chat-latest": {
           "cost": {
@@ -916,7 +932,8 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.3-codex": {
           "cost": {
@@ -924,7 +941,8 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.3-codex-spark": {
           "cost": {
@@ -932,7 +950,8 @@
             "output": "1.4e-05",
             "cache_read": "1.75e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.4": {
           "cost": {
@@ -940,7 +959,8 @@
             "output": "1.5e-05",
             "cache_read": "2.5e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.4-mini": {
           "cost": {
@@ -948,7 +968,8 @@
             "output": "4.5e-06",
             "cache_read": "7.5e-08"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.4-nano": {
           "cost": {
@@ -956,14 +977,16 @@
             "output": "1.25e-06",
             "cache_read": "2e-08"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.4-pro": {
           "cost": {
             "input": "3e-05",
             "output": "0.00018"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.5": {
           "cost": {
@@ -971,14 +994,16 @@
             "output": "3e-05",
             "cache_read": "5e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.5-pro": {
           "cost": {
             "input": "3e-05",
             "output": "0.00018"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.6-luna": {
           "cost": {
@@ -986,7 +1011,8 @@
             "output": "1.2e-06",
             "cache_read": "2e-08"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.6-sol": {
           "cost": {
@@ -994,7 +1020,8 @@
             "output": "3e-05",
             "cache_read": "5e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-5.6-terra": {
           "cost": {
@@ -1002,7 +1029,8 @@
             "output": "1.2e-05",
             "cache_read": "2e-07"
           },
-          "provider_type": "openai"
+          "provider_type": "openai",
+          "wire_api": "responses"
         },
         "gpt-6-astra": {
           "cost": {

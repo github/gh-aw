@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -253,13 +254,11 @@ func buildBootstrapGitHubAppRegistrationURL(owner, ownerType, state string) stri
 	return "https://github.com/settings/apps/new?state=" + state
 }
 
-const bootstrapRegistrationPageTmpl = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Redirecting To GitHub App Creation</title></head><body><p>Redirecting to GitHub App creation...</p><form id="manifest-form" action="{{.Action}}" method="post"><input type="hidden" name="manifest" value="{{.Manifest}}"><noscript><button type="submit">Continue To GitHub App Creation</button></noscript></form><script>document.getElementById('manifest-form').submit();</script></body></html>`
+//go:embed bootstrap_registration_page.html
+var bootstrapRegistrationPageFS embed.FS
 
-// bootstrapRegistrationPage is a pre-compiled html/template whose source is a
-// package-level constant (bootstrapRegistrationPageTmpl above).  Dynamic values
-// are passed only as template data — never as template source — so SSTI is not
-// possible.  The html/template package auto-escapes all interpolated values.
-var bootstrapRegistrationPage = template.Must(template.New("bootstrap").Parse(bootstrapRegistrationPageTmpl)) // #nosec G203
+// The embedded template is static; request-derived values are only execution data.
+var bootstrapRegistrationPage = template.Must(template.ParseFS(bootstrapRegistrationPageFS, "bootstrap_registration_page.html"))
 
 func renderBootstrapGitHubAppRegistrationPage(registrationURL string, manifest map[string]any) (string, error) {
 	encoded, err := json.Marshal(manifest)

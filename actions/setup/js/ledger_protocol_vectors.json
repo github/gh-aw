@@ -1,0 +1,749 @@
+{
+  "sourceDigest": "a86ee4b278fe9bdbe2141c89b84b441e93717624bf3b7e41b82ddca4a686e2c5",
+  "vectors": [
+    {
+      "kind": "raw",
+      "op": "record",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "record", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "record", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "record", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "record", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "record", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "record", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": ["x"], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "log",
+      "op": "append",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "append", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "append", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "append", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "append", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "append", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "append", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": ["x"], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "op": "add",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "add", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "add", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "add", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "add", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "add", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "add", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": ["x"], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "set",
+      "op": "remove",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "remove", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "remove", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "remove", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "remove", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "remove", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "remove", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "op": "put",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "put", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "put", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "put", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "put", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "put", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "put", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "map",
+      "op": "delete",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "delete", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "table",
+      "op": "insert",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "insert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "insert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "insert", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "insert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "insert", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "insert", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "table",
+      "op": "update",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "ExternalAppend",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [{ "op": "insert", "id": "external-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["external-1"]
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "insert", "id": "external-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["external-1"]
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "update", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [
+              { "op": "insert", "id": "external-1", "key": "a", "value": "x" },
+              { "op": "update", "id": "agent-1", "key": "a", "value": "x" }
+            ],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1", "external-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "table",
+      "op": "upsert",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "upsert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "upsert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "upsert", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "upsert", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "upsert", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "upsert", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "x", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "table",
+      "op": "delete",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "delete", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "delete", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "counter",
+      "op": "increment",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "increment", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "increment", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "increment", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "increment", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "increment", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "increment", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 1, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "counter",
+      "op": "decrement",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "decrement", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "decrement", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "decrement", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "decrement", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "decrement", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "decrement", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": -1, "b": 0 }, "notes": [], "votes": [] },
+            "snapshot": { "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "notes": [], "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "notes",
+      "op": "note",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+        "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "note", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": "none",
+            "history": [],
+            "projection": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "note", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "note", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [],
+            "projection": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": []
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "note", "id": "agent-1", "key": "a", "value": "x" },
+            "artifact": { "op": "note", "id": "agent-1", "key": "a", "value": "x" },
+            "history": [{ "op": "note", "id": "agent-1", "key": "a", "value": "x" }],
+            "projection": { "notes": ["agent-1"], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": ["agent-1"]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "notes",
+      "op": "vote",
+      "initial": {
+        "phase": "idle",
+        "request": "none",
+        "artifact": "none",
+        "history": [],
+        "projection": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+        "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+        "shard": []
+      },
+      "steps": [
+        {
+          "action": "ExternalAppend",
+          "state": {
+            "phase": "idle",
+            "request": "none",
+            "artifact": "none",
+            "history": [{ "op": "note", "id": "external-1", "key": "a", "value": "x" }],
+            "projection": { "notes": ["external-1"], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": ["external-1"]
+          }
+        },
+        {
+          "action": "Queue",
+          "state": {
+            "phase": "queued",
+            "request": { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" },
+            "artifact": "none",
+            "history": [{ "op": "note", "id": "external-1", "key": "a", "value": "x" }],
+            "projection": { "notes": ["external-1"], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": ["external-1"]
+          }
+        },
+        {
+          "action": "Validate",
+          "state": {
+            "phase": "validated",
+            "request": { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" },
+            "artifact": { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" },
+            "history": [{ "op": "note", "id": "external-1", "key": "a", "value": "x" }],
+            "projection": { "notes": ["external-1"], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": ["external-1"]
+          }
+        },
+        {
+          "action": "Persist",
+          "state": {
+            "phase": "committed",
+            "request": { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" },
+            "artifact": { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" },
+            "history": [
+              { "op": "note", "id": "external-1", "key": "a", "value": "x" },
+              { "op": "vote", "id": "agent-1", "key": "external-1", "value": "x" }
+            ],
+            "projection": { "notes": ["external-1"], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [["agent-1", "external-1", "x"]] },
+            "snapshot": { "notes": [], "log": [], "members": [], "cells": { "a": "none", "b": "none" }, "counts": { "a": 0, "b": 0 }, "votes": [] },
+            "shard": ["agent-1", "external-1"]
+          }
+        }
+      ]
+    }
+  ]
+}
