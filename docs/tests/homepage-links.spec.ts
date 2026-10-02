@@ -1,7 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const INSTALL_PROMPT =
-  "Initialize this repository for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/install.md";
+const INSTALL_PROMPT = "Initialize this repository for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/install.md";
 
 async function expectHeroPromptCopies(page: Page) {
   const prompt = page.locator(".aw-hero [data-copy-prompt]:visible").first();
