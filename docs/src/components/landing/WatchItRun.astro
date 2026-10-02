@@ -180,34 +180,52 @@ const options = [
 
 <script>
   /* ARIA tabs: one video at a time, paused when switching away. */
-  document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
-    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    const panels = tabs.map((t) => root.querySelector<HTMLElement>('#' + t.getAttribute('aria-controls'))!);
-    root.setAttribute('data-enhanced', '');
-    const select = (index: number, focus = false) => {
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+
+    document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
+      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+      const panels = tabs.map((t) => root.querySelector<HTMLElement>('#' + t.getAttribute('aria-controls'))!);
+      root.setAttribute('data-enhanced', '');
+      const select = (index: number, focus = false) => {
+        tabs.forEach((tab, i) => {
+          const on = i === index;
+          tab.setAttribute('aria-selected', String(on));
+          tab.tabIndex = on ? 0 : -1;
+          panels[i].setAttribute('data-selected', String(on));
+          if (!on) panels[i].querySelector('video')?.pause();
+        });
+        if (focus) tabs[index].focus();
+      };
       tabs.forEach((tab, i) => {
-        const on = i === index;
-        tab.setAttribute('aria-selected', String(on));
-        tab.tabIndex = on ? 0 : -1;
-        panels[i].setAttribute('data-selected', String(on));
-        if (!on) panels[i].querySelector('video')?.pause();
-      });
-      if (focus) tabs[index].focus();
-    };
-    tabs.forEach((tab, i) => {
-      tab.addEventListener('click', () => select(i));
-      tab.addEventListener('keydown', (e) => {
-        const n = tabs.length;
-        let next = -1;
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % n;
-        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + n) % n;
-        else if (e.key === 'Home') next = 0;
-        else if (e.key === 'End') next = n - 1;
-        if (next >= 0) {
-          e.preventDefault();
-          select(next, true);
-        }
+        tab.addEventListener('click', () => select(i), { signal: controller.signal });
+        tab.addEventListener('keydown', (e) => {
+          const n = tabs.length;
+          let next = -1;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % n;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + n) % n;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = n - 1;
+          if (next >= 0) {
+            e.preventDefault();
+            select(next, true);
+          }
+        }, { signal: controller.signal });
       });
     });
-  });
+
+    cleanup = () => {
+      controller.abort();
+      document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
+        root.removeAttribute('data-enhanced');
+      });
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>

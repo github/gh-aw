@@ -38,11 +38,13 @@ test.describe("Hidden text cloaking guard", () => {
 
     await menuButton.click();
     await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator(".site-footer")).toHaveAttribute("inert", "");
     await expect(sheet.locator(".mobile-nav a")).toHaveCount(3);
     await expect(sheet.locator("a", { hasText: "Get started" })).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(menuButton).toHaveAttribute("aria-expanded", "false");
     await expect(sheet).toBeHidden();
+    await expect(page.locator(".site-footer")).not.toHaveAttribute("inert", "");
   });
 });

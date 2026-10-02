@@ -1,0 +1,284 @@
+---
+/** Hero D visual: CI and CD lanes at rest, the Continuous AI lane lit with ongoing agent work. */
+import octicons from '@primer/octicons';
+const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+
+const commits = ['7b21e0', 'c04d9a', '19ef3b'];
+const releases = ['v2.3.1', 'v2.4.0'];
+const work: { ico: keyof typeof octicons; area: string; text: string; num: string; when: string }[] = [
+  { ico: 'issue-opened', area: 'Triage', text: 'Labelled and asked for repro steps', num: '#482', when: 'now' },
+  { ico: 'book', area: 'Docs', text: 'Synced CLI flags with --help', num: '#214', when: '1h' },
+  { ico: 'beaker', area: 'Tests', text: 'Coverage up 3.1% in the parser', num: '#231', when: '3h' },
+  { ico: 'tools', area: 'Fixes', text: 'Diagnosed a flaky db timeout', num: '#519', when: '5h' },
+];
+---
+
+<div class="vd" aria-hidden="true">
+  <div class="vd-lane">
+    <span class="vd-lane-ico" set:html={icon('check-circle', 18)} />
+    <span class="vd-name">CI</span>
+    <span class="vd-cap">Builds it</span>
+    <span class="vd-track">
+      {commits.map((c) => (
+        <span class="vd-chip"><span class="vd-ok" set:html={icon('check', 14)} /><span class="vd-mono">{c}</span></span>
+      ))}
+    </span>
+  </div>
+
+  <div class="vd-lane">
+    <span class="vd-lane-ico" set:html={icon('rocket', 18)} />
+    <span class="vd-name">CD</span>
+    <span class="vd-cap">Ships it</span>
+    <span class="vd-track">
+      {releases.map((r) => (
+        <span class="vd-chip"><span set:html={icon('tag', 14)} /><span class="vd-mono">{r}</span></span>
+      ))}
+    </span>
+  </div>
+
+  <div class="vd-lit-wrap">
+  <div class="vd-lit">
+    <div class="vd-lit-head">
+      <span class="vd-lane-ico vd-spin" set:html={icon('sync', 18)} />
+      <span class="vd-lit-name">Continuous AI</span>
+      <span class="vd-lit-cap"><span class="vd-cap-long">Improving your repo, around the clock</span><span class="vd-cap-short">Around the clock</span></span>
+    </div>
+    <ol class="vd-work" role="list">
+      {work.map((w, i) => (
+        <li style={`--i:${i}`}>
+          <span class="vd-ico" set:html={icon(w.ico, 16)} />
+          <span class="vd-area">{w.area}</span>
+          <span class="vd-text">{w.text} <span class="vd-num">{w.num}</span></span>
+          <span class:list={['vd-when', i === 0 && 'is-now']}>{w.when}</span>
+        </li>
+      ))}
+    </ol>
+  </div>
+  </div>
+</div>
+
+<style>
+  .vd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+  .vd :global(svg) {
+    fill: currentColor;
+    flex: none;
+  }
+  /* Quiet lanes: one line each. */
+  .vd-lane {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.625rem 1.125rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 12px;
+    background: var(--aw-color-bg-subtle);
+  }
+  .vd-name {
+    flex: none;
+    width: 1.5rem;
+    font-size: var(--aw-text-ui);
+    font-weight: 600;
+    color: var(--aw-color-text-secondary);
+  }
+  .vd-cap {
+    flex: none;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .vd-track {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .vd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    flex: none;
+    height: 24px;
+    padding-inline: 0.4375rem 0.5625rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 999px;
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+    white-space: nowrap;
+  }
+  .vd-ok {
+    display: inline-flex;
+    color: var(--aw-color-success);
+  }
+  .vd-mono {
+    font-family: var(--aw-font-mono);
+  }
+
+  /* The lit lane: a plain card (hairline + soft shadow) sitting over a
+     grainy purple-and-coral glow on the background behind it. */
+  .vd-lit-wrap {
+    position: relative;
+    isolation: isolate;
+    margin-top: 0.375rem;
+  }
+  .vd-lit-wrap::before,
+  .vd-lit-wrap::after {
+    content: '';
+    position: absolute;
+    inset: -2.5rem -2rem;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .vd-lit-wrap::before {
+    background:
+      radial-gradient(closest-side at 30% 55%, color-mix(in srgb, var(--aw-color-accent) 80%, transparent), transparent),
+      radial-gradient(closest-side at 80% 45%, color-mix(in srgb, var(--aw-color-complement) 70%, transparent), transparent);
+    filter: blur(32px);
+    opacity: 0.6;
+  }
+  /* Grain: the glow's own purple and coral, shown through a noise mask.
+     The colour itself fades out (closest-side), so no edge-mask is needed. */
+  .vd-lit-wrap::after {
+    inset: -4rem -3.5rem;
+    background:
+      radial-gradient(closest-side at 32% 55%, color-mix(in srgb, var(--aw-color-accent) 70%, transparent), transparent),
+      radial-gradient(closest-side at 72% 45%, color-mix(in srgb, var(--aw-color-complement) 60%, transparent), transparent);
+    opacity: 0.4;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  :global(:root:not([data-theme='light'])) .vd-lit-wrap::before {
+    opacity: 0.75;
+  }
+  .vd-lit {
+    border: 1px solid var(--aw-color-divider);
+    border-radius: 14px;
+    background: var(--aw-color-surface);
+    /* Barely-there contact shadow only; the coloured glow does the lifting. */
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+    overflow: hidden;
+  }
+  .vd-lit-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid var(--aw-color-divider);
+  }
+  .vd-lit-name {
+    flex: none;
+    font-size: var(--aw-step-1);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--aw-color-text-strong);
+  }
+  .vd-lit-cap {
+    margin-left: auto;
+    white-space: nowrap;
+    font-size: var(--aw-step--1);
+    line-height: 1.4;
+    text-align: right;
+    text-wrap: balance;
+    color: var(--aw-color-text-muted);
+  }
+  .vd-cap-short { display: none; }
+  .vd-lane-ico {
+    display: inline-flex;
+    flex: none;
+    color: var(--aw-color-text-muted);
+  }
+  .vd-lit .vd-lane-ico {
+    color: var(--aw-color-accent);
+  }
+  .vd-spin :global(svg) {
+    animation: vd-spin 6s linear infinite;
+  }
+  .vd-work {
+    margin: 0;
+    padding: 0.375rem 0;
+    list-style: none;
+  }
+  .vd-work li {
+    display: grid;
+    grid-template-columns: 16px 3.25rem minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.625rem;
+    margin: 0;
+    padding: 0.625rem 1.125rem;
+    font-size: var(--aw-text-ui);
+    animation: vd-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(0.2s + var(--i) * 0.12s);
+  }
+  .vd-work li + li {
+    border-top: 1px solid var(--aw-color-border);
+  }
+  .vd-ico {
+    display: inline-flex;
+    color: var(--aw-color-accent-text);
+  }
+  .vd-area {
+    font-weight: 600;
+    color: var(--aw-color-text);
+  }
+  .vd-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--aw-color-text-secondary);
+  }
+  .vd-num {
+    color: var(--aw-color-text-muted);
+  }
+  .vd-when {
+    font-size: var(--aw-step--1);
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .vd-when.is-now {
+    padding: 0 0.4375rem;
+    border-radius: 999px;
+    background: var(--aw-color-accent-low);
+    color: var(--aw-color-accent-text);
+    font-weight: 500;
+  }
+  @media (max-width: 479px) {
+    .vd-cap-long { display: none; }
+    .vd-cap-short { display: inline; }
+    .vd-cap {
+      display: none;
+    }
+    .vd-track > :nth-child(n + 3) {
+      display: none;
+    }
+    .vd-work li {
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+    }
+    .vd-area {
+      display: none;
+    }
+  }
+  @keyframes vd-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes vd-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vd-spin :global(svg),
+    .vd-work li {
+      animation: none;
+    }
+  }
+</style>

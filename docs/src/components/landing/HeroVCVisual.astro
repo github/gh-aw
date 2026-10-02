@@ -1,0 +1,235 @@
+---
+/** Hero C visual: a morning feed of what agents did overnight. */
+import octicons from '@primer/octicons';
+const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+
+type Kind = 'issue' | 'pr' | 'report';
+const events: { time: string; agent: string; action: string; kind: Kind; title: string; num: string; meta?: string }[] = [
+  { time: '02:10', agent: 'CI Doctor', action: 'opened an issue', kind: 'issue', title: 'Flaky test: db timeout in integration suite', num: '#519', meta: 'Root cause: shared fixture reused across workers' },
+  { time: '04:30', agent: 'Test Improver', action: 'opened a pull request', kind: 'pr', title: 'Add tests for parser edge cases', num: '#231', meta: 'Coverage +3.1%' },
+  { time: '07:00', agent: 'Repo Status', action: 'posted the daily report', kind: 'report', title: 'Daily status — Oct 2', num: '#233', meta: '12 issues triaged · 4 PRs merged' },
+];
+const kindIcon: Record<Kind, keyof typeof octicons> = { issue: 'issue-opened', pr: 'git-pull-request', report: 'issue-opened' };
+---
+
+<div class="vc" aria-hidden="true">
+  <div class="vc-head">
+    <span class="vc-head-ico" set:html={icon('moon', 16)} />
+    <span class="vc-head-t">While you slept</span>
+    <span class="vc-repo">octo-org/app</span>
+  </div>
+  <div class="vc-greet">
+    <span set:html={icon('sun', 16)} />
+    <span>Good morning — 3 updates awaiting your review.</span>
+  </div>
+  <ol class="vc-feed" role="list">
+    {events.map((e, i) => (
+      <li class="vc-ev" style={`--i:${i}`}>
+        <span class="vc-time">{e.time}</span>
+        <span class="vc-dot" set:html={icon(kindIcon[e.kind], 14)} />
+        <div class="vc-body">
+          <p class="vc-line"><span class="vc-time-sm">{e.time}</span><b>{e.agent}</b> {e.action}</p>
+          <div class="vc-item">
+            <span class:list={['vc-kind', `vc-${e.kind}`]} set:html={icon(kindIcon[e.kind], 16)} />
+            <div class="vc-item-text">
+              <span class="vc-title">{e.title} <span class="vc-num">{e.num}</span></span>
+              {e.meta && (
+                <span class="vc-meta">
+                  {e.kind === 'pr' ? <span class="vc-plus">{e.meta}</span> : e.meta}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </li>
+    ))}
+  </ol>
+</div>
+
+<style>
+  .vc {
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 14px;
+    box-shadow: var(--aw-shadow-raised);
+    overflow: hidden;
+    min-width: 0;
+  }
+  .vc :global(svg) {
+    fill: currentColor;
+    flex: none;
+  }
+  .vc-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.125rem;
+    border-bottom: 1px solid var(--aw-color-border);
+    background: var(--aw-color-surface-header);
+    font-size: var(--aw-text-ui);
+  }
+  .vc-head-ico {
+    display: inline-flex;
+    color: var(--aw-color-accent);
+  }
+  .vc-head-t {
+    font-weight: 600;
+    color: var(--aw-color-text-strong);
+  }
+  .vc-repo {
+    margin-left: auto;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .vc-feed {
+    position: relative;
+    margin: 0;
+    padding: 1.125rem 1.125rem 0.25rem;
+    list-style: none;
+  }
+  .vc-ev {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.75rem 28px minmax(0, 1fr);
+    column-gap: 0.75rem;
+    margin: 0;
+    padding-bottom: 1.25rem;
+    animation: vc-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(0.25s + var(--i) * 0.18s);
+  }
+  /* Timeline line through the dots. */
+  .vc-ev:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    top: 28px;
+    bottom: 0;
+    left: calc(2.75rem + 0.75rem + 13.5px);
+    width: 1px;
+    background: var(--aw-color-border-strong);
+  }
+  /* Time and title share the dot's centre line: 20px line box, 4px down = 14px centre. */
+  .vc-time {
+    padding-top: 4px;
+    line-height: 20px;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .vc-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    color: var(--aw-color-text-secondary);
+  }
+  .vc-body {
+    min-width: 0;
+  }
+  .vc-line {
+    margin: 4px 0 0.5rem;
+    line-height: 20px;
+    font-size: var(--aw-text-ui);
+    color: var(--aw-color-text-secondary);
+  }
+  .vc-line b {
+    font-weight: 600;
+    color: var(--aw-color-text);
+  }
+  .vc-item {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 8px;
+  }
+  .vc-kind {
+    display: inline-flex;
+    padding-top: 0.125rem;
+  }
+  .vc-issue,
+  .vc-pr,
+  .vc-report {
+    color: var(--aw-color-success);
+  }
+  .vc-item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .vc-title {
+    font-size: var(--aw-text-ui);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--aw-color-text-strong);
+  }
+  .vc-num {
+    font-weight: 400;
+    color: var(--aw-color-text-muted);
+  }
+  .vc-meta {
+    font-size: var(--aw-step--1);
+    color: var(--aw-color-text-muted);
+  }
+  .vc-plus {
+    font-weight: 500;
+    color: var(--aw-color-success);
+  }
+  .vc-greet {
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.125rem;
+    border-bottom: 1px solid var(--aw-color-border);
+    font-size: var(--aw-text-ui);
+    color: var(--aw-color-text-secondary);
+  }
+  .vc-greet > span:first-child {
+    display: inline-flex;
+    flex: none;
+  }
+  .vc-greet :global(svg) {
+    display: block;
+    color: var(--aw-color-complement);
+  }
+  .vc-time-sm {
+    display: none;
+    margin-right: 0.5rem;
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  @media (max-width: 479px) {
+    .vc-ev {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+    .vc-time {
+      display: none;
+    }
+    .vc-time-sm {
+      display: inline;
+    }
+    .vc-ev:not(:last-child)::before {
+      left: 13.5px;
+    }
+  }
+  @keyframes vc-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vc-ev {
+      animation: none;
+    }
+  }
+</style>

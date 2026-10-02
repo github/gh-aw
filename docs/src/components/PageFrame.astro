@@ -39,9 +39,11 @@ const { hasSidebar } = Astro.locals.starlightRoute;
 						}
 						/** Trap keyboard focus inside the header and menu when the menu is expanded. */
 						trapFocus(shouldTrap: boolean) {
-							document.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link').forEach((el) => {
-								el.toggleAttribute('inert', shouldTrap);
-							});
+							document
+								.querySelectorAll<HTMLElement>('.main-frame, .sl-skip-link, .site-footer')
+								.forEach((el) => {
+									el.toggleAttribute('inert', shouldTrap);
+								});
 						}
 					}
 					customElements.define('sl-sidebar-pane', StarlightSidebarPane);

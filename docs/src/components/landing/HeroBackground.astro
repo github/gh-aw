@@ -181,6 +181,7 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
 
   const CELL = 3; // CSS px per dither cell
   const FRAME_MS = 1000 / 30;
+  const initialized = new WeakSet<HTMLElement>();
 
   function parseColor(ctx: CanvasRenderingContext2D, value: string): [number, number, number] {
     ctx.clearRect(0, 0, 1, 1);
@@ -204,6 +205,7 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
   }
 
   function init(root: HTMLElement) {
+    if (initialized.has(root)) return;
     const canvas = root.querySelector<HTMLCanvasElement>('.hero-bg-a-canvas');
     if (!canvas) return;
     const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
@@ -320,22 +322,56 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
 
     readColors();
 
-    new ResizeObserver(update).observe(root);
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(root);
 
-    new IntersectionObserver((entries) => {
+    const intersectionObserver = new IntersectionObserver((entries) => {
       onScreen = entries.some((e) => e.isIntersecting);
       update();
-    }).observe(root);
+    });
+    intersectionObserver.observe(root);
 
-    new MutationObserver(() => {
+    const mutationObserver = new MutationObserver(() => {
       readColors();
       if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-    document.addEventListener('visibilitychange', update);
-    reduceMotion.addEventListener('change', update);
+    });
+    mutationObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const onVisibilityChange = () => update();
+    const onMotionChange = () => update();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    reduceMotion.addEventListener('change', onMotionChange);
+    initialized.add(root);
     update();
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+      mutationObserver.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      reduceMotion.removeEventListener('change', onMotionChange);
+      initialized.delete(root);
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    };
   }
 
-  document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach(init);
+  let cleanups: (() => void)[] = [];
+  function cleanup() {
+    cleanups.forEach((dispose) => dispose());
+    cleanups = [];
+  }
+  function initialize() {
+    cleanup();
+    document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach((root) => {
+      const dispose = init(root);
+      if (dispose) cleanups.push(dispose);
+    });
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', cleanup);
+  initialize();
 </script>
