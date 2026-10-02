@@ -42,7 +42,6 @@
   --aw-gray-3: #e7e5e4;
   --aw-gray-4: #d6d3d1;
   --aw-gray-5: #a8a29e;
-  --aw-gray-6: #8a837e;
   --aw-gray-7: #78716c;
   --aw-gray-8: #57534e;
   --aw-gray-9: #44403c;
@@ -106,7 +105,6 @@
   --aw-step-3: clamp(1.3348rem, 1.0819rem + 1.1242vw, 1.9531rem); /* 21.4 → 31.3px */
   --aw-step-4: clamp(1.5017rem, 1.1173rem + 1.7086vw, 2.4414rem); /* 24 → 39.1px */
   --aw-step-5: clamp(1.6894rem, 1.1321rem + 2.477vw, 3.0518rem);  /* 27 → 48.8px */
-  --aw-step-6: clamp(1.9006rem, 1.1175rem + 3.4802vw, 3.8147rem); /* 30.4 → 61px */
 
   --aw-leading-tight: 1.15;
   --aw-leading-snug: 1.35;
@@ -114,20 +112,32 @@
 
   --aw-tracking-tight: -0.025em;
   --aw-tracking-snug: -0.015em;
+
+  /* Inline code is sized in em so it tracks the surrounding text: the one em exception. */
+  --aw-text-code: 0.875em;
+
+  --aw-radius-xs: 4px;
+  --aw-radius-sm: 6px;
+  --aw-radius-md: 8px;
+  --aw-radius-lg: 12px;
+  --aw-radius-pill: 999px;
+
+  --aw-duration-fast: 0.15s;
+  --aw-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --aw-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* 2. Semantic — dark (Starlight's default theme) ------------------------- */
 
-:root {
+/* .aw-tone-dark: a near-black, full-bleed section in either theme (e.g. the
+   video section). It shares the dark tokens so everything inside renders as dark UI. */
+:root,
+.aw-tone-dark {
   --aw-color-bg: var(--aw-gray-13);
   --aw-color-bg-subtle: var(--aw-gray-12);
   --aw-color-bg-raised: rgba(28, 25, 23, 0.88);
   --aw-color-bg-overlay: rgba(12, 10, 9, 0.8);
   --aw-color-bg-page-end: var(--aw-gray-13);
-  --aw-landing-glow:
-    radial-gradient(ellipse 880px 640px at 16% 8%, rgba(var(--aw-accent-rgb), 0.2), transparent 58%),
-    radial-gradient(ellipse 720px 540px at 92% 18%, rgba(var(--aw-accent-rgb), 0.14), transparent 62%),
-    linear-gradient(180deg, rgba(var(--aw-accent-rgb), 0.3), transparent 42%);
 
   /* Mermaid node categories */
   --aw-diagram-tracked-fill: var(--aw-purple-7);
@@ -158,13 +168,17 @@
   --aw-color-accent-low: var(--aw-purple-9);
   --aw-color-accent-high: var(--aw-purple-2);
   --aw-color-accent-text: var(--aw-purple-3);
-  /* Bare RGB triplet, for rgba(var(--aw-accent-rgb), <alpha>) */
-  --aw-accent-rgb: 180, 156, 255;
+  /* Bare RGB triplet of --aw-color-accent (purple-4), for rgba(var(--aw-accent-rgb), <alpha>) */
+  --aw-accent-rgb: 166, 147, 212;
 
   --aw-color-complement: var(--aw-coral-4);
   --aw-color-complement-low: var(--aw-coral-9);
 
   --aw-color-link: var(--aw-color-accent-text);
+
+  /* Focus ring. Declared here so .aw-tone-dark re-resolves it against its own accent. */
+  --aw-focus-ring: 2px solid var(--aw-color-accent);
+  --aw-focus-offset: 2px;
 
   /* Primary actions are ink on paper: inverted text/background */
   --aw-color-button-bg: var(--aw-gray-1);
@@ -206,6 +220,10 @@
   --aw-ramp-7: var(--aw-gray-13);
 }
 
+.aw-tone-dark {
+  color-scheme: dark;
+}
+
 /* 2. Semantic — light ---------------------------------------------------- */
 
 :root[data-theme='light'] {
@@ -214,10 +232,6 @@
   --aw-color-bg-raised: rgba(255, 255, 255, 0.9);
   --aw-color-bg-overlay: rgba(252, 252, 251, 0.85);
   --aw-color-bg-page-end: var(--aw-gray-1);
-  --aw-landing-glow:
-    radial-gradient(ellipse 900px 620px at 16% 8%, rgba(var(--aw-accent-rgb), 0.16), transparent 60%),
-    radial-gradient(ellipse 760px 520px at 92% 20%, rgba(var(--aw-accent-rgb), 0.12), transparent 62%),
-    linear-gradient(180deg, rgba(var(--aw-accent-rgb), 0.06), transparent 38%);
 
   --aw-diagram-tracked-fill: var(--aw-purple-2);
   --aw-diagram-tracked-stroke: var(--aw-purple-7);
@@ -246,7 +260,7 @@
   --aw-color-accent-low: var(--aw-purple-1);
   --aw-color-accent-high: var(--aw-purple-8);
   --aw-color-accent-text: var(--aw-purple-7);
-  --aw-accent-rgb: 130, 80, 223;
+  --aw-accent-rgb: 116, 88, 181; /* purple-6 */
 
   --aw-color-complement: var(--aw-coral-6);
   --aw-color-complement-low: var(--aw-coral-1);
@@ -285,59 +299,6 @@
   --aw-ramp-7: var(--aw-gray-1);
 }
 
-/* Dark section tone ------------------------------------------------------
-   A near-black, full-bleed section in either theme (e.g. the video section).
-   Mirrors the dark semantic tokens so everything inside renders as dark UI. */
-.aw-tone-dark {
-  color-scheme: dark;
-  --aw-color-bg: var(--aw-gray-13);
-  --aw-color-bg-subtle: var(--aw-gray-12);
-  --aw-color-bg-raised: rgba(28, 25, 23, 0.88);
-  --aw-color-bg-overlay: rgba(12, 10, 9, 0.8);
-  --aw-color-bg-page-end: var(--aw-gray-13);
-  --aw-color-text: var(--aw-gray-1);
-  --aw-color-text-body: var(--aw-gray-4);
-  --aw-color-text-secondary: var(--aw-gray-4);
-  --aw-color-text-muted: var(--aw-gray-5);
-  --aw-color-text-strong: var(--aw-gray-0);
-  --aw-color-text-invert: var(--aw-gray-13);
-  --aw-color-divider: rgba(255, 255, 255, 0.1);
-  --aw-color-border: var(--aw-color-divider);
-  --aw-color-border-strong: rgba(255, 255, 255, 0.18);
-  --aw-color-hairline: var(--aw-color-divider);
-  --aw-color-hairline-light: var(--aw-color-divider);
-  --aw-color-accent: var(--aw-purple-4);
-  --aw-color-accent-low: var(--aw-purple-9);
-  --aw-color-accent-high: var(--aw-purple-2);
-  --aw-color-accent-text: var(--aw-purple-3);
-  --aw-accent-rgb: 180, 156, 255;
-  --aw-color-complement: var(--aw-coral-4);
-  --aw-color-complement-low: var(--aw-coral-9);
-  --aw-color-link: var(--aw-color-accent-text);
-  --aw-color-button-bg: var(--aw-gray-1);
-  --aw-color-button-bg-hover: var(--aw-gray-4);
-  --aw-color-button-text: var(--aw-gray-13);
-  --aw-color-text-on-status: var(--aw-gray-0);
-  --aw-color-note: var(--aw-blue-5);
-  --aw-color-success: var(--aw-green-6);
-  --aw-color-caution: var(--aw-amber-5);
-  --aw-color-danger: var(--aw-red-5);
-  /* Callout colours: asides (tip/note/caution/danger) */
-  --aw-color-callout-tip: var(--aw-callout-tip-dark);
-  --aw-color-callout-note: var(--aw-callout-note-dark);
-  --aw-color-callout-caution: var(--aw-callout-caution-dark);
-  --aw-color-callout-danger: var(--aw-callout-danger-dark);
-  --aw-color-code-bg: var(--aw-gray-11);
-  --aw-color-scrollbar: rgba(250, 250, 249, 0.12);
-  --aw-color-scrollbar-hover: rgba(250, 250, 249, 0.22);
-  --aw-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.28);
-  --aw-color-surface: var(--aw-gray-11);
-  --aw-color-surface-header: var(--aw-gray-10);
-  --aw-shadow-raised: inset 0 1px 0 rgba(250, 250, 249, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 56px -8px rgba(0, 0, 0, 0.7);
-  /* A barely-there lift for inline blocks such as asides */
-  --aw-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
 /* 3. Starlight mapping --------------------------------------------------- */
 
 :root,
@@ -374,19 +335,10 @@
   --aw-icon-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z'/%3E%3C/svg%3E");
   --aw-icon-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z'/%3E%3Cpath d='M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z'/%3E%3C/svg%3E");
   --aw-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'/%3E%3C/svg%3E");
-  --aw-icon-tip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1a4 4 0 0 0-2.4 7.2c.6.5.9 1 .9 1.8h3c0-.8.3-1.3.9-1.8A4 4 0 0 0 8 1ZM6.5 11h3v1h-3Zm.5 2h2a1 1 0 0 1-2 0Z'/%3E%3C/svg%3E");
-  --aw-icon-note: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M8 7v4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='4.75' r='.75'/%3E%3C/svg%3E");
-  --aw-icon-caution: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m8 1.5 6.5 12h-13z' fill='none' stroke='black' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M8 5.5v4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.75' r='.75'/%3E%3C/svg%3E");
-  --aw-icon-danger: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m5 1.5 6 0 3.5 3.5v6L11 14.5H5L1.5 11V5z' fill='none' stroke='black' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='m6 6 4 4m0-4-4 4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
-/* Legacy aliases — kept so existing rules keep working until step 2 migrates them. */
+/* Legacy aliases, still read by CustomHeader.astro until branch 4 replaces it. */
 :root {
-  --aw-bg-page: var(--aw-color-bg);
-  --aw-bg-subtle: var(--aw-color-bg-subtle);
   --aw-bg-elevated: var(--aw-color-bg-raised);
-  --aw-bg-overlay: var(--aw-color-bg-overlay);
   --aw-border: var(--aw-color-border);
-  --aw-border-strong: var(--aw-color-border-strong);
-  --aw-text-muted: var(--aw-color-text-muted);
 }
