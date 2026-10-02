@@ -9,6 +9,7 @@ const env = {
   GITHUB_REPOSITORY: "owner/repo",
   GITHUB_WORKFLOW_REF: "owner/repo/.github/workflows/worker.yml@refs/heads/main",
   GITHUB_RUN_ID: "123",
+  GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: JSON.stringify({ type: "object" }),
 };
 
 function createCoordinator(state = "effective") {

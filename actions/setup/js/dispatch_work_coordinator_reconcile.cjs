@@ -37,8 +37,18 @@ function parseTrustedAssignment(raw) {
 function createCoordinator(env) {
   const [owner, repo] = (env.GITHUB_REPOSITORY || "").split("/");
   const workflowRef = env.GITHUB_WORKFLOW_REF || "";
-  if (!owner || !repo || !workflowRef || !env.GITHUB_RUN_ID) {
+  const schemaJSON = env.GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA;
+  if (!owner || !repo || !workflowRef || !env.GITHUB_RUN_ID || typeof schemaJSON !== "string" || Buffer.byteLength(schemaJSON, "utf8") > 16 * 1024) {
     throw new TypeError("Dispatch Work Coordinator safe-output configuration is incomplete");
+  }
+  let workSchema;
+  try {
+    workSchema = JSON.parse(schemaJSON);
+  } catch (error) {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid", { cause: error });
+  }
+  if (!workSchema || typeof workSchema !== "object" || Array.isArray(workSchema) || workSchema.type !== "object") {
+    throw new TypeError("Dispatch Work Coordinator Work schema is invalid");
   }
   return new DispatchWorkCoordinator({
     githubClient: createDispatchWorkCoordinatorGitHubClient(env.GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN, env.GITHUB_API_URL),
@@ -47,6 +57,7 @@ function createCoordinator(env) {
     identity: workflowRef.split("@", 1)[0],
     runId: env.GITHUB_RUN_ID,
     workflowId: workflowRef,
+    workSchema,
   });
 }
 

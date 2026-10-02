@@ -3,6 +3,7 @@
 
 function createDispatchWorkCoordinatorGitHubClient(token, apiUrl = "https://api.github.com") {
   if (typeof token !== "string" || !token) throw new TypeError("Coordinator GitHub token is required");
+  /** @param {string} method @param {string} path @param {{query?: Record<string, string | number | undefined>, body?: Record<string, unknown>}} [options] */
   const request = async (method, path, { query = {}, body: payload } = {}) => {
     let url;
     try {
@@ -33,8 +34,7 @@ function createDispatchWorkCoordinatorGitHubClient(token, apiUrl = "https://api.
       throw new Error("Coordinator GitHub API request failed", { cause: error });
     }
     if (!response.ok) {
-      const error = new Error(`GitHub API request failed with status ${response.status}`);
-      error.status = response.status;
+      const error = Object.assign(new Error(`GitHub API request failed with status ${response.status}`), { status: response.status });
       throw error;
     }
     if (response.status === 204) return { data: undefined };
