@@ -223,7 +223,7 @@ func isDispatchWorkCoordinatorEnabled(data *WorkflowData) bool {
 	if data == nil || data.Tools == nil {
 		return false
 	}
-	value, configured := data.Tools["dispatch-work-coordinator"]
+	value, configured := data.Tools["work-queue"]
 	return configured && value != false
 }
 

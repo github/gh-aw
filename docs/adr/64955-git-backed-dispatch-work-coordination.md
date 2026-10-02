@@ -1,4 +1,4 @@
-# ADR-64955: Git-Backed Dispatch Work Coordination
+# ADR-64955: Git-Backed Work Queue Coordination
 
 **Date**: 2026-10-02
 **Status**: Draft
@@ -12,7 +12,7 @@ The [Dispatch Work Coordinator proposal in issue #64852](https://github.com/gith
 
 ### Decision
 
-Implement `tools.dispatch-work-coordinator` as a first-class, compiler-aware tool backed by one log of immutable transactions, `dispatch-work-coordinator.jsonl`, on a dedicated coordinator branch. Derive authority through one shared deterministic replay implementation, using the issue's protocol and its [TLA+ specification](../../specs/dispatch-work-coordinator/DispatchWorkCoordinator.tla) as the design baseline. The activation job snapshots the current log and branch version into the activation artifact; the coordinator MCP server mounts that snapshot read-only and never reads Git. The current MCP surface is a read-only snapshot query; mutation publication and final worker authorization remain trusted `safe_outputs` responsibilities. Preserve the existing `activation -> agent -> detection -> safe_outputs -> conclusion` topology without an additional worker job.
+Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one log of immutable transactions, `dispatch-work-coordinator.jsonl`, on a dedicated coordinator branch. Operators inspect and update it with `gh aw work-queue`. Derive authority through one shared deterministic replay implementation, using the issue's protocol and its [TLA+ specification](../../specs/dispatch-work-coordinator/DispatchWorkCoordinator.tla) as the design baseline. The activation job snapshots the current log and branch version into the activation artifact; the work-queue MCP server mounts that snapshot read-only and never reads Git. The current MCP surface is a read-only snapshot query; mutation publication and final worker authorization remain trusted `safe_outputs` responsibilities. Preserve the existing `activation -> agent -> detection -> safe_outputs -> conclusion` topology without an additional worker job.
 
 #### Protocol commitments
 

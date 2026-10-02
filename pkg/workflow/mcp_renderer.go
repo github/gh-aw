@@ -176,7 +176,7 @@ func RenderJSONMCPConfig( //nolint:largefunc // Existing renderer keeps MCP JSON
 			if options.Renderers.RenderLedger != nil {
 				options.Renderers.RenderLedger(&configBuilder, isLast, workflowData)
 			}
-		case "dispatch-work-coordinator":
+		case "work-queue":
 			if options.Renderers.RenderDispatchCoordinator != nil {
 				options.Renderers.RenderDispatchCoordinator(&configBuilder, isLast, workflowData)
 			}

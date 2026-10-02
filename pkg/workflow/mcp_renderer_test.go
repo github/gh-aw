@@ -130,6 +130,9 @@ func TestRenderDispatchCoordinatorMCPUsesSnapshotAndFinishIntentMounts(t *testin
 		renderer := NewMCPConfigRenderer(MCPRendererOptions{Format: "json", IncludeCopilotFields: true, IsLast: true})
 		renderer.RenderDispatchCoordinatorMCP(&output, nil)
 		rendered := output.String()
+		if !strings.Contains(rendered, `"work-queue": {`) {
+			t.Fatalf("expected work-queue MCP server: %s", rendered)
+		}
 		if !strings.Contains(rendered, `"dispatch_work_coordinator_read"`) {
 			t.Fatalf("expected the read tool to be exposed: %s", rendered)
 		}
@@ -149,6 +152,9 @@ func TestRenderDispatchCoordinatorMCPUsesSnapshotAndFinishIntentMounts(t *testin
 		renderer := NewMCPConfigRenderer(MCPRendererOptions{Format: "toml"})
 		renderer.RenderDispatchCoordinatorMCP(&output, nil)
 		rendered := output.String()
+		if !strings.Contains(rendered, "[mcp_servers.work-queue]") {
+			t.Fatalf("expected work-queue MCP server: %s", rendered)
+		}
 		if !strings.Contains(rendered, constants.DispatchCoordinatorSnapshotMount) {
 			t.Fatalf("expected a read-only snapshot mount: %s", rendered)
 		}
@@ -162,12 +168,12 @@ func TestRenderDispatchCoordinatorMCPUsesSnapshotAndFinishIntentMounts(t *testin
 }
 
 func TestDispatchCoordinatorMCPIsRegisteredInManifest(t *testing.T) {
-	data := &WorkflowData{Tools: map[string]any{"dispatch-work-coordinator": true}}
-	if !strings.Contains(strings.Join(collectMCPTools(data), ","), "dispatch-work-coordinator") {
+	data := &WorkflowData{Tools: map[string]any{"work-queue": true}}
+	if !strings.Contains(strings.Join(collectMCPTools(data), ","), "work-queue") {
 		t.Fatal("expected the enabled coordinator tool to register an MCP server")
 	}
 	servers := collectMCPServersForManifest(data)
-	if len(servers) != 1 || servers[0].Name != "dispatch-work-coordinator" {
+	if len(servers) != 1 || servers[0].Name != "work-queue" {
 		t.Fatalf("expected coordinator server in manifest, got %#v", servers)
 	}
 	if len(servers[0].Tools) != 2 || servers[0].Tools[0] != "dispatch_claim_finish" || servers[0].Tools[1] != "dispatch_work_coordinator_read" {

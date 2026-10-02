@@ -107,7 +107,7 @@ function createDispatchCoordinatorFinishTool(options = {}) {
 
 function startDispatchCoordinatorServer(options = {}) {
   const snapshot = loadDispatchCoordinatorSnapshot(options.snapshotPath);
-  const server = createServer({ name: "dispatch-work-coordinator", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
+  const server = createServer({ name: "work-queue", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
   registerTool(server, createDispatchCoordinatorStateTool(snapshot));
   registerTool(server, createDispatchCoordinatorFinishTool(options));
   start(server);

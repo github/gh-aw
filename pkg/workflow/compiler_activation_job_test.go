@@ -54,7 +54,7 @@ func TestDispatchCoordinatorSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
 		Name:  "Coordinator",
-		Tools: map[string]any{"dispatch-work-coordinator": true},
+		Tools: map[string]any{"work-queue": true},
 	}
 	job, err := compiler.buildActivationJob(data, false, "", "coordinator.lock.yml")
 	require.NoError(t, err)
