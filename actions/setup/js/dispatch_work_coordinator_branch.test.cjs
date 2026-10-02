@@ -4,7 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DispatchWorkCoordinator, coordinatorBranchName } from "./dispatch_work_coordinator_branch.cjs";
-import { deriveWorkId, parseTransactionLog, serializeTransactions } from "./dispatch_work_coordinator.cjs";
+import { deriveWorkId, parseTransactionLog, replayTransactions, serializeTransactions } from "./dispatch_work_coordinator.cjs";
 
 function apiError(status, message) {
   return Object.assign(new Error(message), { status });
@@ -84,9 +84,9 @@ function mockGitHub() {
     githubClient,
     getRefReads: () => refReads,
     setUpdateFailures: count => (updateFailures = count),
-    async seed(branchName, transactions) {
+    async seed(branchName, transactions, rawContent = serializeTransactions(transactions)) {
       const blob = id("blob");
-      blobs.set(blob, serializeTransactions(transactions));
+      blobs.set(blob, rawContent);
       const tree = id("tree");
       trees.set(tree, [{ path: "dispatch-work-coordinator.jsonl", mode: "100644", type: "blob", sha: blob }]);
       const commit = id("commit");
@@ -99,6 +99,10 @@ function mockGitHub() {
       const tree = trees.get(commits.get(head).tree);
       const content = blobs.get(tree[0].sha);
       return parseTransactionLog(content);
+    },
+    getRawContent(branchName) {
+      const head = branches.get(branchName);
+      return blobs.get(trees.get(commits.get(head).tree)[0].sha);
     },
     branchExists: branchName => branches.has(branchName),
   };
@@ -225,4 +229,70 @@ test("optimistic conflicts trigger a fresh replay and bounded retries", async ()
   assert.ok(client.getRefReads() >= beforeReads + 3);
   client.setUpdateFailures(10);
   await assert.rejects(instance.submit({ title: "Exhausted" }), /bounded concurrency retries/);
+});
+
+test("compaction rewrites only the canonical file and preserves replayed authority", async () => {
+  const client = mockGitHub();
+  const instance = coordinator(client);
+  const work = await instance.submit({ title: "Compact me" });
+  const claim = await instance.claim(work.work_id);
+  await instance.cancelClaim(claim.claim_id);
+  const original = await client.getTransactions(instance.branchName);
+  const rawContent =
+    original
+      .map(record => JSON.stringify(record))
+      .reverse()
+      .concat(JSON.stringify(original[0]))
+      .join("\n") + "\n";
+  await client.seed(instance.branchName, original, rawContent);
+  const projection = replayTransactions(original);
+
+  assert.deepEqual(await instance.compact(), projection);
+  assert.deepEqual(await instance.status(), projection);
+  assert.equal(client.getRawContent(instance.branchName), serializeTransactions(original));
+  assert.equal((await client.getTransactions(instance.branchName)).length, original.length);
+});
+
+test("compaction retries from fresh branch state and leaves the log intact on exhaustion", async () => {
+  const client = mockGitHub();
+  const instance = coordinator(client);
+  const work = await instance.submit({ title: "Retry compaction" });
+  const original = await client.getTransactions(instance.branchName);
+  await client.seed(instance.branchName, original, JSON.stringify(original[0]) + "\n" + JSON.stringify(original[0]) + "\n");
+
+  client.setUpdateFailures(1);
+  const readsBefore = client.getRefReads();
+  assert.deepEqual(await instance.compact(), replayTransactions(original));
+  assert.ok(client.getRefReads() >= readsBefore + 3);
+
+  await client.seed(instance.branchName, original, JSON.stringify(original[0]) + "\n" + JSON.stringify(original[0]) + "\n");
+  const before = client.getRawContent(instance.branchName);
+  client.setUpdateFailures(10);
+  await assert.rejects(instance.compact(), /bounded concurrency retries/);
+  assert.equal(client.getRawContent(instance.branchName), before);
+});
+
+test("compaction regenerates from the full remote log after a competing append", async () => {
+  const client = mockGitHub();
+  const instance = coordinator(client);
+  const first = await instance.submit({ title: "First" });
+  const initial = await client.getTransactions(instance.branchName);
+  await client.seed(instance.branchName, initial, JSON.stringify(initial[0]) + "\n" + JSON.stringify(initial[0]) + "\n");
+
+  const nextWork = { title: "Appended during compaction" };
+  const nextTransaction = { type: "Work", work_id: deriveWorkId(nextWork), work: nextWork };
+  const updateRef = client.githubClient.rest.git.updateRef;
+  let raced = false;
+  client.githubClient.rest.git.updateRef = async params => {
+    if (!raced) {
+      raced = true;
+      await client.seed(instance.branchName, [...initial, nextTransaction], client.getRawContent(instance.branchName) + JSON.stringify(nextTransaction) + "\n");
+    }
+    return updateRef(params);
+  };
+
+  const result = await instance.compact();
+  assert.equal(result.works.length, 2);
+  assert.equal(result.works.find(work => work.work_id === first.work_id).state, "available");
+  assert.equal(client.getRawContent(instance.branchName), serializeTransactions([...initial, nextTransaction]));
 });

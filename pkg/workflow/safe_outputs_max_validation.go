@@ -203,6 +203,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.DispatchClaimFinish != nil {
+		if err := checkMaxField("dispatch_claim_finish", config.DispatchClaimFinish.Max); err != nil {
+			return err
+		}
+	}
 	if config.DismissPullRequestReview != nil {
 		if err := checkMaxField("dismiss_pull_request_review", config.DismissPullRequestReview.Max); err != nil {
 			return err
