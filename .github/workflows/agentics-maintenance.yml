@@ -25,7 +25,7 @@
 # It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 #
 # This workflow is generated automatically when workflows use expiring safe outputs,
-# when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+# Dispatch Work Coordinator, compaction-enabled ledgers (tools.ledger), or when repository
 # maintenance features are enabled in .github/workflows/aw.json.
 #
 # To disable maintenance workflow generation, set in .github/workflows/aw.json:

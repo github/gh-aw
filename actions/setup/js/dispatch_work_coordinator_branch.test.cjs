@@ -204,6 +204,42 @@ test("claim cannot displace an active Claim but can reclaim Work after cancellat
   assert.equal(replacement.claim_state, "effective");
 });
 
+test("orphan recovery cancels an effective Claim only after its owning workflow run completes", async () => {
+  const client = mockGitHub();
+  const instance = coordinator(client);
+  const work = await instance.submit({ title: "Recover orphan" });
+  const claim = await instance.claim(work.work_id);
+  const getWorkflowRun = async runId => ({
+    data: {
+      id: Number(runId),
+      status: "completed",
+      path: ".github/workflows/dispatch.yml@main",
+    },
+  });
+
+  assert.deepEqual(await instance.recoverOrphanClaims(getWorkflowRun), [claim.claim_id]);
+  assert.equal((await instance.get(work.work_id)).state, "available");
+  assert.equal((await client.getTransactions(instance.branchName)).filter(tx => tx.type === "ClaimCancellation").length, 1);
+});
+
+test("orphan recovery leaves active, mismatched, and missing runs untouched", async () => {
+  for (const lookup of [
+    async () => ({ data: { id: 1234, status: "in_progress", path: ".github/workflows/dispatch.yml@main" } }),
+    async () => ({ data: { id: 1234, status: "completed", path: ".github/workflows/other.yml@refs/heads/main" } }),
+    async () => {
+      throw apiError(404, "Not Found");
+    },
+  ]) {
+    const client = mockGitHub();
+    const instance = coordinator(client);
+    const work = await instance.submit({ title: "Keep active" });
+    await instance.claim(work.work_id);
+
+    assert.deepEqual(await instance.recoverOrphanClaims(lookup), []);
+    assert.equal((await instance.get(work.work_id)).state, "claimed");
+  }
+});
+
 test("work cancellation is idempotent and rejects completed work", async () => {
   const client = mockGitHub();
   const instance = coordinator(client);

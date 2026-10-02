@@ -132,7 +132,8 @@ func isNoOpReportAsIssueEnabled(reportAsIssue *string) bool {
 }
 
 // GenerateMaintenanceWorkflow generates the agentics-maintenance.yml workflow
-// if any workflows use expiring safe outputs or noop issue reporting.
+// if any workflows use expiring safe outputs, a Git-backed coordinator, or noop
+// issue reporting.
 // When opts.RepoConfig is non-nil and opts.RepoConfig.MaintenanceDisabled is true the
 // maintenance workflow is deleted and the function returns immediately.
 // opts.RepoSlug is the owner/repo slug used to determine the default branch for the push
@@ -201,8 +202,12 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	// Scan workflows for expires fields and track the minimum expires value
 	hasExpires, minExpires, triggerReason := scanWorkflowsForExpires(workflowDataList, repoConfig)
 	compactionLedgers := collectMaintenanceCompactionLedgers(workflowDataList)
+	dispatchWorkCoordinators, err := collectMaintenanceDispatchWorkCoordinators(workflowDataList)
+	if err != nil {
+		return err
+	}
 
-	if !hasExpires && len(compactionLedgers) == 0 {
+	if !hasExpires && len(compactionLedgers) == 0 && len(dispatchWorkCoordinators) == 0 {
 		maintenanceLog.Print("No workflows use expires field, skipping maintenance workflow generation")
 
 		// No maintenance workflow means no scheduled close-expired-issues consumer.
@@ -255,7 +260,12 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	if triggerReason == "" {
-		triggerReason = fmt.Sprintf("%d compaction-enabled ledger(s)", len(compactionLedgers))
+		switch {
+		case len(dispatchWorkCoordinators) > 0:
+			triggerReason = fmt.Sprintf("%d Dispatch Work Coordinator(s)", len(dispatchWorkCoordinators))
+		default:
+			triggerReason = fmt.Sprintf("%d compaction-enabled ledger(s)", len(compactionLedgers))
+		}
 	}
 	maintenanceLog.Printf("Maintenance workflow generation triggered: %s", triggerReason)
 	maintenanceLog.Printf("Generating maintenance workflow for expired discussions, issues, and pull requests (minimum expires: %d hours)", minExpires)
@@ -289,22 +299,23 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	)
 	copilotOrgBilling := allCopilotWorkflowsUseOrgBilling(workflowDataList)
 	content, err := buildMaintenanceWorkflowYAML(ctx, buildMaintenanceWorkflowYAMLOptions{
-		cronSchedule:        cronSchedule,
-		scheduleDesc:        scheduleDesc,
-		minExpiresDays:      minExpiresDays,
-		runsOnValue:         runsOnValue,
-		actionMode:          actionMode,
-		version:             version,
-		actionTag:           actionTag,
-		resolver:            resolver,
-		configuredRunsOn:    configuredRunsOn,
-		defaultBranch:       defaultBranch,
-		disableLabelTrigger: disableLabelTrigger,
-		maintenanceConfig:   maintenanceConfig,
-		compileGitHubToken:  getEffectiveMaintenanceGitHubToken(compileGitHubTokenSecret),
-		createCompilePR:     enableCompileCreatePullRequest,
-		copilotOrgBilling:   copilotOrgBilling,
-		compactionLedgers:   compactionLedgers,
+		cronSchedule:             cronSchedule,
+		scheduleDesc:             scheduleDesc,
+		minExpiresDays:           minExpiresDays,
+		runsOnValue:              runsOnValue,
+		actionMode:               actionMode,
+		version:                  version,
+		actionTag:                actionTag,
+		resolver:                 resolver,
+		configuredRunsOn:         configuredRunsOn,
+		defaultBranch:            defaultBranch,
+		disableLabelTrigger:      disableLabelTrigger,
+		maintenanceConfig:        maintenanceConfig,
+		compileGitHubToken:       getEffectiveMaintenanceGitHubToken(compileGitHubTokenSecret),
+		createCompilePR:          enableCompileCreatePullRequest,
+		copilotOrgBilling:        copilotOrgBilling,
+		compactionLedgers:        compactionLedgers,
+		dispatchWorkCoordinators: dispatchWorkCoordinators,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)
@@ -401,6 +412,15 @@ func handleMaintenanceDisabled(workflowDataList []*WorkflowData, workflowDir str
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 			fmt.Sprintf("Ledger '%s' has compaction enabled but maintenance is disabled in aw.json. "+
 				"Ledger compaction will not run until maintenance is re-enabled.", ledger.Name)))
+	}
+	coordinators, err := collectMaintenanceDispatchWorkCoordinators(workflowDataList)
+	if err != nil {
+		return err
+	}
+	for _, coordinator := range coordinators {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+			fmt.Sprintf("Workflow '%s' uses Dispatch Work Coordinator but maintenance is disabled in aw.json. "+
+				"Coordinator compaction and orphan Claim recovery will not run until maintenance is re-enabled.", coordinator.workflowID)))
 	}
 
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")

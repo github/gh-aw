@@ -172,6 +172,24 @@ tools:
 
 See **[Repo Memory Reference](/gh-aw/reference/repo-memory/)** for complete configuration options and usage examples.
 
+### Dispatch Work Coordinator (`dispatch-work-coordinator:`)
+
+Configure a durable Work queue with a required payload schema:
+
+```yaml wrap
+tools:
+  dispatch-work-coordinator:
+    schema:
+      type: object
+      properties:
+        title:
+          type: string
+      required: [title]
+      additionalProperties: false
+```
+
+See the [Dispatch Work Coordinator Reference](/gh-aw/reference/dispatch-work-coordinator/) for the MCP tools, Claim lifecycle, completion authorization, and maintenance behavior.
+
 ### QMD Documentation Search (`qmd:`) — Experimental
 
 Build a local vector search index over documentation files and expose it as an MCP search tool. The index is built in a dedicated indexing job (no `contents: read` needed in the agent job):

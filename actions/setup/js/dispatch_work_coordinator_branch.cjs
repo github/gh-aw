@@ -197,6 +197,33 @@ class DispatchWorkCoordinator {
     throw new Error("Coordinator compaction failed after bounded concurrency retries");
   }
 
+  async recoverOrphanClaims(getWorkflowRun) {
+    if (typeof getWorkflowRun !== "function") throw new TypeError("Orphan recovery requires a workflow-run lookup");
+    const snapshot = await this.read();
+    const candidates = snapshot.projection.works.filter(work => work.state === "claimed").flatMap(work => work.claims.filter(claim => claim.claim_id === work.effective_claim_id && claim.state === "effective"));
+    const recovered = [];
+    for (const claim of candidates) {
+      let response;
+      try {
+        response = await getWorkflowRun(claim.run_id);
+      } catch (error) {
+        const status = getStatus(error);
+        if (status === 404) continue;
+        throw error;
+      }
+      const run = response?.data ?? response;
+      const workflowPrefix = `${this.owner}/${this.repo}/`;
+      const claimWorkflowPath = claim.workflow_id.startsWith(workflowPrefix) ? claim.workflow_id.slice(workflowPrefix.length).split("@", 1)[0] : "";
+      if (!run || String(run.id) !== claim.run_id || run.status !== "completed" || typeof run.path !== "string" || claimWorkflowPath !== run.path.split("@", 1)[0]) {
+        continue;
+      }
+      const work = await this.cancelClaim(claim.claim_id);
+      const cancelledClaim = work?.claims.find(item => item.claim_id === claim.claim_id);
+      if (cancelledClaim?.state === "cancelled") recovered.push(claim.claim_id);
+    }
+    return recovered;
+  }
+
   async submit(work) {
     if (validateValueAgainstSchema(work, this.workSchema)) throw new TypeError("Work payload does not match its configured schema");
     const workId = deriveWorkId(work);

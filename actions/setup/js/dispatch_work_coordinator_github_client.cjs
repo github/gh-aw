@@ -59,6 +59,9 @@ function createDispatchWorkCoordinatorGitHubClient(token, apiUrl = "https://api.
         createRef: params => request("POST", repositoryPath(params, "/git/refs"), { body: { ref: params.ref, sha: params.sha } }),
       },
       repos: {},
+      actions: {
+        getWorkflowRun: params => request("GET", repositoryPath(params, `/actions/runs/${encodeURIComponent(params.run_id)}`)),
+      },
     },
   };
 }

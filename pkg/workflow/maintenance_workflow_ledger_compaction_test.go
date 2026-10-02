@@ -194,6 +194,46 @@ func TestGenerateMaintenanceWorkflow_NoLedgerCompactionInputsWithoutLedgers(t *t
 	require.NoError(t, err)
 	assert.NotContains(t, string(content), "compact_ledger")
 	assert.NotContains(t, string(content), "ledger_compaction_")
+	assert.NotContains(t, string(content), "dispatch_work_coordinator_compaction")
+}
+
+func TestGenerateMaintenanceWorkflow_DispatchWorkCoordinatorMaintenance(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+		WorkflowDataList: []*WorkflowData{
+			{
+				Name:       "worker",
+				WorkflowID: "worker",
+				DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{
+					Schema: map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"title": map[string]any{"type": "string"},
+						},
+					},
+				},
+			},
+		},
+		WorkflowDir: tmpDir,
+		Version:     "v1.0.0",
+		ActionMode:  ActionModeDev,
+	})
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(tmpDir, "agentics-maintenance.yml"))
+	require.NoError(t, err)
+	yaml := string(content)
+
+	jobs := parseMaintenanceJobs(t, yaml)
+	job := jobs["dispatch_work_coordinator_compaction"]
+	require.NotEmpty(t, job)
+	assert.Equal(t, 1, strings.Count(yaml, "\n  dispatch_work_coordinator_compaction:\n"))
+	assert.Contains(t, job, "actions: read")
+	assert.Contains(t, job, "contents: write")
+	assert.Contains(t, job, "dispatch_work_coordinator_maintenance.cjs")
+	assert.Contains(t, job, `"identity":".github/workflows/worker.lock.yml"`)
+	assert.Contains(t, job, `"schema":{"properties":{"title":{"type":"string"}},"type":"object"}`)
+	assert.Contains(t, yaml, "'dispatch_work_coordinator_compaction'")
+	assert.Contains(t, jobs["run_operation"], "inputs.operation != 'dispatch_work_coordinator_compaction'")
 }
 
 func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing.T) {

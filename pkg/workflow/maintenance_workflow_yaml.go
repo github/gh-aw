@@ -13,22 +13,23 @@ var maintenanceWorkflowYAMLLog = logger.New("workflow:maintenance_workflow_yaml"
 
 // buildMaintenanceWorkflowYAMLOptions configures the maintenance workflow YAML builder.
 type buildMaintenanceWorkflowYAMLOptions struct {
-	cronSchedule        string
-	scheduleDesc        string
-	minExpiresDays      int
-	runsOnValue         string
-	actionMode          ActionMode
-	version             string
-	actionTag           string
-	resolver            SHAResolver
-	configuredRunsOn    RunsOnValue
-	defaultBranch       string
-	disableLabelTrigger bool
-	maintenanceConfig   *MaintenanceConfig
-	compileGitHubToken  string
-	createCompilePR     bool
-	copilotOrgBilling   bool // all Copilot workflows use copilot-requests: write (GITHUB_TOKEN); COPILOT_GITHUB_TOKEN is not required
-	compactionLedgers   []LedgerConfig
+	cronSchedule             string
+	scheduleDesc             string
+	minExpiresDays           int
+	runsOnValue              string
+	actionMode               ActionMode
+	version                  string
+	actionTag                string
+	resolver                 SHAResolver
+	configuredRunsOn         RunsOnValue
+	defaultBranch            string
+	disableLabelTrigger      bool
+	maintenanceConfig        *MaintenanceConfig
+	compileGitHubToken       string
+	createCompilePR          bool
+	copilotOrgBilling        bool // all Copilot workflows use copilot-requests: write (GITHUB_TOKEN); COPILOT_GITHUB_TOKEN is not required
+	compactionLedgers        []LedgerConfig
+	dispatchWorkCoordinators []maintenanceDispatchWorkCoordinator
 }
 
 // buildMaintenanceWorkflowYAML generates the complete YAML content for the
@@ -64,6 +65,7 @@ func buildMaintenanceWorkflowYAML(
 		return "", err
 	}
 	yaml.WriteString(ledgerJobs)
+	yaml.WriteString(buildMaintenanceDispatchWorkCoordinatorJob(opts, setupActionRef))
 	finalYAML, err := finalizeRunnerTempSafety(yaml.String())
 	if err != nil {
 		return "", fmt.Errorf("runner temp safety: %w", err)
@@ -86,7 +88,7 @@ func buildMaintenanceWorkflowHeaderYAML(opts buildMaintenanceWorkflowYAMLOptions
 It runs scheduled cleanup for expiring safe outputs and supports manual maintenance operations.
 
 This workflow is generated automatically when workflows use expiring safe outputs,
-when workflows declare compaction-enabled ledgers (tools.ledger), or when repository
+Dispatch Work Coordinator, compaction-enabled ledgers (tools.ledger), or when repository
 maintenance features are enabled in .github/workflows/aw.json.
 
 To disable maintenance workflow generation, set in .github/workflows/aw.json:
@@ -97,7 +99,7 @@ Agentic maintenance docs:
 
 	scheduleBasis := "based on minimum expires: " + strconv.Itoa(opts.minExpiresDays) + " days"
 	if opts.minExpiresDays <= 0 {
-		scheduleBasis = "for ledger compaction"
+		scheduleBasis = "for coordinator or ledger maintenance"
 	}
 	return GenerateWorkflowHeader("", "pkg/workflow/maintenance_workflow.go", customInstructions) + `name: Agentic Maintenance
 
@@ -124,8 +126,9 @@ func buildMaintenanceWorkflowTriggerYAML(
 		yaml.WriteString("  issues:\n    types: [labeled]\n")
 	}
 	hasLedgers := len(opts.compactionLedgers) > 0
-	yaml.WriteString(buildMaintenanceDispatchInputsYAML(hasLedgers))
-	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers))
+	hasDispatchWorkCoordinators := len(opts.dispatchWorkCoordinators) > 0
+	yaml.WriteString(buildMaintenanceDispatchInputsYAML(hasLedgers, hasDispatchWorkCoordinators))
+	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers, hasDispatchWorkCoordinators))
 	yaml.WriteString("\npermissions: {}\n\njobs:\n")
 	return yaml.String()
 }
@@ -134,8 +137,8 @@ func buildMaintenanceWorkflowTriggerYAML(
 const maintenanceLedgerInputDescription = "Ledger name to compact when operation is compact_ledger (empty compacts every due ledger)."
 
 // buildMaintenanceDispatchInputsYAML returns the workflow_dispatch trigger block.
-// When compaction-enabled ledgers exist, it adds the compact_ledger operation and a ledger input.
-func buildMaintenanceDispatchInputsYAML(hasLedgers bool) string {
+// It adds feature-specific maintenance operations only when their workflows are present.
+func buildMaintenanceDispatchInputsYAML(hasLedgers, hasDispatchWorkCoordinators bool) string {
 	ledgerOption := ""
 	ledgerInput := ""
 	if hasLedgers {
@@ -146,6 +149,10 @@ func buildMaintenanceDispatchInputsYAML(hasLedgers bool) string {
         type: string
         default: ''
 `
+	}
+	coordinatorOption := ""
+	if hasDispatchWorkCoordinators {
+		coordinatorOption = "          - '" + maintenanceDispatchWorkCoordinatorOperation + "'\n"
 	}
 	return fmt.Sprintf(`  workflow_dispatch:
     inputs:
@@ -168,16 +175,16 @@ func buildMaintenanceDispatchInputsYAML(hasLedgers bool) string {
           - 'update_pull_request_branches'
           - 'validate'
           - 'forecast'
-%[2]s      run_url:
+%[2]s%[3]s      run_url:
         description: 'Run URL or run ID to replay safe outputs from (e.g. https://github.com/owner/repo/actions/runs/12345 or 12345). Required when operation is safe_outputs.'
         required: false
         type: string
         default: ''
-%[3]s`, maintenanceNoOperationValue, ledgerOption, ledgerInput)
+%[4]s`, maintenanceNoOperationValue, ledgerOption, coordinatorOption, ledgerInput)
 }
 
 // buildMaintenanceWorkflowCallYAML returns the workflow_call trigger block.
-func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers bool) string {
+func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers, hasDispatchWorkCoordinators bool) string {
 	operations := "disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues, clean_cache_memories, update_pull_request_branches, validate, forecast"
 	ledgerInput := ""
 	if hasLedgers {
@@ -188,6 +195,9 @@ func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLVal
         type: string
         default: ''
 `
+	}
+	if hasDispatchWorkCoordinators {
+		operations += ", " + maintenanceDispatchWorkCoordinatorOperation
 	}
 	return `  workflow_call:
     inputs:

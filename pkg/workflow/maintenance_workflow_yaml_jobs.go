@@ -171,6 +171,9 @@ func maintenanceRunOperationExclusions(opts buildMaintenanceWorkflowYAMLOptions)
 	if len(opts.compactionLedgers) > 0 {
 		excluded = append(excluded, maintenanceCompactLedgerOperation)
 	}
+	if len(opts.dispatchWorkCoordinators) > 0 {
+		excluded = append(excluded, maintenanceDispatchWorkCoordinatorOperation)
+	}
 	return excluded
 }
 
