@@ -5,7 +5,7 @@ sidebar:
   order: 1365
 version: "1.0.0"
 status: Draft
-date: "2026-10-02"
+publication_date: "2026-10-02"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
