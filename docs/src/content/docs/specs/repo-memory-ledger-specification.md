@@ -106,8 +106,8 @@ MUST result in no compaction.
 
 ### 4.3 Built-in replay
 
-The only supported declared types are `log`, `set`, `map`, `table`, and
-`counter`. Unknown types and any `replay` configuration MUST be rejected.
+The only supported declared types are `log`, `set`, `map`, `table`,
+`counter`, and `claims`. Unknown types and any `replay` configuration MUST be rejected.
 
 | Type | Supported operations | Derived `state` columns |
 | --- | --- | --- |
@@ -116,6 +116,7 @@ The only supported declared types are `log`, `set`, `map`, `table`, and
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+| `claims` | `claim(subject, claim, reason, citations)`, `vote(claim_id, vote, reason?)` | `claims`, `claim_citations`, `claim_votes`, `claim_state` |
 
 Replay MUST apply canonical topological record order, breaking ties between
 simultaneously ready records by SHA-256 lexical order. The `state` table MUST
@@ -129,10 +130,16 @@ declare `key`. Table inserts MUST reject duplicate keys, updates MUST require
 an existing key and preserve the primary key, and upserts MUST replace the
 entire row. Set membership MUST use canonical JSON equality. Counter amounts
 MUST be nonnegative safe integers, and resulting arithmetic MUST remain within
-the safe-integer range. Counters MUST NOT accept value schemas.
+the safe-integer range. Counters and claims MUST NOT accept value schemas.
 
-The `map` type exposes `ledger_map_put` and `ledger_map_delete`; the other
-types use typed `ledger_append` operations. Ledgers without a declared type
+Claims MUST include at least one valid repository citation. Claims and votes
+MUST remain immutable records; the derived `claim_state` view reports vote
+counts and timestamps, not truth or authority. Consumers MUST verify cited
+evidence against current repository state before relying on a claim.
+
+The `map` type exposes `ledger_map_put` and `ledger_map_delete`; `claims`
+exposes `ledger_claim_add` and `ledger_claim_vote`. Other types use typed
+`ledger_append` operations. Ledgers without a declared type
 retain the generic records projection and raw-record append interface. They
 MUST NOT execute custom replay code.
 
@@ -304,6 +311,6 @@ verification, malformed-line isolation, concurrent-head convergence, all
 configured limits, deterministic compaction, hostile and stale plans,
 safe retirement, redacted persistence results,
 ledger limit unit parsing, deferred transaction validation, and projection rebuilds.
-Tests MUST cover rejection of custom replay and compaction scripts, all five
+Tests MUST cover rejection of custom replay and compaction scripts, all six
 built-in reducers, invalid-operation projection failures, and preservation of
 built-in state and generic record history after lossless compaction.

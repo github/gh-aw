@@ -90,6 +90,7 @@ describe("safe_outputs_handlers", () => {
         ],
       },
     });
+
     expect(configured.ledgerBuiltinHandler("map", "put")({ key: "a", value: { status: "ready" } }).isError).toBe(true);
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "queue", key: "a", value: 1 }).isError).toBe(true);
     expect(configured.ledgerBuiltinHandler("map", "put")({ ledger: "cache", key: "a", value: 1, operation: "delete" }).isError).toBe(true);
@@ -98,6 +99,30 @@ describe("safe_outputs_handlers", () => {
     expect(mockAppendSafeOutput.mock.calls.map(([entry]) => entry)).toEqual([
       { type: "ledger_append", ledger: "cache", operation: "put", key: "a", value: { status: "ready" }, temp_id: "entry" },
       { type: "ledger_append", ledger: "other", operation: "put", key: "b", value: 2 },
+    ]);
+  });
+
+  it("routes claims tools through ledger_append without exposing operation envelopes", () => {
+    const configured = createHandlers(mockServer, mockAppendSafeOutput, {
+      ledger_append: {
+        ledgers: [
+          { name: "knowledge", type: "claims" },
+          { name: "other", type: "claims" },
+          { name: "history", type: "log" },
+        ],
+      },
+    });
+    const claim = { subject: "authentication", claim: "Tokens expire", reason: "Documented", citations: [{ type: "repository", path: "README.md" }] };
+    expect(configured.ledgerBuiltinHandler("claims", "claim")({ ...claim }).isError).toBe(true);
+    expect(configured.ledgerBuiltinHandler("claims", "claim")({ ledger: "knowledge", ...claim, operation: "vote" }).isError).toBe(true);
+    expect(configured.ledgerBuiltinHandler("claims", "claim")({ ledger: "knowledge", temp_id: "first", ...claim }).isError).not.toBe(true);
+    expect(configured.ledgerBuiltinHandler("claims", "vote")({ ledger: "knowledge", claim_id: "#first", vote: "up" }).isError).not.toBe(true);
+    expect(configured.ledgerAgentAppendHandler({ ledger: "knowledge", operation: "claim", ...claim }).isError).toBe(true);
+    expect(configured.ledgerAgentAppendHandler({ ledger: "history", operation: "append", value: "ok" }).isError).not.toBe(true);
+    expect(mockAppendSafeOutput.mock.calls.map(([entry]) => entry)).toEqual([
+      { type: "ledger_append", ledger: "knowledge", temp_id: "first", operation: "claim", ...claim },
+      { type: "ledger_append", ledger: "knowledge", operation: "vote", claim_id: "#first", vote: "up" },
+      { type: "ledger_append", ledger: "history", operation: "append", value: "ok" },
     ]);
   });
 

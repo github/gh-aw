@@ -10,8 +10,48 @@ const OPERATIONS = Object.freeze({
   map: ["put", "delete"],
   table: ["insert", "update", "upsert", "delete"],
   counter: ["increment", "decrement"],
+  claims: ["claim", "vote"],
 });
 const MAX_REPLAY_CELL_BYTES = 65536;
+const CLAIM_LIMITS = { subject: 512, claim: 4096, reason: 1024, citations: 32, citationBytes: 2048 };
+const CLAIM_STATE_COLUMNS = { claim_id: "text", upvotes: "integer", downvotes: "integer", net_votes: "integer", last_vote_at: "text", last_positive_vote_at: "text" };
+const CLAIM_STATE_VIEW = `CREATE VIEW claim_state AS
+  WITH vote_state AS (
+    SELECT claim_id,
+      sum(CASE WHEN vote = 'up' THEN 1 ELSE 0 END) AS upvotes,
+      sum(CASE WHEN vote = 'down' THEN 1 ELSE 0 END) AS downvotes,
+      max(created_at) AS last_vote_at,
+      max(CASE WHEN vote = 'up' THEN created_at END) AS last_positive_vote_at
+    FROM claim_votes
+    GROUP BY claim_id
+  )
+  SELECT c.id AS claim_id,
+    coalesce(v.upvotes, 0) AS upvotes,
+    coalesce(v.downvotes, 0) AS downvotes,
+    coalesce(v.upvotes, 0) - coalesce(v.downvotes, 0) AS net_votes,
+    v.last_vote_at,
+    v.last_positive_vote_at
+  FROM claims c
+  LEFT JOIN vote_state v ON v.claim_id = c.id`;
+
+function validateCitation(citation) {
+  if (!citation || typeof citation !== "object" || Array.isArray(citation)) return false;
+  switch (citation.type) {
+    case "repository":
+      return validateRepositoryCitation(citation);
+    default:
+      return false;
+  }
+}
+
+function validateRepositoryCitation(citation) {
+  if (Object.keys(citation).some(key => !["type", "path", "start_line", "end_line"].includes(key))) return false;
+  if (typeof citation.path !== "string" || !citation.path.trim() || /[\\\u0000-\u001f\u007f]/.test(citation.path) || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(citation.path) || /%(?:2e|2f|5c)/i.test(citation.path)) return false;
+  if (citation.path.split("/").some(part => !part || part === "." || part === "..")) return false;
+  if (citation.start_line !== undefined && (!Number.isSafeInteger(citation.start_line) || citation.start_line < 1)) return false;
+  if (citation.end_line !== undefined && (!Number.isSafeInteger(citation.end_line) || citation.end_line < 1 || (citation.start_line !== undefined && citation.end_line < citation.start_line))) return false;
+  return true;
+}
 
 function checkSchema(value, schema) {
   if (!schema) return;
@@ -22,6 +62,31 @@ function checkSchema(value, schema) {
 function validateOperation(record, config) {
   const { operation } = record;
   if (!Object.hasOwn(OPERATIONS, config.type) || !OPERATIONS[config.type].includes(operation)) throw new TypeError("Unsupported ledger operation");
+  if (config.type === "claims") {
+    const fields = operation === "claim" ? ["subject", "claim", "reason", "citations"] : ["claim_id", "vote"];
+    const expected = new Set(["operation", ...fields, ...(operation === "vote" ? ["reason"] : []), ...(record.id === undefined ? [] : ["id"])]);
+    if (Object.keys(record).some(key => !expected.has(key)) || fields.some(key => !Object.hasOwn(record, key))) throw new TypeError("Invalid ledger operation fields");
+    if (record.id !== undefined && (typeof record.id !== "string" || !record.id || Buffer.byteLength(record.id) > 128)) throw new TypeError("Invalid claim record ID");
+    if ((operation === "claim" || Object.hasOwn(record, "reason")) && (typeof record.reason !== "string" || !record.reason.trim() || [...record.reason].length > CLAIM_LIMITS.reason))
+      throw new TypeError("Claim reason must be a nonempty bounded string");
+    if (operation === "claim") {
+      if (
+        typeof record.subject !== "string" ||
+        !record.subject.trim() ||
+        Buffer.byteLength(record.subject) > CLAIM_LIMITS.subject ||
+        typeof record.claim !== "string" ||
+        !record.claim.trim() ||
+        Buffer.byteLength(record.claim) > CLAIM_LIMITS.claim
+      )
+        throw new TypeError("Claim subject and assertion must be nonempty bounded strings");
+      if (!Array.isArray(record.citations) || !record.citations.length || record.citations.length > CLAIM_LIMITS.citations || record.citations.some(citation => !validateCitation(citation)))
+        throw new TypeError("Claim citations must contain at least one valid citation object");
+      for (const citation of record.citations) if (Buffer.byteLength(canonicalJSON(citation)) > CLAIM_LIMITS.citationBytes) throw new RangeError("Claim citation exceeds size limit");
+    } else {
+      if (typeof record.claim_id !== "string" || !record.claim_id || Buffer.byteLength(record.claim_id) > 128 || !["up", "down"].includes(record.vote)) throw new TypeError("Vote requires a bounded claim ID and an up or down vote");
+    }
+    return;
+  }
   const fields = {
     append: ["value"],
     add: ["value"],
@@ -63,10 +128,26 @@ function createReducer(config) {
   if (!Object.hasOwn(OPERATIONS, config.type)) throw new TypeError("Unknown built-in ledger type");
   const sequence = [];
   const state = new Map();
-  function apply(record) {
+  const claims = new Map();
+  const votes = new Map();
+  function apply(record, envelope) {
     validateOperation(record, config);
     const { operation, value, key } = record;
     switch (config.type) {
+      case "claims": {
+        const id = envelope?.id ?? record.id;
+        if (typeof id !== "string" || !id) throw new TypeError("Claims projection requires a canonical record ID");
+        const entry = { record, recordId: envelope?.id ?? null, timestamp: envelope?.timestamp ?? null, sha: envelope?.sha ?? null };
+        if (operation === "claim") {
+          if (claims.has(id) || votes.has(id)) throw new TypeError("Duplicate claim record ID");
+          claims.set(id, entry);
+        } else {
+          if (!claims.has(record.claim_id)) throw new TypeError("Vote references a missing claim");
+          if (votes.has(id) || claims.has(id)) throw new TypeError("Duplicate vote record ID");
+          votes.set(id, entry);
+        }
+        break;
+      }
       case "log":
         sequence.push(value);
         break;
@@ -103,6 +184,37 @@ function createReducer(config) {
     }
   }
   function output() {
+    if (config.type === "claims") {
+      const claimRows = [...claims].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      const voteRows = [...votes].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      const tables = {
+        claims: {
+          columns: { id: "text", subject: "text", claim: "text", reason: "text", created_at: "text", record_sha: "text" },
+          primaryKey: ["id"],
+          rows: claimRows.map(([id, { record, timestamp, sha }]) => ({ id, subject: record.subject, claim: record.claim, reason: record.reason, created_at: timestamp, record_sha: sha })),
+        },
+        claim_citations: {
+          columns: { claim_id: "text", ordinal: "integer", citation_type: "text", path: "text", start_line: "integer", end_line: "integer" },
+          primaryKey: ["claim_id", "ordinal"],
+          rows: claimRows.flatMap(([claim_id, { record }]) =>
+            record.citations.map((citation, ordinal) => ({
+              claim_id,
+              ordinal,
+              citation_type: citation.type,
+              path: citation.path,
+              start_line: citation.start_line ?? null,
+              end_line: citation.end_line ?? null,
+            }))
+          ),
+        },
+        claim_votes: {
+          columns: { record_id: "text", claim_id: "text", vote: "text", reason: "text", created_at: "text" },
+          primaryKey: ["record_id"],
+          rows: voteRows.map(([, { record, recordId, timestamp }]) => ({ record_id: recordId, claim_id: record.claim_id, vote: record.vote, reason: record.reason ?? null, created_at: timestamp })),
+        },
+      };
+      return { version: 1, tables };
+    }
     const rows =
       config.type === "log"
         ? sequence.map((value, index) => ({ position: index, value }))
@@ -133,8 +245,14 @@ function createReducer(config) {
 
 function replayBuiltin(config, records) {
   const reducer = createReducer(config);
-  for (const record of records) reducer.apply(record.payload);
+  if (config.type === "claims") {
+    if (records.some(record => Object.hasOwn(record.payload, "id"))) throw new TypeError("Claims canonical payload must not duplicate the envelope ID");
+    for (const record of records) if (record.payload.operation === "claim") reducer.apply(record.payload, record);
+    for (const record of records) if (record.payload.operation !== "claim") reducer.apply(record.payload, record);
+  } else {
+    for (const record of records) reducer.apply(record.payload);
+  }
   return reducer.output();
 }
 
-module.exports = { OPERATIONS, createReducer, replayBuiltin, validateOperation };
+module.exports = { CLAIM_STATE_COLUMNS, CLAIM_STATE_VIEW, OPERATIONS, createReducer, replayBuiltin, validateOperation };

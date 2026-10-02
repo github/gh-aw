@@ -53,7 +53,7 @@ Ledgers are experimental and their configuration or behavior may change.
 
 Ledgers use `tools.ledger`, independently of repo-memory file storage. The legacy
 `tools.repo-memory.ledger` declaration is no longer supported. For built-in
-state models, declare `log`, `set`, `map`, `table`, or `counter`:
+state models, declare `log`, `set`, `map`, `table`, `counter`, or `claims`:
 
 ```aw wrap
 ---
@@ -95,8 +95,9 @@ tools:
 ```
 
 Agents submit mutations only through the configured ledger safe-output tools.
-Map ledgers expose `ledger_map_put` and `ledger_map_delete`; other built-in
-types use typed `ledger_append` operations. Writes are deferred: the immediate
+Map ledgers expose `ledger_map_put` and `ledger_map_delete`; claims expose
+`ledger_claim_add` and `ledger_claim_vote`. Other built-in types use typed
+`ledger_append` operations. Writes are deferred: the immediate
 response confirms queuing, not durability. The trusted `push_ledger_changes`
 job validates and reconciles accepted requests against the latest branch state
 before pushing. Queued writes are not immediately visible in the run's projection.
