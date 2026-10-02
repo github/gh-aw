@@ -3,17 +3,19 @@ package workqueue
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"net/http"
+	"path"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/github/gh-aw/pkg/constants"
+	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/github/gh-aw/pkg/githubapi"
 )
 
 const maxRetries = 5
@@ -21,192 +23,228 @@ const maxRetries = 5
 var branchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 var repoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
-// Branch operates on a temporary checkout. It never changes the caller's checkout.
+// Branch operates through GitHub Git APIs without a local checkout or Git executable.
 type Branch struct {
 	Remote string
 	Name   string
+	client *api.RESTClient
 }
 
 func (b Branch) validate() error {
-	if b.Remote == "" || !branchPattern.MatchString(b.Name) || strings.Contains(b.Name, "..") ||
-		strings.Contains(b.Name, "//") || strings.HasSuffix(b.Name, ".lock") || strings.HasSuffix(b.Name, "/") {
-		return errors.New("invalid coordinator remote or branch")
+	if !repoPattern.MatchString(b.Remote) {
+		return errors.New("repo must be owner/repo")
+	}
+	for part := range strings.SplitSeq(b.Remote, "/") {
+		if part == "." || part == ".." {
+			return errors.New("repo must be owner/repo")
+		}
+	}
+	if !branchPattern.MatchString(b.Name) || strings.Contains(b.Name, "..") ||
+		strings.Contains(b.Name, "//") || strings.HasSuffix(b.Name, ".") || strings.HasSuffix(b.Name, "/") {
+		return errors.New("invalid coordinator branch")
+	}
+	for part := range strings.SplitSeq(b.Name, "/") {
+		if strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
+			return errors.New("invalid coordinator branch")
+		}
 	}
 	return nil
 }
 
-func remoteURL(remote string) (string, error) {
-	if filepath.IsAbs(remote) {
-		if _, err := os.Stat(remote); err != nil {
-			return "", err
-		}
-		return remote, nil
-	}
-	if repoPattern.MatchString(remote) {
-		return "https://github.com/" + remote + ".git", nil
-	}
-	return "", errors.New("repo must be owner/repo or an absolute local path")
-}
-
-func git(ctx context.Context, dir, remote string, args ...string) ([]byte, error) {
-	if len(args) == 0 {
-		return nil, errors.New("git requires an operation")
-	}
-	argv := []string{"-C", dir}
-	if strings.HasPrefix(remote, "https://") {
-		argv = append(argv, "-c", "credential.helper=!gh auth git-credential")
-	}
-	argv = append(argv, args...)
-	command := exec.CommandContext(ctx, "git", argv...)
-	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	out, err := command.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("git operation failed: %s: %w", strings.TrimSpace(string(out)), err)
-	}
-	return bytes.TrimSpace(out), nil
-}
-
-func (b Branch) checkout(ctx context.Context) (string, func(), bool, error) {
+func (b Branch) withClient() (Branch, error) {
 	if err := b.validate(); err != nil {
-		return "", nil, false, err
+		return b, err
 	}
-	remote, err := remoteURL(b.Remote)
-	if err != nil {
-		return "", nil, false, err
-	}
-	dir, err := os.MkdirTemp("", "gh-aw-work-*")
-	if err != nil {
-		return "", nil, false, err
-	}
-	cleanup := func() { _ = os.RemoveAll(dir) }
-	if _, err := git(ctx, dir, remote, "init", "-q"); err != nil {
-		cleanup()
-		return "", nil, false, err
-	}
-	if _, err := git(ctx, dir, remote, "remote", "add", "origin", remote); err != nil {
-		cleanup()
-		return "", nil, false, err
-	}
-	out, err := git(ctx, dir, remote, "ls-remote", "--heads", "origin", "refs/heads/"+b.Name)
-	exists := err == nil && len(out) > 0
-	if err != nil {
-		cleanup()
-		return "", nil, false, err
-	}
-	if exists {
-		if _, err := git(ctx, dir, remote, "fetch", "-q", "--depth=1", "origin", "refs/heads/"+b.Name); err != nil {
-			cleanup()
-			return "", nil, false, err
+	if b.client == nil {
+		client, err := api.NewRESTClient(githubapi.ClientOptions("", ""))
+		if err != nil {
+			return b, err
 		}
-		if _, err := git(ctx, dir, remote, "checkout", "-q", "-b", b.Name, "FETCH_HEAD"); err != nil {
-			cleanup()
-			return "", nil, false, err
-		}
-	} else {
-		if _, err := git(ctx, dir, remote, "checkout", "-q", "--orphan", b.Name); err != nil {
-			cleanup()
-			return "", nil, false, err
+		b.client = client
+	}
+	return b, nil
+}
+
+func (b Branch) request(ctx context.Context, method, endpoint string, body, response any) error {
+	var data []byte
+	if body != nil {
+		var err error
+		data, err = json.Marshal(body)
+		if err != nil {
+			return err
 		}
 	}
-	return dir, cleanup, exists, nil
+	return b.client.DoWithContext(ctx, method, path.Join("repos", b.Remote, endpoint), bytes.NewReader(data), response)
+}
+
+func hasStatus(err error, status int) bool {
+	var apiError *api.HTTPError
+	return errors.As(err, &apiError) && apiError.StatusCode == status
+}
+
+type branchSnapshot struct {
+	head string
+	tree string
+}
+
+func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error) {
+	var ref struct {
+		Ref    string `json:"ref"`
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := b.request(ctx, http.MethodGet, "git/ref/heads/"+b.Name, nil, &ref); err != nil {
+		if hasStatus(err, http.StatusNotFound) {
+			// A missing repository or missing read permission is not an empty queue.
+			var repository any
+			err = b.client.DoWithContext(ctx, http.MethodGet, "repos/"+b.Remote, nil, &repository)
+			return nil, branchSnapshot{}, err
+		}
+		return nil, branchSnapshot{}, err
+	}
+	if ref.Ref != "refs/heads/"+b.Name || ref.Object.SHA == "" {
+		return nil, branchSnapshot{}, errors.New("invalid coordinator branch reference")
+	}
+	snapshot := branchSnapshot{head: ref.Object.SHA}
+	var commit struct {
+		Tree struct {
+			SHA string `json:"sha"`
+		} `json:"tree"`
+	}
+	if err := b.request(ctx, http.MethodGet, "git/commits/"+snapshot.head, nil, &commit); err != nil {
+		return nil, snapshot, err
+	}
+	snapshot.tree = commit.Tree.SHA
+	if snapshot.tree == "" {
+		return nil, snapshot, errors.New("coordinator commit has no tree")
+	}
+	transactions, err := b.readLog(ctx, snapshot.tree)
+	return transactions, snapshot, err
+}
+
+func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, error) {
+	var tree struct {
+		Truncated bool `json:"truncated"`
+		Tree      []struct {
+			Path string `json:"path"`
+			Mode string `json:"mode"`
+			Type string `json:"type"`
+			SHA  string `json:"sha"`
+		} `json:"tree"`
+	}
+	if err := b.request(ctx, http.MethodGet, "git/trees/"+treeSHA, nil, &tree); err != nil {
+		return nil, err
+	}
+	if tree.Truncated {
+		return nil, errors.New("coordinator tree is truncated")
+	}
+	for _, entry := range tree.Tree {
+		if entry.Path != FileName {
+			continue
+		}
+		if entry.Type != "blob" || (entry.Mode != "100644" && entry.Mode != "100755") || entry.SHA == "" {
+			return nil, errors.New("coordinator log must be a regular file")
+		}
+		var blob struct {
+			Encoding string `json:"encoding"`
+			Content  string `json:"content"`
+		}
+		if err := b.request(ctx, http.MethodGet, "git/blobs/"+entry.SHA, nil, &blob); err != nil {
+			return nil, err
+		}
+		if blob.Encoding != "base64" {
+			return nil, errors.New("unsupported coordinator blob encoding")
+		}
+		data, err := base64.StdEncoding.DecodeString(blob.Content)
+		if err != nil {
+			return nil, err
+		}
+		transactions, err := Parse(data)
+		if err != nil {
+			return nil, err
+		}
+		_, err = Replay(transactions)
+		return transactions, err
+	}
+	return nil, errors.New("coordinator branch is missing " + FileName)
 }
 
 func (b Branch) Read(ctx context.Context) ([]Transaction, error) {
-	dir, cleanup, exists, err := b.checkout(ctx)
+	b, err := b.withClient()
 	if err != nil {
 		return nil, err
 	}
-	defer cleanup()
-	return readCheckout(dir, exists)
-}
-
-func readCheckout(dir string, exists bool) ([]Transaction, error) {
-	if !exists {
-		return nil, nil
-	}
-	data, err := os.ReadFile(filepath.Join(dir, FileName))
-	if err != nil {
-		return nil, err
-	}
-	transactions, err := Parse(data)
-	if err != nil {
-		return nil, err
-	}
-	_, err = Replay(transactions)
+	transactions, _, err := b.read(ctx)
 	return transactions, err
 }
 
-func (b Branch) publish(ctx context.Context, dir string, next []Transaction) error {
+func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []Transaction) (bool, error) {
 	if _, err := Replay(next); err != nil {
-		return err
+		return false, err
 	}
 	data, err := Serialize(next)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if err := writeQueueFile(dir, data); err != nil {
-		return err
+	treeBody := map[string]any{
+		"tree": []map[string]string{{"path": FileName, "mode": "100644", "type": "blob", "content": string(data)}},
 	}
-	if _, err := git(ctx, dir, b.Remote, "add", "--", FileName); err != nil {
-		return err
+	parents := []string{}
+	if snapshot.head != "" {
+		treeBody["base_tree"] = snapshot.tree
+		parents = append(parents, snapshot.head)
 	}
-	if _, err := git(ctx, dir, b.Remote, "-c", "user.name=gh-aw", "-c", "user.email=gh-aw@users.noreply.github.com", "commit", "-qm", "Update dispatch work coordinator"); err != nil {
-		return err
+	var tree struct {
+		SHA string `json:"sha"`
 	}
-	remote, err := remoteURL(b.Remote)
-	if err != nil {
-		return err
+	if err := b.request(ctx, http.MethodPost, "git/trees", treeBody, &tree); err != nil {
+		return false, err
 	}
-	_, err = git(ctx, dir, remote, "push", "-q", "origin", "HEAD:refs/heads/"+b.Name)
-	return err
+	var commit struct {
+		SHA string `json:"sha"`
+	}
+	if err := b.request(ctx, http.MethodPost, "git/commits", map[string]any{
+		"message": "Update dispatch work coordinator", "tree": tree.SHA, "parents": parents,
+	}, &commit); err != nil {
+		return false, err
+	}
+	if snapshot.head == "" {
+		err = b.request(ctx, http.MethodPost, "git/refs", map[string]any{
+			"ref": "refs/heads/" + b.Name, "sha": commit.SHA,
+		}, new(any))
+	} else {
+		err = b.request(ctx, http.MethodPatch, "git/refs/heads/"+b.Name, map[string]any{
+			"sha": commit.SHA, "force": false,
+		}, new(any))
+	}
+	return hasStatus(err, http.StatusConflict) || hasStatus(err, http.StatusUnprocessableEntity), err
 }
 
-func writeQueueFile(dir string, data []byte) error {
-	temp, err := os.CreateTemp(dir, "."+FileName+"-*")
-	if err != nil {
-		return err
-	}
-	tempPath := temp.Name()
-	defer func() { _ = os.Remove(tempPath) }()
-	if err := temp.Chmod(constants.FilePermSensitive); err != nil {
-		return errors.Join(err, temp.Close())
-	}
-	if _, err := temp.Write(data); err != nil {
-		return errors.Join(err, temp.Close())
-	}
-	if err := temp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tempPath, filepath.Join(dir, FileName)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Update retries rejected optimistic pushes from a fresh branch snapshot.
+// Update retries rejected non-force reference updates from a fresh branch snapshot.
 func (b Branch) Update(ctx context.Context, change func([]Transaction) ([]Transaction, bool, error)) ([]Transaction, bool, error) {
+	b, err := b.withClient()
+	if err != nil {
+		return nil, false, err
+	}
 	for attempt := range maxRetries {
-		dir, cleanup, exists, err := b.checkout(ctx)
+		transactions, snapshot, err := b.read(ctx)
 		if err != nil {
-			return nil, false, err
-		}
-		transactions, err := readCheckout(dir, exists)
-		if err != nil {
-			cleanup()
 			return nil, false, err
 		}
 		next, changed, err := change(transactions)
 		if err != nil || !changed {
-			cleanup()
 			return next, changed, err
 		}
-		err = b.publish(ctx, dir, next)
-		cleanup()
+		conflict, err := b.publish(ctx, snapshot, next)
 		if err == nil {
 			return next, true, nil
 		}
 		if ctx.Err() != nil {
 			return nil, false, ctx.Err()
+		}
+		if !conflict {
+			return nil, false, err
 		}
 		if attempt == maxRetries-1 {
 			return nil, false, fmt.Errorf("coordinator publication failed after %d attempts: %w", maxRetries, err)

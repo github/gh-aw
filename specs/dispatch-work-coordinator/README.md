@@ -13,9 +13,17 @@ The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/6
 
 `gh aw work` operates on a dedicated branch without using the current checkout. Supply
 `--repo owner/repo`; use `--branch` to select a different
-coordinator branch. The command creates a temporary checkout, reads and validates
-`dispatch-work-coordinator.jsonl`, and publishes changes with non-force pushes.
-Rejected concurrent pushes are retried against a fresh checkout and replay.
+coordinator branch. The experimental command uses authenticated GitHub Git APIs to
+read and validate `dispatch-work-coordinator.jsonl`, create trees and commits, and
+publish changes with non-force reference updates. It needs neither a checkout nor
+a Git executable, and accepts GitHub repositories rather than local Git remotes.
+Rejected concurrent updates are retried against a fresh branch snapshot and replay.
+In an initialized repository, an absent coordinator branch is initialized with a
+parentless commit; other files in an existing coordinator branch are preserved.
+GitHub Git APIs cannot create the first reference in an entirely empty repository.
+Authentication uses the GitHub
+CLI configuration or `GH_TOKEN`/`GITHUB_TOKEN`, with repository contents write
+permission required for mutations.
 All subcommands support `--json` for machine-readable output.
 
 | Command | Arguments |

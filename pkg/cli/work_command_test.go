@@ -2,21 +2,94 @@ package cli
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workqueue"
 )
 
+type workAPIRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f workAPIRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
 func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
-	remote := filepath.Join(t.TempDir(), "queue.git")
-	if output, err := exec.Command("git", "init", "--bare", "-q", remote).CombinedOutput(); err != nil {
-		t.Fatalf("git init: %s: %v", output, err)
-	}
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("GH_HOST", "github.com")
+	t.Setenv("GH_TOKEN", "test-token")
+	const remote = "owner/repo"
+	var log, pending string
+	head := 0
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	http.DefaultTransport = workAPIRoundTripper(func(r *http.Request) (*http.Response, error) {
+		if r.Header.Get("Authorization") != "token test-token" {
+			t.Error("queue API request was not authenticated")
+		}
+		path := strings.TrimPrefix(r.URL.Path, "/repos/"+remote+"/")
+		status := http.StatusOK
+		var result any
+		switch {
+		case r.Method == http.MethodGet && path == "git/ref/heads/"+workqueue.DefaultBranch:
+			if head == 0 {
+				status = http.StatusNotFound
+				result = map[string]string{"message": "Not Found"}
+			} else {
+				result = map[string]any{"ref": "refs/heads/" + workqueue.DefaultBranch, "object": map[string]string{"sha": strconv.Itoa(head)}}
+			}
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/"+remote:
+			result = map[string]string{"full_name": remote}
+		case r.Method == http.MethodGet && strings.HasPrefix(path, "git/commits/"):
+			result = map[string]any{"tree": map[string]string{"sha": "tree"}}
+		case r.Method == http.MethodGet && path == "git/trees/tree":
+			result = map[string]any{"tree": []map[string]string{
+				{"path": workqueue.FileName, "mode": "100644", "type": "blob", "sha": "blob"},
+			}}
+		case r.Method == http.MethodGet && path == "git/blobs/blob":
+			result = map[string]string{"encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(log))}
+		case r.Method == http.MethodPost && path == "git/trees":
+			var body struct {
+				Tree []struct{ Content string }
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				return nil, err
+			}
+			for _, entry := range body.Tree {
+				pending = entry.Content
+			}
+			result = map[string]string{"sha": "tree"}
+		case r.Method == http.MethodPost && path == "git/commits":
+			result = map[string]string{"sha": strconv.Itoa(head + 1)}
+		case (r.Method == http.MethodPost && path == "git/refs") ||
+			(r.Method == http.MethodPatch && path == "git/refs/heads/"+workqueue.DefaultBranch):
+			head++
+			log = pending
+			result = map[string]string{"ref": "refs/heads/" + workqueue.DefaultBranch}
+		default:
+			t.Errorf("unexpected queue API request: %s %s", r.Method, r.URL.Path)
+			status = http.StatusNotFound
+			result = map[string]string{"message": "Not Found"}
+		}
+		data, err := json.Marshal(result)
+		if err != nil {
+			return nil, err
+		}
+		return &http.Response{
+			StatusCode: status, Header: http.Header{"Content-Type": {"application/json"}},
+			Body: io.NopCloser(bytes.NewReader(data)), Request: r,
+		}, nil
+	})
 	payload := filepath.Join(t.TempDir(), "work.json")
-	if err := os.WriteFile(payload, []byte(`{"task":"review"}`), 0600); err != nil {
+	if err := os.WriteFile(payload, []byte(`{"task":"review"}`), constants.FilePermSensitive); err != nil {
 		t.Fatal(err)
 	}
 	run := func(args ...string) map[string]any {

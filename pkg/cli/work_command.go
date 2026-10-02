@@ -21,7 +21,7 @@ func NewWorkCommand() *cobra.Command {
 		Short: "Experimental: inspect and update a Git-backed dispatch work queue",
 		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	cmd.PersistentFlags().String("repo", "", "Repository owner/repo (or absolute local Git remote)")
+	cmd.PersistentFlags().String("repo", "", "GitHub repository owner/repo")
 	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, "Coordinator branch")
 	cmd.PersistentFlags().Bool("json", false, "Output JSON")
 	cmd.AddCommand(workReplayCommand(), workCompactCommand(), workStatsCommand(),
