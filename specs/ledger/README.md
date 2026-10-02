@@ -5,7 +5,9 @@ types (`log`, `set`, `map`, `table`, `counter`, `notes`). Its actions represent 
 agent's queued intent, validation in `safe_outputs`, the versioned transaction
 artifact, independent revalidation and atomic Git-branch push in
 `push_ledger_changes`, a disposable read-only agent snapshot, and the
-maintenance plan/apply boundary. The immutable history is replayed independently
+maintenance plan/apply boundary. A separate writer may advance the branch after
+validation; persistence rechecks the operation against the latest history and
+rejects one made invalid by that writer. The immutable history is replayed independently
 of the incremental projection. Compaction changes only the physical layout, not
 the ordered logical record stream.
 
@@ -36,11 +38,11 @@ for kind in raw log set map table counter notes; do
 done
 ```
 
-Each configuration has two keys, two abstract JSON values, and at most three
+Each configuration has two keys, two abstract JSON values, and at most two
 durable records. TLC 2026.10.01 completed exhaustive exploration without
-invariant violations (distinct states: raw **6,221**, log **6,221**, set
-**28,185**, map **29,457**, table **119,673**, counter **42,361**, notes
-**160,521**). The state counts may change with TLC version or model changes.
+invariant violations (distinct states: raw **4,637**, log **4,637**, set
+**19,097**, map **19,241**, table **111,795**, counter **26,009**, notes
+**203,331**). The state counts may change with TLC version or model changes.
 `actions/setup/js/ledger_protocol_model.test.cjs` exercises concrete
 corresponding traces through transaction normalization, trusted artifact
 validation, and the production built-in reducers/replay.
@@ -50,7 +52,8 @@ validation, and the production built-in reducers/replay.
 These are **bounded model-checking results**, not an unbounded TLAPS theorem or
 a proof of the implementation. A value denotes a canonical-JSON equality
 class, a table row has a primary key and one non-key field, a counter operation
-has amount one, and a note has a valid citation represented abstractly. One
+has amount one, and a note has a valid citation represented abstractly. IDs
+distinguish transactions but do not model hashes or duplicate-ID retries. One
 artifact contains one operation at a time; batch temporary-ID rewriting,
 forward references in a batch, SHA-256 collision resistance, JSON schemas,
 record/shard byte limits, Git authentication, failed network pushes, DAG

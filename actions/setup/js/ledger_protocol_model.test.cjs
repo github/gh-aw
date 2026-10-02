@@ -143,3 +143,14 @@ test("raw model witness keeps generic record payloads and deterministic artifact
   assert.equal(new Set(first.appends.map(item => item.record.id)).size, 3);
   assert.doesNotThrow(() => validateTransactions({ version: 1, transaction_id: "model-raw", ledgers: { example: { appends: first.appends } } }, [{ name: "example" }]));
 });
+
+test("a concurrent table insert invalidates an earlier validated insert", () => {
+  const config = { type: "table", key: "id" };
+  const pending = { operation: "insert", value: { id: "a", field: "x" } };
+  const normalized = normalizeLedgerAppends([pending], { transactionId: "agent", ledgerNames: new Set(["example"]), ledgers: { example: config } });
+  assert.doesNotThrow(() => validateTransactions({ version: 1, transaction_id: "agent", ledgers: { example: { appends: normalized.appends } } }, [{ name: "example", ...config }]));
+  const latest = createReducer(config);
+  latest.apply({ operation: "insert", value: { id: "a", field: "y" } });
+  assert.throws(() => latest.apply(pending), /already exists/);
+  assert.deepEqual(latest.output().tables.state.rows, [{ key: "a", value: '{"field":"y","id":"a"}' }]);
+});
