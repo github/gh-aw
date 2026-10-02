@@ -73,8 +73,18 @@
   --aw-blue-7: #0753b6;
 
   --aw-green-6: #2ea043;
+  --aw-green-7: #1a7f37;
   --aw-amber-5: #dba82b;
+  --aw-amber-7: #9a6700;
   --aw-red-5: #f85149;
+  --aw-red-6: #cf222e;
+  /* Callout (aside) hues, tuned in the aside jig */
+  --aw-callout-tip-light: #3d7f1a;
+  --aw-callout-caution-light: #b45e0e;
+  --aw-callout-tip-dark: #7dd54d;
+  --aw-callout-note-dark: #75cfff;
+  --aw-callout-caution-dark: #eaa734;
+  --aw-callout-danger-dark: #ff554d;
 
   --aw-pink-2: #ffd6e8;
   --aw-pink-6: #bf3989;
@@ -158,11 +168,16 @@
   --aw-color-button-bg-hover: var(--aw-gray-4);
   --aw-color-button-text: var(--aw-gray-13);
 
-  /* Status colours (same in both themes) */
+  /* Status colours. The light theme swaps in deeper shades so they read as text on paper. */
   --aw-color-note: var(--aw-blue-5);
   --aw-color-success: var(--aw-green-6);
   --aw-color-caution: var(--aw-amber-5);
   --aw-color-danger: var(--aw-red-5);
+  /* Callout colours: asides (tip/note/caution/danger) */
+  --aw-color-callout-tip: var(--aw-callout-tip-dark);
+  --aw-color-callout-note: var(--aw-callout-note-dark);
+  --aw-color-callout-caution: var(--aw-callout-caution-dark);
+  --aw-color-callout-danger: var(--aw-callout-danger-dark);
 
   --aw-color-code-bg: var(--aw-gray-11);
   --aw-color-scrollbar: rgba(250, 250, 249, 0.12);
@@ -174,6 +189,8 @@
   --aw-color-surface: var(--aw-gray-11);
   --aw-color-surface-header: var(--aw-gray-10);
   --aw-shadow-raised: inset 0 1px 0 rgba(250, 250, 249, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 56px -8px rgba(0, 0, 0, 0.7);
+  /* A barely-there lift for inline blocks such as asides */
+  --aw-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
 
   /* Starlight's gray ramp runs from the text colour (gray-1) to the page colour (gray-7). */
   --aw-ramp-1: var(--aw-gray-1);
@@ -240,6 +257,16 @@
   --aw-color-surface: var(--aw-gray-0);
   --aw-color-surface-header: var(--aw-gray-2);
   --aw-shadow-raised: 0 1px 2px rgba(28, 25, 23, 0.05), 0 16px 40px -8px rgba(28, 25, 23, 0.12);
+  --aw-shadow-soft: 0 1px 2px rgba(28, 25, 23, 0.04), 0 2px 8px -2px rgba(28, 25, 23, 0.05);
+
+  --aw-color-note: var(--aw-blue-6);
+  --aw-color-success: var(--aw-green-7);
+  --aw-color-caution: var(--aw-amber-7);
+  --aw-color-danger: var(--aw-red-6);
+  --aw-color-callout-tip: var(--aw-callout-tip-light);
+  --aw-color-callout-note: var(--aw-blue-6);
+  --aw-color-callout-caution: var(--aw-callout-caution-light);
+  --aw-color-callout-danger: var(--aw-red-6);
 
   --aw-ramp-1: var(--aw-gray-12);
   --aw-ramp-2: var(--aw-gray-8);
@@ -286,6 +313,11 @@
   --aw-color-success: var(--aw-green-6);
   --aw-color-caution: var(--aw-amber-5);
   --aw-color-danger: var(--aw-red-5);
+  /* Callout colours: asides (tip/note/caution/danger) */
+  --aw-color-callout-tip: var(--aw-callout-tip-dark);
+  --aw-color-callout-note: var(--aw-callout-note-dark);
+  --aw-color-callout-caution: var(--aw-callout-caution-dark);
+  --aw-color-callout-danger: var(--aw-callout-danger-dark);
   --aw-color-code-bg: var(--aw-gray-11);
   --aw-color-scrollbar: rgba(250, 250, 249, 0.12);
   --aw-color-scrollbar-hover: rgba(250, 250, 249, 0.22);
@@ -293,6 +325,8 @@
   --aw-color-surface: var(--aw-gray-11);
   --aw-color-surface-header: var(--aw-gray-10);
   --aw-shadow-raised: inset 0 1px 0 rgba(250, 250, 249, 0.04), 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 56px -8px rgba(0, 0, 0, 0.7);
+  /* A barely-there lift for inline blocks such as asides */
+  --aw-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* 3. Starlight mapping --------------------------------------------------- */
@@ -323,6 +357,15 @@
 
   --sl-color-text: var(--aw-color-text);
   --sl-color-text-invert: var(--aw-color-text-invert);
+}
+
+/* Icon masks: Primer octicons (16px) as data URIs, drawn with
+   `mask: var(--aw-icon-*)` + `background-color: currentColor` so they take the text colour.
+   Used by the heading-link and code-copy buttons (custom.css). */
+:root {
+  --aw-icon-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z'/%3E%3C/svg%3E");
+  --aw-icon-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z'/%3E%3Cpath d='M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z'/%3E%3C/svg%3E");
+  --aw-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'/%3E%3C/svg%3E");
 }
 
 /* Legacy aliases — kept so existing rules keep working until step 2 migrates them. */
