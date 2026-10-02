@@ -616,11 +616,12 @@ func TestValidateToolsSection(t *testing.T) {
 		{
 			name: "built-in tools only - no error",
 			tools: map[string]any{
-				"github":     map[string]any{"mode": "local"},
-				"playwright": map[string]any{"version": "v1.41.0"},
-				"bash":       []any{"echo", "ls"},
-				"ledger":     map[string]any{"findings": map[string]any{"schema": map[string]any{"type": "object"}}},
-				"web-fetch":  nil,
+				"github":                    map[string]any{"mode": "local"},
+				"playwright":                map[string]any{"version": "v1.41.0"},
+				"bash":                      []any{"echo", "ls"},
+				"ledger":                    map[string]any{"findings": map[string]any{"schema": map[string]any{"type": "object"}}},
+				"dispatch-work-coordinator": true,
+				"web-fetch":                 nil,
 			},
 			wantErr: false,
 		},

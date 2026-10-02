@@ -1,0 +1,52 @@
+name: Dispatch Coordinator Compilation Integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dispatch-coordinator-integration.yml'
+      - 'actions/setup/js/dispatch_work_coordinator*'
+      - 'actions/setup/js/finish_dispatch_work_claim*'
+      - 'actions/setup/js/setup_sh_file_lists.test.cjs'
+      - 'actions/setup/js/write_dispatch_work_coordinator_snapshot*'
+      - 'actions/setup/setup.sh'
+      - 'pkg/constants/**'
+      - 'pkg/workflow/**'
+      - 'specs/dispatch-work-coordinator/**'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/dispatch-coordinator-integration.yml'
+      - 'actions/setup/js/dispatch_work_coordinator*'
+      - 'actions/setup/js/finish_dispatch_work_claim*'
+      - 'actions/setup/js/setup_sh_file_lists.test.cjs'
+      - 'actions/setup/js/write_dispatch_work_coordinator_snapshot*'
+      - 'actions/setup/setup.sh'
+      - 'pkg/constants/**'
+      - 'pkg/workflow/**'
+      - 'specs/dispatch-work-coordinator/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilation-phases:
+    name: Compile coordinator phases
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Compile activation, agent, and safe-outputs phases
+        run: go test -tags=integration ./pkg/workflow -run '^TestDispatchCoordinatorCompilationPhases$' -count=1

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
+import { createDispatchCoordinatorFinishTool, createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
 import { serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
 const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
@@ -26,9 +26,10 @@ afterEach(() => {
 describe("dispatch work coordinator MCP snapshot", () => {
   it("reads and replays an activation snapshot without a Git client", () => {
     const snapshotPath = writeSnapshot({
-      version: 1,
+      version: 2,
       sha: "activation-head",
       transactionLog: serializeTransactionLog([work("w"), claim("w", "c")]),
+      worker: null,
     });
     const snapshot = loadDispatchCoordinatorSnapshot(snapshotPath);
 
@@ -44,9 +45,10 @@ describe("dispatch work coordinator MCP snapshot", () => {
 
   it("treats prototype-named identifiers as ordinary identifiers", () => {
     const snapshotPath = writeSnapshot({
-      version: 1,
+      version: 2,
       sha: null,
       transactionLog: serializeTransactionLog([work("constructor"), claim("constructor", "toString")]),
+      worker: null,
     });
 
     expect(readDispatchCoordinatorState(loadDispatchCoordinatorSnapshot(snapshotPath), { work: "constructor" })).toEqual({
@@ -56,7 +58,19 @@ describe("dispatch work coordinator MCP snapshot", () => {
   });
 
   it("rejects snapshots with an unsupported shape or invalid transaction log", () => {
-    expect(() => loadDispatchCoordinatorSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "" }))).toThrow(/invalid shape/);
-    expect(() => loadDispatchCoordinatorSnapshot(writeSnapshot({ version: 1, sha: null, transactionLog: "{}\n" }))).toThrow(/invalid transaction log/);
+    expect(() => loadDispatchCoordinatorSnapshot(writeSnapshot({ version: 1, sha: null, transactionLog: "" }))).toThrow(/invalid shape/);
+    expect(() => loadDispatchCoordinatorSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "{}\n", worker: null }))).toThrow(/invalid transaction log/);
+  });
+
+  it("records a finish intent without exposing authority parameters", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dispatch-coordinator-finish-"));
+    tempFiles.push(directory);
+    const finishPath = path.join(directory, "finish.jsonl");
+    const tool = createDispatchCoordinatorFinishTool({ finishIntentPath: finishPath });
+
+    expect(Object.keys(tool.inputSchema.properties)).toEqual(["outcome"]);
+    expect(tool.inputSchema.additionalProperties).toBe(false);
+    expect(tool.handler({ outcome: "completed", work_id: "untrusted" })).toEqual({ recorded: true, outcome: "completed" });
+    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
   });
 });

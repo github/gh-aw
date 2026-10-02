@@ -124,7 +124,7 @@ func TestNewMCPConfigRenderer(t *testing.T) {
 	}
 }
 
-func TestRenderDispatchCoordinatorMCPIsReadOnlySnapshotOnly(t *testing.T) {
+func TestRenderDispatchCoordinatorMCPUsesSnapshotAndFinishIntentMounts(t *testing.T) {
 	t.Run("JSON Copilot", func(t *testing.T) {
 		var output strings.Builder
 		renderer := NewMCPConfigRenderer(MCPRendererOptions{Format: "json", IncludeCopilotFields: true, IsLast: true})
@@ -135,6 +135,9 @@ func TestRenderDispatchCoordinatorMCPIsReadOnlySnapshotOnly(t *testing.T) {
 		}
 		if !strings.Contains(rendered, constants.DispatchCoordinatorSnapshotMount) {
 			t.Fatalf("expected a read-only snapshot mount: %s", rendered)
+		}
+		if !strings.Contains(rendered, constants.DispatchCoordinatorFinishIntentMount) || !strings.Contains(rendered, `"dispatch_claim_finish"`) {
+			t.Fatalf("expected the finish tool to use the safe-output intent mount: %s", rendered)
 		}
 		if strings.Contains(rendered, "GITHUB_TOKEN") || strings.Contains(rendered, constants.DefaultWorkspaceMount) || strings.Contains(rendered, constants.DefaultTmpGhAwMount) {
 			t.Fatalf("coordinator MCP must not receive Git credentials or workspace mounts: %s", rendered)
@@ -148,6 +151,9 @@ func TestRenderDispatchCoordinatorMCPIsReadOnlySnapshotOnly(t *testing.T) {
 		rendered := output.String()
 		if !strings.Contains(rendered, constants.DispatchCoordinatorSnapshotMount) {
 			t.Fatalf("expected a read-only snapshot mount: %s", rendered)
+		}
+		if !strings.Contains(rendered, constants.DispatchCoordinatorFinishIntentMount) {
+			t.Fatalf("expected the safe-output intent mount: %s", rendered)
 		}
 		if strings.Contains(rendered, "GITHUB_TOKEN") || strings.Contains(rendered, constants.DefaultWorkspaceMount) || strings.Contains(rendered, constants.DefaultTmpGhAwMount) {
 			t.Fatalf("coordinator MCP must not receive Git credentials or workspace mounts: %s", rendered)
@@ -164,8 +170,8 @@ func TestDispatchCoordinatorMCPIsRegisteredInManifest(t *testing.T) {
 	if len(servers) != 1 || servers[0].Name != "dispatch-work-coordinator" {
 		t.Fatalf("expected coordinator server in manifest, got %#v", servers)
 	}
-	if len(servers[0].Tools) != 1 || servers[0].Tools[0] != "dispatch_work_coordinator_read" {
-		t.Fatalf("expected only the read tool in the manifest, got %#v", servers[0].Tools)
+	if len(servers[0].Tools) != 2 || servers[0].Tools[0] != "dispatch_claim_finish" || servers[0].Tools[1] != "dispatch_work_coordinator_read" {
+		t.Fatalf("expected read and finish tools in the manifest, got %#v", servers[0].Tools)
 	}
 }
 

@@ -79,6 +79,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		// in the unified agent artifact so they survive into the downstream job.
 		paths = append(paths, collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)...)
 	}
+	if isDispatchWorkCoordinatorEnabled(data) {
+		paths = append(paths, constants.DispatchCoordinatorFinishIntentPath)
+	}
 
 	// Collect git patch path if safe-outputs with PR operations is configured.
 	// NOTE: Git patch generation has been moved to the safe-outputs MCP server.
