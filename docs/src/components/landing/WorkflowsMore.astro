@@ -1,0 +1,252 @@
+---
+/**
+ * "More workflows" under the workflows section: a hairline rule, then a plain
+ * text disclosure that opens the rest of the agentics collection by group.
+ */
+import octicons from '@primer/octicons';
+
+const chev = octicons['chevron-down'].toSVG({ width: 16, height: 16 });
+const A = 'https://github.com/githubnext/agentics/blob/main/docs/';
+
+const groups = [
+  {
+    id: 'maintain',
+    heading: 'Maintain',
+    items: [
+      { title: 'Issue Triage', slug: 'issue-triage', text: 'Labels new issues and pull requests.' },
+      { title: 'AI Moderator', slug: 'ai-moderator', text: 'Detects and moderates spam and link spam.' },
+      { title: 'Daily Documentation Updater', slug: 'doc-updater', text: 'Updates docs from recent code changes.' },
+      { title: 'Link Checker', slug: 'link-checker', text: 'Finds and fixes broken links in your docs.' },
+    ],
+  },
+  {
+    id: 'improve',
+    heading: 'Improve code',
+    items: [
+      { title: 'Code Simplifier', slug: 'code-simplifier', text: 'Simplifies recently modified code.' },
+      { title: 'Duplicate Code Detector', slug: 'duplicate-code-detector', text: 'Spots duplication and suggests refactors.' },
+      { title: 'Daily Perf Improver', slug: 'perf-improver', text: 'Benchmarks and optimises slow code.' },
+      { title: 'PR Fix', slug: 'pr-fix', text: 'Fixes failing checks on a pull request.' },
+    ],
+  },
+  {
+    id: 'report',
+    heading: 'Report and plan',
+    items: [
+      { title: 'Weekly Issue Activity', slug: 'weekly-issue-activity', text: 'Weekly issue trends and recommendations.' },
+      { title: 'Daily Team Status', slug: 'team-status', text: 'An upbeat summary of team activity.' },
+      { title: 'Daily Plan', slug: 'plan', text: 'Keeps planning issues up to date.' },
+      { title: 'Grumpy Reviewer', slug: 'grumpy-reviewer', text: 'A thorough, opinionated code review on demand.' },
+    ],
+  },
+];
+const all = groups.flatMap((g) => g.items);
+const docsLink = '/gh-aw/gallery/';
+---
+
+<div class="wf-more ma">
+  <details class="ma-d" data-ma>
+    <summary>
+      <span class="ma-closed">Show {all.length} more workflows</span>
+      <span class="ma-open">Show fewer</span>
+      <span class="chev" set:html={chev} />
+    </summary>
+    <div class="ma-body">
+      <div class="ma-body-inner">
+        <div class="groups">
+              {groups.map((g) => (
+                <section>
+                  <h3>{g.heading}</h3>
+                  <ul role="list">
+                    {g.items.map((i) => (
+                      <li><a href={`${A}${i.slug}.md`}><span class="li-t">{i.title}</span><span class="li-d">{i.text}</span></a></li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+      </div>
+    </div>
+  </details>
+  <a class="docs-link ma-docs" href={docsLink}>Workflow patterns in the docs <span aria-hidden="true">→</span></a>
+</div>
+
+<style>
+  .wf-more {
+    margin-top: 3rem;
+  }
+
+  /* Shared bits */
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li { margin: 0; padding: 0; }
+  li a {
+    display: block;
+    padding: 0.625rem 0;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 4px;
+  }
+  .li-t {
+    display: block;
+    font-size: var(--aw-step-0);
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+  }
+  li a:hover .li-t {
+    text-decoration: underline;
+    text-decoration-color: var(--aw-color-border-strong);
+    text-underline-offset: 3px;
+  }
+  .li-d {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: var(--aw-text-ui);
+    line-height: 1.45;
+    color: var(--aw-color-text-muted);
+  }
+  .docs-link {
+    font-size: var(--aw-text-ui);
+    color: var(--aw-color-accent-text);
+    text-decoration: none;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .docs-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .chev {
+    display: inline-flex;
+    color: var(--aw-color-text-muted);
+    transition: transform 0.2s ease;
+  }
+  .chev :global(svg) { fill: currentColor; }
+  li a:focus-visible,
+  .docs-link:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--aw-color-accent);
+    outline-offset: 3px;
+  }
+  .groups {
+    padding-top: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+  }
+  .groups h3 {
+    margin: 0 0 0.25rem;
+    font-size: var(--aw-text-ui);
+    font-weight: 550;
+    color: var(--aw-color-text-muted);
+    border: 0;
+  }
+  /* Plain text toggle: no border, no fill, so it never reads as a button. */
+  summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    font: inherit;
+    font-size: var(--aw-step-0);
+    font-weight: 500;
+    color: var(--aw-color-text-secondary);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover {
+    color: var(--aw-color-text-strong);
+  }
+
+  /* A */
+  .ma {
+    position: relative;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--aw-color-divider);
+  }
+  .ma-docs {
+    position: absolute;
+    top: 1.25rem;
+    right: 0;
+    line-height: 1.6;
+  }
+  /* Labels and chevron follow [data-expanded] once the script takes over,
+     or plain [open] without JS. */
+  .ma-open,
+  .ma-d[open]:not([data-enhanced]) .ma-closed,
+  .ma-d[data-expanded] .ma-closed { display: none; }
+  .ma-d[open]:not([data-enhanced]) .ma-open,
+  .ma-d[data-expanded] .ma-open { display: inline; }
+  .ma-d[open]:not([data-enhanced]) .chev,
+  .ma-d[data-expanded] .chev { transform: rotate(180deg); }
+
+  /* Smooth open and close: the body folds via grid rows and fades. */
+  .ma-d[data-enhanced] .ma-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.3s ease;
+  }
+  .ma-d[data-enhanced][data-expanded] .ma-body {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .ma-body-inner {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .chev {
+    transition: transform 0.3s ease;
+  }
+
+  @media (max-width: 52rem) {
+    .groups {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+  @media (max-width: 40rem) {
+    .ma-docs { position: static; display: inline-block; margin-top: 1rem; }
+    .ma { display: flex; flex-direction: column; align-items: flex-start; }
+    .ma-d { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chev,
+    .ma-d[data-enhanced] .ma-body { transition: none; }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLDetailsElement>('[data-ma]').forEach((d) => {
+    const summary = d.querySelector('summary')!;
+    const body = d.querySelector<HTMLElement>('.ma-body')!;
+    d.setAttribute('data-enhanced', '');
+    const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    summary.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!d.hasAttribute('data-expanded')) {
+        d.open = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => d.setAttribute('data-expanded', '')));
+      } else {
+        d.removeAttribute('data-expanded');
+        if (reduce()) { d.open = false; return; }
+        const done = (ev: TransitionEvent) => {
+          if (ev.propertyName !== 'grid-template-rows') return;
+          body.removeEventListener('transitionend', done);
+          if (!d.hasAttribute('data-expanded')) d.open = false;
+        };
+        body.addEventListener('transitionend', done);
+      }
+    });
+  });
+</script>

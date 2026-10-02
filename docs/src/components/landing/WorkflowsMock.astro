@@ -1,0 +1,515 @@
+---
+/**
+ * GitHub-faithful product shots of what each ready-made workflow produces.
+ * Shared by the Workflows* variants. `size="lg"` shows extra detail for the
+ * larger stages; `kind="repo-assist-week"` is the Repo Assist activity summary.
+ */
+import octicons from '@primer/octicons';
+
+interface Props {
+  kind: 'repo-assist' | 'repo-assist-week' | 'ci-doctor' | 'repo-status' | 'test-improver';
+  size?: 'sm' | 'md' | 'lg';
+}
+const { kind, size = 'md' } = Astro.props;
+const lg = size === 'lg';
+const icon = (n: keyof typeof octicons, s = 16) => octicons[n].toSVG({ width: s, height: s });
+---
+
+<div class="wf-stage" data-size={size} aria-hidden="true">
+  <div class={`gh gh-${kind}`}>
+    {kind === 'repo-assist' && (<>
+      <div class="gh-head">
+        <div class="gh-title">Parser drops trailing comments <span class="gh-num">#311</span></div>
+        <span class="gh-row"><span class="gh-state gh-state-done"><span set:html={icon('issue-closed', 14)} />Closed</span><span class="gh-lbl gh-lbl-red">bug</span><span class="gh-lbl gh-lbl-blue">parser</span></span>
+      </div>
+      <div class="gh-tl">
+        <div class="gh-cm">
+          <span class="gh-av" set:html={icon('mark-github', 16)} />
+          <div class="gh-box">
+            <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented</span></div>
+            <div class="gh-box-body"><p>Reproduced on <code>main</code>. Fixed in #318.</p></div>
+          </div>
+        </div>
+        <div class="gh-ev">
+          <span class="gh-badge gh-badge-done" set:html={icon('issue-closed', 16)} />
+          <span class="gh-ev-t"><b>github-actions</b> closed this as completed in <b>#318</b></span>
+        </div>
+      </div>
+    </>)}
+
+    {kind === 'repo-assist-week' && (<>
+      <div class="gh-head">
+        <div class="gh-title">[Repo Assist] Monthly activity, October <span class="gh-num">#300</span></div>
+        <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+      </div>
+      <div class="gh-cm">
+        <span class="gh-av" set:html={icon('mark-github', 16)} />
+        <div class="gh-box">
+          <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented · this week</span></div>
+          <ul class="gh-log" role="list">
+            <li><span class="gh-muted" set:html={icon('tag', 16)} /><span>Labelled <b>14</b> new issues</span></li>
+            <li><span class="gh-ok" set:html={icon('git-pull-request', 16)} /><span>Opened <b>#318</b> Fix trailing comment handling</span></li>
+            <li><span class="gh-done" set:html={icon('git-merge', 16)} /><span><b>#309</b> Speed up config loading was merged</span></li>
+            <li><span class="gh-done" set:html={icon('issue-closed', 16)} /><span>Closed <b>#297</b> as a duplicate of #284</span></li>
+            <li><span class="gh-ok" set:html={icon('git-pull-request', 16)} /><span>Opened <b>#322</b> Add tests for the config loader</span></li>
+          </ul>
+        </div>
+      </div>
+    </>)}
+
+    {kind === 'ci-doctor' && (<>
+      <div class="gh-box gh-merge">
+        <div class="gh-merge-head">
+          <span class="gh-merge-ico" set:html={icon('x', 16)} />
+          <span><b>Some checks were not successful</b><br /><span class="gh-muted">1 failing and 1 successful check</span></span>
+        </div>
+        <div class="gh-run"><span class="gh-bad" set:html={icon('x-circle-fill', 16)} /><b>CI / test</b><span class="gh-muted">Failing after 2m</span></div>
+        <div class="gh-run"><span class="gh-ok" set:html={icon('check-circle-fill', 16)} /><b>CI / lint</b><span class="gh-muted">Successful in 12s</span></div>
+      </div>
+      <div class="gh-tl">
+        <div class="gh-ev">
+          <span class="gh-badge gh-badge-ok" set:html={icon('issue-opened', 16)} />
+          <span class="gh-ev-t"><b>github-actions</b> opened <b>test job times out on db setup</b> <span class="gh-num">#519</span></span>
+        </div>
+        {lg && (
+          <div class="gh-cm">
+            <span class="gh-av" set:html={icon('mark-github', 16)} />
+            <div class="gh-box">
+              <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> commented</span></div>
+              <div class="gh-box-body"><p><b>Likely cause:</b> <code>DB_HOST</code> is unset since the runner image update in #512. <b>Next step:</b> set the service hostname in <code>ci.yml</code>.</p></div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>)}
+
+    {kind === 'repo-status' && (<>
+      <div class="gh-head">
+        <div class="gh-title">Daily status, 2 October <span class="gh-num">#507</span></div>
+        <span class="gh-state"><span set:html={icon('issue-opened', 14)} />Open</span>
+      </div>
+      <div class="gh-cm">
+        <span class="gh-av" set:html={icon('mark-github', 16)} />
+        <div class="gh-box">
+          <div class="gh-box-head"><b>github-actions</b><span class="gh-hide-sm"> opened this issue</span></div>
+          <div class="gh-box-body">
+            <p>A busy day: two long-running PRs landed.</p>
+            <div class="gh-stats">
+              <span><b>6</b><span class="gh-muted">PRs merged</span></span>
+              <span><b>4</b><span class="gh-muted">issues opened</span></span>
+              <span><b>9</b><span class="gh-muted">issues closed</span></span>
+            </div>
+            {lg && (
+              <ul class="gh-bullets" role="list">
+                <li><b>#309</b> made config loading 3X faster</li>
+                <li>CI is green on <code>main</code> after #521</li>
+                <li><b>#301</b> needs a maintainer decision</li>
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+    </>)}
+
+    {kind === 'test-improver' && (<>
+      <div class="gh-head">
+        <div class="gh-title">Add tests for the config loader <span class="gh-num">#322</span></div>
+        <span class="gh-state"><span set:html={icon('git-pull-request', 14)} />Open</span>
+      </div>
+      <div class="gh-box gh-files">
+        <div class="gh-frow"><span class="gh-mono">test/config.test.ts</span><span class="gh-add-n">+64</span><span class="gh-del-n">−0</span><span class="gh-stat"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></span></div>
+        <div class="gh-frow"><span class="gh-mono">test/fixtures/app.yml</span><span class="gh-add-n">+12</span><span class="gh-del-n">−0</span><span class="gh-stat"><i class="a"></i><i class="a"></i><i></i><i></i><i></i></span></div>
+      </div>
+      <div class="gh-cov">
+        <span class="gh-muted">Coverage for <span class="gh-mono">src/config.ts</span></span>
+        <span class="gh-cov-n"><span class="gh-muted">41%</span><span class="gh-muted" set:html={icon('arrow-right', 14)} /><b class="gh-ok">88%</b></span>
+      </div>
+      {lg && (
+        <div class="gh-box">
+          <div class="gh-run"><span class="gh-ok" set:html={icon('check-circle-fill', 16)} /><b>All checks have passed</b><span class="gh-muted">212 tests</span></div>
+        </div>
+      )}
+    </>)}
+  </div>
+</div>
+
+<style>
+  .wf-stage {
+    position: relative;
+    overflow: hidden;
+    height: 17rem;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-divider);
+    border-radius: 16px;
+  }
+  .wf-stage[data-size='lg'] {
+    height: 25rem;
+  }
+  /* Small: a scaled-down shot with more air around it. */
+  .wf-stage[data-size='sm'] {
+    height: 15rem;
+    border-color: transparent;
+  }
+  .wf-stage[data-size='sm'] .gh {
+    top: 2.5rem;
+    left: 2.5rem;
+    transform: scale(0.88);
+    transform-origin: top left;
+  }
+  @media (max-width: 47.99rem) {
+    .wf-stage { height: 16rem; }
+    .wf-stage[data-size='sm'] { height: 15rem; }
+    .wf-stage[data-size='sm'] .gh { top: 1.75rem; left: 1.75rem; }
+    .wf-stage[data-size='lg'] { height: 20rem; }
+  }
+
+  /* GitHub UI mocks: Primer-style neutrals and functional colours from site tokens. Dark first. */
+  .gh {
+    --gh-canvas: var(--aw-gray-13);
+    --gh-subtle: var(--aw-gray-12);
+    --gh-border: var(--aw-gray-9);
+    --gh-rail: var(--aw-gray-10);
+    --gh-fg: var(--aw-gray-1);
+    --gh-muted: var(--aw-gray-5);
+    --gh-neutral: var(--aw-gray-8);
+    --gh-success: color-mix(in srgb, var(--aw-green-6) 85%, var(--gh-fg));
+    --gh-success-em: color-mix(in srgb, var(--aw-green-6) 85%, var(--aw-gray-13));
+    --gh-done: var(--aw-purple-4);
+    --gh-done-em: var(--aw-purple-7);
+    --gh-danger: var(--aw-red-5);
+    --gh-r: 8px;
+
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    width: calc(100% + 0.5rem);
+    min-height: calc(100% + 1rem);
+    box-sizing: border-box;
+    padding: 1.25rem 4rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    background: var(--gh-canvas);
+    border: 1px solid var(--gh-border);
+    border-radius: 12px;
+    box-shadow: var(--aw-shadow-raised);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-size: var(--aw-step--1);
+    line-height: 1.5;
+    color: var(--gh-fg);
+    white-space: nowrap;
+  }
+  :global(:root[data-theme='light']) .gh {
+    --gh-canvas: var(--aw-gray-0);
+    --gh-subtle: var(--aw-gray-0);
+    --gh-border: var(--aw-gray-3);
+    --gh-rail: var(--aw-gray-2);
+    --gh-fg: var(--aw-gray-12);
+    --gh-muted: var(--aw-gray-7);
+    --gh-neutral: var(--aw-gray-3);
+    --gh-success: color-mix(in srgb, var(--aw-green-6) 80%, var(--aw-gray-13));
+    --gh-done: var(--aw-purple-7);
+    --gh-done-em: var(--aw-purple-7);
+    --gh-danger: color-mix(in srgb, var(--aw-red-5) 82%, var(--aw-gray-13));
+  }
+  .gh :global(svg) {
+    display: block;
+    fill: currentColor;
+  }
+  .gh b {
+    font-weight: 600;
+    color: var(--gh-fg);
+  }
+  .gh p {
+    margin: 0;
+    font-size: var(--aw-step--1);
+    line-height: 1.5;
+    color: var(--gh-fg);
+  }
+  .gh ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .gh li {
+    margin: 0;
+  }
+  .gh code,
+  .gh-mono {
+    font-family: var(--aw-font-mono);
+    font-size: var(--aw-step--1);
+  }
+  .gh code {
+    padding: 0.05em 0.3em;
+    border: 0;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--gh-muted) 18%, transparent);
+    color: var(--gh-fg);
+  }
+  .gh-muted { color: var(--gh-muted); }
+  .gh-ok { color: var(--gh-success); }
+  .gh-bad { color: var(--gh-danger); }
+  .gh-done { color: var(--gh-done); }
+  b.gh-ok { color: var(--gh-success); }
+
+  /* Title then state/labels on one line; labels wrap below when space runs out. */
+  .gh-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .gh-title {
+    font-size: var(--aw-step-0);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--gh-fg);
+  }
+  .gh-num {
+    color: var(--gh-muted);
+    font-weight: 300;
+  }
+  .gh-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.625rem;
+    padding: 0 0.625rem 0 0.5rem;
+    border-radius: 2em;
+    background: var(--gh-success-em);
+    color: var(--aw-gray-0);
+    font-weight: 500;
+  }
+  .gh-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .gh-state-done {
+    background: var(--gh-done-em);
+  }
+
+  .gh-av {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--gh-canvas);
+    box-shadow: 0 0 0 1px var(--gh-border);
+    color: var(--gh-fg);
+  }
+
+  /* Timeline: a 2px rail with circular event badges on it */
+  .gh-tl {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .gh-tl::before {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    bottom: -3rem;
+    left: calc(1rem - 1px);
+    width: 2px;
+    background: var(--gh-rail);
+  }
+  .gh-ci-doctor .gh-tl::before { top: -1.25rem; }
+  .gh-ev {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--gh-muted);
+  }
+  .gh-ev-t { line-height: 1.75; }
+  .gh-badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-right: 0.375rem;
+    border-radius: 50%;
+    background: var(--gh-subtle);
+    box-shadow: 0 0 0 3px var(--gh-canvas);
+    color: var(--gh-muted);
+  }
+  .gh-badge-ok { color: var(--gh-success); }
+  .gh-badge-done {
+    background: var(--gh-done-em);
+    color: var(--aw-gray-0);
+  }
+  .gh-lbl {
+    white-space: nowrap;
+    padding: 0.0625rem 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--lbl) 30%, transparent);
+    border-radius: 2em;
+    background: color-mix(in srgb, var(--lbl) 18%, transparent);
+    color: color-mix(in srgb, var(--lbl) 55%, var(--gh-fg));
+    font-weight: 500;
+  }
+  .gh-lbl-red { --lbl: var(--aw-red-5); }
+  .gh-lbl-blue { --lbl: var(--aw-blue-6); }
+  :global(:root[data-theme='light']) .gh-lbl {
+    background: var(--lbl);
+    border-color: transparent;
+    color: var(--aw-gray-0);
+  }
+  :global(:root[data-theme='light']) .gh-lbl-red {
+    --lbl: color-mix(in srgb, var(--aw-red-5) 88%, var(--aw-gray-13));
+  }
+
+  /* Boxes: comments, merge box, file list */
+  .gh-box {
+    position: relative;
+    min-width: 0;
+    background: var(--gh-canvas);
+    border: 1px solid var(--gh-border);
+    border-radius: var(--gh-r);
+  }
+  .gh-cm {
+    position: relative;
+    display: flex;
+    gap: 0.875rem;
+    align-items: flex-start;
+  }
+  .gh-cm .gh-box { flex: 1 1 auto; }
+  .gh-box-head {
+    overflow: hidden;
+    padding: 0.5rem 0.875rem;
+    background: var(--gh-subtle);
+    border-bottom: 1px solid var(--gh-border);
+    border-radius: var(--gh-r) var(--gh-r) 0 0;
+    color: var(--gh-muted);
+  }
+  .gh-box-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 0.875rem 0.875rem;
+    white-space: normal;
+    text-wrap: pretty;
+  }
+
+  /* Repo Assist activity log */
+  .gh-log li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+  }
+  .gh-log li + li { border-top: 1px solid var(--gh-border); }
+  .gh-log li > span:first-child { flex: none; }
+
+  /* Repo Status figures */
+  .gh-stats {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .gh-stats > span {
+    display: flex;
+    flex-direction: column;
+  }
+  .gh-stats b {
+    font-size: var(--aw-step-1);
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Scoped under .gh so it beats the .gh ul reset. */
+  .gh .gh-bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gh-border);
+  }
+  .gh-bullets li::before {
+    content: "•";
+    margin-right: 0.5rem;
+    color: var(--gh-muted);
+  }
+
+  /* Checks merge box */
+  .gh-merge-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-bottom: 1px solid var(--gh-border);
+    line-height: 1.4;
+  }
+  .gh-merge-ico {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--gh-r);
+    background: var(--gh-danger);
+    color: var(--aw-gray-0);
+  }
+  .gh-run {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+  }
+  .gh-run + .gh-run { border-top: 1px solid var(--gh-border); }
+
+  /* PR file list with diffstats */
+  .gh-frow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+  }
+  .gh-frow + .gh-frow { border-top: 1px solid var(--gh-border); }
+  .gh-frow .gh-mono { margin-right: auto; padding-right: 1rem; }
+  .gh-add-n { color: var(--gh-success); font-weight: 600; }
+  .gh-del-n { color: var(--gh-danger); font-weight: 600; }
+  .gh-stat { display: inline-flex; gap: 1px; margin-left: 0.25rem; }
+  .gh-stat i {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--gh-neutral);
+  }
+  .gh-stat i.a { background: var(--gh-success-em); }
+  .gh-cov {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--gh-border);
+    border-radius: var(--gh-r);
+  }
+  .gh-cov-n {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 47.99rem) {
+    .gh-hide-sm { display: none; }
+    .gh {
+      top: 1.25rem;
+      left: 1.25rem;
+      padding: 1rem 2.75rem 1rem 1rem;
+      gap: 1rem;
+      white-space: normal;
+    }
+    .gh-stat { display: none; }
+    .gh-stats { gap: 1rem; }
+    .gh-cov { flex-wrap: wrap; gap: 0.25rem 1rem; }
+  }
+</style>
