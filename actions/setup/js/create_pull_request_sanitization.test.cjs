@@ -101,6 +101,18 @@ describe("create_pull_request - body sanitization", () => {
     expect(createCall.body).not.toMatch(/(?<![`])@another-user(?![`])/);
   });
 
+  it("should pass shell metacharacters in PR content as API data", async () => {
+    const payload = "$(touch /tmp/gh-aw-command-injection); echo safe";
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    await handler({ title: "Test PR", body: payload }, {});
+
+    const createCall = global.github.rest.pulls.create.mock.calls[0]?.[0];
+    expect(createCall.body).toContain(payload);
+    expect(JSON.stringify(global.exec.exec.mock.calls)).not.toContain(payload);
+  });
+
   it("should expose hidden markdown link title XPIA payloads in PR body (closing the XPIA channel)", async () => {
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({ allow_empty: true });
