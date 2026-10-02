@@ -6,13 +6,14 @@
 // `image-rendering: pixelated` so each dither cell reads as a deliberate dot.
 //
 // Props let other sections reuse it as a quieter accent:
-// - placement: "hero" (default, top-right anchored) or "top-band" (a shallow
-//   band across the full top edge, fading downward).
+// - placement: "hero" (default, top-right anchored), "top-band" (a shallow
+//   band across the full top edge, fading downward), or "footer" (rises from
+//   the bottom-left corner, fading up and to the right).
 // - strength: multiplier on the field's intensity (1 = hero).
 // - forceDark: always use the dark palette, for bands that stay dark in
 //   light theme. Ignores data-theme.
 interface Props {
-  placement?: 'hero' | 'top-band';
+  placement?: 'hero' | 'top-band' | 'footer';
   strength?: number;
   forceDark?: boolean;
 }
@@ -72,7 +73,7 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
     uniform vec3 u_p3;
     uniform vec3 u_p4;
     uniform vec3 u_coral;
-    uniform float u_band;       // 1 = shallow full-width top band
+    uniform float u_band;       // 0 = hero, 1 = shallow top band, 2 = footer corner
     uniform float u_coralRate;  // multiplier on coral cluster frequency
 
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
@@ -131,7 +132,8 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
       // Falloff: originates top-right, deep behind the hero visual, thinning
       // to a soft shallow wisp across the top-left so the headline stays calm. Narrow screens get a thinner cap.
       bool narrow = size.x < 720.0;
-      bool band = u_band > 0.5;
+      bool band = u_band > 0.5 && u_band < 1.5;
+      bool footer = u_band > 1.5;
       float depth = band
         ? (narrow ? 110.0 : 150.0)
         : narrow
@@ -140,7 +142,18 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
       // Wobble the lower edge so it never reads as a straight gradient.
       depth *= 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, 3.1));
       float m = 1.0 - smoothstep(0.0, depth, fromTop);
-      if (!band) m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
+      if (footer) {
+        // Elliptical falloff from the bottom-left corner (px.y is up from
+        // the bottom), under the brand block and credits and fading out
+        // before the link columns. On narrow screens the columns stack, so
+        // the field stays a low cap. Same wobble so the edge never looks drawn.
+        vec2 reach = narrow
+          ? vec2(size.x * 0.75, min(size.y, 340.0))
+          : vec2(clamp(size.x * 0.4, 360.0, 620.0), size.y * 1.1);
+        vec2 d = px / reach;
+        float edge = 0.85 + 0.3 * vnoise(vec2(px.x / 180.0 + t * 0.03, px.y / 180.0));
+        m = 1.0 - smoothstep(0.3, edge, length(d));
+      } else if (!band) m *= mix(narrow ? 0.5 : 0.25, 1.0, smoothstep(0.05, 0.9, xn));
       m = m * (0.55 + 0.45 * m);
 
       float v = n * m * u_strength;
@@ -221,12 +234,12 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
     const uStrength = u('u_strength');
     const uP = [u('u_p1'), u('u_p2'), u('u_p3'), u('u_p4')];
     const uCoral = u('u_coral');
-    const band = root.dataset.placement === 'top-band';
+    const mode = root.dataset.placement === 'top-band' ? 1 : root.dataset.placement === 'footer' ? 2 : 0;
     const strength = Number(root.dataset.strength) || 1;
     const forceDark = root.hasAttribute('data-force-dark');
     gl.uniform1f(uCell, CELL);
-    gl.uniform1f(u('u_band'), band ? 1 : 0);
-    gl.uniform1f(u('u_coralRate'), band ? 0.35 : 1);
+    gl.uniform1f(u('u_band'), mode);
+    gl.uniform1f(u('u_coralRate'), mode === 0 ? 1 : 0.35);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
 
@@ -247,7 +260,9 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
     const t0 = performance.now() - Math.random() * 60000;
     let raf = 0;
     let last = 0;
-    let onScreen = true;
+    // The IntersectionObserver fires once on observe, so offscreen instances
+    // (footer, lower bands) never draw until scrolled near.
+    let onScreen = false;
 
     function visible() {
       return onScreen && !document.hidden && root.offsetParent !== null && root.clientWidth > 0;

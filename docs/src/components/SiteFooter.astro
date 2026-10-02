@@ -8,6 +8,7 @@
 import darkLogoSvg from '../assets/agentic-workflow.svg?raw';
 import lightLogoSvg from '../assets/agentic-workflow-light.svg?raw';
 import { getFooterGroups } from './site-nav';
+import HeroBackground from './landing/HeroBackground.astro';
 
 const base = import.meta.env.BASE_URL;
 const groups = getFooterGroups(base);
@@ -25,6 +26,9 @@ const legalLinks = [
 
 
 <footer class="site-footer not-content print:hidden">
+	<div class="site-footer-bg" aria-hidden="true">
+		<HeroBackground placement="footer" strength={0.6} />
+	</div>
 	<div class="site-footer-inner">
 		<div class="site-footer-top">
 			<div class="site-footer-brand">
@@ -77,13 +81,24 @@ const legalLinks = [
 <style>
 	/* Full-bleed band; content on the same 72rem grid as the landing sections */
 	.site-footer {
+		position: relative;
+		overflow: hidden;
+		isolation: isolate;
 		container-type: inline-size;
 		padding-block: 4rem 2.5rem;
 		border-top: 1px solid var(--aw-color-divider);
 		background: var(--aw-color-bg);
-		font-size: var(--aw-step--1);
+		font-size: var(--aw-text-ui);
 		line-height: 1.5;
 		color: var(--aw-color-text-secondary);
+	}
+
+	/* Dithered cloud rising from the bottom-right corner, behind the content */
+	.site-footer-bg {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
 	}
 
 	.site-footer-inner {
@@ -123,7 +138,7 @@ const legalLinks = [
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
-		font-size: var(--aw-step-0);
+		font-size: var(--aw-text-ui);
 		font-weight: 600;
 		letter-spacing: var(--aw-tracking-snug);
 	}
@@ -164,8 +179,8 @@ const legalLinks = [
 	}
 
 	.site-footer-groups h2 {
-		margin: 0 0 0.875rem;
-		font-size: var(--aw-step--1);
+		margin: 0 0 1rem;
+		font-size: var(--aw-text-ui);
 		font-weight: 500;
 		line-height: 1.5;
 		letter-spacing: 0;
@@ -174,7 +189,7 @@ const legalLinks = [
 
 	.site-footer-groups ul {
 		display: grid;
-		gap: 0.625rem;
+		gap: 0.75rem;
 	}
 
 	/* Bottom bar */
