@@ -943,9 +943,18 @@ describe("awf_reflect.cjs", () => {
       expect(inferWireApiForModel("anthropic", "claude-opus-5", { wire_api: "responses" })).toBeUndefined();
     });
 
-    it("falls back to completions when the catalog value is invalid or absent", () => {
-      expect(inferWireApiForModel("openai", "gpt-5.5", { wire_api: "grpc" })).toBe("completions");
-      expect(inferWireApiForModel("openai", "gpt-5.5", null)).toBe("completions");
+    it("defaults GPT-5+ models to Responses when the catalog value is invalid or absent", () => {
+      expect(inferWireApiForModel("openai", "gpt-5.5", { wire_api: "grpc" })).toBe("responses");
+      expect(inferWireApiForModel("openai", "gpt-5.5", null)).toBe("responses");
+      expect(inferWireApiForModel("openai", "gpt-7-preview", null)).toBe("responses");
+      expect(inferWireApiForModel("openai", "gpt-4.1", null)).toBe("completions");
+    });
+
+    it.each(["gpt-5-mini", "gpt-6-luna"])("uses the bundled Responses API metadata for %s", model => {
+      const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
+      const catalogEntry = getCatalogModelEntry(modelsJson, model, "openai");
+      expect(catalogEntry.wire_api).toBe("responses");
+      expect(inferWireApiForModel("openai", model, catalogEntry)).toBe("responses");
     });
   });
 
@@ -1141,7 +1150,7 @@ describe("awf_reflect.cjs", () => {
       expect(result.providers[0].wireApi).toBe("responses");
     });
 
-    it("applies the wire API override to the fallback primary model", () => {
+    it("applies an explicit wire API override to the fallback primary model", () => {
       const result = resolveMultiProviderFromReflect({
         model: "nonexistent-model",
         wireApi: "responses",
@@ -1149,6 +1158,16 @@ describe("awf_reflect.cjs", () => {
       });
       expect(result.model).toBe("gpt-6-luna");
       expect(result.providers[0].wireApi).toBe("responses");
+    });
+
+    it("infers the fallback primary model wire API instead of inheriting an automatic GPT default", () => {
+      const result = resolveMultiProviderFromReflect({
+        model: "gpt-6-luna",
+        reflectData: { endpoints: [{ provider: "openai", port: 10002, configured: true, models: ["gpt-4.1"] }] },
+        modelsJson: { providers: { openai: { models: { "gpt-4.1": { wire_api: "completions" } } } } },
+      });
+      expect(result.model).toBe("gpt-4.1");
+      expect(result.providers[0].wireApi).toBe("completions");
     });
 
     it("ignores wire API overrides for Anthropic providers", () => {

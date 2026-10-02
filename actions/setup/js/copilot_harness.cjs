@@ -473,7 +473,7 @@ function applyCopilotWireAPI({ modelsJson, logger = log }) {
     return;
   }
 
-  if (modelName.split("?")[0].toLowerCase().startsWith("gpt-")) {
+  if (/^gpt-(?:[5-9]|\d{2,})(?:[.-]|$)/i.test(modelName.split("?")[0])) {
     logger(`auto-configuring COPILOT_PROVIDER_WIRE_API=responses for GPT model ${modelName}`);
     process.env.COPILOT_PROVIDER_WIRE_API = "responses";
   }

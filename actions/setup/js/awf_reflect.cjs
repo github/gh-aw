@@ -713,7 +713,8 @@ function inferProviderTypeForModel(endpointProvider, modelName, catalogEntryOrMo
  * Resolution order:
  *   1. For Anthropic provider types: undefined (wireApi ignored by SDK).
  *   2. `models.json` explicit `wire_api`/`wireApi`.
- *   3. Heuristic default for OpenAI/Azure-compatible models: "completions".
+ *   3. Heuristic default for GPT-5+ models: "responses".
+ *   4. Default for other OpenAI/Azure-compatible models: "completions".
  *
  * @param {"openai" | "azure" | "anthropic"} providerType
  * @param {string} modelName
@@ -738,6 +739,9 @@ function inferWireApiForModel(providerType, modelName, catalogEntryOrModelsJson)
     .trim();
   if (normalizedWireApi === "responses" || normalizedWireApi === "completions") {
     return /** @type {"responses" | "completions"} */ normalizedWireApi;
+  }
+  if (/^gpt-(?:[5-9]|\d{2,})(?:[.-]|$)/i.test(model.split("?")[0])) {
+    return "responses";
   }
   return "completions";
 }

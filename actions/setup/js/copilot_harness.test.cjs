@@ -3501,6 +3501,12 @@ process.exit(1);`,
       expect(process.env.COPILOT_PROVIDER_WIRE_API).toBe("responses");
     });
 
+    it("does not assume the Responses API for unknown GPT-4 models", () => {
+      process.env.COPILOT_MODEL = "gpt-4.2";
+      applyCopilotWireAPI({ modelsJson: { providers: { "github-copilot": { models: {} } } }, logger: () => {} });
+      expect(process.env.COPILOT_PROVIDER_WIRE_API).toBeUndefined();
+    });
+
     it.each(["grok-4.5", "grok-4.6", "grok-4.7"])("uses the responses API from the bundled catalog for %s", model => {
       process.env.COPILOT_MODEL = model;
       const modelsJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "models.json"), "utf8"));
