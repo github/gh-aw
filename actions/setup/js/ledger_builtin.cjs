@@ -16,14 +16,23 @@ const MAX_REPLAY_CELL_BYTES = 65536;
 const CLAIM_LIMITS = { subject: 512, claim: 4096, reason: 4096, citations: 32, citationBytes: 2048 };
 const CLAIM_STATE_COLUMNS = { claim_id: "text", upvotes: "integer", downvotes: "integer", net_votes: "integer", last_vote_at: "text", last_positive_vote_at: "text" };
 const CLAIM_STATE_VIEW = `CREATE VIEW claim_state AS
+  WITH vote_state AS (
+    SELECT claim_id,
+      sum(CASE WHEN vote = 'up' THEN 1 ELSE 0 END) AS upvotes,
+      sum(CASE WHEN vote = 'down' THEN 1 ELSE 0 END) AS downvotes,
+      max(created_at) AS last_vote_at,
+      max(CASE WHEN vote = 'up' THEN created_at END) AS last_positive_vote_at
+    FROM claim_votes
+    GROUP BY claim_id
+  )
   SELECT c.id AS claim_id,
-    (SELECT count(*) FROM claim_votes v WHERE v.claim_id = c.id AND v.vote = 'up') AS upvotes,
-    (SELECT count(*) FROM claim_votes v WHERE v.claim_id = c.id AND v.vote = 'down') AS downvotes,
-    (SELECT count(*) FROM claim_votes v WHERE v.claim_id = c.id AND v.vote = 'up') -
-    (SELECT count(*) FROM claim_votes v WHERE v.claim_id = c.id AND v.vote = 'down') AS net_votes,
-    (SELECT max(v.created_at) FROM claim_votes v WHERE v.claim_id = c.id) AS last_vote_at,
-    (SELECT max(v.created_at) FROM claim_votes v WHERE v.claim_id = c.id AND v.vote = 'up') AS last_positive_vote_at
-  FROM claims c`;
+    coalesce(v.upvotes, 0) AS upvotes,
+    coalesce(v.downvotes, 0) AS downvotes,
+    coalesce(v.upvotes, 0) - coalesce(v.downvotes, 0) AS net_votes,
+    v.last_vote_at,
+    v.last_positive_vote_at
+  FROM claims c
+  LEFT JOIN vote_state v ON v.claim_id = c.id`;
 
 function validateCitation(citation) {
   if (!citation || typeof citation !== "object" || Array.isArray(citation)) return false;
