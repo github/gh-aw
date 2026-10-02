@@ -8,8 +8,8 @@ import { main, readFinishIntent, reconcileWorkerClaim, renderSummary } from "./f
 
 const worker = { work_id: "w", claim_id: "claim-a" };
 const initialTransactions = [
-  { kind: "Work", work: "w", claim: null, attempt: null },
-  { kind: "Claim", work: "w", claim: "claim-a", attempt: null },
+  { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
+  { version: 1, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
 ];
 
 let tempDirectory;
@@ -56,6 +56,7 @@ describe("dispatch work claim reconciliation", () => {
 
     expect(result).toEqual({ authorized: true, status: "completed" });
     expect(fake.transactions).toContainEqual({
+      version: 1,
       kind: "Completion",
       work: "w",
       claim: "claim-a",
@@ -74,11 +75,11 @@ describe("dispatch work claim reconciliation", () => {
     });
 
     expect(result).toEqual({ authorized: false, status: "cancelled" });
-    expect(fake.transactions).toContainEqual({ kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
+    expect(fake.transactions).toContainEqual({ version: 1, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
   });
 
   it("does not publish or authorize a superseded claim", async () => {
-    const fake = setup([...initialTransactions, { kind: "Claim", work: "w", claim: "claim-0", attempt: null }]);
+    const fake = setup([...initialTransactions, { version: 1, kind: "Claim", work: "w", claim: "claim-0", attempt: null }]);
     const publish = vi.fn(fake.applyAndPublish);
     const result = await reconcileWorkerClaim({
       worker,
@@ -95,14 +96,17 @@ describe("dispatch work claim reconciliation", () => {
 
   it("allows safe outputs for workflows without a worker assignment", async () => {
     const fake = setup();
+    const core = { info: vi.fn() };
     const result = await reconcileWorkerClaim({
       worker: null,
+      core,
       readCoordinatorLog: fake.readCoordinatorLog,
       applyAndPublish: fake.applyAndPublish,
       context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
     });
 
     expect(result).toEqual({ authorized: true, status: "unassigned" });
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining("no inbound worker claim"));
     expect(fake.transactions).toEqual(initialTransactions);
   });
 

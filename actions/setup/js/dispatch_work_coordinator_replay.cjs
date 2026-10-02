@@ -1,7 +1,8 @@
 // @ts-check
 
+const { CURRENT_VERSION, upgradeTransaction } = require("./dispatch_work_coordinator_codemods.cjs");
 const TRANSACTION_KINDS = new Set(["Work", "Claim", "ClaimCancellation", "Completion", "WorkCancellation"]);
-const TRANSACTION_FIELDS = ["kind", "work", "claim", "attempt"];
+const TRANSACTION_FIELDS = ["version", "kind", "work", "claim", "attempt"];
 const SORTED_TRANSACTION_FIELDS = [...TRANSACTION_FIELDS].sort();
 
 /**
@@ -19,11 +20,11 @@ function debugLog(message, details = {}) {
 
 /**
  * @typedef {
- *   | {kind: "Work", work: string, claim: null, attempt: null}
- *   | {kind: "Claim", work: string, claim: string, attempt: null}
- *   | {kind: "ClaimCancellation", work: string, claim: string, attempt: null}
- *   | {kind: "Completion", work: string, claim: string, attempt: string}
- *   | {kind: "WorkCancellation", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
+ *   | {version: number, kind: "WorkCancellation", work: string, claim: null, attempt: null}
  * } DispatchWorkTransaction
  */
 
@@ -40,7 +41,10 @@ function validateTransaction(transaction) {
   const candidate = Object.assign(Object.create(null), transaction);
   const fields = Object.keys(candidate).sort();
   if (fields.length !== SORTED_TRANSACTION_FIELDS.length || fields.some((field, index) => field !== SORTED_TRANSACTION_FIELDS[index])) {
-    throw new TypeError("transaction must contain exactly kind, work, claim, and attempt");
+    throw new TypeError("transaction must contain exactly version, kind, work, claim, and attempt");
+  }
+  if (candidate.version !== CURRENT_VERSION) {
+    throw new TypeError("unsupported dispatch coordinator transaction version");
   }
   if (typeof candidate.kind !== "string" || !TRANSACTION_KINDS.has(candidate.kind)) {
     throw new TypeError("transaction kind is invalid");
@@ -83,7 +87,7 @@ function validateTransaction(transaction) {
  * @returns {string}
  */
 function transactionKey(transaction) {
-  return JSON.stringify([transaction.kind, transaction.work, transaction.claim, transaction.attempt]);
+  return JSON.stringify([transaction.version, transaction.kind, transaction.work, transaction.claim, transaction.attempt]);
 }
 
 /**
@@ -92,6 +96,7 @@ function transactionKey(transaction) {
  */
 function copyTransaction(transaction) {
   return Object.freeze({
+    version: transaction.version,
     kind: transaction.kind,
     work: transaction.work,
     claim: transaction.claim,
@@ -381,6 +386,7 @@ function parseTransactionLog(contents) {
       throw new TypeError(`invalid transaction log line ${index + 1}: malformed JSON`);
     }
     try {
+      transaction = upgradeTransaction(transaction);
       validateTransaction(transaction);
     } catch (error) {
       throw new TypeError(`invalid transaction log line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
