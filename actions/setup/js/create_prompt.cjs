@@ -18,6 +18,7 @@ const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 /**
  * @typedef {Object} PromptRenderConfig
  * @property {PromptRenderItem[]} items
+ * @property {number} [system_item_count]
  */
 
 /**
@@ -34,6 +35,9 @@ function parseConfig(value) {
   }
   if (!parsed || !Array.isArray(parsed.items)) {
     throw new Error(`${ERR_CONFIG}: GH_AW_PROMPT_CONFIG must contain an items array`);
+  }
+  if (parsed.system_item_count !== undefined && (!Number.isInteger(parsed.system_item_count) || parsed.system_item_count < 0 || parsed.system_item_count > parsed.items.length)) {
+    throw new Error(`${ERR_CONFIG}: GH_AW_PROMPT_CONFIG has an invalid system_item_count`);
   }
   return parsed;
 }
@@ -173,7 +177,10 @@ async function main(core) {
     const config = parseConfig(configValue);
     const promptsDir = path.join(runnerTemp, "gh-aw", "prompts");
     const promptOutputDir = path.join(runnerTemp, "gh-aw", "aw-prompts");
-    const content = renderPrompt(config, process.env, promptsDir);
+    const systemItemCount = config.system_item_count ?? 0;
+    const systemContent = renderPrompt({ items: config.items.slice(0, systemItemCount) }, process.env, promptsDir);
+    const userContent = renderPrompt({ items: config.items.slice(systemItemCount) }, process.env, promptsDir);
+    const content = systemContent + userContent;
 
     fs.mkdirSync(promptOutputDir, { recursive: true, mode: 0o700 });
     const unresolvedOutputDir = path.resolve(promptOutputDir);
@@ -182,6 +189,8 @@ async function main(core) {
     const resolvedOutputDir = fs.realpathSync(promptOutputDir);
     assertPathWithin(fs.realpathSync(runnerTemp), resolvedOutputDir);
     const resolvedPromptPath = path.resolve(resolvedOutputDir, path.relative(unresolvedOutputDir, unresolvedPromptPath));
+    writePromptFile(path.join(resolvedOutputDir, "system.txt"), systemContent);
+    writePromptFile(path.join(resolvedOutputDir, "user.txt"), userContent);
     writePromptFile(resolvedPromptPath, content);
     core.info(`Created prompt at ${resolvedPromptPath} (${Buffer.byteLength(content, "utf8")} bytes)`);
   } catch (error) {
