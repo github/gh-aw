@@ -25,6 +25,17 @@ func hasExplicitAppTokenPermission(with map[string]any) bool {
 	return false
 }
 
+func hasExplicitAppTokenRepositories(with map[string]any) bool {
+	for key, value := range with {
+		if !strings.EqualFold(key, "repositories") {
+			continue
+		}
+		repositories, ok := value.(string)
+		return ok && strings.TrimSpace(repositories) != ""
+	}
+	return false
+}
+
 // validateAppTokenPermissions checks the compiled jobs, including imported and
 // compiler-generated steps, before an installation token can inherit every scope.
 func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict bool) error {
@@ -56,6 +67,14 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 			with, ok := step["with"].(map[string]any)
 			if !ok {
 				with = nil
+			}
+			if !hasExplicitAppTokenRepositories(with) {
+				msg := fmt.Sprintf("actions/create-github-app-token in job %q has no explicit repositories input; add repositories: ${{ github.event.repository.name }} to scope the token to the current repository", jobName)
+				if strict {
+					return fmt.Errorf("strict mode: %s", msg)
+				}
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
+				c.IncrementWarningCount()
 			}
 			if hasExplicitAppTokenPermission(with) {
 				continue

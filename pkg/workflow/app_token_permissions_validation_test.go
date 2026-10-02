@@ -11,21 +11,25 @@ import (
 
 func TestAppTokenPermissionsAtCompileTime(t *testing.T) {
 	for _, tc := range []struct {
-		name      string
-		strict    string
-		inputs    string
-		uses      string
-		wantError bool
-		wantWarn  bool
+		name         string
+		strict       string
+		repositories string
+		inputs       string
+		uses         string
+		wantError    bool
+		wantWarn     bool
 	}{
-		{"strict unscoped", "", "", "", true, false},
-		{"case variant strict unscoped", "", "", "Actions/create-github-app-token@v3.2.0", true, false},
-		{"non-strict unscoped", "strict: false\n", "", "", false, true},
-		{"strict empty permission", "", "          permission-contents: ''\n", "", true, false},
-		{"strict invalid permission", "", "          permission-contents: invalid\n", "", true, false},
-		{"strict none permission", "", "          Permission-contents: none\n", "", false, false},
-		{"strict scoped", "", "          permission-contents: read\n", "", false, false},
-		{"non-strict scoped", "strict: false\n", "          permission-issues: write\n", "", false, false},
+		{"strict unscoped", "", "          repositories: ${{ github.event.repository.name }}\n", "", "", true, false},
+		{"case variant strict unscoped", "", "          repositories: ${{ github.event.repository.name }}\n", "", "Actions/create-github-app-token@v3.2.0", true, false},
+		{"non-strict unscoped", "strict: false\n", "          repositories: ${{ github.event.repository.name }}\n", "", "", false, true},
+		{"strict empty permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: ''\n", "", true, false},
+		{"strict invalid permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: invalid\n", "", true, false},
+		{"strict none permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          Permission-contents: none\n", "", false, false},
+		{"strict scoped", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: read\n", "", false, false},
+		{"non-strict scoped", "strict: false\n", "          repositories: ${{ github.event.repository.name }}\n", "          permission-issues: write\n", "", false, false},
+		{"strict missing repositories", "", "", "          permission-contents: read\n", "", true, false},
+		{"non-strict missing repositories", "strict: false\n", "", "          permission-contents: read\n", "", false, true},
+		{"strict empty repositories", "", "          repositories: ''\n", "          permission-contents: read\n", "", true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -38,7 +42,7 @@ func TestAppTokenPermissionsAtCompileTime(t *testing.T) {
 				"network:\n  allowed: [defaults]\njobs:\n  activation:\n    steps:\n" +
 				"      - name: Mint app token\n        uses: " + uses + "\n" +
 				"        with:\n          app-id: ${{ vars.APP_ID }}\n          private-key: ${{ secrets.APP_KEY }}\n" +
-				tc.inputs + "---\n\n# Test\n"
+				tc.repositories + tc.inputs + "---\n\n# Test\n"
 			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +50,7 @@ func TestAppTokenPermissionsAtCompileTime(t *testing.T) {
 			err := compiler.CompileWorkflow(path)
 			if tc.wantError {
 				if err == nil || !strings.Contains(err.Error(), "strict mode: actions/create-github-app-token") {
-					t.Fatalf("expected strict app token permission error, got %v", err)
+					t.Fatalf("expected strict app token scope error, got %v", err)
 				}
 			} else if err != nil {
 				t.Fatalf("unexpected compile error: %v", err)
@@ -106,6 +110,9 @@ network:
 	for _, permission := range []string{"permission-issues: read", "permission-pull-requests: read"} {
 		if !strings.Contains(string(lockContent), permission) {
 			t.Errorf("expected generated token permissions to contain %q", permission)
+		}
+		if !strings.Contains(string(lockContent), "repositories: ${{ github.event.repository.name }}") {
+			t.Fatal("expected generated token to explicitly scope repositories to the current repository")
 		}
 	}
 }
