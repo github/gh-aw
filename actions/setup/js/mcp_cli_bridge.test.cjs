@@ -921,6 +921,32 @@ describe("mcp_cli_bridge.cjs", () => {
       }
     });
 
+    it("retries an initial interrupted read before receiving implicit JSON stdin", () => {
+      const payload = Buffer.from(JSON.stringify({ body: "input after EINTR" }));
+      let callCount = 0;
+      const readSyncSpy = vi.spyOn(fs, "readSync").mockImplementation((_fd, buf, _offset, length) => {
+        callCount += 1;
+        if (callCount === 1) {
+          throw Object.assign(new Error("interrupted system call"), { code: "EINTR" });
+        }
+        if (callCount === 2) {
+          throw Object.assign(new Error("resource temporarily unavailable"), { code: "EAGAIN" });
+        }
+        if (callCount === 3) {
+          payload.copy(buf, 0, 0, payload.length);
+          return payload.length;
+        }
+        return 0;
+      });
+
+      try {
+        expect(parseToolArgs(["."], { body: { type: "string" } }, readStdinSync()).args.body).toBe("input after EINTR");
+        expect(callCount).toBe(4);
+      } finally {
+        readSyncSpy.mockRestore();
+      }
+    });
+
     it.each([0, 1, 1543, 4004, 65537, 1024 * 1024, 10 * 1024 * 1024 - 32])("reads a %i-byte body completely", bodySize => {
       const payload = JSON.stringify({ body: "x".repeat(bodySize) });
       const bytes = Buffer.from(payload);

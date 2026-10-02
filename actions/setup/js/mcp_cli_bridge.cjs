@@ -659,16 +659,19 @@ function readStdinSync(waitForData = false) {
   const chunks = [];
   const bufSize = 65536;
   let totalBytes = 0;
+  let firstRead = true;
   let idleSince = Date.now();
   const retryWait = new Int32Array(new SharedArrayBuffer(4));
   while (true) {
     const buf = Buffer.alloc(bufSize);
     let bytesRead;
+    const isFirstRead = firstRead;
+    firstRead = false;
     try {
       bytesRead = fs.readSync(STDIN_FD, buf, 0, bufSize, null);
     } catch (err) {
       if (err && typeof err === "object" && (err.code === "EAGAIN" || err.code === "EINTR")) {
-        if (totalBytes === 0 && !waitForData) return "";
+        if (err.code === "EAGAIN" && isFirstRead && !waitForData) return "";
         if (Date.now() - idleSince >= 30000) {
           throw new Error("timed out waiting for stdin input", { cause: err });
         }
