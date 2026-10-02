@@ -90,6 +90,8 @@ vars == <<log, head, dispatch, workers, compact, recovery, deadRuns,
 
 Snapshot == [phase |-> "idle", base |-> 0, source |-> <<>>,
              candidate |-> <<>>, observedRuns |-> {}, retries |-> 0]
+EmptyActivationSnapshot ==
+    [ready |-> FALSE, head |-> 0, admitted |-> FALSE]
 Init ==
     /\ log = <<>> /\ head = 0 /\ deadRuns = {}
     /\ terminalHistory = [w \in Works |-> {}]
@@ -99,7 +101,8 @@ Init ==
           base |-> 0, source |-> <<>>, candidate |-> <<>>, retries |-> 0]]
     /\ workers = [a \in Workers |->
          [phase |-> "waiting", finish |-> FALSE,
-          base |-> 0, source |-> <<>>, candidate |-> <<>>, retries |-> 0]]
+          base |-> 0, source |-> <<>>, candidate |-> <<>>, retries |-> 0,
+          activation |-> EmptyActivationSnapshot]]
     /\ compact = Snapshot /\ recovery = Snapshot
 
 Commit(candidate) ==
@@ -147,12 +150,27 @@ RetryDispatch(d) ==
     /\ UNCHANGED <<log, head, workers, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
+ActivationArtifact(a) ==
+    LET c == Inbound(a)
+        w == WorkOf(c)
+        projection == Projection(Facts(log))
+        workState == projection.work[w]
+        winner == projection.winner[w]
+        claimState == projection.claim[c]
+    IN [ready |-> TRUE, head |-> head,
+        admitted |-> claimState = "effective"
+                      /\ workState \notin {"completed", "cancelled"}
+                      /\ winner = c]
+
 Activate(a) ==
-    LET c == Inbound(a) IN
-    /\ workers[a].phase = "waiting" /\ c \notin deadRuns
-    /\ Claim(c) \in Facts(log) /\ ~Terminal(Facts(log), WorkOf(c))
-    /\ Winner(Facts(log), WorkOf(c)) = c
-    /\ workers' = [workers EXCEPT ![a].phase = "running"]
+    LET c == Inbound(a)
+        artifact == ActivationArtifact(a)
+    IN
+    /\ workers[a].phase = "waiting"
+    /\ artifact.admitted
+    /\ c \notin deadRuns
+    /\ workers' = [workers EXCEPT ![a].phase = "running",
+                   ![a].activation = artifact]
     /\ UNCHANGED <<log, head, dispatch, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
 
@@ -303,7 +321,8 @@ TypeOK ==
          [phase : {"waiting", "running", "ready", "prepared", "committed",
                    "authorized", "done", "stopped", "failed"},
           finish : BOOLEAN, base : Nat, source : Seq(AllFacts),
-          candidate : Seq(AllFacts), retries : 0..RetryLimit]]
+          candidate : Seq(AllFacts), retries : 0..RetryLimit,
+          activation : [ready : BOOLEAN, head : Nat, admitted : BOOLEAN]]]
     /\ compact \in [phase : {"idle", "prepared", "done", "failed"}, base : Nat,
                    source : Seq(AllFacts), candidate : Seq(AllFacts),
                    observedRuns : SUBSET Claims, retries : 0..RetryLimit]
@@ -335,7 +354,12 @@ CandidateDerivation ==
 SnapshotVersions ==
     /\ \A d \in Dispatchers : dispatch[d].base <= head
     /\ \A a \in Workers : workers[a].base <= head
+    /\ \A a \in Workers : workers[a].activation.ready =>
+          workers[a].activation.head <= head
     /\ compact.base <= head /\ recovery.base <= head
+ActivationSnapshotValidity ==
+    \A a \in Workers : workers[a].activation.ready =>
+         workers[a].activation.admitted
 Serialization == \A d \in Dispatchers : dispatch[d].local = dispatch[d].serialized
 TerminalHistoryValid ==
     \A w \in Works : terminalHistory[w] # {} =>
@@ -385,11 +409,22 @@ SingleAuthorization ==
 SingleEffect ==
     \A w \in Works : Cardinality({i \in 1..Len(effects) : effects[i].work = w}) <= 1
 Safety ==
-    /\ TypeOK /\ ValidLog /\ SnapshotValidity /\ SnapshotVersions /\ Serialization
+    /\ TypeOK /\ ValidLog /\ SnapshotValidity /\ SnapshotVersions
+    /\ ActivationSnapshotValidity /\ Serialization
     /\ CandidateDerivation /\ TerminalHistoryValid /\ TerminalPersistence /\ TerminalFreeze
     /\ SingleCompletionPerWorker /\ SingleEffectiveClaim /\ AuthorizationSoundness
     /\ EffectSoundness /\ WorkerOrigin /\ FinishRequired
     /\ LifecycleAccounting /\ SingleAuthorization /\ SingleEffect
+
+\* Reachability witnesses: deliberately false for safe executions, not safety requirements.
+NoCompetingClaims ==
+    \A w \in Works : Cardinality({c \in Claims : Claim(c) \in Facts(log)
+                                               /\ WorkOf(c) = w}) < 2
+NoRecoveredOrphan ==
+    ~(recovery.phase = "done" /\ \E c \in recovery.observedRuns :
+          ClaimCancellation(c) \in Facts(recovery.candidate) \ Facts(recovery.source)
+          /\ ClaimCancellation(c) \in Facts(log))
+NoExternalEffect == effects = <<>>
 
 Bound == head <= MaxHead /\ Len(log) <= MaxLog
 

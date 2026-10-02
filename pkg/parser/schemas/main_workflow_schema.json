@@ -5052,6 +5052,20 @@
           ],
           "examples": [true, null]
         },
+        "dispatch-work-coordinator": {
+          "description": "Read dispatch work and claim state from the immutable activation snapshot. The MCP server does not read Git; the snapshot can become stale while the agent runs.",
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Enable or disable the dispatch work coordinator MCP server."
+            },
+            {
+              "type": "null",
+              "description": "Enable the dispatch work coordinator MCP server."
+            }
+          ],
+          "examples": [true, null]
+        },
         "cache-memory": {
           "description": "Cache memory MCP configuration for persistent memory storage",
           "oneOf": [

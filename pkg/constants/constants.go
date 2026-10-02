@@ -539,6 +539,15 @@ const WorkflowsLockYmlGitAttributesEntryLegacy = WorkflowsLockYmlGlob + " lingui
 // TmpGhAwDir is the root /tmp/gh-aw directory (without trailing slash).
 const TmpGhAwDir = "/tmp/gh-aw"
 
+// DispatchCoordinatorSnapshotPath is the activation artifact mounted into the coordinator MCP server.
+const DispatchCoordinatorSnapshotPath = TmpGhAwDir + "/dispatch-work-coordinator.snapshot.json"
+const DispatchCoordinatorFinishIntentPath = TmpGhAwDir + "/dispatch-work-coordinator.finish.jsonl"
+const DispatchCoordinatorFinishIntentDir = GhAwRootDirShell + "/safeoutputs/dispatch-coordinator"
+const DispatchCoordinatorFinishIntentMount = DispatchCoordinatorFinishIntentDir + ":" + DispatchCoordinatorFinishIntentDir + ":rw"
+
+// DispatchCoordinatorSnapshotMount exposes the activation snapshot read-only to the coordinator MCP server.
+const DispatchCoordinatorSnapshotMount = DispatchCoordinatorSnapshotPath + ":" + DispatchCoordinatorSnapshotPath + ":ro"
+
 // TmpGhAwDirSlash is TmpGhAwDir with a trailing slash.
 // Use for path prefix comparisons (e.g. strings.HasPrefix).
 const TmpGhAwDirSlash = TmpGhAwDir + "/"
