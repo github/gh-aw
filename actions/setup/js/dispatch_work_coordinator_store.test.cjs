@@ -159,6 +159,19 @@ describe("dispatch work coordinator Git store", () => {
     expect([...fake.blobs.values()]).toEqual([serializeTransactionLog([work("w")])]);
   });
 
+  it("allows read-only activation to upgrade in memory without publishing", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "legacy-head";
+    fake.state.transactions = [work("w")];
+    fake.state.rawContents = `${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null })}\n`;
+
+    const result = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo", publishUpgrades: false });
+    expect(result.transactions).toEqual([work("w")]);
+    expect(result.sha).toBe("legacy-head");
+    expect(fake.state.updateCalls).toBe(0);
+    expect(fake.blobs.size).toBe(0);
+  });
+
   it("retries a concurrent upgrade against the new head", async () => {
     const fake = createFakeGitHub();
     fake.state.sha = "legacy-head";

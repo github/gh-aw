@@ -45,6 +45,27 @@ describe("write dispatch coordinator activation snapshot", () => {
     expect(fs.statSync(snapshotPath).mode & 0o777).toBe(0o444);
   });
 
+  it("snapshots a legacy log without requiring write access", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dispatch-coordinator-activation-"));
+    tempDirectories.push(directory);
+    const snapshotPath = path.join(directory, "snapshot.json");
+    const legacy = { kind: "Work", work: "w", claim: null, attempt: null };
+    const githubClient = {
+      rest: {
+        git: {
+          getRef: async () => ({ data: { object: { sha: "legacy-head" } } }),
+          getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
+          getTree: async () => ({ data: { tree: [{ path: "dispatch-work-coordinator.jsonl", type: "blob", sha: "blob" }] } }),
+          getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(`${JSON.stringify(legacy)}\n`).toString("base64") } }),
+        },
+      },
+    };
+    await main({ githubClient, context: { repo: { owner: "owner", repo: "repo" } }, snapshotPath, core: { info: () => {} } });
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+    expect(snapshot.sha).toBe("legacy-head");
+    expect(snapshot.transactionLog).toBe(`${JSON.stringify({ version: 1, ...legacy })}\n`);
+  });
+
   it("admits only a trusted inbound assignment that is the current effective claim", () => {
     const transactions = [
       { version: 1, kind: "Work", work: "w", claim: null, attempt: null },

@@ -80,9 +80,13 @@ async function readCoordinatorLogRaw({ githubClient, owner, repo }) {
   }
 }
 
-async function readCoordinatorLog({ githubClient, owner, repo }) {
+/**
+ * Activation is read-only; trusted write-capable readers publish upgrades.
+ * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean}} options
+ */
+async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades = true }) {
   const current = await readCoordinatorLogRaw({ githubClient, owner, repo });
-  if (!current.needsUpgrade) return current;
+  if (!current.needsUpgrade || !publishUpgrades) return current;
   const upgraded = await applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents: [] });
   return { sha: upgraded.sha, transactions: upgraded.transactions };
 }

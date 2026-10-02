@@ -65,7 +65,7 @@ func TestDispatchCoordinatorSnapshotIsPreparedAndUploaded(t *testing.T) {
 	assert.Contains(t, snapshotStep, "write_dispatch_work_coordinator_snapshot.cjs")
 	uploadStep := extractWorkflowStepByName(t, steps, "Upload activation artifact")
 	assert.Contains(t, uploadStep, "/tmp/gh-aw/dispatch-work-coordinator.snapshot.json")
-	assert.Contains(t, job.Permissions, "contents: write")
+	assert.Contains(t, job.Permissions, "contents: read")
 }
 
 func TestActivationInfoArtifactUpload(t *testing.T) {
