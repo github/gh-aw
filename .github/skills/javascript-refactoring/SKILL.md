@@ -230,6 +230,16 @@ global.core = mockCore;
 
 **Solution:** Move it to the action-specific source tree instead of creating a broad workflow-level registry entry.
 
+## Test-Coverage Auditing
+
+Do not audit coverage in `actions/setup/js/` by matching `foo.cjs` to `foo.test.cjs` by basename. That approach overstates untested files because tests here load sources in three other ways:
+
+- **One test file per behavior, not per source**: `create_discussion_labels.test.cjs` and `create_discussion_sanitization.test.cjs` both cover `create_discussion.cjs`.
+- **Cache-busting dynamic import**: `parse_copilot_log.test.cjs` uses `await import("./parse_copilot_log.cjs?" + Date.now())` to get fresh module state per test.
+- **`readFileSync` + `eval`**: `collect_ndjson_output.test.cjs` reads the script source with `fs.readFileSync(scriptPath, "utf8")` and runs it with `eval(...)`.
+
+Resolve `require`, `import`, and `readFileSync` targets from each test file (and their transitive `require`s) before reporting a source file as untested.
+
 ## References
 
 - `actions/README.md` - current action-generation/build workflow
