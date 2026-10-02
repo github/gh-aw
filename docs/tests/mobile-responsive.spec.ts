@@ -31,7 +31,7 @@ test.describe('Mobile and Responsive Layout', () => {
 
     const firstTableCell = page.locator('.sl-markdown-content table tbody td').first();
     await expect(firstTableCell).toBeVisible();
-    await expect(firstTableCell).toHaveAttribute('data-label', 'Engine');
+    await expect(firstTableCell).toHaveAttribute('data-label', 'AI engine');
 
     await context.close();
   });
@@ -90,15 +90,17 @@ test.describe('Mobile and Responsive Layout', () => {
     await page.goto('/gh-aw/reference/engines/');
     await page.waitForLoadState('networkidle');
 
-    // On mobile (<=640px), table cells are rendered as stacked cards.
-    // Each cell must meet the WCAG 2.5.5 AAA minimum touch target of 44 px (2.75 rem).
-    const tdMinHeight = await page.evaluate(() => {
-      const td = document.querySelector('.sl-markdown-content table tbody td');
-      if (!td) return 0;
-      return parseFloat(getComputedStyle(td).minHeight);
+    // On mobile (<=640px), table cells are rendered as stacked cards (label above value).
+    // Each cell's rendered height must meet the WCAG 2.5.5 AAA minimum touch target of 44 px.
+    // Measure the rendered height rather than min-height: the stacked layout reaches it through
+    // its label, line height and padding, so no explicit min-height is needed.
+    const shortestCell = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll('.sl-markdown-content table tbody td'));
+      if (cells.length === 0) return 0;
+      return Math.min(...cells.map((td) => td.getBoundingClientRect().height));
     });
 
-    expect(tdMinHeight).toBeGreaterThanOrEqual(44);
+    expect(shortestCell).toBeGreaterThanOrEqual(44);
 
     await context.close();
   });
@@ -412,7 +414,7 @@ test.describe('Mobile and Responsive Layout', () => {
   });
 
   // Regression test for the 2026-08-08 multi-device docs test report.
-  // The home page quick-start CTA must stay tappable on mobile breakpoints,
+  // The home page primary CTA must stay tappable on mobile breakpoints,
   // including after the navigation menu has been opened and dismissed, so that
   // no leftover overlay intercepts touch or keyboard activation.
   const mobileCtaViewports = [
@@ -422,7 +424,7 @@ test.describe('Mobile and Responsive Layout', () => {
   ];
 
   for (const viewport of mobileCtaViewports) {
-    test(`home page quick-start CTA stays tappable after opening and dismissing the menu at ${viewport.name}`, async ({
+    test(`home page primary CTA stays tappable after opening and dismissing the menu at ${viewport.name}`, async ({
       browser,
     }) => {
       const context = await browser.newContext({
@@ -434,9 +436,9 @@ test.describe('Mobile and Responsive Layout', () => {
       await page.goto('/gh-aw/');
       await page.waitForLoadState('networkidle');
 
-      const cta = page.locator('.hero a.sl-link-button.primary').first();
+      const cta = page.locator('.aw-hero .aw-cta-row a.aw-btn').first();
       await expect(cta).toBeVisible();
-      await expect(cta).toHaveAttribute('href', '/gh-aw/setup/quick-start/');
+      await expect(cta).toHaveAttribute('href', '/gh-aw/setup/creating-workflows/');
 
       // The CTA must be the topmost element at its centre point, i.e. nothing
       // (hero canvas, overlay, sticky header) intercepts the tap.
@@ -448,7 +450,7 @@ test.describe('Mobile and Responsive Layout', () => {
         const isTopmost = await page.evaluate(
           ([x, y]) => {
             const el = document.elementFromPoint(x, y);
-            const ctaEl = document.querySelector('.hero a.sl-link-button.primary');
+            const ctaEl = document.querySelector('.aw-hero .aw-cta-row a.aw-btn');
             if (!el || !ctaEl) return false;
             return el === ctaEl || ctaEl.contains(el);
           },
@@ -475,7 +477,7 @@ test.describe('Mobile and Responsive Layout', () => {
       await expectCtaHittable();
       await cta.click();
       await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/gh-aw\/setup\/quick-start\//);
+      await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
 
       await context.close();
     });
