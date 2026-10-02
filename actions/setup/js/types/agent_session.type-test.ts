@@ -35,6 +35,11 @@ createSessionEvent({}, "tool.execution_complete", { success: "yes" });
 // @ts-expect-error Legacy record types are not canonical event signatures.
 createSessionEvent({}, "result", {});
 createSessionEvent({}, "vendor.progress", { nativeValue: false });
+createSessionEvent({}, "session.format", { version: 1 });
+// @ts-expect-error File format version is numeric, not a document version string.
+createSessionEvent({}, "session.format", { version: "1.1.0" });
+// @ts-expect-error The file format header requires a version.
+createSessionEvent({}, "session.format", {});
 
 const mergedEvent: UnifiedSessionEvent = {
   type: "mcp.rpc.response",

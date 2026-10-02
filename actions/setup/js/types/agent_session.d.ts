@@ -111,9 +111,20 @@ export interface SessionResultEvent extends EventMetadata {
   data: SessionResultData;
 }
 
+export interface SessionFileFormatData {
+  version: number;
+  [key: string]: unknown;
+}
+
+export interface SessionFileFormatEvent extends EventMetadata {
+  type: "session.format";
+  data: SessionFileFormatData;
+}
+
 export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
 
 export interface SessionEventDataMap {
+  "session.format": SessionFileFormatData;
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;

@@ -1338,7 +1338,7 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 		t.Fatalf("Failed to read collect_usage_artifact_files.sh: %v", err)
 	}
 	script := string(scriptBytes)
-	assert.Contains(t, allSteps, "/tmp/gh-aw/usage/session.jsonl")
+	assert.Contains(t, allSteps, "/tmp/gh-aw/usage/aw_session.jsonl")
 	assert.Contains(t, script, `node "${RUNNER_TEMP}/gh-aw/actions/unified_session.cjs"`)
 	assert.Less(t, strings.Index(script, "generate_usage_activity_summary.cjs"), strings.Index(script, "unified_session.cjs"), "include generated detection verdicts in the session")
 	assert.Less(t, strings.Index(allSteps, "Process no-op messages"), strings.Index(allSteps, "Collect usage artifact files"), "collect after conclusion handlers")

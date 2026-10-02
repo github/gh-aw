@@ -253,7 +253,7 @@ func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction 
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", usageArtifactName),
 		"          path: |\n",
-		"            /tmp/gh-aw/usage/session.jsonl\n",
+		"            /tmp/gh-aw/usage/aw_session.jsonl\n",
 		"            /tmp/gh-aw/usage/aw_info.json\n",
 		"            /tmp/gh-aw/usage/aw-info.jsonl\n",
 		"            /tmp/gh-aw/usage/agent_usage.json\n",

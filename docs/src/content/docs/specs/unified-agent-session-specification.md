@@ -24,7 +24,7 @@ editors:
 
 ## Abstract
 
-This specification defines the unified session trace used by GitHub Agentic Workflows: an ordered array of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving normalization contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job merger that enriches the trace with MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval observations. The serialized `usage/session.jsonl` contains timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Existing renderers and accounting artifacts remain compatibility projections, not replacements for the trace.
+This specification defines the unified session trace used by GitHub Agentic Workflows: an ordered array of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving normalization contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job merger that enriches the trace with MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval observations. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Existing renderers and accounting artifacts remain compatibility projections, not replacements for the trace.
 
 ## Status of This Document
 
@@ -32,7 +32,9 @@ This is a **GitHub Agentic Workflows project specification**, written using W3C-
 
 Version 1.1.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
-The specification version belongs to this document. It does not prescribe a version property in trace records.
+The specification version belongs to this document. The unified file's leading
+`session.format` record carries an independent numeric serialization-format
+version; native trace records do not receive per-event specification versions.
 
 ## Table of Contents
 
@@ -83,7 +85,7 @@ The agent artifact already contains native session evidence: Copilot session
 `logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
 without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
 and eval evidence, the conclusion job merges these observations into
-`usage/session.jsonl`. Graders arrive in the agent artifact. Collection and upload
+`usage/aw_session.jsonl`. Graders arrive in the agent artifact. Collection and upload
 run after conclusion handlers, before setup cleanup. The existing usage JSON,
 JSONL accounting, activity summary, and result files remain available.
 
@@ -191,7 +193,7 @@ Numeric range checks remain runtime responsibilities.
 ### 3.5 Conclusion session artifact
 
 **T-UAS-054 — Single-file serialization.** The conclusion job MUST publish the
-unified trace as `session.jsonl` in the existing `usage` artifact. Each nonblank
+unified trace as `aw_session.jsonl` in the existing `usage` artifact. Each nonblank
 line MUST be one canonical event, without a session wrapper, display truncation,
 or a bare legacy accounting result. Serialization MUST use compact JSONL:
 exactly one unindented JSON object per physical line, no pretty-print whitespace
@@ -218,8 +220,28 @@ types describe this additive envelope. Components include `agent`, `mcp`,
 traffic, activation snapshots, evals, safe-output execution, and conclusion
 collection. A component is not an engine name or a success claim.
 
-**T-UAS-056 — Timestamp ordering.** Events with a supported source timestamp
-MUST sort ascending by `provenance.timestampMs`. The merger MUST preserve native
+**T-UAS-064 — File-format version header.** The first record of
+`aw_session.jsonl` MUST be a collector-owned `session.format` entry with
+`data.version` set to the positive integer file-format version, currently `1`.
+The header MUST be present even when no source events are available. Its
+provenance MUST identify component `collector`, phase `conclusion`, the logical
+artifact path `usage/aw_session.jsonl`, and index `0`. It MUST NOT carry an
+invented timestamp. Source-native events named `session.format` MUST remain
+ordinary source observations and MUST NOT replace the file header.
+
+```json
+{"type":"session.format","data":{"version":1},"provenance":{"component":"collector","phase":"conclusion","path":"usage/aw_session.jsonl","index":0}}
+```
+
+The numeric file-format version is independent of this document's semantic
+version and native engine versions. Readers claiming support for this file
+format MUST inspect the first record before consuming the remaining stream and
+MUST report a missing, invalid, or unsupported version instead of silently
+assuming compatibility. Parser-only canonical arrays and `agent-session.jsonl`
+are source traces, not versioned unified files, and do not require this header.
+
+**T-UAS-056 — Timestamp ordering.** After the file-format header, events with a
+supported source timestamp MUST sort ascending by `provenance.timestampMs`. The merger MUST preserve native
 timestamp values and MUST derive its ordering key using the source schema's
 units, not an epoch-magnitude heuristic. ISO timestamps MUST carry a timezone.
 Numeric Squid audit timestamps use Unix seconds; native agent timestamps and
@@ -229,9 +251,10 @@ limited to the JavaScript ordering key; original source precision remains
 preserved.
 
 **T-UAS-057 — Untimed and tied observations.** Missing or invalid timestamps
-MUST NOT cause observations to be discarded. Untimed observations MUST follow
-all timed events. Equal-time events and untimed events MUST preserve the
-deterministic source enumeration and source-local array order. The merger MUST
+MUST NOT cause observations to be discarded. Except for the pinned file-format
+header, untimed observations MUST follow all timed events. Equal-time events and
+untimed events MUST preserve the deterministic source enumeration and source-local
+array order. The merger MUST
 NOT substitute file modification time, collection time, a neighboring event's
 time, or an inferred tool duration for absent evidence. Wall-clock ordering
 does not establish causality or correct cross-process clock skew.
@@ -379,6 +402,7 @@ Unknown runtime kinds MUST remain `<component>.event` observations.
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
+| `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
@@ -394,6 +418,8 @@ phases, event counts, warning count, untimed source-event count, and absent
 required-vocabulary components. Source absence and a present empty source MUST
 remain distinguishable. Warnings MUST identify the source and cause without
 printing malformed payloads or unredacted source text.
+Source-event counts and the untimed source-event count exclude the generated
+file-format header and collection diagnostics.
 
 ## 5. Parsing and Normalization (Normative)
 
@@ -705,7 +731,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-046, T-UAS-047, T-UAS-048 | Canonical snapshots, alias usage, zero/missing metrics, existing telemetry, no trailing newline, failed append | Correct single projection; no double counting/defaults; safe line boundary; best-effort failure; activity not success. |
 | T-UAS-049, T-UAS-050 | Hostile HTML/fences, mask values, oversized display, partial parse boundary | Safe/redacted publication, explicit truncation, canonical source remains unchanged. |
 | T-UAS-051, T-UAS-052, T-UAS-053 | Conformance report and isolated test harness | Applicable IDs covered; structural/round-trip/purity assertions; no real production I/O. |
-| T-UAS-054–T-UAS-063 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete single JSONL artifact, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
+| T-UAS-054–T-UAS-064 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; leading numeric format version; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete compact `aw_session.jsonl`, pinned format header, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -768,7 +794,8 @@ coverage are checked independently of rendered markdown.
 fixtures and synthetic supplemental inputs. Integration cases combine all
 requested components in one persisted file, compare full nested payloads and
 source-native IDs, test timestamp units and Pi message timestamps, retain unknown
-extensions, and verify byte-identical repeated collection. Missing sources,
+extensions, verify the first record's numeric file-format version (including
+empty runs and native namespace collisions), and verify byte-identical repeated collection. Missing sources,
 malformed adjacent records, empty authoritative files, read/write failure,
 symlinks, and decoded-secret/add-mask redaction have separate cases.
 `agent_session_telemetry.test.cjs` verifies canonical bootstrap persistence.
@@ -1082,10 +1109,11 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 
 ### Version 1.1.0 — Draft (2026-10-02)
 
-- Added the artifact-merger conformance class and requirements T-UAS-054 through T-UAS-063.
+- Added the artifact-merger conformance class and requirements T-UAS-054 through T-UAS-064.
 - Defined complete MCPG/AWF and downstream observation payloads, source provenance, timestamp units, deterministic ties, and untimed retention.
 - Specified canonical bootstrap persistence, conclusion-job usage publication, coverage diagnostics, replica precedence, and artifact redaction.
 - Required compact single-record-per-line JSONL while preserving escaped payload whitespace and native metadata.
+- Named the unified artifact file `aw_session.jsonl` and required a leading numeric `session.format` version entry, independent of document and engine versions.
 - Recorded the conclusion pipeline review, empirical multi-engine merger execution, and remaining boundaries.
 
 ### Version 1.0.0 — Draft (2026-10-02)

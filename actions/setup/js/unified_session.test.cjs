@@ -54,8 +54,14 @@ describe("Unified conclusion session", () => {
     write("usage/agent/execution.json", { outcome: "failure", duration_ms: 0 });
     write("usage/detection/detection_result.json", { conclusion: "failure", secret_leak: false });
     const events = writeUnifiedSession({ rootDir: root });
-    const persisted = fs.readFileSync(path.join(root, "usage/session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
     expect(persisted).toEqual(events);
+    expect(persisted[0]).toEqual({
+      type: "session.format",
+      data: { version: 1 },
+      provenance: { component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", index: 0 },
+    });
+    expect(persisted.filter(event => event.type === "session.format")).toHaveLength(1);
     expect(new Set(events.map(event => event.provenance.component))).toEqual(new Set(["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval", "execution", "detection", "collector"]));
     expect(events.find(event => event.type === "assistant.message")).toMatchObject(message);
     expect(events.find(event => event.type === "mcp.rpc.response").data).toEqual(rpc);
@@ -64,13 +70,13 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.data.rid === "request").provenance.timestampMs).toBe(1790899203600);
     expect(events.filter(event => event.provenance.phase === "detection")).toHaveLength(2);
     expect(events.find(event => event.type === "grader.result").data.results[0]).toEqual({ id: "quality", score: 0, passed: false });
-    const times = events.map(event => event.provenance.timestampMs ?? Infinity);
+    const times = events.slice(1).map(event => event.provenance.timestampMs ?? Infinity);
     expect(times).toEqual([...times].sort((a, b) => (a === b ? 0 : a < b ? -1 : 1)));
     expect(events.at(-1).type).toBe("session.collection");
     expect(events.at(-1).data).toMatchObject({ warnings: 0, absentComponents: [] });
-    const original = fs.readFileSync(path.join(root, "usage/session.jsonl"), "utf8");
+    const original = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     writeUnifiedSession({ rootDir: root });
-    expect(fs.readFileSync(path.join(root, "usage/session.jsonl"), "utf8")).toBe(original);
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(original);
   });
 
   it("retains native provenance, equal-time source order, and invalid/absent timestamps without mutation", () => {
@@ -106,7 +112,7 @@ describe("Unified conclusion session", () => {
     write("aw_info.json", { engine_id: "custom" });
     write("agent-stdio.log", prettyPrinted);
     writeUnifiedSession({ rootDir: root });
-    const content = fs.readFileSync(path.join(root, "usage/session.jsonl"), "utf8");
+    const content = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     expect(content.endsWith("\n")).toBe(true);
     expect(content).not.toContain("\n\n");
     const lines = content.trimEnd().split("\n");
@@ -153,13 +159,26 @@ describe("Unified conclusion session", () => {
 
   it("reports absent components for an empty run without a fake agent result", () => {
     const { events } = collectUnifiedSession({ rootDir: root });
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"], warnings: 0, untimedEvents: 0 } });
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
+    expect(events[0].provenance).not.toHaveProperty("timestampMs");
+    expect(events[1]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"], warnings: 0, untimedEvents: 0 } });
+  });
+
+  it("pins only the collector file-format header, preserving a native session.format extension", () => {
+    write("agent-session.jsonl", [
+      { type: "session.format", timestamp: "2026-10-02T00:00:02Z", data: { version: "native-engine-format" } },
+      { type: "assistant.message", timestamp: "2026-10-02T00:00:01Z", data: { content: "first timed event" } },
+    ]);
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.map(event => event.type)).toEqual(["session.format", "assistant.message", "session.format", "session.collection"]);
+    expect(events[0].data.version).toBe(1);
+    expect(events[2]).toMatchObject({ data: { version: "native-engine-format" }, provenance: { component: "agent", index: 0 } });
   });
 
   it("fails explicitly on read errors and removes a stale output rather than uploading it", () => {
     const source = write("agent-session.jsonl", [{ type: "assistant.message", data: { content: "current" } }]);
-    const output = write("usage/session.jsonl", "old session");
+    const output = write("usage/aw_session.jsonl", "old session");
     const originalRead = fs.readFileSync;
     vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) => {
       if (file === source) throw new Error("fixture read denied");
@@ -195,11 +214,11 @@ describe("Unified conclusion session", () => {
     write("agent-session.jsonl", [{ type: "assistant.message", data: { content: "opaque-mask" } }]);
     write("agent-stdio.log", "::add-mask::opaque-mask\n");
     writeUnifiedSession({ rootDir: root });
-    expect(fs.readFileSync(path.join(root, "usage/session.jsonl"), "utf8")).not.toContain("opaque-mask");
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).not.toContain("opaque-mask");
   });
 
   it("writes atomically and cleans up failed outputs without following a temporary symlink", () => {
-    const output = write("usage/session.jsonl", "old");
+    const output = write("usage/aw_session.jsonl", "old");
     const target = write("outside.jsonl", "unchanged");
     fs.symlinkSync(target, `${output}.tmp`);
     expect(() => writeSessionArtifact(output, [{ type: "vendor.event", data: {} }])).toThrow();

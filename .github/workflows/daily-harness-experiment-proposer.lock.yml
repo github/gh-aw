@@ -1520,7 +1520,7 @@ jobs:
         with:
           name: usage
           path: |
-            /tmp/gh-aw/usage/session.jsonl
+            /tmp/gh-aw/usage/aw_session.jsonl
             /tmp/gh-aw/usage/aw_info.json
             /tmp/gh-aw/usage/aw-info.jsonl
             /tmp/gh-aw/usage/agent_usage.json
@@ -1553,7 +1553,7 @@ jobs:
         with:
           name: usage
           path: |
-            /tmp/gh-aw/usage/session.jsonl
+            /tmp/gh-aw/usage/aw_session.jsonl
             /tmp/gh-aw/usage/aw_info.json
             /tmp/gh-aw/usage/aw-info.jsonl
             /tmp/gh-aw/usage/agent_usage.json
