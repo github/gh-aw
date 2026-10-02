@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ClaimTransaction.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "Claim"
+    },
+    "work_id": {
+      "type": "string"
+    },
+    "claim_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    }
+  },
+  "required": ["kind", "work_id", "claim_id", "run_id"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

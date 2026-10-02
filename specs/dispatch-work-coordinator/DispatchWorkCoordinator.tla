@@ -391,6 +391,16 @@ Safety ==
     /\ EffectSoundness /\ WorkerOrigin /\ FinishRequired
     /\ LifecycleAccounting /\ SingleAuthorization /\ SingleEffect
 
+\* Reachability witnesses: deliberately false for safe executions, not safety requirements.
+NoCompetingClaims ==
+    \A w \in Works : Cardinality({c \in Claims : Claim(c) \in Facts(log)
+                                               /\ WorkOf(c) = w}) < 2
+NoRecoveredOrphan ==
+    ~(recovery.phase = "done" /\ \E c \in recovery.observedRuns :
+          ClaimCancellation(c) \in Facts(recovery.candidate) \ Facts(recovery.source)
+          /\ ClaimCancellation(c) \in Facts(log))
+NoExternalEffect == effects = <<>>
+
 Bound == head <= MaxHead /\ Len(log) <= MaxLog
 
 \* Negative controls are deliberately excluded from Next.

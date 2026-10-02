@@ -9,6 +9,49 @@ This TLA+ model formalizes the proposal in [issue #64852](https://github.com/git
 
 The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/64955-git-backed-dispatch-work-coordination.md).
 
+## Queue inspection and operator commands
+
+`gh aw work` operates on a dedicated branch without using the current checkout. Supply
+`--repo owner/repo`; use `--branch` to select a different
+coordinator branch. The experimental command uses authenticated GitHub Git APIs to
+read and validate `dispatch-work-coordinator.jsonl`, create trees and commits, and
+publish changes with non-force reference updates. It needs neither a checkout nor
+a Git executable, and accepts GitHub repositories rather than local Git remotes.
+Rejected concurrent updates are retried against a fresh branch snapshot and replay.
+In an initialized repository, an absent coordinator branch is initialized with a
+parentless commit; other files in an existing coordinator branch are preserved.
+GitHub Git APIs cannot create the first reference in an entirely empty repository.
+Authentication uses the GitHub
+CLI configuration or `GH_TOKEN`/`GITHUB_TOKEN`, with repository contents write
+permission required for mutations.
+All subcommands support `--json` for machine-readable output.
+
+| Command | Arguments |
+|---|---|
+| `replay` | Display the projected Work and Claims |
+| `stats` | Count Work, Claims, and distinct transactions |
+| `compact` | Canonically order facts and remove only identical duplicates |
+| `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
+| `claim` | `--work-id ID --run-id RUN` |
+| `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
+| `cancel-work` | `--work-id ID` |
+| `cancel-claim` | `--claim-id ID` |
+
+These are **operator** commands; `finish` writes a Completion fact, but is not a
+worker safe-output authorization mechanism and does not execute external effects.
+The caller must independently establish the provenance of `--run-id` and
+`--attempt-id`. Worker authorization and MCP/safe-output integration remain
+separate implementation obligations described in the ADR.
+
+The transaction wire format is defined in [`transactions.tsp`](transactions.tsp).
+The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate
+each record before replay or publication. To regenerate them with TypeSpec 1.16.0,
+install `@typespec/compiler` and `@typespec/json-schema` in a temporary directory,
+compile `transactions.tsp` from that directory with emitter options
+`file-type=json` and `seal-object-schemas=true`, and copy the emitted JSON files
+into `pkg/workqueue/schema/`. The TLA+ model abstracts identities as integers;
+the CLI uses stable string identities and canonical JSON Work payloads.
+
 **Verification status:** the module includes parameterized safety theorem statements and the inductive proof argument below. TLC exhaustively checks the supplied finite configurations. The theorem statements are not mechanically checked by TLAPS; bounded model checking is not an unbounded proof.
 
 ## Concrete protocol choices
@@ -153,6 +196,26 @@ The runner checks both positive configurations and the one-shot worker property 
 Verification on 2026-10-02 completed both positive searches, checking `Safety` and `WorkerOneShot`: 3,626,825 distinct states at graph depth 33 for concurrency, and 218,926 distinct states at depth 23 for recovery. The two remaining negative controls produced the expected violations at depths 7 and 10. These results replace the earlier model's counts.
 
 `Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
+
+## Inspect execution traces
+
+Generate bounded textual traces of the guarded `Spec` and three reachable counterexamples to deliberately false *witness* invariants:
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar \
+TLC_TRACE_DEPTH=16 TLC_TRACE_COUNT=3 \
+bash specs/dispatch-work-coordinator/traces.sh
+```
+
+The script prints a temporary results directory (or uses `TLC_RESULTS_DIR` when set). `simulation_*` files are TLC's textual TLA+ state traces, with at most `TLC_TRACE_DEPTH` states each; `TLC_TRACE_COUNT` sets the number of seeded random simulations. These samples illustrate possible schedules, not exhaustive coverage or guaranteed occurrences of a particular action. The `*Witness.log` files contain model-checked textual counterexample states and action names. Each witness configuration also checks `Safety`; the script accepts only the named witness violation, not a safety violation or a TLC failure.
+
+| Witness | What to inspect in its counterexample |
+|---|---|
+| `NoCompetingClaims` | Two Claims for one nonterminal Work are persisted; replay still selects one effective winner. |
+| `NoRecoveredOrphan` | A run terminates, then recovery prepares and publishes its ClaimCancellation. |
+| `NoExternalEffect` | A worker finalizes, commits Completion, verifies it, and enters its output batch. |
+
+These invariants are intentionally **not** protocol requirements: their violation demonstrates reachability of legitimate behavior under the existing guarded `Spec`. Unlike `BrokenCAS.cfg` and `BrokenTerminal.cfg`, the witness configurations do not add unsafe actions. Inspect the preceding states, not just the final state, to verify the ordering claimed by the ADR. Witnesses show that the model permits these paths; they do not establish that a runtime implementation follows them or that progress is guaranteed.
 
 ## Limits
 

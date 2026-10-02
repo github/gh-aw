@@ -49,6 +49,7 @@ const normalizeAuthorsArray = (value: unknown) => {
 };
 
 const pageUrl = new URL(pathname, siteOrigin).toString();
+const socialUrl = isDocsHomePage ? 'https://gh.io/gh-aw' : pageUrl;
 const blogPublishedDate = toSchemaDate(entry?.data?.date);
 const blogModifiedDate = toSchemaDate(entry?.data?.lastUpdated ?? entry?.data?.date);
 const authorInput = entry?.data?.authors ?? entry?.data?.author;
@@ -217,8 +218,8 @@ if (isBlogPost) {
 
 // Properties we override with enhanced values
 const overriddenProps = new Set([
-  'og:title', 'og:description', 'og:image',
-  'twitter:title', 'twitter:description', 'twitter:image',
+  'og:title', 'og:description', 'og:image', 'og:url',
+  'twitter:title', 'twitter:description', 'twitter:image', 'twitter:url',
 ]);
 
 // Filter Starlight's head tags to remove OG/Twitter tags we'll override
@@ -243,12 +244,14 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 <meta property="og:title" content={ogTitle} />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={socialImage} />
+<meta property="og:url" content={socialUrl} />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:type" content="image/png" />
 <meta name="twitter:title" content={ogTitle} />
 <meta name="twitter:description" content={pageDescription} />
 <meta name="twitter:image" content={socialImage} />
+<meta name="twitter:url" content={socialUrl} />
 
 <link
   rel="preload"
