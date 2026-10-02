@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 74 active analyzers:
+// All 75 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -69,6 +69,7 @@
 //   - timenowsub — reports time.Now().Sub(t) calls that should be simplified to time.Since(t)
 //   - tolowerequalfold — flags case-insensitive comparisons via ToLower/ToUpper that should use EqualFold
 //   - trimleftright — flags strings.TrimLeft/TrimRight calls with a multi-character literal cutset where TrimPrefix/TrimSuffix was likely intended
+//   - typeassertionnil — flags single-value type assertions to pointer types and recommends the two-value form
 //   - typeassertionokdiscarded — flags two-value type assertions whose ok result is discarded
 //   - uncheckedsliceindex — reports slice and string indexes without proven bounds
 //   - uncheckedtypeassertion — flags unchecked single-value type assertions
