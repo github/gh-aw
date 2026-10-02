@@ -22,6 +22,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/execcommandwithoutcontext"
 	"github.com/github/gh-aw/pkg/linters/fileclosenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/fmterrorfnoverbs"
+	"github.com/github/gh-aw/pkg/linters/fprintferrorunchecked"
 	"github.com/github/gh-aw/pkg/linters/fprintlnsprintf"
 	"github.com/github/gh-aw/pkg/linters/generatedyamlheredoc"
 	"github.com/github/gh-aw/pkg/linters/globwalkignorederror"
@@ -110,6 +111,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	excessivefuncparams.Analyzer,
 	fileclosenotdeferred.Analyzer,
 	fmterrorfnoverbs.Analyzer,
+	fprintferrorunchecked.Analyzer,
 	generatedyamlheredoc.Analyzer,
 	globwalkignorederror.Analyzer,
 	goroutinemissingrecover.Analyzer,
