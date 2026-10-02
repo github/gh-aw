@@ -8,6 +8,23 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
+func hasExplicitAppTokenPermission(with map[string]any) bool {
+	for key, value := range with {
+		if !strings.HasPrefix(strings.ToLower(key), "permission-") {
+			continue
+		}
+		level, ok := value.(string)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(level)) {
+		case "read", "write", "none":
+			return true
+		}
+	}
+	return false
+}
+
 // validateAppTokenPermissions checks the compiled jobs, including imported and
 // compiler-generated steps, before an installation token can inherit every scope.
 func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict bool) error {
@@ -33,25 +50,14 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 			if !ok {
 				continue
 			}
-			if !strings.HasPrefix(uses, "actions/create-github-app-token@") {
+			if !strings.HasPrefix(strings.ToLower(uses), "actions/create-github-app-token@") {
 				continue
 			}
 			with, ok := step["with"].(map[string]any)
 			if !ok {
 				with = nil
 			}
-			scoped := false
-			for key, value := range with {
-				if !strings.HasPrefix(key, "permission-") {
-					continue
-				}
-				level, ok := value.(string)
-				if ok && (level == "read" || level == "write") {
-					scoped = true
-					break
-				}
-			}
-			if scoped {
+			if hasExplicitAppTokenPermission(with) {
 				continue
 			}
 			name, ok := step["name"].(string)

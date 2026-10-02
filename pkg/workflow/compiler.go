@@ -192,7 +192,7 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 	// used when schema validation is disabled (skipValidation=true), where targeted
 	// fast-path checks avoid an unnecessary yaml.Unmarshal.
 	needsSchemaCheck := !c.skipValidation
-	needsAppTokenCheck := strings.Contains(yamlContent, "actions/create-github-app-token@")
+	needsAppTokenCheck := strings.Contains(strings.ToLower(yamlContent), "actions/create-github-app-token@")
 	needsWorkflowParse := needsSchemaCheck || requireSelfHostedRunners || needsAppTokenCheck
 
 	var parsedWorkflow map[string]any
