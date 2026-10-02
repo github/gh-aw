@@ -29,18 +29,10 @@ Maintenance may run more often than a ledger's schedule. Each run checks whether
 the ledger is due and does nothing if it is not. A `manual` ledger is compacted
 only when compaction is requested.
 
-An optional `compaction.script` chooses which segments to merge. The script
-receives frozen `segments` (`id`, `bytes`, `records`) and `options`, and returns
-`{ sources: [segmentId, ...] }`:
-
-```yaml
-tools:
-  ledger:
-    findings:
-      compaction:
-        script: |
-          return { sources: segments.slice(0, options.maxSegments).map(segment => segment.id) }
-```
+Segment selection uses the built-in deterministic policy: eligible segments
+are considered in segment-ID order, up to `max-segments`, while keeping their
+combined records within `max-segment-kb`. Custom `compaction.script` settings
+are not supported.
 
 ## Trust boundary
 
@@ -48,7 +40,7 @@ All compaction-enabled ledgers share two maintenance jobs:
 
 | Job | Permissions | Responsibility |
 | --- | --- | --- |
-| `ledger_compaction_plan` | `contents: read` | Checks each selected ledger branch, runs any optional selection script in an isolated Node.js process with no environment or credentials, and uploads the created plans in one artifact |
+| `ledger_compaction_plan` | `contents: read` | Checks each selected ledger branch, selects segments with the built-in policy, and uploads the created plans in one artifact |
 | `ledger_compaction_apply` | `contents: write` | Downloads the plans, validates each one against the latest ledger branch, and applies each in one commit |
 
 Each ledger runs in its own step. Plan steps have a 15-minute timeout, and a failed

@@ -70,7 +70,7 @@ implementation MUST NOT move a responsibility to a less trusted job.
 | Agent job (post-agent steps) | Trusted | Merges the ledger transaction log into the safe-output file after revalidating, redacting, deduplicating, and bounding entries | Runner-side only; no memory-branch write token |
 | Safe-outputs job | Trusted | Ingests and validates `ledger_mutation` entries and reports them through the log-only handler | Safe-output tokens; no ledger storage access |
 | Persistence job | Trusted | Restores memory, reconstructs the DAG, normalizes files, selects the trusted copy set, commits and pushes. It MUST NOT compact. | Memory-branch `contents: write` token |
-| Maintenance plan job | Untrusted | Per ledger: reads the ledger branch, runs the optional compaction selection script, and emits a compaction plan artifact | `contents: read` only |
+| Maintenance plan job | Untrusted | Per ledger: reads the ledger branch, uses built-in segment selection, and emits a compaction plan artifact | `contents: read` only |
 | Maintenance apply job | Trusted | Per ledger: validates the hostile plan against the latest ledger state and atomically applies it | `contents: write`; never runs user JavaScript |
 
 The agent job MUST NOT perform compaction, retirement, or persistence. The
@@ -82,9 +82,8 @@ untrusted input.
 
 ## 4. Script extension points
 
-Two user-supplied scripts may exist near the ledger. Both are workflow-author
-code, not agent output. The validation script runs in the persistence job; the
-compaction selection script runs only in the untrusted maintenance plan job.
+The memory validation script is workflow-author code, not agent output, and runs
+in the persistence job. Custom ledger replay and compaction scripts are not supported.
 
 ### 4.1 Memory validation script
 
@@ -93,16 +92,14 @@ MUST run in a separate Node process with a bounded timeout and a sanitized
 environment, and a non-zero exit MUST fail persistence (fail-closed), because it
 is a policy gate on what is about to be pushed.
 
-### 4.2 Compaction selection script
+### 4.2 Built-in compaction selection
 
 Compaction is owned by Agentic Maintenance (section 5.3), never by the agent or
-persistence job. An optional `tools.ledger.<name>.compaction.script` MAY choose
-which segments to compact. It MUST run only in the maintenance plan job, in a
-separate Node process with an empty environment and restrictive Node.js
-permissions, and MUST NOT receive repository write credentials. It exchanges only
-serialized data and returns `{ sources: string[] }`. Its output is a proposal: the
-planner validates it and the trusted apply job independently revalidates the
-resulting plan without executing the script again.
+persistence job. The maintenance plan job MUST use the built-in deterministic
+segment-selection policy and MUST reject `tools.ledger.<name>.compaction.script`.
+Its output is a proposal: the trusted apply job independently revalidates the
+resulting plan. Ledger replay MUST use only the built-in `log`, `set`, `map`,
+`table`, and `counter` types; custom replay configuration MUST be rejected.
 
 ## 5. Lifecycle
 
@@ -255,7 +252,7 @@ memory-branch write credential.
 | Record or segment identity forgery | Record SHA, canonical serialization, and duplicate identity MUST be revalidated on read; mismatches MUST be diagnostics, never silent acceptance |
 | Unbounded growth or denial of service | Record, segment, patch, and shard-count limits MUST be enforced before acknowledging a mutation, and file scanning MUST stop at the configured shard bound |
 | Path traversal, symlinks, or non-regular files | Ledger paths MUST be derived from validated UUIDs, opened without following symlinks, and rejected when not regular files |
-| Escaping a trusted job through scripted compaction policy | Selection scripts MUST run only in the read-only maintenance plan job; the apply job MUST NOT execute them and MUST revalidate every plan (sections 4.2 and 5.3) |
+| Executing custom ledger replay or compaction code | Custom scripts MUST be rejected; replay and segment selection MUST use built-in implementations (section 4.2) |
 | Malicious, stale, or replayed compaction plans | The apply job MUST strictly validate the plan, revalidate it against the latest ledger state, commit with an expected-head guard, and treat a reapplied plan as an idempotent no-op |
 | Forged `ledger_mutation` audit entries | The audit handler MUST be log-only, and authoritative state MUST be derived from validated shard content, never from the transaction log |
 | Agent-authored lines mixing into trusted output records | The ledger transaction log MUST be a dedicated file, and merged entries MUST be revalidated, redacted, deduplicated, and bounded before ingestion |

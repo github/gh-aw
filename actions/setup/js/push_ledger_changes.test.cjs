@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { finalId, normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { execGitSync } from "./git_helpers.cjs";
-import { main, persistLedgerAppends, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
+import { main, persistLedgerAppends, readLedgerConfig, readTransactions, validateTransactions } from "./push_ledger_changes.cjs";
 
 const ledgerConfigs = [
   {
@@ -40,6 +40,13 @@ function transaction(record = { subject: "A finding" }) {
     },
   };
 }
+
+test("trusted ledger configuration rejects removed custom replay", () => {
+  for (const replay of [null, {}, { script: "return { tables: {} }" }]) {
+    const encoded = Buffer.from(JSON.stringify([{ ...ledgerConfigs[0], replay }])).toString("base64");
+    assert.throws(() => readLedgerConfig(encoded), /Custom ledger replay is no longer supported/);
+  }
+});
 
 test("reads and validates only versioned transaction artifacts", () => {
   assert.deepEqual(readTransactions(undefined), { version: 1, ledgers: {} });

@@ -54,6 +54,7 @@ function readLedgerConfig(value = process.env.GH_AW_LEDGER_CONFIG_BASE64) {
   if (!Array.isArray(ledgers)) throw new TypeError("Invalid trusted ledger configuration");
   const names = new Set();
   for (const ledger of ledgers) {
+    if (ledger && Object.hasOwn(ledger, "replay")) throw new TypeError("Custom ledger replay is no longer supported; use a built-in ledger type");
     if (
       !ledger ||
       typeof ledger.name !== "string" ||

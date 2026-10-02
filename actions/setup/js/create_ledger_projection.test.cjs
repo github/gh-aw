@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { Ledger } from "./ledger_store.cjs";
 import { applyTransitionToDirectory, createPlan, loadSegments, parseCompactionConfig, prepareApply, selectSources, validatePlan } from "./ledger_compaction.cjs";
@@ -96,71 +95,24 @@ test("replay table guidance includes column types", () => {
   assert.equal(formatReplayTable("items", { columns: { id: "text", count: "integer", data: "json" } }), "- items(id: text, count: integer, data: json)");
 });
 
-test("replay materializes state alongside immutable records and trusted metadata", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-"));
-  const sourceDir = path.join(root, "source");
-  const databasePath = path.join(root, "projection", "ledger.db");
-  const script = `const items = new Map();
-    for (const record of records) {
-      if (record.payload.kind === "created") items.set(record.payload.id, { id: record.payload.id, status: "open" });
-      if (record.payload.kind === "closed") items.get(record.payload.id).status = "closed";
-    }
-    return { version: 1, tables: { items: { columns: { id: "text", status: "text" }, primaryKey: ["id"], rows: [...items.values()] },
-      totals: { columns: { count: "integer" }, primaryKey: ["count"], rows: [{ count: items.size }] } } };`;
-  const ledger = new Ledger({ memoryDir: sourceDir });
-  try {
-    fs.mkdirSync(sourceDir);
-    ledger.append("finding", { kind: "created", id: "123", version: 1 });
-    ledger.append("finding", { kind: "closed", id: "123", version: 2 });
-    createProjection({ sourceDir, databasePath, config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script } } });
-    const db = new DatabaseSync(databasePath, { readOnly: true });
-    try {
-      assert.deepEqual(
-        [...db.prepare("SELECT id, status FROM items").all()].map(row => ({ ...row })),
-        [{ id: "123", status: "closed" }]
-      );
-      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 2);
-      assert.equal(db.prepare("SELECT count FROM totals").get().count, 1);
-      const meta = db.prepare("SELECT * FROM replay_metadata WHERE table_name = 'items'").get();
-      assert.equal(meta.ledger_name, "findings");
-      assert.equal(meta.record_count, 2);
-      assert.match(meta.script_sha256, /^[a-f0-9]{64}$/);
-      assert.equal(meta.script_sha256, createHash("sha256").update(script).digest("hex"));
-      assert.equal(meta.output_version, 1);
-      assert.throws(() => db.exec("UPDATE items SET status = 'open'"));
-    } finally {
-      db.close();
-    }
-  } finally {
-    ledger.close();
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("invalid replay preserves generic records without partial tables", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-fallback-"));
+test("custom replay is rejected instead of silently falling back to generic records", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-rejected-"));
   const sourceDir = path.join(root, "source");
   const databasePath = path.join(root, "projection", "ledger.db");
   const ledger = new Ledger({ memoryDir: sourceDir });
-  const warnings = [];
   try {
     fs.mkdirSync(sourceDir);
     ledger.append("finding", { id: "a" });
-    createProjection({
-      sourceDir,
-      databasePath,
-      config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script: `return { tables: { items: { columns: { id: "text" }, primaryKey: ["id"], rows: [{ id: "a" }, { id: "a" }] } } }` } },
-      onReplayError: message => warnings.push(message),
-    });
-
-    assert.equal(warnings.length, 1);
-    const db = new DatabaseSync(databasePath, { readOnly: true });
-    try {
-      assert.equal(db.prepare("SELECT count(*) AS n FROM records").get().n, 1);
-      assert.equal(db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'items'").get().n, 0);
-    } finally {
-      db.close();
-    }
+    assert.throws(
+      () =>
+        createProjection({
+          sourceDir,
+          databasePath,
+          config: { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script: `return { tables: { items: { columns: { id: "text" }, primaryKey: ["id"], rows: [{ id: "a" }, { id: "a" }] } } }` } },
+        }),
+      /Custom ledger replay is no longer supported/
+    );
+    assert.equal(fs.existsSync(databasePath), false);
   } finally {
     ledger.close();
     fs.rmSync(root, { recursive: true, force: true });
@@ -171,17 +123,15 @@ test("compaction preserves replay's ordered logical history", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-replay-compaction-"));
   const sourceDir = path.join(root, "source");
   fs.mkdirSync(sourceDir);
-  const script = `return { tables: { history: { columns: { position: "integer", id: "text" },
-    primaryKey: ["position"], rows: records.map((record, position) => ({ position, id: record.payload.id })) } } }`;
-  const config = { name: "findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, replay: { script } };
+  const config = { name: "findings", type: "log", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
   const first = new Ledger({ memoryDir: sourceDir });
   const second = new Ledger({ memoryDir: sourceDir });
   const compaction = parseCompactionConfig(
     JSON.stringify({ name: "findings", branch_name: "ledgers/findings", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10, compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } })
   );
   try {
-    first.append("finding", { id: "first" });
-    second.append("finding", { id: "second" });
+    first.append("ledger_append", { operation: "append", value: "first" });
+    second.append("ledger_append", { operation: "append", value: "second" });
     const before = path.join(root, "before.db");
     const after = path.join(root, "after.db");
     createProjection({ sourceDir, databasePath: before, config });
@@ -198,13 +148,13 @@ test("compaction preserves replay's ordered logical history", () => {
     try {
       assert.deepEqual(
         oldDb
-          .prepare("SELECT id FROM history ORDER BY position")
+          .prepare("SELECT value FROM state ORDER BY position")
           .all()
-          .map(row => row.id),
+          .map(row => row.value),
         newDb
-          .prepare("SELECT id FROM history ORDER BY position")
+          .prepare("SELECT value FROM state ORDER BY position")
           .all()
-          .map(row => row.id)
+          .map(row => row.value)
       );
     } finally {
       oldDb.close();

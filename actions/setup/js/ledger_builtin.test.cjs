@@ -97,7 +97,7 @@ test("log preserves duplicates in exact order", () => {
   );
 });
 
-test("built-in logs can materialize more rows than the custom replay limit", () => {
+test("built-in logs can materialize more rows than the default materialization limit", () => {
   const records = Array.from({ length: 10001 }, (_, value) => ({ payload: { operation: "append", value } }));
   const output = replayBuiltin({ type: "log" }, records);
   assert.throws(() => validateReplayOutput(output), /Too many replay rows/);

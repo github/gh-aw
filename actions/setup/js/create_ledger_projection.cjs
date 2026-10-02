@@ -7,7 +7,7 @@ const { Ledger, configuredLedgerLimits } = require("./ledger_store.cjs");
 const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
-const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
+const { materializeReplay } = require("./ledger_replay.cjs");
 const { replayBuiltin } = require("./ledger_builtin.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
@@ -83,8 +83,9 @@ function materializeLedger({ refName, workspaceDir, sourceDir, config }) {
   }
 }
 
-/** @param {{sourceDir: string, databasePath: string, config: any, onReplayError?: (message: string) => void}} options */
-function createProjection({ sourceDir, databasePath, config, onReplayError = () => {} }) {
+/** @param {{sourceDir: string, databasePath: string, config: any}} options */
+function createProjection({ sourceDir, databasePath, config }) {
+  if (Object.hasOwn(config, "replay")) throw new TypeError("Custom ledger replay is no longer supported; use a built-in ledger type");
   const limits = configuredLedgerLimits(config);
   const ledger = new Ledger({
     memoryDir: sourceDir,
@@ -106,16 +107,12 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     }
     const database = ledger.project(state);
     if (!database) throw new Error("Node.js SQLite support is required to create the ledger projection");
+    /** @type {ReturnType<typeof replayBuiltin>["tables"] | null} */
     let tables = null;
-    if (config.replay || config.type) {
-      try {
-        const output = config.type ? replayBuiltin(config, state.records) : executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output, config.type ? state.records.length : 10000);
-        tables = output.tables;
-      } catch (error) {
-        if (config.type) throw error;
-        onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);
-      }
+    if (config.type) {
+      const output = replayBuiltin(config, state.records);
+      materializeReplay(database, config.name, `builtin:${config.type}`, state.records, output, state.records.length);
+      tables = output.tables;
     }
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     fs.rmSync(databasePath, { force: true });
@@ -159,16 +156,14 @@ async function main(options = {}) {
       });
       if (exists) materializeLedger({ refName, workspaceDir, sourceDir, config: ledger });
       else fs.mkdirSync(sourceDir, { recursive: true });
-      const tables = createProjection({ sourceDir, databasePath, config: ledger, onReplayError: message => core.warning(message) });
-      if (ledger.replay || ledger.type) {
+      const tables = createProjection({ sourceDir, databasePath, config: ledger });
+      if (ledger.type) {
         replayGuidance.push(`Ledger ${ledger.name} (${databasePath}):`);
         if (tables && Object.keys(tables).length) {
           replayGuidance.push(...Object.entries(tables).map(([name, table]) => formatReplayTable(name, table)));
-          replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through ledger append safe output. Do not update replay tables.");
+          replayGuidance.push("Use these derived, read-only tables for current state; use generic records for immutable event history. Persist new events only through the configured ledger safe-output tools. Do not update replay tables.");
         } else if (tables) {
           replayGuidance.push("Replay produced no tables; use generic records for immutable event history.");
-        } else {
-          replayGuidance.push("Replay failed; only generic ledger tables are available. Use records for immutable event history.");
         }
       }
       fs.chmodSync(projectionDir, 0o555);

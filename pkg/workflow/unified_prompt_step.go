@@ -131,7 +131,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection { /
 	if section := buildLedgerPromptSection(data.LedgerConfig); section != nil {
 		sections = append(sections, *section)
 		for _, ledger := range data.LedgerConfig.Ledgers {
-			if ledger.Replay != nil {
+			if ledger.Type != "" {
 				sections = append(sections, PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
 				break
 			}
