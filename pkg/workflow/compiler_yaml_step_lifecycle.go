@@ -279,7 +279,11 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 		yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}\n")
 		yaml.WriteString("        run: |\n")
 		yaml.WriteString("          finish_intent_dir=\"$(dirname \"$GH_AW_SAFE_OUTPUTS\")/dispatch-coordinator\"\n")
-		fmt.Fprintf(yaml, "          cp \"$finish_intent_dir/dispatch-work-coordinator.finish.jsonl\" %s 2>/dev/null || true\n", constants.DispatchCoordinatorFinishIntentPath)
+		fmt.Fprintf(yaml, "          if cp \"$finish_intent_dir/dispatch-work-coordinator.finish.jsonl\" %s 2>/dev/null; then\n", constants.DispatchCoordinatorFinishIntentPath)
+		yaml.WriteString("            echo 'Dispatch coordinator: copied finish intent into agent artifact'\n")
+		yaml.WriteString("          else\n")
+		yaml.WriteString("            echo 'Dispatch coordinator: no finish intent to copy (tool not called or file unavailable)'\n")
+		yaml.WriteString("          fi\n")
 	}
 
 	yaml.WriteString("      - name: Ingest agent output\n")

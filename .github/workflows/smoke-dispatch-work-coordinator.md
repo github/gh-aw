@@ -22,8 +22,12 @@ safe-outputs:
   steps:
     - name: Verify coordinator finish intent artifact
       run: |
-        test -s /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
-        grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
+        if grep -Eq '"type"[[:space:]]*:[[:space:]]*"create_issue"' /tmp/gh-aw/safeoutputs.jsonl; then
+          echo 'Dispatch coordinator smoke failure reported; processing the failure issue'
+        else
+          test -s /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
+          grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/dispatch-work-coordinator.finish.jsonl
+        fi
   create-issue:
     max: 1
     title-prefix: "[smoke-dispatch-work-coordinator] "
