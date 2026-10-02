@@ -178,6 +178,31 @@ function projectSessionResult(events) {
   };
 }
 
+/** @param {Array<any>} events @returns {any|undefined} */
+function projectSessionInitialization(events) {
+  let data;
+  for (const event of normalizeAgentSession(events)) {
+    if (event.type !== "session.init" && event.type !== "session.start") continue;
+    data ??= {};
+    for (const [key, value] of Object.entries(event.data)) {
+      if (value !== undefined) data = { ...data, [key]: structuredClone(value) };
+    }
+  }
+  if (!data) return undefined;
+  return {
+    type: "system",
+    subtype: "init",
+    source_engine: data.sourceEngine,
+    model: data.model,
+    session_id: data.sessionId,
+    cwd: data.cwd,
+    tools: data.tools,
+    mcp_servers: data.mcpServers,
+    slash_commands: data.slashCommands,
+    model_info: data.modelInfo,
+  };
+}
+
 /** @param {any} value @returns {string} */
 function sessionOutputText(value) {
   if (typeof value === "string") return value;
@@ -294,6 +319,7 @@ module.exports = {
   normalizeAgentSession,
   selectSessionResult,
   projectSessionResult,
+  projectSessionInitialization,
   sessionOutputText,
   sessionToolSuccess,
   transformFlatSessionEntries,

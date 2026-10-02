@@ -60,6 +60,7 @@ function parseCopilotLog(logContent) {
   }
 
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
+    includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry =>
       formatInitializationSummary(initEntry, {

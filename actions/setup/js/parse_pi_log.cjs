@@ -70,6 +70,7 @@ function parsePiLog(logContent) {
     return { markdown: buildStepSummaryDetailsSection("Pi", "Log format not recognized as Pi JSONL."), logEntries: [], mcpFailures: [], maxTurnsHit: false };
   }
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
+    includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => formatInitializationSummary(initEntry, { includeSlashCommands: false }),
   });

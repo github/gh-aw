@@ -7,6 +7,7 @@ const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
 const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
+const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -255,6 +256,8 @@ async function runLogParser(options) {
     }
 
     const result = parseLog(content);
+    const publicationMasks = new Set(collectAddMaskedValues(content));
+    const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
     // Handle result that may be a simple string or an object with metadata
     let markdown = "";
@@ -348,6 +351,7 @@ async function runLogParser(options) {
       if (fs.existsSync(stdioLogPath)) {
         const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
         const maskedValues = collectAddMaskedValues(stdioContent);
+        for (const value of maskedValues) publicationMasks.add(value);
         if (maskedValues.length > 0) {
           const redactedContent = applyAddMaskRedaction(stdioContent, maskedValues);
           if (redactedContent !== stdioContent) {
@@ -376,13 +380,14 @@ async function runLogParser(options) {
     if (markdown) {
       // Generate lightweight plain text summary for core.info and Copilot CLI style for step summary
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
+        const publicationEntries = redactSessionForPublication(logEntries, redactPublication);
         const model = observedSessionModel(logEntries);
 
-        const plainTextSummary = generatePlainTextSummary(logEntries, {
-          model,
+        const plainTextSummary = generatePlainTextSummary(publicationEntries, {
+          model: model === undefined ? undefined : redactPublication(model),
           parserName,
         });
-        core.info(plainTextSummary);
+        core.info(redactPublication(plainTextSummary));
 
         // Add safe outputs preview to core.info
         if (safeOutputsContent) {
@@ -393,8 +398,8 @@ async function runLogParser(options) {
         }
 
         // Generate Copilot CLI style markdown for step summary
-        const copilotCliStyleMarkdown = generateCopilotCliStyleSummary(logEntries, {
-          model,
+        const copilotCliStyleMarkdown = generateCopilotCliStyleSummary(publicationEntries, {
+          model: model === undefined ? undefined : redactPublication(model),
           parserName,
         });
 
@@ -413,7 +418,7 @@ async function runLogParser(options) {
           }
         }
 
-        await core.summary.addRaw(redactStepSummaryContent(fullMarkdown)).write();
+        await core.summary.addRaw(redactPublication(fullMarkdown)).write();
       } else {
         // Fallback path: markdown exists but no structured log entries were parsed.
         // Suppress the "parsed successfully" message for Claude since it always produces
@@ -445,7 +450,7 @@ async function runLogParser(options) {
             fullMarkdown += "\n" + safeOutputsMarkdown;
           }
         }
-        await core.summary.addRaw(redactStepSummaryContent(fullMarkdown)).write();
+        await core.summary.addRaw(redactPublication(fullMarkdown)).write();
       }
     } else {
       core.error(`Failed to parse ${parserName} log`);

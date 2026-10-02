@@ -56,6 +56,7 @@ function parseGeminiLog(logContent) {
   // Generate conversation markdown using shared function
   const canonicalLogEntries = convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "gemini" });
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
+    includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => formatInitializationSummary(initEntry, { includeSlashCommands: false }),
   });

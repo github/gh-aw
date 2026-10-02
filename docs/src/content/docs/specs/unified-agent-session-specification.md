@@ -486,6 +486,49 @@ The projection uses `type: "result"` only at the legacy telemetry boundary. Addi
 
 **T-UAS-050 — Explicit limits.** Implementations imposing parsing or display limits MUST report truncation or partial coverage rather than fabricate complete execution or accounting. A display limit MUST NOT truncate the canonical trace. Recovery from a malformed record MUST remain independent of display limits and MUST preserve valid adjacent records within the declared parsing limits.
 
+### 8.4 Implemented summary views (Informative)
+
+The Actions and console renderers share the same compatibility projection and
+accounting selection. The Actions view starts with `### Agent session`, shows
+statistics first, and places the detailed fenced trace in a collapsed
+`<details>` section. The console view renders the same observations as plain text.
+Neither view publishes user prompts or dumps unknown extension payloads.
+
+| Source event | Display |
+| --- | --- |
+| `session.init` | Merge supplied initialization observations for the display header: engine, observed model, session ID, cwd, tools, MCP status, slash commands, and model information. Missing inventories remain unavailable, not empty. |
+| `user.message` | Retained in the canonical trace; omitted from default publication. |
+| `assistant.message` | Assistant answer, including supported structured native content. |
+| `assistant.reasoning` | Distinct reasoning channel, not converted into an answer or tool output. |
+| `tool.execution_start` | All standard tools, including built-ins and bookkeeping tools; JSON arguments can be objects, arrays, scalars, null, or empty strings. A missing result is visibly pending. |
+| `tool.execution_complete` | Source-proven pairing, separate output and error previews, known success/failure versus unknown outcome, duration, and an explicit missing-start label for orphan results. Empty observed output has an `[empty output]` marker. |
+| `session.result` | Selected accounting, zero-valued metrics, cache counts, structured provider errors, and permission-denial records. Tool statistics separate failed, pending, and unknown outcomes. |
+
+These are display projections, not reversible interchange conversions. Generated
+display-only IDs avoid collisions with supplied native IDs, including empty IDs.
+MCP names retain their namespace; the `Bash` presentation alias applies only to the
+builtin shell tool. Legacy-only inputs keep their earlier compact tool filtering.
+
+`generateConversationMarkdown` includes its Information section by default for
+canonical input. Engine adapters use `includeInformation: false` when they append
+that section themselves, avoiding duplicate accounting. This option does not
+change the canonical result or the Actions/console accounting paths.
+
+Publication creates redacted copies before shortening previews, so truncation
+cannot expose the prefix of a recognized credential or registered add-mask value.
+Private tool pairing keys remain available internally for correct correlation;
+the final publication text is redacted as well. Source events are unchanged.
+Formatted tool output uses a fence longer than its payload's backtick runs, and
+untrusted inline HTML is escaped rather than treated as summary structure.
+
+Both text publication views have a 1000 KiB byte budget, below GitHub Actions'
+1024 KiB hard limit. UTF-8-safe clipping and explicit notices distinguish partial
+display from complete source evidence; the Actions budget reserves its generated
+code fences and disclosure markup. Existing per-message and conversation-line
+limits remain in effect. `agent_session_render.test.cjs` exercises field coverage,
+tool states, namespace and ID handling, payload fences, and the measured byte
+limit; bootstrap tests verify pre-truncation redaction in both publication sinks.
+
 ## 9. Compliance Testing (Normative)
 
 ### 9.1 Test procedure and coverage

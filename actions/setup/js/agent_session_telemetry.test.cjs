@@ -99,4 +99,26 @@ describe("Unified session bootstrap telemetry conformance", () => {
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("fixture permission denied"));
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
+
+  it("T-UAS-045/049: Actions and console publication redact before shortening values", async () => {
+    const token = "github_pat_" + "a".repeat(82);
+    const masked = "opaque-mask-" + "b".repeat(180);
+    files.set(STDIO, `::add-mask::${masked}\n`);
+    const events = [
+      { type: "user.message", data: { content: "PRIVATE_PROMPT" } },
+      { type: "tool.execution_start", data: { toolCallId: "lookup", toolName: "lookup", input: { token, masked } } },
+      { type: "tool.execution_complete", data: { toolCallId: "lookup", success: true, output: token + "\n" + masked } },
+    ];
+    const original = structuredClone(events);
+    await parse(events);
+    const consoleText = global.core.info.mock.calls.map(call => call[0]).find(text => text.includes("Execution Summary"));
+    const markdown = global.core.summary.addRaw.mock.calls[0][0];
+    for (const output of [consoleText, markdown]) {
+      expect(output).not.toContain(token.slice(0, 40));
+      expect(output).not.toContain(masked.slice(0, 40));
+      expect(output).not.toContain("PRIVATE_PROMPT");
+      expect(output).toContain("***REDACTED***");
+    }
+    expect(events).toEqual(original);
+  });
 });

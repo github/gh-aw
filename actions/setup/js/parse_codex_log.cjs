@@ -214,6 +214,7 @@ function isCodexJsonlFormat(lines) {
 function parseCodexJsonl(logContent) {
   const canonicalLogEntries = normalizeCodexSession(parseLogEntries(logContent) ?? [], extractCodexModel(logContent));
   const conversation = generateConversationMarkdown(canonicalLogEntries, {
+    includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult),
     formatInitCallback: init => formatInitializationSummary(init),
   });

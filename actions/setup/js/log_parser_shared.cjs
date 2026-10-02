@@ -6,7 +6,8 @@ const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { isSessionEvent, normalizeAgentSession, projectSessionResult, sessionOutputText, sessionToolSuccess, sessionTokenTotal } = require("./agent_session.cjs");
+const { isSessionEvent, normalizeAgentSession, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
+const { escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
 
 /**
  * Shared utility functions for log parsers
@@ -332,13 +333,14 @@ function generateInformationSection(lastEntry, options = {}) {
   if (lastEntry.errors && Array.isArray(lastEntry.errors) && lastEntry.errors.length > 0) {
     markdown += `**Errors:**\n`;
     for (const error of lastEntry.errors) {
-      markdown += `- ${sessionOutputText(error)}\n`;
+      markdown += `- ${escapeSummaryText(sessionOutputText(error))}\n`;
     }
     markdown += "\n";
   }
 
-  if (lastEntry.permission_denials && lastEntry.permission_denials.length > 0) {
+  if (Array.isArray(lastEntry.permission_denials)) {
     markdown += `**Permission Denials:** ${lastEntry.permission_denials.length}\n\n`;
+    for (const denial of lastEntry.permission_denials) markdown += `- ${escapeSummaryText(sessionOutputText(denial))}\n`;
   }
 
   return buildStepSummaryDetailsSection("Information", markdown, { emptyBodyMessage: "No information available." });
@@ -346,10 +348,12 @@ function generateInformationSection(lastEntry, options = {}) {
 
 /**
  * Formats MCP parameters into a human-readable string
- * @param {Record<string, any>} input - The input object containing parameters
+ * @param {any} input - JSON arguments, including arrays and scalar values
  * @returns {string} Formatted parameters string
  */
 function formatMcpParameters(input) {
+  if (input === undefined) return "";
+  if (input === null || typeof input !== "object" || Array.isArray(input)) return truncateString(displayArgument(input), 100);
   const keys = Object.keys(input);
   if (keys.length === 0) return "";
 
@@ -416,9 +420,10 @@ function formatInitializationSummary(initEntry, options = {}) {
   let markdown = "";
   const mcpFailures = [];
 
+  if (initEntry.source_engine !== undefined) markdown += `**Engine:** ${escapeSummaryText(sessionOutputText(initEntry.source_engine))}\n\n`;
   // Display model and session info
-  if (initEntry.model) {
-    markdown += `**Model:** ${initEntry.model}\n\n`;
+  if (initEntry.model !== undefined) {
+    markdown += `**Model:** ${escapeSummaryText(sessionOutputText(initEntry.model) || '""')}\n\n`;
   }
 
   // Call model info callback for engine-specific model information (e.g., Copilot premium info)
@@ -427,24 +432,30 @@ function formatInitializationSummary(initEntry, options = {}) {
     if (modelInfo) {
       markdown += modelInfo;
     }
+  } else if (initEntry.model_info !== undefined) {
+    markdown += formatToolCallAsDetails({ summary: "Model Information", sections: [{ label: "Metadata", content: JSON.stringify(initEntry.model_info, null, 2), language: "json" }] });
   }
 
-  if (initEntry.session_id) {
-    markdown += `**Session ID:** ${initEntry.session_id}\n\n`;
+  if (initEntry.session_id !== undefined) {
+    markdown += `**Session ID:** ${escapeSummaryText(sessionOutputText(initEntry.session_id) || '""')}\n\n`;
   }
 
-  if (initEntry.cwd) {
+  if (typeof initEntry.cwd === "string") {
     // Show a cleaner path by removing common prefixes
     const cleanCwd = initEntry.cwd.replace(/^\/home\/runner\/work\/[^\/]+\/[^\/]+/, ".");
-    markdown += `**Working Directory:** ${cleanCwd}\n\n`;
+    markdown += `**Working Directory:** ${escapeSummaryText(cleanCwd || '""')}\n\n`;
   }
 
   // Display MCP servers status
   if (initEntry.mcp_servers && Array.isArray(initEntry.mcp_servers)) {
     markdown += "**MCP Servers:**\n";
     for (const server of initEntry.mcp_servers) {
+      if (!server || typeof server !== "object") {
+        markdown += `- ❓ ${escapeSummaryText(sessionOutputText(server))} (unknown)\n`;
+        continue;
+      }
       const statusIcon = server.status === "connected" ? "✅" : server.status === "failed" ? "❌" : "❓";
-      markdown += `- ${statusIcon} ${server.name} (${server.status})\n`;
+      markdown += `- ${statusIcon} ${escapeSummaryText(typeof server.name === "string" ? server.name : "unknown")} (${escapeSummaryText(typeof server.status === "string" ? server.status : "unknown")})\n`;
 
       // Track failed MCP servers - call callback if provided (for Claude's detailed error tracking)
       if (server.status === "failed") {
@@ -489,7 +500,7 @@ function formatInitializationSummary(initEntry, options = {}) {
     const internalTools = ["fetch_copilot_cli_documentation"];
 
     for (const toolEntry of initEntry.tools) {
-      const tool = typeof toolEntry === "string" ? toolEntry : (toolEntry?.name ?? toolEntry?.function?.name);
+      const tool = toolInventoryName(toolEntry);
       if (typeof tool !== "string") continue;
       const toolLower = tool.toLowerCase();
 
@@ -528,7 +539,7 @@ function formatInitializationSummary(initEntry, options = {}) {
       if (tools.length > 0) {
         markdown += `- **${category}:** ${tools.length} tools\n`;
         // Show all tools for complete visibility
-        markdown += `  - ${tools.join(", ")}\n`;
+        markdown += `  - ${tools.map(escapeSummaryText).join(", ")}\n`;
       }
     }
     markdown += "\n";
@@ -539,9 +550,9 @@ function formatInitializationSummary(initEntry, options = {}) {
     const commandCount = initEntry.slash_commands.length;
     markdown += `**Slash Commands:** ${commandCount} available\n`;
     if (commandCount <= 10) {
-      markdown += `- ${initEntry.slash_commands.join(", ")}\n`;
+      markdown += `- ${initEntry.slash_commands.map(toolInventoryName).map(escapeSummaryText).join(", ")}\n`;
     } else {
-      markdown += `- ${initEntry.slash_commands.slice(0, 5).join(", ")}, and ${commandCount - 5} more\n`;
+      markdown += `- ${initEntry.slash_commands.slice(0, 5).map(toolInventoryName).map(escapeSummaryText).join(", ")}, and ${commandCount - 5} more\n`;
     }
     markdown += "\n";
   }
@@ -663,6 +674,15 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const pendingByToolCallId = new Map();
   const pendingIdsByToolName = new Map();
   let toolCounter = 0;
+  const usedToolIds = new Set(logEntries.filter(e => typeof e.data?.toolCallId === "string").map(e => e.data.toolCallId));
+  const displayToolId = () => {
+    let id;
+    do {
+      id = `sdk_tool_${++toolCounter}`;
+    } while (usedToolIds.has(id));
+    usedToolIds.add(id);
+    return id;
+  };
 
   const addPendingId = (toolName, toolId) => {
     const existing = pendingIdsByToolName.get(toolName);
@@ -680,7 +700,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     if (existing.length === 0) {
       pendingIdsByToolName.delete(toolName);
     }
-    return toolId || null;
+    return toolId ?? null;
   };
 
   const removePendingId = (toolName, toolId) => {
@@ -701,15 +721,12 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     // the capitalized "Bash" name used by Claude. Normalize so Copilot's bash
     // calls get the same command formatting instead of falling through to the
     // generic tool renderer.
-    if (toolName.toLowerCase() === "bash") {
-      toolName = "Bash";
-    }
     if (toolName.startsWith("mcp__")) {
       return toolName;
     }
     const serverName = typeof mcpServerName === "string" ? mcpServerName.trim() : "";
     if (!serverName) {
-      return toolName;
+      return toolName.toLowerCase() === "bash" ? "Bash" : toolName;
     }
     return `mcp__${serverName}__${toolName}`;
   };
@@ -738,6 +755,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       }
       return base;
     }
+    if (base !== undefined) return base;
     if (includeCommand && typeof data.command === "string") {
       return { command: data.command };
     }
@@ -751,17 +769,6 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     switch (entry.type) {
       case "session.start":
       case "session.init":
-        normalizedEntries.push({
-          type: "system",
-          subtype: "init",
-          model: data.model,
-          session_id: data.sessionId,
-          cwd: data.cwd,
-          tools: Array.isArray(data.tools) ? data.tools : [],
-          mcp_servers: Array.isArray(data.mcpServers) ? data.mcpServers : [],
-          slash_commands: Array.isArray(data.slashCommands) ? data.slashCommands : [],
-          model_info: data.modelInfo,
-        });
         break;
 
       case "user.message":
@@ -782,7 +789,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
 
       case "assistant.reasoning":
       case "reasoning": {
-        const text = typeof data.content === "string" ? data.content : "";
+        const text = readString(data.content);
         if (!text.trim()) break;
         normalizedEntries.push({
           type: "assistant",
@@ -795,16 +802,16 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
 
       case "tool.execution_start": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
-        const toolCallId = typeof data.toolCallId === "string" && data.toolCallId.trim() ? data.toolCallId : null;
-        const resolvedToolId = toolCallId || `sdk_tool_${++toolCounter}`;
-        if (toolCallId) {
+        const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
+        const resolvedToolId = toolCallId ?? displayToolId();
+        if (toolCallId !== null) {
           pendingByToolCallId.set(toolCallId, { id: resolvedToolId, name: toolName });
         }
         addPendingId(toolName, resolvedToolId);
         normalizedEntries.push({
           type: "assistant",
           message: {
-            content: [{ type: "tool_use", id: resolvedToolId, name: toolName, input: buildToolInput(data) }],
+            content: [{ type: "tool_use", id: resolvedToolId, name: toolName, input: buildToolInput(data), command: data.command, has_input: data.input !== undefined || data.parameters !== undefined, standard_trace: true }],
           },
         });
         break;
@@ -812,29 +819,31 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
 
       case "tool.execution_complete": {
         const toolName = normalizeToolName(data.toolName, data.mcpServerName);
-        const toolCallId = typeof data.toolCallId === "string" && data.toolCallId.trim() ? data.toolCallId : null;
+        const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : null;
         /** @type {any} */
         let resolvedToolId = null;
 
-        if (toolCallId && pendingByToolCallId.has(toolCallId)) {
+        if (toolCallId !== null && pendingByToolCallId.has(toolCallId)) {
           const pending = pendingByToolCallId.get(toolCallId);
           resolvedToolId = pending.id;
           pendingByToolCallId.delete(toolCallId);
-          if (resolvedToolId) {
+          if (resolvedToolId !== null) {
             removePendingId(pending.name, resolvedToolId);
           }
         }
-        if (!resolvedToolId && !toolCallId && (pendingIdsByToolName.get(toolName)?.length ?? 0) === 1) {
+        if (resolvedToolId === null && toolCallId === null && (pendingIdsByToolName.get(toolName)?.length ?? 0) === 1) {
           resolvedToolId = shiftPendingId(toolName);
         }
-        if (!resolvedToolId) {
-          resolvedToolId = toolCallId || `sdk_tool_${++toolCounter}`;
+        if (resolvedToolId === null) {
+          resolvedToolId = toolCallId ?? displayToolId();
           normalizedEntries.push({
             type: "assistant",
             message: {
               // Orphaned completion events have no corresponding start event, so keep
               // structured input but do not synthesize a command from completion data.
-              content: [{ type: "tool_use", id: resolvedToolId, name: toolName, input: buildToolInput(data, { includeCommand: false }) }],
+              content: [
+                { type: "tool_use", id: resolvedToolId, name: toolName, input: buildToolInput(data, { includeCommand: false }), has_input: data.input !== undefined || data.parameters !== undefined, orphaned: true, standard_trace: true },
+              ],
             },
           });
         }
@@ -850,8 +859,10 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
                 type: "tool_result",
                 tool_use_id: resolvedToolId,
                 content: output,
+                has_output: data.output !== undefined || data.result !== undefined,
+                error: data.error,
                 is_error: success === undefined ? undefined : !success,
-                duration_ms: typeof data.durationMs === "number" ? data.durationMs : undefined,
+                duration_ms: isMetric(data.durationMs) ? data.durationMs : undefined,
               },
             ],
           },
@@ -863,20 +874,14 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         break;
       }
 
-      case "result":
-        // A pre-formed legacy result summary may be appended to a copilot-event array
-        // (e.g. parse_pi_log.cjs appends one so log_parser_bootstrap.cjs can emit OTEL
-        // turn/token metrics). Pass it through unchanged so token/turn statistics still
-        // render and the synthetic-result fallback below does not duplicate it.
-        normalizedEntries.push(entry);
-        break;
-
       default:
         break;
     }
   }
 
   const result = projectSessionResult(logEntries);
+  const init = projectSessionInitialization(logEntries);
+  if (init) normalizedEntries.unshift(init);
   if (result) normalizedEntries.push(result);
 
   return normalizedEntries;
@@ -895,6 +900,9 @@ const { generateConversationMarkdown, formatToolUse, generatePlainTextSummary, g
   unfenceMarkdown,
   isCopilotEventLogEntries,
   convertCopilotEventsToLegacyLogEntries,
+  generateInformationSection,
+  createSummaryTracker: () => new StepSummaryTracker(MAX_STEP_SUMMARY_SIZE - Buffer.byteLength(SIZE_LIMIT_WARNING, "utf8")),
+  MAX_STEP_SUMMARY_SIZE,
   MAX_AGENT_TEXT_LENGTH,
   SIZE_LIMIT_WARNING,
 });
@@ -968,14 +976,11 @@ function formatToolCallAsDetails(options) {
       content = content.substring(0, maxContentLength) + "... (truncated)";
     }
 
-    // Use 6 backticks to avoid conflicts with content that may contain 3 or 5 backticks
-    if (section.language) {
-      detailsContent += `\`\`\`\`\`\`${section.language}\n`;
-    } else {
-      detailsContent += "``````\n";
-    }
+    const runs = content.match(/`+/g) ?? [];
+    const fence = "`".repeat(runs.reduce((longest, run) => Math.max(longest, run.length + 1), 6));
+    detailsContent += `${fence}${section.language || ""}\n`;
     detailsContent += content;
-    detailsContent += "\n``````\n\n";
+    detailsContent += `\n${fence}\n\n`;
   }
 
   // Remove trailing newlines from details content

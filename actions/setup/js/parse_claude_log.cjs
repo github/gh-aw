@@ -34,6 +34,7 @@ function parseClaudeLog(logContent) {
 
   // Generate conversation markdown using shared function
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
+    includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => {
       const result = formatInitializationSummary(initEntry, {
