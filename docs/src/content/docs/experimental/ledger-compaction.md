@@ -34,6 +34,11 @@ are considered in segment-ID order, up to `max-segments`, while keeping their
 combined records within `max-segment-kb`. Custom `compaction.script` settings
 are not supported.
 
+When upgrading an existing workflow, remove `compaction.script` and retain
+only `schedule`, `min-segments`, and `max-segments` (or `compaction: false`).
+There is no replacement script hook. The built-in policy applies to typed and
+generic ledgers without changing record payloads or folding historical operations.
+
 ## Trust boundary
 
 All compaction-enabled ledgers share two maintenance jobs:

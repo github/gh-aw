@@ -20,7 +20,7 @@ For workflows that **persist state across runs** — deduplication, incremental 
 | Track a numeric metric and compare current vs. baseline (runs at least every 7 days) | `cache-memory` ✅ first choice |
 | Long-lived knowledge base visible in PRs and code reviews | `repo-memory` |
 | Baselines that must survive cache expiry (e.g. security findings, dedup lists) | `repo-memory` |
-| Bounded append-only structured event history with record-level queries | `repo-memory` with the experimental ledger |
+| Bounded append-only structured event history and built-in current-state projections | Experimental `tools.ledger` |
 | Human-readable wiki pages for knowledge accumulation | `repo-memory` with `wiki: true` |
 | Persist notes/state inline on the triggering issue or PR | `comment-memory` |
 | Private-preview GitHub Drives backend (enrolled repos only) | `drive-memory` — see [drive-memory.md](drive-memory.md) |
@@ -206,63 +206,58 @@ tools:
 
 Compiler creates a separate `push_repo_memory` job with `contents: write`; main agent job stays read-only.
 
-### Structured event history: repo-memory ledger (experimental)
+### Structured event history: standalone ledger (experimental)
 
 Use the ledger for immutable, structured events when each run should add records
 and later runs need to query them. For example, a low-volume audit can append
 one result per scan and query prior results by a stable application-level key.
-The ledger exposes `ledger_append`, `ledger_get`, `ledger_query`, and
-`ledger_status`; its SQLite query projection is disposable and rebuilt from the
-persisted JSONL shards.
+Configure `tools.ledger` independently of repo-memory. The legacy
+`tools.repo-memory.ledger` declaration is unsupported. Each ledger has a
+`ledgers/<name>` branch and a disposable read-only SQLite projection rebuilt
+from persisted JSONL shards.
 
 ```yaml
 tools:
-  repo-memory:
-    branch-name: memory/audit-history
-    ledger:
+  ledger:
+    audit-history:
+      type: log
       compaction:
         min-segments: 32
         max-segments: 32
 ```
 
-Optionally set `ledger.schema` to a repository-relative JSON Schema file to
-validate payloads. The supported schema vocabulary is intentionally limited;
-see the [repo-memory reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/repo-memory.md#structured-ledger).
+Declare `type: log`, `set`, `map`, `table`, or `counter` for built-in state
+models. Schemas validate operation values, not envelopes; tables require a
+string primary-key field through `key`. Maps expose `ledger_map_put` and
+`ledger_map_delete`; other types use typed `ledger_append` operations.
 
-Ledger records are append-only and concurrent histories converge when their
-repo-memory branches merge, but this is not a transactional database. Include
-stable event keys and timestamps in payloads, deduplicate and resolve
-conflicting application events deterministically, and use `ledger_status` to
-check for malformed or incomplete records. Do not edit ledger shard files
-directly.
+Query `state` for current state or `records` for immutable history at
+`/tmp/gh-aw/ledgers/<name>/ledger.db`. For a log, submit `ledger_append` with
+`operation: append` and the event in `value`. Requests are deferred and become
+durable only when the trusted `push_ledger_changes` job succeeds; queued writes
+are not immediately visible in the run's projection. Never edit SQLite or
+canonical ledger files.
 
-The ledger is experimental and bounded: it inspects at most 1024 shard files
-(configurable with `ledger.max-shards`), each record is limited to 32 KiB, each
-shard defaults to 100 KiB, each run defaults to a 10 KiB append budget, and each
-query returns at most 500 records. Configure limits with
-`max-segment-kb`, `max-record-kb`, and `max-patch-kb`; defaults align with
-repo-memory's 100 KiB per-file and 10 KiB per-push defaults. Compilation warns
-when ledger limits exceed the corresponding repo-memory persistence limits.
+Each record is limited to 32 KiB, each shard defaults to 100 KiB, and each run
+defaults to a 10 KiB append budget. Configure per-ledger limits with
+`max-segment-kb`, `max-record-kb`, and `max-patch-kb`. Projection preparation
+inspects at most 1024 canonical files and 100 MiB of history.
 Each writing workflow invocation creates a shard, so a frequently running
 workflow can exhaust the shard limit. Use ordinary repo-memory files for
 replaceable snapshots, pruned baselines, or histories that need more than 1024
-writer shards. Use bounded declarative `ledger.compaction` options to compact
-stable segments; custom JavaScript compactor scripts are disabled because Node's
-in-process VM is not a security boundary. Ledger workflows require AWF's
-Cloud Hypervisor runtime, which keeps ledger storage outside the agent's
-`filesystem.allowWrite` paths; only the MCP ledger server can append records.
-The persistence job ignores agent-supplied coverage files and overwrites of
-trusted shards, then verifies replacement coverage before retirement.
+writer shards. Compaction belongs to Agentic Maintenance, never the agent or
+persistence job. Use per-ledger `compaction` settings (`schedule`,
+`min-segments`, `max-segments`) or disable it with `compaction: false`.
+Custom `replay.script`, `replay.config`, and `compaction.script` settings are
+rejected. Ordinary repo-memory `validation.script` remains a separate supported
+file-storage validator.
 
-The ledger is eventually convergent, not transactional or exactly-once. Record
-SHA-256 values are unkeyed checksums, not authentication; rely on the AWF write
-boundary, use stable application keys, and deterministically resolve duplicates
-and concurrent conflicts. Compaction, normalization, and save details appear in
-the persistence step summary. Every successful append also emits a redacted
-`ledger_mutation` audit entry to a dedicated ledger transaction log; a trusted
-post-agent step revalidates and merges those entries into the safe outputs for
-threat detection, and their safe-output handler only logs that metadata and
-performs no side effects.
+Removing custom replay does not rewrite history. Existing raw-record ledgers
+can omit `type` and query `records.payload` with SQLite JSON functions. Do not
+add a built-in type to raw history unless every payload already matches that
+type's operation format. Use a new ledger name for a new typed state model.
+See the [ledger replay reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/ledger-replay.md)
+and [compaction guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/experimental/ledger-compaction.md).
 
 ### Tradeoffs
 

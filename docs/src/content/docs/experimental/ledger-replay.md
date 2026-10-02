@@ -3,7 +3,7 @@ title: Standalone ledger replay projections
 description: Build disposable read-only SQLite materialized views from immutable ledger history
 ---
 
-Standalone `tools.ledger` projections support only the built-in types below.
+Standalone `tools.ledger` typed projections support only the built-in types below.
 gh-aw validates each operation and replays it in trusted code. Custom
 `replay.script` and `replay.config` settings are not supported.
 
@@ -77,7 +77,8 @@ The trusted persistence result reports ledger type, operation, deterministic
 record ID, transaction ID, and validation status without echoing values.
 
 Built-in projections replay canonical transaction order. Express domain concepts
-as schemas on these types, not as custom replay code. Maintenance compaction is deliberately lossless: it
+as schemas on these types, not as custom replay code. Maintenance compaction is
+deliberately lossless: it
 merges verified source segments while preserving every record ID, hash, and
 parent relation. This preserves set/map/counter state deterministically but
 does **not** fold away historical operations, because doing so would violate
@@ -96,9 +97,27 @@ state, `replay_metadata` for projection metadata, and `records` for immutable
 event history. Replay never writes back to Git or canonical ledger files.
 Persist new events only through the configured ledger safe-output tools.
 
-Ledgers without a declared type retain their generic `records` projection.
-To preserve existing raw-record history when removing custom replay, query
-`records.payload` with SQLite JSON functions. Switching that history to a
-built-in type requires migrating its payloads to that type's operation format.
+## Removing custom replay from existing ledgers
+
+Remove the entire `replay` setting, including its `script` and optional `config`.
+Ledgers without a declared type retain their generic `records` projection;
+custom table names no longer exist. Replace queries against those tables with
+SQLite JSON queries over `records.payload`, for example:
+
+```sql
+SELECT json_extract(payload, '$.run_id') AS run_id,
+       json_extract(payload, '$.status') AS status
+FROM records
+WHERE json_extract(payload, '$.record_type') = 'audit'
+ORDER BY ordinal DESC
+LIMIT 100;
+```
+
+This preserves the canonical history without rewriting records. Do not merely
+add `type` to an existing raw-record ledger: built-in replay requires every
+historical payload to have that type's operation format. For a new built-in
+state model, use a new ledger name and seed it through its supported operations
+while retaining the old ledger as immutable history.
+
 The serialized configuration for all ledgers remains limited to 96 KiB after
 base64 encoding.
