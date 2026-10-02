@@ -416,7 +416,7 @@ test.describe('Mobile and Responsive Layout', () => {
   });
 
   // Regression test for the 2026-08-08 multi-device docs test report.
-  // The home page quick-start CTA must stay tappable on mobile breakpoints,
+  // The home page workflow-creation CTA must stay tappable on mobile breakpoints,
   // including after the navigation menu has been opened and dismissed, so that
   // no leftover overlay intercepts touch or keyboard activation.
   const mobileCtaViewports = [
@@ -426,7 +426,7 @@ test.describe('Mobile and Responsive Layout', () => {
   ];
 
   for (const viewport of mobileCtaViewports) {
-    test(`home page quick-start CTA stays tappable after opening and dismissing the menu at ${viewport.name}`, async ({
+    test(`home page workflow CTA stays tappable after opening and dismissing the menu at ${viewport.name}`, async ({
       browser,
     }) => {
       const context = await browser.newContext({
@@ -438,9 +438,9 @@ test.describe('Mobile and Responsive Layout', () => {
       await page.goto('/gh-aw/');
       await page.waitForLoadState('networkidle');
 
-      const cta = page.locator('.hero a.sl-link-button.primary').first();
+      const cta = page.locator('.aw-hero .aw-btn').first();
       await expect(cta).toBeVisible();
-      await expect(cta).toHaveAttribute('href', '/gh-aw/setup/quick-start/');
+      await expect(cta).toHaveAttribute('href', '/gh-aw/setup/creating-workflows/');
 
       // The CTA must be the topmost element at its centre point, i.e. nothing
       // (hero canvas, overlay, sticky header) intercepts the tap.
@@ -452,7 +452,7 @@ test.describe('Mobile and Responsive Layout', () => {
         const isTopmost = await page.evaluate(
           ([x, y]) => {
             const el = document.elementFromPoint(x, y);
-            const ctaEl = document.querySelector('.hero a.sl-link-button.primary');
+            const ctaEl = document.querySelector('.aw-hero .aw-btn');
             if (!el || !ctaEl) return false;
             return el === ctaEl || ctaEl.contains(el);
           },
@@ -479,7 +479,7 @@ test.describe('Mobile and Responsive Layout', () => {
       await expectCtaHittable();
       await cta.click();
       await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/gh-aw\/setup\/quick-start\//);
+      await expect(page).toHaveURL(/\/gh-aw\/setup\/creating-workflows\//);
 
       await context.close();
     });
