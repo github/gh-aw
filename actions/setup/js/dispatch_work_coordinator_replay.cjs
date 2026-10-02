@@ -224,8 +224,10 @@ function replayTransactions(transactions) {
     }
   }
 
-  const workState = Object.fromEntries(
-    [...works].map(work => {
+  const sortedWorks = [...works].sort();
+  const sortedClaims = [...claims.keys()].sort();
+  const workState = new Map(
+    sortedWorks.map(work => {
       const completion = completions.get(work);
       const activeClaims = [...claims.entries()]
         .filter(([claim, claimWork]) => claimWork === work && !cancellations.has(claim))
@@ -236,9 +238,15 @@ function replayTransactions(transactions) {
       return [work, { state, winner }];
     })
   );
+  const getWorkState = work => {
+    const state = workState.get(work);
+    if (!state) throw new TypeError(`projection is missing work ${work}`);
+    return state;
+  };
   const claimState = Object.fromEntries(
-    [...claims.entries()].map(([claim, work]) => {
-      const workStatus = workState[work];
+    sortedClaims.map(claim => {
+      const work = claims.get(claim);
+      const workStatus = getWorkState(work);
       const state = cancellations.has(claim) || workStatus.state === "cancelled" ? "cancelled" : workStatus.winner === claim ? "effective" : "superseded";
       return [claim, state];
     })
@@ -246,8 +254,8 @@ function replayTransactions(transactions) {
 
   debugLog("replay completed", { transactions: facts.size, works: works.size, claims: claims.size });
   return {
-    work: Object.fromEntries([...works].map(work => [work, workState[work].state])),
-    winner: Object.fromEntries([...works].map(work => [work, workState[work].winner])),
+    work: Object.fromEntries(sortedWorks.map(work => [work, getWorkState(work).state])),
+    winner: Object.fromEntries(sortedWorks.map(work => [work, getWorkState(work).winner])),
     claim: claimState,
     transactions: [...facts.values()].sort((left, right) => {
       const leftKey = transactionKey(left);
@@ -287,15 +295,18 @@ function applyTransactions(transactions, intents) {
     }
 
     const projection = replayTransactions(accepted);
-    const terminal = ["completed", "cancelled"].includes(projection.work[transaction.work]);
+    const hasWork = Object.hasOwn(projection.work, transaction.work);
+    const hasClaimState = transaction.claim !== null && Object.hasOwn(projection.claim, transaction.claim);
+    const claimState = hasClaimState ? projection.claim[transaction.claim] : undefined;
+    const terminal = hasWork && ["completed", "cancelled"].includes(projection.work[transaction.work]);
     const existingClaim = accepted.find(existing => existing.kind === "Claim" && existing.claim === transaction.claim);
     let reason = "";
     switch (transaction.kind) {
       case "Work":
-        if (projection.work[transaction.work]) reason = "work already exists";
+        if (hasWork) reason = "work already exists";
         break;
       case "Claim":
-        if (!projection.work[transaction.work]) reason = "work does not exist";
+        if (!hasWork) reason = "work does not exist";
         else if (terminal) reason = "work is terminal";
         else if (existingClaim) reason = "claim already exists for different work";
         break;
@@ -303,18 +314,18 @@ function applyTransactions(transactions, intents) {
         if (!existingClaim) reason = "claim does not exist";
         else if (existingClaim.work !== transaction.work) reason = "claim belongs to different work";
         else if (terminal) reason = "work is terminal";
-        else if (projection.claim[transaction.claim] === "cancelled") reason = "claim is already cancelled";
+        else if (hasClaimState && claimState === "cancelled") reason = "claim is already cancelled";
         break;
       case "Completion":
-        if (!projection.work[transaction.work]) reason = "work does not exist";
+        if (!hasWork) reason = "work does not exist";
         else if (terminal) reason = "work is terminal";
         else if (!existingClaim) reason = "claim does not exist";
         else if (existingClaim.work !== transaction.work) reason = "claim belongs to different work";
-        else if (projection.claim[transaction.claim] !== "effective") reason = "claim is not effective";
+        else if (!hasClaimState || claimState !== "effective") reason = "claim is not effective";
         else if (accepted.some(existing => existing.kind === "Completion" && existing.attempt === transaction.attempt)) reason = "attempt already completed work";
         break;
       case "WorkCancellation":
-        if (!projection.work[transaction.work]) reason = "work does not exist";
+        if (!hasWork) reason = "work does not exist";
         else if (terminal) reason = "work is terminal";
         break;
     }

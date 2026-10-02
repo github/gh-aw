@@ -44,9 +44,20 @@ describe("dispatch work coordinator replay", () => {
     const expected = replayTransactions(transactions);
     for (const permutation of permutations(transactions)) {
       expect(replayTransactions(permutation)).toEqual(expected);
+      expect(JSON.stringify(replayTransactions(permutation))).toBe(JSON.stringify(expected));
     }
     expect(expected.winner.w).toBe("b");
     expect(expected.work.other).toBe("available");
+  });
+
+  it("supports prototype-named identifiers without treating inherited members as state", () => {
+    const result = applyTransactions([], [claim("constructor", "toString"), cancelWork("valueOf"), work("__proto__"), claim("__proto__", "constructor")]);
+
+    expect(result.rejected.map(item => item.reason)).toEqual(["work does not exist", "work does not exist"]);
+    const projection = replayTransactions(result.transactions);
+    expect(projection.work["__proto__"]).toBe("claimed");
+    expect(projection.winner["__proto__"]).toBe("constructor");
+    expect(projection.claim.constructor).toBe("effective");
   });
 
   it("uses lexicographic claim identity for deterministic arbitration", () => {
