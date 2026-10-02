@@ -220,6 +220,54 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     expect(result).toMatchObject({ numTurns: 2, durationMs: 0, usage: { input_tokens: 15, output_tokens: 2 }, errors: ["first", "second"], permissionDenials: [] });
   });
 
+  it("T-UAS-031/032: overflowing contributions stay unavailable, including after serialization", () => {
+    let usage = {};
+    accumulateSessionUsage(usage, { input_tokens: Number.MAX_SAFE_INTEGER, output_tokens: 1 });
+    const first = { type: "session.result", data: { usage: { ...usage } } };
+    accumulateSessionUsage(usage, { input_tokens: 1, output_tokens: 2 });
+    expect(usage.input_tokens).toBeUndefined();
+    usage = JSON.parse(JSON.stringify(usage));
+    accumulateSessionUsage(usage, { input_tokens: 0, output_tokens: 3 });
+    accumulateSessionUsage(usage, { input_tokens: 4 });
+    expect(usage.input_tokens).toBeUndefined();
+    expect(usage.output_tokens).toBe(6);
+    const events = [first, { type: "session.result", data: { usage } }];
+    expect(projectSessionResult(events).usage.input_tokens).toBeUndefined();
+    expect(projectSessionResult(JSON.parse(JSON.stringify(events))).usage.output_tokens).toBe(6);
+    expect(projectSessionResult([...events, { type: "session.result", data: { usage: { input_tokens: 8 } } }]).usage.input_tokens).toBe(8);
+    expect(sessionTokenTotal({ input_tokens: Number.MAX_SAFE_INTEGER, output_tokens: 1 })).toBeUndefined();
+    expect(sessionTokenTotal({ input_tokens: Number.MAX_SAFE_INTEGER, output_tokens: 0 })).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it.each([
+    ["input_tokens", "inputTokens"],
+    ["output_tokens", "outputTokens"],
+    ["cache_creation_input_tokens", "cacheCreationInputTokens"],
+    ["cache_read_input_tokens", "cacheReadInputTokens"],
+  ])("keeps overflowed %s unavailable after further %s contributions", (key, alias) => {
+    const usage = {};
+    accumulateSessionUsage(usage, { [alias]: Number.MAX_SAFE_INTEGER });
+    accumulateSessionUsage(usage, { [key]: 1 });
+    accumulateSessionUsage(usage, { [alias]: 5 });
+    expect(normalizeSessionUsage(usage)[key]).toBeUndefined();
+    expect(usage.overflowed_tokens).toEqual([key]);
+    const result = selectSessionResult([
+      { type: "session.result", data: { usage } },
+      { type: "session.result", data: { usage: { [alias]: 0 } } },
+    ]);
+    expect(result.usage[key]).toBe(0);
+    expect(result.usage.overflowed_tokens).toBeUndefined();
+  });
+
+  it("ignores invalid overflow metadata without discarding valid counts", () => {
+    const result = selectSessionResult([
+      { type: "session.result", data: { usage: { input_tokens: 4, overflowed_tokens: 17 } } },
+      { type: "session.result", data: { usage: { output_tokens: 2, overflowed_tokens: [null, ["input_tokens"], "unknown"] } } },
+    ]);
+    expect(result.usage).toMatchObject({ input_tokens: 4, output_tokens: 2 });
+    expect(result.usage.overflowed_tokens).toBeUndefined();
+  });
+
   it("T-UAS-027/049: extension keys cannot inject inherited accounting", () => {
     const events = JSON.parse('[{"type":"session.result","data":{"__proto__":{"numTurns":99},"constructor":{"native":true},"errors":[]}}]');
     const result = selectSessionResult(events);

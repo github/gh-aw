@@ -61,6 +61,8 @@ export interface SessionUsage {
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   input_tokens_include_cache?: boolean;
+  /** Unavailable aggregate fields whose contributions exceeded safe integer precision. */
+  overflowed_tokens?: string[];
   [key: string]: unknown;
 }
 

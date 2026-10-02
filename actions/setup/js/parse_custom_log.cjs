@@ -42,9 +42,9 @@ function parseCustomLog(logContent) {
   // Codex parser now returns an object { markdown, logEntries, mcpFailures, maxTurnsHit }
   const codexModule = require("./parse_codex_log.cjs");
   const codexSignature =
-    codexModule.isCodexJsonlFormat(logContent.split("\n")) || /^(?:OpenAI Codex\b|model:\s+\S|thinking\s*$|tool\s+\w+\.\w+\(|ERROR:\s+\S)|ToolCall:\s+\w+__\w+|^\[.*?\]\s+(?:tool\s+\w+\.\w+\(|exec\s+bash\s+-lc\s+')/m.test(logContent);
+    codexModule.isCodexJsonlFormat([], entries) || /^(?:OpenAI Codex\b|model:\s+\S|thinking\s*$|tool\s+\w+\.\w+\(|ERROR:\s+\S)|ToolCall:\s+\w+__\w+|^\[.*?\]\s+(?:tool\s+\w+\.\w+\(|exec\s+bash\s+-lc\s+')/m.test(logContent);
   if (codexSignature) {
-    const codexResult = codexModule.parseCodexLog(logContent);
+    const codexResult = codexModule.parseCodexLog(logContent, entries);
 
     // Check if we got meaningful content
     if (codexResult && codexResult.logEntries.length > 0) {

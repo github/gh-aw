@@ -154,7 +154,10 @@ function parsePrettyPrintFormat(logContent) {
         }
       }
       const mcp = header.match(/^(\S+) (\S+) · /);
-      const shell = /^(?:cd|mkdir|cat|gh|echo|curl|grep|ls|pwd|git|npm|node|python3?|safeoutputs)\s/.test(header);
+      const namedTool =
+        /^(?:Bash|BashOutput|KillBash|Read|Write|Edit|MultiEdit|LS|Grep|Glob|TodoWrite|Task|WebFetch|WebSearch|AskUserQuestion|NotebookEdit|Skill|EnterPlanMode|ExitPlanMode|ListMcpResourcesTool|ReadMcpResourceTool)(?:\s|$)/.test(header);
+      // Preserve named tool layouts, without restricting which executables can run.
+      const shell = !mcp && !/^mcp__\S+/.test(header) && !namedTool;
       const toolName = mcp ? mcp[2] : shell ? "bash" : header.match(/^\S+/)?.[0];
       const source = { prettyPrint: { marker: marker[1], header: marker[2], continuation: rawContinuation } };
       entries.push(

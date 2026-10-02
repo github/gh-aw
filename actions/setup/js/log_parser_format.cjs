@@ -636,10 +636,10 @@ function createLogParserFormatters(deps) {
       for (const error of lastEntry.errors) {
         lines.push(`    ${sessionOutputText(error)}`);
       }
-      if (Array.isArray(lastEntry?.permission_denials)) {
-        lines.push(`  Permission Denials: ${lastEntry.permission_denials.length}`);
-        for (const denial of lastEntry.permission_denials) lines.push(`    ${sessionOutputText(denial)}`);
-      }
+    }
+    if (Array.isArray(lastEntry?.permission_denials)) {
+      lines.push(`  Permission Denials: ${lastEntry.permission_denials.length}`);
+      for (const denial of lastEntry.permission_denials) lines.push(`    ${sessionOutputText(denial)}`);
     }
   }
 

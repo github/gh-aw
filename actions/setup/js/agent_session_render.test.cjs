@@ -102,6 +102,15 @@ describe("standard agent trace rendering", () => {
     }
   });
 
+  it.each([undefined, []])("renders permission denials without accompanying errors %j in both views", errors => {
+    const events = [{ type: "session.result", data: { errors, permissionDenials: [{ toolName: "Read", permission: "read" }] } }];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("Permission Denials: 1");
+      expect(output).toContain('"permission": "read"');
+      expect(output).not.toContain("  Errors:");
+    }
+  });
+
   it("T-UAS-042/045/049: formatted summaries cover all core fields and safely display source markup", () => {
     const result = generateConversationMarkdown(trace, options);
     expect(result.markdown).toContain("<summary>Information</summary>");

@@ -35,6 +35,37 @@ function normalizeSessionUsage(usage) {
     if (isTokenCount(value)) result[key] = value;
     else delete result[key];
   }
+  if (Array.isArray(usage.overflowed_tokens)) {
+    result.overflowed_tokens = [...new Set(usage.overflowed_tokens.filter(key => typeof key === "string" && Object.hasOwn(USAGE_ALIASES, key)))];
+    for (const key of result.overflowed_tokens) {
+      delete result[key];
+      delete result[USAGE_ALIASES[key]];
+    }
+  } else delete result.overflowed_tokens;
+  return result;
+}
+
+/**
+ * Overflow is explicit unavailable evidence, unlike a snapshot omitting a field.
+ * @param {any} previous
+ * @param {any} snapshot
+ * @returns {Record<string, any>|undefined}
+ */
+function reconcileSessionUsage(previous, snapshot) {
+  const normalized = normalizeSessionUsage(snapshot);
+  if (!normalized) return previous;
+  const result = { ...previous, ...normalized };
+  const overflowed = new Set(Array.isArray(previous?.overflowed_tokens) ? previous.overflowed_tokens : []);
+  for (const key of Object.keys(USAGE_ALIASES)) {
+    if (isTokenCount(normalized[key])) overflowed.delete(key);
+  }
+  for (const key of normalized.overflowed_tokens ?? []) {
+    overflowed.add(key);
+    delete result[key];
+    delete result[USAGE_ALIASES[key]];
+  }
+  if (overflowed.size) result.overflowed_tokens = [...overflowed];
+  else delete result.overflowed_tokens;
   return result;
 }
 
@@ -42,8 +73,19 @@ function normalizeSessionUsage(usage) {
 function accumulateSessionUsage(target, usage) {
   const normalized = normalizeSessionUsage(usage);
   if (!normalized) return;
+  const overflowed = new Set([...(Array.isArray(target.overflowed_tokens) ? target.overflowed_tokens : []), ...(normalized.overflowed_tokens ?? [])]);
   for (const key of Object.keys(USAGE_ALIASES)) {
-    if (isTokenCount(normalized[key])) target[key] = (target[key] ?? 0) + normalized[key];
+    if (overflowed.has(key) || !isTokenCount(normalized[key])) continue;
+    const sum = (target[key] ?? 0) + normalized[key];
+    if (isTokenCount(sum)) target[key] = sum;
+    else overflowed.add(key);
+  }
+  if (overflowed.size) {
+    target.overflowed_tokens = [...overflowed];
+    for (const key of overflowed) {
+      delete target[key];
+      delete target[USAGE_ALIASES[key]];
+    }
   }
 }
 
@@ -151,7 +193,7 @@ function selectSessionResult(events) {
     const data = event.data;
     for (const [key, value] of Object.entries(data)) {
       if (value === undefined) continue;
-      if (key === "usage") result.usage = { ...result.usage, ...normalizeSessionUsage(value) };
+      if (key === "usage") result.usage = reconcileSessionUsage(result.usage, value);
       else if ((key === "errors" || key === "permissionDenials") && Array.isArray(value)) result[key] = [...(result[key] ?? []), ...structuredClone(value)];
       else if (key === "numTurns") {
         if (isTokenCount(value)) result[key] = value;
@@ -296,7 +338,8 @@ function sessionTokenTotal(usage) {
   if (isTokenCount(usage.total_tokens)) return usage.total_tokens;
   if (!isTokenCount(usage.input_tokens) && !isTokenCount(usage.output_tokens)) return undefined;
   const cache = usage.input_tokens_include_cache === false ? (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) : 0;
-  return (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + cache;
+  const total = (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + cache;
+  return isTokenCount(total) ? total : undefined;
 }
 
 /** @param {Array<any>} events @returns {string|undefined} */
@@ -315,6 +358,7 @@ module.exports = {
   isMetric,
   normalizeSessionUsage,
   accumulateSessionUsage,
+  reconcileSessionUsage,
   createSessionEvent,
   normalizeAgentSession,
   selectSessionResult,

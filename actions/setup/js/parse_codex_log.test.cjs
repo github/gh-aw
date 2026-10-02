@@ -794,6 +794,24 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
       expect(isCodexJsonlFormat("thinking\nsome thinking\ntool github.x({})".split("\n"))).toBe(false);
     });
 
+    it.each([
+      { type: "reasoning", data: { content: "legacy reasoning" } },
+      { type: "assistant", message: { content: [{ type: "text", text: "legacy response" }] } },
+      { type: "result", usage: { output_tokens: 0 } },
+      { type: "system", subtype: "init", model: "legacy" },
+    ])("uses the same supported detector for legacy-compatible record %j", record => {
+      const log = `debug noise\n{"type":"assistant",\n${JSON.stringify(record)}\nnull`;
+      expect(isCodexJsonlFormat(log.split("\n"))).toBe(true);
+      expect(parseCodexLog(log).logEntries).toHaveLength(1);
+      expect(parseCodexLog(JSON.stringify([record])).logEntries).toHaveLength(1);
+      expect(parseCodexLog("debug noise", [record]).logEntries).toEqual(parseCodexLog(JSON.stringify([record])).logEntries);
+    });
+
+    it.each(['{"unrelated":true}', '{"type":"thread.unknown"}', '{"type":"assistant","message":17}'])("keeps unsupported JSON out of Codex detection: %s", log => {
+      expect(isCodexJsonlFormat(log.split("\n"))).toBe(false);
+      expect(parseCodexLog(log).logEntries).toEqual([]);
+    });
+
     it("extracts agent messages, tool calls, bash commands, and reasoning", () => {
       const result = parseCodexLog(jsonlLog);
       const types = result.logEntries.map(e => e.type);

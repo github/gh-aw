@@ -199,20 +199,22 @@ function extractCodexModel(logContent) {
  * `{"type":"item.completed","item":{"type":"agent_message",...}}` instead of the
  * legacy pretty-printed "thinking"/"tool server.method(...)" lines.
  * @param {string[]} lines - The log split into lines
+ * @param {Array<any>} [entries] - Already parsed records, when available
  * @returns {boolean} True if at least one Codex JSONL event line is present
  */
-function isCodexJsonlFormat(lines) {
-  return (parseLogEntries(lines.join("\n")) ?? []).some(isCodexRecord);
+function isCodexJsonlFormat(lines, entries = parseLogEntries(lines.join("\n")) ?? []) {
+  return entries.some(entry => isCodexRecord(entry) || normalizeCodexSession([entry]).length > 0);
 }
 
 /**
  * Parse the Codex experimental JSONL event stream into the shared logEntries model.
  * Retains native item lifecycles, message snapshots and per-turn accounting.
  * @param {string} logContent - The raw log content
+ * @param {Array<any>} [entries] - Already parsed records, when available
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexJsonl(logContent) {
-  const canonicalLogEntries = normalizeCodexSession(parseLogEntries(logContent) ?? [], extractCodexModel(logContent));
+function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []) {
+  const canonicalLogEntries = normalizeCodexSession(entries, extractCodexModel(logContent));
   const conversation = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult),
@@ -312,13 +314,14 @@ function parseCodexLegacySession(lines, model) {
 /**
  * Parse codex log content and format as markdown
  * @param {string} logContent - The raw log content to parse
+ * @param {Array<any>} [parsed] - Already parsed records, when available
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
-function parseCodexLog(logContent) {
+function parseCodexLog(logContent, parsed = parseLogEntries(logContent) ?? []) {
   // Newer Codex CLI versions emit a structured JSONL event stream rather than the
   // legacy pretty-printed format. Route those to the dedicated JSONL parser.
-  if (logContent && ((parseLogEntries(logContent) ?? []).some(isCodexRecord) || (parseLogEntries(logContent) ?? []).some(entry => normalizeCodexSession([entry]).length > 0))) {
-    return parseCodexJsonl(logContent);
+  if (logContent && isCodexJsonlFormat([], parsed)) {
+    return parseCodexJsonl(logContent, parsed);
   }
   if (!logContent) {
     return {

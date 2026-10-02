@@ -138,6 +138,40 @@ describe("Copilot real CI shape projections", () => {
     expect(parseCopilotLog(JSON.stringify(events)).logEntries).toEqual(events);
   });
 
+  it("deduplicates identified projections across interleaving without losing distinct evidence", () => {
+    const start = { type: "session.start", id: "same", timestamp: 0, data: { sessionId: "s", selectedModel: "first" } };
+    const records = [start, { type: "vendor.interleaved", data: {} }, start, { ...start, data: { ...start.data, selectedModel: "second" } }, { ...start, nativeFlag: true }];
+    const events = normalizeCopilotSession(records);
+    expect(events.filter(event => event.type === "session.start")).toHaveLength(4);
+    expect(events.filter(event => event.type === "session.init").map(event => event.data.model)).toEqual(["first", "second", "first"]);
+    const interleaved = [...events.filter(event => !event.copilotProjection), ...events.filter(event => event.copilotProjection)];
+    expect(normalizeCopilotSession(interleaved)).toEqual(interleaved);
+    expect(normalizeCopilotSession(JSON.parse(JSON.stringify(interleaved)))).toEqual(JSON.parse(JSON.stringify(interleaved)));
+  });
+
+  it.each([undefined, 0])("retains separate unidentified projections with timestamp %j and matches existing ones by occurrence", timestamp => {
+    const error = { type: "session.error", timestamp, data: { message: "same text" } };
+    const records = [error, { type: "vendor.interleaved", data: {} }, error];
+    const events = normalizeCopilotSession(records);
+    expect(projectSessionResult(events).errors).toEqual([error.data, error.data]);
+    const interleaved = [...events.filter(event => !event.copilotProjection), ...events.filter(event => event.copilotProjection)];
+    expect(normalizeCopilotSession(interleaved)).toEqual(interleaved);
+  });
+
+  it("leaves overflowed live accounting unavailable rather than reverting to an earlier snapshot", () => {
+    const records = [
+      { type: "assistant.usage", id: "large", data: { inputTokens: Number.MAX_SAFE_INTEGER, outputTokens: 1 } },
+      { type: "assistant.usage", id: "overflow", data: { inputTokens: 1, outputTokens: 2 } },
+      { type: "assistant.usage", id: "later", data: { inputTokens: 0, outputTokens: 3 } },
+    ];
+    const events = normalizeCopilotSession(records);
+    expect(projectSessionResult(events).usage.input_tokens).toBeUndefined();
+    expect(projectSessionResult(events).usage.output_tokens).toBe(6);
+    const roundTrip = JSON.parse(JSON.stringify(events));
+    expect(normalizeCopilotSession(roundTrip)).toEqual(roundTrip);
+    expect(projectSessionResult(roundTrip).usage.input_tokens).toBeUndefined();
+  });
+
   it("uses explicit finalized-turn identities, not messages or tools", () => {
     const events = [
       { type: "assistant.message", data: { content: "First." } },
@@ -371,6 +405,29 @@ describe("Copilot pretty-print observations", () => {
     expect(events[1].data).toMatchObject({ success: false, output: "Sanitized permission denial." });
     expect(events[2].data.toolName).toBe("bash");
     expect(events[3].data.output).toBe("observed output  \n2 lines…");
+  });
+
+  it.each([
+    "go test ./...",
+    "sed -n '1,3p' file",
+    "awk '{print $1}' file",
+    "find . -name '*.cjs'",
+    "printf exact",
+    "PATH=/custom/bin command --flag",
+    "/opt/custom/bin/run --flag",
+    "./scripts/check.sh",
+    "pwd",
+    "PowerShell -Command example",
+    "CustomExecutable",
+  ])("recognizes a shell display without an executable allowlist: %s", command => {
+    const events = parsePrettyPrintFormat(`✓ ${command}\n  └ observed`);
+    expect(events[0].data).toMatchObject({ toolName: "bash", command });
+    expect(events[1].data).toMatchObject({ toolName: "bash", success: true, output: "observed" });
+  });
+
+  it("does not classify named built-ins or MCP display headers as shell commands", () => {
+    const events = parsePrettyPrintFormat('✓ Read file.txt\n✓ Bash\n✓ github list_issues · {"state":"open"}');
+    expect(events.filter(event => event.type === "tool.execution_start").map(event => event.data)).toEqual([{ toolName: "Read" }, { toolName: "Bash" }, { toolName: "list_issues", mcpServerName: "github" }]);
   });
 
   it("uses explicit zero turns and duration while reconciling CLI footer with model breakdown", () => {

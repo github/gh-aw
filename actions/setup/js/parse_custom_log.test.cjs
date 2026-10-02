@@ -35,6 +35,17 @@ describe("parseCustomLog", () => {
     expect(result.logEntries.find(e => e.type === "assistant.message").data.content).toBe("Hello");
   });
 
+  it("uses Codex's supported legacy-compatible detector after malformed neighbors", () => {
+    const log = 'noise\n{"type":"assistant",\n{"type":"reasoning","data":{"content":"recovered"}}';
+    const result = parseCustomLog(log);
+    expect(result.markdown).toContain("Codex format");
+    expect(result.logEntries).toMatchObject([{ type: "assistant.reasoning", data: { content: "recovered" } }]);
+  });
+
+  it("preserves Claude priority for supported signatures shared with Codex", () => {
+    expect(parseCustomLog('{"type":"result","usage":{"output_tokens":0}}').markdown).toContain("Claude format");
+  });
+
   it("should handle unrecognized log format with basic fallback", () => {
     const unknownLog = "Some plain text log\nwith multiple lines\nand no structure";
 

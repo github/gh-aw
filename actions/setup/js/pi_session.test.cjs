@@ -89,6 +89,58 @@ describe("Pi CI stream regressions", () => {
     expect(selectSessionResult(result.logEntries).errors).toContainEqual({ code: "interrupted" });
   });
 
+  it("emits toolcall starts in source order and reconciles owned partial and final arguments", () => {
+    const records = [
+      { type: "message_update", id: "start", assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, id: "call", toolName: "bash" } },
+      { type: "message_update", id: "delta", assistantMessageEvent: { type: "toolcall_delta", contentIndex: 0, delta: '{"command":' } },
+      { type: "vendor.interleaved", data: { observed: true } },
+      { type: "message_update", id: "end", assistantMessageEvent: { type: "toolcall_end", contentIndex: 0, toolCall: { id: "call", name: "bash", arguments: { command: "echo exact" } } } },
+      { type: "tool_execution_start", toolCallId: "call", toolName: "bash", args: { command: "echo exact" } },
+    ];
+    const original = structuredClone(records);
+    const events = transformPiV3Entries(records);
+    expect(events.map(event => event.type)).toEqual(["pi.message_update", "tool.execution_start", "pi.message_update", "vendor.interleaved", "pi.message_update"]);
+    const start = byType(events, "tool.execution_start")[0];
+    expect(start.id).toBe("start");
+    expect(start.data).toMatchObject({ toolCallId: "call", toolName: "bash", argumentText: '{"command":', input: { command: "echo exact" } });
+    expect(byType(transformPiV3Entries(records.slice(0, 2)), "tool.execution_start")[0].data.argumentText).toBe('{"command":');
+    expect(transformPiV3Entries(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
+    expect(records).toEqual(original);
+  });
+
+  it("reconciles a later message snapshot into the original toolcall start", () => {
+    const records = [
+      { type: "message_update", id: "first", assistantMessageEvent: { type: "toolcall_start", contentIndex: 1, id: "call", toolName: "lookup" } },
+      { type: "message_update", assistantMessageEvent: { type: "toolcall_delta", contentIndex: 1, delta: "false" } },
+      {
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "after" },
+            { type: "toolCall", id: "call", name: "lookup", arguments: false },
+          ],
+        },
+      },
+    ];
+    const starts = byType(transformPiV3Entries(records), "tool.execution_start");
+    expect(starts).toHaveLength(1);
+    expect(starts[0]).toMatchObject({ id: "first", data: { input: false, argumentText: "false" } });
+  });
+
+  it("reconciles newly exposed tool IDs without conflating anonymous executions", () => {
+    const events = transformPiV3Entries([
+      { type: "message_update", id: "first", assistantMessageEvent: { type: "toolcall_start", contentIndex: 0 } },
+      { type: "message_update", assistantMessageEvent: { type: "toolcall_end", contentIndex: 0, toolCall: { id: "known", name: "lookup", arguments: 0, nativeFlag: true } } },
+      { type: "tool_execution_start", toolName: "bash", args: { command: "first" } },
+      { type: "tool_execution_start", toolName: "bash", args: { command: "second" } },
+    ]);
+    const starts = byType(events, "tool.execution_start");
+    expect(starts).toHaveLength(3);
+    expect(starts[0]).toMatchObject({ id: "first", data: { toolCallId: "known", toolName: "lookup", input: 0, nativeFlag: true } });
+    expect(starts.slice(1).map(event => event.data.input.command)).toEqual(["first", "second"]);
+  });
+
   it("recovers malformed neighbors and handles mixed native, flat and v3 records", () => {
     const lines = [
       JSON.stringify({ type: "assistant", content: " flat " }),
@@ -152,6 +204,46 @@ describe("Pi CI stream regressions", () => {
     ];
     expect(selectSessionResult(parse(records).logEntries)).toMatchObject({ numTurns: 1, durationMs: 0, totalCostUsd: 0, usage: { input_tokens: 6, output_tokens: 2, cache_read_input_tokens: 3 } });
     expect(computePiV3Stats([{ type: "result", stats: { turns: 0 } }]).turns).toBe(0);
+  });
+
+  it.each(["result", "session.result"])("does not synthesize a duplicate terminal result in a hybrid v3/%s stream", type => {
+    const terminal =
+      type === "result"
+        ? { type, id: "terminal", stats: { input_tokens: 6, turns: 0, duration_ms: 0, total_cost_usd: 0 }, errors: ["terminal"], permission_denials: [] }
+        : { type, id: "terminal", data: { usage: { input_tokens: 6 }, numTurns: 0, durationMs: 0, totalCostUsd: 0, errors: ["terminal"], permissionDenials: [] } };
+    const records = [{ type: "message_end", message: { role: "assistant", id: "m", content: [], usage: { input: 4, output: 2, cacheRead: 3 } } }, terminal, { type: "vendor.trailing", data: { observed: true } }];
+    const original = structuredClone(records);
+    const events = parse(records).logEntries;
+    expect(byType(events, "session.result")).toHaveLength(1);
+    expect(byType(events, "session.result")[0]).toMatchObject({
+      id: "terminal",
+      data: { numTurns: 0, durationMs: 0, totalCostUsd: 0, usage: { input_tokens: 6, output_tokens: 2, cache_read_input_tokens: 3 }, errors: ["terminal"], permissionDenials: [] },
+    });
+    expect(events.at(-1).type).toBe("vendor.trailing");
+    expect(parse(events).logEntries).toEqual(events);
+    expect(records).toEqual(original);
+  });
+
+  it("keeps hybrid flat errors once while retaining separate v3 message diagnostics", () => {
+    const events = parse([
+      { type: "turn_start" },
+      { type: "message_end", message: { role: "assistant", content: [], errorMessage: "same diagnostic" } },
+      { type: "error", error: "same diagnostic" },
+      { type: "result", errors: ["terminal diagnostic"] },
+    ]).logEntries;
+    expect(byType(events, "session.result")).toHaveLength(1);
+    expect(byType(events, "pi.error")).toHaveLength(1);
+    expect(selectSessionResult(events).errors).toEqual(["terminal diagnostic", "same diagnostic", "same diagnostic"]);
+  });
+
+  it("reconciles hybrid snapshots in source order, including a later agent_end", () => {
+    const events = parse([
+      { type: "message_end", message: { role: "assistant", id: "m", content: [], usage: { input: 4, output: 2, cacheRead: 3 } } },
+      { type: "result", stats: { input_tokens: 6, output_tokens: 5, duration_ms: 10, turns: 2, total_cost_usd: 1 }, usage: { nativeFlag: true } },
+      { type: "agent_end", messages: [], usage: { input: 0 }, durationMs: 0, totalCostUsd: 0, numTurns: 0 },
+    ]).logEntries;
+    expect(byType(events, "session.result")).toHaveLength(1);
+    expect(selectSessionResult(events)).toMatchObject({ numTurns: 0, durationMs: 0, totalCostUsd: 0, usage: { input_tokens: 0, output_tokens: 5, cache_read_input_tokens: 3, nativeFlag: true } });
   });
 
   it("retains anonymous calls without inventing IDs or repeating message snapshots", () => {

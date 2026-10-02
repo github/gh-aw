@@ -93,6 +93,35 @@ describe("Claude CI session shapes", () => {
     expect(partial.data.is_error).toBeUndefined();
   });
 
+  it.each([undefined, { output_tokens: 0 }, { input_tokens: 9, output_tokens: -1 }])("reconciles incomplete terminal usage %j field by field", terminalUsage => {
+    const records = freeze([
+      { type: "assistant", message: { id: "first", content: [], usage: { input_tokens: 2, output_tokens: 3, cache_read_input_tokens: 4 } } },
+      { type: "assistant", message: { id: "first", content: [], usage: { output_tokens: 5 } } },
+      { type: "assistant", message: { id: "second", content: [], usage: { input_tokens: 6, output_tokens: 7 } } },
+      { type: "result", usage: terminalUsage, num_turns: 2, duration_ms: 0, errors: ["terminal"], permission_denials: [] },
+    ]);
+    const events = normalizeClaudeSession(records);
+    const results = events.filter(event => event.type === "session.result");
+    expect(results).toHaveLength(1);
+    expect(projectSessionResult(events)).toMatchObject({
+      num_turns: 2,
+      duration_ms: 0,
+      errors: ["terminal"],
+      permission_denials: [],
+      usage: { input_tokens: terminalUsage?.input_tokens ?? 8, output_tokens: terminalUsage?.output_tokens === 0 ? 0 : 12, cache_read_input_tokens: 4, input_tokens_include_cache: false },
+    });
+    expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
+  });
+
+  it("preserves independent response fields with canonical terminal snapshots", () => {
+    const events = normalizeClaudeSession([
+      { type: "assistant", message: { id: "known", content: [], usage: { input_tokens: 4, output_tokens: 2 } } },
+      { type: "session.result", data: { usage: { outputTokens: 0 }, numTurns: 1 } },
+      { type: "session.result", data: { durationMs: 0 } },
+    ]);
+    expect(projectSessionResult(events)).toMatchObject({ num_turns: 1, duration_ms: 0, usage: { input_tokens: 4, output_tokens: 0 } });
+  });
+
   it("is pure, deterministic, idempotent, and JSON-round-trippable", () => {
     const original = structuredClone(success);
     const records = freeze(structuredClone(success));

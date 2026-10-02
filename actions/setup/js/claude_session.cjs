@@ -1,6 +1,6 @@
 // @ts-check
 
-const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, isMetric } = require("./agent_session.cjs");
+const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric } = require("./agent_session.cjs");
 
 /**
  * Claude input tokens exclude cache reads and cache writes.
@@ -31,7 +31,7 @@ function normalizeClaudeSession(records) {
   const streams = new Map();
   const streamedMessages = new Map();
   const responseUsage = new Map();
-  let hasResult = false;
+  const terminalResults = [];
   let lastUsageSource;
 
   const channelKey = source => JSON.stringify([source.session_id, source.parent_tool_use_id]);
@@ -86,7 +86,7 @@ function normalizeClaudeSession(records) {
     const source = structuredClone(record);
     if (isSessionEvent(source)) {
       events.push(source);
-      if (source.type === "session.result") hasResult = true;
+      if (source.type === "session.result") terminalResults.push(source);
       if (source.type === "tool.execution_start" && source.data.toolCallId !== undefined) tools.set(toolKey(source, source.data.toolCallId), source.data);
       continue;
     }
@@ -185,7 +185,6 @@ function normalizeClaudeSession(records) {
     } else if (source.type === "reasoning" && typeof source.data?.content === "string") {
       emit(source, "assistant.reasoning", source.data);
     } else if (source.type === "result") {
-      hasResult = true;
       const mapped = normalizeAgentSession([source], { sourceEngine: "claude" })[0];
       if (!mapped || mapped.type !== "session.result") continue;
       /** @type {import("./types/agent_session").SessionResultData} */
@@ -198,7 +197,7 @@ function normalizeClaudeSession(records) {
         }
         data.errors = [diagnostic];
       }
-      emit(source, "session.result", data);
+      terminalResults.push(emit(source, "session.result", data));
     } else if (source.type === "system" && typeof source.subtype === "string") {
       native(source, "claude.system");
       if (source.subtype === "api_retry" && source.error != null) {
@@ -217,11 +216,17 @@ function normalizeClaudeSession(records) {
     }
   }
 
-  if (!hasResult && responseUsage.size > 0) {
+  if (responseUsage.size > 0) {
     const usage = {};
     for (const observation of responseUsage.values()) accumulateSessionUsage(usage, observation);
     if (Object.keys(usage).length > 0) {
-      emit(lastUsageSource, "session.result", { usage: { ...usage, input_tokens_include_cache: false }, partial: true });
+      const observed = { ...usage, input_tokens_include_cache: false };
+      if (terminalResults.length) {
+        const first = terminalResults[0];
+        first.data.usage = reconcileSessionUsage(observed, first.data.usage);
+      } else {
+        emit(lastUsageSource, "session.result", { usage: observed, partial: true });
+      }
     }
   }
   return events;

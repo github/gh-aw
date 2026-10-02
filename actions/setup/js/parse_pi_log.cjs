@@ -11,7 +11,7 @@ const {
   convertLegacyLogEntriesToCopilotEvents,
   parseLogEntries,
 } = require("./log_parser_shared.cjs");
-const { transformFlatSessionEntries, projectSessionResult } = require("./agent_session.cjs");
+const { transformFlatSessionEntries, projectSessionResult, selectSessionResult, reconcileSessionUsage } = require("./agent_session.cjs");
 const { transformPiV3Entries, computePiV3Stats } = require("./pi_session.cjs");
 
 const main = createEngineLogParser({
@@ -61,11 +61,23 @@ function parsePiLog(logContent) {
   const logEntries = useV3Schema ? transformPiV3Entries(rawEntries) : transformPiEntries(rawEntries);
 
   const stats = useV3Schema ? computePiV3Stats(rawEntries) : null;
-  if (stats) {
-    logEntries.push({ type: "result", num_turns: stats.turns, usage: stats.usage, total_cost_usd: stats.total_cost_usd, duration_ms: stats.duration_ms, errors: stats.errors.length || stats.exposedErrors ? stats.errors : undefined });
-  }
-
   const canonicalLogEntries = convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "pi" });
+  if (stats) {
+    const terminal = [...canonicalLogEntries].reverse().find(event => event.type === "session.result");
+    const selected = selectSessionResult(canonicalLogEntries);
+    const data = {
+      numTurns: stats.turns ?? selected?.numTurns,
+      usage: reconcileSessionUsage(selected?.usage, stats.usage),
+      totalCostUsd: stats.total_cost_usd ?? selected?.totalCostUsd,
+      durationMs: stats.duration_ms ?? selected?.durationMs,
+    };
+    if (terminal) {
+      Object.assign(terminal.data, data);
+      if (stats.errors.length || stats.exposedErrors) terminal.data.errors = [...(terminal.data.errors ?? []), ...stats.errors];
+    } else {
+      canonicalLogEntries.push({ type: "session.result", data: { ...data, errors: stats.errors.length || stats.exposedErrors ? stats.errors : undefined } });
+    }
+  }
   if (canonicalLogEntries.length === 0) {
     return { markdown: buildStepSummaryDetailsSection("Pi", "Log format not recognized as Pi JSONL."), logEntries: [], mcpFailures: [], maxTurnsHit: false };
   }

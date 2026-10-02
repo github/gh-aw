@@ -5,6 +5,7 @@
 /** @typedef {import("./types/agent_session").SessionResultData} SessionResultData */
 
 const { normalizeAgentSession, createSessionEvent, accumulateSessionUsage, isTokenCount, isMetric } = require("./agent_session.cjs");
+const { isDeepStrictEqual } = require("node:util");
 
 /**
  * Copilot persists lifecycle events but emits assistant.usage only on the live
@@ -21,6 +22,17 @@ function normalizeCopilotSession(entries) {
   const responses = new Set();
   const turns = new Set();
   const tools = new Map();
+  const projections = new Map();
+  const projectionKey = (label, event) => JSON.stringify([label, event.type, event.id, event.timestamp]);
+  const projectionData = data => Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+  const projectionEvidence = event => projectionData({ ...event, data: projectionData(event.data) });
+  for (const event of source) {
+    if (!event.copilotProjection) continue;
+    const key = projectionKey(event.copilotProjection, event);
+    const bucket = projections.get(key) ?? [];
+    bucket.push({ evidence: projectionEvidence(event), consumed: false });
+    projections.set(key, bucket);
+  }
   const deltaText = new Map();
   for (const event of source) {
     if (event.type === "assistant.message_delta" && event.data.messageId !== undefined && typeof event.data.deltaContent === "string") {
@@ -49,9 +61,21 @@ function normalizeCopilotSession(entries) {
      * @param {SessionEvent["type"]} [label]
      */
     const project = (type, fields, label = event.type) => {
-      const next = source[index + 1];
-      if (next?.copilotProjection === label && next.id === event.id && next.timestamp === event.timestamp) return;
-      events.push({ ...createSessionEvent(event, type, fields), copilotProjection: label });
+      const projected = { ...createSessionEvent(event, type, fields), copilotProjection: label };
+      const key = projectionKey(label, projected);
+      const bucket = projections.get(key) ?? [];
+      const identified = event.id !== undefined;
+      const comparable = projectionEvidence(projected);
+      const previous = bucket.find(item => (identified || !item.consumed) && isDeepStrictEqual(item.evidence, comparable));
+      if (previous) {
+        previous.consumed = true;
+        return;
+      }
+      events.push(projected);
+      if (identified) {
+        bucket.push({ evidence: comparable, consumed: true });
+        projections.set(key, bucket);
+      }
     };
 
     if (event.type === "session.start") {

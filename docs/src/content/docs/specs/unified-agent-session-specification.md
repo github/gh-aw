@@ -339,6 +339,13 @@ means cache counts are already included in input. Without that evidence, the dis
 computed total is input plus output, with cache counts shown separately. A valid
 source `total_tokens` takes precedence over a computed display total.
 
+The implementation rejects aggregate token counts above `Number.MAX_SAFE_INTEGER`.
+Its optional `usage.overflowed_tokens` array records which canonical fields became
+unavailable, preventing subsequent contributions or result selection from restoring
+an incomplete earlier subtotal. A later valid authoritative snapshot can replace
+the unavailable field. This metadata survives JSON serialization; it is not a token
+count.
+
 ### 6.2 Per-turn accumulation and snapshots
 
 **T-UAS-032 — Cumulative per-turn accounting.** Distinct Codex per-turn usage reports and distinct Pi finalized-turn usage reports MUST accumulate into session usage, field by field, rather than retaining only the last turn. A field MUST remain absent if no report exposes it; missing values are not assertions of zero. Turn or response identities, when supplied, MUST prevent counting duplicate observations of the same report.
