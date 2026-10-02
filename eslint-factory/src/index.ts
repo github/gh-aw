@@ -63,6 +63,7 @@ import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
 import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
 import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
+import { noAsyncArrayPredicateCallbackRule } from "./rules/no-async-array-predicate-callback";
 
 const plugin = {
   meta: {
@@ -134,6 +135,7 @@ const plugin = {
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
     "no-single-char-string-replace": noSingleCharStringReplaceRule,
     "no-async-foreach-callback": noAsyncForEachCallbackRule,
+    "no-async-array-predicate-callback": noAsyncArrayPredicateCallbackRule,
   },
 };
 

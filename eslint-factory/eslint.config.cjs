@@ -51,6 +51,7 @@ module.exports = [
       "gh-aw-custom/require-fs-chmod-try-catch": "warn",
       "gh-aw-custom/no-single-char-string-replace": "warn",
       "gh-aw-custom/no-async-foreach-callback": "warn",
+      "gh-aw-custom/no-async-array-predicate-callback": "warn",
       "gh-aw-custom/no-setfailed-then-exit-zero": "warn",
       "gh-aw-custom/no-err-stack-then-string-fallback": "warn",
       "gh-aw-custom/no-caught-error-interpolation": "warn",
