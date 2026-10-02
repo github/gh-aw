@@ -103,5 +103,40 @@
    "Active (pushed 2026-10-01)"
   ],
   "blogged": false
+ },
+ "idorozin/AgentPages": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-02",
+  "score": 6,
+  "summary": "Cron-driven agent maintains an Astro research site and opens auto-merged PRs; fun but stale since Mar 2026 and auto-merge weakens review.",
+  "highlights": [
+   "README.md: user/ -> agent/ -> website/ -> docs/ pipeline",
+   "Tavily web search integration",
+   "Live example sites"
+  ],
+  "blogged": false
+ },
+ "zircote-plugins/github-agentic-workflows": {
+  "kind": "tool",
+  "reviewed": "2026-10-02",
+  "score": 5,
+  "summary": "Claude Code plugin (aw-author) to author/validate/improve gh-aw workflows; stale since Jul 2026.",
+  "highlights": [
+   "Guided + one-shot authoring",
+   "Validation beyond gh aw compile (permissions, safe-output coverage)"
+  ],
+  "blogged": false
+ },
+ "ks6088ts-labs/template-github-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-02",
+  "score": 5,
+  "summary": "Persona-based template collection with Makefile tasks and tutorials; mostly onboarding.",
+  "highlights": [
+   "Makefile-driven tasks",
+   "docs/tutorials getting-started",
+   "Use-case index"
+  ],
+  "blogged": false
  }
 }

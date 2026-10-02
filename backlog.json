@@ -1,23 +1,5 @@
 [
  {
-  "id": "idorozin/AgentPages",
-  "kind": "workflow-collection",
-  "source": "topic:gh-aw",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "zircote-plugins/github-agentic-workflows",
-  "kind": "tool",
-  "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "ks6088ts-labs/template-github-agentic-workflows",
-  "kind": "workflow-collection",
-  "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- },
- {
   "id": "yutkat/github-star-organizer",
   "kind": "workflow-collection",
   "source": "topic:github-agentic-workflows",
