@@ -1,0 +1,192 @@
+---
+import LandingSection from './LandingSection.astro';
+import HeroBackground from './HeroBackground.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const options = [
+  {
+    id: 'cli',
+    title: 'From the terminal',
+    short: 'Terminal',
+    duration: '1:16',
+    description: 'Install the extension, add a sample workflow and trigger the first run.',
+    linkText: 'Follow the quick start',
+    href: `${base}/setup/quick-start/`,
+    video: 'install-and-add-workflow-in-cli',
+  },
+  {
+    id: 'web',
+    title: 'From github.com',
+    short: 'github.com',
+    duration: '1:41',
+    description: "Ask Copilot in your repository's Agents tab to write the workflow for you.",
+    linkText: 'Create a workflow',
+    href: `${base}/setup/creating-workflows/`,
+    video: 'create-workflow-on-github',
+  },
+];
+---
+<LandingSection id="watch" titleId="watch-title" tone="dark" title="Watch it run" lede="Create and run your first workflow in under two minutes.">
+  <div class="aw-watch-bg" aria-hidden="true">
+    <HeroBackground placement="top-band" strength={0.45} forceDark />
+  </div>
+  <div class="aw-watch" data-watch>
+    <div class="aw-watch-tabs" role="tablist" aria-label="Choose a walkthrough">
+      {options.map((o, i) => (
+        <button type="button" class="aw-watch-tab" role="tab" id={`watch-tab-${o.id}`} aria-controls={`watch-panel-${o.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+          <span class="aw-watch-long">{o.title}</span><span class="aw-watch-short">{o.short}</span><span class="aw-watch-time">{o.duration}</span>
+        </button>
+      ))}
+    </div>
+    {options.map((o, i) => (
+      <div class="aw-watch-panel" role="tabpanel" id={`watch-panel-${o.id}`} aria-labelledby={`watch-tab-${o.id}`} data-selected={i === 0 ? 'true' : 'false'}>
+        <div class="aw-watch-frame aw-card">
+          <video controls playsinline preload="none" poster={`${base}/videos/${o.video}-poster.jpg`} aria-label={o.title}>
+            <source src={`${base}/videos/${o.video}.mp4`} type="video/mp4" />
+            <track kind="captions" src={`${base}/videos/${o.video}.vtt`} srclang="en" label="English" default />
+          </video>
+        </div>
+        <p class="aw-watch-desc">{o.description} <a class="aw-link" href={o.href}>{o.linkText} →</a></p>
+      </div>
+    ))}
+  </div>
+</LandingSection>
+
+<style>
+  :global(.aw-container:has(.aw-watch) > h2),
+  :global(.aw-container:has(.aw-watch) > .aw-lede) {
+    margin-inline: auto;
+    text-align: center;
+  }
+  /* Faint dithered cloud band along the top edge of the dark section. */
+  :global(#watch) {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .aw-watch-bg {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 12rem;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .aw-watch {
+    margin-top: 2.5rem;
+    display: grid;
+    justify-items: center;
+    gap: 1.5rem;
+  }
+  .aw-watch-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    max-width: 100%;
+    background: var(--aw-color-bg-subtle);
+    border: 1px solid var(--aw-color-border);
+    border-radius: var(--aw-radius-pill);
+  }
+  .aw-watch-tab {
+    appearance: none;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    white-space: nowrap;
+    padding: 0.375rem 0.875rem;
+    border: 0;
+    border-radius: var(--aw-radius-pill);
+    background: transparent;
+    font-size: var(--aw-step--1);
+    font-weight: 540;
+    color: var(--aw-color-text-muted);
+    transition: background-color var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease;
+  }
+  .aw-watch-tab:hover { color: var(--aw-color-text); }
+  .aw-watch-tab[aria-selected='true'] {
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text-strong);
+    box-shadow: 0 0 0 1px var(--aw-color-border-strong);
+  }
+  .aw-watch-time {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--aw-color-text-muted);
+  }
+  .aw-watch-panel { width: 100%; max-width: 64rem; }
+  .aw-watch-panel + .aw-watch-panel { margin-top: 2rem; }
+  .aw-watch-frame {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--aw-color-bg-subtle);
+  }
+  .aw-watch-frame video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--aw-color-bg-subtle);
+  }
+  .aw-watch-desc {
+    margin: 1.25rem auto 0;
+    max-width: 52ch;
+    text-align: center;
+    font-size: var(--aw-step-0);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .aw-watch-desc a {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  /* Enhanced: one panel at a time. Without JS the toggle is hidden and both videos show. */
+  .aw-watch[data-enhanced] .aw-watch-panel[data-selected='false'] { display: none; }
+  .aw-watch:not([data-enhanced]) .aw-watch-tabs { display: none; }
+  /* Narrow screens: short labels keep the toggle to one slim row. */
+  .aw-watch-short { display: none; }
+  @media (max-width: 519px) {
+    .aw-watch-long { display: none; }
+    .aw-watch-short { display: inline; }
+  }
+  @media (min-width: 520px) {
+    .aw-watch-tab { gap: 0.625rem; padding: 0.5rem 1.25rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aw-watch-tab { transition: none; }
+  }
+</style>
+
+<script>
+  /* ARIA tabs: one video at a time, paused when switching away. */
+  import { setupTabs } from '../../scripts/tabs';
+
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+
+    document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
+      root.setAttribute('data-enhanced', '');
+      setupTabs(root, (panel, on) => {
+        panel.setAttribute('data-selected', String(on));
+        if (!on) panel.querySelector('video')?.pause();
+      }, controller.signal);
+    });
+
+    cleanup = () => {
+      controller.abort();
+      document.querySelectorAll<HTMLElement>('[data-watch]').forEach((root) => {
+        root.removeAttribute('data-enhanced');
+      });
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
+</script>

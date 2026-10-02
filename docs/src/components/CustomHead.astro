@@ -252,14 +252,7 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 
 <link
   rel="preload"
-  href="/gh-aw/fonts/MonaSans-Regular.woff2"
-  as="font"
-  type="font/woff2"
-  crossorigin
-/>
-<link
-  rel="preload"
-  href="/gh-aw/fonts/MonaSans-Bold.woff2"
+  href="/gh-aw/fonts/MonaSansVF.woff2"
   as="font"
   type="font/woff2"
   crossorigin
@@ -280,6 +273,11 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 <!-- Copy button accessibility enhancement: mirrors title→aria-label on Expressive Code copy buttons -->
 <script>
   import '../scripts/copy-button-aria.ts';
+</script>
+
+<!-- Heading links: copy a link to the section (styles in custom.css, "Heading links") -->
+<script>
+  import '../scripts/heading-links.ts';
 </script>
 
 <!-- Skip link accessibility enhancement: adds id="starlight__main" and tabindex="-1" to <main> -->
