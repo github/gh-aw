@@ -1,0 +1,515 @@
+/* Docs components: prev/next pagination, aside callouts, heading links and
+ * the code-block copy button. Loads last in customCss (astro.config.mjs).
+ * Icon masks (--aw-icon-*) live in tokens.css.
+ */
+
+/* ==========================================================================
+   Pagination: no boxes, two plain links under a hairline.
+   ========================================================================== */
+
+.pagination-links {
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--aw-color-divider);
+}
+
+/* Starlight's link is a bordered card; strip it back to text */
+.pagination-links a {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--aw-radius-xs); /* rounds the focus ring */
+  box-shadow: none;
+  color: var(--aw-color-text-muted);
+  font-size: var(--aw-step--1);
+  transition: color var(--aw-duration-fast) ease;
+}
+
+.pagination-links a:hover {
+  color: var(--aw-color-text-secondary);
+}
+
+.pagination-links [rel='next'] {
+  grid-column: 2;
+}
+
+/* Starlight's arrow is replaced by the octicon drawn on the label line below. */
+.pagination-links a > svg,
+.pagination-links a br {
+  display: none;
+}
+
+/* Label ("Previous" / "Next") and arrow on row 1, title on row 2. */
+.pagination-links a > span {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  column-gap: 0.375rem;
+}
+
+.pagination-links [rel='prev'] > span {
+  grid-template-columns: auto 1fr;
+  text-align: start;
+}
+
+.pagination-links [rel='next'] > span {
+  grid-template-columns: 1fr auto;
+  text-align: end;
+}
+
+.pagination-links [rel='prev'] > span::before,
+.pagination-links [rel='next'] > span::after {
+  content: '';
+  grid-row: 1;
+  width: 14px;
+  height: 14px;
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-arrow-left) center / contain no-repeat;
+  mask: var(--aw-icon-arrow-left) center / contain no-repeat;
+  transition: transform var(--aw-duration-fast) ease;
+}
+
+.pagination-links [rel='prev'] > span::before {
+  grid-column: 1;
+}
+
+.pagination-links [rel='next'] > span::after {
+  grid-column: 2;
+  -webkit-mask-image: var(--aw-icon-arrow-right);
+  mask-image: var(--aw-icon-arrow-right);
+}
+
+.pagination-links [rel='prev']:hover > span::before {
+  transform: translateX(-2px);
+}
+
+.pagination-links [rel='next']:hover > span::after {
+  transform: translateX(2px);
+}
+
+.pagination-links .link-title {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  font-size: var(--aw-step-1);
+  letter-spacing: var(--aw-tracking-snug);
+  line-height: var(--aw-leading-snug);
+  color: var(--aw-color-text);
+  transition: color var(--aw-duration-fast) ease;
+}
+
+.pagination-links a:hover .link-title {
+  color: var(--aw-color-accent-text);
+}
+
+@media (max-width: 40rem) {
+  .pagination-links {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .pagination-links [rel='next'] {
+    grid-column: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagination-links a,
+  .pagination-links a > span::before,
+  .pagination-links a > span::after,
+  .pagination-links .link-title {
+    transition: none;
+  }
+
+  .pagination-links a:hover > span::before,
+  .pagination-links a:hover > span::after {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Asides: a faint tint of the type colour, a hairline in the same hue,
+   and an icon badge beside the type label. Each type sets four variables:
+   --aw-aside-color (status colour), --aw-aside-tint (background mix),
+   --aw-aside-line (border mix) and --aw-aside-ring (badge ring mix).
+   ========================================================================== */
+
+.sl-markdown-content .starlight-aside {
+  position: relative;
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), transparent);
+  border-radius: var(--aw-radius-lg);
+  background: color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-tint), var(--aw-color-bg));
+  box-shadow: var(--aw-shadow-soft);
+}
+
+/* More space above an aside than between ordinary blocks. */
+.sl-markdown-content .starlight-aside:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+/* Dark values; light overrides follow */
+.sl-markdown-content .starlight-aside--note {
+  --aw-aside-color: var(--aw-color-callout-note);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 16%;
+  --aw-aside-icon: var(--aw-icon-info);
+}
+
+.sl-markdown-content .starlight-aside--tip {
+  --aw-aside-color: var(--aw-color-callout-tip);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 23%;
+  --aw-aside-icon: var(--aw-icon-light-bulb);
+}
+
+.sl-markdown-content .starlight-aside--caution {
+  --aw-aside-color: var(--aw-color-callout-caution);
+  --aw-aside-tint: 18%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 21%;
+  --aw-aside-icon: var(--aw-icon-alert);
+}
+
+.sl-markdown-content .starlight-aside--danger {
+  --aw-aside-color: var(--aw-color-callout-danger);
+  --aw-aside-tint: 15%;
+  --aw-aside-line: 10%;
+  --aw-aside-ring: 20%;
+  --aw-aside-icon: var(--aw-icon-stop);
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--note {
+  --aw-aside-tint: 5%;
+  --aw-aside-line: 12%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--tip {
+  --aw-aside-tint: 5%;
+  --aw-aside-line: 15%;
+  --aw-aside-ring: 20%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--caution {
+  --aw-aside-tint: 7.5%;
+  --aw-aside-line: 15%;
+  --aw-aside-ring: 15%;
+}
+
+:root[data-theme='light'] .sl-markdown-content .starlight-aside--danger {
+  --aw-aside-tint: 4%;
+  --aw-aside-line: 11%;
+  --aw-aside-ring: 15%;
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__icon {
+  display: none;
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__title {
+  position: relative;
+  gap: 0.625rem;
+  font-size: var(--aw-text-ui);
+  font-weight: 600;
+  line-height: var(--aw-leading-snug);
+  color: var(--aw-aside-color);
+}
+
+/* Badge: a surface-coloured circle with a faint ring in the type colour… */
+.sl-markdown-content .starlight-aside__title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--aw-color-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-ring), transparent);
+}
+
+/* …with the 12px icon centred on top. */
+.sl-markdown-content .starlight-aside__title::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  background-color: var(--aw-aside-color);
+  -webkit-mask: var(--aw-aside-icon) center / contain no-repeat;
+  mask: var(--aw-aside-icon) center / contain no-repeat;
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__content {
+  margin-top: 0.625rem;
+  color: var(--aw-color-text-body);
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__content a {
+  color: var(--aw-color-link);
+}
+
+/* ==========================================================================
+   Heading links (markup: Starlight's rehype-heading-links; script: heading-links.ts)
+   ========================================================================== */
+
+/* Starlight wraps each heading as .sl-heading-wrapper > h2 + a.sl-anchor-link.
+   Its chain SVG is hidden; the link draws Primer's `link` octicon with a mask and,
+   once heading-links.ts has run, copies the section URL on click and briefly shows
+   `check` plus a small "Copied" tip. Without JS it stays a plain #anchor link.
+   With a mouse on wide screens the button sits in the left gutter and fades in on
+   hover; elsewhere it follows the heading text, always faintly visible on touch. */
+.sl-markdown-content .sl-heading-wrapper {
+  --aw-anchor-box: 1.5rem;
+  --aw-anchor-lh: var(--aw-leading-snug);
+  /* Starlight's end-of-line reservation, resized for the button box */
+  --sl-anchor-icon-size: var(--aw-anchor-box);
+  --sl-anchor-icon-gap: 0.25rem;
+  position: relative;
+  line-height: var(--aw-anchor-lh);
+}
+
+/* Size the wrapper like its heading, so the line box (and the button's em-based
+   centring) follows the heading rather than Starlight's larger --sl-text-hN strut.
+   Starlight spaces wrappers at 1.5em of its own sizes; keep that spacing. */
+.sl-markdown-content .sl-heading-wrapper.level-h1 { font-size: var(--aw-step-4); --aw-anchor-lh: var(--aw-leading-tight); --aw-anchor-space: var(--sl-text-h1); }
+.sl-markdown-content .sl-heading-wrapper.level-h2 { font-size: var(--aw-step-2); --aw-anchor-space: var(--sl-text-h2); }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { font-size: var(--aw-step-1); --aw-anchor-space: var(--sl-text-h3); }
+.sl-markdown-content .sl-heading-wrapper:is(.level-h4, .level-h5, .level-h6) { font-size: var(--aw-step-0); --aw-anchor-space: var(--sl-text-h4); }
+
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper {
+  margin-top: calc(1.5 * var(--aw-anchor-space));
+}
+
+.sl-markdown-content .sl-anchor-icon {
+  display: none;
+}
+
+.sl-markdown-content .sl-anchor-link {
+  align-items: center;
+  justify-content: center;
+  width: var(--aw-anchor-box);
+  height: var(--aw-anchor-box);
+  /* Centre the box on the heading's first line */
+  vertical-align: top;
+  transform: translateY(calc((var(--aw-anchor-lh) * 1em - var(--aw-anchor-box)) / 2));
+  border-radius: var(--aw-radius-sm);
+  color: var(--aw-color-text-muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
+}
+
+.sl-markdown-content .sl-anchor-link::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-link) center / contain no-repeat;
+  mask: var(--aw-icon-link) center / contain no-repeat;
+}
+
+.sl-markdown-content .sl-heading-wrapper:hover .sl-anchor-link,
+.sl-markdown-content .sl-anchor-link:focus-visible,
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  opacity: 1;
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-bg-subtle);
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied]::before {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+/* "Copied" tip: injected by heading-links.ts here, and shared with the code-block
+   copy button's feedback label (see "Code block copy button") */
+.sl-markdown-content .aw-anchor-tip,
+.expressive-code .frame .copy .feedback {
+  padding: 0.1875rem 0.4375rem;
+  border: 1px solid var(--aw-color-divider);
+  border-radius: var(--aw-radius-sm);
+  background-color: var(--aw-color-surface);
+  font-family: var(--aw-font-sans);
+  font-size: var(--aw-step--1);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--aw-color-text);
+  pointer-events: none;
+}
+
+.sl-markdown-content .aw-anchor-tip {
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, 0.125rem);
+  transition: opacity var(--aw-duration-fast) ease, transform var(--aw-duration-fast) ease;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Touch: no hover, so keep the button faintly visible after the text */
+@media (hover: none) {
+  .sl-markdown-content .sl-anchor-link {
+    opacity: 0.45;
+  }
+}
+
+/* Mouse on wide screens: move the button into the left gutter */
+@media (hover: hover) and (min-width: 50rem) {
+  .sl-markdown-content .sl-heading-wrapper > :first-child:not([hidden]) {
+    padding-inline-end: 0;
+  }
+
+  .sl-markdown-content .sl-anchor-link {
+    position: absolute;
+    top: 0;
+    inset-inline-start: calc(-1 * (var(--aw-anchor-box) + 0.375rem));
+    margin: 0;
+  }
+
+  /* Bridge the gap to the heading so the button stays visible on the way over */
+  .sl-markdown-content .sl-anchor-link::after {
+    inset: -0.25rem -0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-markdown-content .sl-anchor-link,
+  .sl-markdown-content .aw-anchor-tip {
+    transition: none;
+  }
+
+  .sl-markdown-content .aw-anchor-tip,
+  .sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ==========================================================================
+   Code block copy button
+   ========================================================================== */
+
+/* Expressive Code's frames plugin; markup:
+   .frame > .copy > [aria-live] > .feedback + button > div). Same language as the
+   heading links: a quiet octicon button, `copy` morphing to `check`, and the shared
+   "Copied" tip beside it. EC's separate hover layer (button > div) and border layer
+   (::before) are dropped so every state shares one rounded box. EC's script adds
+   .feedback.show for 1.5s; the label text comes from src/content/i18n/en.json. */
+.expressive-code .frame .copy {
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.expressive-code .frame .copy button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: var(--aw-radius-sm);
+  background: transparent;
+  color: var(--aw-color-text-muted);
+  transition: opacity var(--aw-duration-fast) ease, color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
+}
+
+.expressive-code .frame .copy button div,
+.expressive-code .frame .copy button::before {
+  display: none;
+}
+
+.expressive-code .frame .copy button::after {
+  inset: 50% auto auto 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-copy) center / contain no-repeat;
+  mask: var(--aw-icon-copy) center / contain no-repeat;
+}
+
+/* Touch devices: keep a 44px hit area (WCAG 2.5.5) around the compact button */
+@media (pointer: coarse) {
+  .expressive-code .frame .copy button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.expressive-code .frame .copy button:hover,
+.expressive-code .frame .copy button:focus-visible {
+  opacity: 1;
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-divider);
+}
+
+/* Copied: check icon in the neutral text colour */
+.expressive-code .frame .copy:has(.feedback.show) button {
+  opacity: 1;
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.expressive-code .frame .copy:has(.feedback.show) button::after {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+.expressive-code .frame .copy .feedback {
+  align-self: center;
+  margin: 0;
+  transform: translateX(0.125rem);
+  transition: opacity var(--aw-duration-fast) ease, transform var(--aw-duration-fast) ease;
+}
+
+.expressive-code .frame .copy .feedback.show {
+  transform: none;
+}
+
+.expressive-code .frame .copy .feedback::after {
+  content: none;
+}
+
+/* Touch: no hover, so keep the button visible */
+@media (hover: none) {
+  .expressive-code .frame .copy button {
+    opacity: 0.75;
+  }
+}
+
+/* Mouse: hidden until the block is hovered or focused (EC reveals it at 0.75) */
+@media (hover: hover) {
+  .expressive-code .frame:hover .copy button:not(:hover),
+  .expressive-code .frame:focus-within :focus-visible ~ .copy button:not(:hover) {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expressive-code .frame .copy button,
+  .expressive-code .frame .copy .feedback {
+    transition: none;
+  }
+
+  .expressive-code .frame .copy .feedback {
+    transform: none;
+  }
+}

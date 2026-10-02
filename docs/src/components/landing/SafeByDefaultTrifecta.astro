@@ -1,0 +1,498 @@
+---
+import Octicon from '../Octicon.astro';
+
+const TRIFECTA_URL = 'https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents';
+
+interface Props {
+  /** Render the intro paragraph or the diagram. */
+  part: 'text' | 'figure';
+}
+const { part } = Astro.props;
+
+// Geometry in viewBox units. At full size (40rem) one unit is roughly one CSS pixel, which is what
+// the pill clearances below are tuned against. HTML overlays reuse the same numbers as percentages.
+const W = 640;
+const H = 460;
+const C = { x: 320, y: 280 }; // where the three legs would meet: the agent
+const CORE_R = 34; // spokes stop short of the agent badge
+
+const nodes = [
+  {
+    id: 'data',
+    x: 320,
+    y: 32,
+    icon: 'lock',
+    label: 'Private data',
+    sub: 'Secrets, tokens, private repos',
+    cut: 'Credential isolation',
+    t: 0.44, // wide layout: where the pill sits along the spoke
+    tc: 0.45, // compact layout: where the cut disc sits
+  },
+  {
+    id: 'untrusted',
+    x: 56,
+    y: 428,
+    icon: 'alert',
+    label: 'Untrusted content',
+    sub: 'Issues, PR comments, web pages',
+    cut: 'Integrity filtering',
+    t: 0.48,
+    tc: 0.6,
+  },
+  {
+    id: 'outbound',
+    x: 584,
+    y: 428,
+    icon: 'globe',
+    label: 'Outbound access',
+    sub: 'Network, APIs, writes',
+    cut: 'Sandboxed agent',
+    t: 0.48,
+    tc: 0.6,
+  },
+] as const;
+
+const f = (v: number) => v.toFixed(1);
+const pct = (v: number, of: number) => `${((v / of) * 100).toFixed(2)}%`;
+
+const spokes = nodes.map((n) => {
+  const dx = C.x - n.x;
+  const dy = C.y - n.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  const at = (d: number) => ({ x: n.x + ux * d, y: n.y + uy * d });
+  // The apex leg stops above the "lethal trifecta" caption; the caption sits higher, in units, when compact.
+  const isApex = n.id === 'data';
+  const split = (t: number, stop: number) => {
+    const p = at(len * t);
+    return { p, before: { a: n, b: p }, after: { a: p, b: at(len - stop) } };
+  };
+  return {
+    ...n,
+    wide: split(n.t, isApex ? 62 : CORE_R),
+    compact: split(n.tc, isApex ? 88 : CORE_R),
+  };
+});
+
+// Triangle edges: an outer hairline and an inner dotted line, inset towards the incentre.
+const [A, B, Cc] = nodes;
+const side = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+const a = side(B, Cc);
+const b = side(A, Cc);
+const c = side(A, B);
+const per = a + b + c;
+const inc = { x: (a * A.x + b * B.x + c * Cc.x) / per, y: (a * A.y + b * B.y + c * Cc.y) / per };
+const s = per / 2;
+const inr = Math.sqrt(((s - a) * (s - b) * (s - c)) / s);
+const inset = (d: number) =>
+  nodes
+    .map((n) => {
+      const k = (inr - d) / inr;
+      return `${f(inc.x + (n.x - inc.x) * k)},${f(inc.y + (n.y - inc.y) * k)}`;
+    })
+    .join(' ');
+const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
+---
+
+<div class="tri">
+  {part === 'text' && <p class="tri-text">
+    An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
+    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six layers between
+    the agent and your repository, and three of them each block one leg of it.
+  </p>}
+
+  {part === 'figure' && <figure class="tri-fig">
+    <div class="tri-stage" aria-hidden="true">
+      <div class="tri-art" style={`aspect-ratio: ${W} / ${H}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
+          <polygon class="tri-zone" points={inset(10)}></polygon>
+          <polygon class="tri-edge" points={outline}></polygon>
+          <circle class="tri-core-ring" cx={C.x} cy={C.y} r={CORE_R - 6}></circle>
+          {spokes.map((sp, i) =>
+            (['wide', 'compact'] as const).map((mode) => {
+              const g = sp[mode];
+              return (
+                <g class={`tri-spoke is-${mode}`} style={`--i:${i}`}>
+                  <line class="tri-line" x1={f(g.before.a.x)} y1={f(g.before.a.y)} x2={f(g.before.b.x)} y2={f(g.before.b.y)} />
+                  <line class="tri-line tri-live" x1={f(g.after.a.x)} y1={f(g.after.a.y)} x2={f(g.after.b.x)} y2={f(g.after.b.y)} />
+                  <line class="tri-line tri-dead" x1={f(g.after.a.x)} y1={f(g.after.a.y)} x2={f(g.after.b.x)} y2={f(g.after.b.y)} />
+                </g>
+              );
+            }),
+          )}
+        </svg>
+
+        {spokes.map((sp) => (
+          <Octicon name={sp.icon} size={20} class="tri-badge" style={`left:${pct(sp.x, W)};top:${pct(sp.y, H)}`} />
+        ))}
+
+        {spokes.map((sp) => (
+          <span class={`tri-label tri-label-${sp.id}`} style={`--x:${pct(sp.x, W)};--y:${pct(sp.y, H)}`}>
+            <span class="tri-name">{sp.label}</span>
+            <span class="tri-sub">{sp.sub}</span>
+            <span class="tri-blocked"><Octicon name="circle-slash" size={12} class="tri-cut-icon" />{sp.cut}</span>
+          </span>
+        ))}
+
+        {spokes.map((sp, i) => (
+          <span
+            class="tri-cut"
+            style={`--i:${i};--wx:${pct(sp.wide.p.x, W)};--wy:${pct(sp.wide.p.y, H)};--cx:${pct(sp.compact.p.x, W)};--cy:${pct(sp.compact.p.y, H)}`}
+          >
+            <Octicon name="circle-slash" class="tri-cut-icon" />
+            <span class="tri-cut-name">{sp.cut}</span>
+          </span>
+        ))}
+
+        <span class="tri-core" style={`left:${pct(C.x, W)};top:${pct(C.y, H)}`}>
+          <span class="tri-core-label">the lethal trifecta</span>
+          <Octicon name="copilot" size={20} class="tri-agent" />
+          <span class="tri-agent-label">Agent</span>
+        </span>
+      </div>
+    </div>
+
+
+    <figcaption class="sr-only">
+      Diagram of the lethal trifecta: three capabilities that are dangerous when an agent holds all of them at once.
+      Private data means secrets, tokens and private repositories. Untrusted content means issues, pull request
+      comments and web pages. Outbound access means the network, APIs and writes. Each one would reach the agent at
+      the centre, but gh-aw cuts every leg: credential isolation keeps private data away from the agent, integrity
+      filtering screens untrusted content, and the sandboxed agent restricts outbound access.
+    </figcaption>
+  </figure>}
+</div>
+
+<script>
+  // Entrance: each leg starts live all the way to the agent; on scroll the layer drops in and the
+  // remainder of the leg goes quiet. Without JS, or with reduced motion, the final state is shown.
+  const art = document.querySelector<HTMLElement>('.tri-art');
+  if (art && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    art.classList.add('is-armed');
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          art.classList.add('is-in');
+          io.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    io.observe(art);
+  }
+</script>
+
+<style>
+  .tri {
+    display: grid;
+    gap: 2.5rem;
+  }
+  .tri-text {
+    margin: 1.5rem 0 0;
+    max-width: 60ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  .tri-text a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+
+  .tri-fig {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 40rem;
+    min-width: 0;
+    container-type: inline-size;
+  }
+  /* Room above the apex and below the base for the HTML labels. */
+  .tri-stage {
+    padding: 4.25rem 0 4.75rem;
+  }
+  .tri-art {
+    position: relative;
+    width: 100%;
+  }
+  .tri-art svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* ---- Triangle ---- */
+  .tri-zone {
+    fill: var(--aw-color-complement-low);
+    fill-opacity: 0.45;
+  }
+  .tri-edge {
+    fill: none;
+    stroke: var(--aw-color-border-strong);
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+  .tri-core-ring {
+    fill: none;
+    stroke: var(--aw-color-border-strong);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+  }
+
+  /* ---- Spokes ---- */
+  .tri-line {
+    stroke: var(--aw-color-text-muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  /* The leg beyond the cut is neutralised: dashed and quiet. */
+  .tri-dead {
+    stroke: var(--aw-color-border-strong);
+    stroke-dasharray: 3 4;
+  }
+  .tri-live {
+    opacity: 0;
+  }
+  .tri-spoke.is-compact {
+    display: none;
+  }
+
+  /* ---- Overlays ---- */
+  .tri-badge,
+  .tri-cut,
+  .tri-core {
+    position: absolute;
+    transform: translate(-50%, -50%);
+  }
+  .tri-badge {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    color: var(--aw-color-text-strong);
+  }
+
+  .tri-label {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: max-content;
+    max-width: 44%;
+  }
+  /* Apex: label centred above the badge. */
+  .tri-label-data {
+    left: var(--x);
+    bottom: calc(100% - var(--y) + 2rem);
+    transform: translateX(-50%);
+    align-items: center;
+    text-align: center;
+    max-width: 90%;
+  }
+  /* Base: labels below the badges, flush with the outer badge edge. */
+  .tri-label-untrusted {
+    left: calc(var(--x) - 1.5rem);
+    top: calc(var(--y) + 2rem);
+  }
+  .tri-label-outbound {
+    right: calc(100% - var(--x) - 1.5rem);
+    top: calc(var(--y) + 2rem);
+    align-items: flex-end;
+    text-align: right;
+  }
+  .tri-name {
+    font-size: var(--aw-step-0);
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--aw-color-text-strong);
+  }
+  .tri-sub {
+    font-size: var(--aw-step--1);
+    line-height: 1.4;
+    color: var(--aw-color-text-muted);
+    text-wrap: balance;
+  }
+  /* Layer name under each node: only in the compact layout, where pills don't fit. */
+  .tri-blocked {
+    display: none;
+    align-items: center;
+    gap: 0.3125rem;
+    margin-top: 0.25rem;
+    font-size: var(--aw-step--1);
+    line-height: 1.3;
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+  }
+
+  .tri-cut {
+    left: var(--wx);
+    top: var(--wy);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    width: max-content;
+    white-space: nowrap;
+    padding: 0.3125rem 0.75rem 0.3125rem 0.5625rem;
+    border-radius: var(--aw-radius-pill);
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    box-shadow: var(--aw-shadow-raised);
+    color: var(--aw-color-text-strong);
+    font-size: var(--aw-step-0);
+    line-height: 1.15;
+    font-weight: 550;
+  }
+  .tri-cut-icon {
+    color: var(--aw-color-complement);
+  }
+
+  .tri-core {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .tri-agent {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    background: var(--aw-color-surface);
+    border: 1px solid var(--aw-color-border-strong);
+    color: var(--aw-color-text-muted);
+  }
+  .tri-core-label,
+  .tri-agent-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: var(--aw-step--1);
+    line-height: 1.2;
+  }
+  .tri-core-label {
+    bottom: calc(100% + 0.75rem);
+    font-weight: 600;
+    color: var(--aw-color-complement);
+  }
+  .tri-agent-label {
+    top: calc(100% + 0.375rem);
+    color: var(--aw-color-text-muted);
+  }
+
+  /* ---- Compact layout: pills become cut discs, layer names move under each node ---- */
+  @container (max-width: 37.5rem) {
+    .tri-spoke.is-wide {
+      display: none;
+    }
+    .tri-spoke.is-compact {
+      display: inline;
+    }
+    .tri-stage {
+      padding: 4rem 0 6rem;
+    }
+    .tri-badge {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+    .tri-badge :global(svg) {
+      width: 18px;
+      height: 18px;
+    }
+    .tri-label-data {
+      bottom: calc(100% - var(--y) + 1.75rem);
+    }
+    .tri-label-untrusted {
+      left: calc(var(--x) - 1.25rem);
+      top: calc(var(--y) + 1.75rem);
+    }
+    .tri-label-outbound {
+      right: calc(100% - var(--x) - 1.25rem);
+      top: calc(var(--y) + 1.75rem);
+    }
+    .tri-name {
+      font-size: var(--aw-step--1);
+    }
+    .tri-blocked {
+      display: inline-flex;
+    }
+    .tri-cut {
+      left: var(--cx);
+      top: var(--cy);
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+    }
+    .tri-cut-name {
+      display: none;
+    }
+    .tri-core-ring {
+      display: none;
+    }
+    .tri-agent {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+    .tri-agent :global(svg) {
+      width: 16px;
+      height: 16px;
+    }
+    .tri-core-label {
+      bottom: calc(100% + 0.5rem);
+    }
+    .tri-agent-label {
+      display: none;
+    }
+  }
+  /* The apex label's sublabel crowds the cut disc on very narrow figures. */
+  @container (max-width: 22rem) {
+    .tri-label-data .tri-sub {
+      display: none;
+    }
+    .tri-stage {
+      padding: 3.25rem 0 7.5rem;
+    }
+  }
+
+  /* ---- Entrance ---- */
+  .tri-art.is-armed .tri-cut {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  .tri-art.is-armed .tri-dead {
+    opacity: 0;
+  }
+  .tri-art.is-armed .tri-live {
+    opacity: 1;
+  }
+  .tri-art.is-armed.is-in .tri-cut {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  .tri-art.is-armed.is-in .tri-dead {
+    opacity: 1;
+  }
+  .tri-art.is-armed.is-in .tri-live {
+    opacity: 0;
+  }
+  .tri-art.is-in .tri-cut,
+  .tri-art.is-in .tri-dead,
+  .tri-art.is-in .tri-live {
+    transition:
+      opacity 0.45s ease-out,
+      transform 0.5s var(--aw-ease-emphasized);
+    transition-delay: calc(300ms + var(--i, 0) * 180ms);
+  }
+  .tri-art.is-in .tri-spoke .tri-dead,
+  .tri-art.is-in .tri-spoke .tri-live {
+    transition-delay: calc(420ms + var(--i, 0) * 180ms);
+  }
+</style>

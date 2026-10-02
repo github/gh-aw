@@ -1,4 +1,7 @@
-/* Site styles. Tokens (colours, fonts, Starlight mapping) live in tokens.css. */
+/* Base and docs reading styles: page basics, markdown typography, code, tables,
+ * links, blog metadata and media. Tokens live in tokens.css, site chrome (frame,
+ * header, sidebar, TOC, mobile menu) in chrome.css, and docs components
+ * (pager, asides, heading links, code copy) in docs-components.css. */
 
 :root {
   /* Prevent Android Chrome from automatically inflating text sizes when the user
@@ -16,27 +19,8 @@
 
 /* Page background */
 body {
-  background: linear-gradient(180deg, var(--aw-color-bg) 0%, var(--aw-color-bg-page-end) 100%);
-  background-attachment: fixed;
+  background: var(--aw-color-bg);
   font-family: var(--sl-font);
-}
-
-/* Let the page background show through Starlight's frames on desktop */
-@media (min-width: 769px) {
-  .page,
-  .main-frame,
-  main,
-  .content-panel,
-  #starlight__sidebar,
-  .sidebar,
-  .sidebar-content,
-  .sidebar-pane {
-    background: transparent;
-  }
-}
-
-#starlight__sidebar, .sidebar {
-  border-right: 1px solid var(--aw-color-hairline-light);
 }
 
 
@@ -109,104 +93,6 @@ body {
   fill: var(--aw-diagram-text);
 }
 
-
-/* Sidebar Navigation Styling */
-.sidebar .top-level > li > details > summary,
-.sidebar .top-level > li > a {
-  font-weight: 600;
-  font-size: var(--aw-step--1);
-  color: var(--aw-color-text);
-  letter-spacing: 0;
-  border-radius: 6px;
-  background: none;
-  transition: color 0.15s ease;
-}
-
-.sidebar .top-level > li > details > summary .large,
-.sidebar .top-level > li > a .large {
-  font-size: inherit;
-  font-weight: inherit;
-  color: inherit;
-}
-
-.sidebar .top-level > li > details > summary svg,
-.sidebar .top-level > li > details > summary .caret {
-  color: var(--aw-color-text-muted);
-}
-
-/* Breathing room between groups */
-.sidebar .top-level > li + li {
-  margin-top: 1.125rem;
-}
-
-.sidebar .top-level li li a {
-  transition: color 0.15s ease, background-color 0.15s ease;
-  color: var(--aw-color-text-muted);
-  font-size: var(--aw-step--1);
-  line-height: 1.45;
-  padding: 0.3rem 0.5rem;
-  border-radius: 6px;
-  border: none;
-  font-weight: 400;
-  background: transparent;
-}
-
-/* Mobile-specific: Increase touch targets for sidebar navigation */
-@media (max-width: 768px) {
-  .sidebar .top-level > li > details > summary,
-  .sidebar .top-level > li > a,
-  .sidebar .top-level li li a {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-  }
-}
-
-.sidebar .top-level li li a:hover {
-  color: var(--aw-color-text);
-}
-
-.sidebar .top-level li li a[aria-current="page"] {
-  color: var(--aw-color-text);
-  font-weight: 500;
-  background: var(--aw-color-bg-subtle);
-}
-
-/* Starlight fills the current page link with the accent colour; keep it quiet. */
-.sidebar a[aria-current="page"],
-a[aria-current="page"].link {
-  background: var(--aw-color-bg-subtle);
-}
-
-/* Header Theme */
-header {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--aw-color-bg) 92%, transparent),
-    color-mix(in srgb, var(--aw-color-bg-page-end) 86%, transparent)
-  );
-  border-bottom: 1px solid var(--aw-color-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-header::after {
-  content: '';
-  position: absolute;
-  bottom: -40px;
-  left: 0;
-  right: 0;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--aw-color-bg) 74%, transparent),
-    color-mix(in srgb, var(--aw-color-bg-page-end) 28%, transparent),
-    transparent
-  );
-  pointer-events: none;
-  z-index: -1;
-}
-
 /* Markdown Content Typography */
 .sl-markdown-content {
   color: var(--aw-color-text);
@@ -214,20 +100,20 @@ header::after {
   max-width: 100%;
 }
 
-.sl-markdown-content p,
-.sl-markdown-content li {
+.sl-markdown-content p:not(.not-content *),
+.sl-markdown-content li:not(.not-content *) {
   font-size: var(--aw-step-0);
   line-height: var(--aw-leading-body);
   color: var(--aw-color-text-body);
 }
 
-.sl-markdown-content li + li {
+.sl-markdown-content li:not(.not-content *) + li {
   margin-top: 0.375rem;
 }
 
 /* Page title (Starlight renders it outside .sl-markdown-content) and body h1 */
 .content-panel h1#_top,
-.sl-markdown-content h1 {
+.sl-markdown-content h1:not(.not-content *) {
   font-size: var(--aw-step-4);
   font-weight: 400;
   line-height: var(--aw-leading-tight);
@@ -238,43 +124,19 @@ header::after {
   margin-bottom: 0.75rem;
 }
 
-/* Header Anchor Links */
-.sl-markdown-content h1 a.header-anchor,
-.sl-markdown-content h2 a.header-anchor,
-.sl-markdown-content h3 a.header-anchor,
-.sl-markdown-content h4 a.header-anchor,
-.sl-markdown-content h5 a.header-anchor,
-.sl-markdown-content h6 a.header-anchor,
-.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) a[aria-label^="Permalink"] {
-  font-size: 0.2em;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+/* Page title: spacing comes from the panels (see chrome.css, "Frame and docs layout") */
+.content-panel h1#_top {
+  margin-bottom: 0;
 }
 
-/* Mobile-specific: Increase touch targets for header anchor links */
-@media (max-width: 768px) {
-  .sl-markdown-content h1 a.header-anchor,
-  .sl-markdown-content h2 a.header-anchor,
-  .sl-markdown-content h3 a.header-anchor,
-  .sl-markdown-content h4 a.header-anchor,
-  .sl-markdown-content h5 a.header-anchor,
-  .sl-markdown-content h6 a.header-anchor,
-  .sl-markdown-content :is(h1, h2, h3, h4, h5, h6) a[aria-label^="Permalink"] {
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    opacity: 0.5; /* Make visible on mobile for better discoverability */
+/* Phones: step-4 bottoms out near body size, so go one step up */
+@media (max-width: 30rem) {
+  .content-panel h1#_top {
+    font-size: var(--aw-step-5);
   }
 }
 
-.sl-markdown-content :is(h1, h2, h3, h4, h5, h6):hover a[aria-label^="Permalink"] {
-  opacity: 0.2;
-}
-
-.sl-markdown-content h2 {
+.sl-markdown-content h2:not(.not-content *) {
   font-size: var(--aw-step-2);
   font-weight: 400;
   line-height: var(--aw-leading-snug);
@@ -285,7 +147,7 @@ header::after {
   margin-bottom: 0.75rem;
 }
 
-.sl-markdown-content h3 {
+.sl-markdown-content h3:not(.not-content *) {
   font-size: var(--aw-step-1);
   font-weight: 600;
   line-height: var(--aw-leading-snug);
@@ -295,9 +157,9 @@ header::after {
   margin-bottom: 0.5rem;
 }
 
-.sl-markdown-content h4,
-.sl-markdown-content h5,
-.sl-markdown-content h6 {
+.sl-markdown-content h4:not(.not-content *),
+.sl-markdown-content h5:not(.not-content *),
+.sl-markdown-content h6:not(.not-content *) {
   font-size: var(--aw-step-0);
   font-weight: 600;
   line-height: var(--aw-leading-snug);
@@ -308,7 +170,7 @@ header::after {
 }
 
 /* Code Blocks: frames are styled by Expressive Code (see astro.config.mjs styleOverrides) */
-.sl-markdown-content pre {
+.sl-markdown-content pre:not(.not-content *) {
   max-width: 100%;
 }
 
@@ -317,32 +179,8 @@ header::after {
   --code-background: var(--aw-color-bg-subtle);
 }
 
-/* Copy button: compact and quiet (overrides Expressive Code's larger touch sizing) */
-.expressive-code .copy button {
-  width: 1.75rem;
-  height: 1.75rem;
-  margin: 0.375rem;
-  border: 1px solid var(--aw-color-border);
-  border-radius: 6px;
-  background: var(--aw-color-bg-subtle);
-  color: var(--aw-color-text-muted);
-}
-
-@media (pointer: coarse) {
-  .expressive-code .copy button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-}
-
-.expressive-code .copy button:hover,
-.expressive-code .copy button:focus-visible {
-  color: var(--aw-color-text);
-  border-color: var(--aw-color-border-strong);
-}
-
 /* Inline code */
-.sl-markdown-content :not(pre) > code {
+.sl-markdown-content :not(pre) > code:not(.not-content *) {
   background-color: var(--aw-color-code-bg);
   border-radius: 4px;
   padding: 0.1em 0.35em;
@@ -351,7 +189,7 @@ header::after {
   overflow-wrap: anywhere;
 }
 
-.sl-markdown-content td code:not(pre code) {
+.sl-markdown-content td:not(.not-content *) code:not(pre code) {
   white-space: nowrap;
   overflow-wrap: normal;
 }
@@ -373,7 +211,7 @@ header::after {
 }
 
 /* Tables - Desktop styles (open table: no outer border, hairline row dividers) */
-.sl-markdown-content table {
+.sl-markdown-content table:not(.not-content *) {
   width: 100%;
   max-width: 100%;
   table-layout: auto;
@@ -381,7 +219,7 @@ header::after {
   border-collapse: collapse;
 }
 
-.sl-markdown-content th {
+.sl-markdown-content th:not(.not-content *) {
   background-color: transparent;
   border-bottom: 1px solid var(--aw-color-border);
   color: var(--aw-color-text-secondary);
@@ -393,7 +231,7 @@ header::after {
   padding: 0.625rem 1rem;
 }
 
-.sl-markdown-content td {
+.sl-markdown-content td:not(.not-content *) {
   border-bottom: 1px solid var(--aw-color-hairline-light);
   color: var(--aw-color-text-body);
   font-size: var(--aw-step-0);
@@ -402,29 +240,29 @@ header::after {
   padding: 0.75rem 1rem;
 }
 
-.sl-markdown-content th:first-child,
-.sl-markdown-content td:first-child {
+.sl-markdown-content th:not(.not-content *):first-child,
+.sl-markdown-content td:not(.not-content *):first-child {
   padding-inline-start: 0;
 }
 
-.sl-markdown-content tbody tr:last-child td {
+.sl-markdown-content tbody:not(.not-content *) tr:last-child td {
   border-bottom: none;
 }
 
-.sl-markdown-content tbody tr:hover {
+.sl-markdown-content tbody:not(.not-content *) tr:hover {
   background-color: transparent;
 }
 
 /* Tables - Responsive card layout for mobile */
 @media (max-width: 640px) {
-  .sl-markdown-content table {
+  .sl-markdown-content table:not(.not-content *) {
     border: none;
     border-radius: 0;
     display: block;
   }
 
   /* Visually hide thead while keeping it accessible to screen readers */
-  .sl-markdown-content thead {
+  .sl-markdown-content thead:not(.not-content *) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -437,11 +275,11 @@ header::after {
   }
 
   /* Display each row as a card */
-  .sl-markdown-content tbody {
+  .sl-markdown-content tbody:not(.not-content *) {
     display: block;
   }
 
-  .sl-markdown-content tbody tr {
+  .sl-markdown-content tbody:not(.not-content *) tr {
     display: block;
     margin-bottom: 1rem;
     border: 1px solid var(--aw-color-border);
@@ -451,7 +289,7 @@ header::after {
   }
 
   /* Display each cell as a row within the card */
-  .sl-markdown-content td {
+  .sl-markdown-content td:not(.not-content *) {
     display: block;
     min-height: 44px;
     padding: 0.5rem 0;
@@ -460,22 +298,22 @@ header::after {
     padding-left: 0;
   }
 
-  .sl-markdown-content td:first-child {
+  .sl-markdown-content td:not(.not-content *):first-child {
     padding-top: 0;
     padding-inline-start: 0;
   }
 
-  .sl-markdown-content td code:not(pre code) {
+  .sl-markdown-content td:not(.not-content *) code:not(pre code) {
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
-  .sl-markdown-content td:last-child {
+  .sl-markdown-content td:not(.not-content *):last-child {
     padding-bottom: 0;
   }
 
   /* Label above the value, both left-aligned */
-  .sl-markdown-content td::before {
+  .sl-markdown-content td:not(.not-content *)::before {
     content: attr(data-label);
     display: block;
     margin-bottom: 0.125rem;
@@ -486,11 +324,11 @@ header::after {
   }
 
   /* Fallback: if data-label is not present, just display cells stacked */
-  .sl-markdown-content td:not([data-label])::before {
+  .sl-markdown-content td:not(.not-content *):not([data-label])::before {
     content: '';
   }
 
-  .sl-markdown-content td:not([data-label]) {
+  .sl-markdown-content td:not(.not-content *):not([data-label]) {
     text-align: left;
   }
 }
@@ -505,7 +343,7 @@ header::after {
 }
 
 /* Links */
-.sl-markdown-content a:not(.sl-link-button) {
+.sl-markdown-content a:not(.sl-link-button, .sl-anchor-link):not(.not-content *) {
   color: var(--aw-color-link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -514,7 +352,7 @@ header::after {
   transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
-.sl-markdown-content a:not(.sl-link-button):hover {
+.sl-markdown-content a:not(.sl-link-button, .sl-anchor-link):not(.not-content *):hover {
   color: var(--aw-color-link);
   text-decoration-color: var(--aw-color-accent);
 }
@@ -527,32 +365,12 @@ nav a {
 
 nav a:hover,
 nav a[aria-current="page"] {
-  color: var(--aw-color-accent-text);
-}
-
-nav a[aria-current="page"] {
-  font-weight: 600;
-}
-
-/* Social Icons */
-.social-icons a[href*="github.com"] {
   color: var(--aw-color-text-strong);
 }
 
-/* Mobile-specific: Ensure social icons have adequate touch targets */
-@media (max-width: 768px) {
-  .social-icons a {
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-
 /* Buttons */
-.sl-markdown-content button:not(.expressive-code *),
-.sl-markdown-content .button,
+.sl-markdown-content button:not(.expressive-code *, .not-content *),
+.sl-markdown-content .button:not(.not-content *),
 a.button {
   background: var(--aw-color-bg-subtle);
   border: 1px solid var(--aw-color-border-strong);
@@ -562,8 +380,8 @@ a.button {
   transition: border-color 0.2s ease;
 }
 
-.sl-markdown-content button:not(.expressive-code *):hover,
-.sl-markdown-content .button:hover,
+.sl-markdown-content button:not(.expressive-code *, .not-content *):hover,
+.sl-markdown-content .button:not(.not-content *):hover,
 a.button:hover {
   border-color: rgba(var(--aw-accent-rgb), 0.45);
 }
@@ -602,44 +420,6 @@ a.button:hover {
   scrollbar-color: var(--aw-color-scrollbar) transparent;
 }
 
-/* Right Sidebar (TOC) */
-@media (min-width: 769px) {
-  .right-sidebar,
-  .right-sidebar[class*="astro-"] {
-    border-left: 1px solid var(--aw-color-hairline-light);
-  }
-}
-
-/* Table of Contents */
-starlight-toc nav {
-  font-size: var(--aw-step--1);
-}
-
-starlight-toc a {
-  color: var(--aw-color-text-muted);
-  text-decoration: none;
-  border-left: none;
-  transition: color 0.15s ease;
-  font-size: var(--aw-step--1);
-  line-height: 1.4;
-  padding-block: 0.25rem;
-  font-weight: 400;
-}
-
-starlight-toc a:hover,
-starlight-toc a[aria-current="true"] {
-  color: var(--aw-color-text);
-  background: none;
-}
-
-starlight-toc h2 {
-  font-size: var(--aw-step--1);
-  font-weight: 600;
-  color: var(--aw-color-text);
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 /* Hide blog plugin's card-grid pagination (uses reverse chronological order) */
 .post-footer .pagination.astro-q3jscx35 {
   display: none;
@@ -675,77 +455,6 @@ starlight-toc h2 {
   margin-bottom: 2.5rem; /* Increased from default for cleaner look */
 }
 
-/* Pagination Links */
-.pagination-links {
-  border-top: 1px solid var(--aw-color-border);
-}
-
-.pagination-links a {
-  border: 1px solid var(--aw-color-border-strong);
-  border-radius: 6px;
-  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.06), rgba(var(--aw-accent-rgb), 0.03));
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  text-decoration: none;
-}
-
-.pagination-links a:hover {
-  background: linear-gradient(135deg, rgba(var(--aw-accent-rgb), 0.12), rgba(var(--aw-accent-rgb), 0.05));
-  border-color: var(--aw-color-accent);
-  box-shadow: 0 4px 12px rgba(var(--aw-accent-rgb), 0.12);
-}
-
-.pagination-links a .meta {
-  font-size: var(--aw-step--1);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--aw-color-text-muted);
-  transition: color 0.2s ease;
-}
-
-.pagination-links a:hover .meta {
-  color: var(--aw-color-text-secondary);
-}
-
-.pagination-links .link-title {
-  font-weight: 600;
-  font-size: var(--aw-step-0);
-  color: var(--aw-color-text);
-  transition: color 0.2s ease;
-}
-
-.pagination-links a:hover .link-title {
-  color: var(--aw-color-accent-text);
-}
-
-/* Aside/Callout Blocks */
-.sl-markdown-content .starlight-aside {
-  --aw-aside-accent: var(--aw-color-note);
-  background: color-mix(in srgb, var(--aw-aside-accent) 5%, var(--aw-color-bg-subtle));
-  border: 1px solid color-mix(in srgb, var(--aw-aside-accent) 22%, var(--aw-color-border));
-  border-radius: 8px;
-  padding: 0.875rem 1rem;
-}
-
-.sl-markdown-content .starlight-aside--note { --aw-aside-accent: var(--aw-color-note); }
-.sl-markdown-content .starlight-aside--tip { --aw-aside-accent: var(--aw-color-success); }
-.sl-markdown-content .starlight-aside--caution { --aw-aside-accent: var(--aw-color-caution); }
-.sl-markdown-content .starlight-aside--danger { --aw-aside-accent: var(--aw-color-danger); }
-
-.sl-markdown-content .starlight-aside__title {
-  color: var(--aw-aside-accent);
-  font-size: var(--aw-step--1);
-  font-weight: 600;
-}
-
-.sl-markdown-content .starlight-aside__content {
-  color: var(--aw-color-text-body);
-}
-
-:root[data-theme='light'] .sl-markdown-content .starlight-aside__title {
-  color: color-mix(in srgb, var(--aw-aside-accent) 45%, var(--aw-color-text));
-}
-
 /* Horizontal Rules */
 .sl-markdown-content hr {
   border: none;
@@ -774,115 +483,6 @@ starlight-toc h2 {
 html {
   scroll-behavior: auto;
   scrollbar-gutter: stable;
-}
-
-/* Site Title */
-.site-title {
-  font-size: var(--aw-step-0);
-  font-weight: 700;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.site-title:hover {
-  text-decoration: none;
-}
-
-.site-title span {
-  color: var(--aw-color-text);
-}
-
-.site-title img {
-  display: block;
-}
-
-/* Mobile-specific: Ensure site title has adequate touch target */
-@media (max-width: 768px) {
-  .site-title {
-    min-height: 44px;
-    min-width: 44px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem;
-  }
-}
-
-/* Mobile Navigation - Ensure theme toggle is visible on mobile */
-@media (max-width: 768px) {
-  /* Ensure theme toggle is visible on mobile */
-  starlight-theme-select {
-    display: flex !important;
-  }
-}
-
-/* Mobile - responsive navigation */
-@media (max-width: 768px) {
-  /* Hide title text on mobile to save space - keep only logo icon */
-  .site-title span {
-    display: none !important;
-  }
-  
-  /* Ensure search button meets minimum touch target */
-  site-search button[data-open-modal],
-  site-search button[aria-label="Search"] {
-    min-height: 44px !important;
-    min-width: 44px !important;
-    padding: 0.75rem !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  /* Force theme toggle and social icons to stay visible on mobile ONLY on landing page (with hero) */
-  body:has(.hero) header starlight-theme-select,
-  body:has(.hero) .header starlight-theme-select,
-  body:has(.hero) starlight-theme-select {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-  
-  body:has(.hero) .social-icons {
-    display: flex !important;
-    visibility: visible !important;
-  }
-  
-  /* Hide theme toggle and social icons on mobile for non-landing pages (without hero) to prevent overlap with TOC button */
-  body:not(:has(.hero)) header starlight-theme-select,
-  body:not(:has(.hero)) .header starlight-theme-select,
-  body:not(:has(.hero)) starlight-theme-select {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-  }
-  
-  body:not(:has(.hero)) .social-icons {
-    display: none !important;
-    visibility: hidden !important;
-  }
-  
-  /* Override Starlight's hiding of header right side on mobile */
-  header .sl-flex,
-  header .right-group,
-  header [class*="right"] {
-    display: flex !important;
-    visibility: visible !important;
-  }
-  
-  /* Make theme toggle easier to tap on mobile - WCAG 2.1 Level AAA (44x44px) */
-  starlight-theme-select .icon-wrapper {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-  }
-  
-  /* Ensure proper spacing on mobile header */
-  header {
-    padding: 0.5rem 1rem !important;
-  }
 }
 
 /* Link buttons (hero actions and <LinkButton>) */
@@ -946,33 +546,12 @@ table img[src*="badge.svg"] {
   vertical-align: middle;
 }
 
-/* Hero Styling */
-.hero {
-  background: transparent;
-  border-bottom: 1px solid var(--aw-color-border);
-}
-
-.hero h1 {
-  font-size: var(--aw-step-5);
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--aw-color-text);
-  letter-spacing: -0.02em;
-}
-
-.hero .tagline {
-  font-size: var(--aw-step-1);
-  line-height: 1.6;
-  color: var(--aw-color-text-muted);
-  font-weight: 400;
-}
-
 /* Responsive improvements to prevent horizontal overflow */
 * {
   box-sizing: border-box;
 }
 
-/* Ensure body and main containers don't overflow.
+/* Ensure the body doesn't overflow (the frame containers: see chrome.css).
    NOTE: overflow-x is intentionally set ONLY on body, not on html.
    Setting overflow-x:hidden on the html element breaks position:fixed overlays
    (e.g. the mobile sidebar drawer) on Android Chrome with large user fonts.
@@ -984,14 +563,6 @@ html {
 body {
   overflow-x: hidden;
   max-width: 100vw;
-}
-
-.page,
-.main-frame,
-main,
-.content-panel {
-  max-width: 100%;
-  overflow-x: hidden;
 }
 
 /* Ensure all content respects container width */
@@ -1019,63 +590,6 @@ main,
   max-width: 100%;
 }
 
-@media (max-width: 768px) {
-  /* Disable heavy background animation on mobile to reduce CPU/battery usage */
-  body::before {
-    animation: none;
-  }
-}
-
-/* Mobile and tablet navigation (all viewports ≤1200px) — hamburger replaces full header nav */
-/* The full 7-item nav bar only fits alongside the sidebar, search and icons from ~1200px up;
-   below that it overflowed (see https://github.com/github/gh-aw/issues/45211, which first
-   raised this from 900px to 1050px for iPad Pro 12.9). */
-@media (max-width: 1200px) {
-  /* Hide full nav; hamburger provides equivalent navigation on mobile and tablet */
-  .custom-header-links {
-    display: none !important;
-  }
-
-  /* Show hamburger wrapper on mobile and tablet */
-  .tablet-nav-wrapper {
-    display: flex !important;
-    align-items: center;
-  }
-}
-
-/* === W2: Lower sidebar breakpoint to 768px for tablet support === */
-/* Starlight default is 50rem (800px). At 48rem (768px) the sidebar becomes persistent */
-/* so iPad (768×1024) and iPad Pro 11 (834×1194) show a sidebar instead of hamburger menu. */
-@media (min-width: 48rem) {
-  /* Offset main content to make room for the persistent sidebar */
-  html[data-has-sidebar] {
-    --sl-content-inline-start: var(--sl-sidebar-width);
-  }
-
-  /* Make the sidebar pane always visible (not overlay) */
-  .sidebar-pane {
-    --sl-sidebar-visibility: visible;
-    width: var(--sl-sidebar-width) !important;
-    background-color: var(--sl-color-bg-sidebar) !important;
-    border-inline-end: 1px solid var(--sl-color-hairline-shade) !important;
-  }
-
-  /* Remove the extra header padding that was reserved for the hamburger button */
-  [data-has-sidebar] .header {
-    padding-inline-end: var(--sl-nav-pad-x) !important;
-  }
-
-  /* Hide the mobile hamburger toggle since the sidebar is now persistent */
-  starlight-menu-button button {
-    display: none !important;
-  }
-
-  /* Restore body scroll when sidebar becomes persistent (was locked when menu was open) */
-  [data-mobile-menu-expanded] {
-    overflow: auto !important;
-  }
-}
-
 /* Mobile-specific: Additional touch target improvements for remaining elements */
 @media (max-width: 768px) {
   /* Skip to content link - accessibility feature */
@@ -1087,21 +601,6 @@ main,
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-  }
-  
-  /* Anchor links in markdown content */
-  .sl-anchor-link,
-  a.sl-anchor-link,
-  .sl-markdown-content .sl-anchor-link {
-    min-width: 44px !important;
-    padding: 0.75rem !important;
-    /* Grow the tap area sideways/outwards only, so heading line spacing stays even */
-    margin-block: -0.75rem !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    vertical-align: middle;
-    line-height: 1;
   }
 }
 
@@ -1173,25 +672,13 @@ main,
   :focus-visible {
     outline-width: 3px;
   }
-
-  .site-title span,
-  .header-link {
-    text-decoration: underline;
-  }
 }
 
 @media (forced-colors: active) {
-  .site-title,
-  .header-link,
   .gh-aw-video-container,
   .gh-aw-video-caption {
     border: 1px solid CanvasText;
     background: Canvas;
     color: CanvasText;
-  }
-
-  .header-link:hover,
-  .site-title:hover {
-    forced-color-adjust: auto;
   }
 }

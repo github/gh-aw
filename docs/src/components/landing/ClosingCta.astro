@@ -1,0 +1,20 @@
+---
+import LandingSection from './LandingSection.astro';
+import CtaRow from './CtaRow.astro';
+---
+
+<LandingSection id="get-started" title="Create your first workflow">
+  <div class="aw-closing"><CtaRow align="center" /></div>
+</LandingSection>
+
+<style>
+  .aw-closing {
+    margin-top: 2rem;
+  }
+  :global(#get-started .aw-container) {
+    text-align: center;
+  }
+  :global(#get-started h2) {
+    margin-inline: auto;
+  }
+</style>

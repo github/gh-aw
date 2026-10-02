@@ -1,0 +1,494 @@
+/* Site chrome: the page frame and docs layout, header, sidebar, "On this page",
+ * docs footer meta and the mobile menu sheet. Loads after custom.css (reading
+ * styles) and before docs-components.css (see customCss in astro.config.mjs).
+ * Component-scoped styles live in the components themselves (SiteHeader.astro,
+ * PageFrame.astro, SiteFooter.astro, ...). */
+
+/* ==========================================================================
+   Frame and docs layout (Starlight's PageFrame, TwoColumnContent, ContentPanel)
+   ========================================================================== */
+
+/* Contain horizontal overflow. clip, not hidden: hidden would make these scroll
+   containers and stop the sticky sidebar and TOC (PageFrame.astro) sticking. */
+.page,
+.main-frame,
+main,
+.content-panel {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Let the page background show through Starlight's frames on desktop */
+@media (min-width: 50rem) {
+  .page,
+  .main-frame,
+  main,
+  .content-panel,
+  .sidebar,
+  .sidebar-content {
+    background: transparent;
+  }
+}
+
+/* Landing page only: lift Starlight's splash width/padding so landing
+   sections control their own 72rem container (see components/landing). */
+body:has(.aw-hero) .content-panel {
+  padding: 0;
+}
+
+body:has(.aw-hero) .sl-container {
+  max-width: none;
+}
+
+/* Docs pages: Starlight puts the title in its own .content-panel with a hairline
+   under it, and centres the content column in the space left by the sidebars.
+   Here the title and body read as one unit, and the column sits left-aligned a
+   fixed gutter from the sidebar, with a narrower "On this page" column on the right. */
+:root {
+  --aw-toc-width: 15rem;
+  --aw-content-gutter: 3.5rem;
+}
+
+.content-panel + .content-panel {
+  border-top: 0;
+}
+
+/* Title panel: no bottom padding; the body follows at heading-to-body rhythm */
+main > .content-panel:has(h1#_top) {
+  padding-top: 2rem;
+  padding-bottom: 0;
+}
+
+@media (min-width: 50rem) {
+  main > .content-panel:has(h1#_top) {
+    padding-top: 3.5rem;
+  }
+}
+
+main > .content-panel:has(h1#_top) + .content-panel {
+  padding-top: 1.75rem;
+}
+
+@media (min-width: 50rem) {
+  [data-has-sidebar] .content-panel {
+    padding-inline-start: var(--aw-content-gutter);
+  }
+
+  [data-has-sidebar] .main-pane {
+    --sl-content-margin-inline: 0 auto;
+  }
+}
+
+@media (min-width: 50rem) and (max-width: 71.99rem) {
+  :root {
+    --aw-content-gutter: 2.5rem;
+  }
+}
+
+@media (min-width: 72rem) {
+  .right-sidebar-container,
+  .right-sidebar {
+    width: var(--aw-toc-width);
+  }
+
+  /* Starlight sizes the TOC list from --sl-sidebar-width (the left sidebar's
+     width); let it fill the narrower column instead */
+  .right-sidebar-panel {
+    padding-inline: 0 1.5rem;
+  }
+
+  .right-sidebar-panel .sl-container {
+    width: auto;
+    max-width: none;
+  }
+
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: 0 auto;
+    width: calc(100% - var(--aw-toc-width));
+  }
+}
+
+/* ==========================================================================
+   Header (SiteHeader.astro): solid page background, hairline rule
+   ========================================================================== */
+
+:root {
+  --sl-nav-height: 3.75rem;
+}
+
+header.header {
+  background: var(--aw-color-bg);
+  border-bottom: 1px solid var(--aw-color-divider);
+}
+
+/* Site title (CustomLogo.astro) */
+.site-title {
+  font-size: var(--aw-text-ui);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.site-title:hover {
+  text-decoration: none;
+}
+
+.site-title span {
+  color: var(--aw-color-text);
+}
+
+.site-title img {
+  display: block;
+}
+
+/* Mobile-specific: Ensure site title has adequate touch target */
+@media (max-width: 768px) {
+  .site-title {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem;
+    margin-inline-start: -0.5rem;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .site-title span {
+    text-decoration: underline;
+  }
+}
+
+@media (forced-colors: active) {
+  .site-title {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .site-title:hover {
+    forced-color-adjust: auto;
+  }
+}
+
+/* ==========================================================================
+   Sidebar (Starlight's sidebar; Sidebar.astro adds the mobile menu top)
+   ========================================================================== */
+
+/* Desktop: same background and hairline as the header, so the top-left
+   corner joins cleanly */
+@media (min-width: 50rem) {
+  #starlight__sidebar {
+    background: var(--aw-color-bg);
+    border-inline-end: 1px solid var(--aw-color-divider);
+  }
+}
+
+.sidebar .top-level > li > details > summary,
+.sidebar .top-level > li > a {
+  font-weight: 600;
+  font-size: var(--aw-text-ui);
+  line-height: 1.45;
+  color: var(--aw-color-text);
+  letter-spacing: 0;
+  border-radius: var(--aw-radius-sm);
+  background: none;
+  transition: color var(--aw-duration-fast) ease;
+}
+
+.sidebar .top-level > li > details > summary .large,
+.sidebar .top-level > li > a .large {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+
+.sidebar .top-level > li > details > summary svg,
+.sidebar .top-level > li > details > summary .caret {
+  color: var(--aw-color-text-muted);
+}
+
+/* Breathing room between groups */
+.sidebar .top-level > li + li {
+  margin-top: 0.5rem;
+}
+
+.sidebar .top-level li li a {
+  transition: color var(--aw-duration-fast) ease, background-color var(--aw-duration-fast) ease;
+  color: var(--aw-color-text-muted);
+  font-size: var(--aw-text-ui);
+  line-height: 1.45;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--aw-radius-sm);
+  border: none;
+  font-weight: 400;
+  background: transparent;
+}
+
+/* Mobile menu sheet: Increase touch targets for sidebar navigation */
+@media (max-width: 49.99rem) {
+  .sidebar .top-level > li > details > summary,
+  .sidebar .top-level > li > a,
+  .sidebar .top-level li li a {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+  }
+  /* Denser sheet: groups sit close so more of the tree fits on screen */
+  .sidebar .top-level > li + li {
+    margin-top: 0.125rem;
+  }
+
+  /* Group labels align with the sheet's nav rows and heading; nested links keep their indent */
+  .sidebar .top-level > li > details > summary,
+  .sidebar .top-level > li > a {
+    padding-inline: 0;
+  }
+}
+
+.sidebar .top-level li li a:hover {
+  color: var(--aw-color-text);
+}
+
+.sidebar .top-level li li a[aria-current="page"] {
+  color: var(--aw-color-text);
+  font-weight: 500;
+  background: var(--aw-color-bg-subtle);
+}
+
+/* Top-level page links (e.g. "All posts"): same quiet pill, not Starlight's accent fill */
+.sidebar .top-level > li > a[aria-current="page"] {
+  color: var(--aw-color-text-strong);
+  background: var(--aw-color-bg-subtle);
+}
+
+/* Sidebar links that leave the docs (e.g. the hosted Creation Wizard): trailing link-external octicon */
+.sidebar-external::after {
+  content: '';
+  display: inline-block;
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-start: 0.375rem;
+  vertical-align: -0.05em;
+  background-color: currentColor;
+  opacity: 0.7;
+  -webkit-mask: var(--aw-icon-link-external) center / contain no-repeat;
+  mask: var(--aw-icon-link-external) center / contain no-repeat;
+}
+
+/* ==========================================================================
+   On this page (Starlight's TableOfContents / MobileTableOfContents)
+   ========================================================================== */
+
+/* Starlight's styles sit in @layer starlight.core, so these unlayered rules win.
+   Both lists share one look: muted items on a 1px rail, the current section in
+   strong text with a 1px accent segment over the rail. Starlight sets
+   aria-current="true" on the link as you scroll. --depth comes from Starlight. */
+.right-sidebar {
+  border-inline-start: 0; /* no rule between content and TOC; the list keeps its own rail */
+}
+
+.right-sidebar-panel {
+  padding-top: 1.25rem; /* heading lines up with the sidebar's first group label */
+}
+
+/* Heading matches the sidebar's group labels */
+starlight-toc h2 {
+  margin-bottom: 0.75rem;
+  font-size: var(--aw-text-ui);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--aw-color-text);
+}
+
+starlight-toc nav > ul,
+mobile-starlight-toc .dropdown > ul {
+  margin: 0;
+  border-inline-start: 1px solid var(--aw-color-divider);
+}
+
+:is(starlight-toc, mobile-starlight-toc) a {
+  position: relative;
+  display: block;
+  padding-block: 0.375rem;
+  padding-inline: calc(0.875rem + 0.75rem * var(--depth, 0)) 0.5rem;
+  border-radius: 0;
+  font-size: var(--aw-text-ui);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--aw-color-text-muted);
+  text-decoration: none;
+  transition: color var(--aw-duration-fast) ease;
+}
+
+:is(starlight-toc, mobile-starlight-toc) a:hover {
+  color: var(--aw-color-text);
+  background: none;
+}
+
+:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"],
+:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"]:hover {
+  color: var(--aw-color-text-strong);
+  background: none;
+}
+
+:is(starlight-toc, mobile-starlight-toc) a[aria-current="true"]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -1px;
+  width: 1px;
+  background: var(--aw-color-accent);
+}
+
+:is(starlight-toc, mobile-starlight-toc) a:focus-visible {
+  outline: var(--aw-focus-ring);
+  outline-offset: -2px; /* inset: the rail and column edge would clip an outer ring */
+  border-radius: var(--aw-radius-xs);
+}
+
+/* Below 72rem: the "On this page" bar sticks under the header. Page background,
+   one hairline below, a quiet text button and the current section in muted text.
+   Its height stays --sl-mobile-toc-height so Starlight's scroll-padding-top
+   (header + bar + 1.5rem) keeps anchored headings clear of both. */
+mobile-starlight-toc nav {
+  top: var(--sl-nav-height);
+  border-top: 0;
+  background-color: var(--aw-color-bg);
+}
+
+mobile-starlight-toc summary {
+  gap: 0.625rem;
+  padding: 0 var(--sl-nav-pad-x);
+  border-bottom: 1px solid var(--aw-color-divider);
+  font-size: var(--aw-text-ui);
+  cursor: pointer;
+}
+
+mobile-starlight-toc summary:focus-visible {
+  outline: var(--aw-focus-ring);
+  outline-offset: -2px; /* inset: the bar is full-bleed */
+  border-radius: 0;
+}
+
+mobile-starlight-toc .toggle,
+mobile-starlight-toc details[open] .toggle,
+mobile-starlight-toc details .toggle:hover {
+  gap: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--aw-color-text-strong);
+}
+
+mobile-starlight-toc .caret {
+  color: var(--aw-color-text-muted);
+  transition: transform var(--aw-duration-fast) ease;
+}
+
+mobile-starlight-toc .display-current {
+  color: var(--aw-color-text-muted);
+}
+
+mobile-starlight-toc .dropdown {
+  margin: 0.375rem var(--sl-nav-pad-x) 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--aw-color-divider);
+  border-radius: var(--aw-radius-md);
+  background-color: var(--aw-color-surface);
+  box-shadow: var(--aw-shadow-raised);
+}
+
+/* Starlight's mobile list has row dividers and a checkmark; use the TOC's look instead */
+mobile-starlight-toc .isMobile a {
+  display: block;
+  border-top: 0;
+  padding-block: 0.5rem;
+}
+
+mobile-starlight-toc .isMobile a[aria-current="true"]::after {
+  content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(starlight-toc, mobile-starlight-toc) a,
+  mobile-starlight-toc .caret {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Docs footer meta (Starlight's Footer, via CustomFooter.astro)
+   ========================================================================== */
+
+/* Docs footer: edit link / last updated, then prev/next. Flat cards that sit
+   above the site footer (CustomFooter.astro) without competing with it. */
+.content-panel footer.sl-flex .meta {
+  font-size: var(--aw-step--1);
+  color: var(--aw-color-text-muted);
+}
+
+.content-panel footer.sl-flex .meta a {
+  color: var(--aw-color-text-secondary);
+}
+
+.content-panel footer.sl-flex .meta a:hover {
+  color: var(--aw-color-text-strong);
+}
+
+/* ==========================================================================
+   Mobile menu sheet
+   ========================================================================== */
+
+/* Below 50rem (Starlight's own sidebar breakpoint, which also drives its popover JS)
+   the header's menu button (SiteMenuToggle) opens one sheet: Starlight's sidebar
+   popover on pages with a sidebar, or #site-menu (SiteHeader) on the landing page.
+   Sidebar.astro puts the site links on top; MobileMenuFooter sits pinned at the bottom. */
+@media (max-width: 49.99rem) {
+  /* The menu button is in the header row now, so drop Starlight's reserved space */
+  [data-has-sidebar] header.header {
+    padding-inline-end: var(--sl-nav-pad-x);
+  }
+
+  body:has(#starlight__sidebar:popover-open),
+  body:has(#site-menu:popover-open) {
+    overflow: hidden;
+  }
+
+  #starlight__sidebar {
+    background-color: var(--aw-color-bg);
+    border-right: 0;
+    overscroll-behavior: contain;
+  }
+
+  .sidebar-pane .sidebar-content {
+    gap: 1.25rem;
+  }
+
+  /* starlight-blog adds a mobile-only "Blog" link to the docs tree; Blog is already a nav row */
+  .sidebar .top-level > li:has(> .sl-blog-mobile-link) {
+    display: none;
+  }
+
+  .sidebar .top-level > li:has(> .sl-blog-mobile-link) + li {
+    margin-top: 0;
+  }
+
+  /* Pin the footer row (GitHub, theme, Get started) to the bottom of the sheet */
+  .sidebar-content > :has(> .mobile-menu-footer) {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    margin-inline: calc(-1 * var(--sl-sidebar-pad-x));
+    padding-inline: var(--sl-sidebar-pad-x);
+    background-color: var(--aw-color-bg);
+  }
+}
