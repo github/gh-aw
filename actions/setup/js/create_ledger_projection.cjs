@@ -8,7 +8,7 @@ const { execGitSync, getGitAuthEnv } = require("./git_helpers.cjs");
 const { readLedgerConfig } = require("./push_ledger_changes.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { executeReplay, materializeReplay } = require("./ledger_replay.cjs");
-const { replayBuiltin } = require("./ledger_builtin.cjs");
+const { CLAIM_STATE_COLUMNS, CLAIM_STATE_VIEW, replayBuiltin } = require("./ledger_builtin.cjs");
 
 const PROJECTION_ROOT = "/tmp/gh-aw/ledgers";
 const MAX_PROJECTION_BYTES = 100 * 1024 * 1024;
@@ -110,8 +110,16 @@ function createProjection({ sourceDir, databasePath, config, onReplayError = () 
     if (config.replay || config.type) {
       try {
         const output = config.type ? replayBuiltin(config, state.records) : executeReplay(config.replay.script, state.records, config.replay.config || {});
-        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output, config.type ? state.records.length : 10000);
+        const maxRows = config.type === "claims" ? Object.values(output.tables).reduce((count, table) => count + table.rows.length, 0) : config.type ? state.records.length : 10000;
+        materializeReplay(database, config.name, config.type ? `builtin:${config.type}` : config.replay.script, state.records, output, maxRows);
         tables = output.tables;
+        if (config.type === "claims") {
+          database.exec(CLAIM_STATE_VIEW);
+          database
+            .prepare("INSERT INTO replay_metadata SELECT ledger_name, projection_version, record_count, script_sha256, output_version, ?, ? FROM replay_metadata WHERE table_name = 'claims'")
+            .run("claim_state", JSON.stringify(CLAIM_STATE_COLUMNS));
+          tables = { ...output.tables, claim_state: { columns: CLAIM_STATE_COLUMNS } };
+        }
       } catch (error) {
         if (config.type) throw error;
         onReplayError(`Ledger ${config.name} replay failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown error"}`);

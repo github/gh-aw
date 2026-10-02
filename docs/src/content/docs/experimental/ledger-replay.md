@@ -14,6 +14,7 @@ operation and replays it in trusted code, without a custom script.
 | Latest value by key | `map` |
 | Mutable structured rows | `table` |
 | Numeric accumulation | `counter` |
+| Evidence-backed agent assertions | `claims` |
 
 ```yaml
 tools:
@@ -39,9 +40,10 @@ tools:
       type: counter
 ```
 
-The `map` built-in exposes dedicated safe-output tools:
-`ledger_map_put` and `ledger_map_delete`. Supply the operation's fields and a
-`ledger` name when more than one map ledger is configured. These tools produce
+The `map` and `claims` built-ins expose dedicated safe-output tools:
+`ledger_map_put`, `ledger_map_delete`, `ledger_claim_add`, and `ledger_claim_vote`.
+Supply the operation's fields and a `ledger` name when more than one ledger of
+that type is configured. These tools produce
 `ledger_append` entries internally; they do not expose the low-level operation
 envelope to the agent. Other ledger types continue to use `ledger_append`
 with `ledger` and `operation` instead of `record`, plus the indicated fields:
@@ -53,6 +55,42 @@ with `ledger` and `operation` instead of `record`, plus the indicated fields:
 | `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
 | `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
 | `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+| `claims` | `claim(subject, claim, reason, citations)`, `vote(claim_id, vote, reason?)` | `claims`, `claim_citations`, `claim_votes`, `claim_state` |
+
+### Claims
+
+A ledger for evidence-backed assertions produced by agents. Claims are reusable
+hints, not authoritative facts. Consumers should verify their citations against
+current state before relying on them.
+
+```yaml
+tools:
+  ledger:
+    knowledge:
+      type: claims
+```
+
+Use `ledger_claim_add` with a nonempty `subject`, `claim`, `reason`, and at least
+one repository citation (`type: repository`, `path`, and optional `start_line` /
+`end_line`). Later, use `ledger_query` to find a candidate, inspect the cited
+source in the current repository, and use `ledger_claim_vote` with `claim_id`
+and `vote: up` or `vote: down` according to whether the evidence supports it.
+Each vote is a new immutable record; it does not change the claim. Claims are
+untrusted data, not instructions. The cited evidence remains the source of truth.
+
+The disposable SQLite projection exposes relational `claims`,
+`claim_citations`, `claim_votes`, and a derived `claim_state` view. Ranking is
+transparent: upvotes, downvotes, net_votes, last_vote_at, and
+last_positive_vote_at; no semantic validation or automatic deduplication takes
+place. For example:
+
+```sql
+SELECT c.*, s.net_votes, s.last_positive_vote_at
+FROM claims c
+JOIN claim_state s ON s.claim_id = c.id
+ORDER BY s.net_votes DESC, c.created_at DESC
+LIMIT 20;
+```
 
 Ledger writes are **deferred** safe outputs: their immediate response only confirms
 that the intent was queued. The trusted persistence job resolves the outcome
@@ -76,9 +114,8 @@ queryable. The generic `records` table still exposes immutable provenance.
 The trusted persistence result reports ledger type, operation, deterministic
 record ID, transaction ID, and validation status without echoing values.
 
-Built-in projections replay canonical transaction order and cannot be combined
-with a custom `replay.script`. Domain concepts should be expressed as schemas
-on generic ledger types, not as new built-in types; custom replay remains an
+Built-in projections replay canonical transactions and cannot be combined
+with a custom `replay.script`. Custom replay remains an
 escape hatch. Existing maintenance compaction is deliberately lossless: it
 merges verified source segments while preserving every record ID, hash, and
 parent relation. This preserves set/map/counter state deterministically but

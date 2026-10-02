@@ -12,6 +12,7 @@ import { Ledger } from "./ledger_store.cjs";
 import { applyTransitionToDirectory, createPlan, loadSegments, parseCompactionConfig, prepareApply, selectSources, validatePlan } from "./ledger_compaction.cjs";
 import { createProjection, formatReplayPrompt, formatReplayTable } from "./create_ledger_projection.cjs";
 import { replayBuiltin } from "./ledger_builtin.cjs";
+import { finalId } from "./ledger_transactions.cjs";
 
 test("creates a read-only SQLite projection from canonical ledger shards", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-projection-"));
@@ -213,6 +214,197 @@ test("compaction preserves replay's ordered logical history", () => {
   } finally {
     first.close();
     second.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("claims projection derives vote state from canonical records across compaction", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-compaction-"));
+  const sourceDir = path.join(root, "source");
+  fs.mkdirSync(sourceDir);
+  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const compaction = parseCompactionConfig(JSON.stringify({ ...config, branch_name: "ledgers/knowledge", compaction: { schedule: "daily", min_segments: 2, max_segments: 2 } }));
+  const claimId = finalId("knowledge", 0);
+  const voteId = finalId("knowledge", 1);
+  const dissentId = finalId("knowledge", 2);
+  const first = new Ledger({ memoryDir: sourceDir });
+  const second = new Ledger({ memoryDir: sourceDir });
+  try {
+    first.append(
+      "ledger_append",
+      {
+        operation: "claim",
+        subject: "README",
+        claim: "Contains instructions",
+        reason: "Read the source",
+        citations: [
+          { type: "repository", path: "README.md", start_line: 1 },
+          { type: "repository", path: "CONTRIBUTING.md" },
+          { type: "repository", path: "LICENSE", end_line: 10 },
+        ],
+      },
+      claimId
+    );
+    second.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, voteId);
+    first.append("ledger_append", { operation: "vote", claim_id: claimId, vote: "down" }, dissentId);
+    const envelopes = new Map(first.reconstruct().records.map(record => [record.id, record]));
+    assert.deepEqual([...envelopes.keys()].sort(), [claimId, voteId, dissentId].sort());
+    assert.ok([...envelopes.values()].every(record => !Object.hasOwn(record.payload, "id")));
+    const before = path.join(root, "before.db");
+    const after = path.join(root, "after.db");
+    createProjection({ sourceDir, databasePath: before, config });
+    const loaded = loadSegments(sourceDir, compaction);
+    const { sources } = selectSources(loaded, compaction);
+    assert.ok(sources);
+    const plan = validatePlan(createPlan({ loaded, sources, config: compaction, trigger: "scheduled", baseCommit: "a".repeat(40) }), compaction);
+    const prepared = prepareApply({ plan, sourceDir, config: compaction });
+    assert.equal(prepared.status, "ready");
+    applyTransitionToDirectory(sourceDir, prepared);
+    createProjection({ sourceDir, databasePath: after, config });
+    const inspect = file => {
+      const db = new DatabaseSync(file, { readOnly: true });
+      try {
+        return {
+          claims: db
+            .prepare("SELECT * FROM claims ORDER BY id")
+            .all()
+            .map(row => ({ ...row })),
+          citations: db
+            .prepare("SELECT * FROM claim_citations ORDER BY claim_id, ordinal")
+            .all()
+            .map(row => ({ ...row })),
+          votes: db
+            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .all()
+            .map(row => ({ ...row })),
+          state: db
+            .prepare("SELECT * FROM claim_state ORDER BY claim_id")
+            .all()
+            .map(row => ({ ...row })),
+          metadata: db
+            .prepare("SELECT table_name FROM replay_metadata ORDER BY table_name")
+            .all()
+            .map(row => row.table_name),
+        };
+      } finally {
+        db.close();
+      }
+    };
+    const projected = inspect(before);
+    assert.deepEqual(inspect(after), projected);
+    assert.deepEqual(projected.claims, [{ id: claimId, subject: "README", claim: "Contains instructions", reason: "Read the source", created_at: envelopes.get(claimId).timestamp, record_sha: envelopes.get(claimId).sha }]);
+    assert.deepEqual(projected.citations, [
+      { claim_id: claimId, ordinal: 0, citation_type: "repository", path: "README.md", start_line: 1, end_line: null },
+      { claim_id: claimId, ordinal: 1, citation_type: "repository", path: "CONTRIBUTING.md", start_line: null, end_line: null },
+      { claim_id: claimId, ordinal: 2, citation_type: "repository", path: "LICENSE", start_line: null, end_line: 10 },
+    ]);
+    assert.deepEqual(
+      projected.votes,
+      [
+        { record_id: envelopes.get(voteId).id, claim_id: claimId, vote: "up", reason: "Verified", created_at: envelopes.get(voteId).timestamp },
+        { record_id: envelopes.get(dissentId).id, claim_id: claimId, vote: "down", reason: null, created_at: envelopes.get(dissentId).timestamp },
+      ].sort((a, b) => a.record_id.localeCompare(b.record_id))
+    );
+    assert.deepEqual(projected.state, [
+      {
+        claim_id: claimId,
+        upvotes: 1,
+        downvotes: 1,
+        net_votes: 0,
+        last_vote_at: [envelopes.get(voteId).timestamp, envelopes.get(dissentId).timestamp].sort().at(-1),
+        last_positive_vote_at: envelopes.get(voteId).timestamp,
+      },
+    ]);
+    assert.deepEqual(projected.metadata, ["claim_citations", "claim_state", "claim_votes", "claims"]);
+  } finally {
+    first.close();
+    second.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("independent votes reconcile to identical immutable rows and claim state in either arrival order", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-claims-concurrent-"));
+  const base = path.join(root, "base");
+  const branchA = path.join(root, "branch-a");
+  const branchB = path.join(root, "branch-b");
+  const claimId = finalId("claims-concurrent", 0);
+  const upId = finalId("claims-concurrent", 1);
+  const downId = finalId("claims-concurrent", 2);
+  const config = { name: "knowledge", type: "claims", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 };
+  const append = (dir, time, payload, id) => {
+    const ledger = new Ledger({ memoryDir: dir, clock: () => new Date(time) });
+    try {
+      ledger.append("ledger_append", payload, id);
+    } finally {
+      ledger.close();
+    }
+  };
+  try {
+    fs.mkdirSync(base);
+    append(base, "2026-01-01T00:00:00.000Z", { operation: "claim", subject: "README", claim: "Documented", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] }, claimId);
+    fs.cpSync(base, branchA, { recursive: true });
+    fs.cpSync(base, branchB, { recursive: true });
+    append(branchA, "2026-01-02T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "up", reason: "Verified" }, upId);
+    append(branchB, "2026-01-03T00:00:00.000Z", { operation: "vote", claim_id: claimId, vote: "down" }, downId);
+    const a = new Ledger({ memoryDir: branchA });
+    const b = new Ledger({ memoryDir: branchB });
+    try {
+      const up = a.reconstruct().records.find(record => record.id === upId);
+      const down = b.reconstruct().records.find(record => record.id === downId);
+      assert.deepEqual(up.parents, down.parents);
+      assert.notEqual(up.sha, down.sha);
+    } finally {
+      a.close();
+      b.close();
+    }
+
+    const snapshots = [];
+    for (const [index, order] of [
+      [branchA, branchB],
+      [branchB, branchA],
+    ].entries()) {
+      const merged = path.join(root, `merged-${index}`);
+      const shardDir = path.join(merged, "ledger", "shards");
+      fs.mkdirSync(shardDir, { recursive: true });
+      for (const branch of order) {
+        for (const file of fs.readdirSync(path.join(branch, "ledger", "shards"))) {
+          fs.copyFileSync(path.join(branch, "ledger", "shards", file), path.join(shardDir, file));
+        }
+      }
+      const databasePath = path.join(root, `merged-${index}.db`);
+      createProjection({ sourceDir: merged, databasePath, config });
+      const db = new DatabaseSync(databasePath, { readOnly: true });
+      try {
+        snapshots.push({
+          records: db
+            .prepare("SELECT id, payload FROM records ORDER BY id")
+            .all()
+            .map(row => ({ ...row })),
+          votes: db
+            .prepare("SELECT * FROM claim_votes ORDER BY record_id")
+            .all()
+            .map(row => ({ ...row })),
+          state: db
+            .prepare("SELECT * FROM claim_state")
+            .all()
+            .map(row => ({ ...row })),
+        });
+      } finally {
+        db.close();
+      }
+    }
+    assert.deepEqual(snapshots[0], snapshots[1]);
+    assert.equal(snapshots[0].records.length, 3);
+    assert.deepEqual(
+      snapshots[0].votes,
+      [
+        { record_id: upId, claim_id: claimId, vote: "up", reason: "Verified", created_at: "2026-01-02T00:00:00.000Z" },
+        { record_id: downId, claim_id: claimId, vote: "down", reason: null, created_at: "2026-01-03T00:00:00.000Z" },
+      ].sort((a, b) => a.record_id.localeCompare(b.record_id))
+    );
+    assert.deepEqual(snapshots[0].state, [{ claim_id: claimId, upvotes: 1, downvotes: 1, net_votes: 0, last_vote_at: "2026-01-03T00:00:00.000Z", last_positive_vote_at: "2026-01-02T00:00:00.000Z" }]);
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

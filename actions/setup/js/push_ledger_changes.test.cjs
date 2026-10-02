@@ -96,6 +96,7 @@ test("built-in persistence reports redacted transaction audit metadata", async (
     githubClient: {},
     persistLedger: async () => ({ persisted: 1, already_present: 0, reconciled: 0 }),
   });
+
   assert.deepEqual(result.ledgers.findings.transactions, [
     {
       id: finalId("run-42:1", 0),
@@ -106,6 +107,73 @@ test("built-in persistence reports redacted transaction audit metadata", async (
   ]);
   assert.equal(result.ledgers.findings.type, "set");
   assert.doesNotMatch(JSON.stringify(result), /not-in-audit/);
+});
+
+test("claims audit counts only after persistence succeeds", async () => {
+  const config = { ...ledgerConfigs[0], type: "claims", schema: undefined };
+  const requests = [
+    { operation: "claim", subject: "topic", claim: "assertion", reason: "evidence", citations: [{ type: "repository", path: "README.md" }] },
+    { operation: "vote", claim_id: "#first", vote: "up" },
+    { operation: "vote", claim_id: "#first", vote: "down" },
+  ];
+  const normalized = normalizeLedgerAppends(
+    requests.map((request, index) => ({ ...request, ...(index === 0 ? { temp_id: "first" } : {}) })),
+    {
+      transactionId: "claims:1",
+      ledgerNames: new Set(["findings"]),
+      ledgers: { findings: config },
+    }
+  );
+  const artifact = { version: 1, transaction_id: "claims:1", ledgers: { findings: { appends: normalized.appends } } };
+  let persist = async () => {
+    throw new Error("not durable");
+  };
+  const options = { artifact, ledgerConfigs: [config], outputFile: "", githubClient: {}, owner: "octo", repo: "repo", serverHost: "github.com", token: "test-token", persistLedger: (...args) => persist(...args) };
+  await assert.rejects(main(options), /not durable/);
+  persist = async () => ({ persisted: 3, already_present: 0, reconciled: 0 });
+  const result = await main(options);
+  assert.deepEqual(Object.fromEntries(["claims_added", "claim_votes_added", "upvotes", "downvotes", "invalid_vote_requests"].map(key => [key, result.ledgers.findings[key]])), {
+    claims_added: 1,
+    claim_votes_added: 2,
+    upvotes: 1,
+    downvotes: 1,
+    invalid_vote_requests: 0,
+  });
+  persist = async () => ({ persisted: 1, already_present: 2, reconciled: 2, persisted_ids: [normalized.appends[2].record.id] });
+  const retried = await main(options);
+  assert.equal(retried.ledgers.findings.claims_added, 0);
+  assert.equal(retried.ledgers.findings.claim_votes_added, 1);
+  assert.equal(retried.ledgers.findings.upvotes, 0);
+  assert.equal(retried.ledgers.findings.downvotes, 1);
+});
+
+test("invalid claim vote targets are rejected and audited without counting durable mutations", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "claims-vote-audit-"));
+  const outputFile = path.join(directory, "output");
+  const config = { ...ledgerConfigs[0], type: "claims", schema: undefined };
+  const artifact = transaction({ operation: "vote", claim_id: finalId("missing", 0), vote: "down" });
+  try {
+    await assert.rejects(
+      main({
+        artifact,
+        ledgerConfigs: [config],
+        outputFile,
+        githubClient: {},
+        owner: "octo",
+        repo: "repo",
+        serverHost: "github.com",
+        token: "test-token",
+        persistLedger: async () => {
+          throw new TypeError("Vote references a missing claim");
+        },
+      }),
+      /missing claim/
+    );
+    const audit = JSON.parse(fs.readFileSync(outputFile, "utf8").trim().slice("ledger_result=".length));
+    assert.deepEqual(audit.ledgers.findings, { requested: 1, persisted: 0, rejected: 1, invalid_vote_requests: 1 });
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("appends canonical ledger state and delegates the upstream push", async () => {
@@ -148,6 +216,57 @@ test("appends canonical ledger state and delegates the upstream push", async () 
     assert.equal(pushCalls[0].branchName, "ledgers/findings");
     assert.match(shard, /^ledger\/shards\//);
     assert.equal(JSON.parse(canonical.trim()).payload.id, largeTransaction.ledgers.findings.appends[0].record.id);
+  } finally {
+    if (previousCore === undefined) delete global.core;
+    else global.core = previousCore;
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("trusted claims persistence uses canonical envelope IDs without duplicating payload metadata", async () => {
+  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "claims-persist-"));
+  const previousCore = global.core;
+  global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
+  const config = { ...ledgerConfigs[0], type: "claims", schema: undefined };
+  const normalized = normalizeLedgerAppends(
+    [
+      { operation: "claim", temp_id: "finding", subject: "readme", claim: "Readme exists", reason: "Inspected", citations: [{ type: "repository", path: "README.md" }] },
+      { operation: "vote", claim_id: "#finding", vote: "up" },
+    ],
+    { transactionId: "claims:1", ledgerNames: new Set(["findings"]), ledgers: { findings: config } }
+  );
+  try {
+    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base", { cwd: workspaceDir, stdio: "pipe" });
+    const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
+    const result = await persistLedgerAppends({
+      appends: normalized.appends,
+      config,
+      githubClient: {},
+      owner: "octo",
+      repo: "repo",
+      token: "test-token",
+      serverHost: "github.com",
+      workspaceDir,
+      checkoutLedgerBranchFn: async ({ branchName }) => {
+        execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
+        return baseRef;
+      },
+      pushChangesFn: async () => true,
+    });
+    assert.equal(result.persisted, 2);
+    const shards = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim().split("\n");
+    const records = shards.flatMap(shard =>
+      execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" })
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line))
+    );
+    assert.deepEqual(
+      records.map(record => record.id),
+      normalized.appends.map(append => append.record.id)
+    );
+    assert.ok(records.every(record => !Object.hasOwn(record.payload, "id")));
+    assert.equal(records[1].payload.claim_id, records[0].id);
   } finally {
     if (previousCore === undefined) delete global.core;
     else global.core = previousCore;

@@ -812,6 +812,18 @@ jobs:
                   "amount": {
                     "type": "number"
                   },
+                  "citations": {
+                    "type": "array",
+                    "itemType": "object"
+                  },
+                  "claim": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "claim_id": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
                   "filter": {
                     "type": "object"
                   },
@@ -845,12 +857,23 @@ jobs:
                   "result": {
                     "allowNull": true
                   },
+                  "subject": {
+                    "type": "string",
+                    "maxLength": 512
+                  },
                   "temp_id": {
                     "type": "string",
                     "pattern": "^#?[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
                   },
                   "value": {
                     "allowNull": true
+                  },
+                  "vote": {
+                    "type": "string",
+                    "enum": [
+                      "up",
+                      "down"
+                    ]
                   },
                   "work": {
                     "type": "object"

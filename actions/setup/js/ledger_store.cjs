@@ -667,8 +667,9 @@ class Ledger {
     return state;
   }
 
-  append(type, payload) {
+  append(type, payload, recordId) {
     if (typeof type !== "string" || !type || type.length > 128 || /[\u0000-\u001f]/.test(type)) throw new TypeError("Invalid ledger record type");
+    if (recordId !== undefined && (typeof recordId !== "string" || !RECORD_ID.test(recordId))) throw new TypeError("Invalid ledger record ID");
     let copy;
     try {
       copy = JSON.parse(canonicalJSON(payload));
@@ -679,7 +680,8 @@ class Ledger {
     if (validator && !validator(copy)) throw new TypeError("Ledger payload does not match local JSON Schema");
     const state = this.reconstruct();
     if (state.heads.length > MAX_PARENTS) throw new RangeError("Too many ledger DAG heads");
-    const body = { version: 1, id: `ldg-${crypto.randomUUID()}`, type, timestamp: this.clock().toISOString(), parents: state.heads, payload: copy };
+    if (recordId && state.records.some(record => record.id === recordId)) throw new TypeError("Duplicate ledger record ID");
+    const body = { version: 1, id: recordId || `ldg-${crypto.randomUUID()}`, type, timestamp: this.clock().toISOString(), parents: state.heads, payload: copy };
     const record = { ...body, sha: sha256(body) };
     const line = Buffer.from(`${canonicalJSON(record)}\n`);
     if (line.length > this.maxRecordBytes) throw new RangeError("Ledger record exceeds maximum message size");

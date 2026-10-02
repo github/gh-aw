@@ -5491,11 +5491,11 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, or counter for trusted built-in replay, or replay.script for custom replay. Tables require key (the string primary-key field). Built-ins accept typed operations via the ledger append safe output. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
+          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, counter, or claims for trusted built-in replay, or replay.script for custom replay. Tables require key (the string primary-key field). Built-ins accept typed operations via safe-output tools. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
           "type": "object",
           "properties": {
             "type": {
-              "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter"] }, { "type": "object" }],
+              "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter", "claims"] }, { "type": "object" }],
               "description": "Built-in ledger reducer type, or a named object-valued ledger."
             },
             "key": {
