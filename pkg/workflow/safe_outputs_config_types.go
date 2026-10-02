@@ -142,7 +142,9 @@ type SafeOutputsConfig struct {
 	AutoInjectedCreateIssue                bool                                   `yaml:"-"`                                   // Internal: true when create-issues was automatically injected by the compiler (not user-configured)
 }
 
-type DispatchClaimFinishConfig struct{}
+type DispatchClaimFinishConfig struct {
+	BaseSafeOutputConfig `yaml:",inline"`
+}
 
 // SafeOutputMessagesConfig holds custom message templates for safe-output footer and notification messages
 type SafeOutputMessagesConfig struct {

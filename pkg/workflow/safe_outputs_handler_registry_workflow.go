@@ -124,7 +124,9 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		if cfg.DispatchClaimFinish == nil {
 			return nil
 		}
-		return map[string]any{}
+		return newHandlerConfigBuilder().
+			AddTemplatableInt("max", cfg.DispatchClaimFinish.Max).
+			Build()
 	},
 	"autofix_code_scanning_alert": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.AutofixCodeScanningAlert == nil {
