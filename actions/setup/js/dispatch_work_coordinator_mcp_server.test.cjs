@@ -6,8 +6,8 @@ import path from "path";
 import { createDispatchCoordinatorFinishTool, createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
 import { serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
 
 const tempFiles = [];
 

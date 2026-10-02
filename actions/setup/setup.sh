@@ -389,6 +389,7 @@ SAFE_OUTPUTS_FILES=(
   "data_schema_normalizer.cjs"
   "dispatch_work_coordinator_store.cjs"
   "dispatch_work_coordinator_replay.cjs"
+  "dispatch_work_coordinator_codemods.cjs"
 )
 
 SAFE_OUTPUTS_COUNT=0
