@@ -152,49 +152,87 @@
 /* ==========================================================================
    Asides: a faint tint of the type colour, a hairline in the same hue,
    and an icon badge beside the type label.
+
+   Every parameter is a custom property, so it can be tuned from outside
+   (see /design-jig/asides/ in dev). Unset properties fall back to the
+   production defaults written inline below.
+
+   Per type (tip | note | caution | danger):
+     --aw-aside-{type}-color        base colour       (default: the status token)
+     --aw-aside-{type}-bg           background tint % (default: --aw-aside-bg-pct)
+     --aw-aside-{type}-border       border tint %     (default: --aw-aside-border-pct)
+     --aw-aside-{type}-ring         badge ring %      (default: 28%)
+     --aw-aside-{type}-label        label colour      (default: base colour)
+     --aw-aside-{type}-icon-color   icon colour       (default: base colour)
+   Global:
+     --aw-aside-radius, --aw-aside-pad-y, --aw-aside-pad-x, --aw-aside-border-width,
+     --aw-aside-shadow, --aw-aside-badge-size, --aw-aside-icon-size,
+     --aw-aside-label-size, --aw-aside-label-weight, --aw-aside-gap-above
    ========================================================================== */
 
+/* Theme-dependent defaults: dark needs a touch more colour for the tint to register. */
+:root,
+.aw-tone-dark {
+  --aw-aside-bg-pct: 4%;
+  --aw-aside-border-pct: 10%;
+}
+
+:root[data-theme='light'] {
+  --aw-aside-bg-pct: 2.5%;
+  --aw-aside-border-pct: 7%;
+}
+
 .sl-markdown-content .starlight-aside {
-  --aw-aside-color: var(--aw-color-note);
-  --aw-aside-icon: var(--aw-icon-info);
-  --aw-aside-tint: 2.5%;
-  --aw-aside-line: 7%;
   position: relative;
-  padding: 1.125rem 1.25rem 1.125rem;
-  border: 1px solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), var(--aw-color-border-strong));
-  border-radius: 8px;
+  padding: var(--aw-aside-pad-y, 1.125rem) var(--aw-aside-pad-x, 1.25rem);
+  border: var(--aw-aside-border-width, 1px) solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), var(--aw-color-border-strong));
+  border-radius: var(--aw-aside-radius, 8px);
   background: color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-tint), var(--aw-color-bg));
-  box-shadow: var(--aw-shadow-soft);
+  box-shadow: var(--aw-aside-shadow, var(--aw-shadow-soft));
 }
 
-/* 16px more space above an aside than between ordinary blocks. */
+/* More space above an aside than between ordinary blocks. */
 .sl-markdown-content .starlight-aside:not(:first-child) {
-  margin-top: 2rem;
-}
-
-/* Dark mode needs a touch more colour for the tint to register. */
-:root:not([data-theme='light']) .sl-markdown-content .starlight-aside {
-  --aw-aside-tint: 4%;
-  --aw-aside-line: 10%;
+  margin-top: var(--aw-aside-gap-above, 2rem);
 }
 
 .sl-markdown-content .starlight-aside--note {
-  --aw-aside-color: var(--aw-color-note);
+  --aw-aside-color: var(--aw-aside-note-color, var(--aw-color-note));
+  --aw-aside-tint: var(--aw-aside-note-bg, var(--aw-aside-bg-pct));
+  --aw-aside-line: var(--aw-aside-note-border, var(--aw-aside-border-pct));
+  --aw-aside-ring: var(--aw-aside-note-ring, 28%);
+  --aw-aside-label: var(--aw-aside-note-label, var(--aw-aside-color));
+  --aw-aside-icon-color: var(--aw-aside-note-icon-color, var(--aw-aside-color));
   --aw-aside-icon: var(--aw-icon-info);
 }
 
 .sl-markdown-content .starlight-aside--tip {
-  --aw-aside-color: var(--aw-color-success);
+  --aw-aside-color: var(--aw-aside-tip-color, var(--aw-color-success));
+  --aw-aside-tint: var(--aw-aside-tip-bg, var(--aw-aside-bg-pct));
+  --aw-aside-line: var(--aw-aside-tip-border, var(--aw-aside-border-pct));
+  --aw-aside-ring: var(--aw-aside-tip-ring, 28%);
+  --aw-aside-label: var(--aw-aside-tip-label, var(--aw-aside-color));
+  --aw-aside-icon-color: var(--aw-aside-tip-icon-color, var(--aw-aside-color));
   --aw-aside-icon: var(--aw-icon-light-bulb);
 }
 
 .sl-markdown-content .starlight-aside--caution {
-  --aw-aside-color: var(--aw-color-caution);
+  --aw-aside-color: var(--aw-aside-caution-color, var(--aw-color-caution));
+  --aw-aside-tint: var(--aw-aside-caution-bg, var(--aw-aside-bg-pct));
+  --aw-aside-line: var(--aw-aside-caution-border, var(--aw-aside-border-pct));
+  --aw-aside-ring: var(--aw-aside-caution-ring, 28%);
+  --aw-aside-label: var(--aw-aside-caution-label, var(--aw-aside-color));
+  --aw-aside-icon-color: var(--aw-aside-caution-icon-color, var(--aw-aside-color));
   --aw-aside-icon: var(--aw-icon-alert);
 }
 
 .sl-markdown-content .starlight-aside--danger {
-  --aw-aside-color: var(--aw-color-danger);
+  --aw-aside-color: var(--aw-aside-danger-color, var(--aw-color-danger));
+  --aw-aside-tint: var(--aw-aside-danger-bg, var(--aw-aside-bg-pct));
+  --aw-aside-line: var(--aw-aside-danger-border, var(--aw-aside-border-pct));
+  --aw-aside-ring: var(--aw-aside-danger-ring, 28%);
+  --aw-aside-label: var(--aw-aside-danger-label, var(--aw-aside-color));
+  --aw-aside-icon-color: var(--aw-aside-danger-icon-color, var(--aw-aside-color));
   --aw-aside-icon: var(--aw-icon-stop);
 }
 
@@ -205,33 +243,33 @@
 :root .sl-markdown-content .starlight-aside .starlight-aside__title {
   position: relative;
   gap: 0.625rem;
-  font-size: var(--aw-text-ui);
-  font-weight: 580;
+  font-size: var(--aw-aside-label-size, var(--aw-text-ui));
+  font-weight: var(--aw-aside-label-weight, 580);
   line-height: var(--aw-leading-snug);
-  color: var(--aw-aside-color);
+  color: var(--aw-aside-label);
 }
 
-/* Badge: a 26px surface-coloured circle with a faint ring in the type colour… */
+/* Badge: a surface-coloured circle with a faint ring in the type colour… */
 .sl-markdown-content .starlight-aside__title::before {
   content: '';
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
+  width: var(--aw-aside-badge-size, 26px);
+  height: var(--aw-aside-badge-size, 26px);
   border-radius: 50%;
   background: var(--aw-color-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-aside-color) 28%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-ring), transparent);
 }
 
-/* …with the 14px icon centred on top. */
+/* …with the icon centred on top. */
 .sl-markdown-content .starlight-aside__title::after {
   content: '';
   position: absolute;
   top: 50%;
-  left: 6px;
-  width: 14px;
-  height: 14px;
+  left: calc((var(--aw-aside-badge-size, 26px) - var(--aw-aside-icon-size, 14px)) / 2);
+  width: var(--aw-aside-icon-size, 14px);
+  height: var(--aw-aside-icon-size, 14px);
   transform: translateY(-50%);
-  background-color: var(--aw-aside-color);
+  background-color: var(--aw-aside-icon-color);
   -webkit-mask: var(--aw-aside-icon) center / contain no-repeat;
   mask: var(--aw-aside-icon) center / contain no-repeat;
 }
