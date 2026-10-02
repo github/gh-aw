@@ -23,7 +23,7 @@ on:
         required: false
         default: validate workflow_call checkout
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
 engine: claude
 strict: true
@@ -34,6 +34,17 @@ imports:
   - shared/otlp.md
   - shared/reporting.md
 tools:
+  dispatch-work-coordinator:
+    id: smoke-call-workflow
+    schema:
+      type: object
+      properties:
+        task_id:
+          type: string
+        task_description:
+          type: string
+      required: [task_id, task_description]
+      additionalProperties: false
   bash:
     - "git status"
     - "git log *"
@@ -44,6 +55,8 @@ safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
     hide-older-comments: true
+    max: 1
+  dispatch-claim-finish:
     max: 1
   messages:
     append-only-comments: true
@@ -66,6 +79,8 @@ It validates that the PR branch checkout works correctly when invoked in a `work
 
 ## Test Requirements
 
+Use `aw_context.dispatch_work_coordinator.work.task_description` as the task when a trusted Dispatch Work Coordinator assignment is present. Do not derive the task from a caller-controlled workflow input in that case.
+
 1. **Git Status**: Run `git status` to verify the workspace is properly initialized.
 2. **Branch Check**: Run `git branch --show-current` to confirm which branch is checked out.
 3. **Remote Check**: Run `git remote -v` to confirm the remote configuration.
@@ -74,8 +89,10 @@ It validates that the PR branch checkout works correctly when invoked in a `work
 ## Output
 
 Add a comment summarizing the checkout validation results:
-- Task: "${{ inputs.task-description }}"
+- Task: the trusted Work task description, or "${{ inputs.task-description }}" when no coordinator assignment is present
 - Current branch name
 - Whether the workspace is clean or has changes
 - Whether the checkout succeeded (based on git commands working without errors)
 - Overall status: ✅ PASS or ❌ FAIL
+
+When a trusted Dispatch Work Coordinator assignment is present, finish it exactly once with `dispatch_claim_finish` and an outcome containing the validation status. Do not include Work or Claim authority fields in the outcome.

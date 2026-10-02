@@ -2,7 +2,7 @@
 "use strict";
 
 const fs = require("node:fs");
-const { DispatchWorkCoordinator } = require("./dispatch_work_coordinator_branch.cjs");
+const { DispatchWorkCoordinator, resolveCoordinatorIdentity } = require("./dispatch_work_coordinator_branch.cjs");
 const { createDispatchWorkCoordinatorGitHubClient } = require("./dispatch_work_coordinator_github_client.cjs");
 
 async function runDispatchWorkCoordinatorActivation(env = process.env) {
@@ -25,7 +25,7 @@ async function runDispatchWorkCoordinatorActivation(env = process.env) {
     githubClient: createDispatchWorkCoordinatorGitHubClient(env.GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN, env.GITHUB_API_URL),
     owner,
     repo,
-    identity: workflowRef.split("@", 1)[0],
+    identity: resolveCoordinatorIdentity(workflowRef, env.GH_AW_DISPATCH_WORK_COORDINATOR_ID),
     runId: env.GITHUB_RUN_ID,
     workflowId: workflowRef,
     workSchema,

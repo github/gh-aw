@@ -205,6 +205,20 @@ func TestGenerateMaintenanceWorkflow_DispatchWorkCoordinatorMaintenance(t *testi
 				Name:       "worker",
 				WorkflowID: "worker",
 				DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{
+					ID: "shared-queue",
+					Schema: map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"title": map[string]any{"type": "string"},
+						},
+					},
+				},
+			},
+			{
+				Name:       "dispatcher",
+				WorkflowID: "dispatcher",
+				DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{
+					ID: "shared-queue",
 					Schema: map[string]any{
 						"type": "object",
 						"properties": map[string]any{
@@ -227,13 +241,34 @@ func TestGenerateMaintenanceWorkflow_DispatchWorkCoordinatorMaintenance(t *testi
 	job := jobs["dispatch_work_coordinator_compaction"]
 	require.NotEmpty(t, job)
 	assert.Equal(t, 1, strings.Count(yaml, "\n  dispatch_work_coordinator_compaction:\n"))
+	assert.Equal(t, 1, strings.Count(job, "Maintain Dispatch Work Coordinator"))
 	assert.Contains(t, job, "actions: read")
 	assert.Contains(t, job, "contents: write")
 	assert.Contains(t, job, "dispatch_work_coordinator_maintenance.cjs")
-	assert.Contains(t, job, `"identity":".github/workflows/worker.lock.yml"`)
+	assert.Contains(t, job, `"identity":"shared-queue"`)
 	assert.Contains(t, job, `"schema":{"properties":{"title":{"type":"string"}},"type":"object"}`)
 	assert.Contains(t, yaml, "'dispatch_work_coordinator_compaction'")
 	assert.Contains(t, jobs["run_operation"], "inputs.operation != 'dispatch_work_coordinator_compaction'")
+}
+
+func TestGenerateMaintenanceWorkflow_RejectsSharedCoordinatorIDWithDifferentSchemas(t *testing.T) {
+	_, err := collectMaintenanceDispatchWorkCoordinators([]*WorkflowData{
+		{
+			WorkflowID: "worker",
+			DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{
+				ID:     "shared-queue",
+				Schema: map[string]any{"type": "object"},
+			},
+		},
+		{
+			WorkflowID: "dispatcher",
+			DispatchWorkCoordinator: &DispatchWorkCoordinatorConfig{
+				ID:     "shared-queue",
+				Schema: map[string]any{"type": "object", "required": []any{"title"}},
+			},
+		},
+	})
+	require.ErrorContains(t, err, "conflicting Dispatch Work Coordinator configurations")
 }
 
 func TestGenerateMaintenanceWorkflow_LedgerCompaction_CaseSensitivity(t *testing.T) {

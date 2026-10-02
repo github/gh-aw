@@ -72,7 +72,7 @@ func (r *MCPConfigRendererUnified) RenderDispatchWorkCoordinatorMCP(yaml *string
 		yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs\"]\n")
-		yaml.WriteString("          env_vars = [\"GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN\", \"GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA\", \"GITHUB_API_URL\", \"GITHUB_REPOSITORY\", \"GITHUB_RUN_ID\", \"GITHUB_WORKFLOW_REF\"]\n")
+		yaml.WriteString("          env_vars = [\"GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN\", \"GH_AW_DISPATCH_WORK_COORDINATOR_ID\", \"GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA\", \"GITHUB_API_URL\", \"GITHUB_REPOSITORY\", \"GITHUB_RUN_ID\", \"GITHUB_WORKFLOW_REF\"]\n")
 		return
 	}
 	yaml.WriteString("              \"dispatch-work-coordinator\": {\n")
@@ -85,6 +85,7 @@ func (r *MCPConfigRendererUnified) RenderDispatchWorkCoordinatorMCP(yaml *string
 	yaml.WriteString("                \"entrypointArgs\": [\"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs\"],\n")
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN\": \"\\${GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN}\",\n")
+	yaml.WriteString("                  \"GH_AW_DISPATCH_WORK_COORDINATOR_ID\": \"\\${GH_AW_DISPATCH_WORK_COORDINATOR_ID}\",\n")
 	yaml.WriteString("                  \"GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA\": \"\\${GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA}\",\n")
 	yaml.WriteString("                  \"GITHUB_API_URL\": \"\\${GITHUB_API_URL}\",\n")
 	yaml.WriteString("                  \"GITHUB_REPOSITORY\": \"\\${GITHUB_REPOSITORY}\",\n")

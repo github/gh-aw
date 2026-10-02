@@ -5509,6 +5509,17 @@
           "description": "Enable the durable Dispatch Work Coordinator MCP tools. Define the JSON Schema for Work payloads in `schema`; supported keywords are type, enum, required, properties, additionalProperties: false, items, oneOf, and anyOf.",
           "type": "object",
           "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "description": "Optional stable coordinator ID shared by dispatcher and worker workflows."
+            },
+            "auto-claim": {
+              "type": "boolean",
+              "description": "Automatically claim the next available Work during activation (default: true)."
+            },
             "schema": {
               "type": "object",
               "description": "Required JSON Schema object describing the Work payload. The root type must be object.",

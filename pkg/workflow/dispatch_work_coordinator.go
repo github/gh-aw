@@ -4,10 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"regexp"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 const maxDispatchWorkSchemaBytes = 16 * 1024
+
+var dispatchWorkCoordinatorIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 var dispatchWorkSchemaKeywords = map[string]struct{}{
 	"type": {}, "enum": {}, "required": {}, "properties": {},
@@ -17,8 +23,21 @@ var dispatchWorkSchemaKeywords = map[string]struct{}{
 
 // DispatchWorkCoordinatorConfig enables the built-in durable Work queue.
 type DispatchWorkCoordinatorConfig struct {
+	ID         string         `json:"id,omitempty" yaml:"id,omitempty"`
+	AutoClaim  *bool          `json:"auto-claim,omitempty" yaml:"auto-claim,omitempty"`
 	Schema     map[string]any `json:"schema" yaml:"schema"`
 	SchemaJSON string         `json:"-" yaml:"-"`
+}
+
+func (c *DispatchWorkCoordinatorConfig) shouldAutoClaim() bool {
+	return c.AutoClaim == nil || *c.AutoClaim
+}
+
+func (c *DispatchWorkCoordinatorConfig) identityForWorkflow(workflowID string) string {
+	if c.ID != "" {
+		return c.ID
+	}
+	return path.Join(constants.WorkflowsDir, workflowID+".lock.yml")
 }
 
 func parseDispatchWorkCoordinatorConfig(raw any) (*DispatchWorkCoordinatorConfig, error) {
@@ -26,12 +45,28 @@ func parseDispatchWorkCoordinatorConfig(raw any) (*DispatchWorkCoordinatorConfig
 	if !ok {
 		return nil, errors.New("tools.dispatch-work-coordinator must be an object")
 	}
+	id := ""
+	if value, exists := config["id"]; exists {
+		var valid bool
+		id, valid = value.(string)
+		if !valid || !dispatchWorkCoordinatorIDPattern.MatchString(id) {
+			return nil, errors.New("tools.dispatch-work-coordinator.id must be 1-128 letters, numbers, dots, underscores, or hyphens and start with a letter or number")
+		}
+	}
+	var autoClaim *bool
+	if value, exists := config["auto-claim"]; exists {
+		enabled, valid := value.(bool)
+		if !valid {
+			return nil, errors.New("tools.dispatch-work-coordinator.auto-claim must be a boolean")
+		}
+		autoClaim = &enabled
+	}
 	schema, ok := config["schema"].(map[string]any)
 	if !ok {
 		return nil, errors.New("tools.dispatch-work-coordinator.schema must be a JSON Schema object")
 	}
 	for key := range config {
-		if key != "schema" {
+		if key != "id" && key != "auto-claim" && key != "schema" {
 			return nil, fmt.Errorf("tools.dispatch-work-coordinator has unsupported property %q", key)
 		}
 	}
@@ -51,7 +86,7 @@ func parseDispatchWorkCoordinatorConfig(raw any) (*DispatchWorkCoordinatorConfig
 	if _, err := compileSchema(string(encoded), "https://github.com/github/gh-aw/dispatch-work.schema.json"); err != nil {
 		return nil, fmt.Errorf("tools.dispatch-work-coordinator.schema is invalid: %w", err)
 	}
-	return &DispatchWorkCoordinatorConfig{Schema: schema, SchemaJSON: string(encoded)}, nil
+	return &DispatchWorkCoordinatorConfig{ID: id, AutoClaim: autoClaim, Schema: schema, SchemaJSON: string(encoded)}, nil
 }
 
 func validateDispatchWorkSchemaExpressions(value any, depth int) error {

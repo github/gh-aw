@@ -263,7 +263,14 @@ func (t *ToolsConfig) ToMap() map[string]any { //nolint:largefunc // Existing co
 		result["repo-memory"] = t.RepoMemory.Raw
 	}
 	if t.DispatchWorkCoordinator != nil {
-		result["dispatch-work-coordinator"] = map[string]any{"schema": t.DispatchWorkCoordinator.Schema}
+		coordinator := map[string]any{"schema": t.DispatchWorkCoordinator.Schema}
+		if t.DispatchWorkCoordinator.ID != "" {
+			coordinator["id"] = t.DispatchWorkCoordinator.ID
+		}
+		if t.DispatchWorkCoordinator.AutoClaim != nil {
+			coordinator["auto-claim"] = *t.DispatchWorkCoordinator.AutoClaim
+		}
+		result["dispatch-work-coordinator"] = coordinator
 	}
 	if t.Timeout != nil {
 		result["timeout"] = t.Timeout.ToValue()

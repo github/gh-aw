@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"slices"
 	"strings"
-
-	"github.com/github/gh-aw/pkg/constants"
 )
 
 const maintenanceDispatchWorkCoordinatorOperation = "dispatch_work_coordinator_compaction"
@@ -42,7 +39,7 @@ func collectMaintenanceDispatchWorkCoordinators(workflowDataList []*WorkflowData
 		if workflowData.DispatchWorkCoordinator.Schema == nil || workflowData.DispatchWorkCoordinator.Schema["type"] != "object" {
 			return nil, fmt.Errorf("dispatch work coordinator for workflow %s requires an object schema", workflowData.WorkflowID)
 		}
-		identity := path.Join(constants.WorkflowsDir, workflowData.WorkflowID+".lock.yml")
+		identity := workflowData.DispatchWorkCoordinator.identityForWorkflow(workflowData.WorkflowID)
 		config, err := json.Marshal(map[string]any{
 			"identity": identity,
 			"schema":   workflowData.DispatchWorkCoordinator.Schema,

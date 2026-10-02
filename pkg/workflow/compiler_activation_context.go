@@ -154,17 +154,18 @@ func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuil
 	ctx.outputs["setup-span-id"] = "${{ steps.setup.outputs.span-id }}"
 	ctx.outputs["setup-parent-span-id"] = "${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}"
 	c.addActivationWorkflowCallResolutionSteps(ctx)
-	if ctx.data.DispatchWorkCoordinator != nil {
-		ctx.steps = append(ctx.steps, buildDispatchWorkCoordinatorActivationStep(ctx.data.DispatchWorkCoordinator.SchemaJSON))
+	if ctx.data.DispatchWorkCoordinator != nil && ctx.data.DispatchWorkCoordinator.shouldAutoClaim() {
+		ctx.steps = append(ctx.steps, buildDispatchWorkCoordinatorActivationStep(ctx.data.DispatchWorkCoordinator.SchemaJSON, ctx.data.DispatchWorkCoordinator.ID))
 		ctx.outputs["dispatch_work_coordinator_assignment"] = "${{ steps.dispatch-work-coordinator.outputs.assignment }}"
 	}
 }
 
-func buildDispatchWorkCoordinatorActivationStep(schemaJSON string) string {
+func buildDispatchWorkCoordinatorActivationStep(schemaJSON, coordinatorID string) string {
 	return "      - name: Claim Dispatch Work Coordinator assignment\n" +
 		"        id: dispatch-work-coordinator\n" +
 		"        env:\n" +
 		"          GH_AW_DISPATCH_WORK_COORDINATOR_TOKEN: ${{ github.token }}\n" +
+		"          GH_AW_DISPATCH_WORK_COORDINATOR_ID: " + quoteYAMLEnvValue(coordinatorID) + "\n" +
 		"          GH_AW_DISPATCH_WORK_COORDINATOR_SCHEMA: " + quoteYAMLEnvValue(schemaJSON) + "\n" +
 		"        run: node \"${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_activation.cjs\"\n"
 }

@@ -2,7 +2,7 @@
 "use strict";
 
 const { createServer, registerTool, start } = require("./mcp_server_core.cjs");
-const { DispatchWorkCoordinator } = require("./dispatch_work_coordinator_branch.cjs");
+const { DispatchWorkCoordinator, resolveCoordinatorIdentity } = require("./dispatch_work_coordinator_branch.cjs");
 const { createDispatchWorkCoordinatorGitHubClient } = require("./dispatch_work_coordinator_github_client.cjs");
 
 function result(value) {
@@ -142,7 +142,7 @@ function createServerFromEnvironment() {
     githubClient: createDispatchWorkCoordinatorGitHubClient(token, process.env.GITHUB_API_URL),
     owner,
     repo,
-    identity: workflowRef?.split("@", 1)[0],
+    identity: resolveCoordinatorIdentity(workflowRef, process.env.GH_AW_DISPATCH_WORK_COORDINATOR_ID),
     runId: process.env.GITHUB_RUN_ID,
     workflowId: workflowRef,
     workSchema,

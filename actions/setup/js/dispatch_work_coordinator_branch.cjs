@@ -31,6 +31,17 @@ function coordinatorBranchName(identity) {
   return `gh-aw/dispatch-work/${crypto.createHash("sha256").update(identity).digest("hex").slice(0, 32)}`;
 }
 
+function resolveCoordinatorIdentity(workflowRef, coordinatorId) {
+  if (coordinatorId !== undefined && coordinatorId !== "") {
+    if (typeof coordinatorId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(coordinatorId)) {
+      throw new TypeError("Invalid coordinator ID");
+    }
+    return coordinatorId;
+  }
+  if (typeof workflowRef !== "string" || !workflowRef.trim()) throw new TypeError("Invalid coordinator workflow identity");
+  return workflowRef.split("@", 1)[0];
+}
+
 function decodeContent(content) {
   if (!content || content.type !== "file" || content.encoding !== "base64" || typeof content.content !== "string") {
     throw new TypeError("Coordinator branch has an invalid canonical file");
@@ -338,6 +349,7 @@ module.exports = {
   DispatchWorkCoordinator,
   coordinatorBranchName,
   isConflict,
+  resolveCoordinatorIdentity,
   readSnapshot,
   writeSnapshot,
 };

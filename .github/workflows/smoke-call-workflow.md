@@ -14,7 +14,7 @@ on:
     types: [labeled]
     names: ["water"]
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
 model: gpt-5.3-codex
 engine:
@@ -33,6 +33,18 @@ timeout-minutes: 20
 imports:
   - shared/otlp.md
 tools:
+  dispatch-work-coordinator:
+    id: smoke-call-workflow
+    auto-claim: false
+    schema:
+      type: object
+      properties:
+        task_id:
+          type: string
+        task_description:
+          type: string
+      required: [task_id, task_description]
+      additionalProperties: false
   cli-proxy: true
 features:
   gh-aw-detection: false
@@ -52,7 +64,7 @@ The worker will validate that the repository checkout works correctly in a `work
 
 ## Instructions
 
-1. Use the `smoke_workflow_call` MCP tool to select the `smoke-workflow-call` worker.
-2. Pass `"smoke test checkout validation"` as the `task-description` input.
+1. Submit one Work item with `task_id` set to the current trusted `aw_context.run_id` and `task_description` set to `"smoke test checkout validation"`.
+2. Use the `smoke_workflow_call` MCP tool to call the `smoke-workflow-call` worker with the same task description.
 
 **Important**: You MUST call the `smoke_workflow_call` MCP tool with the `task-description` input. Do not use the `noop` tool.
