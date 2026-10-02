@@ -15,11 +15,12 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.285"},
-		{"Copilot CLI", DefaultCopilotVersion, "1.0.89"},
-		{"Codex", DefaultCodexVersion, "0.159.2"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.286"},
+		{"Copilot CLI", DefaultCopilotVersion, "1.0.90"},
+		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
+		{"Codex", DefaultCodexVersion, "0.159.3"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.62.0"},
-		{"Pi CLI", DefaultPiVersion, "0.99.1"},
+		{"Pi CLI", DefaultPiVersion, "0.99.2"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.2"},
 		{"Firewall", DefaultFirewallVersion, "v0.28.30"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.27"},
