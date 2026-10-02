@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -127,7 +128,7 @@ func workSubmitCommand() *cobra.Command {
 			var data []byte
 			var err error
 			if path == "-" {
-				data, err = os.ReadFile("/dev/stdin")
+				data, err = io.ReadAll(cmd.InOrStdin())
 			} else {
 				data, err = os.ReadFile(path)
 			}

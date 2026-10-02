@@ -61,6 +61,29 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 	if run("compact")["changed"] != false {
 		t.Fatal("second compaction should not change the canonical log")
 	}
+	second := NewWorkCommand()
+	second.SetIn(strings.NewReader(`{"task":"another"}`))
+	second.SetArgs([]string{"--repo", remote, "--json", "submit-work", "--file", "-"})
+	var secondOutput bytes.Buffer
+	second.SetOut(&secondOutput)
+	if err := second.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var submittedSecond map[string]any
+	if err := json.Unmarshal(secondOutput.Bytes(), &submittedSecond); err != nil {
+		t.Fatal(err)
+	}
+	secondID := submittedSecond["work_id"].(string)
+	secondClaim := run("claim", "--work-id", secondID, "--run-id", "run-2")["claim_id"].(string)
+	if run("cancel-claim", "--claim-id", secondClaim)["cancelled"] != true {
+		t.Fatal("claim cancellation failed")
+	}
+	if run("cancel-work", "--work-id", secondID)["cancelled"] != true {
+		t.Fatal("work cancellation failed")
+	}
+	if run("stats")["cancelled"] != float64(1) {
+		t.Fatal("stats did not reflect cancellation")
+	}
 	command := NewWorkCommand()
 	command.SetArgs([]string{"--repo", remote, "cancel-work", "--work-id", workID})
 	if err := command.Execute(); err == nil || !strings.Contains(err.Error(), "terminal") {

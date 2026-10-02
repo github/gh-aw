@@ -369,9 +369,6 @@ func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, err
 		for _, claim := range state.Claims {
 			if claim.ClaimID == tx.ClaimID {
 				found = true
-				if tx.Kind == "ClaimCancellation" && claim.State == "cancelled" {
-					return transactions, false, nil
-				}
 			}
 		}
 		if !found {
