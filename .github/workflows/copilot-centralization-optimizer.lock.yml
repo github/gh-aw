@@ -703,14 +703,6 @@ jobs:
                     "type": "array",
                     "itemType": "object"
                   },
-                  "claim": {
-                    "type": "string",
-                    "maxLength": 4096
-                  },
-                  "claim_id": {
-                    "type": "string",
-                    "maxLength": 128
-                  },
                   "filter": {
                     "type": "object"
                   },
@@ -726,6 +718,14 @@ jobs:
                   "name": {
                     "type": "string",
                     "maxLength": 256
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "note_id": {
+                    "type": "string",
+                    "maxLength": 128
                   },
                   "operation": {
                     "type": "string",

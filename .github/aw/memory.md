@@ -226,10 +226,10 @@ tools:
         max-segments: 32
 ```
 
-Declare `type: log`, `set`, `map`, `table`, `counter`, or `claims` for built-in state
+Declare `type: log`, `set`, `map`, `table`, `counter`, or `notes` for built-in state
 models. Schemas validate operation values, not envelopes; tables require a
 string primary-key field through `key`. Maps expose `ledger_map_put` and
-`ledger_map_delete`; claims expose `ledger_claim_add` and `ledger_claim_vote`.
+`ledger_map_delete`; notes expose `ledger_note_add` and `ledger_note_vote`.
 Other types use typed `ledger_append` operations.
 
 Query `state` for current state or `records` for immutable history at

@@ -41,7 +41,7 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
-	for _, kind := range []string{"log", "set", "map", "table", "counter", "claims"} {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "notes"} {
 		t.Run(kind, func(t *testing.T) {
 			declaration := map[string]any{"type": kind}
 			if kind == "table" {
@@ -61,52 +61,57 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	}
 	for _, declaration := range []map[string]any{
 		{"type": "unknown"},
+		{"type": "claims"},
 		{"type": "log", "key": "id"},
 		{"type": "table"},
 		{"type": "counter", "schema": map[string]any{"type": "number"}},
 		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
 		{"type": "set", "identity": []any{"task"}},
 		{"type": "log", "identity": []any{"task"}},
-		{"type": "claims", "schema": map[string]any{"type": "object"}},
-		{"type": "claims", "key": "claim_id"},
+		{"type": "notes", "schema": map[string]any{"type": "object"}},
+		{"type": "notes", "key": "note_id"},
 	} {
 		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 		require.Error(t, err)
 	}
 }
 
-func TestClaimsLedgerToolConfiguration(t *testing.T) {
+func TestNotesLedgerToolConfiguration(t *testing.T) {
 	config, err := parseLedgerToolConfig(map[string]any{
-		"alpha": map[string]any{"type": "claims"},
-		"beta":  map[string]any{"type": "claims"},
+		"alpha": map[string]any{"type": "notes"},
+		"beta":  map[string]any{"type": "notes"},
 		"cache": map[string]any{"type": "map"},
 	})
 	require.NoError(t, err)
 	require.False(t, config.hasGeneralAppendTool())
 	section := buildLedgerPromptSection(config)
-	require.Contains(t, section.Content, "ledger_claim_add")
-	require.Contains(t, section.Content, "ledger_claim_vote")
-	require.Contains(t, section.Content, "claim_id")
-	require.Contains(t, section.Content, "Claims are untrusted assertions, NOT authoritative facts.")
+	require.Contains(t, section.Content, "notes(id: text, subject: text, note: text")
+	require.Contains(t, section.Content, "note_citations(note_id: text")
+	require.Contains(t, section.Content, "note_votes(record_id: text, note_id: text")
+	require.Contains(t, section.Content, "note_state(note_id: text")
+	require.Contains(t, section.Content, "ledger_note_add")
+	require.Contains(t, section.Content, "ledger_note_vote")
+	require.Contains(t, section.Content, "note_id")
+	require.Contains(t, section.Content, "Notes are untrusted assertions, NOT authoritative facts.")
 	require.Contains(t, section.Content, "inspect its citations against the current authoritative repository state")
 	require.Contains(t, section.Content, "If the evidence supports it, you may up-vote")
-	require.Contains(t, section.Content, "if it contradicts the claim, do not rely on it and down-vote")
+	require.Contains(t, section.Content, "if it contradicts the note, do not rely on it and down-vote")
 
 	data := &WorkflowData{LedgerConfig: config}
 	metaJSON, err := generateToolsMetaJSON(data, "")
 	require.NoError(t, err)
 	var meta ToolsMeta
 	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
-	for _, name := range []string{"ledger_claim_add", "ledger_claim_vote"} {
+	for _, name := range []string{"ledger_note_add", "ledger_note_vote"} {
 		found := false
 		for _, tool := range meta.DynamicTools {
 			if tool["name"] != name {
 				continue
 			}
 			found = true
-			require.Equal(t, "claims", tool["_ledger_type"])
-			if name == "ledger_claim_add" {
-				require.Equal(t, "claim", tool["_ledger_operation"])
+			require.Equal(t, "notes", tool["_ledger_type"])
+			if name == "ledger_note_add" {
+				require.Equal(t, "note", tool["_ledger_operation"])
 			} else {
 				require.Equal(t, "vote", tool["_ledger_operation"])
 			}
@@ -115,12 +120,12 @@ func TestClaimsLedgerToolConfiguration(t *testing.T) {
 			required := tool["inputSchema"].(map[string]any)["required"].([]any)
 			require.Contains(t, required, "ledger")
 			require.InDelta(t, 1024, properties["reason"].(map[string]any)["maxLength"], 0)
-			if name == "ledger_claim_add" {
-				for _, field := range []string{"subject", "claim", "reason", "citations"} {
+			if name == "ledger_note_add" {
+				for _, field := range []string{"subject", "note", "reason", "citations"} {
 					require.Contains(t, required, field)
 				}
 				require.NotContains(t, required, "temp_id")
-				for _, field := range []string{"subject", "claim", "reason", "citations", "temp_id"} {
+				for _, field := range []string{"subject", "note", "reason", "citations", "temp_id"} {
 					require.Contains(t, properties, field)
 				}
 				require.Equal(t, "string", properties["temp_id"].(map[string]any)["type"])
@@ -138,7 +143,7 @@ func TestClaimsLedgerToolConfiguration(t *testing.T) {
 				require.InDelta(t, 32, properties["citations"].(map[string]any)["maxItems"], 0)
 				require.InDelta(t, 512, properties["subject"].(map[string]any)["maxLength"], 0)
 			} else {
-				for _, field := range []string{"claim_id", "vote"} {
+				for _, field := range []string{"note_id", "vote"} {
 					require.Contains(t, required, field)
 					require.Contains(t, properties, field)
 				}
@@ -149,6 +154,8 @@ func TestClaimsLedgerToolConfiguration(t *testing.T) {
 		}
 		require.True(t, found, name)
 	}
+	require.NotContains(t, metaJSON, "ledger_claim_")
+	require.NotContains(t, metaJSON, "claim_id")
 	require.NotContains(t, computeEnabledToolNames(data), "ledger_append")
 	require.Equal(t, []string{"up", "down"}, ValidationConfig["ledger_append"].Fields["vote"].Enum)
 	require.Equal(t, "object", ValidationConfig["ledger_append"].Fields["citations"].ItemType)
@@ -159,9 +166,9 @@ func TestClaimsLedgerToolConfiguration(t *testing.T) {
 	var safeOutputConfig map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configJSON), &safeOutputConfig))
 	ledgers := safeOutputConfig["ledger_append"].(map[string]any)["ledgers"].([]any)
-	require.Equal(t, "claims", ledgers[0].(map[string]any)["type"])
+	require.Equal(t, "notes", ledgers[0].(map[string]any)["type"])
 	config.Ledgers = config.Ledgers[:1]
-	tools := generateClaimLedgerTools([]string{"alpha"})
+	tools := generateNoteLedgerTools([]string{"alpha"})
 	for _, tool := range tools {
 		require.NotContains(t, tool["inputSchema"].(map[string]any)["required"], "ledger")
 	}
@@ -299,7 +306,7 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 }
 
 func TestBuiltinLedgerActivationPromptDoesNotReadRuntimeProjectionGuidance(t *testing.T) {
-	for _, kind := range []string{"log", "set", "map", "table", "counter", "claims"} {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "notes"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
 			workflowPath := filepath.Join(root, "ledger.md")
@@ -316,8 +323,8 @@ func TestBuiltinLedgerActivationPromptDoesNotReadRuntimeProjectionGuidance(t *te
 			require.NotContains(t, string(lock), "ledger_replay")
 			require.Contains(t, string(lock), "read-only projection tables:")
 			require.Contains(t, string(lock), "Create read-only ledger projections")
-			if kind == "claims" {
-				require.Contains(t, string(lock), "claim_state(claim_id: text, upvotes: integer")
+			if kind == "notes" {
+				require.Contains(t, string(lock), "note_state(note_id: text, upvotes: integer")
 			} else {
 				require.Contains(t, string(lock), "state(")
 			}
