@@ -1,11 +1,9 @@
 ---
-import octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 import LandingSection from './LandingSection.astro';
 import SafeByDefaultTrifecta from './SafeByDefaultTrifecta.astro';
 
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
-
-const base = '/gh-aw';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const layers = [
   {
     id: 'compile',
@@ -53,7 +51,7 @@ const layers = [
 ---
 
 <LandingSection id="safety" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
-  <SafeByDefaultTrifecta slot="intro" part="text" noun="layers" />
+  <SafeByDefaultTrifecta slot="intro" part="text" />
   <SafeByDefaultTrifecta slot="aside" part="figure" />
   <div class="aw-safe">
 
@@ -61,7 +59,7 @@ const layers = [
 
     <div class="aw-layout" data-safe-root>
       <div class="aw-stack">
-        <div class="aw-end"><span class="aw-ico" set:html={icon('copilot')} />The agent</div>
+        <div class="aw-end"><Octicon name="copilot" class="aw-end-ico" />The agent</div>
         <ol class="aw-layers">
           {layers.map((l, i) => (
             <li class:list={['aw-layer', i === 0 && 'is-active']}>
@@ -73,25 +71,25 @@ const layers = [
                 aria-controls={`safe-${l.id}`}
                 aria-expanded={i === 0 ? 'true' : 'false'}
               >
-                <span class="aw-ico aw-row-icon" set:html={icon(l.icon)} />
+                <Octicon name={l.icon} class="aw-row-icon" />
                 <span class="aw-row-name">{l.name}</span>
-                <span class="aw-ico aw-chev" set:html={icon('chevron-down', 12)} />
+                <Octicon name="chevron-down" size={12} class="aw-chev" />
                 <span class="aw-progress" aria-hidden="true" />
               </button>
               <div class="aw-detail" id={`safe-${l.id}`} role="region" aria-labelledby={`safe-${l.id}-btn`}>
                 <h3>{l.name}</h3>
                 <p>{l.text}</p>
-                <a href={l.href}>Learn more <span class="aw-ico" set:html={icon('arrow-right', 12)} /></a>
+                <a href={l.href}>Learn more <Octicon name="arrow-right" size={12} /></a>
               </div>
             </li>
           ))}
         </ol>
-        <div class="aw-end"><span class="aw-ico" set:html={icon('repo')} />Your repository</div>
+        <div class="aw-end"><Octicon name="repo" class="aw-end-ico" />Your repository</div>
       </div>
     </div>
 
     <p class="aw-foot">
-      Try it safely: <a href={`${base}/reference/safe-outputs/`}><code>staged: true</code></a> previews every output without writing anything.
+      Try it safely: <a href={`${base}/reference/safe-outputs/`}><code class="aw-code">staged: true</code></a> previews every output without writing anything.
     </p>
     <p class="aw-foot aw-foot-link">
       <a href={`${base}/introduction/architecture/`}>Read the security architecture →</a>
@@ -108,21 +106,9 @@ const layers = [
     --aw-safe-step: 4500ms;
     margin-top: 1.25rem;
   }
-  .aw-ico {
-    display: inline-flex;
-    flex: none;
-  }
-  .aw-ico :global(svg) {
-    fill: currentColor;
-  }
   a {
     color: var(--aw-color-accent-text);
     text-underline-offset: 0.2em;
-  }
-  a:focus-visible,
-  button:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
   }
 
   .aw-defence-intro {
@@ -155,7 +141,7 @@ const layers = [
     gap: 0.625rem;
     padding: 0.5rem 1rem 0.5rem 0.5rem;
     border: 1px solid var(--aw-color-border-strong);
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     font-size: var(--aw-step-0);
     font-weight: 500;
     color: var(--aw-color-text-strong);
@@ -163,7 +149,7 @@ const layers = [
     box-shadow: var(--aw-shadow-raised);
   }
   /* icon disc: its centre sits on the stack's vertical line (1.5rem in) */
-  .aw-end .aw-ico {
+  .aw-end-ico {
     display: grid;
     place-items: center;
     width: 2rem;
@@ -242,15 +228,16 @@ const layers = [
     font-size: var(--aw-step-0);
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color var(--aw-duration-fast) ease, border-color var(--aw-duration-fast) ease;
   }
   .aw-row:hover {
     border-color: var(--aw-color-border-strong);
     background: var(--aw-color-bg-subtle);
   }
+  /* `all: unset` drops the global ring, so restore it. */
   .aw-row:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
+    outline: var(--aw-focus-ring);
+    outline-offset: var(--aw-focus-offset);
   }
   /* Auto-advance cue: a hairline filling along the bottom edge of the active row. */
   .aw-progress {
@@ -363,7 +350,7 @@ const layers = [
       box-sizing: border-box;
       padding: 1.5rem 1.75rem;
       border: 1px solid var(--aw-color-border);
-      border-radius: 12px;
+      border-radius: var(--aw-radius-lg);
       background: var(--aw-color-surface);
       box-shadow: var(--aw-shadow-raised);
       opacity: 0;
@@ -389,18 +376,14 @@ const layers = [
     line-height: 1.7;
     color: var(--aw-color-text-muted);
   }
+  /* Full-size chip: it's the link text. */
   .aw-foot code {
-    font-size: inherit;
     padding: 0.1em 0.4em;
-    border-radius: 4px;
-    background: var(--aw-color-code-bg);
-    color: var(--aw-color-text);
+    font-size: inherit;
+    color: inherit;
   }
   .aw-foot-link {
     margin-top: 0.5rem;
-  }
-  .aw-foot a code {
-    color: inherit;
   }
 
   @media (prefers-reduced-motion: reduce) {

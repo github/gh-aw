@@ -6,8 +6,8 @@ interface Props {
   titleId?: string;
   title: string;
   lede?: string;
-  /** Section background: page colour, a subtle tint, or a full-bleed dark band. */
-  tone?: 'default' | 'subtle' | 'dark';
+  /** Section background: the page colour, or a full-bleed dark band. */
+  tone?: 'default' | 'dark';
 }
 const { id, titleId, title, lede, tone = 'default' } = Astro.props;
 const headingId = titleId ?? `${id ?? 'section'}-title`;
@@ -43,9 +43,6 @@ const headingId = titleId ?? `${id ?? 'section'}-title`;
     padding-block: clamp(4rem, 8vw, 7rem);
     background: var(--aw-color-bg);
     color: var(--aw-color-text);
-  }
-  .aw-section.aw-tone-subtle {
-    background: var(--aw-color-bg-subtle);
   }
   /* In the dark theme the page is already near-black, so hairlines mark the band. */
   :global([data-theme='dark']) .aw-section.aw-tone-dark {
@@ -86,7 +83,6 @@ const headingId = titleId ?? `${id ?? 'section'}-title`;
     line-height: 1.1;
     text-wrap: balance;
     color: var(--aw-color-text);
-    border: 0;
   }
   .aw-lede {
     margin: 1rem 0 0;

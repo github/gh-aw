@@ -1,20 +1,21 @@
 ---
-import octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 import LandingSection from './LandingSection.astro';
+import LandingPoints from './LandingPoints.astro';
 
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const points = [
   {
     title: 'Your own runners',
     text: 'Run on Linux self-hosted runners, including Actions Runner Controller with Docker-in-Docker.',
-    href: '/gh-aw/reference/self-hosted-runners/',
+    href: `${base}/reference/self-hosted-runners/`,
     label: 'Self-hosted runners',
   },
   {
     title: 'Every repository',
     text: 'Roll workflows out across an organization or enterprise and manage them centrally.',
-    href: '/gh-aw/guides/using-at-scale/',
+    href: `${base}/guides/using-at-scale/`,
     label: 'Using at scale',
   },
 ];
@@ -47,8 +48,8 @@ const fan = [8, 29, 50, 71, 92];
       aria-label="One workflow file, triage.md, rolls out to sixteen repositories in the acme organization and runs on three self-hosted runners."
       data-fan
     >
-      <div class="aw-source" aria-hidden="true">
-        <span class="aw-ico" set:html={icon('file')} />.github/workflows/triage.md
+      <div class="aw-source aw-card" aria-hidden="true">
+        <Octicon name="file" class="aw-muted-ico" />.github/workflows/triage.md
       </div>
 
       <svg class="aw-wires" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
@@ -59,7 +60,7 @@ const fan = [8, 29, 50, 71, 92];
 
       <div class="aw-orgbox" aria-hidden="true">
         <div class="aw-orghead">
-          <span class="aw-ico" set:html={icon('organization')} />
+          <Octicon name="organization" class="aw-muted-ico" />
           <span class="aw-mono">org/acme</span>
           <span class="aw-count">{repos.length} repositories</span>
         </div>
@@ -67,12 +68,12 @@ const fan = [8, 29, 50, 71, 92];
         <ul class="aw-repos">
           {repos.map((r) => (
             <li class:list={['aw-repo', `is-${r.state}`, r.extra && 'is-extra']} style={`--d: ${r.delay}ms`}>
-              <span class="aw-ico aw-repo-ico" set:html={icon('repo')} />
+              <Octicon name="repo" class="aw-muted-ico aw-repo-ico" />
               <span class="aw-repo-name">{r.name}</span>
               <span class="aw-status">
                 <span class="st st-pending" />
                 <span class="st st-running" />
-                <span class="st st-success" set:html={icon('check-circle-fill', 14)} />
+                <Octicon name="check-circle-fill" size={14} class="st st-success" />
               </span>
             </li>
           ))}
@@ -82,22 +83,14 @@ const fan = [8, 29, 50, 71, 92];
           <span class="aw-runners-label">Self-hosted runners</span>
           <ul>
             {runners.map((r) => (
-              <li><span class="aw-ico" set:html={icon('server')} /><span class="aw-mono">{r}</span></li>
+              <li><Octicon name="server" class="aw-muted-ico" /><span class="aw-mono">{r}</span></li>
             ))}
           </ul>
         </div>
       </div>
     </div>
 
-    <ul class="aw-points">
-      {points.map((p) => (
-        <li>
-          <h3>{p.title}</h3>
-          <p>{p.text}</p>
-          <a href={p.href}>{p.label}<span aria-hidden="true"> →</span></a>
-        </li>
-      ))}
-    </ul>
+    <LandingPoints points={points} layout="stack" />
   </div>
 </LandingSection>
 
@@ -133,12 +126,8 @@ const fan = [8, 29, 50, 71, 92];
     }
   }
 
-  .aw-ico {
-    display: inline-flex;
-    flex: none;
-  }
-  .aw-ico :global(svg) {
-    fill: currentColor;
+  .aw-muted-ico {
+    color: var(--aw-color-text-muted);
   }
   .aw-mono {
     font-family: var(--aw-font-mono);
@@ -157,9 +146,6 @@ const fan = [8, 29, 50, 71, 92];
     gap: 0.5rem;
     max-width: 100%;
     padding: 0.5rem 0.875rem;
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
-    box-shadow: var(--aw-shadow-raised);
     border-radius: 10px;
     font-family: var(--aw-font-mono);
     font-size: var(--aw-step--1);
@@ -168,9 +154,6 @@ const fan = [8, 29, 50, 71, 92];
     overflow: hidden;
     position: relative;
     z-index: 1;
-  }
-  .aw-source .aw-ico {
-    color: var(--aw-color-text-muted);
   }
 
   .aw-wires {
@@ -199,9 +182,6 @@ const fan = [8, 29, 50, 71, 92];
     padding: 0.75rem 1rem;
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-secondary);
-  }
-  .aw-orghead .aw-ico {
-    color: var(--aw-color-text-muted);
   }
   .aw-count {
     margin-left: auto;
@@ -237,14 +217,11 @@ const fan = [8, 29, 50, 71, 92];
     padding: 0.4375rem 0.5rem 0.4375rem 0.625rem;
     background: var(--aw-color-surface);
     border: 1px solid var(--aw-color-border);
-    border-radius: 8px;
+    border-radius: var(--aw-radius-md);
     font-family: var(--aw-font-mono);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text);
     transition: border-color 400ms ease;
-  }
-  .aw-repo-ico {
-    color: var(--aw-color-text-muted);
   }
   .aw-repo-name {
     flex: 1;
@@ -285,9 +262,6 @@ const fan = [8, 29, 50, 71, 92];
   }
   .st-success {
     color: var(--aw-color-success);
-  }
-  .st-success :global(svg) {
-    fill: currentColor;
   }
 
   /* Resting state (no JS, reduced motion, or after the ripple). */
@@ -390,61 +364,8 @@ const fan = [8, 29, 50, 71, 92];
     margin: 0;
     padding: 0.25rem 0.5rem;
     border: 1px solid var(--aw-color-border);
-    border-radius: 6px;
+    border-radius: var(--aw-radius-sm);
     background: var(--aw-color-bg-subtle);
     color: var(--aw-color-text-secondary);
-  }
-  .aw-runners li .aw-ico {
-    color: var(--aw-color-text-muted);
-  }
-
-  /* ---------- Text points ---------- */
-  .aw-points {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  @media (min-width: 40rem) and (max-width: 59.99rem) {
-    .aw-points {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 3rem;
-    }
-  }
-  .aw-points li {
-    margin: 0;
-    padding: 1.25rem 0;
-    border-top: 1px solid var(--aw-color-border);
-  }
-  h3 {
-    margin: 0;
-    font-size: var(--aw-step-1);
-    font-weight: 520;
-    letter-spacing: -0.015em;
-    color: var(--aw-color-text);
-    border: 0;
-  }
-  .aw-points p {
-    margin: 0.375rem 0 0.5rem;
-    max-width: 44ch;
-    font-size: var(--aw-step-0);
-    line-height: 1.55;
-    color: var(--aw-color-text-secondary);
-    text-wrap: pretty;
-  }
-  .aw-points a {
-    font-size: var(--aw-step--1);
-    color: var(--aw-color-accent-text);
-    text-decoration: none;
-  }
-  .aw-points a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .aw-points a:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 3px;
-    border-radius: 2px;
   }
 </style>

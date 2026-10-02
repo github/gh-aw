@@ -1,19 +1,13 @@
 ---
-import octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 
 const TRIFECTA_URL = 'https://simonw.substack.com/p/the-lethal-trifecta-for-ai-agents';
 
 interface Props {
-  /** What gh-aw puts between the agent and the repository, e.g. "layers" or "gates". */
-  noun?: string;
-  /** Render the intro paragraph, the diagram, or both (stacked). */
-  part?: 'text' | 'figure' | 'both';
+  /** Render the intro paragraph or the diagram. */
+  part: 'text' | 'figure';
 }
-const { noun = 'layers', part = 'both' } = Astro.props;
-const showText = part !== 'figure';
-const showFigure = part !== 'text';
-
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+const { part } = Astro.props;
 
 // Geometry in viewBox units. At full size (40rem) one unit is roughly one CSS pixel, which is what
 // the pill clearances below are tuned against. HTML overlays reuse the same numbers as percentages.
@@ -102,13 +96,13 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 ---
 
 <div class="tri">
-  {showText && <p class="tri-text">
+  {part === 'text' && <p class="tri-text">
     An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
-    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six {noun} between
+    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six layers between
     the agent and your repository, and three of them each block one leg of it.
   </p>}
 
-  {showFigure && <figure class="tri-fig">
+  {part === 'figure' && <figure class="tri-fig">
     <div class="tri-stage" aria-hidden="true">
       <div class="tri-art" style={`aspect-ratio: ${W} / ${H}`}>
         <svg viewBox={`0 0 ${W} ${H}`} focusable="false">
@@ -130,14 +124,14 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
         </svg>
 
         {spokes.map((sp) => (
-          <span class="tri-badge" style={`left:${pct(sp.x, W)};top:${pct(sp.y, H)}`} set:html={icon(sp.icon, 20)} />
+          <Octicon name={sp.icon} size={20} class="tri-badge" style={`left:${pct(sp.x, W)};top:${pct(sp.y, H)}`} />
         ))}
 
         {spokes.map((sp) => (
           <span class={`tri-label tri-label-${sp.id}`} style={`--x:${pct(sp.x, W)};--y:${pct(sp.y, H)}`}>
             <span class="tri-name">{sp.label}</span>
             <span class="tri-sub">{sp.sub}</span>
-            <span class="tri-blocked"><span class="tri-cut-icon" set:html={icon('circle-slash', 12)} />{sp.cut}</span>
+            <span class="tri-blocked"><Octicon name="circle-slash" size={12} class="tri-cut-icon" />{sp.cut}</span>
           </span>
         ))}
 
@@ -146,21 +140,21 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
             class="tri-cut"
             style={`--i:${i};--wx:${pct(sp.wide.p.x, W)};--wy:${pct(sp.wide.p.y, H)};--cx:${pct(sp.compact.p.x, W)};--cy:${pct(sp.compact.p.y, H)}`}
           >
-            <span class="tri-cut-icon" set:html={icon('circle-slash', 16)} />
+            <Octicon name="circle-slash" class="tri-cut-icon" />
             <span class="tri-cut-name">{sp.cut}</span>
           </span>
         ))}
 
         <span class="tri-core" style={`left:${pct(C.x, W)};top:${pct(C.y, H)}`}>
           <span class="tri-core-label">the lethal trifecta</span>
-          <span class="tri-agent" set:html={icon('copilot', 20)} />
+          <Octicon name="copilot" size={20} class="tri-agent" />
           <span class="tri-agent-label">Agent</span>
         </span>
       </div>
     </div>
 
 
-    <figcaption class="tri-sr">
+    <figcaption class="sr-only">
       Diagram of the lethal trifecta: three capabilities that are dangerous when an agent holds all of them at once.
       Private data means secrets, tokens and private repositories. Untrusted content means issues, pull request
       comments and web pages. Outbound access means the network, APIs and writes. Each one would reach the agent at
@@ -205,10 +199,6 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
   .tri-text a {
     color: var(--aw-color-accent-text);
     text-underline-offset: 0.2em;
-  }
-  .tri-text a:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
   }
 
   .tri-fig {
@@ -288,11 +278,6 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     border: 1px solid var(--aw-color-border-strong);
     color: var(--aw-color-text-strong);
   }
-  .tri-badge :global(svg),
-  .tri-agent :global(svg),
-  .tri-cut-icon :global(svg) {
-    fill: currentColor;
-  }
 
   .tri-label {
     position: absolute;
@@ -355,7 +340,7 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     width: max-content;
     white-space: nowrap;
     padding: 0.3125rem 0.75rem 0.3125rem 0.5625rem;
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     background: var(--aw-color-surface);
     border: 1px solid var(--aw-color-border-strong);
     box-shadow: var(--aw-shadow-raised);
@@ -365,8 +350,6 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
     font-weight: 550;
   }
   .tri-cut-icon {
-    display: inline-flex;
-    flex: none;
     color: var(--aw-color-complement);
   }
 
@@ -505,20 +488,11 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
   .tri-art.is-in .tri-live {
     transition:
       opacity 0.45s ease-out,
-      transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      transform 0.5s var(--aw-ease-emphasized);
     transition-delay: calc(300ms + var(--i, 0) * 180ms);
   }
   .tri-art.is-in .tri-spoke .tri-dead,
   .tri-art.is-in .tri-spoke .tri-live {
     transition-delay: calc(420ms + var(--i, 0) * 180ms);
-  }
-
-  .tri-sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 </style>
