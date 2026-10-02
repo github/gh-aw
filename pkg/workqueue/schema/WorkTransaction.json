@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "WorkTransaction.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "Work"
+    },
+    "work_id": {
+      "type": "string"
+    },
+    "work": {
+      "$ref": "#/$defs/RecordUnknown"
+    }
+  },
+  "required": ["kind", "work_id", "work"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "$defs": {
+    "RecordUnknown": {
+      "type": "object",
+      "properties": {},
+      "unevaluatedProperties": {}
+    }
+  }
+}
