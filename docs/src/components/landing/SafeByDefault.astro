@@ -146,6 +146,8 @@ const layers = [
   }
   /* Centred over the layer rows, which start 2.75rem in (rail + row indent). */
   .aw-end {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     align-self: center;
@@ -171,10 +173,24 @@ const layers = [
     color: var(--aw-color-accent-text);
   }
   .aw-layers {
+    position: relative;
     list-style: none;
     margin: 0 0 0 1.5rem;
     padding: 0.75rem 0;
-    border-left: 1px solid var(--aw-color-border-strong);
+  }
+  /* The rail: runs down the left of the layers and bends round both corners
+     into the centres of the agent and repository pills, which sit on top. */
+  .aw-layers::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -1.5625rem;
+    bottom: -1.5625rem;
+    width: calc(50% + 0.625rem);
+    border: 1px solid var(--aw-color-border-strong);
+    border-right: 0;
+    border-radius: 1rem 0 0 1rem;
+    pointer-events: none;
   }
   .aw-layer {
     margin: 0;
@@ -339,9 +355,12 @@ const layers = [
     .aw-layout[data-enhanced] .aw-layer:not(.is-active) .aw-detail {
       display: block;
       position: absolute;
+      /* Positioned against .aw-layers (it hosts the rail), which starts 1.5rem in. */
       top: 50%;
-      left: calc(var(--aw-safe-stack) + var(--aw-safe-gap));
-      right: 0;
+      left: calc(var(--aw-safe-stack) + var(--aw-safe-gap) - 1.5rem);
+      width: var(--aw-safe-panel);
+      max-width: calc(100vw - var(--aw-safe-stack) - var(--aw-safe-gap) - 2rem);
+      box-sizing: border-box;
       padding: 1.5rem 1.75rem;
       border: 1px solid var(--aw-color-border);
       border-radius: 12px;
