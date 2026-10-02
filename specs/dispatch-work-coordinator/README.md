@@ -156,6 +156,16 @@ The earlier model revision completed both positive searches on 2026-10-02, check
 
 `Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
 
+## Runtime smoke coverage
+
+The private `.github/workflows/smoke-dispatch-work-coordinator.md` workflow
+exercises the activation snapshot read tool and the trusted finish-intent tool
+through the compiled MCP mount, verifies the finish intent in the downloaded
+agent artifact, and runs it through safe-output reconciliation. It runs without
+an inbound worker claim, so it must not append to the durable coordinator log.
+This smoke test validates tool wiring and finish-intent transport; it does not
+cover dispatcher transaction submission, recovery, or compaction.
+
 ## Limits
 
 Safety does not imply eventual dispatch, successful external effects, or eventual orphan recovery. Those require fairness, available workflows, and successful retries. A crash after Completion but before outputs can leave completed Work with no output; recovering that gap requires an additional idempotent effect-delivery protocol. The activation artifact is a snapshot, not a live subscription; reads can be stale and are never used as final authority.
