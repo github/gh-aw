@@ -1258,7 +1258,9 @@ async function main() {
         return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
       },
     });
-    applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+    if (!copilotSDKMode) {
+      applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+    }
   }
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
