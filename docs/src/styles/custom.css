@@ -241,10 +241,14 @@ main > .content-panel:has(h1#_top) + .content-panel {
   .sidebar .top-level > li > details > summary,
   .sidebar .top-level > li > a,
   .sidebar .top-level li li a {
-    min-height: 44px;
+    min-height: 40px;
     display: flex;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 1rem;
+  }
+  /* Denser sheet: groups sit close so more of the tree fits on screen */
+  .sidebar .top-level > li + li {
+    margin-top: 0.125rem;
   }
 
   /* Group labels align with the sheet's nav rows and heading; nested links keep their indent */
