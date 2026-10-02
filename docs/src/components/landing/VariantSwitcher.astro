@@ -7,7 +7,7 @@
 const enabledByDefault = import.meta.env.DEV;
 ---
 
-<aside class="aw-switcher not-content" data-enabled={enabledByDefault ? 'true' : 'false'} aria-label="Design variants" hidden>
+<aside class="aw-switcher aw-card not-content" data-enabled={enabledByDefault ? 'true' : 'false'} aria-label="Design variants" hidden>
   <button class="aw-switcher-toggle" type="button" aria-expanded="true">Variants</button>
   <div class="aw-switcher-body"></div>
 </aside>
@@ -108,10 +108,6 @@ const enabledByDefault = import.meta.env.DEV;
     z-index: 100;
     width: min(20rem, calc(100vw - 2rem));
     padding: 0.5rem;
-    border: 1px solid var(--aw-color-border);
-    border-radius: 12px;
-    background: var(--aw-color-surface);
-    box-shadow: var(--aw-shadow-raised);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text);
   }
@@ -119,7 +115,7 @@ const enabledByDefault = import.meta.env.DEV;
     width: 100%;
     padding: 0.25rem 0.5rem;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--aw-radius-sm);
     background: none;
     color: var(--aw-color-text-muted);
     font: inherit;
@@ -131,6 +127,10 @@ const enabledByDefault = import.meta.env.DEV;
     display: grid;
     gap: 0.5rem;
     padding: 0.25rem 0.5rem 0.5rem;
+  }
+  /* `display: grid` above would otherwise beat the [hidden] attribute. */
+  .aw-switcher-body[hidden] {
+    display: none;
   }
   .aw-switcher :global(.aw-switcher-row) {
     display: grid;
@@ -150,14 +150,14 @@ const enabledByDefault = import.meta.env.DEV;
   .aw-switcher :global(.aw-switcher-seg) {
     display: inline-flex;
     padding: 2px;
-    border-radius: 8px;
+    border-radius: var(--aw-radius-md);
     background: var(--aw-color-bg-subtle);
   }
   .aw-switcher :global(.aw-switcher-seg button) {
     min-width: 1.75rem;
     padding: 0.125rem 0.375rem;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--aw-radius-sm);
     background: none;
     color: var(--aw-color-text-muted);
     font: inherit;
@@ -169,9 +169,9 @@ const enabledByDefault = import.meta.env.DEV;
     color: var(--aw-color-text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
+  /* Tight offset: the segmented buttons sit 2px apart. */
   .aw-switcher :global(button:focus-visible),
   .aw-switcher :global(a:focus-visible) {
-    outline: 2px solid var(--aw-color-accent);
     outline-offset: 1px;
   }
 </style>

@@ -277,7 +277,7 @@ export default defineConfig({
         PageTitle: "./src/components/PageTitle.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
-      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css", "./src/styles/chrome.css", "./src/styles/docs-components.css"],
+      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css", "./src/styles/landing.css", "./src/styles/chrome.css", "./src/styles/docs-components.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/github/gh-aw" }],
       tableOfContents: {
         minHeadingLevel: 2,

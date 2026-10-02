@@ -1,7 +1,7 @@
 ---
 /** Hero D visual: CI and CD lanes at rest, the Continuous AI lane lit with ongoing agent work. */
-import octicons from '@primer/octicons';
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+import type octicons from '@primer/octicons';
+import Octicon from '../Octicon.astro';
 
 const commits = ['7b21e0', 'c04d9a', '19ef3b'];
 const releases = ['v2.3.1', 'v2.4.0'];
@@ -15,23 +15,23 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
 
 <div class="vd" aria-hidden="true">
   <div class="vd-lane">
-    <span class="vd-lane-ico" set:html={icon('check-circle', 18)} />
+    <Octicon name="check-circle" size={18} class="vd-lane-ico" />
     <span class="vd-name">CI</span>
     <span class="vd-cap">Builds it</span>
     <span class="vd-track">
       {commits.map((c) => (
-        <span class="vd-chip"><span class="vd-ok" set:html={icon('check', 14)} /><span class="vd-mono">{c}</span></span>
+        <span class="vd-chip"><Octicon name="check" size={14} class="vd-ok" /><span class="vd-mono">{c}</span></span>
       ))}
     </span>
   </div>
 
   <div class="vd-lane">
-    <span class="vd-lane-ico" set:html={icon('rocket', 18)} />
+    <Octicon name="rocket" size={18} class="vd-lane-ico" />
     <span class="vd-name">CD</span>
     <span class="vd-cap">Ships it</span>
     <span class="vd-track">
       {releases.map((r) => (
-        <span class="vd-chip"><span set:html={icon('tag', 14)} /><span class="vd-mono">{r}</span></span>
+        <span class="vd-chip"><Octicon name="tag" size={14} /><span class="vd-mono">{r}</span></span>
       ))}
     </span>
   </div>
@@ -39,17 +39,17 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
   <div class="vd-lit-wrap">
   <div class="vd-lit">
     <div class="vd-lit-head">
-      <span class="vd-lane-ico vd-spin" set:html={icon('sync', 18)} />
+      <Octicon name="sync" size={18} class="vd-lane-ico vd-spin" />
       <span class="vd-lit-name">Continuous AI</span>
       <span class="vd-lit-cap"><span class="vd-cap-long">Improving your repo, around the clock</span><span class="vd-cap-short">Around the clock</span></span>
     </div>
     <ol class="vd-work" role="list">
       {work.map((w, i) => (
         <li style={`--i:${i}`}>
-          <span class="vd-ico" set:html={icon(w.ico, 16)} />
+          <Octicon name={w.ico} class="vd-ico" />
           <span class="vd-area">{w.area}</span>
           <span class="vd-text">{w.text} <span class="vd-num">{w.num}</span></span>
-          <span class:list={['vd-when', i === 0 && 'is-now']}>{w.when}</span>
+          <span class:list={['vd-when', i === 0 && 'aw-pill is-accent']}>{w.when}</span>
         </li>
       ))}
     </ol>
@@ -64,10 +64,6 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
     gap: 0.625rem;
     min-width: 0;
   }
-  .vd :global(svg) {
-    fill: currentColor;
-    flex: none;
-  }
   /* Quiet lanes: one line each. */
   .vd-lane {
     display: flex;
@@ -76,7 +72,7 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
     min-width: 0;
     padding: 0.625rem 1.125rem;
     border: 1px solid var(--aw-color-border);
-    border-radius: 12px;
+    border-radius: var(--aw-radius-lg);
     background: var(--aw-color-bg-subtle);
   }
   .vd-name {
@@ -107,13 +103,12 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
     height: 24px;
     padding-inline: 0.4375rem 0.5625rem;
     border: 1px solid var(--aw-color-border);
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-muted);
     white-space: nowrap;
   }
   .vd-ok {
-    display: inline-flex;
     color: var(--aw-color-success);
   }
   .vd-mono {
@@ -189,8 +184,6 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
   }
   .vd-cap-short { display: none; }
   .vd-lane-ico {
-    display: inline-flex;
-    flex: none;
     color: var(--aw-color-text-muted);
   }
   .vd-lit .vd-lane-ico {
@@ -212,14 +205,13 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
     margin: 0;
     padding: 0.625rem 1.125rem;
     font-size: var(--aw-text-ui);
-    animation: vd-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation: vd-in 0.5s var(--aw-ease-out) backwards;
     animation-delay: calc(0.2s + var(--i) * 0.12s);
   }
   .vd-work li + li {
     border-top: 1px solid var(--aw-color-border);
   }
   .vd-ico {
-    display: inline-flex;
     color: var(--aw-color-accent-text);
   }
   .vd-area {
@@ -239,14 +231,12 @@ const work: { ico: keyof typeof octicons; area: string; text: string; num: strin
   .vd-when {
     font-size: var(--aw-step--1);
     font-variant-numeric: tabular-nums;
+  }
+  .vd-when:not(.aw-pill) {
     color: var(--aw-color-text-muted);
   }
-  .vd-when.is-now {
+  .vd-when.aw-pill {
     padding: 0 0.4375rem;
-    border-radius: 999px;
-    background: var(--aw-color-accent-low);
-    color: var(--aw-color-accent-text);
-    font-weight: 500;
   }
   @media (max-width: 479px) {
     .vd-cap-long { display: none; }

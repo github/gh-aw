@@ -1,5 +1,8 @@
 ---
 import LandingSection from './LandingSection.astro';
+import LandingPoints from './LandingPoints.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 /*
  * An imagined cost dashboard for one workflow. gh-aw doesn't ship this UI;
@@ -37,10 +40,32 @@ const kpis = [
   { label: 'Tokens', value: `${(totalTokens / 1e6).toFixed(1)}M`, note: `${Math.round(totalTokens / runs.length / 1000)}K per run` },
   { label: 'Avg turns', value: fmt1(totalTurns / runs.length), note: `max ${Math.max(...runs.map((r) => r.turns))}` },
 ];
+
+const code = (c: string) => `<code class="aw-code">${c}</code>`;
+const points = [
+  {
+    title: 'Cap every run',
+    text: `${code('max-ai-credits')} and ${code('max-turns')} stop a run that runs away. On by default: 1,000 AI Credits per run.`,
+    href: `${base}/reference/cost-management/#cap-ai-credits-per-run`,
+    label: 'Set a budget',
+  },
+  {
+    title: 'Cap every day',
+    text: `${code('max-daily-ai-credits')} limits a workflow across 24 hours, 5,000 AIC by default. Over budget, the agent is skipped.`,
+    href: `${base}/reference/cost-management/#cap-daily-ai-credits-per-workflow`,
+    label: 'Daily limits',
+  },
+  {
+    title: 'Find the expensive runs',
+    text: `${code('gh aw logs')} lists tokens, AIC and turns per run. ${code('gh aw audit')} breaks one down. 1 AIC is $0.01.`,
+    href: `${base}/reference/cost-management/#monitoring-costs-with-gh-aw-logs`,
+    label: 'Monitor cost',
+  },
+];
 ---
 
 <LandingSection id="cost" title="Cost under control" lede="Set a budget per run and see where every credit goes.">
-  <figure class="aw-dash" aria-label="Cost dashboard for the issue-triage workflow over the last 7 days">
+  <figure class="aw-dash aw-card" aria-label="Cost dashboard for the issue-triage workflow over the last 7 days">
     <header class="aw-dash-head">
       <div class="aw-wf">
         <span class="aw-wf-name">issue-triage</span>
@@ -79,15 +104,12 @@ const kpis = [
             </span>
             <ol class="aw-bars">
               {runs.map((r) => (
-                <li
-                  class:list={['aw-col', r.capped && 'is-capped']}
-                  tabindex="0"
-                  aria-label={`Run ${r.id}, ${r.date}: ${fmt1(r.aic)} AIC, ${r.turns} turns, ${r.dur}${r.capped ? ', stopped at cap' : ''}`}
-                >
+                <li class:list={['aw-col', r.capped && 'is-capped']}>
+                  <span class="sr-only">{`Run ${r.id}, ${r.date}: ${fmt1(r.aic)} AIC, ${r.turns} turns, ${r.dur}${r.capped ? ', stopped at cap' : ''}`}</span>
                   <span class="aw-bar" style={`height:${pct(Math.min(r.aic, yMax))}`}>
                     <span class="aw-bar-val" aria-hidden="true">{fmt1(r.aic)}</span>
                   </span>
-                  <span class="aw-tip" aria-hidden="true">
+                  <span class="aw-tip aw-card" aria-hidden="true">
                     <span class="aw-tip-id">#{r.id}</span>
                     <span><b>{fmt1(r.aic)}</b> AIC · {r.turns} turns · {r.dur}</span>
                   </span>
@@ -115,7 +137,7 @@ const kpis = [
             {top.map((r) => (
               <li>
                 <span class="aw-top-id">#{r.id}</span>
-                {r.capped && <span class="aw-pill">Stopped at cap</span>}
+                {r.capped && <span class="aw-pill aw-top-pill">Stopped at cap</span>}
                 <span class="aw-top-aic">{fmt1(r.aic)}</span>
               </li>
             ))}
@@ -125,39 +147,16 @@ const kpis = [
     </div>
   </figure>
 
-  <div class="aw-points">
-    <div class="aw-point">
-      <h3>Cap every run</h3>
-      <p><code>max-ai-credits</code> and <code>max-turns</code> stop a run that runs away. On by default: 1,000 AI Credits per run.</p>
-      <a href="/gh-aw/reference/cost-management/#cap-ai-credits-per-run">Set a budget<span aria-hidden="true"> →</span></a>
-    </div>
-    <div class="aw-point">
-      <h3>Cap every day</h3>
-      <p><code>max-daily-ai-credits</code> limits a workflow across 24 hours, 5,000 AIC by default. Over budget, the agent is skipped.</p>
-      <a href="/gh-aw/reference/cost-management/#cap-daily-ai-credits-per-workflow">Daily limits<span aria-hidden="true"> →</span></a>
-    </div>
-    <div class="aw-point">
-      <h3>Find the expensive runs</h3>
-      <p><code>gh aw logs</code> lists tokens, AIC and turns per run. <code>gh aw audit</code> breaks one down. 1 AIC is $0.01.</p>
-      <a href="/gh-aw/reference/cost-management/#monitoring-costs-with-gh-aw-logs">Monitor cost<span aria-hidden="true"> →</span></a>
-    </div>
-  </div>
-  <p class="aw-more">Send traces to any OTLP backend with <a href="/gh-aw/reference/open-telemetry/">OpenTelemetry</a>, and compare cost with <a href="/gh-aw/reference/outcomes/">outcomes</a>.</p>
+  <LandingPoints points={points} layout="row" />
+  <p class="aw-more">Send traces to any OTLP backend with <a class="aw-link" href={`${base}/reference/open-telemetry/`}>OpenTelemetry</a>, and compare cost with <a class="aw-link" href={`${base}/reference/outcomes/`}>outcomes</a>.</p>
 </LandingSection>
 
 <style>
   .aw-dash {
-    margin: 2.5rem 0 0;
+    margin: 2.5rem 0 3rem;
     min-width: 0;
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
-    border-radius: 12px;
-    box-shadow: var(--aw-shadow-raised);
     font-variant-numeric: tabular-nums;
     overflow: hidden;
-  }
-  .aw-dash h3 {
-    border: 0;
   }
 
   /* Header */
@@ -184,21 +183,21 @@ const kpis = [
   .aw-engine {
     padding: 0.0625rem 0.5rem;
     border: 1px solid var(--aw-color-border);
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-secondary);
   }
   .aw-period {
     display: inline-flex;
     padding: 2px;
-    border-radius: 8px;
+    border-radius: var(--aw-radius-md);
     background: var(--aw-color-surface-header);
     font-size: var(--aw-step--1);
     color: var(--aw-color-text-muted);
   }
   .aw-period span {
     padding: 0.125rem 0.625rem;
-    border-radius: 6px;
+    border-radius: var(--aw-radius-sm);
   }
   .aw-period .is-on {
     background: var(--aw-color-surface);
@@ -347,7 +346,7 @@ const kpis = [
     padding: 0;
     background: none;
     font-family: var(--aw-font-mono);
-    font-size: 1em;
+    font-size: inherit;
     color: var(--aw-color-text-secondary);
   }
   .aw-bars {
@@ -366,25 +365,19 @@ const kpis = [
     justify-content: center;
     align-items: flex-end;
     margin: 0;
-    outline: none;
     cursor: default;
   }
   .aw-bar {
     position: relative;
     width: min(2.5rem, 55%);
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--aw-radius-xs) var(--aw-radius-xs) 0 0;
     background: var(--aw-color-accent);
   }
   .aw-col.is-capped .aw-bar {
     background: var(--aw-color-complement);
   }
-  .aw-col:hover .aw-bar,
-  .aw-col:focus-visible .aw-bar {
+  .aw-col:hover .aw-bar {
     opacity: 0.85;
-  }
-  .aw-col:focus-visible .aw-bar {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
   }
   .aw-bar-val {
     position: absolute;
@@ -419,10 +412,7 @@ const kpis = [
     gap: 0.125rem;
     padding: 0.5rem 0.625rem;
     transform: translateX(-50%);
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
-    border-radius: 8px;
-    box-shadow: var(--aw-shadow-raised);
+    border-radius: var(--aw-radius-md);
     font-size: var(--aw-step--1);
     line-height: 1.4;
     color: var(--aw-color-text-secondary);
@@ -436,8 +426,7 @@ const kpis = [
     font-family: var(--aw-font-mono);
     color: var(--aw-color-text-muted);
   }
-  .aw-col:hover .aw-tip,
-  .aw-col:focus-visible .aw-tip {
+  .aw-col:hover .aw-tip {
     display: flex;
   }
   .aw-col:first-child .aw-tip {
@@ -490,7 +479,7 @@ const kpis = [
     padding: 0;
     background: none;
     font-family: var(--aw-font-mono);
-    font-size: 1em;
+    font-size: inherit;
     color: var(--aw-color-text-muted);
   }
 
@@ -516,14 +505,8 @@ const kpis = [
     font-family: var(--aw-font-mono);
     color: var(--aw-color-text);
   }
-  .aw-pill {
+  .aw-top-pill {
     padding: 0 0.4375rem;
-    border-radius: 999px;
-    background: var(--aw-color-complement-low);
-    color: var(--aw-color-complement);
-    font-size: var(--aw-step--1);
-    font-weight: 500;
-    white-space: nowrap;
   }
   .aw-top-aic {
     margin-left: auto;
@@ -556,64 +539,6 @@ const kpis = [
     }
   }
 
-  /* Points */
-  .aw-points {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    margin-top: 3rem;
-  }
-  @media (min-width: 50rem) {
-    .aw-points {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 2.5rem;
-    }
-  }
-  .aw-point {
-    padding: 1.25rem 0;
-    border-top: 1px solid var(--aw-color-border);
-  }
-  @media (min-width: 50rem) {
-    .aw-point {
-      padding-bottom: 0;
-    }
-  }
-  .aw-points h3 {
-    margin: 0;
-    font-size: var(--aw-step-1);
-    font-weight: 520;
-    letter-spacing: -0.015em;
-    color: var(--aw-color-text);
-    border: 0;
-  }
-  .aw-points p {
-    margin: 0.375rem 0 0.5rem;
-    font-size: var(--aw-step-0);
-    line-height: 1.55;
-    color: var(--aw-color-text-secondary);
-    text-wrap: pretty;
-  }
-  .aw-points code {
-    padding: 0.1em 0.35em;
-    border-radius: 4px;
-    background: var(--aw-color-code-bg);
-    font-family: var(--aw-font-mono);
-    font-size: 0.875em;
-    color: var(--aw-color-text);
-    white-space: nowrap;
-  }
-  .aw-points a,
-  .aw-more a {
-    color: var(--aw-color-accent-text);
-    text-decoration: none;
-  }
-  .aw-points a {
-    font-size: var(--aw-step--1);
-  }
-  .aw-points a:hover,
-  .aw-more a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
   .aw-more {
     margin: 1.5rem 0 0;
     font-size: var(--aw-step--1);

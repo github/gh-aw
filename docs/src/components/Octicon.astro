@@ -1,0 +1,31 @@
+---
+/**
+ * An inline Primer octicon, decorative (aria-hidden). Renders an inline-flex
+ * span holding the SVG, filled with currentColor. Pass `class` (and any other
+ * attribute, such as `style`) to size or position the wrapper.
+ */
+import octicons from '@primer/octicons';
+
+interface Props {
+  name: keyof typeof octicons;
+  /** Width and height in px. */
+  size?: number;
+  class?: string;
+  [attr: string]: unknown;
+}
+const { name, size = 16, class: className, ...rest } = Astro.props;
+const svg = octicons[name].toSVG({ width: size, height: size });
+---
+
+<span class:list={['aw-octicon', className]} aria-hidden="true" {...rest} set:html={svg} />
+
+<style is:global>
+  /* Zero specificity, so a caller's class can change the display (grid, none). */
+  :where(.aw-octicon) {
+    display: inline-flex;
+    flex: none;
+  }
+  :where(.aw-octicon) svg {
+    fill: currentColor;
+  }
+</style>

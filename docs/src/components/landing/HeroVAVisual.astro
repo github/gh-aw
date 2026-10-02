@@ -1,25 +1,24 @@
 ---
 /** Hero A visual: a prompt, the workflow file it created, and the issue it opened next morning. */
-import octicons from '@primer/octicons';
-const icon = (n: keyof typeof octicons, size = 16) => octicons[n].toSVG({ width: size, height: size });
+import Octicon from '../Octicon.astro';
 ---
 
 <div class="va" aria-hidden="true">
-  <div class="va-card va-chat">
+  <div class="va-card aw-card va-chat">
     <div class="va-msg">
       <span class="va-you">You</span>
       <p>Create a daily agentic workflow that gives me an issue summary</p>
     </div>
     <div class="va-reply">
-      <span class="va-agent" set:html={icon('copilot', 14)} />
+      <Octicon name="copilot" size={14} class="va-agent" />
       <span>Added <code>daily-issue-summary.md</code> and opened a pull request.</span>
     </div>
   </div>
 
   <div class="va-step"><span class="va-step-line"></span></div>
 
-  <div class="va-card va-file">
-    <div class="va-bar"><span class="va-ico" set:html={icon('file', 14)} />.github/workflows/daily-issue-summary.md</div>
+  <div class="va-card aw-card va-file">
+    <div class="va-bar"><Octicon name="file" size={14} />.github/workflows/daily-issue-summary.md</div>
 <pre class="va-code"><span class="m">---</span>
 <span class="k">on:</span> daily
 <span class="k">safe-outputs:</span>
@@ -29,12 +28,12 @@ Summarise yesterday's issues. Flag
 anything that needs a reply.</pre>
   </div>
 
-  <div class="va-step va-step-time"><span class="va-step-label"><span class="va-ico" set:html={icon('clock', 14)} />Next morning, 08:00</span></div>
+  <div class="va-step va-step-time"><span class="va-step-label"><Octicon name="clock" size={14} />Next morning, 08:00</span></div>
 
-  <div class="va-card va-issue">
+  <div class="va-card aw-card va-issue">
     <div class="va-issue-head">
       <span class="va-title">Issue summary — Oct 2 <span class="va-num">#241</span></span>
-      <span class="va-state"><span class="va-ico" set:html={icon('issue-opened', 14)} />Open</span>
+      <span class="va-state"><Octicon name="issue-opened" size={14} />Open</span>
     </div>
     <ul>
       <li><b>9</b> new issues, <b>6</b> closed</li>
@@ -50,18 +49,7 @@ anything that needs a reply.</pre>
     flex-direction: column;
     min-width: 0;
   }
-  .va-ico {
-    display: inline-flex;
-    flex: none;
-  }
-  .va :global(svg) {
-    fill: currentColor;
-  }
   .va-card {
-    background: var(--aw-color-surface);
-    border: 1px solid var(--aw-color-border);
-    box-shadow: var(--aw-shadow-raised);
-    border-radius: 12px;
     min-width: 0;
   }
   /* Prompt */
@@ -99,10 +87,8 @@ anything that needs a reply.</pre>
     color: var(--aw-color-text-secondary);
   }
   .va-agent {
-    display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: none;
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -187,7 +173,7 @@ anything that needs a reply.</pre>
   /* Issue */
   .va-issue {
     padding: 0.875rem 1rem 1rem;
-    animation: va-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+    animation: va-rise 0.5s var(--aw-ease-out) 0.3s backwards;
   }
   .va-issue-head {
     display: flex;
@@ -202,9 +188,9 @@ anything that needs a reply.</pre>
     align-items: center;
     gap: 0.3125rem;
     padding: 0.25rem 0.625rem 0.25rem 0.5rem;
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     background: var(--aw-color-success);
-    color: var(--aw-gray-0);
+    color: var(--aw-color-text-on-status);
     font-size: var(--aw-step--1);
     font-weight: 500;
   }

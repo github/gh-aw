@@ -1,0 +1,58 @@
+/* Shared pieces for the landing page (components/landing/*).
+ *
+ * One rule per recurring pattern, so components don't restate them. Components
+ * use these classes and keep only what's specific to them in their own <style>.
+ * Each selector is wrapped in :where() (zero specificity), so a component's own
+ * scoped rule always wins when it adjusts one property (a radius, a background).
+ */
+
+/* Raised surface: diagrams, mocks, popovers. */
+:where(.aw-card) {
+  background: var(--aw-color-surface);
+  border: 1px solid var(--aw-color-border);
+  border-radius: var(--aw-radius-lg);
+  box-shadow: var(--aw-shadow-raised);
+}
+
+/* Accent text link: plain at rest, underlined on hover. */
+:where(.aw-link) {
+  color: var(--aw-color-accent-text);
+  text-decoration: none;
+}
+:where(.aw-link):hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Small rounded tag. Coral by default; .is-accent for the purple tone. */
+:where(.aw-pill) {
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--aw-radius-pill);
+  background: var(--aw-color-complement-low);
+  color: var(--aw-color-complement);
+  font-weight: 500;
+  white-space: nowrap;
+}
+:where(.aw-pill.is-accent) {
+  background: var(--aw-color-accent-low);
+  color: var(--aw-color-accent-text);
+}
+
+/* Inline code chip in landing copy. */
+:where(.aw-code) {
+  padding: 0.1em 0.35em;
+  border-radius: var(--aw-radius-xs);
+  background: var(--aw-color-code-bg);
+  font-family: var(--aw-font-mono);
+  font-size: var(--aw-text-code);
+  color: var(--aw-color-text);
+  white-space: nowrap;
+}
+
+/* Title of a short point, link or card in a list. */
+:where(.aw-point-title) {
+  font-size: var(--aw-step-1);
+  font-weight: 520;
+  letter-spacing: -0.015em;
+  color: var(--aw-color-text);
+}

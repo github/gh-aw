@@ -1,7 +1,7 @@
 ---
 /**
  * Compact copy control. Shows a short label; the full text appears in a popover
- * below it on hover or keyboard focus, and clicking copies it. Used for prompts you hand
+ * below it on hover or keyboard focus (Esc hides it), and clicking copies it. Used for prompts you hand
  * to a coding agent (installation, workflow creation).
  */
 interface Props {
@@ -10,28 +10,26 @@ interface Props {
   /** Text copied to the clipboard and previewed in the popover. */
   text: string;
   /** Popover alignment relative to the control. */
-  align?: 'start' | 'center' | 'end';
-  /** Solid primary-button style instead of the quiet pill. */
-  primary?: boolean;
+  align?: 'start' | 'center';
   /**
    * Small note above the previewed text. Defaults to "Run in your terminal" for
    * shell commands and "Paste into your favourite coding agent" for prompts.
    */
   meta?: string;
 }
-const { label, text, align = 'start', primary = false } = Astro.props;
+const { label, text, align = 'start' } = Astro.props;
 const isCommand = /^(gh|git|npm|npx|curl)\s/.test(text);
 const meta = Astro.props.meta ?? (isCommand ? 'Run in your terminal' : 'Paste into your favourite coding agent');
 const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
 ---
 
-<span class:list={['aw-cp', `is-${align}`, primary && 'is-primary']} data-copy-prompt={text} data-label={label}>
+<span class:list={['aw-cp', `is-${align}`]} data-copy-prompt={text} data-label={label}>
   <button type="button" class="aw-cp-btn" aria-label={label} aria-describedby={id}>
     <span class="aw-cp-ico" aria-hidden="true"></span>
     <span class="aw-cp-label" aria-hidden="true">{label}</span>
   </button>
-  <span class="aw-cp-pop" id={id} role="tooltip"><span class="aw-cp-meta">{meta}</span><span class="aw-cp-text">{text}</span></span>
-  <span class="aw-cp-sr" role="status" aria-live="polite"></span>
+  <span class="aw-cp-pop aw-card" id={id} role="tooltip"><span class="aw-cp-meta">{meta}</span><span class="aw-cp-text">{text}</span></span>
+  <span class="sr-only" role="status" aria-live="polite"></span>
 </span>
 
 <style>
@@ -49,7 +47,7 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
     max-width: 100%;
     padding-inline: 1rem 1.125rem;
     border: 1px solid var(--aw-color-border-strong);
-    border-radius: 999px;
+    border-radius: var(--aw-radius-pill);
     background: var(--aw-color-surface);
     color: var(--aw-color-text);
     font: inherit;
@@ -57,22 +55,10 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color var(--aw-duration-fast) ease, border-color var(--aw-duration-fast) ease;
   }
   .aw-cp-btn:hover {
     background: var(--aw-color-bg-subtle);
-  }
-  .is-primary .aw-cp-btn {
-    border-color: transparent;
-    background: var(--aw-color-button-bg);
-    color: var(--aw-color-button-text);
-  }
-  .is-primary .aw-cp-btn:hover {
-    background: var(--aw-color-button-bg-hover);
-  }
-  .aw-cp-btn:focus-visible {
-    outline: 2px solid var(--aw-color-accent);
-    outline-offset: 2px;
   }
   .aw-cp-ico {
     flex: none;
@@ -81,12 +67,12 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
     background: currentColor;
     -webkit-mask: var(--aw-icon-copy) center / contain no-repeat;
     mask: var(--aw-icon-copy) center / contain no-repeat;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s var(--aw-ease-out);
   }
   .aw-cp[data-copied] .aw-cp-ico {
     -webkit-mask-image: var(--aw-icon-check);
     mask-image: var(--aw-icon-check);
-    animation: aw-cp-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: aw-cp-pop 0.25s var(--aw-ease-out);
   }
   .aw-cp-label {
     overflow: hidden;
@@ -101,16 +87,13 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
     width: max-content;
     max-width: min(28rem, calc(100vw - 2rem));
     padding: 0.625rem 0.75rem;
-    border: 1px solid var(--aw-color-border);
     border-radius: 10px;
-    background: var(--aw-color-surface);
-    box-shadow: var(--aw-shadow-raised);
     text-align: left;
     pointer-events: none;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+    transition: opacity var(--aw-duration-fast) ease, transform var(--aw-duration-fast) ease, visibility 0s linear var(--aw-duration-fast);
   }
   .aw-cp-meta {
     display: block;
@@ -134,35 +117,24 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
   .is-start .aw-cp-pop {
     left: 0;
   }
-  .is-end .aw-cp-pop {
-    right: 0;
-  }
   .is-center .aw-cp-pop {
     left: 50%;
     translate: -50% 0;
   }
-  .aw-cp:has(.aw-cp-btn:focus-visible) .aw-cp-pop {
+  /* Esc sets [data-dismissed], hiding it until the pointer or focus leaves. */
+  .aw-cp:not([data-dismissed]):has(.aw-cp-btn:focus-visible) .aw-cp-pop {
     opacity: 1;
     visibility: visible;
     transform: none;
     transition-delay: 0s;
   }
   @media (hover: hover) {
-    .aw-cp:hover .aw-cp-pop {
+    .aw-cp:not([data-dismissed]):hover .aw-cp-pop {
       opacity: 1;
       visibility: visible;
       transform: none;
-      transition-delay: 0.15s;
+      transition-delay: var(--aw-duration-fast);
     }
-  }
-  .aw-cp-sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
   }
   @keyframes aw-cp-pop {
     from {
@@ -196,6 +168,9 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
       const status = root.querySelector('[role="status"]');
       const original = root.dataset.label ?? '';
       let timer: number | undefined;
+      const undismiss = () => root.removeAttribute('data-dismissed');
+      root.addEventListener('pointerleave', undismiss, { signal });
+      btn?.addEventListener('blur', undismiss, { signal });
       btn?.addEventListener('click', async () => {
         try {
           await navigator.clipboard.writeText(root.dataset.copyPrompt ?? '');
@@ -218,6 +193,14 @@ const id = `aw-cp-${Math.random().toString(36).slice(2, 8)}`;
         timers.push(timer);
       }, { signal });
     });
+
+    // WCAG 1.4.13: Esc hides any open popover without moving focus or the pointer.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll<HTMLElement>('[data-copy-prompt]').forEach((root) => {
+        if (root.matches(':hover, :focus-within')) root.setAttribute('data-dismissed', '');
+      });
+    }, { signal });
 
     cleanup = () => {
       controller.abort();
