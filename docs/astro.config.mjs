@@ -270,9 +270,10 @@ export default defineConfig({
         SocialIcons: "./src/components/CustomHeader.astro",
         ThemeSelect: "./src/components/ThemeToggle.astro",
         Footer: "./src/components/CustomFooter.astro",
+        PageTitle: "./src/components/PageTitle.astro",
         SiteTitle: "./src/components/CustomLogo.astro",
       },
-      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css"],
+      customCss: ["./src/styles/tokens.css", "./src/styles/custom.css", "./src/styles/landing.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/github/gh-aw" }],
       tableOfContents: {
         minHeadingLevel: 2,
@@ -282,6 +283,24 @@ export default defineConfig({
       expressiveCode: {
         frames: {
           showCopyToClipboardButton: true,
+        },
+        styleOverrides: {
+          borderRadius: "7px",
+          borderWidth: "1px",
+          borderColor: "var(--aw-color-border)",
+          codeBackground: "var(--aw-color-bg-subtle)",
+          codeFontSize: "var(--aw-step--1)",
+          codeLineHeight: "1.6",
+          frames: {
+            shadowColor: "transparent",
+            frameBoxShadowCssValue: "none",
+            editorTabBarBackground: "var(--aw-color-bg-subtle)",
+            editorActiveTabBackground: "var(--aw-color-bg-subtle)",
+            editorTabBarBorderBottomColor: "var(--aw-color-border)",
+            terminalTitlebarBackground: "var(--aw-color-bg-subtle)",
+            terminalTitlebarBorderBottomColor: "var(--aw-color-border)",
+            terminalBackground: "var(--aw-color-bg-subtle)",
+          },
         },
         shiki: {
           langs: /** @type {any[]} */ ["markdown", "yaml"],

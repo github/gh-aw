@@ -1,0 +1,509 @@
+---
+import Octicon from '../Octicon.astro';
+import LandingSection from './LandingSection.astro';
+import SafeByDefaultTrifecta from './SafeByDefaultTrifecta.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const layers = [
+  {
+    id: 'compile',
+    icon: 'checklist',
+    name: 'Compile-time validation',
+    text: 'Schema validation, expression allowlisting and pinned actions are checked before a workflow can ever run.',
+    href: `${base}/introduction/architecture/#compilation-time-security`,
+  },
+  {
+    id: 'sandbox',
+    icon: 'container',
+    name: 'Sandboxed agent',
+    text: 'The agent runs read-only by default, with optional Cloud Hypervisor microVMs for stronger isolation.',
+    href: `${base}/reference/glossary/#cloud-hypervisor`,
+  },
+  {
+    id: 'credentials',
+    icon: 'key',
+    name: 'Credential isolation',
+    text: 'An API proxy holds the tokens, so the agent never sees them and cannot leak them.',
+    href: `${base}/introduction/architecture/#agent-workflow-firewall-awf`,
+  },
+  {
+    id: 'integrity',
+    icon: 'filter',
+    name: 'Integrity filtering',
+    text: 'Untrusted GitHub content is filtered before the agent sees it.',
+    href: `${base}/reference/integrity/`,
+  },
+  {
+    id: 'threat',
+    icon: 'shield',
+    name: 'Threat detection',
+    text: 'A separate job scans proposed outputs and blocks suspicious ones.',
+    href: `${base}/reference/threat-detection/`,
+  },
+  {
+    id: 'outputs',
+    icon: 'check-circle',
+    name: 'Safe outputs',
+    text: 'Only the writes you declared are applied, by a separate job with its own permissions.',
+    href: `${base}/reference/safe-outputs/`,
+  },
+] as const;
+---
+
+<LandingSection id="safety" title="Safe by default" lede="Agents read by default. Every write is checked before it lands.">
+  <SafeByDefaultTrifecta slot="intro" part="text" />
+  <SafeByDefaultTrifecta slot="aside" part="figure" />
+  <div class="aw-safe">
+
+    <p class="aw-defence-intro">Step through the layers.</p>
+
+    <div class="aw-layout" data-safe-root>
+      <div class="aw-stack">
+        <div class="aw-end"><Octicon name="copilot" class="aw-end-ico" />The agent</div>
+        <ol class="aw-layers">
+          {layers.map((l, i) => (
+            <li class:list={['aw-layer', i === 0 && 'is-active']}>
+              <span class="aw-dot" aria-hidden="true"></span>
+              <button
+                type="button"
+                class="aw-row"
+                id={`safe-${l.id}-btn`}
+                aria-controls={`safe-${l.id}`}
+                aria-expanded={i === 0 ? 'true' : 'false'}
+              >
+                <Octicon name={l.icon} class="aw-row-icon" />
+                <span class="aw-row-name">{l.name}</span>
+                <Octicon name="chevron-down" size={12} class="aw-chev" />
+                <span class="aw-progress" aria-hidden="true" />
+              </button>
+              <div class="aw-detail" id={`safe-${l.id}`} role="region" aria-labelledby={`safe-${l.id}-btn`}>
+                <h3>{l.name}</h3>
+                <p>{l.text}</p>
+                <a href={l.href}>Learn more <Octicon name="arrow-right" size={12} /></a>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div class="aw-end"><Octicon name="repo" class="aw-end-ico" />Your repository</div>
+      </div>
+    </div>
+
+    <p class="aw-foot">
+      Try it safely: <a href={`${base}/reference/safe-outputs/`}><code class="aw-code">staged: true</code></a> previews every output without writing anything.
+    </p>
+    <p class="aw-foot aw-foot-link">
+      <a href={`${base}/introduction/architecture/`}>Read the security architecture →</a>
+    </p>
+  </div>
+</LandingSection>
+
+<style>
+  /* Tight to the heading + lede so the trifecta paragraph reads as part of that group. */
+  .aw-safe {
+    --aw-safe-stack: 23rem;
+    --aw-safe-gap: 3rem;
+    --aw-safe-panel: 28rem;
+    --aw-safe-step: 4500ms;
+    margin-top: 1.25rem;
+  }
+  a {
+    color: var(--aw-color-accent-text);
+    text-underline-offset: 0.2em;
+  }
+
+  .aw-defence-intro {
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+    max-width: 52ch;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  /* Stack */
+  .aw-layout {
+    position: relative;
+    margin-top: 1.5rem;
+    max-width: 26rem;
+  }
+  .aw-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  /* Centred over the layer rows, which start 2.75rem in (rail + row indent). */
+  .aw-end {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    margin-left: 2.75rem;
+    gap: 0.625rem;
+    padding: 0.5rem 1rem 0.5rem 0.5rem;
+    border: 1px solid var(--aw-color-border-strong);
+    border-radius: var(--aw-radius-pill);
+    font-size: var(--aw-step-0);
+    font-weight: 500;
+    color: var(--aw-color-text-strong);
+    background: var(--aw-color-surface);
+    box-shadow: var(--aw-shadow-raised);
+  }
+  /* icon disc: its centre sits on the stack's vertical line (1.5rem in) */
+  .aw-end-ico {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--aw-color-accent-low);
+    color: var(--aw-color-accent-text);
+  }
+  .aw-layers {
+    position: relative;
+    list-style: none;
+    margin: 0 0 0 1.5rem;
+    padding: 0.75rem 0;
+  }
+  /* The rail: runs down the left of the layers and bends round both corners
+     into the centres of the agent and repository pills, which sit on top. */
+  .aw-layers::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -1.5625rem;
+    bottom: -1.5625rem;
+    width: calc(50% + 0.625rem);
+    border: 1px solid var(--aw-color-border-strong);
+    border-right: 0;
+    border-radius: 1rem 0 0 1rem;
+    pointer-events: none;
+  }
+  .aw-layer {
+    margin: 0;
+    padding: 0 0 0 1.25rem;
+  }
+  /* marker on the vertical line, level with the row's centre. A zero-height
+     relative box, so the layer itself stays unpositioned (the desktop detail
+     panel is positioned against .aw-layout). */
+  .aw-dot {
+    display: block;
+    position: relative;
+    height: 0;
+  }
+  .aw-dot::before {
+    content: '';
+    position: absolute;
+    left: calc(-1.25rem - 0.5px);
+    top: 1.5rem;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--aw-color-border-strong);
+    background: var(--aw-color-bg);
+    transform: translate(-50%, -50%);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .aw-layer.is-active .aw-dot::before {
+    border-color: var(--aw-color-accent);
+    background: var(--aw-color-accent);
+  }
+  .aw-layer + .aw-layer {
+    margin-top: 0.5rem;
+  }
+  .aw-row {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--aw-color-surface);
+    color: var(--aw-color-text);
+    font-size: var(--aw-step-0);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--aw-duration-fast) ease, border-color var(--aw-duration-fast) ease;
+  }
+  .aw-row:hover {
+    border-color: var(--aw-color-border-strong);
+    background: var(--aw-color-bg-subtle);
+  }
+  /* `all: unset` drops the global ring, so restore it. */
+  .aw-row:focus-visible {
+    outline: var(--aw-focus-ring);
+    outline-offset: var(--aw-focus-offset);
+  }
+  /* Auto-advance cue: a hairline filling along the bottom edge of the active row. */
+  .aw-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--aw-color-accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .aw-layout[data-auto] .aw-layer.is-active .aw-progress {
+    animation: aw-safe-progress var(--aw-safe-step) linear forwards;
+  }
+  .aw-layout[data-auto][data-paused] .aw-layer.is-active .aw-progress {
+    animation-play-state: paused;
+  }
+  @keyframes aw-safe-progress {
+    to {
+      transform: scaleX(1);
+    }
+  }
+  .aw-row-icon {
+    color: var(--aw-color-text-muted);
+  }
+  .aw-row-name {
+    flex: 1;
+    min-width: 0;
+  }
+  .aw-chev {
+    display: none;
+    color: var(--aw-color-text-muted);
+    transition: transform 0.2s ease;
+  }
+  .aw-layer.is-active .aw-row {
+    background: var(--aw-color-accent-low);
+    border-color: var(--aw-color-accent);
+    color: var(--aw-color-text-strong);
+  }
+  .aw-layer.is-active .aw-row-icon {
+    color: var(--aw-color-accent-text);
+  }
+
+  /* Details: no JS = all visible, stacked under each layer */
+  .aw-detail {
+    padding: 0.75rem 0.25rem 0.5rem 1rem;
+  }
+  .aw-detail h3 {
+    margin: 0;
+    font-size: var(--aw-step-1);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--aw-color-text-strong);
+  }
+  .aw-detail p {
+    margin: 0.5rem 0 0.75rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.6;
+    color: var(--aw-color-text-secondary);
+    max-width: 42ch;
+    text-wrap: pretty;
+  }
+  .aw-detail a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--aw-step-0);
+  }
+  /* h3 is redundant next to the row on small screens */
+  [data-enhanced] .aw-detail h3 {
+    display: none;
+  }
+  [data-enhanced] .aw-layer:not(.is-active) .aw-detail {
+    display: none;
+  }
+  [data-enhanced] .aw-chev {
+    display: inline-flex;
+  }
+  [data-enhanced] .aw-layer.is-active .aw-chev {
+    transform: rotate(180deg);
+  }
+
+  /* Desktop: stack + detail panel as one centred unit */
+  @media (min-width: 52rem) {
+    .aw-defence-intro,
+    .aw-layout[data-enhanced],
+    .aw-safe:has(.aw-layout[data-enhanced]) .aw-foot {
+      width: calc(var(--aw-safe-stack) + var(--aw-safe-gap) + var(--aw-safe-panel));
+      max-width: 100%;
+      margin-inline: auto;
+    }
+    .aw-layout[data-enhanced] .aw-stack {
+      width: var(--aw-safe-stack);
+    }
+    .aw-layout[data-enhanced] .aw-chev {
+      display: none;
+    }
+    /* Every panel sits in the same spot; only the active one is shown, so they cross-fade. */
+    .aw-layout[data-enhanced] .aw-detail,
+    .aw-layout[data-enhanced] .aw-layer:not(.is-active) .aw-detail {
+      display: block;
+      position: absolute;
+      /* Positioned against .aw-layers (it hosts the rail), which starts 1.5rem in. */
+      top: 50%;
+      left: calc(var(--aw-safe-stack) + var(--aw-safe-gap) - 1.5rem);
+      width: var(--aw-safe-panel);
+      max-width: calc(100vw - var(--aw-safe-stack) - var(--aw-safe-gap) - 2rem);
+      box-sizing: border-box;
+      padding: 1.5rem 1.75rem;
+      border: 1px solid var(--aw-color-border);
+      border-radius: var(--aw-radius-lg);
+      background: var(--aw-color-surface);
+      box-shadow: var(--aw-shadow-raised);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(calc(-50% + 6px));
+      transition: opacity 0.45s ease, transform 0.45s ease, visibility 0s linear 0.45s;
+    }
+    .aw-layout[data-enhanced] .aw-layer.is-active .aw-detail {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(-50%);
+      transition: opacity 0.45s ease 0.1s, transform 0.45s ease 0.1s, visibility 0s;
+    }
+    .aw-layout[data-enhanced] .aw-detail h3 {
+      display: block;
+    }
+  }
+
+  /* Foot */
+  .aw-foot {
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    font-size: var(--aw-step-0);
+    line-height: 1.7;
+    color: var(--aw-color-text-muted);
+  }
+  /* Full-size chip: it's the link text. */
+  .aw-foot code {
+    padding: 0.1em 0.4em;
+    font-size: inherit;
+    color: inherit;
+  }
+  .aw-foot-link {
+    margin-top: 0.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aw-row,
+    .aw-chev,
+    .aw-layout[data-enhanced] .aw-detail,
+    .aw-layout[data-enhanced] .aw-layer.is-active .aw-detail {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const root = document.querySelector<HTMLElement>('[data-safe-root]');
+    if (!root) return;
+
+    const controller = new AbortController();
+    const layers = Array.from(root.querySelectorAll<HTMLElement>('.aw-layer'));
+    const buttons = layers.map((l) => l.querySelector<HTMLButtonElement>('.aw-row')!);
+    const desktop = window.matchMedia('(min-width: 52rem)');
+
+    const setActive = (idx: number | null) => {
+      layers.forEach((l, i) => {
+        const on = i === idx;
+        l.classList.toggle('is-active', on);
+        buttons[i].setAttribute('aria-expanded', String(on));
+      });
+    };
+    const current = () => layers.findIndex((l) => l.classList.contains('is-active'));
+
+    root.setAttribute('data-enhanced', '');
+
+    // Auto-advance: desktop only, in view, no reduced motion. Paused on hover/focus,
+    // stopped for good once the user picks a layer. The progress bar's animation
+    // is the timer, so pausing it pauses the cycle too.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let userTookOver = false;
+    let inView = false;
+    let hovering = false;
+    let focusoutRaf = 0;
+    const updateAuto = () => {
+      const on = !userTookOver && inView && desktop.matches && !reduced.matches;
+      root.toggleAttribute('data-auto', on);
+      root.toggleAttribute('data-paused', hovering || root.contains(document.activeElement));
+    };
+    const onFocusOut = () => {
+      if (focusoutRaf) cancelAnimationFrame(focusoutRaf);
+      focusoutRaf = requestAnimationFrame(updateAuto);
+    };
+    const takeOver = () => {
+      userTookOver = true;
+      updateAuto();
+    };
+
+    root.addEventListener('animationend', (e) => {
+      if (!(e.target as HTMLElement).classList.contains('aw-progress')) return;
+      if (!root.hasAttribute('data-auto')) return;
+      setActive((current() + 1) % layers.length);
+    }, { signal: controller.signal });
+    root.addEventListener('pointerenter', () => { hovering = true; updateAuto(); }, { signal: controller.signal });
+    root.addEventListener('pointerleave', () => { hovering = false; updateAuto(); }, { signal: controller.signal });
+    root.addEventListener('focusin', updateAuto, { signal: controller.signal });
+    root.addEventListener('focusout', onFocusOut, { signal: controller.signal });
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+        updateAuto();
+      },
+      { threshold: 0.35 },
+    );
+    intersectionObserver.observe(root);
+    reduced.addEventListener('change', updateAuto);
+
+    buttons.forEach((b, i) => {
+      b.addEventListener('click', () => {
+        takeOver();
+        if (desktop.matches) setActive(i);
+        else setActive(current() === i ? null : i);
+      }, { signal: controller.signal });
+      b.addEventListener('keydown', (e) => {
+        const keys: Record<string, number> = {
+          ArrowDown: (i + 1) % buttons.length,
+          ArrowUp: (i - 1 + buttons.length) % buttons.length,
+          Home: 0,
+          End: buttons.length - 1,
+        };
+        if (!(e.key in keys)) return;
+        e.preventDefault();
+        takeOver();
+        const next = keys[e.key];
+        buttons[next].focus();
+        if (desktop.matches) setActive(next);
+      }, { signal: controller.signal });
+    });
+
+    // Desktop always shows one detail.
+    const sync = () => {
+      if (desktop.matches && current() === -1) setActive(0);
+      updateAuto();
+    };
+    desktop.addEventListener('change', sync);
+    sync();
+
+    cleanup = () => {
+      controller.abort();
+      intersectionObserver.disconnect();
+      reduced.removeEventListener('change', updateAuto);
+      desktop.removeEventListener('change', sync);
+      if (focusoutRaf) cancelAnimationFrame(focusoutRaf);
+      root.removeAttribute('data-enhanced');
+      root.removeAttribute('data-auto');
+      root.removeAttribute('data-paused');
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
+</script>

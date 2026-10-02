@@ -1,0 +1,95 @@
+---
+interface Props {
+  /** Anchor id. */
+  id?: string;
+  /** Unique id for the heading (defaults to `${id}-title`). */
+  titleId?: string;
+  title: string;
+  lede?: string;
+  /** Section background: the page colour, or a full-bleed dark band. */
+  tone?: 'default' | 'dark';
+}
+const { id, titleId, title, lede, tone = 'default' } = Astro.props;
+const headingId = titleId ?? `${id ?? 'section'}-title`;
+---
+
+<section
+  id={id}
+  class:list={['aw-section', 'not-content', tone !== 'default' && `aw-tone-${tone}`]}
+  aria-labelledby={headingId}
+>
+  <div class="aw-container">
+    {Astro.slots.has('aside') ? (
+      <div class="aw-split">
+        <div class="aw-split-main">
+          <h2 id={headingId}>{title}</h2>
+          {lede && <p class="aw-lede">{lede}</p>}
+          <slot name="intro" />
+        </div>
+        <div class="aw-split-aside"><slot name="aside" /></div>
+      </div>
+    ) : (
+      <>
+        <h2 id={headingId}>{title}</h2>
+        {lede && <p class="aw-lede">{lede}</p>}
+      </>
+    )}
+    <slot />
+  </div>
+</section>
+
+<style>
+  .aw-section {
+    padding-block: clamp(4rem, 8vw, 7rem);
+    background: var(--aw-color-bg);
+    color: var(--aw-color-text);
+  }
+  /* In the dark theme the page is already near-black, so hairlines mark the band. */
+  :global([data-theme='dark']) .aw-section.aw-tone-dark {
+    border-block: 1px solid var(--aw-color-divider);
+  }
+  /* Optional two-column head: heading, lede and intro on the left, a visual on the right. */
+  .aw-split {
+    display: grid;
+    gap: 2.5rem;
+  }
+  @media (min-width: 64rem) {
+    .aw-split {
+      grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+      gap: 3rem;
+      align-items: start;
+    }
+  }
+  .aw-split-aside {
+    min-width: 0;
+  }
+  @media (min-width: 64rem) {
+    /* Nudge the text down so it sits level with the visual beside it. */
+    .aw-split-main {
+      margin-top: 3rem;
+    }
+  }
+  .aw-container {
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 2rem);
+  }
+  h2 {
+    margin: 0;
+    max-width: 24ch;
+    font-size: var(--aw-step-4);
+    font-weight: 460;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+    color: var(--aw-color-text);
+  }
+  .aw-lede {
+    margin: 1rem 0 0;
+    max-width: 46ch;
+    font-size: var(--aw-step-1);
+    line-height: 1.5;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+</style>

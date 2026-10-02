@@ -1,0 +1,78 @@
+---
+/**
+ * A short list of titled points, each with a line of copy and a link, under
+ * a hairline. Used beside or below a section's visual.
+ * - layout "row": stacked on phones, one row from 50rem.
+ * - layout "stack": stacked, two-up between 40rem and 60rem (for a narrow column).
+ */
+interface Point {
+  title: string;
+  /** HTML: may contain <code class="aw-code"> chips. */
+  text: string;
+  href: string;
+  label: string;
+}
+interface Props {
+  points: Point[];
+  layout?: 'row' | 'stack';
+}
+const { points, layout = 'stack' } = Astro.props;
+---
+
+<ul class:list={['aw-points', `is-${layout}`]} role="list">
+  {points.map((p) => (
+    <li>
+      <h3 class="aw-point-title">{p.title}</h3>
+      <p set:html={p.text} />
+      <a class="aw-link" href={p.href}>{p.label}<span aria-hidden="true"> →</span></a>
+    </li>
+  ))}
+</ul>
+
+<style>
+  .aw-points {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    margin: 0;
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--aw-color-border);
+  }
+  h3 {
+    margin: 0;
+  }
+  p {
+    margin: 0.375rem 0 0.5rem;
+    font-size: var(--aw-step-0);
+    line-height: 1.55;
+    color: var(--aw-color-text-secondary);
+    text-wrap: pretty;
+  }
+  a {
+    font-size: var(--aw-step--1);
+  }
+  @media (min-width: 50rem) {
+    .is-row {
+      grid-template-columns: none;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: 2.5rem;
+    }
+    .is-row li {
+      padding-bottom: 0;
+    }
+  }
+  .is-stack p {
+    max-width: 44ch;
+  }
+  @media (min-width: 40rem) and (max-width: 59.99rem) {
+    .is-stack {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 3rem;
+    }
+  }
+</style>

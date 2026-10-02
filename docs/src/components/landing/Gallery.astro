@@ -1,0 +1,63 @@
+---
+/** Ready-made workflows from githubnext/agentics, directly under the hero (#gallery). */
+import WorkflowsPicker from './WorkflowsPicker.astro';
+
+const docs = (slug: string) => `https://github.com/githubnext/agentics/blob/main/docs/${slug}.md`;
+// Short prompts in the documented creating-workflows form (setup/creating-workflows.mdx).
+const prompt = (purpose: string) =>
+  `Create a workflow for GitHub Agentic Workflows using https://raw.githubusercontent.com/github/gh-aw/main/create.md
+
+The purpose of the workflow is ${purpose}`;
+
+const workflows = [
+  {
+    id: 'repo-assist',
+    name: 'Repo Assist',
+    trigger: 'Twice a day',
+    triggerIcon: 'clock',
+    outcome: 'A repository assistant that triages issues, fixes bugs and proposes improvements.',
+    detail:
+      'Each run it picks tasks to suit the state of your repository: labelling and investigating issues, fixing bugs, adding tests and engineering improvements. It keeps a monthly activity summary so maintainers can see what it did.',
+    href: docs('repo-assist'),
+    prompt: prompt('to act as a repository assistant: twice a day, triage new issues, fix bugs, and open small pull requests with improvements.'),
+  },
+  {
+    id: 'ci-doctor',
+    name: 'CI Doctor',
+    trigger: 'When CI fails',
+    triggerIcon: 'zap',
+    outcome: 'Investigates failing CI and opens an issue with the likely cause.',
+    detail:
+      'It reads the failed job’s logs alongside the commit and pull request that triggered it, then files one issue with the root cause and next steps. Repeat failures update that issue instead of adding noise.',
+    href: docs('ci-doctor'),
+    prompt: prompt('to investigate failing CI runs: read the logs, find the likely cause, and open an issue with the diagnosis and next steps.'),
+  },
+  {
+    id: 'repo-status',
+    name: 'Repo Status',
+    trigger: 'Daily',
+    triggerIcon: 'clock',
+    outcome: 'A daily report of what happened in your repository, posted as an issue.',
+    detail:
+      'It gathers pull requests, issues and workflow results, then writes a short status report. Yesterday’s report closes when today’s arrives.',
+    href: docs('repo-status'),
+    prompt: prompt('a daily report on recent activity in the repository, delivered as an issue.'),
+  },
+  {
+    id: 'test-improver',
+    name: 'Test Improver',
+    trigger: 'Daily',
+    triggerIcon: 'clock',
+    outcome: 'Opens pull requests that improve test coverage where it matters.',
+    detail:
+      'It works out how your project builds and measures coverage, finds high-value gaps, and opens pull requests with the measured improvement. It keeps its own pull requests up to date.',
+    href: docs('test-improver'),
+    prompt: prompt('to run daily and improve test coverage: find untested code and open pull requests that add focused tests.'),
+  },
+];
+
+const title = 'Workflows that already work';
+const lede = 'Ready-made workflows, running in real repositories today. Paste one prompt into your coding agent to add it to your repo.';
+---
+
+<WorkflowsPicker workflows={workflows} title={title} lede={lede} />
