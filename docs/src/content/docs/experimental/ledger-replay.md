@@ -130,7 +130,9 @@ Equivalent history after compaction produces the same state.
 Trusted preparation validates canonical records before replay and fails if
 built-in operations are invalid. Each ledger's disposable SQLite database at
 `/tmp/gh-aw/ledgers/<name>/ledger.db` remains read-only to the agent. The generated
-prompt lists the derived tables and their columns. Query `state` for current
+activation prompt lists the built-in tables and their columns from the declared
+type; it does not read files created later during agent-job preparation.
+Query `state` for current
 state, `replay_metadata` for projection metadata, and `records` for immutable
 event history. Replay never writes back to Git or canonical ledger files.
 Persist new events only through the configured ledger safe-output tools.

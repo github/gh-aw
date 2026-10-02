@@ -270,7 +270,8 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "log", config.Ledgers[1].Type)
 	require.NotContains(t, buildLedgerPromptSection(config).Content, "Replay scripts")
-	require.Contains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+	require.NotContains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+	require.Contains(t, buildLedgerPromptSection(config).Content, "state(position: integer, value: text)")
 	encoded, err := encodeLedgerConfigBase64(config)
 	require.NoError(t, err)
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
@@ -294,6 +295,33 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 			_, err := parseLedgerToolConfig(declaration)
 			require.ErrorContains(t, err, "replay is no longer supported")
 		}
+	}
+}
+
+func TestBuiltinLedgerActivationPromptDoesNotReadRuntimeProjectionGuidance(t *testing.T) {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "claims"} {
+		t.Run(kind, func(t *testing.T) {
+			root := t.TempDir()
+			workflowPath := filepath.Join(root, "ledger.md")
+			key := ""
+			if kind == "table" {
+				key = "      key: id\n"
+			}
+			source := "---\non: workflow_dispatch\nengine: copilot\ntools:\n  ledger:\n    history:\n      type: " + kind + "\n" + key + "---\nInspect ledger history.\n"
+			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+			lock, err := os.ReadFile(filepath.Join(root, "ledger.lock.yml"))
+			require.NoError(t, err)
+			require.NotContains(t, string(lock), ledgerReplayPromptFile)
+			require.NotContains(t, string(lock), "ledger_replay")
+			require.Contains(t, string(lock), "read-only projection tables:")
+			require.Contains(t, string(lock), "Create read-only ledger projections")
+			if kind == "claims" {
+				require.Contains(t, string(lock), "claim_state(claim_id: text, upvotes: integer")
+			} else {
+				require.Contains(t, string(lock), "state(")
+			}
+		})
 	}
 }
 
