@@ -23,6 +23,7 @@ const fs = require("fs");
 const path = require("path");
 const { LEDGER_TRANSACTION_LOG_PATH } = require("./constants.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_SYSTEM } = require("./error_codes.cjs");
 
 /** @type {number} Maximum transaction log size inspected, in bytes */
 const MAX_LOG_BYTES = 4 * 1024 * 1024;
@@ -94,7 +95,7 @@ function readAuditEntries(logPath) {
   try {
     content = fs.readFileSync(logPath, "utf8");
   } catch (error) {
-    throw new Error(`Failed to read ledger transaction log: ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Failed to read ledger transaction log: ${getErrorMessage(error)}`, { cause: error });
   }
   const entries = [];
   const seen = new Set();

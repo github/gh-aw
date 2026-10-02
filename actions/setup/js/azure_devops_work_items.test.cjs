@@ -130,7 +130,50 @@ describe("azure_devops_work_items", () => {
 
     expect(result).toEqual({
       success: false,
-      error: "assignee 'GitHub Copilot' is a reserved identity",
+      error: "E001: assignee 'GitHub Copilot' is a reserved identity",
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      type: "ado_assign_work_item",
+      config: { target: "*" },
+      message: { work_item_id: 42, assignee: "" },
+      error: "E001: assignee must not be empty",
+    },
+    {
+      type: "ado_create_work_item",
+      config: { work_item_type: "Task" },
+      message: { temporary_id: "#aw_item", title: "Fix the build", description: "Detailed description of the build failure.", tags: "not-an-array" },
+      error: "E001: tags must be an array",
+    },
+    {
+      type: "ado_create_work_item",
+      config: { work_item_type: "Task" },
+      message: { temporary_id: "#aw_item", title: "Fix the build", description: "Detailed description of the build failure.", tags: ["bad;tag"] },
+      error: "E001: tag 'bad;tag' contains a semicolon",
+    },
+  ])("prefixes validation failures with E001", async ({ type, config, message, error }) => {
+    const result = await createAzureDevOpsWorkItemHandler(type, config)(message);
+
+    expect(result).toEqual({ success: false, error });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("prefixes invalid tag errors with E001", async () => {
+    const result = await createAzureDevOpsWorkItemHandler("ado_create_work_item", {
+      work_item_type: "Task",
+    })({
+      temporary_id: "#aw_item",
+      title: "Fix the build",
+      description: "Detailed description of the build failure.",
+      tags: [""],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "E001: tags must not contain empty values",
     });
     expect(global.fetch).not.toHaveBeenCalled();
   });

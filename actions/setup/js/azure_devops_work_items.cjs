@@ -34,10 +34,10 @@ function staged(message, extra = {}) {
 function normalizeAssignee(value) {
   const assignee = String(value || "").trim();
   if (!assignee) {
-    throw new Error("assignee must not be empty");
+    throw new Error("E001: assignee must not be empty");
   }
   if (RESERVED_ASSIGNEES.has(assignee.toLowerCase())) {
-    throw new Error(`assignee '${assignee}' is a reserved identity`);
+    throw new Error(`E001: assignee '${assignee}' is a reserved identity`);
   }
   return assignee;
 }
@@ -48,15 +48,15 @@ function matchesPattern(value, pattern) {
 
 function validateTags(tags) {
   if (!Array.isArray(tags)) {
-    throw new Error("tags must be an array");
+    throw new Error("E001: tags must be an array");
   }
   return tags.map(tag => {
     const value = String(tag).trim();
     if (!value) {
-      throw new Error("tags must not contain empty values");
+      throw new Error("E001: tags must not contain empty values");
     }
     if (value.includes(";")) {
-      throw new Error(`tag '${value}' contains a semicolon`);
+      throw new Error(`E001: tag '${value}' contains a semicolon`);
     }
     return value;
   });
