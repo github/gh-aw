@@ -170,19 +170,32 @@
      --aw-aside-label-size, --aw-aside-label-weight, --aw-aside-gap-above
    ========================================================================== */
 
-/* Theme-dependent defaults: dark needs a touch more colour for the tint to register. */
+/* Per-type tint, border and badge-ring strength, tuned in the aside jig. */
 :root,
 .aw-tone-dark {
-  --aw-aside-bg-pct: 4%;
+  --aw-aside-bg-pct: 15%;
   --aw-aside-border-pct: 10%;
+  --aw-aside-tip-ring: 23%;
+  --aw-aside-note-ring: 16%;
+  --aw-aside-caution-bg: 18%;
+  --aw-aside-caution-ring: 21%;
+  --aw-aside-danger-ring: 20%;
   --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 3px 10px -2px rgb(0 0 0 / 0.072);
 }
 
 :root[data-theme='light'] {
-  --aw-aside-bg-pct: 2.5%;
-  --aw-aside-border-pct: 7%;
   --aw-aside-tip-bg: 5%;
-  --aw-aside-tip-border: 6%;
+  --aw-aside-tip-border: 15%;
+  --aw-aside-tip-ring: 20%;
+  --aw-aside-note-bg: 5%;
+  --aw-aside-note-border: 12%;
+  --aw-aside-note-ring: 16%;
+  --aw-aside-caution-bg: 7.5%;
+  --aw-aside-caution-border: 15%;
+  --aw-aside-caution-ring: 15%;
+  --aw-aside-danger-bg: 4%;
+  --aw-aside-danger-border: 11%;
+  --aw-aside-danger-ring: 15%;
   --aw-aside-shadow: 0 1px 2px rgb(0 0 0 / 0.01), 0 3px 10px -2px rgb(0 0 0 / 0.017);
 }
 
@@ -193,7 +206,7 @@
   --aw-aside-pad-x: 1.25rem;
   --aw-aside-badge-size: 24px;
   --aw-aside-icon-size: 12px;
-  --aw-aside-label-size: var(--aw-step-0);
+  --aw-aside-label-size: var(--aw-text-ui);
   --aw-aside-label-weight: 600;
   --aw-aside-gap-above: 1.25rem;
 }
@@ -213,7 +226,7 @@
 }
 
 .sl-markdown-content .starlight-aside--note {
-  --aw-aside-color: var(--aw-aside-note-color, var(--aw-color-note));
+  --aw-aside-color: var(--aw-aside-note-color, var(--aw-color-callout-note));
   --aw-aside-tint: var(--aw-aside-note-bg, var(--aw-aside-bg-pct));
   --aw-aside-line: var(--aw-aside-note-border, var(--aw-aside-border-pct));
   --aw-aside-ring: var(--aw-aside-note-ring, 28%);
@@ -223,7 +236,7 @@
 }
 
 .sl-markdown-content .starlight-aside--tip {
-  --aw-aside-color: var(--aw-aside-tip-color, var(--aw-color-success));
+  --aw-aside-color: var(--aw-aside-tip-color, var(--aw-color-callout-tip));
   --aw-aside-tint: var(--aw-aside-tip-bg, var(--aw-aside-bg-pct));
   --aw-aside-line: var(--aw-aside-tip-border, var(--aw-aside-border-pct));
   --aw-aside-ring: var(--aw-aside-tip-ring, 28%);
@@ -233,7 +246,7 @@
 }
 
 .sl-markdown-content .starlight-aside--caution {
-  --aw-aside-color: var(--aw-aside-caution-color, var(--aw-color-caution));
+  --aw-aside-color: var(--aw-aside-caution-color, var(--aw-color-callout-caution));
   --aw-aside-tint: var(--aw-aside-caution-bg, var(--aw-aside-bg-pct));
   --aw-aside-line: var(--aw-aside-caution-border, var(--aw-aside-border-pct));
   --aw-aside-ring: var(--aw-aside-caution-ring, 28%);
@@ -243,7 +256,7 @@
 }
 
 .sl-markdown-content .starlight-aside--danger {
-  --aw-aside-color: var(--aw-aside-danger-color, var(--aw-color-danger));
+  --aw-aside-color: var(--aw-aside-danger-color, var(--aw-color-callout-danger));
   --aw-aside-tint: var(--aw-aside-danger-bg, var(--aw-aside-bg-pct));
   --aw-aside-line: var(--aw-aside-danger-border, var(--aw-aside-border-pct));
   --aw-aside-ring: var(--aw-aside-danger-ring, 28%);
