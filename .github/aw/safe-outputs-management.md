@@ -92,6 +92,7 @@ description: Safe-output reference for update, label, milestone, project, releas
       max-labels: 10                              # Optional: maximum labels per call (default: 10)
       target: "*"                                 # Optional: "triggering" (default), "*" (any issue/PR), or number
       target-repo: "owner/repo"                   # Optional: cross-repository
+      create-if-missing: true                     # Optional: auto-create labels that don't already exist (default: false; otherwise rejected with an error)
       item-schema: { ... }                        # Optional: narrows the label item schema shown to/enforced on the agent (can only restrict, not widen, the built-in string-or-object shape)
   ```
 
