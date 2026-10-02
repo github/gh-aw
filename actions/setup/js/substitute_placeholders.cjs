@@ -26,8 +26,8 @@ const substitutePlaceholders = async ({ file, substitutions }) => {
 
   core.info(`[substitutePlaceholders] ${file} (${Object.keys(substitutions).length} substitution(s))`);
 
-  const splitPaths = path.basename(file) === "prompt.txt" ? ["system.txt", "user.txt"].map(name => path.join(path.dirname(file), name)) : [];
-  const hasSplit = splitPaths.length > 0 && splitPaths.every(splitPath => fs.existsSync(splitPath));
+  const splitPaths = ["system.txt", "user.txt"].map(name => path.join(path.dirname(file), name));
+  const hasSplit = !splitPaths.some(splitPath => path.resolve(splitPath) === path.resolve(file)) && splitPaths.every(splitPath => fs.existsSync(splitPath));
   const files = hasSplit ? [file, ...splitPaths] : [file];
 
   // Read the files

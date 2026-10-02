@@ -252,6 +252,7 @@ describe("interpolate_prompt", () => {
         }));
     }),
     describe("main function integration", () => {
+      const { main } = require("./interpolate_prompt.cjs");
       let tmpDir, promptPath, originalEnv;
       /**
        * Apply the STEP 2.5 experiment condition substitution logic from main().
@@ -296,6 +297,28 @@ describe("interpolate_prompt", () => {
           if (!mainMatch) throw new Error("Could not extract main function");
           const main = eval(`(${mainMatch[0]})`);
           (main(), expect(core.setFailed).toHaveBeenCalledWith(`${ERR_CONFIG}: GH_AW_PROMPT environment variable is not set`));
+        }),
+        it("should fail when split prompt files do not match the combined prompt", async () => {
+          fs.writeFileSync(path.join(tmpDir, "system.txt"), "System");
+          fs.writeFileSync(path.join(tmpDir, "user.txt"), "User");
+          fs.writeFileSync(promptPath, "Different");
+
+          await main();
+
+          expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Split prompt files do not match the combined prompt"));
+          expect(fs.readFileSync(promptPath, "utf8")).toBe("Different");
+        }),
+        it("should fail when template rendering removes the split boundary", async () => {
+          const system = "{{#if false}}\nHidden\n";
+          const user = "{{/if}}\nVisible\n";
+          fs.writeFileSync(path.join(tmpDir, "system.txt"), system);
+          fs.writeFileSync(path.join(tmpDir, "user.txt"), user);
+          fs.writeFileSync(promptPath, system + user);
+
+          await main();
+
+          expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Prompt split boundary was lost during processing"));
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(system + user);
         }),
         it("should not corrupt condition when experiment value contains $1 (STEP 2.5)", () => {
           // Regression: GH_AW_EXPERIMENTS_* value containing $1 must not be interpreted as a
@@ -364,6 +387,9 @@ describe("interpolate_prompt", () => {
           await main();
           expect(core.setFailed).not.toHaveBeenCalled();
           expect(fs.readFileSync(path.join(tmpDir, "prompt-template.txt"), "utf8")).toBe(system + user);
+          const importTree = JSON.parse(fs.readFileSync(path.join(tmpDir, "prompt-import-tree.json"), "utf8"));
+          expect(importTree.template).toBe(system + user);
+          expect(importTree.template).not.toContain("\x00GH_AW_PROMPT_SPLIT_");
           const substitutePlaceholders = require("./substitute_placeholders.cjs");
           await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
 

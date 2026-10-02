@@ -126,7 +126,7 @@ async function main() {
     // can identify which parts of the rendered prompt originated from which source files.
     const importTree = {
       version: 1,
-      template: content,
+      template: splitMarker ? content.replace(splitMarker, "") : content,
       children: /** @type {ImportTreeNode[]} */ [],
     };
 
