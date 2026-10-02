@@ -9,6 +9,41 @@ This TLA+ model formalizes the proposal in [issue #64852](https://github.com/git
 
 The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/64955-git-backed-dispatch-work-coordination.md).
 
+## Queue inspection and operator commands
+
+`gh aw work` operates on a dedicated branch without using the current checkout. Supply
+`--repo owner/repo`; use `--branch` to select a different
+coordinator branch. The command creates a temporary checkout, reads and validates
+`dispatch-work-coordinator.jsonl`, and publishes changes with non-force pushes.
+Rejected concurrent pushes are retried against a fresh checkout and replay.
+All subcommands support `--json` for machine-readable output.
+
+| Command | Arguments |
+|---|---|
+| `replay` | Display the projected Work and Claims |
+| `stats` | Count Work, Claims, and distinct transactions |
+| `compact` | Canonically order facts and remove only identical duplicates |
+| `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
+| `claim` | `--work-id ID --run-id RUN` |
+| `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
+| `cancel-work` | `--work-id ID` |
+| `cancel-claim` | `--claim-id ID` |
+
+These are **operator** commands; `finish` writes a Completion fact, but is not a
+worker safe-output authorization mechanism and does not execute external effects.
+The caller must independently establish the provenance of `--run-id` and
+`--attempt-id`. Worker authorization and MCP/safe-output integration remain
+separate implementation obligations described in the ADR.
+
+The transaction wire format is defined in [`transactions.tsp`](transactions.tsp).
+The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate
+each record before replay or publication. To regenerate them with TypeSpec 1.16.0,
+install `@typespec/compiler` and `@typespec/json-schema` in a temporary directory,
+compile `transactions.tsp` from that directory with emitter options
+`file-type=json` and `seal-object-schemas=true`, and copy the emitted JSON files
+into `pkg/workqueue/schema/`. The TLA+ model abstracts identities as integers;
+the CLI uses stable string identities and canonical JSON Work payloads.
+
 **Verification status:** the module includes parameterized safety theorem statements and the inductive proof argument below. TLC exhaustively checks the supplied finite configurations. The theorem statements are not mechanically checked by TLAPS; bounded model checking is not an unbounded proof.
 
 ## Concrete protocol choices
