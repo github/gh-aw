@@ -69,7 +69,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 				with = nil
 			}
 			if !hasExplicitAppTokenRepositories(with) {
-				msg := fmt.Sprintf("actions/create-github-app-token in job %q has no explicit repositories input; add repositories: ${{ github.event.repository.name }} to scope the token to the current repository", jobName)
+				msg := fmt.Sprintf("actions/create-github-app-token in job %q has no explicit repositories input; add repositories: ${{ github.repository }} to scope the token to the current repository", jobName)
 				if strict {
 					return fmt.Errorf("strict mode: %s", msg)
 				}

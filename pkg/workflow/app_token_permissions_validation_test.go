@@ -19,14 +19,14 @@ func TestAppTokenPermissionsAtCompileTime(t *testing.T) {
 		wantError    bool
 		wantWarn     bool
 	}{
-		{"strict unscoped", "", "          repositories: ${{ github.event.repository.name }}\n", "", "", true, false},
-		{"case variant strict unscoped", "", "          repositories: ${{ github.event.repository.name }}\n", "", "Actions/create-github-app-token@v3.2.0", true, false},
-		{"non-strict unscoped", "strict: false\n", "          repositories: ${{ github.event.repository.name }}\n", "", "", false, true},
-		{"strict empty permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: ''\n", "", true, false},
-		{"strict invalid permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: invalid\n", "", true, false},
-		{"strict none permission", "", "          repositories: ${{ github.event.repository.name }}\n", "          Permission-contents: none\n", "", false, false},
-		{"strict scoped", "", "          repositories: ${{ github.event.repository.name }}\n", "          permission-contents: read\n", "", false, false},
-		{"non-strict scoped", "strict: false\n", "          repositories: ${{ github.event.repository.name }}\n", "          permission-issues: write\n", "", false, false},
+		{"strict unscoped", "", "          repositories: ${{ github.repository }}\n", "", "", true, false},
+		{"case variant strict unscoped", "", "          repositories: ${{ github.repository }}\n", "", "Actions/create-github-app-token@v3.2.0", true, false},
+		{"non-strict unscoped", "strict: false\n", "          repositories: ${{ github.repository }}\n", "", "", false, true},
+		{"strict empty permission", "", "          repositories: ${{ github.repository }}\n", "          permission-contents: ''\n", "", true, false},
+		{"strict invalid permission", "", "          repositories: ${{ github.repository }}\n", "          permission-contents: invalid\n", "", true, false},
+		{"strict none permission", "", "          repositories: ${{ github.repository }}\n", "          Permission-contents: none\n", "", false, false},
+		{"strict scoped", "", "          repositories: ${{ github.repository }}\n", "          permission-contents: read\n", "", false, false},
+		{"non-strict scoped", "strict: false\n", "          repositories: ${{ github.repository }}\n", "          permission-issues: write\n", "", false, false},
 		{"strict missing repositories", "", "", "          permission-contents: read\n", "", true, false},
 		{"non-strict missing repositories", "strict: false\n", "", "          permission-contents: read\n", "", false, true},
 		{"strict empty repositories", "", "          repositories: ''\n", "          permission-contents: read\n", "", true, false},
@@ -74,8 +74,12 @@ func TestAppTokenPermissionsCheckAllCompiledJobs(t *testing.T) {
 			map[string]any{"uses": "actions/create-github-app-token@sha", "with": map[string]any{"private-key": "secret"}},
 		}},
 	}}
-	if err := compiler.validateAppTokenPermissions(workflow, true); err == nil || !strings.Contains(err.Error(), `job "custom"`) {
+	err := compiler.validateAppTokenPermissions(workflow, true)
+	if err == nil || !strings.Contains(err.Error(), `job "custom"`) {
 		t.Fatalf("expected custom job permission error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "repositories: ${{ github.repository }}") {
+		t.Fatalf("expected missing-repositories error to recommend the trusted repository context, got %v", err)
 	}
 }
 
