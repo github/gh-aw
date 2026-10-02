@@ -7,6 +7,8 @@ description: TLA+ model, safety proof argument, and bounded verification for the
 
 This TLA+ model formalizes the proposal in [issue #64852](https://github.com/github/gh-aw/issues/64852): deferred dispatcher transactions, trusted worker finalization, optimistic branch writes, orphan recovery, and compaction.
 
+The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/64955-git-backed-dispatch-work-coordination.md).
+
 **Verification status:** the module includes parameterized safety theorem statements and the inductive proof argument below. TLC exhaustively checks the supplied finite configurations. The theorem statements are not mechanically checked by TLAPS; bounded model checking is not an unbounded proof.
 
 ## Concrete protocol choices
