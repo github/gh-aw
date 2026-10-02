@@ -1,0 +1,246 @@
+/* Docs components: prev/next pagination and aside callouts.
+ *
+ * Loads after custom.css (see customCss in astro.config.mjs), so these rules
+ * override the older pagination and aside styles there.
+ */
+
+/* Octicons (16px) as data URIs, drawn with mask + currentColor. */
+:root {
+  --aw-icon-light-bulb: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z'/%3E%3C/svg%3E");
+  --aw-icon-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E");
+  --aw-icon-alert: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z'/%3E%3C/svg%3E");
+  --aw-icon-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E");
+  --aw-icon-arrow-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z'/%3E%3C/svg%3E");
+  --aw-icon-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z'/%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   Pagination: no boxes, two plain links under a hairline.
+   ========================================================================== */
+
+.pagination-links {
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--aw-color-divider);
+}
+
+.pagination-links a {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--aw-color-text-muted);
+  font-size: var(--aw-step--1);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.pagination-links a:hover {
+  background: transparent;
+  color: var(--aw-color-text-secondary);
+}
+
+.pagination-links a:focus-visible {
+  outline: 2px solid var(--aw-color-accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.pagination-links [rel='next'] {
+  grid-column: 2;
+}
+
+/* Starlight's arrow is replaced by the octicon drawn on the label line below. */
+.pagination-links a > svg,
+.pagination-links a br {
+  display: none;
+}
+
+/* Label ("Previous" / "Next") and arrow on row 1, title on row 2. */
+.pagination-links a > span {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  column-gap: 0.375rem;
+}
+
+.pagination-links [rel='prev'] > span {
+  grid-template-columns: auto 1fr;
+  text-align: start;
+}
+
+.pagination-links [rel='next'] > span {
+  grid-template-columns: 1fr auto;
+  text-align: end;
+}
+
+.pagination-links [rel='prev'] > span::before,
+.pagination-links [rel='next'] > span::after {
+  content: '';
+  grid-row: 1;
+  width: 14px;
+  height: 14px;
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-arrow-left) center / contain no-repeat;
+  mask: var(--aw-icon-arrow-left) center / contain no-repeat;
+  transition: transform 0.15s ease;
+}
+
+.pagination-links [rel='prev'] > span::before {
+  grid-column: 1;
+}
+
+.pagination-links [rel='next'] > span::after {
+  grid-column: 2;
+  -webkit-mask-image: var(--aw-icon-arrow-right);
+  mask-image: var(--aw-icon-arrow-right);
+}
+
+.pagination-links [rel='prev']:hover > span::before {
+  transform: translateX(-2px);
+}
+
+.pagination-links [rel='next']:hover > span::after {
+  transform: translateX(2px);
+}
+
+.pagination-links .link-title {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  font-size: var(--aw-step-1);
+  letter-spacing: var(--aw-tracking-snug);
+  line-height: var(--aw-leading-snug);
+  color: var(--aw-color-text);
+  transition: color 0.15s ease;
+}
+
+.pagination-links a:hover .link-title {
+  color: var(--aw-color-accent-text);
+}
+
+@media (max-width: 40rem) {
+  .pagination-links {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .pagination-links [rel='next'] {
+    grid-column: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pagination-links a,
+  .pagination-links a > span::before,
+  .pagination-links a > span::after,
+  .pagination-links .link-title {
+    transition: none;
+  }
+
+  .pagination-links a:hover > span::before,
+  .pagination-links a:hover > span::after {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Asides: a faint tint of the type colour, a hairline in the same hue,
+   and an icon badge beside the type label.
+   ========================================================================== */
+
+.sl-markdown-content .starlight-aside {
+  --aw-aside-color: var(--aw-color-note);
+  --aw-aside-icon: var(--aw-icon-info);
+  --aw-aside-tint: 2.5%;
+  --aw-aside-line: 7%;
+  position: relative;
+  padding: 1.125rem 1.25rem 1.125rem;
+  border: 1px solid color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-line), var(--aw-color-border-strong));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--aw-aside-color) var(--aw-aside-tint), var(--aw-color-bg));
+  box-shadow: var(--aw-shadow-soft);
+}
+
+/* 16px more space above an aside than between ordinary blocks. */
+.sl-markdown-content .starlight-aside:not(:first-child) {
+  margin-top: 2rem;
+}
+
+/* Dark mode needs a touch more colour for the tint to register. */
+:root:not([data-theme='light']) .sl-markdown-content .starlight-aside {
+  --aw-aside-tint: 4%;
+  --aw-aside-line: 10%;
+}
+
+.sl-markdown-content .starlight-aside--note {
+  --aw-aside-color: var(--aw-color-note);
+  --aw-aside-icon: var(--aw-icon-info);
+}
+
+.sl-markdown-content .starlight-aside--tip {
+  --aw-aside-color: var(--aw-color-success);
+  --aw-aside-icon: var(--aw-icon-light-bulb);
+}
+
+.sl-markdown-content .starlight-aside--caution {
+  --aw-aside-color: var(--aw-color-caution);
+  --aw-aside-icon: var(--aw-icon-alert);
+}
+
+.sl-markdown-content .starlight-aside--danger {
+  --aw-aside-color: var(--aw-color-danger);
+  --aw-aside-icon: var(--aw-icon-stop);
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__icon {
+  display: none;
+}
+
+:root .sl-markdown-content .starlight-aside .starlight-aside__title {
+  position: relative;
+  gap: 0.625rem;
+  font-size: var(--aw-text-ui);
+  font-weight: 580;
+  line-height: var(--aw-leading-snug);
+  color: var(--aw-aside-color);
+}
+
+/* Badge: a 26px surface-coloured circle with a faint ring in the type colour… */
+.sl-markdown-content .starlight-aside__title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--aw-color-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-aside-color) 28%, transparent);
+}
+
+/* …with the 14px icon centred on top. */
+.sl-markdown-content .starlight-aside__title::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  background-color: var(--aw-aside-color);
+  -webkit-mask: var(--aw-aside-icon) center / contain no-repeat;
+  mask: var(--aw-aside-icon) center / contain no-repeat;
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__content {
+  margin-top: 0.625rem;
+  color: var(--aw-color-text-body);
+}
+
+.sl-markdown-content .starlight-aside .starlight-aside__content a {
+  color: var(--aw-color-link);
+}
