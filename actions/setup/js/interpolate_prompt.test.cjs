@@ -402,6 +402,35 @@ describe("interpolate_prompt", () => {
           expect(finalUser).toContain("developer");
           expect(fs.readFileSync(promptPath, "utf8")).toBe(finalSystem + finalUser);
         }),
+        it("extracts inline agent and skill headings at the start of the split user prompt", async () => {
+          const systemPath = path.join(tmpDir, "system.txt");
+          const userPath = path.join(tmpDir, "user.txt");
+          const system = "<system>\nRules\n</system>";
+          const user = "## agent: `helper`\nAgent body\n## end agent: `helper`\n## skill: `tool`\nSkill body\n## end skill: `tool`\n{{#if false}}\nHidden\n{{/if}}\nTask\n";
+          fs.writeFileSync(systemPath, system);
+          fs.writeFileSync(userPath, user);
+          fs.writeFileSync(promptPath, system + user);
+          const realWriteFileSync = fs.writeFileSync;
+          const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation((file, ...args) => {
+            if (String(file).startsWith(tmpDir)) realWriteFileSync(file, ...args);
+          });
+
+          await main();
+
+          expect(core.setFailed).not.toHaveBeenCalled();
+          const writtenPaths = writeSpy.mock.calls.map(call => String(call[0]));
+          writeSpy.mockRestore();
+          expect(writtenPaths.some(p => p.includes("helper") && !p.startsWith(tmpDir))).toBe(true);
+          expect(writtenPaths.some(p => p.includes("tool") && !p.startsWith(tmpDir))).toBe(true);
+          const finalSystem = fs.readFileSync(systemPath, "utf8");
+          const finalUser = fs.readFileSync(userPath, "utf8");
+          expect(finalSystem).toBe(system);
+          expect(finalUser).not.toContain("Agent body");
+          expect(finalUser).not.toContain("Skill body");
+          expect(finalUser).not.toContain("Hidden");
+          expect(finalUser).toContain("Task");
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(finalSystem + finalUser);
+        }),
         it("should write prompt-import-tree.json with version and empty children when no imports", async () => {
           const templateContent = "Hello World";
           fs.writeFileSync(promptPath, templateContent, "utf8");

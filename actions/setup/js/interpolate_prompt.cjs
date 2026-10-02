@@ -112,7 +112,10 @@ async function main() {
       if (content !== system + user) {
         throw new Error(`${ERR_VALIDATION}: Split prompt files do not match the combined prompt`);
       }
-      splitMarker = `\x00GH_AW_PROMPT_SPLIT_${randomUUID()}\x00`;
+      // Keep the marker on its own line so line-anchored processing (inline
+      // agent/skill headings, template blocks) sees the same line starts.
+      const leadingNewline = system === "" || system.endsWith("\n") ? "" : "\n";
+      splitMarker = `${leadingNewline}\x00GH_AW_PROMPT_SPLIT_${randomUUID()}\x00\n`;
       content = system + splitMarker + user;
     }
 
