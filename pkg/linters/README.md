@@ -73,6 +73,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
 - `tolowerequalfold` — reports case-insensitive string comparisons using `strings.ToLower`/`ToUpper` that should use `strings.EqualFold`.
 - `trimleftright` — reports `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended.
+- `typeassertionnil` — reports type assertions to pointer types without an `ok` check before dereferencing.
 - `typeassertionokdiscarded` — reports two-value type assertions whose `ok` result is discarded.
 - `uncheckedsliceindex` — reports slice and string indexes without proven bounds checks.
 - `uncheckedtypeassertion` — reports single-value type assertions where unchecked panics are possible.
@@ -175,6 +176,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
 | `tolowerequalfold` | Custom `go/analysis` analyzer that flags case-insensitive comparisons via `strings.ToLower`/`ToUpper` that should use `strings.EqualFold` |
 | `trimleftright` | Custom `go/analysis` analyzer that flags `strings.TrimLeft`/`TrimRight` calls with a multi-character literal cutset where `TrimPrefix`/`TrimSuffix` was likely intended |
+| `typeassertionnil` | Custom `go/analysis` analyzer that flags pointer type assertions without an `ok` check before dereferencing |
 | `typeassertionokdiscarded` | Custom `go/analysis` analyzer that flags two-value type assertions whose `ok` result is discarded |
 | `uncheckedsliceindex` | Custom `go/analysis` analyzer that reports slice and string indexes without proven bounds checks |
 | `uncheckedtypeassertion` | Custom `go/analysis` analyzer that flags unchecked single-value type assertions |
@@ -314,6 +316,7 @@ _ = trimleftright.Analyzer
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/trimleftright` — trim-left-right analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/typeassertionnil` — type-assertion-nil analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded` — type-assertion-ok-discarded analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/unchecked-slice-index` — unchecked-slice-index analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/uncheckedtypeassertion` — unchecked-type-assertion analyzer subpackage

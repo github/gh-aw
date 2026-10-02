@@ -449,6 +449,22 @@ describe("materializeRepo (real git)", () => {
     expect(fs.existsSync(path.join(second.path, "junk.txt"))).toBe(false);
   });
 
+  it("reinitializes a cached shallow checkout for a partial clone with full ancestry", async () => {
+    const rootDir = path.join(tmp, "dyn-upgrade");
+    const first = await materializeRepo("octo/demo", "tok", { baseBranch: "main", rootDir });
+    expect(first.success).toBe(true);
+    expect(git(["rev-parse", "--is-shallow-repository"], first.path)).toBe("true");
+
+    const second = await materializeRepo("octo/demo", "tok", { partialClone: true, rootDir });
+    expect(second.success).toBe(true);
+    expect(second.reused).toBe(false);
+    expect(git(["config", "--local", "remote.origin.partialclonefilter"], second.path)).toBe("blob:none");
+    git(["fetch", "origin", "+refs/heads/main:refs/remotes/origin/main"], second.path);
+    expect(git(["rev-parse", "--is-shallow-repository"], second.path)).toBe("false");
+    const oldBase = git(["rev-parse", "origin/main^"], second.path);
+    expect(git(["merge-base", oldBase, "origin/main"], second.path)).toBe(oldBase);
+  });
+
   it("configures a blobless promisor remote when partialClone is set", async () => {
     const rootDir = path.join(tmp, "dyn-partial");
     const result = await materializeRepo("octo/other", "tok", { partialClone: true, rootDir });

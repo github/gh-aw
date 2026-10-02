@@ -1146,6 +1146,29 @@
           "desc": "Model for this engine, overriding the top-level model.",
           "leaf": true
         },
+        "model-routing": {
+          "type": "object",
+          "desc": "Ask AWF to select a Copilot model for this task using its rendered prompt.",
+          "children": {
+            "goal": {
+              "type": "string",
+              "desc": "Routing objective.",
+              "enum": ["cost", "cost-speed"],
+              "leaf": true
+            },
+            "mode": {
+              "type": "string",
+              "desc": "Routing quality/cost profile.",
+              "enum": ["economy", "balanced", "robust", "auto"],
+              "leaf": true
+            },
+            "allowed-models": {
+              "type": "array",
+              "desc": "Copilot model candidates; provider qualification is added by the compiler.",
+              "array": true
+            }
+          }
+        },
         "context-window": {
           "type": "integer",
           "desc": "Optional model context window metadata for engines that need to register explicit model catalog entries.",
@@ -1422,6 +1445,11 @@
     "max-tool-denials": {
       "type": "integer|string",
       "desc": "Copilot SDK safeguard threshold for repeated tool denials before stopping inference.",
+      "leaf": true
+    },
+    "max-tool-calls": {
+      "type": "integer|string",
+      "desc": "Maximum aggregate number of tool dispatches for the workflow run, including subagents.",
       "leaf": true
     },
     "max-ai-credits": {
@@ -2211,6 +2239,23 @@
           "deprecated": true,
           "x-deprecation-message": "Built-in support for Serena has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
+        "ledger": {
+          "type": "object",
+          "desc": "Standalone Git-backed ledger configuration.",
+          "children": {
+            "type": {
+              "type": "string|object",
+              "desc": "Built-in ledger reducer type, or a named object-valued ledger.",
+              "enum": ["log", "set", "map", "table", "counter"],
+              "leaf": true
+            },
+            "key": {
+              "type": "string|object",
+              "desc": "Table primary-key field, or a named object-valued ledger.",
+              "leaf": true
+            }
+          }
+        },
         "repo-memory": {
           "type": "boolean|null|object|array",
           "desc": "Repo memory configuration for git-based persistent storage",
@@ -2278,6 +2323,41 @@
               "desc": "When true, all .json files are pretty-printed (2-space indent) before being committed, making them human-readable in ...",
               "enum": [true, false],
               "leaf": true
+            },
+            "ledger": {
+              "type": "object|null",
+              "desc": "Experimental.",
+              "children": {
+                "schema": {
+                  "type": "string",
+                  "desc": "Repository-relative path to a JSON schema for ledger entries.",
+                  "leaf": true
+                },
+                "max-shards": {
+                  "type": "integer",
+                  "desc": "Maximum number of JSONL ledger shard files to inspect.",
+                  "leaf": true
+                },
+                "max-segment-kb": {
+                  "type": "integer",
+                  "desc": "Maximum size of one JSONL ledger segment in KiB.",
+                  "leaf": true
+                },
+                "max-record-kb": {
+                  "type": "integer",
+                  "desc": "Maximum size of one serialized ledger record in KiB.",
+                  "leaf": true
+                },
+                "max-patch-kb": {
+                  "type": "integer",
+                  "desc": "Maximum patch size appended by one ledger writer in KiB.",
+                  "leaf": true
+                },
+                "compaction": {
+                  "type": "object",
+                  "desc": "Deterministic compaction policy."
+                }
+              }
             },
             "validation": {
               "type": "object",
@@ -2756,6 +2836,12 @@
         "group-reports": {
           "type": "boolean",
           "desc": "When true, creates a parent '[aw] Failed runs' issue that tracks all workflow failures as sub-issues.",
+          "enum": [true, false],
+          "leaf": true
+        },
+        "dynamic-checkout": {
+          "type": "boolean",
+          "desc": "When true, the safe_outputs job does not run actions/checkout for create-pull-request / push-to-pull-request-branch.",
           "enum": [true, false],
           "leaf": true
         },

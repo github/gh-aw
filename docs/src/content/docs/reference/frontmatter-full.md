@@ -2604,6 +2604,19 @@ engine:
   # (optional)
   model: "example-value"
 
+  # Ask AWF to select a Copilot model for this task using its rendered prompt.
+  # (optional)
+  model-routing:
+    # Routing objective.
+    goal: "cost"
+
+    # Routing quality/cost profile.
+    mode: "economy"
+
+    # Copilot model candidates; provider qualification is added by the compiler.
+    allowed-models: []
+      # Array of strings
+
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its
   # AWF gateway models.json; other engines ignore it and emit a warning.
@@ -3397,11 +3410,11 @@ max-tool-denials: "example-value"
 # (optional)
 # Accepted formats:
 
-# Format 1: positive integer
+# Format 1: integer
 max-tool-calls: 1
 
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
-max-tool-calls: "${{ inputs.max-tool-calls }}"
+max-tool-calls: "example-value"
 
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
 # default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement
@@ -4519,6 +4532,35 @@ tools:
   # (optional)
   cli-proxy: true
 
+  # Standalone Git-backed ledger configuration. Declare type: log, set, map, table,
+  # or counter for trusted built-in replay, or replay.script for custom replay.
+  # Tables require key (the string primary-key field). Built-ins accept typed
+  # operations via the ledger append safe output. Each ledger may set compaction;
+  # compaction is lossless and preserves all source transactions.
+  # (optional)
+  ledger:
+    # Built-in ledger reducer type, or a named object-valued ledger.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    type: "log"
+
+    # Format 2: object
+    type:
+      {}
+
+    # Table primary-key field, or a named object-valued ledger.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    key: "example-value"
+
+    # Format 2: object
+    key:
+      {}
+
   # Repo memory configuration for git-based persistent storage
   # (optional)
   # Accepted formats:
@@ -4596,6 +4638,12 @@ tools:
     # committed, making them human-readable in the repository (default: false)
     # (optional)
     format-json: true
+
+    # Experimental. Enable the repo-memory ledger projection, optionally validated
+    # against a repository-relative JSON schema. Ledger workflows require AWF Cloud
+    # Hypervisor filesystem isolation. Using this field emits a compile-time warning.
+    # (optional)
+    ledger: null
 
     # Custom domain validation hook for this repo-memory entry
     # (optional)
@@ -20985,6 +21033,19 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
+      # Ask AWF to select a Copilot model for this task using its rendered prompt.
+      # (optional)
+      model-routing:
+        # Routing objective.
+        goal: "cost"
+
+        # Routing quality/cost profile.
+        mode: "economy"
+
+        # Copilot model candidates; provider qualification is added by the compiler.
+        allowed-models: []
+          # Array of strings
+
       # Optional model context window metadata for engines that need to register
       # explicit model catalog entries. Supported by the Pi engine when generating its
       # AWF gateway models.json; other engines ignore it and emit a warning.
@@ -22081,6 +22142,16 @@ safe-outputs:
   # in smaller repositories. Defaults to false.
   # (optional)
   group-reports: true
+
+  # When true, the safe_outputs job does not run actions/checkout for
+  # create-pull-request / push-to-pull-request-branch. Instead, the handlers
+  # initialize a fresh repository under RUNNER_TEMP for each target repository and
+  # fetch only the refs they need (base branch, PR branch, bundle prerequisites).
+  # Checkout options that only actions/checkout honors (lfs, submodules,
+  # sparse-checkout, extra fetch refs, path layout) do not apply to the safe_outputs
+  # job in this mode. Defaults to false.
+  # (optional)
+  dynamic-checkout: true
 
   # (optional)
   # Accepted formats:

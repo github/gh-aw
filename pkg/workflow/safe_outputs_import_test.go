@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -1473,6 +1474,32 @@ func TestMergeSafeOutputsJobsSkippedWhenEmpty(t *testing.T) {
 	require.NotNil(t, result.CreateIssues, "CreateIssues should be preserved")
 	require.NotNil(t, result.AddComments, "AddComments should be merged")
 	assert.Equal(t, strPtr("5"), result.AddComments.Max, "AddComments config should be correct")
+}
+
+func TestMergeSafeOutputsDynamicCheckoutTrueWins(t *testing.T) {
+	compiler := NewCompiler(WithVersion("1.0.0"))
+	tests := []struct {
+		name     string
+		top      bool
+		imported bool
+		want     bool
+	}{
+		{"imported true overrides explicit top-level false", false, true, true},
+		{"top-level true overrides imported false", true, false, true},
+		{"both false", false, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := compiler.MergeSafeOutputs(
+				&SafeOutputsConfig{DynamicCheckout: tt.top},
+				[]string{`{"dynamic-checkout":` + strconv.FormatBool(tt.imported) + `}`},
+				map[string]any{"dynamic-checkout": tt.top},
+			)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.want, result.DynamicCheckout)
+		})
+	}
 }
 
 // TestMergeSafeOutputsErrorPropagation tests error propagation from mergeSafeOutputConfig

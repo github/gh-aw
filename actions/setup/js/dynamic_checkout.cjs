@@ -258,7 +258,13 @@ async function materializeRepo(repoSlug, token, options = {}) {
   const gitOpts = { cwd: repoDir };
 
   try {
-    const reused = materializedRepos.get(key) === repoDir && fs.existsSync(path.join(repoDir, ".git"));
+    let reused = materializedRepos.get(key) === repoDir && fs.existsSync(path.join(repoDir, ".git"));
+    if (reused && options.partialClone) {
+      const shallow = await exec.getExecOutput("git", ["rev-parse", "--is-shallow-repository"], gitOpts);
+      // A depth-1 checkout cannot establish ancestry for older PR base commits.
+      // Start fresh so the next branch fetch obtains full history with the blob filter.
+      reused = shallow.stdout.trim() !== "true";
+    }
     if (reused) {
       core.info(`Reusing dynamic checkout of ${repoSlug} at ${repoDir}`);
       // Discard state left behind by a previous message (failed am, dirty tree).

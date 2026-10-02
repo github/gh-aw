@@ -78,6 +78,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
 	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 	"github.com/github/gh-aw/pkg/linters/uncheckedflushreturn"
@@ -112,7 +113,7 @@ type docAnalyzer struct {
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
-//	tolowerequalfold, trimleftright, typeassertionokdiscarded, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkfuncerrshadow, wgdonenotdeferred, writebytestring
+//	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
 		{"appendbytestring", appendbytestring.Analyzer},
@@ -182,6 +183,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"timenowsub", timenowsub.Analyzer},
 		{"tolowerequalfold", tolowerequalfold.Analyzer},
 		{"trimleftright", trimleftright.Analyzer},
+		{"typeassertionnil", typeassertionnil.Analyzer},
 		{"typeassertionokdiscarded", typeassertionokdiscarded.Analyzer},
 		{"uncheckedsliceindex", uncheckedsliceindex.Analyzer},
 		{"uncheckedtypeassertion", uncheckedtypeassertion.Analyzer},
