@@ -83,37 +83,6 @@ tools:
             type: integer
             minimum: 1
         additionalProperties: false
-      replay:
-        script: |
-          const audits = records
-            .filter(record => record.payload.record_type === "mcp_concurrency_audit")
-            .map(({ payload }) => ({
-              run_id: payload.run_id,
-              analyzed_tool: payload.analyzed_tool,
-              status: payload.status,
-              issue_number: payload.issue_number ?? null
-            }));
-          const latestByTool = new Map();
-          for (const audit of audits) latestByTool.set(audit.analyzed_tool, audit);
-          return {
-            tables: {
-              tool_audits: {
-                columns: { run_id: "text", analyzed_tool: "text", status: "text", issue_number: "integer" },
-                primaryKey: ["run_id"],
-                rows: audits
-              },
-              tools: {
-                columns: { analyzed_tool: "text", status: "text", issue_number: "integer", last_run_id: "text" },
-                primaryKey: ["analyzed_tool"],
-                rows: [...latestByTool.values()].map(audit => ({
-                  analyzed_tool: audit.analyzed_tool,
-                  status: audit.status,
-                  issue_number: audit.issue_number,
-                  last_run_id: audit.run_id
-                }))
-              }
-            }
-          };
       max-record-kb: 4
       max-patch-kb: 10
   cli-proxy: true
@@ -581,17 +550,22 @@ If you emitted any actionable safe outputs, do not emit `noop`.
 {"noop": {"message": "No actionable concurrency issues found in <tool_name>; analysis completed and cache state updated."}}
 ```
 
-After the safe output, query the replay projection at `/tmp/gh-aw/ledgers/concurrency-audits/ledger.db` for this run ID:
+After the safe output, query the generic records projection at `/tmp/gh-aw/ledgers/concurrency-audits/ledger.db` for this run ID:
 
 ```sql
-SELECT run_id, analyzed_tool, status, issue_number FROM tool_audits
-WHERE run_id = '${{ github.run_id }}'
+SELECT json_extract(payload, '$.run_id') AS run_id,
+       json_extract(payload, '$.analyzed_tool') AS analyzed_tool,
+       json_extract(payload, '$.status') AS status,
+       json_extract(payload, '$.issue_number') AS issue_number
+FROM records
+WHERE json_extract(payload, '$.record_type') = 'mcp_concurrency_audit'
+  AND json_extract(payload, '$.run_id') = '${{ github.run_id }}'
 LIMIT 1;
 ```
 
-If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
 If absent, submit one `ledger_append` record with `record_type: mcp_concurrency_audit`. Include only the run ID, analyzed tool, status, and issue number if one was created; do not store code or raw analysis notes. Do not edit ledger branches directly.
-Use `tools` for the latest audit status per analyzed tool; use `records` for immutable event history.
+For the latest audit status per analyzed tool, filter `records` by
+`json_extract(payload, '$.analyzed_tool')` and order by `ordinal DESC LIMIT 1`.
 
 ## Concurrency Analysis Best Practices
 

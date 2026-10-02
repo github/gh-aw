@@ -225,28 +225,8 @@ describe("selectSources", () => {
     expect(selectSources(loaded, config).sources).toEqual(shardIds().slice(1));
   });
 
-  it("runs a configured selection script in an isolated worker", () => {
-    const config = parseCompactionConfig(encodeConfig({ script: "return { sources: segments.slice(-2).map(segment => segment.id).reverse() }" }));
-    writeSegments(4);
-    expect(selectSources(loadSegments(sourceDir, config), config).sources).toEqual(shardIds().slice(-2));
-  });
-
-  it.each([
-    ["unknown segment ids", "return { sources: ['00000000-0000-4000-8000-000000000000', segments[0].id] }"],
-    ["a single segment", "return { sources: [segments[0].id] }"],
-    ["unexpected output keys", "return { sources: [segments[0].id, segments[1].id], command: 'push' }"],
-  ])("rejects a selection script returning %s", (_name, script) => {
-    const config = parseCompactionConfig(encodeConfig({ script }));
-    writeSegments(3);
-    expect(() => selectSources(loadSegments(sourceDir, config), config)).toThrow(TypeError);
-  });
-
-  it("denies the selection script access to process and dynamic code", () => {
-    writeSegments(3);
-    for (const script of ["return { sources: process.env }", "return { sources: Function('return 1')() }", "return { sources: require('fs') }"]) {
-      const config = parseCompactionConfig(encodeConfig({ script }));
-      expect(() => selectSources(loadSegments(sourceDir, config), config)).toThrow("Ledger compaction script failed");
-    }
+  it.each(["", "return { sources: [] }", "return { sources: segments.slice(-2).map(segment => segment.id) }"])("rejects custom selection scripts: %s", script => {
+    expect(() => parseCompactionConfig(encodeConfig({ script }))).toThrow("Invalid ledger compaction policy");
   });
 });
 

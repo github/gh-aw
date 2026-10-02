@@ -113,30 +113,29 @@ Write the current advisory IDs to `/tmp/gh-aw/repo-memory/default/vuln-baseline.
 - **Engine restriction** — `repo-memory` requires Claude or a custom engine; it is **not available** for the Copilot engine
 - **Baseline schema** — store only stable identifiers (advisory ID strings), not mutable fields like severity, to avoid false "new" alerts when metadata changes
 
-## Append-only Event History (repo-memory ledger; experimental)
+## Append-only Event History (standalone ledger; experimental)
 
-Use the repo-memory ledger when a workflow needs a durable event log rather than
+Use a standalone ledger when a workflow needs a durable event log rather than
 a replaceable baseline: for example, a low-volume audit that appends one
 structured result per run and queries prior results by a stable event key.
-Configure it alongside repo-memory:
+Configure a built-in log independently of repo-memory:
 
 ```yaml
 tools:
-  repo-memory:
-    branch-name: memory/audit-history
-    ledger:
+  ledger:
+    audit-history:
+      type: log
       compaction:
         min-segments: 32
         max-segments: 32
 ```
 
-At the start of a run, use `ledger_query` or `ledger_get` to inspect relevant
-records; after the result is complete, use `ledger_append` to add an immutable
-record with an explicit timestamp and stable domain key. Use
-`ledger_status` to inspect malformed or incomplete records. Never modify ledger
-shards directly. When concurrent runs can report the same event, deduplicate
-and resolve conflicts using deterministic application rules; the ledger
-converges after branch merges but does not provide transactions.
+At the start of a run, query the read-only SQLite `state` or `records` tables at
+`/tmp/gh-aw/ledgers/audit-history/ledger.db`. After the result is complete,
+submit `ledger_append` with `operation: append` and a `value` containing a
+stable domain key. The response confirms queuing; records become durable only
+after `push_ledger_changes` succeeds. Never modify SQLite or ledger shards
+directly. Use stable application keys to identify duplicate events.
 
-For shard/record/query limits, compaction behavior, and the Cloud Hypervisor
-isolation model, see [memory.md](memory.md#structured-event-history-repo-memory-ledger-experimental).
+For built-in types, script restrictions, and persistence behavior, see
+[memory.md](memory.md#structured-event-history-standalone-ledger-experimental).

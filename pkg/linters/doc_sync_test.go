@@ -39,6 +39,7 @@ var notYetEnforced = map[string]string{
 	"sprintferrdot":               "has not yet completed an enforcement-readiness audit",
 	"ssljson":                     "has not yet completed an enforcement-readiness audit",
 	"stringsconcatloop":           "has not yet completed an enforcement-readiness audit",
+	"typeassertionnil":            "needs a cross-platform enforcement-readiness audit before CI enables it",
 	"typeassertionokdiscarded":    "existing production violations need remediation before enforcement; nolint suppression already works",
 	"uncheckedsliceindex":         "existing production violations need remediation before enforcement; nolint suppression already works",
 }

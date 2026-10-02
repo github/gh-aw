@@ -26,12 +26,12 @@ func TestLedgerCompactionConfigParsing(t *testing.T) {
 
 	t.Run("supports per-ledger policies and opt-out", func(t *testing.T) {
 		config, err := parseLedgerToolConfig(map[string]any{
-			"findings": map[string]any{"compaction": map[string]any{"schedule": "weekly", "min-segments": 4, "script": "return { sources: [] }"}},
+			"findings": map[string]any{"compaction": map[string]any{"schedule": "weekly", "min-segments": 4}},
 			"metrics":  map[string]any{"compaction": false},
 		})
 		require.NoError(t, err)
 		require.Len(t, config.Ledgers, 2)
-		assert.Equal(t, &LedgerCompactionConfig{Schedule: "weekly", MinSegments: 4, MaxSegments: 128, Script: "return { sources: [] }"}, config.Ledgers[0].Compaction)
+		assert.Equal(t, &LedgerCompactionConfig{Schedule: "weekly", MinSegments: 4, MaxSegments: 128}, config.Ledgers[0].Compaction)
 		assert.Nil(t, config.Ledgers[1].Compaction)
 		enabled := config.compactionEnabledLedgers()
 		require.Len(t, enabled, 1)
@@ -61,6 +61,7 @@ func TestLedgerCompactionConfigParsing(t *testing.T) {
 		"unknown property":   map[string]any{"command": "git push"},
 		"expression script":  map[string]any{"script": "return ${{ secrets.TOKEN }}"},
 		"empty script":       map[string]any{"script": " "},
+		"valid script":       map[string]any{"script": "return { sources: [] }"},
 		"non-object setting": "daily",
 	} {
 		t.Run("rejects "+name, func(t *testing.T) {
@@ -70,7 +71,7 @@ func TestLedgerCompactionConfigParsing(t *testing.T) {
 	}
 
 	t.Run("excludes compaction policy from the agent-facing ledger config", func(t *testing.T) {
-		config, err := parseLedgerToolConfig(map[string]any{"findings": map[string]any{"compaction": map[string]any{"script": "return { sources: [] }"}}})
+		config, err := parseLedgerToolConfig(map[string]any{"findings": map[string]any{"compaction": map[string]any{"schedule": "weekly"}}})
 		require.NoError(t, err)
 		encoded, err := encodeLedgerConfigBase64(config)
 		require.NoError(t, err)
@@ -109,7 +110,7 @@ func TestLedgerRequestCompactionHandlerConfig(t *testing.T) {
 
 func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	findings, err := parseLedgerToolConfig(map[string]any{
-		"findings": map[string]any{"compaction": map[string]any{"script": "return { sources: [] }"}},
+		"findings": map[string]any{"compaction": map[string]any{"schedule": "daily"}},
 		"metrics":  map[string]any{"compaction": false},
 	})
 	require.NoError(t, err)
