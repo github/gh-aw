@@ -565,6 +565,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 	if !result.GroupReports && importedConfig.GroupReports {
 		result.GroupReports = true
 	}
+	if !result.DynamicCheckout && importedConfig.DynamicCheckout {
+		result.DynamicCheckout = true
+	}
 	if result.ReportFailureAsIssue == nil && importedConfig.ReportFailureAsIssue != nil {
 		result.ReportFailureAsIssue = importedConfig.ReportFailureAsIssue
 		result.ReportFailureAsIssueCategories = importedConfig.ReportFailureAsIssueCategories

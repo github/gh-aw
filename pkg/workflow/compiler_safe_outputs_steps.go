@@ -76,6 +76,15 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 		steps = append(steps, checkoutMgr.GenerateSafeOutputCheckoutAppTokenSteps(c, resolveCheckoutAppTokenPermissions(data))...)
 	}
 
+	// dynamic-checkout: the handlers initialize the target repositories themselves
+	// (dynamic_checkout.cjs materializeRepo) using the PR token passed via GITHUB_TOKEN,
+	// so no actions/checkout step (and no persisted checkout credential) is emitted.
+	// App-token minting steps above are kept because the token expression may reference them.
+	if data.SafeOutputs != nil && data.SafeOutputs.DynamicCheckout {
+		consolidatedSafeOutputsStepsLog.Print("dynamic-checkout enabled: skipping actions/checkout and git credential steps")
+		return steps
+	}
+
 	// Default workspace checkout (identical to the agent job). Skipped when
 	// permissions.contents: none signals a target-only checkout (see
 	// Compiler.shouldAddCheckoutStep for the equivalent agent-job gating); the
@@ -528,7 +537,9 @@ func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData
 		// Only override GITHUB_TOKEN when a custom token (app or PAT) is explicitly configured.
 		// When no custom token is set, the default repo-scoped GITHUB_TOKEN from GitHub Actions
 		// is already in the environment and overriding it with the same default is unnecessary.
-		if isCustom {
+		// With dynamic-checkout, the handlers have no checkout credential to fall back on, so
+		// the resolved token is always exposed.
+		if isCustom || data.SafeOutputs.DynamicCheckout {
 			//nolint:gosec // G101: False positive - this is a GitHub Actions expression template, not a hardcoded credential
 			*steps = append(*steps, fmt.Sprintf("          GITHUB_TOKEN: %s\n", gitToken))
 			consolidatedSafeOutputsStepsLog.Printf("Adding GITHUB_TOKEN env var for cross-repo git CLI operations")

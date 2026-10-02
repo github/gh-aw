@@ -12431,6 +12431,12 @@
           "default": false,
           "examples": [false, true]
         },
+        "dynamic-checkout": {
+          "type": "boolean",
+          "description": "When true, the safe_outputs job does not run actions/checkout for create-pull-request / push-to-pull-request-branch. Instead, the handlers initialize a fresh repository under RUNNER_TEMP for each target repository and fetch only the refs they need (base branch, PR branch, bundle prerequisites). Checkout options that only actions/checkout honors (lfs, submodules, sparse-checkout, extra fetch refs, path layout) do not apply to the safe_outputs job in this mode. Defaults to false.",
+          "default": false,
+          "examples": [false, true]
+        },
         "report-failure-as-issue": {
           "oneOf": [
             {

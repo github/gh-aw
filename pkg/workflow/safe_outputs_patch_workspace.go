@@ -115,3 +115,19 @@ func injectCheckoutMapping(handlerName string, handlerCfg map[string]any, data *
 	handlerCfg["checkout_mapping"] = mapping
 	patchWorkspaceLog.Printf("Injected checkout_mapping for handler=%s: %d entries", handlerName, len(mapping))
 }
+
+// injectDynamicCheckout marks create_pull_request / push_to_pull_request_branch handler
+// configs with dynamic_checkout when safe-outputs.dynamic-checkout is enabled. In that mode
+// the safe_outputs job has no actions/checkout layout, so checkout_mapping is dropped and
+// the handlers materialize each target repository themselves.
+func injectDynamicCheckout(handlerName string, handlerCfg map[string]any, data *WorkflowData) {
+	if handlerCfg == nil || data == nil || data.SafeOutputs == nil || !data.SafeOutputs.DynamicCheckout {
+		return
+	}
+	if handlerName != "create_pull_request" && handlerName != "push_to_pull_request_branch" {
+		return
+	}
+	handlerCfg["dynamic_checkout"] = true
+	delete(handlerCfg, "checkout_mapping")
+	patchWorkspaceLog.Printf("Injected dynamic_checkout for handler=%s", handlerName)
+}

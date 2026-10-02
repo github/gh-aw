@@ -474,6 +474,25 @@ Fork-backed `create-pull-request` is different: upstream pull request management
 This applies to the git checkout used by the handlers' `fetch`/`push`. The GitHub API calls each handler makes still honor that handler's own `github-token` precedence.
 :::
 
+### Dynamic checkout (`dynamic-checkout:`)
+
+By default, the `safe_outputs` job runs `actions/checkout` with `persist-credentials: true` and a "Configure Git credentials" step, so the handlers can `git fetch` and `git push`. Set `dynamic-checkout: true` to skip both steps:
+
+```yaml wrap
+safe-outputs:
+  dynamic-checkout: true
+  create-pull-request:
+  push-to-pull-request-branch:
+```
+
+With dynamic checkout, `create-pull-request` and `push-to-pull-request-branch` create a minimal repository for each target under `$RUNNER_TEMP/gh-aw/dynamic-checkout/<owner>/<repo>`:
+
+- `create-pull-request` fetches only the base branch with `--depth=1`.
+- `push-to-pull-request-branch` uses a blobless partial clone.
+- The checkout token (same precedence as above) is stored only in that temporary repository's local git config, never in `$GITHUB_WORKSPACE`.
+
+This avoids credential issues with persisted checkouts on self-hosted runners and keeps the workspace credential-free. The following are not supported with dynamic checkout: Git LFS, submodules, sparse checkout, extra `fetch:` refs from `checkout:`, and custom `safe-outputs.steps` that expect the repository to be checked out in the workspace.
+
 ## Add Reviewer (`add-reviewer:`)
 
 Adds reviewers to pull requests. Specify `allowed-reviewers` to restrict to specific GitHub usernames and `allowed-team-reviewers` to restrict to specific team slugs.

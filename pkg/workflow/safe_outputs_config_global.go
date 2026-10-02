@@ -171,6 +171,14 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 		}
 	}
 
+	// Handle dynamic-checkout flag
+	if dynamicCheckout, exists := outputMap["dynamic-checkout"]; exists {
+		if dynamicCheckoutBool, ok := dynamicCheckout.(bool); ok {
+			config.DynamicCheckout = dynamicCheckoutBool
+			safeOutputsConfigLog.Printf("Dynamic checkout: %t", dynamicCheckoutBool)
+		}
+	}
+
 	// Handle report-failure-as-issue as templatable bool or array of categories.
 	if reportFailureAsIssue, exists := outputMap["report-failure-as-issue"]; exists {
 		// Support []any category filters.

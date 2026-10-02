@@ -327,6 +327,35 @@ func TestInjectCheckoutMappingForWildcardTargetRepo(t *testing.T) {
 	})
 }
 
+func TestInjectDynamicCheckout(t *testing.T) {
+	t.Run("marks PR handlers and drops checkout_mapping", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{DynamicCheckout: true}}
+		for _, handlerName := range []string{"create_pull_request", "push_to_pull_request_branch"} {
+			handlerCfg := map[string]any{"checkout_mapping": map[string]string{"a/b": "b"}}
+			injectDynamicCheckout(handlerName, handlerCfg, data)
+			assert.Equal(t, true, handlerCfg["dynamic_checkout"], "%s: dynamic_checkout should be true", handlerName)
+			_, hasMapping := handlerCfg["checkout_mapping"]
+			assert.False(t, hasMapping, "%s: checkout_mapping should be removed", handlerName)
+		}
+	})
+
+	t.Run("no-op when flag is unset", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{}}
+		handlerCfg := map[string]any{}
+		injectDynamicCheckout("create_pull_request", handlerCfg, data)
+		_, ok := handlerCfg["dynamic_checkout"]
+		assert.False(t, ok, "dynamic_checkout should not be injected when disabled")
+	})
+
+	t.Run("skips unrelated handlers", func(t *testing.T) {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{DynamicCheckout: true}}
+		handlerCfg := map[string]any{}
+		injectDynamicCheckout("create_issue", handlerCfg, data)
+		_, ok := handlerCfg["dynamic_checkout"]
+		assert.False(t, ok, "dynamic_checkout should not be injected for unrelated handlers")
+	})
+}
+
 func TestHandlerConfigInjectsCurrentCheckoutPatchWorkspacePath(t *testing.T) {
 	compiler := NewCompiler()
 	workflowData := &WorkflowData{

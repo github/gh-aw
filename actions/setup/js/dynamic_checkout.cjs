@@ -214,8 +214,103 @@ function createCheckoutManager(token, options = {}) {
   };
 }
 
+/**
+ * Cache of repositories materialized by materializeRepo in this process, keyed by
+ * lowercase repo slug, so multiple messages targeting the same repository reuse it.
+ * @type {Map<string, string>}
+ */
+const materializedRepos = new Map();
+
+/**
+ * Initialize (or reuse) a standalone git repository for `repoSlug` under RUNNER_TEMP,
+ * without actions/checkout. Used when safe-outputs.dynamic-checkout is enabled.
+ *
+ * The repository gets an `origin` remote, a local git identity, and a local
+ * http.<server>/.extraheader credential built from `token`, scoped to this temp
+ * repository only (never the workspace). When `baseBranch` is provided, it is
+ * shallow-fetched and checked out so HEAD points at a commit.
+ *
+ * @param {string} repoSlug - Repository slug (owner/repo)
+ * @param {string} token - Token used to authenticate fetch/push for this repository
+ * @param {Object} [options]
+ * @param {string} [options.baseBranch] - Branch to shallow-fetch and check out
+ * @param {boolean} [options.partialClone] - Configure origin as a blob:none promisor remote on first init
+ * @param {string} [options.rootDir] - Override the root directory (defaults to $RUNNER_TEMP/gh-aw/dynamic-checkout)
+ * @returns {Promise<{success: true, path: string, reused: boolean} | {success: false, error: string}>}
+ */
+async function materializeRepo(repoSlug, token, options = {}) {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+
+  const parts = (repoSlug || "").trim().split("/");
+  if (parts.length !== 2 || !/^[A-Za-z0-9_.-]+$/.test(parts[0]) || !/^[A-Za-z0-9_.-]+$/.test(parts[1]) || parts.some(p => p === "." || p === "..")) {
+    return { success: false, error: `${ERR_VALIDATION}: Invalid repository slug: ${repoSlug}. Expected format: owner/repo` };
+  }
+  if (!token) {
+    return { success: false, error: `${ERR_VALIDATION}: dynamic-checkout requires a GitHub token (GITHUB_TOKEN) to fetch ${repoSlug}` };
+  }
+
+  const key = repoSlug.trim().toLowerCase();
+  const rootDir = options.rootDir || path.join(process.env.RUNNER_TEMP || os.tmpdir(), "gh-aw", "dynamic-checkout");
+  const repoDir = path.join(rootDir, ...key.split("/"));
+  const serverUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
+  const gitOpts = { cwd: repoDir };
+
+  try {
+    const reused = materializedRepos.get(key) === repoDir && fs.existsSync(path.join(repoDir, ".git"));
+    if (reused) {
+      core.info(`Reusing dynamic checkout of ${repoSlug} at ${repoDir}`);
+      // Discard state left behind by a previous message (failed am, dirty tree).
+      await exec.exec("git", ["am", "--abort"], { ...gitOpts, ignoreReturnCode: true, silent: true });
+      await exec.exec("git", ["reset", "--hard"], { ...gitOpts, ignoreReturnCode: true, silent: true });
+      await exec.exec("git", ["clean", "-fdx"], { ...gitOpts, ignoreReturnCode: true, silent: true });
+    } else {
+      core.info(`Initializing dynamic checkout of ${repoSlug} at ${repoDir}`);
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.mkdirSync(repoDir, { recursive: true });
+      await exec.exec("git", ["init", "--quiet"], gitOpts);
+      await exec.exec("git", ["remote", "add", "origin", `${serverUrl}/${repoSlug.trim()}.git`], gitOpts);
+      await exec.exec("git", ["config", "--local", "user.email", "github-actions[bot]@users.noreply.github.com"], gitOpts);
+      await exec.exec("git", ["config", "--local", "user.name", "github-actions[bot]"], gitOpts);
+      await exec.exec("git", ["config", "--local", "am.keepcr", "true"], gitOpts);
+      if (options.partialClone) {
+        // Blobless partial clone: full commit/tree history (so ancestry checks work) while
+        // blobs are fetched lazily using the local credential configured below.
+        await exec.exec("git", ["config", "--local", "remote.origin.promisor", "true"], gitOpts);
+        await exec.exec("git", ["config", "--local", "remote.origin.partialclonefilter", "blob:none"], gitOpts);
+      }
+
+      maskSecret(token);
+      const tokenBase64 = Buffer.from(`x-access-token:${token}`).toString("base64");
+      maskSecret(tokenBase64);
+      await gitExecSilent(["config", "--local", `http.${serverUrl}/.extraheader`, `Authorization: basic ${tokenBase64}`], repoDir);
+      materializedRepos.set(key, repoDir);
+    }
+
+    if (options.baseBranch) {
+      const baseBranch = options.baseBranch;
+      core.info(`Fetching base branch ${baseBranch} for ${repoSlug}`);
+      try {
+        await exec.exec("git", ["fetch", "--depth=1", "origin", `+refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`], gitOpts);
+      } catch (fetchError) {
+        throw new Error(`${ERR_NOT_FOUND}: Base branch ${baseBranch} could not be fetched from ${repoSlug}: ${getErrorMessage(fetchError)}`);
+      }
+      await exec.exec("git", ["checkout", "--quiet", "-B", baseBranch, `refs/remotes/origin/${baseBranch}`], gitOpts);
+    }
+
+    return { success: true, path: repoDir, reused };
+  } catch (error) {
+    materializedRepos.delete(key);
+    const errorMsg = getErrorMessage(error);
+    core.error(`Failed to materialize repository ${repoSlug}: ${errorMsg}`);
+    return { success: false, error: `Failed to materialize repository ${repoSlug}: ${errorMsg}` };
+  }
+}
+
 module.exports = {
   getCurrentCheckoutRepo,
   checkoutRepo,
   createCheckoutManager,
+  materializeRepo,
 };

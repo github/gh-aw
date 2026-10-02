@@ -104,6 +104,45 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 			},
 		},
 		{
+			name: "dynamic-checkout skips actions/checkout and git credentials",
+			safeOutputs: &SafeOutputsConfig{
+				DynamicCheckout:    true,
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			checkNotContains: []string{
+				"actions/checkout@",
+				"persist-credentials",
+				"Configure Git credentials",
+				"configure_git_credentials.sh",
+			},
+		},
+		{
+			name: "dynamic-checkout keeps safe-output checkout app token minting",
+			safeOutputs: &SafeOutputsConfig{
+				DynamicCheckout: true,
+				CreatePullRequests: &CreatePullRequestsConfig{
+					TargetRepoSlug: "org/target-repo",
+				},
+			},
+			checkoutConfigs: []*CheckoutConfig{
+				{
+					Repository: "org/target-repo",
+					Path:       "./target-repo",
+					SafeOutputGitHubApp: &GitHubAppConfig{
+						AppID:      "12345",
+						PrivateKey: "test-key",
+					},
+				},
+			},
+			checkContains: []string{
+				"id: checkout-safe-output-app-token-0",
+			},
+			checkNotContains: []string{
+				"actions/checkout@",
+				"Configure Git credentials",
+			},
+		},
+		{
 			name:      "trial mode with target repo",
 			trialMode: true,
 			trialRepo: "org/trial-repo",
@@ -301,7 +340,9 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 
 			steps := compiler.buildSharedPRCheckoutSteps(workflowData)
 
-			require.NotEmpty(t, steps)
+			if tt.safeOutputs == nil || !tt.safeOutputs.DynamicCheckout {
+				require.NotEmpty(t, steps)
+			}
 
 			stepsContent := strings.Join(steps, "")
 

@@ -75,6 +75,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 			}
 			injectCurrentCheckoutPatchWorkspacePath(handlerName, handlerConfig, data)
 			injectCheckoutMapping(handlerName, handlerConfig, data)
+			injectDynamicCheckout(handlerName, handlerConfig, data)
 			// Augment protected-files protection with engine-specific files for handlers that use it.
 			if _, hasProtected := handlerConfig["protected_files"]; hasProtected {
 				// Extract per-handler exclusions set by the handler builder (sentinel key).

@@ -23,6 +23,7 @@ const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
 const { ensureFullHistoryForBundle, extractBundlePrerequisiteCommits, isShallowOrSparseCheckout, linearizeRangeAsCommit, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
 const { extractPatchBaseCommit } = require("./commit_sha_helpers.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
+const { materializeRepo } = require("./dynamic_checkout.cjs");
 const { getThreatWarningPresentation } = require("./threat_detection_warning.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
@@ -646,7 +647,17 @@ async function main(config = {}) {
     /** @type {any} */
     let repoCwd = undefined;
     const workflowRepo = process.env.GITHUB_REPOSITORY || "";
-    if (itemRepo.toLowerCase() !== workflowRepo.toLowerCase()) {
+    if (config.dynamic_checkout === true) {
+      // dynamic-checkout: no actions/checkout ran in this job; initialize the target
+      // repository on demand. The PR branch itself is fetched below, so only an empty
+      // blobless repository with origin + credentials is needed here.
+      const materializeResult = await materializeRepo(itemRepo, process.env.GITHUB_TOKEN || "", { partialClone: true });
+      if (!materializeResult.success) {
+        return { success: false, error: materializeResult.error };
+      }
+      repoCwd = materializeResult.path;
+      core.info(`Using dynamic checkout for ${itemRepo} at: ${repoCwd}`);
+    } else if (itemRepo.toLowerCase() !== workflowRepo.toLowerCase()) {
       core.info(`Cross-repo push: looking for checkout of ${itemRepo}`);
       // First try the checkout mapping (faster than scanning the workspace)
       const checkoutMappingConfig = config.checkout_mapping || null;

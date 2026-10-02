@@ -361,3 +361,111 @@ describe("getCurrentCheckoutRepo URL parsing", () => {
     expect(result).toBe("owner/repo");
   });
 });
+
+describe("materializeRepo (real git)", () => {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+  const { spawnSync } = require("child_process");
+  const { materializeRepo } = require("./dynamic_checkout.cjs");
+
+  let tmp;
+  let originalExec;
+  let originalCore;
+  let originalServerUrl;
+
+  const git = (args, cwd) => {
+    const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+
+  const realExec = {
+    exec: vi.fn(async (cmd, args, opts = {}) => {
+      const r = spawnSync(cmd, args, { cwd: opts.cwd, env: opts.env, encoding: "utf8" });
+      if (r.status !== 0 && !opts.ignoreReturnCode) throw new Error(`${cmd} ${args.join(" ")} failed: ${r.stderr}`);
+      return r.status;
+    }),
+    getExecOutput: vi.fn(async (cmd, args, opts = {}) => {
+      const r = spawnSync(cmd, args, { cwd: opts.cwd, env: opts.env, encoding: "utf8" });
+      if (r.status !== 0 && !opts.ignoreReturnCode) throw new Error(`${cmd} ${args.join(" ")} failed: ${r.stderr}`);
+      return { stdout: r.stdout, stderr: r.stderr, exitCode: r.status };
+    }),
+  };
+
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-materialize-"));
+    // Remote layout: <tmp>/server/<owner>/<repo>.git so GITHUB_SERVER_URL=file://<tmp>/server resolves it.
+    const work = path.join(tmp, "work");
+    fs.mkdirSync(work);
+    git(["init", "-q", "-b", "main"], work);
+    for (const n of ["1", "2"]) {
+      fs.writeFileSync(path.join(work, `f${n}.txt`), n);
+      git(["add", "."], work);
+      git(["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", `c${n}`], work);
+    }
+    const bare = path.join(tmp, "server", "octo", "demo.git");
+    fs.mkdirSync(path.dirname(bare), { recursive: true });
+    git(["clone", "-q", "--bare", work, bare]);
+    git(["--git-dir", bare, "config", "uploadpack.allowFilter", "true"]);
+
+    originalExec = global.exec;
+    originalCore = global.core;
+    originalServerUrl = process.env.GITHUB_SERVER_URL;
+    global.exec = realExec;
+    global.core = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), debug: vi.fn(), setSecret: vi.fn() };
+    process.env.GITHUB_SERVER_URL = `file://${path.join(tmp, "server")}`;
+  });
+
+  afterEach(() => {
+    global.exec = originalExec;
+    global.core = originalCore;
+    if (originalServerUrl === undefined) delete process.env.GITHUB_SERVER_URL;
+    else process.env.GITHUB_SERVER_URL = originalServerUrl;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("initializes a shallow checkout of the base branch with local identity and credential", async () => {
+    const rootDir = path.join(tmp, "dyn");
+    const result = await materializeRepo("octo/demo", "tok-123", { baseBranch: "main", rootDir });
+    expect(result.success).toBe(true);
+    expect(result.path).toBe(path.join(rootDir, "octo", "demo"));
+    expect(fs.readFileSync(path.join(result.path, "f2.txt"), "utf8")).toBe("2");
+    expect(git(["rev-parse", "--abbrev-ref", "HEAD"], result.path)).toBe("main");
+    expect(git(["rev-parse", "--is-shallow-repository"], result.path)).toBe("true");
+    expect(git(["config", "--local", "user.name"], result.path)).toBe("github-actions[bot]");
+    const header = git(["config", "--local", "--get", `http.${process.env.GITHUB_SERVER_URL}/.extraheader`], result.path);
+    expect(header).toBe(`Authorization: basic ${Buffer.from("x-access-token:tok-123").toString("base64")}`);
+    expect(global.core.setSecret).toHaveBeenCalledWith("tok-123");
+  });
+
+  it("reuses and cleans an existing materialized repository", async () => {
+    const rootDir = path.join(tmp, "dyn");
+    const first = await materializeRepo("octo/demo", "tok", { baseBranch: "main", rootDir });
+    fs.writeFileSync(path.join(first.path, "junk.txt"), "x");
+    const second = await materializeRepo("OCTO/demo", "tok", { baseBranch: "main", rootDir });
+    expect(second.success).toBe(true);
+    expect(second.reused).toBe(true);
+    expect(fs.existsSync(path.join(second.path, "junk.txt"))).toBe(false);
+  });
+
+  it("configures a blobless promisor remote when partialClone is set", async () => {
+    const rootDir = path.join(tmp, "dyn-partial");
+    const result = await materializeRepo("octo/other", "tok", { partialClone: true, rootDir });
+    expect(result.success).toBe(true);
+    expect(git(["config", "--local", "remote.origin.partialclonefilter"], result.path)).toBe("blob:none");
+    expect(git(["config", "--local", "remote.origin.promisor"], result.path)).toBe("true");
+  });
+
+  it("fails when the base branch does not exist", async () => {
+    const result = await materializeRepo("octo/demo", "tok", { baseBranch: "missing", rootDir: path.join(tmp, "dyn-missing") });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("missing");
+  });
+
+  it("rejects invalid slugs and missing tokens", async () => {
+    expect((await materializeRepo("../evil", "tok")).success).toBe(false);
+    expect((await materializeRepo("a/..", "tok")).success).toBe(false);
+    expect((await materializeRepo("octo/demo", "")).success).toBe(false);
+  });
+});

@@ -23,7 +23,7 @@ const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { pushExtraEmptyCommit } = require("./extra_empty_commit.cjs");
-const { createCheckoutManager } = require("./dynamic_checkout.cjs");
+const { createCheckoutManager, materializeRepo } = require("./dynamic_checkout.cjs");
 const { closeOlderPullRequests } = require("./close_older_pull_requests.cjs");
 const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getBaseBranch } = require("./get_base_branch.cjs");
@@ -957,7 +957,11 @@ async function main(config = {}) {
   // Multi-repo support: checkout mapping from compile-time checkout: configs.
   // When target-repo: "*" is configured and repos are checked out into subdirectories,
   // the checkout_mapping tells us where each repo lives on disk.
-  const checkoutMapping = config.checkout_mapping || null;
+  const checkoutMapping = config.dynamic_checkout === true ? null : config.checkout_mapping || null;
+
+  // dynamic-checkout: the safe_outputs job ran no actions/checkout, so every target repository
+  // (including the workflow repository) is materialized on demand under RUNNER_TEMP.
+  const dynamicCheckout = config.dynamic_checkout === true;
 
   // Create checkout manager for multi-repo support (fallback when no checkout_mapping)
   // Token is available via GITHUB_TOKEN environment variable (set by the workflow job)
@@ -965,7 +969,12 @@ async function main(config = {}) {
   const checkoutManager = checkoutToken ? createCheckoutManager(checkoutToken, { defaultBaseBranch: configBaseBranch }) : null;
 
   // Log multi-repo support status
-  if (checkoutMapping) {
+  if (dynamicCheckout) {
+    core.info(`Dynamic checkout enabled: target repositories are initialized on demand (no actions/checkout)`);
+    if (!checkoutToken) {
+      core.warning(`Dynamic checkout enabled but GITHUB_TOKEN is not available; repository materialization will fail`);
+    }
+  } else if (checkoutMapping) {
     core.info(`Multi-repo support enabled via checkout mapping: ${Object.keys(checkoutMapping).length} repo(s) mapped`);
   } else if (allowedRepos.size > 0 && checkoutManager) {
     core.info(`Multi-repo support enabled: can switch between repos in allowed-repos list`);
@@ -1140,7 +1149,18 @@ async function main(config = {}) {
     const workflowRepo = process.env.GITHUB_REPOSITORY || "";
     const isTargetingDifferentRepo = itemRepo && itemRepo.toLowerCase() !== workflowRepo.toLowerCase();
 
-    if (isTargetingDifferentRepo && checkoutMapping) {
+    if (dynamicCheckout) {
+      const targetRepoSlug = itemRepo || workflowRepo;
+      // Only pass a base branch that is already in canonical form; invalid names are
+      // rejected with a clear error by the base-branch validation below.
+      const canonicalBaseBranch = baseBranch && normalizeBranchName(baseBranch) === baseBranch ? baseBranch : undefined;
+      const materializeResult = await materializeRepo(targetRepoSlug, checkoutToken || "", { baseBranch: canonicalBaseBranch });
+      if (!materializeResult.success) {
+        return { success: false, error: materializeResult.error };
+      }
+      repoCwd = materializeResult.path;
+      core.info(`Using dynamic checkout for ${targetRepoSlug} at: ${repoCwd}`);
+    } else if (isTargetingDifferentRepo && checkoutMapping) {
       // Use checkout mapping to find the subdirectory for this repo
       const targetLower = itemRepo.toLowerCase();
       const mappedPath = checkoutMapping[targetLower];
