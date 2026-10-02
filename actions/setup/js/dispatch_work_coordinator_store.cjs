@@ -9,11 +9,11 @@ const DEFAULT_MAX_RETRIES = 5;
 
 /**
  * @typedef {
- *   | {kind: "Work", work: string, claim: null, attempt: null}
- *   | {kind: "Claim", work: string, claim: string, attempt: null}
- *   | {kind: "ClaimCancellation", work: string, claim: string, attempt: null}
- *   | {kind: "Completion", work: string, claim: string, attempt: string}
- *   | {kind: "WorkCancellation", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
+ *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
+ *   | {version: number, kind: "WorkCancellation", work: string, claim: null, attempt: null}
  * } CoordinatorTransaction
  */
 
@@ -49,7 +49,7 @@ function isRefConflict(error) {
  * Read the coordinator branch and its canonical transaction log.
  * @param {{githubClient: any, owner: string, repo: string, core?: {info: (message: string) => void}}} options
  */
-async function readCoordinatorLog({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+async function readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
   coreApi?.info("Dispatch coordinator: reading queue branch");
   let head;
   try {
@@ -82,10 +82,21 @@ async function readCoordinatorLog({ githubClient, owner, repo, core: coreApi = t
     const contents = Buffer.from(blob.data.content, "base64").toString("utf8");
     const transactions = parseTransactionLog(contents);
     coreApi?.info(`Dispatch coordinator: read ${transactions.length} queue transactions`);
-    return { sha: head, transactions };
+    return { sha: head, transactions, needsUpgrade: contents !== serializeTransactionLog(transactions) };
   } catch (error) {
     throw new Error("Failed to read dispatch coordinator log", { cause: error });
   }
+}
+
+/**
+ * Activation is read-only; trusted write-capable readers publish upgrades.
+ * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean, core?: {info: (message: string) => void}}} options
+ */
+async function readCoordinatorLog({ githubClient, owner, repo, publishUpgrades = true, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+  const current = await readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi });
+  if (!current.needsUpgrade || !publishUpgrades) return current;
+  const upgraded = await applyAndPublishCoordinatorTransactions({ githubClient, owner, repo, intents: [], core: coreApi });
+  return { sha: upgraded.sha, transactions: upgraded.transactions };
 }
 
 /**
@@ -118,19 +129,20 @@ async function applyAndPublishCoordinatorTransactions({
   coreApi?.info(`Dispatch coordinator: publishing ${intents.length} queue intents`);
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     coreApi?.info(`Dispatch coordinator: queue publication attempt ${attempt + 1} of ${maxRetries + 1}`);
-    const current = await readCoordinatorLog({ githubClient, owner, repo, core: coreApi });
+    const current = await readCoordinatorLogRaw({ githubClient, owner, repo, core: coreApi });
     const applied = applyTransactions(current.transactions, intents);
     coreApi?.info(`Dispatch coordinator: ${applied.transactions.length - current.transactions.length} new transactions, ${applied.rejected.length} rejected intents`);
-    if (applied.transactions.length === current.transactions.length) {
+    if (!current.needsUpgrade && applied.transactions.length === current.transactions.length) {
       coreApi?.info("Dispatch coordinator: queue unchanged; publication skipped");
       return { ...applied, sha: current.sha, persisted: false };
     }
 
     try {
+      const contents = serializeTransactionLog(applied.transactions);
       const blob = await githubClient.rest.git.createBlob({
         owner,
         repo,
-        content: serializeTransactionLog(applied.transactions),
+        content: contents,
         encoding: "utf-8",
       });
       const tree = await githubClient.rest.git.createTree({
@@ -164,7 +176,7 @@ async function applyAndPublishCoordinatorTransactions({
         });
       }
       coreApi?.info(`Dispatch coordinator: queue published ${applied.transactions.length} transactions`);
-      return { ...applied, sha: commit.data.sha, persisted: true };
+      return { ...applied, transactions: parseTransactionLog(contents), sha: commit.data.sha, persisted: true };
     } catch (error) {
       if (!isRefConflict(error)) throw new Error("Failed to publish dispatch coordinator log", { cause: error });
       lastConflict = error;

@@ -25,7 +25,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
 - `fmterrorfnoverbs` — reports `fmt.Errorf` calls whose format string contains no verbs, recommending `errors.New` instead.
-- `fprintferrorunchecked` — reports `fmt.Fprintf`, `fmt.Fprint`, and `fmt.Fprintln` assignments that discard both return values with blank identifiers, potentially silencing write failures.
+- `fprintferrorunchecked` — reports `fmt.Fprintf`, `fmt.Fprint`, and `fmt.Fprintln` assignments that explicitly discard all return values, potentially silencing write failures.
 - `fprintlnsprintf` — reports `fmt.Fprintln(..., fmt.Sprintf(...))` patterns and recommends direct formatting calls.
 - `generatedyamlheredoc` — reports shell heredocs embedded in generated workflow YAML and recommends passing plain environment-variable content to a JavaScript renderer. Run `make golint-custom` to verify that an unsuppressed heredoc in `pkg/workflow` is reported.
 - `globwalkignorederror` — reports `filepath.Glob` and `os.ReadDir` calls where the error return is discarded with `_`.
@@ -129,7 +129,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `fmterrorfnoverbs` | Custom `go/analysis` analyzer that flags `fmt.Errorf` calls with no format verbs, recommending `errors.New` |
-| `fprintferrorunchecked` | Custom `go/analysis` analyzer that flags `fmt.Fprintf`/`Fprint`/`Fprintln` assignments that discard both return values with blank identifiers |
+| `fprintferrorunchecked` | Custom `go/analysis` analyzer that flags `fmt.Fprintf`/`Fprint`/`Fprintln` assignments that explicitly discard all return values |
 | `fprintlnsprintf` | Custom `go/analysis` analyzer that flags `fmt.Fprintln(..., fmt.Sprintf(...))` patterns |
 | `generatedyamlheredoc` | Custom `go/analysis` analyzer that flags shell heredocs embedded in generated workflow YAML |
 | `globwalkignorederror` | Custom `go/analysis` analyzer that flags `filepath.Glob` and `os.ReadDir` calls where the error return is discarded with `_` |
@@ -278,6 +278,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/excessivefuncparams` — excessive-func-params analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/fileclosenotdeferred` — file-close-not-deferred analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/fmterrorfnoverbs` — fmt-errorf-no-verbs analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/fprintferrorunchecked` — unchecked-fprint-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/fprintlnsprintf` — fprintln-sprintf analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/globwalkignorederror` — glob-walk-ignored-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/hardcodedfilepath` — hard-coded-file-path analyzer subpackage
@@ -342,7 +343,7 @@ _ = typeassertionnil.Analyzer
 ## Design Notes
 
 - The package is intentionally organized as a namespace (`pkg/linters/*`) so individual analyzers remain isolated and independently testable.
-- CI currently enforces the `errstringmatch`, `manualmutexunlock`, `panicinlibrarycode`, `osexitinlibrary`, and `rawloginlib` analyzers via `.github/workflows/cgo.yml`.
+- CI currently enforces selected production analyzers, including `fprintferrorunchecked`, via the native and WebAssembly `LINTER_FLAGS` lists in `.github/workflows/cgo.yml`.
 - `typeassertionnil` is registered but excluded from CI enforcement pending a cross-platform enforcement-readiness audit.
 - `excessivefuncparams` exposes a `-max-params` analyzer flag and defaults to `8` parameters (`DefaultMaxParams`).
 - `largefunc` exposes a `-max-lines` analyzer flag, defaults to `60` lines (`DefaultMaxLines`), and skips `_test.go` files.
