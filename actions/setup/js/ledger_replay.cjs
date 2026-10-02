@@ -2,10 +2,6 @@
 "use strict";
 
 const crypto = require("node:crypto");
-const cp = require("node:child_process");
-const path = require("node:path");
-
-const WORKER = path.join(__dirname, "ledger_replay_worker.cjs");
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const RESERVED = new Set(["records", "parents", "shards", "diagnostics", "replay_metadata", "records_by_id", "records_by_type_time", "records_by_shard_offset", "parents_by_parent", "diagnostics_by_code"]);
 const TYPES = new Set(["text", "integer", "real", "boolean", "json"]);
@@ -94,29 +90,6 @@ function validateReplayOutput(output, maxRows = 10000) {
   return tables;
 }
 
-function executeReplay(script, records, config = {}) {
-  if (typeof script !== "string" || !script.trim() || Buffer.byteLength(script) > 65536) throw new TypeError("Invalid replay script");
-  const input = JSON.stringify({ script, records, config });
-  if (Buffer.byteLength(input) > 16 * 1024 * 1024) throw new RangeError("Replay input exceeds size limit");
-  const proc = cp.spawnSync(process.execPath, ["--permission", "--max-old-space-size=256", `--allow-fs-read=${WORKER}`, WORKER], {
-    input,
-    encoding: "utf8",
-    timeout: 6000,
-    maxBuffer: 4 * 1024 * 1024 + 1024,
-    env: {},
-    cwd: "/tmp",
-  });
-  if (proc.error || proc.status !== 0) throw new Error(proc.error && Reflect.get(proc.error, "code") === "ETIMEDOUT" ? "Replay timed out" : "Replay worker failed");
-  let output;
-  try {
-    output = JSON.parse(proc.stdout);
-  } catch {
-    throw new TypeError("Malformed replay output");
-  }
-  validateReplayOutput(output);
-  return output;
-}
-
 function materializeReplay(db, ledgerName, script, records, output, maxRows = 10000) {
   const tables = validateReplayOutput(output, maxRows);
   db.exec("BEGIN");
@@ -147,4 +120,4 @@ function materializeReplay(db, ledgerName, script, records, output, maxRows = 10
   }
 }
 
-module.exports = { executeReplay, materializeReplay, validateReplayOutput };
+module.exports = { materializeReplay, validateReplayOutput };

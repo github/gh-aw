@@ -42,6 +42,7 @@ describe("safe_outputs_tools_loader", () => {
     const register = vi.fn((server, tool) => {
       server.tools[tool.name] = tool;
     });
+
     const normalize = name => name.replace(/-/g, "_");
     const config = { ledger_append: { ledgers: [{ name: "cache", type: "map" }] } };
     registerPredefinedTools(mockServer, tools, config, register, normalize);
@@ -50,6 +51,13 @@ describe("safe_outputs_tools_loader", () => {
     tools[0].handler({ key: "k", ignored: "stripped" });
     expect(handlers.ledgerBuiltinHandler).toHaveBeenCalledWith("map", "put");
     expect(handler).toHaveBeenCalledWith({ key: "k" });
+  });
+
+  it("attaches the notes-aware agent handler to the generic append tool", () => {
+    const ledgerAgentAppendHandler = vi.fn();
+    const tools = attachHandlers([{ name: "ledger_append" }], { defaultHandler: vi.fn(() => vi.fn()), ledgerAgentAppendHandler }, mockServer);
+    tools[0].handler({ ledger: "history", operation: "append", value: "ok" });
+    expect(ledgerAgentAppendHandler).toHaveBeenCalledWith({ ledger: "history", operation: "append", value: "ok" });
   });
 
   describe("loadTools", () => {

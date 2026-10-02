@@ -5491,11 +5491,11 @@
           "x-removal-message": "tools.serena built-in support has been removed. Import shared/mcp/serena.md instead:\n  imports:\n    - uses: shared/mcp/serena.md\n      with:\n        languages: [\"go\", \"typescript\"]"
         },
         "ledger": {
-          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, or counter for trusted built-in replay, or replay.script for custom replay. Tables require key (the string primary-key field). Built-ins accept typed operations via the ledger append safe output. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
+          "description": "Standalone Git-backed ledger configuration. Declare type: log, set, map, table, counter, or notes for trusted built-in replay. Custom replay and compaction scripts are not supported. Tables require key (the string primary-key field). Built-ins accept typed operations via the configured ledger safe-output tools. Each ledger may set compaction; compaction is lossless and preserves all source transactions.",
           "type": "object",
           "properties": {
             "type": {
-              "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter"] }, { "type": "object" }],
+              "oneOf": [{ "type": "string", "enum": ["log", "set", "map", "table", "counter", "notes"] }, { "type": "object" }],
               "description": "Built-in ledger reducer type, or a named object-valued ledger."
             },
             "key": {
@@ -5503,6 +5503,45 @@
               "description": "Table primary-key field, or a named object-valued ledger."
             }
           },
+          "allOf": [
+            {
+              "if": {
+                "anyOf": [
+                  { "required": ["schema"] },
+                  { "required": ["max-record-kb"] },
+                  { "required": ["max-segment-kb"] },
+                  { "required": ["max-patch-kb"] },
+                  { "required": ["type"], "properties": { "type": { "type": "string" } } },
+                  { "required": ["key"], "properties": { "key": { "type": "string" } } },
+                  {
+                    "required": ["compaction"],
+                    "properties": {
+                      "compaction": {
+                        "anyOf": [
+                          { "type": "boolean" },
+                          {
+                            "type": "object",
+                            "anyOf": [{ "required": ["schedule"] }, { "required": ["min-segments"] }, { "required": ["max-segments"] }, { "required": ["script"] }]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "required": ["replay"],
+                    "properties": {
+                      "replay": {
+                        "type": "object",
+                        "anyOf": [{ "required": ["script"] }, { "required": ["config"] }]
+                      }
+                    }
+                  }
+                ]
+              },
+              "then": { "$ref": "#/$defs/ledgerScriptRestrictions" },
+              "else": { "additionalProperties": { "$ref": "#/$defs/ledgerScriptRestrictions" } }
+            }
+          ],
           "additionalProperties": true
         },
         "repo-memory": {
@@ -13755,6 +13794,23 @@
     }
   ],
   "$defs": {
+    "ledgerScriptRestrictions": {
+      "type": "object",
+      "properties": {
+        "replay": {
+          "not": {},
+          "description": "Removed. Use a built-in ledger type instead of custom replay."
+        },
+        "compaction": {
+          "properties": {
+            "script": {
+              "not": {},
+              "description": "Removed. Use the built-in compaction policy."
+            }
+          }
+        }
+      }
+    },
     "repoMemoryLedger": {
       "type": ["object", "null"],
       "description": "Experimental. Enable the repo-memory ledger projection, optionally validated against a repository-relative JSON schema. Ledger workflows require AWF Cloud Hypervisor filesystem isolation. Using this field emits a compile-time warning.",

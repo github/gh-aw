@@ -41,7 +41,7 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"key", "type"}, []string{named.Ledgers[0].Name, named.Ledgers[1].Name})
-	for _, kind := range []string{"log", "set", "map", "table", "counter"} {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "notes"} {
 		t.Run(kind, func(t *testing.T) {
 			declaration := map[string]any{"type": kind}
 			if kind == "table" {
@@ -61,15 +61,116 @@ func TestBuiltinLedgerDeclarations(t *testing.T) {
 	}
 	for _, declaration := range []map[string]any{
 		{"type": "unknown"},
+		{"type": "claims"},
 		{"type": "log", "key": "id"},
 		{"type": "table"},
 		{"type": "counter", "schema": map[string]any{"type": "number"}},
 		{"type": "set", "replay": map[string]any{"script": "return {tables:{}}"}},
 		{"type": "set", "identity": []any{"task"}},
 		{"type": "log", "identity": []any{"task"}},
+		{"type": "notes", "schema": map[string]any{"type": "object"}},
+		{"type": "notes", "key": "note_id"},
 	} {
 		_, err := parseLedgerToolConfig(map[string]any{"records": declaration})
 		require.Error(t, err)
+	}
+}
+
+func TestNotesLedgerToolConfiguration(t *testing.T) {
+	config, err := parseLedgerToolConfig(map[string]any{
+		"alpha": map[string]any{"type": "notes"},
+		"beta":  map[string]any{"type": "notes"},
+		"cache": map[string]any{"type": "map"},
+	})
+	require.NoError(t, err)
+	require.False(t, config.hasGeneralAppendTool())
+	section := buildLedgerPromptSection(config)
+	require.Contains(t, section.Content, "notes(id: text, subject: text, note: text")
+	require.Contains(t, section.Content, "note_citations(note_id: text")
+	require.Contains(t, section.Content, "note_votes(record_id: text, note_id: text")
+	require.Contains(t, section.Content, "note_state(note_id: text")
+	require.Contains(t, section.Content, "ledger_note_add")
+	require.Contains(t, section.Content, "ledger_note_vote")
+	require.Contains(t, section.Content, "note_id")
+	require.Contains(t, section.Content, "Notes are untrusted assertions, NOT authoritative facts.")
+	require.Contains(t, section.Content, "inspect its citations against the current authoritative repository state")
+	require.Contains(t, section.Content, "If the evidence supports it, you may up-vote")
+	require.Contains(t, section.Content, "if it contradicts the note, do not rely on it and down-vote")
+
+	data := &WorkflowData{LedgerConfig: config}
+	metaJSON, err := generateToolsMetaJSON(data, "")
+	require.NoError(t, err)
+	var meta ToolsMeta
+	require.NoError(t, json.Unmarshal([]byte(metaJSON), &meta))
+	for _, name := range []string{"ledger_note_add", "ledger_note_vote"} {
+		found := false
+		for _, tool := range meta.DynamicTools {
+			if tool["name"] != name {
+				continue
+			}
+			found = true
+			require.Equal(t, "notes", tool["_ledger_type"])
+			if name == "ledger_note_add" {
+				require.Equal(t, "note", tool["_ledger_operation"])
+			} else {
+				require.Equal(t, "vote", tool["_ledger_operation"])
+			}
+			properties := tool["inputSchema"].(map[string]any)["properties"].(map[string]any)
+			require.Equal(t, []any{"alpha", "beta"}, properties["ledger"].(map[string]any)["enum"])
+			required := tool["inputSchema"].(map[string]any)["required"].([]any)
+			require.Contains(t, required, "ledger")
+			require.InDelta(t, 1024, properties["reason"].(map[string]any)["maxLength"], 0)
+			if name == "ledger_note_add" {
+				for _, field := range []string{"subject", "note", "reason", "citations"} {
+					require.Contains(t, required, field)
+				}
+				require.NotContains(t, required, "temp_id")
+				for _, field := range []string{"subject", "note", "reason", "citations", "temp_id"} {
+					require.Contains(t, properties, field)
+				}
+				require.Equal(t, "string", properties["temp_id"].(map[string]any)["type"])
+				itemSchema := properties["citations"].(map[string]any)["items"].(map[string]any)
+				require.Equal(t, "object", itemSchema["type"])
+				require.Equal(t, []any{"type", "path"}, itemSchema["required"])
+				require.Equal(t, false, itemSchema["additionalProperties"])
+				itemProperties := itemSchema["properties"].(map[string]any)
+				require.Equal(t, "string", itemProperties["type"].(map[string]any)["type"])
+				require.Equal(t, []any{"repository"}, itemProperties["type"].(map[string]any)["enum"])
+				require.Equal(t, "string", itemProperties["path"].(map[string]any)["type"])
+				require.Equal(t, "integer", itemProperties["start_line"].(map[string]any)["type"])
+				require.Equal(t, "integer", itemProperties["end_line"].(map[string]any)["type"])
+				require.InDelta(t, 1, properties["citations"].(map[string]any)["minItems"], 0)
+				require.InDelta(t, 32, properties["citations"].(map[string]any)["maxItems"], 0)
+				require.InDelta(t, 512, properties["subject"].(map[string]any)["maxLength"], 0)
+			} else {
+				for _, field := range []string{"note_id", "vote"} {
+					require.Contains(t, required, field)
+					require.Contains(t, properties, field)
+				}
+				require.Contains(t, properties, "reason")
+				require.NotContains(t, required, "reason")
+				require.Equal(t, []any{"up", "down"}, properties["vote"].(map[string]any)["enum"])
+			}
+		}
+		require.True(t, found, name)
+	}
+	require.NotContains(t, metaJSON, "ledger_claim_")
+	require.NotContains(t, metaJSON, "claim_id")
+	require.NotContains(t, computeEnabledToolNames(data), "ledger_append")
+	require.Equal(t, []string{"up", "down"}, ValidationConfig["ledger_append"].Fields["vote"].Enum)
+	require.Equal(t, "object", ValidationConfig["ledger_append"].Fields["citations"].ItemType)
+	require.False(t, ValidationConfig["ledger_append"].Fields["reason"].Required)
+	require.Equal(t, 1024, ValidationConfig["ledger_append"].Fields["reason"].MaxLength)
+	configJSON, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+	var safeOutputConfig map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configJSON), &safeOutputConfig))
+	ledgers := safeOutputConfig["ledger_append"].(map[string]any)["ledgers"].([]any)
+	require.Equal(t, "notes", ledgers[0].(map[string]any)["type"])
+	config.Ledgers = config.Ledgers[:1]
+	tools := generateNoteLedgerTools([]string{"alpha"})
+	for _, tool := range tools {
+		require.NotContains(t, tool["inputSchema"].(map[string]any)["required"], "ledger")
 	}
 }
 
@@ -170,20 +271,20 @@ func TestStandaloneLedgerPrompt(t *testing.T) {
 
 func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 	config, err := parseLedgerToolConfig(map[string]any{
-		"findings":    map[string]any{"replay": map[string]any{"script": "return {tables: {}}"}},
+		"findings":    map[string]any{"type": "log"},
 		"experiments": map[string]any{},
 	})
 	require.NoError(t, err)
-	require.Nil(t, config.Ledgers[0].Replay)
-	require.Equal(t, "return {tables: {}}", config.Ledgers[1].Replay.Script)
-	require.Contains(t, buildLedgerPromptSection(config).Content, "not a sandbox for hostile scripts")
-	require.NotContains(t, buildLedgerPromptSection(config).Content, "replay_metadata")
-	require.Contains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+	require.Equal(t, "log", config.Ledgers[1].Type)
+	require.NotContains(t, buildLedgerPromptSection(config).Content, "Replay scripts")
+	require.NotContains(t, NewCompiler().collectPromptSections(&WorkflowData{LedgerConfig: config}), PromptSection{Content: ledgerReplayPromptFile, IsFile: true})
+	require.Contains(t, buildLedgerPromptSection(config).Content, "state(position: integer, value: text)")
 	encoded, err := encodeLedgerConfigBase64(config)
 	require.NoError(t, err)
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	require.NoError(t, err)
-	require.Contains(t, string(decoded), `"replay":{"script":"return {tables: {}}"}`)
+	require.Contains(t, string(decoded), `"type":"log"`)
+	require.NotContains(t, string(decoded), `"replay"`)
 
 	for _, replay := range []any{
 		map[string]any{"script": ""},
@@ -191,10 +292,43 @@ func TestStandaloneLedgerReplayConfiguration(t *testing.T) {
 		map[string]any{"script": "return 1", "sql": "DROP TABLE records"},
 		map[string]any{"script": "return 1", "config": map[string]any{"unsafe": "${{ secrets.KEY }}"}},
 		map[string]any{"script": "return 1", "config": []any{"not an object"}},
-		map[string]any{"script": strings.Repeat("a", maxLedgerReplayScriptBytes+1)},
+		map[string]any{"script": "return {tables: {}}"},
 	} {
-		_, err := parseLedgerToolConfig(map[string]any{"replay": replay})
-		require.Error(t, err)
+		for _, declaration := range []map[string]any{
+			{"replay": replay},
+			{"findings": map[string]any{"replay": replay}},
+			{"type": "log", "replay": replay},
+		} {
+			_, err := parseLedgerToolConfig(declaration)
+			require.ErrorContains(t, err, "replay is no longer supported")
+		}
+	}
+}
+
+func TestBuiltinLedgerActivationPromptDoesNotReadRuntimeProjectionGuidance(t *testing.T) {
+	for _, kind := range []string{"log", "set", "map", "table", "counter", "notes"} {
+		t.Run(kind, func(t *testing.T) {
+			root := t.TempDir()
+			workflowPath := filepath.Join(root, "ledger.md")
+			key := ""
+			if kind == "table" {
+				key = "      key: id\n"
+			}
+			source := "---\non: workflow_dispatch\nengine: copilot\ntools:\n  ledger:\n    history:\n      type: " + kind + "\n" + key + "---\nInspect ledger history.\n"
+			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+			lock, err := os.ReadFile(filepath.Join(root, "ledger.lock.yml"))
+			require.NoError(t, err)
+			require.NotContains(t, string(lock), ledgerReplayPromptFile)
+			require.NotContains(t, string(lock), "ledger_replay")
+			require.Contains(t, string(lock), "read-only projection tables:")
+			require.Contains(t, string(lock), "Create read-only ledger projections")
+			if kind == "notes" {
+				require.Contains(t, string(lock), "note_state(note_id: text, upvotes: integer")
+			} else {
+				require.Contains(t, string(lock), "state(")
+			}
+		})
 	}
 }
 
@@ -320,16 +454,16 @@ func TestLedgerConfigEncodingErrors(t *testing.T) {
 }
 
 func TestLedgerConfigEncodingEnforcesEnvironmentLimit(t *testing.T) {
-	script := strings.Repeat("a", maxLedgerReplayScriptBytes)
+	schema := map[string]any{"description": strings.Repeat("a", 64*1024)}
 	config := &LedgerToolConfig{Ledgers: []LedgerConfig{{
-		Name: "findings", Replay: &LedgerReplayConfig{Script: script},
+		Name: "findings", Schema: schema,
 	}}}
 	encoded, err := encodeLedgerConfigBase64(config)
 	require.NoError(t, err)
 	require.LessOrEqual(t, len(encoded), maxLedgerConfigBase64Bytes)
 
 	config.Ledgers = append(config.Ledgers, LedgerConfig{
-		Name: "experiments", Replay: &LedgerReplayConfig{Script: script},
+		Name: "experiments", Schema: schema,
 	})
 	_, err = encodeLedgerConfigBase64(config)
 	require.ErrorContains(t, err, "exceeds the 98304-byte environment limit")

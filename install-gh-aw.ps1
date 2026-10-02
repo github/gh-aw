@@ -126,6 +126,83 @@ if ($env:GH_TOKEN) {
     $GitHubHeaders.Authorization = ("Bearer " + $env:GH_TOKEN)
 }
 
+function Compare-SemVerTags {
+    param(
+        [Parameter(Mandatory)][string]$Candidate,
+        [Parameter(Mandatory)][string]$Current
+    )
+
+    $candidateParts = $Candidate.Substring(1).Split(".")
+    $currentParts = $Current.Substring(1).Split(".")
+    $candidateParts[2] = $candidateParts[2].Split("+")[0]
+    $currentParts[2] = $currentParts[2].Split("+")[0]
+    for ($index = 0; $index -lt 3; $index++) {
+        if ($candidateParts[$index].Length -gt $currentParts[$index].Length) {
+            return 1
+        }
+        if ($candidateParts[$index].Length -lt $currentParts[$index].Length) {
+            return -1
+        }
+
+        $comparison = [string]::CompareOrdinal($candidateParts[$index], $currentParts[$index])
+        if ($comparison -gt 0) {
+            return 1
+        }
+        if ($comparison -lt 0) {
+            return -1
+        }
+    }
+
+    return 0
+}
+
+function Resolve-MajorVersionChannel {
+    param([Parameter(Mandatory)][string]$Major)
+
+    $bestTag = ""
+    $page = 1
+    $perPage = 100
+    do {
+        $releasesUrl = "https://api.github.com/repos/$Repo/releases?per_page=$perPage&page=$page"
+        try {
+            $releases = @(Invoke-RestMethod -Uri $releasesUrl -Headers $GitHubHeaders -TimeoutSec 30)
+        } catch {
+            Write-ErrorMessage "Failed to resolve stable releases for version channel v$Major from GitHub API."
+            return ""
+        }
+
+        foreach ($release in $releases) {
+            if ($release.draft -or $release.prerelease) {
+                continue
+            }
+
+            $tag = [string]$release.tag_name
+            if ($tag -cmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$' -and $Matches[1] -ceq $Major) {
+                if (-not $bestTag -or (Compare-SemVerTags -Candidate $tag -Current $bestTag) -gt 0) {
+                    $bestTag = $tag
+                }
+            }
+        }
+
+        $releaseCount = $releases.Count
+        $page++
+    } while ($releaseCount -ge $perPage)
+
+    return $bestTag
+}
+
+if ($Version -cmatch '^v(0|[1-9][0-9]*)$') {
+    $channelMajor = $Matches[1]
+    $resolvedTag = Resolve-MajorVersionChannel -Major $channelMajor
+    if (-not $resolvedTag) {
+        Write-ErrorMessage "No stable release found for version channel $Version."
+        exit 1
+    }
+
+    Write-Info "Resolved version channel $Version to $resolvedTag"
+    $Version = $resolvedTag
+}
+
 function Invoke-ProcessWithTimeout {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -232,7 +309,7 @@ if ($TryGhInstall -and (Get-Command gh -ErrorAction SilentlyContinue)) {
             if (-not $installedVersion) {
                 Write-WarningMessage "gh extension install completed but the installed gh-aw version could not be determined"
                 Write-Info "Falling back to manual installation..."
-            } elseif ($Version -ne "latest" -and $installedVersion -ne $Version) {
+            } elseif ($Version -ne "latest" -and $installedVersion -ne ($Version -replace '\+.*$', '')) {
                 Write-WarningMessage "Version mismatch: requested $Version but gh extension install installed $installedVersion"
                 Write-Info "Falling back to manual installation to install the correct version..."
             } else {

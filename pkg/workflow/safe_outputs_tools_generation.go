@@ -80,6 +80,9 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 				"inputSchema": map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false},
 			})
 		}
+		if noteLedgers := ledgerNamesByType["notes"]; len(noteLedgers) > 0 {
+			dynamicTools = append(dynamicTools, generateNoteLedgerTools(noteLedgers)...)
+		}
 	}
 
 	// Add custom job tools from SafeOutputs.Jobs
@@ -248,6 +251,69 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 	}
 
 	return dynamicTools, nil
+}
+
+func generateNoteLedgerTools(ledgerNames []string) []map[string]any {
+	ledger := map[string]any{
+		"type": "string", "enum": ledgerNames,
+		"description": "Target notes ledger; optional when only one notes ledger exists, required otherwise.",
+	}
+	fields := []struct {
+		name, operation string
+		properties      map[string]any
+		required        []string
+	}{
+		{
+			name: "ledger_note_add", operation: "note",
+			properties: map[string]any{
+				"temp_id": map[string]any{"type": "string", "description": "Optional temporary ID for same-batch references."},
+				"subject": map[string]any{"type": "string", "minLength": 1, "maxLength": 512},
+				"note":    map[string]any{"type": "string", "minLength": 1, "maxLength": 4096},
+				"reason":  map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},
+				"citations": map[string]any{
+					"type": "array", "minItems": 1, "maxItems": 32,
+					"items": map[string]any{
+						"type": "object", "required": []string{"type", "path"}, "additionalProperties": false,
+						"properties": map[string]any{
+							"type":       map[string]any{"type": "string", "enum": []string{"repository"}},
+							"path":       map[string]any{"type": "string", "minLength": 1, "description": "Repository-relative file path without traversal or encoded separators."},
+							"start_line": map[string]any{"type": "integer", "minimum": 1},
+							"end_line":   map[string]any{"type": "integer", "minimum": 1},
+						},
+					},
+				},
+			},
+			required: []string{"subject", "note", "reason", "citations"},
+		},
+		{
+			name: "ledger_note_vote", operation: "vote",
+			properties: map[string]any{
+				"note_id": map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+				"vote":    map[string]any{"type": "string", "enum": []string{"up", "down"}},
+				"reason":  map[string]any{"type": "string", "minLength": 1, "maxLength": 1024},
+			},
+			required: []string{"note_id", "vote"},
+		},
+	}
+	tools := make([]map[string]any, 0, len(fields))
+	actions := map[string]string{"note": "Add", "vote": "Vote on"}
+	for _, field := range fields {
+		properties := field.properties
+		properties["ledger"] = ledger
+		required := field.required
+		if len(ledgerNames) > 1 {
+			required = append(required, "ledger")
+		}
+		tools = append(tools, map[string]any{
+			"name":         field.name,
+			"description":  actions[field.operation] + " a note in a notes ledger. Persistence follows trusted validation.",
+			"_ledger_type": "notes", "_ledger_operation": field.operation,
+			"inputSchema": map[string]any{
+				"type": "object", "properties": properties, "required": required, "additionalProperties": false,
+			},
+		})
+	}
+	return tools
 }
 
 // ToolsMeta is the structure written to tools_meta.json at compile time and read

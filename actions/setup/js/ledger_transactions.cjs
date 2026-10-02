@@ -36,10 +36,15 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
     if (options.type && (request.record !== undefined || typeof request.operation !== "string")) throw new TypeError("Built-in ledger requires an operation, not a record");
     if (!options.type && (!request.record || typeof request.record !== "object" || Array.isArray(request.record) || request.operation !== undefined)) throw new TypeError("Custom ledger requires a record");
     const record = sanitizeRecord(
-      options.type ? Object.fromEntries(["operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason"].filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]])) : request.record
+      options.type
+        ? Object.fromEntries(
+            ["operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]])
+          )
+        : request.record
     );
     if (options.type) {
-      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason"].includes(key))) throw new TypeError("Invalid built-in transaction fields");
+      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].includes(key)))
+        throw new TypeError("Invalid built-in transaction fields");
       validateOperation(record, options);
     } else if (options.schema) {
       const schemaError = validateValueAgainstSchema(record, options.schema);
@@ -70,8 +75,8 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
   };
   const patchBytes = new Map();
   for (const item of normalized) {
-    item.record = rewrite(item.record, item.ledger);
     const config = ledgers[item.ledger] || {};
+    item.record = config.type === "notes" ? { ...item.record, ...(item.record.operation === "vote" ? { note_id: rewrite(item.record.note_id, item.ledger) } : {}) } : rewrite(item.record, item.ledger);
     if (config.type) validateOperation(item.record, config);
     const recordBytes = Buffer.byteLength(JSON.stringify(item.record), "utf8");
     if (recordBytes > (config.max_record_kb || 32) * 1024) throw new RangeError("Ledger record exceeds max-record-kb");

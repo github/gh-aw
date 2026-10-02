@@ -3,7 +3,7 @@
 "use strict";
 
 // Untrusted Agentic Maintenance planning step for one ledger. It runs with read-only repository
-// access, may execute a user-configured selection script, and writes only a compaction plan
+// access, uses built-in segment selection, and writes only a compaction plan
 // artifact. It never modifies the ledger branch.
 
 const fs = require("node:fs");

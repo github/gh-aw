@@ -108,10 +108,10 @@ func buildLedgerCompactionStepCondition(ledgerName string) ConditionNode {
 // buildMaintenanceLedgerCompactionJobs emits one plan/apply job pair for all ledgers.
 //
 // Trust boundary:
-//   - ledger_compaction_plan is untrusted. It has contents: read only, may run the
-//     user-configured selection scripts, and its only durable output is a plan artifact.
+//   - ledger_compaction_plan is untrusted. It has contents: read only, uses built-in
+//     segment selection, and its only durable output is a plan artifact.
 //   - ledger_compaction_apply is trusted. It has contents: write, runs only first-party
-//     scripts, never executes the compaction scripts, and revalidates each hostile plan
+//     scripts and revalidates each hostile plan
 //     against the latest ledger state before committing with an expected-head guard.
 func buildMaintenanceLedgerCompactionJobs(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) (string, error) {
 	if len(opts.compactionLedgers) == 0 {

@@ -2096,7 +2096,7 @@ ${issueSafeFallbackFooter}`;
 
               // Abort the failed git am before attempting any fallback
               try {
-                await exec.exec("git am --abort");
+                await exec.exec("git", ["am", "--abort"]);
                 core.info("Aborted failed git am");
               } catch (abortError) {
                 core.warning(`Failed to abort git am: ${getErrorMessage(abortError)}`);
@@ -2154,7 +2154,7 @@ ${issueSafeFallbackFooter}`;
                         core.warning(`Automatic add/add conflict recovery attempt failed during fallback: ${recoveredFallback.errorMessage}`);
                       }
                       try {
-                        await exec.exec("git am --abort");
+                        await exec.exec("git", ["am", "--abort"]);
                       } catch (abortFallbackError) {
                         core.warning(`Failed to abort fallback git am: ${getErrorMessage(abortFallbackError)}`);
                       }
@@ -2393,7 +2393,7 @@ ${issueSafeFallbackFooter}`;
             // Push the branch with an empty commit to allow PR creation
             try {
               // Create an empty commit to ensure there's a commit difference
-              await exec.exec(`git commit --allow-empty -m "Initialize"`);
+              await exec.exec("git", ["commit", "--allow-empty", "-m", "Initialize"]);
               core.info("Created empty commit");
 
               const forkCwd = process.cwd();

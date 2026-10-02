@@ -1,23 +1,23 @@
 ---
-title: Repository Memory Ledger Specification
-description: W3C-style specification for append-only repository-memory ledgers, their projections, compaction, and audit trails
+title: Git-backed Ledger Specification
+description: Specification for standalone Git-backed ledgers, built-in projections, trusted persistence, and lossless compaction
 sidebar:
   order: 1370
 ---
 
-# Repository Memory Ledger Specification
+# Git-backed Ledger Specification
 
-**Version**: 1.0<br>
+**Version**: 1.1<br>
 **Status**: Working Draft<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
 
 This specification defines bounded, deterministic, append-only JSONL ledgers with
-disposable query projections. It specifies repository-memory
-profiles, record identity, per-job responsibilities, script extension points,
+disposable query projections. It specifies standalone `tools.ledger`
+configuration, record identity, per-job responsibilities, built-in state models,
 concurrent reconstruction, compaction, retirement, configuration limits, the
-transaction log consumed by safe-output threat detection, and the adversarial
+validated transactions consumed by trusted persistence, and the adversarial
 review of the feature.
 
 ## 1. Conformance and terminology
@@ -26,20 +26,19 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**,
 **SHOULD**, and **MAY** in this document are to be interpreted as described in
 RFC 2119 and RFC 8174.
 
-* **Agent** is the untrusted workflow process that can request ledger reads and
-  appends through the ledger MCP server.
+* **Agent** is the untrusted workflow process that reads a disposable projection
+  and requests mutations through configured ledger safe-output tools.
 * **Record** is one immutable version-1 JSON object.
-* **Shard** is a JSONL file containing records. The current writer shard is not
-  closed.
+* **Shard** is a JSONL file containing immutable records.
 * **Projection** is disposable SQLite state reconstructed from shards.
 * **Coverage declaration** says that a replacement shard contains all records
   from one or more source shards.
 * **Stable shard** is a closed shard not created by the current persistence run.
-* **Transaction log** is the JSONL safe-output artifact containing ledger mutation
-  events.
-* **Agent job** is the workflow job that runs the agent and the ledger MCP server.
-* **Persistence job** is the trusted job that restores, compacts, and pushes
-  repository memory.
+* **Validated transactions** are the versioned artifact of accepted ledger
+  mutations produced by safe-output validation.
+* **Agent job** is the workflow job that prepares read-only projections and runs the agent.
+* **Persistence job** is the trusted `push_ledger_changes` job that revalidates
+  transactions, reconciles the latest ledger branch, and pushes durable records.
 * **Safe-outputs job** is the trusted job that ingests and handles safe outputs.
 
 ## 2. Data model and integrity
@@ -61,30 +60,28 @@ file and containing directory.
 
 ## 3. Job responsibilities
 
-Ledger work is split across three jobs with different privileges. An
+Ledger work is split across jobs with different privileges. An
 implementation MUST NOT move a responsibility to a less trusted job.
 
 | Job | Trust | Ledger responsibilities | Credentials |
 | --- | --- | --- | --- |
-| Agent job | Untrusted | Runs the ledger MCP server; requests `ledger_append`, `ledger_get`, `ledger_query`, `ledger_status`; writes shards into the run's writer shard and audit entries into the transaction log | No memory-branch write token |
-| Agent job (post-agent steps) | Trusted | Merges the ledger transaction log into the safe-output file after revalidating, redacting, deduplicating, and bounding entries | Runner-side only; no memory-branch write token |
-| Safe-outputs job | Trusted | Ingests and validates `ledger_mutation` entries and reports them through the log-only handler | Safe-output tokens; no ledger storage access |
-| Persistence job | Trusted | Restores memory, reconstructs the DAG, normalizes files, selects the trusted copy set, commits and pushes. It MUST NOT compact. | Memory-branch `contents: write` token |
-| Maintenance plan job | Untrusted | Per ledger: reads the ledger branch, runs the optional compaction selection script, and emits a compaction plan artifact | `contents: read` only |
+| Agent job preparation | Trusted | Fetches canonical ledger history, validates records, and creates disposable read-only SQLite projections | Repository read access |
+| Agent execution | Untrusted | Queries projections and queues mutations through the configured ledger safe-output tools; MUST NOT write canonical files | No ledger-branch write token |
+| Safe-outputs job | Trusted | Validates requested mutations and emits the versioned transaction artifact; does not persist ledger records | Safe-output tokens |
+| Persistence job | Trusted | Revalidates transactions, reconciles the latest ledger branch, commits and pushes accepted records. It MUST NOT compact. | Ledger-branch `contents: write` token |
+| Maintenance plan job | Untrusted | Per ledger: reads the ledger branch, uses built-in segment selection, and emits a compaction plan artifact | `contents: read` only |
 | Maintenance apply job | Trusted | Per ledger: validates the hostile plan against the latest ledger state and atomically applies it | `contents: write`; never runs user JavaScript |
 
 The agent job MUST NOT perform compaction, retirement, or persistence. The
-safe-outputs job MUST NOT mutate ledger storage; its `ledger_mutation` handler is
-log-only and performs no side effects, because the append it describes already
-happened. The persistence job MUST treat everything under the restored memory
-directory, including shards, coverage declarations, and audit entries, as
-untrusted input.
+safe-outputs job MUST NOT mutate ledger storage. An immediate safe-output response
+MUST NOT imply durability: an accepted request becomes durable only after the
+persistence job succeeds. The persistence job MUST treat transaction artifacts
+and restored ledger files as untrusted input and revalidate both.
 
-## 4. Script extension points
+## 4. Built-in behavior and script restrictions
 
-Two user-supplied scripts may exist near the ledger. Both are workflow-author
-code, not agent output. The validation script runs in the persistence job; the
-compaction selection script runs only in the untrusted maintenance plan job.
+Custom ledger replay and compaction scripts are not supported. Domain-specific
+constraints MUST be expressed as value schemas on supported built-in types.
 
 ### 4.1 Memory validation script
 
@@ -93,73 +90,92 @@ MUST run in a separate Node process with a bounded timeout and a sanitized
 environment, and a non-zero exit MUST fail persistence (fail-closed), because it
 is a policy gate on what is about to be pushed.
 
-### 4.2 Compaction selection script
+This separate file-storage validator is not a ledger replay or compaction
+extension point. Removing custom ledger scripts MUST NOT disable it.
+
+### 4.2 Built-in compaction selection
 
 Compaction is owned by Agentic Maintenance (section 5.3), never by the agent or
-persistence job. An optional `tools.ledger.<name>.compaction.script` MAY choose
-which segments to compact. It MUST run only in the maintenance plan job, in a
-separate Node process with an empty environment and restrictive Node.js
-permissions, and MUST NOT receive repository write credentials. It exchanges only
-serialized data and returns `{ sources: string[] }`. Its output is a proposal: the
-planner validates it and the trusted apply job independently revalidates the
-resulting plan without executing the script again.
+persistence job. The maintenance plan job MUST use the built-in deterministic
+segment-selection policy and MUST reject `tools.ledger.<name>.compaction.script`.
+Its output is a proposal: the trusted apply job independently revalidates the
+resulting plan. Eligible segments MUST be considered in segment-ID order, with
+at most `max-segments` selected and their union bounded by `max-segment-kb`.
+Segments that do not fit MUST be skipped. Fewer than two selected segments
+MUST result in no compaction.
+
+### 4.3 Built-in replay
+
+The only supported declared types are `log`, `set`, `map`, `table`,
+`counter`, and `notes`. Unknown types and any `replay` configuration MUST be rejected.
+
+| Type | Supported operations | Derived `state` columns |
+| --- | --- | --- |
+| `log` | `append(value)` | `position`, `value` |
+| `set` | `add(value)`, `remove(value)` | `identity`, `value` |
+| `map` | `put(key, value)`, `delete(key)` | `key`, `value` |
+| `table` | `insert(value)`, `update(key, patch)`, `upsert(value)`, `delete(key)` | `key`, `value` |
+| `counter` | `increment(name, amount)`, `decrement(name, amount)` | `name`, `value` |
+| `notes` | `note(subject, note, reason, citations)`, `vote(note_id, vote, reason?)` | `notes`, `note_citations`, `note_votes`, `note_state` |
+
+Replay MUST apply canonical topological record order, breaking ties between
+simultaneously ready records by SHA-256 lexical order. The `state` table MUST
+be disposable and read-only to the agent; canonical JSONL records remain
+authoritative. Invalid built-in operations MUST fail projection preparation,
+not silently fall back to generic records.
+
+Value schemas MUST validate values rather than operation envelopes. A `table`
+MUST declare a string primary-key field through `key`; other types MUST NOT
+declare `key`. Table inserts MUST reject duplicate keys, updates MUST require
+an existing key and preserve the primary key, and upserts MUST replace the
+entire row. Set membership MUST use canonical JSON equality. Counter amounts
+MUST be nonnegative safe integers, and resulting arithmetic MUST remain within
+the safe-integer range. Counters and notes MUST NOT accept value schemas.
+
+Notes MUST include at least one valid repository citation. Notes and votes
+MUST remain immutable records; the derived `note_state` view reports vote
+counts and timestamps, not truth or authority. Consumers MUST verify cited
+evidence against current repository state before relying on a note.
+
+The `map` type exposes `ledger_map_put` and `ledger_map_delete`; `notes`
+exposes `ledger_note_add` and `ledger_note_vote`. Other types use typed
+`ledger_append` operations. Ledgers without a declared type
+retain the generic records projection and raw-record append interface. They
+MUST NOT execute custom replay code.
 
 ## 5. Lifecycle
 
 ### 5.1 Restore and reconstruct
 
-Persistence first restores the repository-memory directory and reconstructs the
-record DAG from all valid shards. The projection MAY then be rebuilt in memory
-for bounded structured queries. The projection is not durable ledger state and
-MUST NOT be required for recovery.
+Trusted preparation fetches each `ledgers/<name>` branch and reconstructs the
+record DAG from canonical shards. A missing branch represents an empty ledger.
+Malformed canonical history MUST fail standalone projection preparation.
+The read-only database is created at `/tmp/gh-aw/ledgers/<name>/ledger.db`.
+It is not durable ledger state and MUST NOT be required for recovery.
 
-### 5.2 Agent append
+### 5.2 Deferred mutations
 
-The agent MAY request `ledger_append`, `ledger_get`, `ledger_query`, and
-`ledger_status`. Only `ledger_append` mutates ledger state. The MCP server MUST
-validate arguments and MUST NOT expose filesystem paths or runtime exception
-details.
+The agent MAY query the SQLite projection and queue mutations through the
+configured ledger safe-output tools. It MUST NOT edit SQLite or ledger files
+to persist changes. Mutations queued during a run are not immediately visible
+in that run's projection.
 
-`ledger_query` MUST return matching records in ascending record-SHA order. It
-MUST support an exclusive `after` cursor containing a record SHA, and return
-`hasMore` plus `nextCursor` so a caller can retrieve bounded pages without
-silently treating a truncated result as complete. `nextCursor` MUST be the last
-returned record's SHA when more matches remain, and `null` otherwise. Each page
-uses the same query filters and limit. Pagination is not a snapshot: concurrent
-writes may add matches between requests.
+Safe-output validation MUST check the configured ledger, operation fields,
+schemas, and record and batch limits. It MUST normalize temporary IDs and
+same-batch references into deterministic record IDs and emit a versioned
+transaction artifact. The persistence job MUST independently revalidate the
+artifact against trusted configuration before writing.
 
-After a durable append, the server MUST attempt to serialize one `ledger_mutation` event
-to the ledger transaction log. The event MUST identify the operation, record ID,
-record type, timestamp, parent hashes, record SHA, and a hash of the payload.
-Payload contents MUST NOT be copied into this audit event. Once a shard is
-durable, an audit-write failure MUST NOT cause the append to report failure:
-the server reports the audit failure separately without exposing payloads or
-filesystem paths. Such failures leave a gap in the transaction log; the
-authoritative ledger remains the validated shards, not the audit trail.
-
-The ledger transaction log MUST be a dedicated file. It MUST NOT be the
-safe-output manifest, because the manifest records outputs the runtime executed,
-while the transaction log records mutations an agent-facing server reports.
-
-After agent execution, a trusted runner step MUST merge the transaction log into
-the safe-output file so audit entries are ingested with every other safe output.
-The merge step MUST treat the log as untrusted input: it MUST keep only append
-entries whose identifiers and hashes match the required syntax, MUST drop
-unknown fields, MUST deduplicate by record SHA, MUST bound the number of merged
-entries, and MUST NOT fail the workflow when the log is missing, oversized, or
-malformed.
-
-When the workflow enables a ledger, the compiler MUST declare `ledger_mutation`
-as an ingested safe-output type so audit entries are validated and bounded rather
-than rejected as unexpected output. The corresponding handler MUST be log-only:
-it reports the redacted metadata and performs no repository, ledger, or network
-side effect, because the mutation it describes is already durable and its
-provenance is not verifiable from the transaction log alone.
+The persistence result MUST report ledger type, operation, deterministic
+record ID, transaction ID, and validation status without echoing values.
+An accepted request MUST NOT be reported as durable before its branch push
+succeeds.
 
 ### 5.3 Compaction
 
 Compaction runs in the generated Agentic Maintenance workflow, as one
-plan/apply job pair per ledger, sharing a per-ledger concurrency group. It runs
+shared plan/apply job pair with separate steps and plan files for each ledger.
+The jobs MUST NOT share a workflow concurrency group. Compaction runs
 on the ledger's `compaction.schedule` (`daily` by default, `weekly`, or `manual`)
 and on demand through the `compact_ledger` maintenance operation, which the
 `ledger_request_compaction` safe output dispatches. Both triggers use the same
@@ -193,20 +209,19 @@ and MUST NOT block appends or persistence.
 
 ### 5.4 Retirement
 
-The runtime owns retirement. Before deleting a source
-shard, it MUST validate the declaration, require that replacement and sources
-are stable, read the replacement, and verify that every source record SHA is
-present in the replacement. Invalid, incomplete, current-run, or forged
-declarations MUST be ignored. Source deletion and coverage-declaration removal
-MUST be followed by directory synchronization.
+Maintenance apply owns retirement. Before deleting a source shard, it MUST
+validate the plan against the latest branch state and verify that every source
+record SHA is present in the rebuilt replacement. Invalid plans MUST fail
+without changing the branch. Source deletion, replacement creation, and the
+compaction state update MUST be published together under the expected-head guard.
 
 ### 5.5 Save
 
-The persistence job saves ordinary memory files and trusted ledger shards to
-the repository-memory branch. Agent-supplied ledger shards and coverage files
-MUST be excluded from the trusted copy set. Ledger files MUST be included in
-the safe-output transaction and threat-detection artifacts so mutations can be
-reviewed alongside other workflow outputs.
+The persistence job saves accepted records to the corresponding
+`ledgers/<name>` branch. It MUST reconcile concurrent or retried requests
+against the latest canonical history, preserve existing records, and
+revalidate built-in operations against reconstructed state before pushing.
+Agent-supplied ledger files MUST NOT be used as authoritative storage.
 
 ## 6. Concurrency and guarantees
 
@@ -214,7 +229,7 @@ Concurrent writers MAY produce multiple DAG heads. Reconstruction MUST retain
 all valid heads, and the next append MUST reference every current head up to
 the configured parent bound. Identical deterministic replacement shards MUST
 converge by identity; different valid replacements MAY coexist. No compaction
-operation MAY remove a record unless the replacement coverage check succeeds.
+operation MAY remove a source segment unless the replacement record-union check succeeds.
 
 The ledger provides integrity, boundedness, deterministic reconstruction, and
 best-effort convergence. It does not provide distributed locking, serializable
@@ -222,44 +237,60 @@ transactions across branches, or confidentiality of repository-memory contents.
 
 ## 7. Configuration
 
-Implementations MUST expose bounded configuration for maximum shard count,
+Implementations MUST bound canonical file counts and expose configuration for
 segment size, record size, and patch size. Size fields are expressed in KiB in
 workflow configuration and MUST be converted to bytes exactly once. Invalid or
 overflowing values MUST be rejected or ignored without silently increasing a
-bound. When a ledger limit exceeds the corresponding repo-memory persistence
-limit, compilation SHOULD emit a diagnostic.
+bound. Standalone projection preparation MUST inspect at most 1024 canonical
+files and 100 MiB of history. These limits are independent of repo-memory
+file-storage limits.
+
+Compaction MUST default to `schedule: daily`, `min-segments: 32`, and
+`max-segments: 128`; `compaction: false` disables it. Schedules MUST be
+`daily`, `weekly`, or `manual`, and segment counts MUST be between 2 and 256
+with the maximum no smaller than the minimum. When only the minimum is raised
+above 128, the default maximum MUST rise to match.
+
+The compiler MUST reject `replay`, including `replay.script` and
+`replay.config`, and `compaction.script` with an explicit diagnostic.
+The legacy `tools.repo-memory.ledger` declaration is not supported; standalone
+ledgers MUST use `tools.ledger`.
+
+Removing custom replay MUST NOT rewrite existing history. Existing raw-record
+ledgers MAY omit `type` and query the generic `records.payload` column with
+SQLite JSON functions. Declaring a built-in type on raw-record history is not
+an automatic migration: each payload MUST satisfy the selected type's
+operation format.
 
 ## 8. Security considerations
 
 The ledger directory is untrusted input during persistence. Path traversal,
 symlink replacement, forged coverage, malformed JSON, hash mismatch, duplicate
-IDs, and oversized files MUST be handled as invalid input. Threat detection
-SHOULD consume the transaction log and ledger artifacts together; an audit
-event is evidence of an attempted or completed mutation, not authorization for
-that mutation.
+IDs, and oversized files MUST be handled as invalid input. A queued safe output
+is a request, not authorization or proof of a durable mutation. Persistence
+MUST revalidate the versioned transaction artifact and the canonical history.
 
 ## 9. Adversarial review
 
 This section records the agentic threats considered for this feature and the
 required countermeasures. The adversary is a prompt-injected agent that can call
-ledger tools, write arbitrary files into the repository-memory staging directory,
+ledger safe-output tools, write arbitrary files into agent-accessible directories,
 and append arbitrary lines to the safe-output file, but that holds no
-memory-branch write credential.
+ledger-branch write credential.
 
 | Threat | Required countermeasure |
 | --- | --- |
-| Forged replacement shard used to delete history | Retirement MUST only act on coverage declarations created by the current runtime run, and MUST verify that the replacement contains every source record SHA |
-| Forged coverage file dropped into the memory directory | Coverage files supplied by the agent MUST be excluded from the trusted copy set and MUST NOT be honoured during retirement |
+| Forged replacement shard used to delete history | Maintenance apply MUST rebuild the replacement from verified branch records and verify that it contains every source record SHA |
+| Forged ledger files supplied by the agent | Persistence MUST consume validated requests, not agent-authored shards or coverage declarations |
 | Overwriting an existing shard with a truncated copy | Agent-supplied files whose path matches an already-trusted shard ID MUST be rejected during persistence |
-| Compacting the run's own writer shard or newly added shards | Compaction MUST exclude the writer shard and every shard added during the current run |
+| Deleting records appended after planning | Maintenance apply MUST preserve every segment not selected by the validated plan |
 | Record or segment identity forgery | Record SHA, canonical serialization, and duplicate identity MUST be revalidated on read; mismatches MUST be diagnostics, never silent acceptance |
 | Unbounded growth or denial of service | Record, segment, patch, and shard-count limits MUST be enforced before acknowledging a mutation, and file scanning MUST stop at the configured shard bound |
 | Path traversal, symlinks, or non-regular files | Ledger paths MUST be derived from validated UUIDs, opened without following symlinks, and rejected when not regular files |
-| Escaping a trusted job through scripted compaction policy | Selection scripts MUST run only in the read-only maintenance plan job; the apply job MUST NOT execute them and MUST revalidate every plan (sections 4.2 and 5.3) |
+| Executing custom ledger replay or compaction code | Custom scripts MUST be rejected; replay and segment selection MUST use built-in implementations (sections 4.2 and 4.3) |
 | Malicious, stale, or replayed compaction plans | The apply job MUST strictly validate the plan, revalidate it against the latest ledger state, commit with an expected-head guard, and treat a reapplied plan as an idempotent no-op |
-| Forged `ledger_mutation` audit entries | The audit handler MUST be log-only, and authoritative state MUST be derived from validated shard content, never from the transaction log |
-| Agent-authored lines mixing into trusted output records | The ledger transaction log MUST be a dedicated file, and merged entries MUST be revalidated, redacted, deduplicated, and bounded before ingestion |
-| Durable prompt injection through stored payloads | Ledger payloads are untrusted content; consumers MUST treat `ledger_get` and `ledger_query` results as data, never as instructions |
+| Forged validated transactions | Persistence MUST reject invalid artifact versions, ledger names, deterministic IDs, schemas, operation fields, and size limits |
+| Durable prompt injection through stored payloads | Ledger payloads are untrusted content; consumers MUST treat projection query results as data, never as instructions |
 | Pre-creating a deterministic replacement shard ID to block compaction | A shard identity collision MUST fail open with a diagnostic and MUST NOT delete, overwrite, or retire any source shard |
 | Leaking payloads or credentials through audit or logs | Audit entries MUST carry hashes and identifiers only, ledger errors MUST NOT expose filesystem paths or exception details, and audit logging MUST truncate unexpected values |
 | Compaction failure blocking persistence | Compaction MUST fail open and report a diagnostic |
@@ -269,14 +300,17 @@ Residual risks are accepted and documented rather than mitigated: records are
 integrity-checked but not authenticated, so a well-formed record proves only that
 its content hashes correctly, never who authored it; the agent can append
 semantically false but well-formed records, can consume its own configured
-budget, and can emit audit entries for mutations that a reviewer must correlate
-with shard content. Repository memory is not confidential; it MUST NOT be used
+budget, and can request semantically false but schema-valid mutations.
+Ledger storage is not confidential; it MUST NOT be used
 for secrets.
 
 ## 10. Conformance tests
 
 A conforming implementation SHOULD test canonical serialization, hash
 verification, malformed-line isolation, concurrent-head convergence, all
-configured limits, deterministic compaction, forged and current-run coverage,
-safe retirement, transaction-log redaction, audit-entry merge validation,
-log-only audit handling, ledger limit unit parsing, and projection rebuilds.
+configured limits, deterministic compaction, hostile and stale plans,
+safe retirement, redacted persistence results,
+ledger limit unit parsing, deferred transaction validation, and projection rebuilds.
+Tests MUST cover rejection of custom replay and compaction scripts, all six
+built-in reducers, invalid-operation projection failures, and preservation of
+built-in state and generic record history after lossless compaction.

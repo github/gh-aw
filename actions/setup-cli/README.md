@@ -1,10 +1,10 @@
 # Setup gh-aw CLI Action
 
-This GitHub Action installs the `gh-aw` CLI extension for a specific version using release tags.
+This GitHub Action installs the `gh-aw` CLI extension using the latest stable release, an exact release tag, or a major-version channel.
 
 ## Features
 
-- ✅ **Version validation**: Ensures the specified version exists as a release
+- ✅ **Flexible versions**: Supports latest, exact release tags, and major-version channels
 - ✅ **Checksum verification**: Validates SHA256 checksums for downloaded binaries
 - ✅ **Automatic fallback**: Tries `gh extension install` first, falls back to direct download if needed
 - ✅ **Cross-platform**: Works on Linux, macOS, Windows, and FreeBSD
@@ -12,7 +12,27 @@ This GitHub Action installs the `gh-aw` CLI extension for a specific version usi
 
 ## Usage
 
-### Basic Usage
+### Install Latest Stable Release
+
+Omit `version` to install the latest stable release:
+
+```yaml
+- uses: github/gh-aw/actions/setup-cli@main
+```
+
+### Install a Major-Version Channel
+
+Use a `vN` channel to install the highest stable SemVer release in that major:
+
+```yaml
+- uses: github/gh-aw/actions/setup-cli@main
+  with:
+    version: v1
+```
+
+Major-version channels are preparatory until stable releases exist for those majors. There is no stable `v1` release yet, so `v1` currently fails with a clear error. The `v0` channel can resolve to the existing stable `v0.x` release line.
+
+### Install an Exact Release Tag
 
 ```yaml
 - name: Install gh-aw
@@ -48,11 +68,16 @@ jobs:
 
 ## Inputs
 
-### `version` (required)
+### `version` (optional)
 
-The version of gh-aw to install. Must be a release tag.
+The version selector for gh-aw.
 
-- **Release tag**: e.g., `v0.37.18`, `v0.37.0`
+- **Default**: `latest`
+- **Latest**: Selects the latest stable release overall
+- **Major-version channel**: `vN`, e.g. `v0` or `v1`, selects the highest stable SemVer release in that major
+- **Release tag**: e.g., `v0.37.18`, installs that exact release
+
+Prereleases are not selected by `latest` or a major-version channel. A channel without a stable release fails; for example, `v1` has no matching release yet.
 
 ### `github-token` (optional)
 
@@ -70,12 +95,11 @@ The version tag that was actually installed.
 
 ## How It Works
 
-1. **Version validation**: Validates the input is a valid release tag
-2. **Release verification**: Validates that the release exists on GitHub
-3. **Primary installation method**: Attempts to install using `gh extension install github/gh-aw`
-4. **Fallback method**: If primary method fails, downloads the binary directly from GitHub releases
-5. **Checksum verification**: Downloads and verifies SHA256 checksums for the binary
-6. **Binary verification**: Ensures the installed binary works correctly
+1. **Version resolution**: Resolves `latest` or a `vN` channel to a stable release tag; exact tags are kept unchanged
+2. **Primary installation method**: Attempts to install using `gh extension install github/gh-aw`
+3. **Fallback method**: If primary method fails, downloads the binary directly from GitHub releases
+4. **Checksum verification**: Downloads and verifies SHA256 checksums for the binary
+5. **Binary verification**: Ensures the installed binary works correctly
 
 ## Requirements
 
@@ -86,8 +110,8 @@ The version tag that was actually installed.
 
 The action will fail if:
 
-- No version is provided
 - The specified release tag doesn't exist
+- A major-version channel has no stable release
 - The binary download fails
 - The downloaded binary is not executable or doesn't work
 
@@ -109,6 +133,22 @@ The action will fail if:
   with:
     version: v0.37.18
 ```
+
+### Install Latest Stable Release
+
+```yaml
+- uses: github/gh-aw/actions/setup-cli@main
+```
+
+### Install a Major-Version Channel
+
+```yaml
+- uses: github/gh-aw/actions/setup-cli@main
+  with:
+    version: v1
+```
+
+`v1` is an example of a forward-looking channel and will work once a stable v1 release is published. Use `v0` for the existing stable v0 release line.
 
 ### Use Output
 

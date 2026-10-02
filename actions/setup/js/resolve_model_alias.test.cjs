@@ -29,6 +29,11 @@ describe("resolve_model_alias", () => {
     expect(resolved).toBe("copilot/claude-haiku-4.5");
   });
 
+  it("resolves gpt-6 to GPT-6.1 Sol when available", () => {
+    const resolved = resolveModelAlias("gpt-6", ALIAS_MAP, ["copilot/gpt-6-sol", "copilot/gpt-6.1-sol"]);
+    expect(resolved).toBe("copilot/gpt-6.1-sol");
+  });
+
   it("strips copilot/ prefix for native CLI env var", () => {
     expect(normalizeForCopilotCLI("copilot/claude-haiku-4.5")).toBe("claude-haiku-4.5");
   });
