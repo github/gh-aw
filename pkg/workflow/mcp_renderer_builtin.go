@@ -10,6 +10,45 @@ import (
 
 var mcpRendererBuiltinLog = logger.New("workflow:mcp_renderer_builtin")
 
+const dispatchCoordinatorMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs"
+
+// RenderDispatchCoordinatorMCP mounts the activation snapshot read-only and
+// the finish-intent directory writable; the server has no Git client or credentials.
+func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Builder, workflowData *WorkflowData) {
+	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
+	serverName := "work-queue"
+	mounts := []string{constants.DefaultGhAwMount, constants.DispatchCoordinatorSnapshotMount, constants.DispatchCoordinatorFinishIntentMount}
+
+	if r.options.Format == "toml" {
+		yaml.WriteString("          \n")
+		yaml.WriteString("          [mcp_servers." + serverName + "]\n")
+		yaml.WriteString("          container = \"" + image + "\"\n")
+		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
+		yaml.WriteString("          env_vars = [\"RUNNER_TEMP\"]\n")
+		yaml.WriteString("          entrypoint = \"node\"\n")
+		yaml.WriteString("          entrypointArgs = [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+		return
+	}
+
+	yaml.WriteString("              \"" + serverName + "\": {\n")
+	if r.options.IncludeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+		yaml.WriteString("                \"tools\": [\"dispatch_work_coordinator_read\", \"dispatch_claim_finish\"],\n")
+	}
+	yaml.WriteString("                \"container\": \"" + image + "\",\n")
+	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
+	yaml.WriteString("                \"env\": {\n")
+	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\"\n")
+	yaml.WriteString("                },\n")
+	yaml.WriteString("                \"entrypoint\": \"node\",\n")
+	yaml.WriteString("                \"entrypointArgs\": [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+	if r.options.IsLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}
+
 // RenderSafeOutputsMCP generates the Safe Outputs MCP server configuration
 func (r *MCPConfigRendererUnified) RenderSafeOutputsMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	mcpRendererLog.Printf("Rendering Safe Outputs MCP: format=%s", r.options.Format)

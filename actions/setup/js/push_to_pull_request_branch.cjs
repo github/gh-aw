@@ -608,7 +608,11 @@ async function main(config = {}) {
       }
 
       if (!pullNumber) {
-        return { success: false, error: 'push-to-pull-request-branch with target "triggering" requires pull request context' };
+        return {
+          success: false,
+          error:
+            "push-to-pull-request-branch with target \"triggering\" requires pull request context, which is unavailable for scheduled runs. Configure safe-outputs.push-to-pull-request-branch with target: '*' and supply pull_request_number in the safe output message to select a pull request.",
+        };
       }
     } else if (target === "*") {
       if (message.pull_request_number) {

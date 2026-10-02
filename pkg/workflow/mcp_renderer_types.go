@@ -37,14 +37,15 @@ type RenderCustomMCPToolConfigHandler func(yaml *strings.Builder, toolName strin
 
 // MCPToolRenderers holds engine-specific rendering functions for each MCP tool type
 type MCPToolRenderers struct {
-	RenderGitHub           func(yaml *strings.Builder, githubTool map[string]any, isLast bool, workflowData *WorkflowData)
-	RenderCacheMemory      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
-	RenderAgenticWorkflows func(yaml *strings.Builder, isLast bool)
-	RenderSafeOutputs      func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
-	RenderLedger           func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
-	RenderMCPScripts       func(yaml *strings.Builder, mcpScripts *MCPScriptsConfig, isLast bool)
-	RenderEnclave          func(yaml *strings.Builder, workflowData *WorkflowData, isLast bool)
-	RenderCustomMCPConfig  RenderCustomMCPToolConfigHandler
+	RenderGitHub              func(yaml *strings.Builder, githubTool map[string]any, isLast bool, workflowData *WorkflowData)
+	RenderCacheMemory         func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
+	RenderAgenticWorkflows    func(yaml *strings.Builder, isLast bool)
+	RenderSafeOutputs         func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
+	RenderLedger              func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
+	RenderDispatchCoordinator func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData)
+	RenderMCPScripts          func(yaml *strings.Builder, mcpScripts *MCPScriptsConfig, isLast bool)
+	RenderEnclave             func(yaml *strings.Builder, workflowData *WorkflowData, isLast bool)
+	RenderCustomMCPConfig     RenderCustomMCPToolConfigHandler
 }
 
 // JSONMCPConfigOptions defines configuration for JSON-based MCP config rendering

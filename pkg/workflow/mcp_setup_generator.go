@@ -195,7 +195,7 @@ func collectMCPTools(workflowData *WorkflowData) []string {
 			mcpSetupGeneratorLog.Print("Skipping GitHub MCP server registration: tools.github.mode is gh-proxy")
 			continue
 		}
-		if toolName == "github" || toolName == "cache-memory" || toolName == "agentic-workflows" {
+		if toolName == "github" || toolName == "cache-memory" || toolName == "agentic-workflows" || toolName == "work-queue" {
 			mcpTools = append(mcpTools, toolName)
 			continue
 		}

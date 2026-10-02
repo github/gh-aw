@@ -39,6 +39,7 @@ var builtInToolNames = map[string]bool{
 	"comment-memory":    true,
 	"repo-memory":       true,
 	"ledger":            true,
+	"work-queue":        true,
 	"bash":              true,
 	"edit":              true,
 	"web-fetch":         true,

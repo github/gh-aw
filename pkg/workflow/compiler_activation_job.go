@@ -60,6 +60,7 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	c.configureActivationNeedsAndCondition(ctx)
 	compilerActivationJobLog.Print("Generating prompt in activation job")
 	c.generatePromptInActivationJob(&ctx.steps, data, preActivationJobCreated, ctx.customJobsBeforeActivation)
+	c.addDispatchCoordinatorSnapshotStep(ctx)
 	c.addActivationArtifactUploadStep(ctx)
 	if len(ctx.steps) == 0 {
 		ctx.steps = append(ctx.steps, "      - run: echo \"Activation success\"\n")

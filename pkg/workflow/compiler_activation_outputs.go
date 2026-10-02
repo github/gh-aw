@@ -174,6 +174,9 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	// Keep aw_info.json in activation for fallback downloads from workflows created
 	// before the compact info artifact was available.
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw_info.json\n")
+	if isDispatchWorkCoordinatorEnabled(ctx.data) {
+		ctx.steps = append(ctx.steps, "            "+constants.DispatchCoordinatorSnapshotPath+"\n")
+	}
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/models.json\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/prompt.txt\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/system.txt\n")
@@ -199,6 +202,29 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	}
 	ctx.steps = append(ctx.steps, "          if-no-files-found: ignore\n")
 	ctx.steps = append(ctx.steps, "          retention-days: 1\n")
+}
+
+func (c *Compiler) addDispatchCoordinatorSnapshotStep(ctx *activationJobBuildContext) {
+	if !isDispatchWorkCoordinatorEnabled(ctx.data) {
+		return
+	}
+
+	compilerActivationJobLog.Print("Adding activation-time dispatch coordinator snapshot")
+	ctx.steps = append(ctx.steps,
+		"      - name: Snapshot dispatch coordinator state\n",
+		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),
+		"        with:\n",
+		"          script: |\n",
+		generateGitHubScriptWithRequire("write_dispatch_work_coordinator_snapshot.cjs"),
+	)
+}
+
+func isDispatchWorkCoordinatorEnabled(data *WorkflowData) bool {
+	if data == nil || data.Tools == nil {
+		return false
+	}
+	value, configured := data.Tools["work-queue"]
+	return configured && value != false
 }
 
 // addActivationInfoArtifactUploadStep appends an archived upload of aw_info.json.

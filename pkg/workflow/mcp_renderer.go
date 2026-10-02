@@ -176,6 +176,10 @@ func RenderJSONMCPConfig( //nolint:largefunc // Existing renderer keeps MCP JSON
 			if options.Renderers.RenderLedger != nil {
 				options.Renderers.RenderLedger(&configBuilder, isLast, workflowData)
 			}
+		case "work-queue":
+			if options.Renderers.RenderDispatchCoordinator != nil {
+				options.Renderers.RenderDispatchCoordinator(&configBuilder, isLast, workflowData)
+			}
 		case "mcp-scripts":
 			if options.Renderers.RenderMCPScripts != nil {
 				options.Renderers.RenderMCPScripts(&configBuilder, workflowData.MCPScripts, isLast)
