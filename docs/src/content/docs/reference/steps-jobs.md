@@ -27,7 +27,13 @@ pre-steps:
   - name: Mint checkout token
     id: checkout_app
     uses: actions/create-github-app-token@v2
+    with:
+      app-id: ${{ vars.APP_ID }}
+      private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      permission-contents: read
 ```
+
+Set explicit `permission-*` inputs for every `actions/create-github-app-token` step; otherwise the installation token inherits all permissions granted to the App. The compiler warns when they are missing and rejects the workflow in strict mode. Job-level `permissions:` does not scope the App token.
 
 Use pre-steps when later checkout or setup must consume outputs from a step in the same job.
 

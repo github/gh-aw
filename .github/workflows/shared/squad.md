@@ -49,6 +49,7 @@ jobs:
           app-id: ${{ vars.SQUAD_GITHUB_APP_ID }}
           private-key: ${{ secrets.SQUAD_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ vars.SQUAD_GITHUB_APP_OWNER }}
+          permission-contents: read
       - name: Initialize Squad team
         if: ${{ steps.squad-installation.outputs.installed != 'true' }}
         env:
