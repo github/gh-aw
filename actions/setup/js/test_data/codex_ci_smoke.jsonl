@@ -1,0 +1,11 @@
+[codex-harness] 2026-10-01T18:55:37.604Z attempt 1: spawning: codex exec --model gpt-5.3-codex --skip-git-repo-check <prompt omitted>
+Reading additional input from stdin...
+{"type":"thread.started","thread_id":"sanitized-smoke-thread"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata unavailable; using fallback metadata."}}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"  Inspecting the example.\n"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"example-check --version","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"example-check --version","aggregated_output":"example-check: command not found\n","exit_code":127,"status":"failed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"The example command is unavailable."}}
+{"type":"item.completed","item":{"id":"item_4","type":"agent_message","text":"### Summary\nNo changes made.\n"}}
+{"type":"turn.completed","usage":{"input_tokens":35078,"cached_input_tokens":18176,"cache_write_input_tokens":0,"output_tokens":1638,"reasoning_output_tokens":0}}

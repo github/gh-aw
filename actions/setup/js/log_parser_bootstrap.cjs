@@ -6,6 +6,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
+const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -285,21 +286,27 @@ async function runLogParser(options) {
     //     the existing line-oriented parser in readAgentRuntimeMetrics can find it.
     //  3. All errors are non-fatal – telemetry enrichment must never break workflows.
     if (logEntries && Array.isArray(logEntries)) {
-      const resultEntry = logEntries.find(e => e && typeof e === "object" && e.type === "result" && (typeof e.num_turns === "number" || e.usage));
-      if (resultEntry) {
+      const resultEntry = projectSessionResult(logEntries);
+      if (resultEntry && (isTokenCount(resultEntry.num_turns) || isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens))) {
         const normalizedResultEntry = {
           type: "result",
-          num_turns: typeof resultEntry.num_turns === "number" && Number.isFinite(resultEntry.num_turns) && resultEntry.num_turns >= 0 ? resultEntry.num_turns : 0,
-          usage: {
-            input_tokens: typeof resultEntry.usage?.input_tokens === "number" && Number.isFinite(resultEntry.usage.input_tokens) && resultEntry.usage.input_tokens >= 0 ? resultEntry.usage.input_tokens : 0,
-            output_tokens: typeof resultEntry.usage?.output_tokens === "number" && Number.isFinite(resultEntry.usage.output_tokens) && resultEntry.usage.output_tokens >= 0 ? resultEntry.usage.output_tokens : 0,
-          },
+          num_turns: resultEntry.num_turns,
+          usage:
+            isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens)
+              ? {
+                  input_tokens: resultEntry.usage?.input_tokens,
+                  output_tokens: resultEntry.usage?.output_tokens,
+                }
+              : undefined,
         };
         const stdioLogPath = AGENT_STDIO_LOG_PATH;
         try {
           let alreadyHasResult = false;
+          let newline = "";
+          const isUsableResult = entry => entry?.type === "result" && (isTokenCount(entry.num_turns) || isTokenCount(entry.usage?.input_tokens) || isTokenCount(entry.usage?.output_tokens));
           if (fs.existsSync(stdioLogPath)) {
             const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
+            if (stdioContent && !stdioContent.endsWith("\n")) newline = "\n";
             alreadyHasResult = stdioContent.split("\n").some(line => {
               const objectStart = line.indexOf("{");
               const arrayStart = line.indexOf("[");
@@ -315,9 +322,9 @@ async function runLogParser(options) {
               try {
                 const parsed = JSON.parse(line.slice(start));
                 if (Array.isArray(parsed)) {
-                  return parsed.some(entry => entry && typeof entry === "object" && entry.type === "result");
+                  return parsed.some(isUsableResult);
                 }
-                return parsed && parsed.type === "result";
+                return isUsableResult(parsed);
               } catch {
                 return false;
               }
@@ -325,7 +332,7 @@ async function runLogParser(options) {
           }
           if (!alreadyHasResult) {
             fs.mkdirSync(path.dirname(stdioLogPath), { recursive: true });
-            fs.appendFileSync(stdioLogPath, JSON.stringify(normalizedResultEntry) + "\n");
+            fs.appendFileSync(stdioLogPath, newline + JSON.stringify(normalizedResultEntry) + "\n");
             core.info(`[log-parser] Wrote ${parserName} result entry to agent-stdio.log: num_turns=${normalizedResultEntry.num_turns ?? "n/a"}`);
           }
         } catch (err) {
@@ -369,9 +376,7 @@ async function runLogParser(options) {
     if (markdown) {
       // Generate lightweight plain text summary for core.info and Copilot CLI style for step summary
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
-        // Extract model from init entry if available
-        const initEntry = logEntries.find(entry => (entry.type === "system" && entry.subtype === "init") || entry.type === "session.init");
-        const model = initEntry?.model || initEntry?.data?.model || null;
+        const model = observedSessionModel(logEntries);
 
         const plainTextSummary = generatePlainTextSummary(logEntries, {
           model,

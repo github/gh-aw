@@ -1,16 +1,9 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const {
-  createEngineLogParser,
-  generateConversationMarkdown,
-  generateInformationSection,
-  buildStepSummaryDetailsSection,
-  formatInitializationSummary,
-  formatToolUse,
-  parseLogEntries,
-  convertLegacyLogEntriesToCopilotEvents,
-} = require("./log_parser_shared.cjs");
+const { createEngineLogParser, generateConversationMarkdown, generateInformationSection, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, parseLogEntries } = require("./log_parser_shared.cjs");
+const { projectSessionResult } = require("./agent_session.cjs");
+const { normalizeClaudeSession } = require("./claude_session.cjs");
 
 const main = createEngineLogParser({
   parserName: "Claude",
@@ -27,7 +20,8 @@ function parseClaudeLog(logContent) {
   // Use shared parseLogEntries function
   const logEntries = parseLogEntries(logContent);
 
-  if (!logEntries) {
+  const canonicalLogEntries = logEntries ? normalizeClaudeSession(logEntries) : [];
+  if (!logEntries || (logEntries.length > 0 && canonicalLogEntries.length === 0)) {
     return {
       markdown: buildStepSummaryDetailsSection("Agent Log Summary", "Log format not recognized as Claude JSON array or JSONL."),
       mcpFailures: [],
@@ -39,7 +33,6 @@ function parseClaudeLog(logContent) {
   const mcpFailures = [];
 
   // Generate conversation markdown using shared function
-  const canonicalLogEntries = convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "claude" });
   const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => {
@@ -95,13 +88,13 @@ function parseClaudeLog(logContent) {
   let markdown = conversationResult.markdown;
 
   // Add Information section from the last entry with result metadata
-  const lastEntry = logEntries[logEntries.length - 1];
+  const lastEntry = projectSessionResult(canonicalLogEntries);
   markdown += generateInformationSection(lastEntry);
 
   // Check if max-turns limit was hit
-  let maxTurnsHit = false;
+  let maxTurnsHit = canonicalLogEntries.some(entry => entry.type === "session.result" && entry.data.subtype === "error_max_turns");
   const maxTurns = process.env.GH_AW_MAX_TURNS;
-  if (maxTurns && lastEntry && lastEntry.num_turns) {
+  if (maxTurns && lastEntry && lastEntry.num_turns !== undefined) {
     const configuredMaxTurns = parseInt(maxTurns, 10);
     if (!Number.isNaN(configuredMaxTurns) && lastEntry.num_turns >= configuredMaxTurns) {
       maxTurnsHit = true;

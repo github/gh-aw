@@ -1,6 +1,7 @@
 // @ts-check
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
+const { sessionTokenTotal, sessionOutputText, observedSessionModel } = require("./agent_session.cjs");
 
 /**
  * Minimal dependency contract injected from log_parser_shared.cjs.
@@ -174,6 +175,13 @@ function createLogParserFormatters(deps) {
         return { markdown, commandSummary: [], sizeLimitReached };
       }
     }
+    const observedModel = observedSessionModel(logEntries);
+    if (observedModel && observedModel !== initEntry?.model) {
+      if (!addDetailsSectionFitting("Model", `**Observed Model:** ${observedModel}\n`)) {
+        markdown += SIZE_LIMIT_WARNING;
+        return { markdown, commandSummary: [], sizeLimitReached };
+      }
+    }
 
     let reasoningBody = "";
     let commandDetailsBody = "";
@@ -237,7 +245,7 @@ function createLogParserFormatters(deps) {
         const toolResult = toolUsePairs.get(content.id);
         let statusIcon = "❓";
         if (toolResult) {
-          statusIcon = toolResult.is_error === true ? "❌" : "✅";
+          statusIcon = toolResult.is_error === true ? "❌" : toolResult.is_error === false ? "✅" : "❓";
         }
 
         if (toolName === "Bash") {
@@ -289,7 +297,7 @@ function createLogParserFormatters(deps) {
 
     function getStatusIcon() {
       if (toolResult) {
-        return toolResult.is_error === true ? "❌" : "✅";
+        return toolResult.is_error === true ? "❌" : toolResult.is_error === false ? "✅" : "❓";
       }
       return "❓";
     }
@@ -311,8 +319,8 @@ function createLogParserFormatters(deps) {
     const totalTokens = estimateTokens(inputText) + estimateTokens(outputText);
 
     let metadata = "";
-    if (toolResult && toolResult.duration_ms) {
-      metadata += `<code>${formatDuration(toolResult.duration_ms)}</code> `;
+    if (toolResult && toolResult.duration_ms !== undefined) {
+      metadata += `<code>${toolResult.duration_ms === 0 ? "0s" : formatDuration(toolResult.duration_ms)}</code> `;
     }
     if (totalTokens > 0) {
       metadata += `<code>~${totalTokens}t</code>`;
@@ -486,7 +494,7 @@ function createLogParserFormatters(deps) {
 
     const toolResult = toolUsePairs.get(content.id);
     const isError = toolResult?.is_error === true;
-    const statusIcon = isError ? "✗" : "✓";
+    const statusIcon = isError ? "✗" : toolResult?.is_error === false ? "✓" : "?";
 
     let displayName;
     let resultPreview = "";
@@ -533,13 +541,13 @@ function createLogParserFormatters(deps) {
   }
 
   function appendStatistics(lines, logEntries, toolUsePairs) {
-    const lastEntry = logEntries[logEntries.length - 1];
+    const lastEntry = logEntries.findLast(entry => entry.type === "result");
     lines.push("Statistics:");
-    if (lastEntry?.num_turns) {
+    if (lastEntry?.num_turns !== undefined) {
       lines.push(`  Turns: ${lastEntry.num_turns}`);
     }
-    if (lastEntry?.duration_ms) {
-      const duration = formatDuration(lastEntry.duration_ms);
+    if (lastEntry?.duration_ms !== undefined) {
+      const duration = lastEntry.duration_ms === 0 ? "0s" : formatDuration(lastEntry.duration_ms);
       if (duration) {
         lines.push(`  Duration: ${duration}`);
       }
@@ -559,7 +567,7 @@ function createLogParserFormatters(deps) {
             const isError = toolResult?.is_error === true;
             if (isError) {
               toolCounts.error++;
-            } else {
+            } else if (toolResult?.is_error === false) {
               toolCounts.success++;
             }
           }
@@ -572,23 +580,23 @@ function createLogParserFormatters(deps) {
     }
     if (lastEntry?.usage) {
       const usage = lastEntry.usage;
-      if (usage.input_tokens || usage.output_tokens) {
-        const inputTokens = usage.input_tokens || 0;
-        const outputTokens = usage.output_tokens || 0;
-        const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
-        const cacheReadTokens = usage.cache_read_input_tokens || 0;
-        const totalTokens = inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
-
-        lines.push(`  Tokens: ${totalTokens.toLocaleString()} total (${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)`);
+      const totalTokens = sessionTokenTotal(usage);
+      if (totalTokens !== undefined) {
+        const inputTokens = usage.input_tokens === undefined ? "unknown" : usage.input_tokens.toLocaleString();
+        const outputTokens = usage.output_tokens === undefined ? "unknown" : usage.output_tokens.toLocaleString();
+        const complete = usage.total_tokens !== undefined || (usage.input_tokens !== undefined && usage.output_tokens !== undefined);
+        lines.push(`  Tokens: ${totalTokens.toLocaleString()} ${complete ? "total" : "observed"} (${inputTokens} in / ${outputTokens} out)`);
       }
+      if (usage.cache_read_input_tokens !== undefined) lines.push(`  Cache Read Tokens: ${usage.cache_read_input_tokens.toLocaleString()}`);
+      if (usage.cache_creation_input_tokens !== undefined) lines.push(`  Cache Creation Tokens: ${usage.cache_creation_input_tokens.toLocaleString()}`);
     }
-    if (lastEntry?.total_cost_usd) {
+    if (lastEntry?.total_cost_usd !== undefined) {
       lines.push(`  Cost: $${lastEntry.total_cost_usd.toFixed(4)}`);
     }
     if (lastEntry?.errors && Array.isArray(lastEntry.errors) && lastEntry.errors.length > 0) {
       lines.push("  Errors:");
       for (const error of lastEntry.errors) {
-        lines.push(`    ${error}`);
+        lines.push(`    ${sessionOutputText(error)}`);
       }
     }
   }
@@ -656,7 +664,8 @@ function createLogParserFormatters(deps) {
    * @returns {string} Plain text summary for console output
    */
   function generatePlainTextSummary(logEntries, options = {}) {
-    const { model, parserName = "Agent" } = options;
+    const { parserName = "Agent" } = options;
+    const model = options.model ?? observedSessionModel(logEntries);
     const lines = [];
 
     lines.push(`=== ${parserName} Execution Summary ===`);
@@ -683,7 +692,8 @@ function createLogParserFormatters(deps) {
    */
   function generateCopilotCliStyleSummary(logEntries, options = {}) {
     const lines = [];
-    const bodyLines = ["Conversation:", "", ...generateSummaryLines(logEntries)];
+    const model = options.model ?? observedSessionModel(logEntries);
+    const bodyLines = [...(model ? [`Model: ${model}`, ""] : []), "Conversation:", "", ...generateSummaryLines(logEntries)];
     const fence = buildSafeOuterCodeFence(bodyLines);
 
     lines.push(fence);

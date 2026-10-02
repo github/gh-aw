@@ -6,6 +6,7 @@ const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
+const { isSessionEvent, normalizeAgentSession, projectSessionResult, sessionOutputText, sessionToolSuccess, sessionTokenTotal } = require("./agent_session.cjs");
 
 /**
  * Shared utility functions for log parsers
@@ -287,18 +288,18 @@ function generateInformationSection(lastEntry, options = {}) {
     return buildStepSummaryDetailsSection("Information", "", { emptyBodyMessage: "No information available." });
   }
 
-  if (lastEntry.num_turns) {
+  if (lastEntry.num_turns !== undefined) {
     markdown += `**Turns:** ${lastEntry.num_turns}\n\n`;
   }
 
-  if (lastEntry.duration_ms) {
+  if (lastEntry.duration_ms !== undefined) {
     const durationSec = Math.round(lastEntry.duration_ms / 1000);
     const minutes = Math.floor(durationSec / 60);
     const seconds = durationSec % 60;
     markdown += `**Duration:** ${minutes}m ${seconds}s\n\n`;
   }
 
-  if (lastEntry.total_cost_usd) {
+  if (lastEntry.total_cost_usd !== undefined) {
     markdown += `**Total Cost:** $${lastEntry.total_cost_usd.toFixed(4)}\n\n`;
   }
 
@@ -312,20 +313,18 @@ function generateInformationSection(lastEntry, options = {}) {
 
   if (lastEntry.usage) {
     const usage = lastEntry.usage;
-    if (usage.input_tokens || usage.output_tokens) {
-      // Calculate total tokens (matching Go parser logic)
-      const inputTokens = usage.input_tokens || 0;
-      const outputTokens = usage.output_tokens || 0;
-      const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
-      const cacheReadTokens = usage.cache_read_input_tokens || 0;
-      const totalTokens = inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
-
+    const totalTokens = sessionTokenTotal(usage);
+    if (totalTokens !== undefined || usage.cache_creation_input_tokens !== undefined || usage.cache_read_input_tokens !== undefined) {
       markdown += `**Token Usage:**\n`;
-      if (totalTokens > 0) markdown += `- Total: ${totalTokens.toLocaleString()}\n`;
-      if (usage.input_tokens) markdown += `- Input: ${usage.input_tokens.toLocaleString()}\n`;
-      if (usage.cache_creation_input_tokens) markdown += `- Cache Creation: ${usage.cache_creation_input_tokens.toLocaleString()}\n`;
-      if (usage.cache_read_input_tokens) markdown += `- Cache Read: ${usage.cache_read_input_tokens.toLocaleString()}\n`;
-      if (usage.output_tokens) markdown += `- Output: ${usage.output_tokens.toLocaleString()}\n`;
+      const calculation = usage.total_tokens !== undefined ? "source total" : usage.input_tokens_include_cache === false ? "input + output + separate cache" : "input + output";
+      if (totalTokens !== undefined) {
+        const complete = usage.total_tokens !== undefined || (usage.input_tokens !== undefined && usage.output_tokens !== undefined);
+        markdown += complete ? `- Total: ${totalTokens.toLocaleString()} (${calculation})\n` : `- Observed Tokens: ${totalTokens.toLocaleString()} (partial accounting)\n`;
+      }
+      if (usage.input_tokens !== undefined) markdown += `- Input: ${usage.input_tokens.toLocaleString()}\n`;
+      if (usage.cache_creation_input_tokens !== undefined) markdown += `- Cache Creation: ${usage.cache_creation_input_tokens.toLocaleString()}\n`;
+      if (usage.cache_read_input_tokens !== undefined) markdown += `- Cache Read: ${usage.cache_read_input_tokens.toLocaleString()}\n`;
+      if (usage.output_tokens !== undefined) markdown += `- Output: ${usage.output_tokens.toLocaleString()}\n`;
       markdown += "\n";
     }
   }
@@ -333,7 +332,7 @@ function generateInformationSection(lastEntry, options = {}) {
   if (lastEntry.errors && Array.isArray(lastEntry.errors) && lastEntry.errors.length > 0) {
     markdown += `**Errors:**\n`;
     for (const error of lastEntry.errors) {
-      markdown += `- ${error}\n`;
+      markdown += `- ${sessionOutputText(error)}\n`;
     }
     markdown += "\n";
   }
@@ -378,7 +377,7 @@ function formatMcpParameters(input) {
       value = JSON.stringify(rawValue);
     } else {
       // Primitive values (string, number, boolean, null, undefined)
-      value = String(rawValue || "");
+      value = rawValue === undefined ? "" : String(rawValue);
     }
 
     paramStrs.push(`${key}: ${truncateString(value, 40)}`);
@@ -489,7 +488,9 @@ function formatInitializationSummary(initEntry, options = {}) {
     // Internal tools that are specific to Copilot CLI
     const internalTools = ["fetch_copilot_cli_documentation"];
 
-    for (const tool of initEntry.tools) {
+    for (const toolEntry of initEntry.tools) {
+      const tool = typeof toolEntry === "string" ? toolEntry : (toolEntry?.name ?? toolEntry?.function?.name);
+      if (typeof tool !== "string") continue;
       const toolLower = tool.toLowerCase();
 
       if (["Task", "Bash", "BashOutput", "KillBash", "ExitPlanMode"].includes(tool)) {
@@ -560,6 +561,7 @@ function formatInitializationSummary(initEntry, options = {}) {
  * @returns {Array|null} Array of parsed log entries, or null if parsing fails
  */
 function parseLogEntries(logContent) {
+  if (typeof logContent !== "string" || !logContent.trim()) return null;
   let logEntries;
 
   // First, try to parse as JSON array (old format)
@@ -629,24 +631,7 @@ function isCopilotEventLogEntries(logEntries) {
     return false;
   }
 
-  const eventTypePrefixes = ["user.", "assistant.", "tool.", "session."];
-  let eventLikeCount = 0;
-
-  for (const entry of logEntries) {
-    if (!entry || typeof entry !== "object" || typeof entry.type !== "string") continue;
-    // Legacy Claude/Pi message entries disqualify the array outright. A bare `result`
-    // entry is NOT treated as a disqualifier here: an OTEL-enrichment `result` summary
-    // may be appended to an otherwise copilot-event array (see parse_pi_log.cjs), and a
-    // genuinely legacy array is already identified by its assistant/user/system entries.
-    if (entry.type === "assistant" || entry.type === "user" || entry.type === "system") {
-      return false;
-    }
-    if (eventTypePrefixes.some(prefix => entry.type.startsWith(prefix))) {
-      eventLikeCount++;
-    }
-  }
-
-  return eventLikeCount > 0;
+  return logEntries.some(isSessionEvent);
 }
 
 /**
@@ -656,122 +641,7 @@ function isCopilotEventLogEntries(logEntries) {
  * @returns {Array<any>}
  */
 function convertLegacyLogEntriesToCopilotEvents(logEntries, options = {}) {
-  if (!Array.isArray(logEntries) || logEntries.length === 0) {
-    return [];
-  }
-  if (isCopilotEventLogEntries(logEntries)) {
-    return logEntries;
-  }
-
-  const { sourceEngine = "unknown" } = options;
-  /** @type {Array<any>} */
-  const events = [];
-  const toolUsesById = new Map();
-
-  for (const entry of logEntries) {
-    if (!entry || typeof entry !== "object") continue;
-
-    if (entry.type === "system" && entry.subtype === "init") {
-      events.push({
-        type: "session.init",
-        data: {
-          sourceEngine,
-          model: entry.model,
-          sessionId: entry.session_id,
-          cwd: entry.cwd,
-          tools: Array.isArray(entry.tools) ? entry.tools : [],
-          mcpServers: Array.isArray(entry.mcp_servers) ? entry.mcp_servers : [],
-          slashCommands: Array.isArray(entry.slash_commands) ? entry.slash_commands : [],
-          modelInfo: entry.model_info,
-        },
-      });
-      continue;
-    }
-
-    if (entry.type === "system" && entry.subtype && entry.subtype !== "init") {
-      if (entry.message?.content && Array.isArray(entry.message.content)) {
-        for (const content of entry.message.content) {
-          if (content?.type === "text" && typeof content.text === "string" && content.text.trim()) {
-            events.push({
-              type: "assistant.message",
-              data: { content: content.text },
-            });
-          }
-        }
-      } else if (typeof entry.message === "string" && entry.message.trim()) {
-        events.push({
-          type: "assistant.message",
-          data: { content: entry.message },
-        });
-      }
-      continue;
-    }
-
-    if (entry.type === "assistant" && entry.message?.content && Array.isArray(entry.message.content)) {
-      for (const content of entry.message.content) {
-        if (!content || typeof content !== "object") continue;
-
-        if (content.type === "text" && typeof content.text === "string" && content.text.trim()) {
-          events.push({
-            type: "assistant.message",
-            data: { content: content.text },
-          });
-        } else if (content.type === "thinking" && typeof content.thinking === "string" && content.thinking.trim()) {
-          events.push({
-            type: "assistant.reasoning",
-            data: { content: content.thinking },
-          });
-        } else if (content.type === "tool_use") {
-          const toolCallId = typeof content.id === "string" && content.id.trim() ? content.id : `tool_${events.length + 1}`;
-          toolUsesById.set(toolCallId, content);
-          events.push({
-            type: "tool.execution_start",
-            data: {
-              toolCallId,
-              toolName: content.name,
-              input: content.input || {},
-            },
-          });
-        }
-      }
-      continue;
-    }
-
-    if (entry.type === "user" && entry.message?.content && Array.isArray(entry.message.content)) {
-      for (const content of entry.message.content) {
-        if (!content || content.type !== "tool_result") continue;
-        const toolCallId = typeof content.tool_use_id === "string" && content.tool_use_id.trim() ? content.tool_use_id : `tool_${events.length + 1}`;
-        const toolUse = toolUsesById.get(toolCallId);
-        events.push({
-          type: "tool.execution_complete",
-          data: {
-            toolCallId,
-            toolName: toolUse?.name,
-            success: content.is_error !== true,
-            output: content.content,
-            durationMs: content.duration_ms,
-          },
-        });
-      }
-      continue;
-    }
-
-    if (entry.type === "result") {
-      events.push({
-        type: "session.result",
-        data: {
-          numTurns: entry.num_turns,
-          durationMs: entry.duration_ms,
-          totalCostUsd: entry.total_cost_usd,
-          usage: entry.usage,
-          errors: entry.errors,
-          permissionDenials: entry.permission_denials,
-        },
-      });
-    }
-  }
-
-  return events;
+  return normalizeAgentSession(logEntries, options);
 }
 
 /**
@@ -786,14 +656,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   if (!isCopilotEventLogEntries(logEntries)) {
     return logEntries;
   }
+  logEntries = normalizeAgentSession(logEntries);
 
   /** @type {Array<any>} */
   const normalizedEntries = [];
   const pendingByToolCallId = new Map();
   const pendingIdsByToolName = new Map();
   let toolCounter = 0;
-  let turnCount = 0;
-  let assistantMessageCount = 0;
 
   const addPendingId = (toolName, toolId) => {
     const existing = pendingIdsByToolName.get(toolName);
@@ -848,6 +717,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   const readString = (...values) => {
     for (const value of values) {
       if (typeof value === "string") return value;
+      if (value !== undefined) return sessionOutputText(value);
     }
     return "";
   };
@@ -861,7 +731,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
   // may still carry structured input but cannot reliably recover the original command.
   const buildToolInput = (data, options = {}) => {
     const { includeCommand = true } = options;
-    const base = data.input || data.parameters;
+    const base = Object.hasOwn(data, "input") ? data.input : data.parameters;
     if (base && typeof base === "object" && !Array.isArray(base)) {
       if (includeCommand && base.command === undefined && typeof data.command === "string") {
         return { ...base, command: data.command };
@@ -871,7 +741,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     if (includeCommand && typeof data.command === "string") {
       return { command: data.command };
     }
-    return {};
+    return base === undefined ? {} : base;
   };
 
   for (const entry of logEntries) {
@@ -879,6 +749,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     const data = entry.data && typeof entry.data === "object" ? entry.data : {};
 
     switch (entry.type) {
+      case "session.start":
       case "session.init":
         normalizedEntries.push({
           type: "system",
@@ -894,13 +765,12 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         break;
 
       case "user.message":
-        turnCount++;
+        normalizedEntries.push({ type: "user", message: { content: [{ type: "text", text: data.content }] } });
         break;
 
       case "assistant.message": {
         const text = readString(data.content, data.message);
         if (!text.trim()) break;
-        assistantMessageCount++;
         normalizedEntries.push({
           type: "assistant",
           message: {
@@ -928,7 +798,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         const toolCallId = typeof data.toolCallId === "string" && data.toolCallId.trim() ? data.toolCallId : null;
         const resolvedToolId = toolCallId || `sdk_tool_${++toolCounter}`;
         if (toolCallId) {
-          pendingByToolCallId.set(toolCallId, resolvedToolId);
+          pendingByToolCallId.set(toolCallId, { id: resolvedToolId, name: toolName });
         }
         addPendingId(toolName, resolvedToolId);
         normalizedEntries.push({
@@ -947,17 +817,18 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         let resolvedToolId = null;
 
         if (toolCallId && pendingByToolCallId.has(toolCallId)) {
-          resolvedToolId = pendingByToolCallId.get(toolCallId);
+          const pending = pendingByToolCallId.get(toolCallId);
+          resolvedToolId = pending.id;
           pendingByToolCallId.delete(toolCallId);
           if (resolvedToolId) {
-            removePendingId(toolName, resolvedToolId);
+            removePendingId(pending.name, resolvedToolId);
           }
         }
-        if (!resolvedToolId) {
+        if (!resolvedToolId && !toolCallId && (pendingIdsByToolName.get(toolName)?.length ?? 0) === 1) {
           resolvedToolId = shiftPendingId(toolName);
         }
         if (!resolvedToolId) {
-          resolvedToolId = `sdk_tool_${++toolCounter}`;
+          resolvedToolId = toolCallId || `sdk_tool_${++toolCounter}`;
           normalizedEntries.push({
             type: "assistant",
             message: {
@@ -968,50 +839,8 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
           });
         }
 
-        const success = typeof data.success === "boolean" ? data.success : !data.error;
-        // Order of precedence for structured result payloads:
-        // 1) direct text/content fields
-        // 2) json payloads
-        // 3) serialized object fallback
-        const extractResultContentText = value => {
-          if (typeof value === "string") return value;
-          if (!value || typeof value !== "object") return "";
-          if (typeof value.text === "string") return value.text;
-          if (typeof value.content === "string") return value.content;
-          if (value.type === "json" && value.json !== undefined) {
-            try {
-              return JSON.stringify(value.json, null, 2);
-            } catch {
-              return String(value.json);
-            }
-          }
-          try {
-            return JSON.stringify(value, null, 2);
-          } catch {
-            return String(value);
-          }
-        };
-
-        let output = "";
-        if (typeof data.output === "string") {
-          output = data.output;
-        } else if (typeof data.result === "string") {
-          output = data.result;
-        } else if (data.result && data.result.content !== undefined && data.result.content !== null) {
-          // Native Copilot CLI events.jsonl format: result.content is the concise
-          // tool result payload sent to the LLM (may be truncated for token efficiency).
-          if (Array.isArray(data.result.content)) {
-            output = data.result.content.map(extractResultContentText).filter(Boolean).join("\n");
-          } else if (typeof data.result.content === "string" || typeof data.result.content === "object") {
-            output = extractResultContentText(data.result.content);
-          }
-        } else if (data.error) {
-          output = typeof data.error === "object" && typeof data.error.message === "string" ? data.error.message : String(data.error);
-        } else if (success) {
-          output = "success";
-        } else {
-          output = "Tool execution failed";
-        }
+        const success = sessionToolSuccess(data);
+        const output = Object.hasOwn(data, "output") && data.output !== undefined ? sessionOutputText(data.output) : Object.hasOwn(data, "result") ? sessionOutputText(data.result) : data.error != null ? sessionOutputText(data.error) : "";
 
         normalizedEntries.push({
           type: "user",
@@ -1021,7 +850,7 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
                 type: "tool_result",
                 tool_use_id: resolvedToolId,
                 content: output,
-                is_error: !success,
+                is_error: success === undefined ? undefined : !success,
                 duration_ms: typeof data.durationMs === "number" ? data.durationMs : undefined,
               },
             ],
@@ -1031,21 +860,6 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
       }
 
       case "session.result": {
-        const usage = data.usage && typeof data.usage === "object" ? data.usage : {};
-        normalizedEntries.push({
-          type: "result",
-          num_turns: typeof data.numTurns === "number" ? data.numTurns : undefined,
-          duration_ms: typeof data.durationMs === "number" ? data.durationMs : undefined,
-          total_cost_usd: typeof data.totalCostUsd === "number" ? data.totalCostUsd : undefined,
-          usage: {
-            input_tokens: usage.input_tokens ?? usage.inputTokens,
-            output_tokens: usage.output_tokens ?? usage.outputTokens,
-            cache_creation_input_tokens: usage.cache_creation_input_tokens ?? usage.cacheCreationInputTokens,
-            cache_read_input_tokens: usage.cache_read_input_tokens ?? usage.cacheReadInputTokens,
-          },
-          errors: Array.isArray(data.errors) ? data.errors : undefined,
-          permission_denials: Array.isArray(data.permissionDenials) ? data.permissionDenials : undefined,
-        });
         break;
       }
 
@@ -1062,17 +876,8 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
     }
   }
 
-  if (normalizedEntries.length === 0) {
-    return [];
-  }
-
-  const hasResult = normalizedEntries.some(entry => entry.type === "result");
-  if (!hasResult) {
-    normalizedEntries.push({
-      type: "result",
-      num_turns: turnCount > 0 ? turnCount : assistantMessageCount,
-    });
-  }
+  const result = projectSessionResult(logEntries);
+  if (result) normalizedEntries.push(result);
 
   return normalizedEntries;
 }

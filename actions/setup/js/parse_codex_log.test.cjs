@@ -217,7 +217,8 @@ github.list_pull_requests(...) success in 123ms:
 
       const toolStarts = getEventData(result.logEntries, "tool.execution_start");
       expect(toolStarts.length).toBeGreaterThan(0);
-      expect(toolStarts[0].toolName).toBe("github__list_pull_requests");
+      expect(toolStarts[0].toolName).toBe("list_pull_requests");
+      expect(toolStarts[0].mcpServerName).toBe("github");
     });
 
     it("should populate logEntries with response for new-format tool calls", () => {
@@ -663,7 +664,7 @@ github.list_pull_requests(...) success in 123ms:
     });
   });
 
-  describe("session preview (logEntries always populated)", () => {
+  describe("source-dependent session preview", () => {
     let extractCodexModel;
 
     beforeEach(async () => {
@@ -671,11 +672,12 @@ github.list_pull_requests(...) success in 123ms:
       extractCodexModel = module.extractCodexModel;
     });
 
-    it("should always include a system init entry", () => {
+    it("should retain short reasoning without fabricating an init entry", () => {
       const result = parseCodexLog("thinking\nsome thinking here");
 
       const initEntry = result.logEntries.find(e => e.type === "session.init");
-      expect(initEntry).toBeDefined();
+      expect(initEntry).toBeUndefined();
+      expect(result.logEntries.find(e => e.type === "assistant.reasoning")?.data.content).toBe("some thinking here");
     });
 
     it("should extract model from Codex log header", () => {
@@ -701,29 +703,28 @@ Some analysis here`;
       expect(initEntry.data?.model).toBe("gpt-4o");
     });
 
-    it("should still include system init entry when model is absent from log", () => {
+    it("should not fabricate system init when model and header are absent", () => {
       const logContent = `thinking
 Some analysis here`;
 
       const result = parseCodexLog(logContent);
 
       const initEntry = result.logEntries.find(e => e.type === "session.init");
-      expect(initEntry).toBeDefined();
-      expect(initEntry.data?.model).toBeUndefined();
+      expect(initEntry).toBeUndefined();
     });
 
-    it("should add error messages as assistant entries when there are no tool calls", () => {
+    it("should retain error messages as diagnostics, not assistant answers", () => {
       const logContent = `model: o4-mini
 ERROR: cyber_policy_violation`;
 
       const result = parseCodexLog(logContent);
 
       const assistantMessages = result.logEntries.filter(e => e.type === "assistant.message");
-      expect(assistantMessages.length).toBeGreaterThan(0);
-      expect(assistantMessages[0].data?.content).toContain("cyber_policy_violation");
+      expect(assistantMessages).toEqual([]);
+      expect(result.logEntries.find(e => e.type === "session.result")?.data.errors).toEqual(["cyber_policy_violation"]);
     });
 
-    it("should add reconnect count as assistant entry when no tool calls and reconnects occurred", () => {
+    it("should preserve separate reconnect diagnostics with native attempt metadata", () => {
       const logContent = `Reconnecting... 1/3 (connection lost)
 Reconnecting... 2/3 (connection lost)
 ERROR: connection lost`;
@@ -731,9 +732,10 @@ ERROR: connection lost`;
       const result = parseCodexLog(logContent);
 
       const assistantMessages = result.logEntries.filter(e => e.type === "assistant.message");
-      const reconnectEntry = assistantMessages.find(c => (c.data?.content || "").includes("Reconnect attempts:"));
-      expect(reconnectEntry).toBeDefined();
-      expect(reconnectEntry.data?.content).toContain("2/3");
+      expect(assistantMessages).toEqual([]);
+      const diagnostics = result.logEntries.filter(e => e.type === "session.result");
+      expect(diagnostics.map(e => e.data.errors)).toEqual([["connection lost"], ["connection lost"], ["connection lost"]]);
+      expect(diagnostics[1]).toMatchObject({ reconnectAttempt: 2, maxReconnects: 3 });
     });
 
     it("should not add error assistant entries when tool calls are present", () => {
@@ -803,14 +805,14 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
       const toolStarts = result.logEntries.filter(e => e.type === "tool.execution_start");
       // One MCP tool call + one bash command.
       expect(toolStarts.length).toBe(2);
-      expect(toolStarts.some(e => e.data?.toolName === "github__issue_read")).toBe(true);
-      expect(toolStarts.some(e => e.data?.toolName === "Bash")).toBe(true);
+      expect(toolStarts.some(e => e.data?.toolName === "issue_read" && e.data?.mcpServerName === "github")).toBe(true);
+      expect(toolStarts.some(e => e.data?.toolName === "bash")).toBe(true);
     });
 
     it("marks failed command executions as errors", () => {
       const result = parseCodexLog(jsonlLog);
       const completes = result.logEntries.filter(e => e.type === "tool.execution_complete");
-      const bashComplete = completes.find(e => e.data?.toolName === "Bash");
+      const bashComplete = completes.find(e => e.data?.toolName === "bash");
       expect(bashComplete).toBeDefined();
       expect(bashComplete.data?.success).toBe(false);
     });
@@ -833,7 +835,7 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
     it("produces non-empty markdown for a JSONL run", () => {
       const result = parseCodexLog(jsonlLog);
       expect(result.markdown).toContain("Reviewed the issue");
-      expect(result.markdown).toContain("Total Tokens Used:");
+      expect(result.markdown).toContain("**Token Usage:**");
     });
 
     it("surfaces item errors in the result and rendered step summary without usage", () => {
@@ -845,7 +847,7 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
 
       expect(resultEntry?.data?.errors).toEqual([errorMessage]);
       expect(generateCopilotCliStyleSummary(result.logEntries)).toContain(errorMessage);
-      expect(result.markdown).toContain("<summary>Errors</summary>");
+      expect(result.markdown).toContain("**Errors:**");
       expect(result.markdown).toContain(errorMessage);
     });
   });
