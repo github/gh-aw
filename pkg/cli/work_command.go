@@ -18,7 +18,7 @@ import (
 func NewWorkCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "work",
-		Short: "Inspect and update a Git-backed dispatch work queue",
+		Short: "Experimental: inspect and update a Git-backed dispatch work queue",
 		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	cmd.PersistentFlags().String("repo", "", "Repository owner/repo (or absolute local Git remote)")
