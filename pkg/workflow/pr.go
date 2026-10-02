@@ -2,7 +2,7 @@ package workflow
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
@@ -28,7 +28,7 @@ func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
 	// checkout_pr_branch and the subsequent base-folder restore operate on the
 	// workspace root, so neither may run when it belongs to another repository.
 	for _, checkout := range data.CheckoutConfigs {
-		if checkout == nil || (filepath.Clean(checkout.Path) != "." && !strings.Contains(checkout.Path, "${{")) {
+		if checkout == nil || (path.Clean(strings.ReplaceAll(checkout.Path, "\\", "/")) != "." && !strings.Contains(checkout.Path, "${{")) {
 			continue
 		}
 		repository := strings.TrimSpace(checkout.Repository)

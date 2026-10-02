@@ -128,6 +128,12 @@ func TestShouldGeneratePRCheckoutStep_MultiCheckout(t *testing.T) {
 			},
 		},
 		{
+			name: "external repository at root with Windows path separators",
+			checkouts: []*CheckoutConfig{
+				{Repository: "other/project", Path: ".\\"},
+			},
+		},
+		{
 			name: "wiki repository at root",
 			checkouts: []*CheckoutConfig{
 				{Repository: "${{ github.repository }}", Wiki: true},
