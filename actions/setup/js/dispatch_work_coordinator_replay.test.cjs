@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
 const work = id => ({ kind: "Work", work: id, claim: null, attempt: null });
@@ -14,6 +14,22 @@ function permutations(items) {
 }
 
 describe("dispatch work coordinator replay", () => {
+  it("logs debug summaries without transaction identifiers", () => {
+    const previousDebug = process.env.DEBUG;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    process.env.DEBUG = "dispatch_work_coordinator";
+    try {
+      replayTransactions([work("submitted-work-id")]);
+
+      expect(errorSpy).toHaveBeenCalledOnce();
+      expect(errorSpy.mock.calls.flat().join(" ")).not.toContain("submitted-work-id");
+    } finally {
+      if (previousDebug === undefined) delete process.env.DEBUG;
+      else process.env.DEBUG = previousDebug;
+      errorSpy.mockRestore();
+    }
+  });
+
   it("projects work and claim states from the transaction facts", () => {
     expect(replayTransactions([work("w"), claim("w", "c")])).toEqual({
       work: { w: "claimed" },

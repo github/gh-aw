@@ -386,6 +386,7 @@ SAFE_OUTPUTS_FILES=(
   "temporary_id.cjs"
   "invocation_context_helpers.cjs"
   "data_schema_normalizer.cjs"
+  "dispatch_work_coordinator_replay.cjs"
 )
 
 SAFE_OUTPUTS_COUNT=0

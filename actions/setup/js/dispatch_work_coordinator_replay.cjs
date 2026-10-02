@@ -5,6 +5,19 @@ const TRANSACTION_FIELDS = ["kind", "work", "claim", "attempt"];
 const SORTED_TRANSACTION_FIELDS = [...TRANSACTION_FIELDS].sort();
 
 /**
+ * Log coordinator diagnostics when DEBUG enables this module. Transaction
+ * identifiers are deliberately omitted because they may contain submitted data.
+ * @param {string} message
+ * @param {Record<string, string | number>} [details]
+ */
+function debugLog(message, details = {}) {
+  const debug = process.env.DEBUG || "";
+  if (debug === "*" || debug.includes("dispatch_work_coordinator")) {
+    console.error(`[dispatch_work_coordinator_replay] ${message} ${JSON.stringify(details)}`);
+  }
+}
+
+/**
  * @typedef {
  *   | {kind: "Work", work: string, claim: null, attempt: null}
  *   | {kind: "Claim", work: string, claim: string, attempt: null}
@@ -231,6 +244,7 @@ function replayTransactions(transactions) {
     })
   );
 
+  debugLog("replay completed", { transactions: facts.size, works: works.size, claims: claims.size });
   return {
     work: Object.fromEntries([...works].map(work => [work, workState[work].state])),
     winner: Object.fromEntries([...works].map(work => [work, workState[work].winner])),
@@ -259,6 +273,7 @@ function applyTransactions(transactions, intents) {
   /** @type {{transaction: DispatchWorkTransaction, reason: string}[]} */
   const rejected = [];
 
+  debugLog("applying intents", { existing: facts.size, intents: intents.length });
   intents.forEach((transaction, index) => {
     try {
       validateTransaction(transaction);
@@ -267,6 +282,7 @@ function applyTransactions(transactions, intents) {
     }
     const key = transactionKey(transaction);
     if (facts.has(key)) {
+      debugLog("intent already present", { kind: transaction.kind });
       return;
     }
 
@@ -305,14 +321,17 @@ function applyTransactions(transactions, intents) {
 
     if (reason) {
       rejected.push({ transaction, reason });
+      debugLog("intent rejected", { kind: transaction.kind, reason });
       return;
     }
 
     const fact = copyTransaction(transaction);
     facts.set(key, fact);
     accepted.push(fact);
+    debugLog("intent accepted", { kind: transaction.kind });
   });
 
+  debugLog("intent application completed", { accepted: accepted.length, rejected: rejected.length });
   return { transactions: accepted, rejected };
 }
 
