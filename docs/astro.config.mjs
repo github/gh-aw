@@ -378,7 +378,7 @@ export default defineConfig({
             { label: "Quick Start", link: "/setup/quick-start/" },
             { label: "Creating New Workflows", link: "/setup/creating-workflows/" },
             { label: "Working with Workflows", link: "/guides/working-with-workflows/" },
-            { label: "Creation Wizard", link: "/wizard/" },
+            { label: "Creation Wizard", link: "/wizard/", attrs: { class: "sidebar-external", target: "_blank", rel: "noopener" } },
             { label: "CLI Commands", link: "/setup/cli/" },
           ],
         },
