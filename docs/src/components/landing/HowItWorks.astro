@@ -13,20 +13,19 @@ const engines = [
 ];
 ---
 
-<LandingSection id="how-it-works" title="How it works" lede="Write a task in Markdown. GitHub compiles it into an Actions workflow and runs your coding agent.">
+<LandingSection id="how-it-works" title="How it works" lede="Prompt your coding agent to create a workflow. GitHub compiles it into an Actions workflow and runs it.">
   <ol class="aw-steps">
     <li class="aw-step">
-      <div class="aw-frag aw-file" role="img" aria-label="A file named triage.md with the lines on: issues, safe-outputs: add-labels, and the instruction Label new issues by type and priority.">
-        <div class="aw-bar"><span class="aw-ico" set:html={icon('file')} />.github/workflows/triage.md</div>
-<pre class="aw-code" aria-hidden="true"><span class="m">---</span>
-<span class="k">on:</span> issues
-<span class="k">safe-outputs:</span>
-<span class="k">  add-labels:</span>
-<span class="m">---</span>
-Label new issues by type and priority.</pre>
+      <div class="aw-frag aw-prompt-card" role="img" aria-label="A GitHub Copilot prompt: slash agentic workflows, create a daily status workflow. Followed by slash agentic workflow, optimize it.">
+        <div class="aw-bar">GitHub Copilot</div>
+        <div class="aw-prompt-body" aria-hidden="true">
+          <p class="aw-prompt-command">/agentic-workflows</p>
+          <p class="aw-prompt-text">Create a daily status workflow.</p>
+          <p class="aw-prompt-followup">/agentic-workflow optimize it</p>
+        </div>
       </div>
-      <h3>Write</h3>
-      <p>Describe the job in plain language, with the triggers and permissions it needs.</p>
+      <h3>Prompt</h3>
+      <p>Ask your coding agent for a workflow in plain language, then refine it with <code>/agentic-workflow optimize it</code>.</p>
     </li>
 
     <li class="aw-step">
@@ -134,21 +133,32 @@ Label new issues by type and priority.</pre>
     white-space: nowrap;
     overflow: hidden;
   }
-  .aw-code {
-    margin: 0;
+  .aw-prompt-body {
+    display: grid;
+    gap: 0.5rem;
     padding: 0.875rem 1rem;
-    overflow: hidden;
-    white-space: pre-wrap;
-    font-family: var(--aw-font-mono);
     font-size: var(--aw-step--1);
-    line-height: 1.6;
-    color: var(--aw-color-text);
-    background: transparent;
-    border: 0;
-    border-radius: 0;
+    line-height: 1.45;
   }
-  .m,
-  .k {
+  .aw-prompt-body p {
+    margin: 0;
+  }
+  .aw-prompt-command {
+    width: fit-content;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--aw-color-complement-low);
+    color: var(--aw-color-complement);
+    font-family: var(--aw-font-mono);
+  }
+  .aw-prompt-text {
+    color: var(--aw-color-text-strong);
+  }
+  .aw-prompt-followup {
+    color: var(--aw-color-text-muted);
+    font-family: var(--aw-font-mono);
+  }
+  .m {
     color: var(--aw-color-text-muted);
   }
   .aw-term-body,

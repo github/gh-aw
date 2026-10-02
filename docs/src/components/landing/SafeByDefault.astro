@@ -414,8 +414,14 @@ const layers = [
 </style>
 
 <script>
-  const root = document.querySelector<HTMLElement>('[data-safe-root]');
-  if (root) {
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const root = document.querySelector<HTMLElement>('[data-safe-root]');
+    if (!root) return;
+
+    const controller = new AbortController();
     const layers = Array.from(root.querySelectorAll<HTMLElement>('.aw-layer'));
     const buttons = layers.map((l) => l.querySelector<HTMLButtonElement>('.aw-row')!);
     const desktop = window.matchMedia('(min-width: 52rem)');
@@ -438,10 +444,15 @@ const layers = [
     let userTookOver = false;
     let inView = false;
     let hovering = false;
+    let focusoutRaf = 0;
     const updateAuto = () => {
       const on = !userTookOver && inView && desktop.matches && !reduced.matches;
       root.toggleAttribute('data-auto', on);
       root.toggleAttribute('data-paused', hovering || root.contains(document.activeElement));
+    };
+    const onFocusOut = () => {
+      if (focusoutRaf) cancelAnimationFrame(focusoutRaf);
+      focusoutRaf = requestAnimationFrame(updateAuto);
     };
     const takeOver = () => {
       userTookOver = true;
@@ -452,18 +463,19 @@ const layers = [
       if (!(e.target as HTMLElement).classList.contains('aw-progress')) return;
       if (!root.hasAttribute('data-auto')) return;
       setActive((current() + 1) % layers.length);
-    });
-    root.addEventListener('pointerenter', () => { hovering = true; updateAuto(); });
-    root.addEventListener('pointerleave', () => { hovering = false; updateAuto(); });
-    root.addEventListener('focusin', updateAuto);
-    root.addEventListener('focusout', () => requestAnimationFrame(updateAuto));
-    new IntersectionObserver(
+    }, { signal: controller.signal });
+    root.addEventListener('pointerenter', () => { hovering = true; updateAuto(); }, { signal: controller.signal });
+    root.addEventListener('pointerleave', () => { hovering = false; updateAuto(); }, { signal: controller.signal });
+    root.addEventListener('focusin', updateAuto, { signal: controller.signal });
+    root.addEventListener('focusout', onFocusOut, { signal: controller.signal });
+    const intersectionObserver = new IntersectionObserver(
       ([entry]) => {
         inView = entry.isIntersecting;
         updateAuto();
       },
       { threshold: 0.35 },
-    ).observe(root);
+    );
+    intersectionObserver.observe(root);
     reduced.addEventListener('change', updateAuto);
 
     buttons.forEach((b, i) => {
@@ -471,7 +483,7 @@ const layers = [
         takeOver();
         if (desktop.matches) setActive(i);
         else setActive(current() === i ? null : i);
-      });
+      }, { signal: controller.signal });
       b.addEventListener('keydown', (e) => {
         const keys: Record<string, number> = {
           ArrowDown: (i + 1) % buttons.length,
@@ -485,7 +497,7 @@ const layers = [
         const next = keys[e.key];
         buttons[next].focus();
         if (desktop.matches) setActive(next);
-      });
+      }, { signal: controller.signal });
     });
 
     // Desktop always shows one detail.
@@ -495,5 +507,20 @@ const layers = [
     };
     desktop.addEventListener('change', sync);
     sync();
+
+    cleanup = () => {
+      controller.abort();
+      intersectionObserver.disconnect();
+      reduced.removeEventListener('change', updateAuto);
+      desktop.removeEventListener('change', sync);
+      if (focusoutRaf) cancelAnimationFrame(focusoutRaf);
+      root.removeAttribute('data-enhanced');
+      root.removeAttribute('data-auto');
+      root.removeAttribute('data-paused');
+    };
   }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>

@@ -305,22 +305,53 @@ const { placement = 'hero', strength = 1, forceDark = false } = Astro.props;
 
     readColors();
 
-    new ResizeObserver(update).observe(root);
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(root);
 
-    new IntersectionObserver((entries) => {
+    const intersectionObserver = new IntersectionObserver((entries) => {
       onScreen = entries.some((e) => e.isIntersecting);
       update();
-    }).observe(root);
+    });
+    intersectionObserver.observe(root);
 
-    new MutationObserver(() => {
+    const mutationObserver = new MutationObserver(() => {
       readColors();
       if (visible()) draw(reduceMotion.matches ? t0 + 20000 : performance.now());
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    });
+    mutationObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     document.addEventListener('visibilitychange', update);
     reduceMotion.addEventListener('change', update);
     update();
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+      mutationObserver.disconnect();
+      document.removeEventListener('visibilitychange', update);
+      reduceMotion.removeEventListener('change', update);
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    };
   }
 
-  document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach(init);
+  let cleanups: (() => void)[] = [];
+  function cleanup() {
+    cleanups.forEach((fn) => fn());
+    cleanups = [];
+  }
+  function initialize() {
+    cleanup();
+    document.querySelectorAll<HTMLElement>('[data-hero-bg-a]').forEach((root) => {
+      const dispose = init(root);
+      if (dispose) cleanups.push(dispose);
+    });
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', cleanup);
+  initialize();
 </script>

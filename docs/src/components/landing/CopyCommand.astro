@@ -102,23 +102,41 @@ const checkIcon = octicons.check.toSVG({ width: 16, height: 16 });
 </style>
 
 <script>
-  document.querySelectorAll<HTMLElement>('[data-copy-command]').forEach((root) => {
-    const btn = root.querySelector('button');
-    const status = root.querySelector('[role="status"]');
-    let timer: number | undefined;
-    btn?.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(root.dataset.copyCommand ?? '');
-      } catch {
-        return;
-      }
-      root.setAttribute('data-copied', '');
-      if (status) status.textContent = 'Copied';
-      clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        root.removeAttribute('data-copied');
-        if (status) status.textContent = '';
-      }, 1500);
+  let cleanup = () => {};
+
+  function initialize() {
+    cleanup();
+    const controller = new AbortController();
+    const timers: number[] = [];
+
+    document.querySelectorAll<HTMLElement>('[data-copy-command]').forEach((root) => {
+      const btn = root.querySelector('button');
+      const status = root.querySelector('[role="status"]');
+      let timer: number | undefined;
+      btn?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(root.dataset.copyCommand ?? '');
+        } catch {
+          return;
+        }
+        root.setAttribute('data-copied', '');
+        if (status) status.textContent = 'Copied';
+        if (timer !== undefined) clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          root.removeAttribute('data-copied');
+          if (status) status.textContent = '';
+        }, 1500);
+        timers.push(timer);
+      }, { signal: controller.signal });
     });
-  });
+
+    cleanup = () => {
+      controller.abort();
+      timers.forEach(clearTimeout);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initialize);
+  document.addEventListener('astro:before-swap', () => cleanup());
+  initialize();
 </script>
