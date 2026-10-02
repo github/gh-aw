@@ -97,4 +97,12 @@ describe("substitutePlaceholders", () => {
     });
     expect(fs.readFileSync(testFile, "utf8")).toBe("Repo: test/repo\nComment: \nIssue: ");
   });
+
+  it("preserves legacy prompt substitution when split files are absent", async () => {
+    const promptPath = path.join(tempDir, "prompt.txt");
+    fs.writeFileSync(promptPath, "__ACTOR__");
+    await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
+    expect(fs.readFileSync(promptPath, "utf8")).toBe("developer");
+    fs.unlinkSync(promptPath);
+  });
 });

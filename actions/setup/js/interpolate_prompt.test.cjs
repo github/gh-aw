@@ -349,6 +349,33 @@ describe("interpolate_prompt", () => {
           // The prompt.txt should have the interpolated value
           expect(fs.readFileSync(promptPath, "utf8")).toContain("Process: 123");
         }),
+        it("keeps split prompts synchronized through imports, rendering, and placeholder substitution", async () => {
+          const systemPath = path.join(tmpDir, "system.txt");
+          const userPath = path.join(tmpDir, "user.txt");
+          const system = "<system>\nRepo: ${GH_AW_EXPR_REPO}\n__ACTOR__\n</system>\n";
+          const user = "Task:\n{{#runtime-import .github/workflows/helper.md}}\n{{#if false}}\nHidden\n{{/if}}\n__ACTOR__\n";
+          fs.mkdirSync(path.join(tmpDir, ".github", "workflows"), { recursive: true });
+          fs.writeFileSync(path.join(tmpDir, ".github", "workflows", "helper.md"), "Imported task");
+          fs.writeFileSync(systemPath, system);
+          fs.writeFileSync(userPath, user);
+          fs.writeFileSync(promptPath, system + user);
+          process.env.GH_AW_EXPR_REPO = "github/gh-aw";
+
+          await main();
+          expect(core.setFailed).not.toHaveBeenCalled();
+          expect(fs.readFileSync(path.join(tmpDir, "prompt-template.txt"), "utf8")).toBe(system + user);
+          const substitutePlaceholders = require("./substitute_placeholders.cjs");
+          await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
+
+          const finalSystem = fs.readFileSync(systemPath, "utf8");
+          const finalUser = fs.readFileSync(userPath, "utf8");
+          expect(finalSystem).toBe("<system>\nRepo: github/gh-aw\ndeveloper\n</system>\n");
+          expect(finalUser).toContain("Imported task");
+          expect(finalUser).not.toContain("runtime-import");
+          expect(finalUser).not.toContain("Hidden");
+          expect(finalUser).toContain("developer");
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(finalSystem + finalUser);
+        }),
         it("should write prompt-import-tree.json with version and empty children when no imports", async () => {
           const templateContent = "Hello World";
           fs.writeFileSync(promptPath, templateContent, "utf8");
