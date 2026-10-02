@@ -70,7 +70,14 @@ body:has(.aw-hero) .sl-container {
 
 /* Title panel: no bottom padding; the body follows at heading-to-body rhythm */
 main > .content-panel:has(h1#_top) {
+  padding-top: 2rem;
   padding-bottom: 0;
+}
+
+@media (min-width: 50rem) {
+  main > .content-panel:has(h1#_top) {
+    padding-top: 3.5rem;
+  }
 }
 
 main > .content-panel:has(h1#_top) + .content-panel {
@@ -191,7 +198,8 @@ main > .content-panel:has(h1#_top) + .content-panel {
 .sidebar .top-level > li > details > summary,
 .sidebar .top-level > li > a {
   font-weight: 600;
-  font-size: var(--aw-step--1);
+  font-size: var(--aw-text-ui);
+  line-height: 1.45;
   color: var(--aw-color-text);
   letter-spacing: 0;
   border-radius: 6px;
@@ -213,15 +221,15 @@ main > .content-panel:has(h1#_top) + .content-panel {
 
 /* Breathing room between groups */
 .sidebar .top-level > li + li {
-  margin-top: 1.125rem;
+  margin-top: 1.375rem;
 }
 
 .sidebar .top-level li li a {
   transition: color 0.15s ease, background-color 0.15s ease;
   color: var(--aw-color-text-muted);
-  font-size: var(--aw-step--1);
+  font-size: var(--aw-text-ui);
   line-height: 1.45;
-  padding: 0.3rem 0.5rem;
+  padding: 0.375rem 0.625rem;
   border-radius: 6px;
   border: none;
   font-weight: 400;
@@ -309,40 +317,164 @@ header.header {
   margin-bottom: 0;
 }
 
-/* Header Anchor Links */
-.sl-markdown-content h1 a.header-anchor,
-.sl-markdown-content h2 a.header-anchor,
-.sl-markdown-content h3 a.header-anchor,
-.sl-markdown-content h4 a.header-anchor,
-.sl-markdown-content h5 a.header-anchor,
-.sl-markdown-content h6 a.header-anchor,
-.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) a[aria-label^="Permalink"] {
-  font-size: 0.2em;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-/* Mobile-specific: Increase touch targets for header anchor links */
-@media (max-width: 768px) {
-  .sl-markdown-content h1 a.header-anchor,
-  .sl-markdown-content h2 a.header-anchor,
-  .sl-markdown-content h3 a.header-anchor,
-  .sl-markdown-content h4 a.header-anchor,
-  .sl-markdown-content h5 a.header-anchor,
-  .sl-markdown-content h6 a.header-anchor,
-  .sl-markdown-content :is(h1, h2, h3, h4, h5, h6) a[aria-label^="Permalink"] {
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    opacity: 0.5; /* Make visible on mobile for better discoverability */
+/* Phones: step-4 bottoms out near body size, so go one step up */
+@media (max-width: 30rem) {
+  .content-panel h1#_top {
+    font-size: var(--aw-step-5);
   }
 }
 
-.sl-markdown-content :is(h1, h2, h3, h4, h5, h6):hover a[aria-label^="Permalink"] {
-  opacity: 0.2;
+/* === Heading links (markup: Starlight's rehype-heading-links; script: heading-links.ts) ===
+   Starlight wraps each heading as .sl-heading-wrapper > h2 + a.sl-anchor-link.
+   Its chain SVG is hidden; the link draws Primer's `link` octicon with a mask and,
+   once heading-links.ts has run, copies the section URL on click and briefly shows
+   `check` plus a small "Copied" tip. Without JS it stays a plain #anchor link.
+   With a mouse on wide screens the button sits in the left gutter and fades in on
+   hover; elsewhere it follows the heading text, always faintly visible on touch. */
+.sl-markdown-content .sl-heading-wrapper {
+  --aw-anchor-box: 1.5rem;
+  --aw-anchor-lh: var(--aw-leading-snug);
+  /* Starlight's end-of-line reservation, resized for the button box */
+  --sl-anchor-icon-size: var(--aw-anchor-box);
+  --sl-anchor-icon-gap: 0.25rem;
+  position: relative;
+  line-height: var(--aw-anchor-lh);
+}
+
+/* Size the wrapper like its heading, so the line box (and the button's em-based
+   centring) follows the heading rather than Starlight's larger --sl-text-hN strut.
+   Starlight spaces wrappers at 1.5em of its own sizes; keep that spacing. */
+.sl-markdown-content .sl-heading-wrapper.level-h1 { font-size: var(--aw-step-4); --aw-anchor-lh: var(--aw-leading-tight); --aw-anchor-space: var(--sl-text-h1); }
+.sl-markdown-content .sl-heading-wrapper.level-h2 { font-size: var(--aw-step-2); --aw-anchor-space: var(--sl-text-h2); }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { font-size: var(--aw-step-1); --aw-anchor-space: var(--sl-text-h3); }
+.sl-markdown-content .sl-heading-wrapper:is(.level-h4, .level-h5, .level-h6) { font-size: var(--aw-step-0); --aw-anchor-space: var(--sl-text-h4); }
+
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper {
+  margin-top: calc(1.5 * var(--aw-anchor-space));
+}
+
+.sl-markdown-content .sl-anchor-icon {
+  display: none;
+}
+
+.sl-markdown-content .sl-anchor-link {
+  align-items: center;
+  justify-content: center;
+  width: var(--aw-anchor-box);
+  height: var(--aw-anchor-box);
+  /* Centre the box on the heading's first line */
+  vertical-align: top;
+  transform: translateY(calc((var(--aw-anchor-lh) * 1em - var(--aw-anchor-box)) / 2));
+  border-radius: 6px;
+  color: var(--aw-color-text-muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.sl-markdown-content .sl-anchor-link::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-link) center / contain no-repeat;
+  mask: var(--aw-icon-link) center / contain no-repeat;
+}
+
+.sl-markdown-content .sl-heading-wrapper:hover .sl-anchor-link,
+.sl-markdown-content .sl-anchor-link:focus-visible,
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  opacity: 1;
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--aw-color-text);
+  background-color: var(--aw-color-bg-subtle);
+}
+
+.sl-markdown-content .sl-anchor-link:focus-visible {
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] {
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied]::before {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+/* "Copied" tip: injected by heading-links.ts here, and shared with the code-block
+   copy button's feedback label (see "Code block copy button") */
+.sl-markdown-content .aw-anchor-tip,
+.expressive-code .frame .copy .feedback {
+  padding: 0.1875rem 0.4375rem;
+  border: 1px solid var(--aw-color-divider);
+  border-radius: 6px;
+  background-color: var(--aw-color-surface);
+  font-family: var(--aw-font-sans);
+  font-size: var(--aw-step--1);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--aw-color-text);
+  pointer-events: none;
+}
+
+.sl-markdown-content .aw-anchor-tip {
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, 0.125rem);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Touch: no hover, so keep the button faintly visible after the text */
+@media (hover: none) {
+  .sl-markdown-content .sl-anchor-link {
+    opacity: 0.45;
+  }
+}
+
+/* Mouse on wide screens: move the button into the left gutter */
+@media (hover: hover) and (min-width: 50rem) {
+  .sl-markdown-content .sl-heading-wrapper > :first-child:not([hidden]) {
+    padding-inline-end: 0;
+  }
+
+  .sl-markdown-content .sl-anchor-link {
+    position: absolute;
+    top: 0;
+    inset-inline-start: calc(-1 * (var(--aw-anchor-box) + 0.375rem));
+    margin: 0;
+  }
+
+  /* Bridge the gap to the heading so the button stays visible on the way over */
+  .sl-markdown-content .sl-anchor-link::after {
+    inset: -0.25rem -0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-markdown-content .sl-anchor-link,
+  .sl-markdown-content .aw-anchor-tip {
+    transition: none;
+  }
+
+  .sl-markdown-content .aw-anchor-tip,
+  .sl-markdown-content .sl-anchor-link[data-copied] .aw-anchor-tip {
+    transform: translate(-50%, 0);
+  }
 }
 
 .sl-markdown-content h2:not(.not-content *) {
@@ -388,21 +520,106 @@ header.header {
   --code-background: var(--aw-color-bg-subtle);
 }
 
-/* Copy button: compact and quiet (overrides Expressive Code's larger touch sizing) */
-.expressive-code .copy button {
-  width: 1.75rem;
-  height: 1.75rem;
-  margin: 0.375rem;
-  border: 1px solid var(--aw-color-border);
-  border-radius: 6px;
-  background: var(--aw-color-bg-subtle);
-  color: var(--aw-color-text-muted);
+/* Code block copy button (Expressive Code's frames plugin; markup:
+   .frame > .copy > [aria-live] > .feedback + button > div). Same language as the
+   heading links: a quiet octicon button, `copy` morphing to `check`, and the shared
+   "Copied" tip beside it. EC's separate hover layer (button > div) and border layer
+   (::before) are dropped so every state shares one rounded box. EC's script adds
+   .feedback.show for 1.5s; the label text comes from src/content/i18n/en.json. */
+.expressive-code .frame .copy {
+  align-items: center;
+  gap: 0.375rem;
 }
 
-.expressive-code .copy button:hover,
-.expressive-code .copy button:focus-visible {
+.expressive-code .frame .copy button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--aw-color-text-muted);
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.expressive-code .frame .copy button div,
+.expressive-code .frame .copy button::before {
+  display: none;
+}
+
+.expressive-code .frame .copy button::after {
+  inset: 50% auto auto 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  background-color: currentColor;
+  -webkit-mask: var(--aw-icon-copy) center / contain no-repeat;
+  mask: var(--aw-icon-copy) center / contain no-repeat;
+}
+
+.expressive-code .frame .copy button:hover,
+.expressive-code .frame .copy button:focus-visible {
+  opacity: 1;
   color: var(--aw-color-text);
-  border-color: var(--aw-color-border-strong);
+  background-color: var(--aw-color-divider);
+}
+
+.expressive-code .frame .copy button:focus-visible {
+  outline: 2px solid var(--aw-color-accent-text);
+  outline-offset: 1px;
+}
+
+/* Copied: check icon in the neutral text colour */
+.expressive-code .frame .copy:has(.feedback.show) button {
+  opacity: 1;
+  color: var(--aw-color-text);
+  background-color: transparent;
+}
+
+.expressive-code .frame .copy:has(.feedback.show) button::after {
+  -webkit-mask-image: var(--aw-icon-check);
+  mask-image: var(--aw-icon-check);
+}
+
+.expressive-code .frame .copy .feedback {
+  align-self: center;
+  margin: 0;
+  transform: translateX(0.125rem);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.expressive-code .frame .copy .feedback.show {
+  transform: none;
+}
+
+.expressive-code .frame .copy .feedback::after {
+  content: none;
+}
+
+/* Touch: no hover, so keep the button visible */
+@media (hover: none) {
+  .expressive-code .frame .copy button {
+    opacity: 0.75;
+  }
+}
+
+/* Mouse: hidden until the block is hovered or focused (EC reveals it at 0.75) */
+@media (hover: hover) {
+  .expressive-code .frame:hover .copy button:not(:hover),
+  .expressive-code .frame:focus-within :focus-visible ~ .copy button:not(:hover) {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expressive-code .frame .copy button,
+  .expressive-code .frame .copy .feedback {
+    transition: none;
+  }
+
+  .expressive-code .frame .copy .feedback {
+    transform: none;
+  }
 }
 
 /* Inline code */
@@ -568,7 +785,7 @@ header.header {
 }
 
 /* Links */
-.sl-markdown-content a:not(.sl-link-button):not(.not-content *) {
+.sl-markdown-content a:not(.sl-link-button, .sl-anchor-link):not(.not-content *) {
   color: var(--aw-color-link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -577,7 +794,7 @@ header.header {
   transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
-.sl-markdown-content a:not(.sl-link-button):not(.not-content *):hover {
+.sl-markdown-content a:not(.sl-link-button, .sl-anchor-link):not(.not-content *):hover {
   color: var(--aw-color-link);
   text-decoration-color: var(--aw-color-accent);
 }
@@ -660,8 +877,8 @@ a.button:hover {
 
 /* Heading matches the sidebar's group labels */
 starlight-toc h2 {
-  margin-bottom: 0.625rem;
-  font-size: var(--aw-step--1);
+  margin-bottom: 0.75rem;
+  font-size: var(--aw-text-ui);
   font-weight: 600;
   line-height: 1.45;
   letter-spacing: 0;
@@ -678,12 +895,12 @@ mobile-starlight-toc .dropdown > ul {
 :is(starlight-toc, mobile-starlight-toc) a {
   position: relative;
   display: block;
-  padding-block: 0.3125rem;
-  padding-inline: calc(0.75rem + 0.75rem * var(--depth, 0)) 0.5rem;
+  padding-block: 0.375rem;
+  padding-inline: calc(0.875rem + 0.75rem * var(--depth, 0)) 0.5rem;
   border-radius: 0;
-  font-size: var(--aw-step--1);
+  font-size: var(--aw-text-ui);
   font-weight: 400;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--aw-color-text-muted);
   text-decoration: none;
   transition: color 0.15s ease;
@@ -729,7 +946,7 @@ mobile-starlight-toc summary {
   gap: 0.625rem;
   padding: 0 var(--sl-nav-pad-x);
   border-bottom: 1px solid var(--aw-color-divider);
-  font-size: var(--aw-step--1);
+  font-size: var(--aw-text-ui);
   cursor: pointer;
 }
 
@@ -1143,21 +1360,6 @@ main,
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-  }
-  
-  /* Anchor links in markdown content */
-  .sl-anchor-link,
-  a.sl-anchor-link,
-  .sl-markdown-content .sl-anchor-link {
-    min-width: 44px !important;
-    padding: 0.75rem !important;
-    /* Grow the tap area sideways/outwards only, so heading line spacing stays even */
-    margin-block: -0.75rem !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    vertical-align: middle;
-    line-height: 1;
   }
 }
 
