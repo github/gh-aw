@@ -109,7 +109,7 @@ function witness(jar, kind, op) {
 }
 
 async function main() {
-  const jar = process.env.TLA2TOOLS_JAR;
+  const jar = process.env.TLA2TOOLS_JAR && path.resolve(process.env.TLA2TOOLS_JAR);
   let validJar = false;
   try {
     validJar = Boolean(jar && fs.statSync(jar).isFile());
