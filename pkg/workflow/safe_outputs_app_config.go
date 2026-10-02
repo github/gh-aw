@@ -379,6 +379,51 @@ func (c *Compiler) buildGitHubAppTokenMintStepForRepository(app *GitHubAppConfig
 	return c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, "Generate GitHub App token", "safe-outputs-app-token")
 }
 
+func appTokenPermissionFields(app *GitHubAppConfig, permissions *Permissions) map[string]string {
+	if permissions == nil {
+		permissions = NewPermissionsContentsRead()
+	}
+	permissionFields := convertPermissionsToAppTokenFields(permissions)
+	for key, val := range app.Permissions {
+		scope := convertStringToPermissionScope(key)
+		if scope == "" {
+			safeOutputsAppLog.Printf("Skipping unknown permission scope %q in github-app.permissions", key)
+			continue
+		}
+		level := strings.ToLower(strings.TrimSpace(val))
+		tempPerms := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{scope: PermissionLevel(level)})
+		maps.Copy(permissionFields, convertPermissionsToAppTokenFields(tempPerms))
+	}
+	if len(permissionFields) == 0 {
+		permissionFields["permission-contents"] = "none"
+	}
+	return permissionFields
+}
+
+func appendGitHubAppTokenRepositoryInput(steps []string, app *GitHubAppConfig, fallbackRepoExpr string) []string {
+	if len(app.Repositories) == 1 {
+		for _, repository := range app.Repositories {
+			if repository == "*" {
+				safeOutputsAppLog.Print("Using org-wide GitHub App token (repositories: *)")
+			} else {
+				steps = append(steps, fmt.Sprintf("          repositories: %s\n", repository))
+			}
+		}
+	} else if len(app.Repositories) > 1 {
+		steps = append(steps, "          repositories: |-\n")
+		for _, repository := range app.Repositories {
+			steps = append(steps, fmt.Sprintf("            %s\n", repository))
+		}
+	} else {
+		repoExpr := fallbackRepoExpr
+		if repoExpr == "" {
+			repoExpr = "${{ github.event.repository.name }}"
+		}
+		steps = append(steps, fmt.Sprintf("          repositories: %s\n", repoExpr))
+	}
+	return steps
+}
+
 func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
 	safeOutputsAppLog.Printf("Building GitHub App token mint step: owner=%s, repos=%d", app.Owner, len(app.Repositories))
 	var steps []string
@@ -402,69 +447,16 @@ func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, per
 	// Add owner - default to the derived checkout owner when available, otherwise current repository owner.
 	steps = append(steps, fmt.Sprintf("          owner: %s\n", owner))
 
-	// Add repositories - behavior depends on configuration:
-	// - If repositories is ["*"], omit the field to allow org-wide access
-	// - If repositories is a single value, use inline format
-	// - If repositories has multiple values, use block scalar format (newline-separated)
-	//   to ensure clarity and proper parsing by actions/create-github-app-token
-	// - If repositories is empty/not specified, default to fallbackRepoExpr or the current repository
-	if len(app.Repositories) == 1 && app.Repositories[0] == "*" {
-		// Org-wide access: omit repositories field entirely
-		safeOutputsAppLog.Print("Using org-wide GitHub App token (repositories: *)")
-	} else if len(app.Repositories) == 1 {
-		// Single repository: use inline format for clarity
-		steps = append(steps, fmt.Sprintf("          repositories: %s\n", app.Repositories[0]))
-	} else if len(app.Repositories) > 1 {
-		// Multiple repositories: use block scalar format (newline-separated)
-		// This format is more readable and avoids potential issues with comma-separated parsing
-		steps = append(steps, "          repositories: |-\n")
-		for _, repo := range app.Repositories {
-			steps = append(steps, fmt.Sprintf("            %s\n", repo))
-		}
-	} else {
-		// No explicit repositories: use fallback expression, or default to the triggering repo's name.
-		// For workflow_call relay scenarios the caller passes needs.activation.outputs.target_repo_name so
-		// the token is scoped to the platform (host) repo name rather than the full owner/repo slug.
-		repoExpr := fallbackRepoExpr
-		if repoExpr == "" {
-			repoExpr = "${{ github.event.repository.name }}"
-		}
-		steps = append(steps, fmt.Sprintf("          repositories: %s\n", repoExpr))
-	}
+	steps = appendGitHubAppTokenRepositoryInput(steps, app, fallbackRepoExpr)
 
 	// Always add github-api-url from environment variable
 	steps = append(steps, "          github-api-url: ${{ github.api_url }}\n")
 
-	// Add permission-* fields automatically computed from job permissions.
-	// Sort keys to ensure deterministic compilation order.
-	if permissions != nil {
-		permissionFields := convertPermissionsToAppTokenFields(permissions)
+	permissionFields := appTokenPermissionFields(app, permissions)
+	keys := sliceutil.SortedKeys(permissionFields)
 
-		// Apply app.Permissions overrides on top of handler-computed permissions.
-		// This allows workflows to add GitHub App-only scopes (e.g. members: read,
-		// organization-administration: read) that are not expressible via standard
-		// safe-output handler declarations.  The override wins over the computed value
-		// for any scope it declares.
-		for key, val := range app.Permissions {
-			scope := convertStringToPermissionScope(key)
-			if scope == "" {
-				safeOutputsAppLog.Printf("Skipping unknown permission scope %q in github-app.permissions", key)
-				continue
-			}
-			level := strings.ToLower(strings.TrimSpace(val))
-			// Map the scope back to a permission-* field name by running it through
-			// a single-entry Permissions object so the same mapping logic applies.
-			tempPerms := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{scope: PermissionLevel(level)})
-			maps.Copy(permissionFields, convertPermissionsToAppTokenFields(tempPerms))
-		}
-
-		// Extract and sort keys for deterministic ordering
-		keys := sliceutil.SortedKeys(permissionFields)
-
-		// Add permissions in sorted order
-		for _, key := range keys {
-			steps = append(steps, fmt.Sprintf("          %s: %s\n", key, permissionFields[key]))
-		}
+	for _, key := range keys {
+		steps = append(steps, fmt.Sprintf("          %s: %s\n", key, permissionFields[key]))
 	}
 
 	return steps

@@ -144,7 +144,13 @@ func sideRepoAppTokenMintStepYAML(app *GitHubAppConfig, targetRepo string) strin
 	var c Compiler
 	lines := c.buildGitHubAppTokenMintStepWithMeta(
 		app,
-		nil, // no additional permission scoping; the app's installation grants determine access
+		NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+			PermissionActions:      PermissionRead,
+			PermissionContents:     PermissionWrite,
+			PermissionDiscussions:  PermissionWrite,
+			PermissionIssues:       PermissionWrite,
+			PermissionPullRequests: PermissionWrite,
+		}),
 		targetRepo,
 		targetRepo,
 		"Generate GitHub App token",

@@ -659,7 +659,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 		headRepoSlug := getSafeOutputsHeadRepoSlug(data.SafeOutputs)
 		preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepWithMeta(
 			headApp,
-			nil,
+			NewPermissionsContentsWritePRWrite(),
 			headRepoNameFromSlug(headRepoSlug),
 			headRepoSlug,
 			"Generate GitHub App head token",
