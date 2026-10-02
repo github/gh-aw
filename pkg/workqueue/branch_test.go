@@ -78,3 +78,27 @@ func TestBranchRejectsInvalidRepositoryAndBranch(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteQueueFileReplacesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(t.TempDir(), "outside")
+	const original = "must not be overwritten"
+	if err := os.WriteFile(target, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	queuePath := filepath.Join(dir, FileName)
+	if err := os.Symlink(target, queuePath); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+	if err := writeQueueFile(dir, []byte("queue")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != original {
+		t.Fatalf("symlink target changed: %q, %v", got, err)
+	}
+	info, err := os.Lstat(queuePath)
+	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("queue path was not replaced by a regular file: %v, %v", info, err)
+	}
+}

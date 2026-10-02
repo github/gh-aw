@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 const maxRetries = 5
@@ -142,7 +144,7 @@ func (b Branch) publish(ctx context.Context, dir string, next []Transaction) err
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, FileName), data, 0600); err != nil {
+	if err := writeQueueFile(dir, data); err != nil {
 		return err
 	}
 	if _, err := git(ctx, dir, b.Remote, "add", "--", FileName); err != nil {
@@ -151,8 +153,34 @@ func (b Branch) publish(ctx context.Context, dir string, next []Transaction) err
 	if _, err := git(ctx, dir, b.Remote, "-c", "user.name=gh-aw", "-c", "user.email=gh-aw@users.noreply.github.com", "commit", "-qm", "Update dispatch work coordinator"); err != nil {
 		return err
 	}
-	_, err = git(ctx, dir, b.Remote, "push", "-q", "origin", "HEAD:refs/heads/"+b.Name)
+	remote, err := remoteURL(b.Remote)
+	if err != nil {
+		return err
+	}
+	_, err = git(ctx, dir, remote, "push", "-q", "origin", "HEAD:refs/heads/"+b.Name)
 	return err
+}
+
+func writeQueueFile(dir string, data []byte) error {
+	temp, err := os.CreateTemp(dir, "."+FileName+"-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	defer func() { _ = os.Remove(tempPath) }()
+	if err := temp.Chmod(constants.FilePermSensitive); err != nil {
+		return errors.Join(err, temp.Close())
+	}
+	if _, err := temp.Write(data); err != nil {
+		return errors.Join(err, temp.Close())
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tempPath, filepath.Join(dir, FileName)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Update retries rejected optimistic pushes from a fresh branch snapshot.

@@ -125,6 +125,17 @@ func TestReplayRejectsInvalidFactsAndMessages(t *testing.T) {
 			t.Errorf("accepted invalid message: %s", line)
 		}
 	}
+	completion, err := json.Marshal(Transaction{
+		Kind: "Completion", WorkID: work.WorkID, ClaimID: a.ClaimID, AttemptID: "attempt",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := strings.TrimSuffix(string(completion), "}") + `,"outcome":""}`
+	log, err := Parse(append(valid, append([]byte(line), '\n')...))
+	if err != nil || len(log) != 3 || log[2].Outcome != "" {
+		t.Fatalf("schema-valid empty outcome did not parse: %v, %v", log, err)
+	}
 	var value map[string]any
 	if err := json.Unmarshal(work.Work, &value); err != nil {
 		t.Fatal(err)

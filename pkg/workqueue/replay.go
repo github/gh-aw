@@ -148,7 +148,7 @@ func Parse(data []byte) ([]Transaction, error) {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		var raw map[string]json.RawMessage
+		var raw map[string]any
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+1, err)
 		}
@@ -156,18 +156,16 @@ func Parse(data []byte) ([]Transaction, error) {
 		if err := json.Unmarshal([]byte(line), &tx); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+1, err)
 		}
-		canonical, err := json.Marshal(tx)
+		schemas, err := transactionSchemas()
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+1, err)
 		}
-		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(canonical, &fields); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
+		schema, ok := schemas[tx.Kind]
+		if !ok {
+			return nil, fmt.Errorf("line %d: unknown transaction kind %q", i+1, tx.Kind)
 		}
-		for key := range raw {
-			if _, ok := fields[key]; !ok {
-				return nil, fmt.Errorf("line %d: unknown field %q", i+1, key)
-			}
+		if err := schema.Validate(raw); err != nil {
+			return nil, fmt.Errorf("line %d: invalid %s transaction: %w", i+1, tx.Kind, err)
 		}
 		if err := validateTransaction(tx); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+1, err)
