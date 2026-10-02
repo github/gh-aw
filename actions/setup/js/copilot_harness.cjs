@@ -139,8 +139,8 @@ const HTTP_400_RESPONSE_ERROR_PATTERN =
 // This is a persistent policy configuration error — retrying will not help.
 const MCP_POLICY_BLOCKED_PATTERN = /MCP servers were blocked by policy:/;
 
-// Pattern to detect "model not supported" error (e.g. Copilot Pro/Education users hitting
-// a model that is unavailable for their subscription tier).
+// Pattern to detect "model not supported" errors (e.g. a model unavailable to the
+// current token or repository context).
 // Also matches the Copilot SDK driver's policy-enablement error, which is emitted when a model
 // (commonly the one requested by a subagent / `task` dispatch) is disabled by the org/repo
 // Copilot policy:
@@ -148,7 +148,7 @@ const MCP_POLICY_BLOCKED_PATTERN = /MCP servers were blocked by policy:/;
 //    Check policy enablement under GitHub Settings > Copilot"
 // The alternative is anchored to the "policy enablement" phrase so that the generic
 // "No model available" wording alone does not produce false positives.
-// This is a persistent configuration error — retrying with --continue will not help.
+// Retrying the same session with --continue will not change model availability.
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
 
 // Pattern to detect missing authentication credentials.
@@ -1487,7 +1487,7 @@ async function main() {
           // CAPIError 400 is the well-known transient case, but any partial-execution failure is
           // eligible for a retry.
           // Exceptions:
-          //   - MCP policy errors and model-not-supported errors are persistent configuration issues.
+          //   - MCP policy errors and model-not-supported errors cannot be fixed by continuing the same session.
           //   - Auth errors trigger a one-time fallback to a fresh run; after that --continue is
           //     permanently disabled.
           //   - Null-type tool_call 400 errors poison conversation history — always restart fresh and
@@ -1718,7 +1718,7 @@ async function main() {
               }
               log(`attempt ${attempt + 1}: refreshed awf-reflect does not include model '${configuredModel || "(none)"}' — treating as non-retryable`);
             }
-            log(`attempt ${attempt + 1}: model not supported — not retrying (the requested model is unavailable for this subscription tier; specify a supported model in the workflow frontmatter)`);
+            log(`attempt ${attempt + 1}: model not supported — not retrying (the model is unavailable to this token/context; check the model catalog and provider access)`);
             return { action: "stop" };
           }
 

@@ -92,15 +92,15 @@ MCP servers can persist temporary state by reading and writing files under `/tmp
 
 ## Behavior
 
-GitHub Actions cache evicts unused entries after 7 days and provides a 10GB per-repository limit with LRU eviction. `retention-days` controls the retention of the uploaded artifact (1-90 days); it does not extend the cache lifetime.
+GitHub Actions cache evicts unused entries after 7 days and provides a 10GB per-repository limit with LRU eviction. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime.
 
-Cache memory is branch-scoped. Runs restore from caches on the same branch and can also fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves then create a branch-local cache lineage.
+Cache memory is branch-scoped: runs restore from the same branch first, then can fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves create a branch-local cache lineage.
 
-The compiler strips `${{ github.run_id }}` from restore keys so each run can fall back to earlier runs, and for `scope: repo` it adds a broader restore key for cross-workflow sharing within the same branch scope. Custom user-supplied keys automatically append `-${{ github.run_id }}` when needed.
+The compiler strips `${{ github.run_id }}` from restore keys so each run can fall back to earlier runs. For `scope: repo`, it also adds a broader restore key for cross-workflow sharing within the same branch scope. Custom user-supplied keys automatically append `-${{ github.run_id }}` when needed.
 
 ## Best Practices
 
-Use cache-memory for short-lived, branch-local state. Prefer scheduled runs on the default branch when a workflow depends on warmed caches, and use descriptive file names, hierarchical keys such as `project-${{ github.repository_owner }}-${{ github.workflow }}`, and the narrowest practical scope. Monitor total cache growth within the 10GB repository limit.
+Use cache-memory for short-lived, branch-local state. Prefer scheduled runs on the default branch when a workflow depends on warmed caches. Use descriptive file names, hierarchical keys such as `project-${{ github.repository_owner }}-${{ github.workflow }}`, and the narrowest practical scope, then monitor total cache growth within the 10GB repository limit.
 
 ## Comparison with Repo Memory
 
@@ -123,7 +123,7 @@ The [agentic maintenance](/gh-aw/reference/ephemerals/#cache-memory-cleanup) wor
 
 If files are not persisting, check cache key consistency and the restore/save log messages. For file access issues, create subdirectories first, verify permissions, and use absolute paths. If cache growth becomes a problem, clear old entries periodically or use time-based keys for auto-expiration.
 
-When an agent calls `missing_data` with `reason: `cache_memory_miss``, the conclusion handler automatically opens a failure issue that points to a likely cache path problem. Verify that the prompt uses the correct path (`/tmp/gh-aw/cache-memory/` by default or `/tmp/gh-aw/cache-memory-{id}/` for named caches) and that the cache key stays consistent across runs.
+When an agent calls `missing_data` with `reason: "cache_memory_miss"`, the conclusion handler automatically opens a failure issue that points to a likely cache path problem. Verify that the prompt uses the correct path (`/tmp/gh-aw/cache-memory/` by default or `/tmp/gh-aw/cache-memory-{id}/` for named caches) and that the cache key stays consistent across runs.
 
 ## Integrity-Aware Caching
 
@@ -155,7 +155,4 @@ See [Grumpy Code Reviewer](https://github.com/github/gh-aw/blob/main/.github/wor
 
 ## Learn More
 
-- [Repo Memory](/gh-aw/reference/repo-memory/) - Git branch-based persistent storage with unlimited retention
-- [Frontmatter](/gh-aw/reference/frontmatter/) - Complete frontmatter configuration guide
-- [Safe Outputs](/gh-aw/reference/safe-outputs/) - Output processing and automation
-- [GitHub Actions Cache Documentation](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows) - Official GitHub cache documentation
+See [Repo Memory](/gh-aw/reference/repo-memory/) for git branch-based persistent storage with unlimited retention, [Frontmatter](/gh-aw/reference/frontmatter/) for the full configuration model, and [Safe Outputs](/gh-aw/reference/safe-outputs/) for output processing and automation. For cache mechanics, refer to the [GitHub Actions cache documentation](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows).
