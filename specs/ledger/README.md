@@ -39,8 +39,9 @@ done
 ```
 
 Each configuration has two keys, two abstract JSON values, and at most two
-durable records. TLC 2026.10.01 completed exhaustive exploration without
-invariant violations (distinct states: raw **4,637**, log **4,637**, set
+durable records. TLC from [TLA+ Tools 1.8.0](https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0)
+completed exhaustive exploration without invariant violations (distinct states:
+raw **4,637**, log **4,637**, set
 **19,097**, map **19,241**, table **111,795**, counter **26,009**, notes
 **203,331**). The state counts may change with TLC version or model changes.
 `actions/setup/js/ledger_protocol_model.test.cjs` exercises hand-selected
