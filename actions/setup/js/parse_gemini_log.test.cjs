@@ -227,7 +227,7 @@ describe("parse_gemini_log.cjs", () => {
       expect(entries[0].message.content[0].is_error).toBe(true);
     });
 
-    it("should skip user messages and result entries", () => {
+    it("should retain user messages and result entries for canonical conversion", () => {
       const raw = [
         { type: "message", role: "user", content: "User prompt" },
         { type: "result", status: "success", stats: {} },
@@ -235,10 +235,12 @@ describe("parse_gemini_log.cjs", () => {
 
       const entries = transformGeminiEntries(raw);
 
-      expect(entries).toHaveLength(0);
+      expect(entries).toHaveLength(2);
+      expect(entries[0].message.content[0].text).toBe("User prompt");
+      expect(entries[1].type).toBe("result");
     });
 
-    it("should skip empty assistant delta messages", () => {
+    it("should preserve empty and whitespace-only assistant delta messages", () => {
       const raw = [
         { type: "message", role: "assistant", content: "", delta: true },
         { type: "message", role: "assistant", content: "   ", delta: true },
@@ -248,15 +250,78 @@ describe("parse_gemini_log.cjs", () => {
       const entries = transformGeminiEntries(raw);
 
       expect(entries).toHaveLength(1);
-      expect(entries[0].message.content[0].text).toBe("Valid content");
+      expect(entries[0].message.content[0].text).toBe("   Valid content");
     });
 
-    it("should serialize non-string tool_result output as JSON", () => {
+    it("should preserve structured tool_result output", () => {
       const raw = [{ type: "tool_result", tool_id: "t1", status: "success", output: { items: [1, 2] } }];
 
       const entries = transformGeminiEntries(raw);
 
-      expect(entries[0].message.content[0].content).toBe('{"items":[1,2]}');
+      expect(entries[0].message.content[0].content).toEqual({ items: [1, 2] });
+    });
+
+    describe("unified session regressions", () => {
+      it("emits canonical statistics without interpreting tool_calls as turns", () => {
+        const result = parseGeminiLog(JSON.stringify({ type: "result", status: "success", stats: { input_tokens: 0, output_tokens: 2, cached: 0, duration_ms: 0, tool_calls: 10 } }));
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0]).toMatchObject({ type: "session.result", data: { usage: { input_tokens: 0, output_tokens: 2, cache_read_input_tokens: 0 }, durationMs: 0 } });
+        expect(result.logEntries[0].data.numTurns).toBeUndefined();
+        expect(result.logEntries[0].stats.tool_calls).toBe(10);
+        expect(result.markdown).not.toContain("Turns:");
+      });
+
+      it("uses the supplied source token total instead of adding cached subtotals", () => {
+        const result = parseGeminiLog(JSON.stringify({ type: "result", stats: { total_tokens: 12, input_tokens: 10, output_tokens: 2, cached: 7 } }));
+        expect(result.logEntries[0].data.usage).toMatchObject({ total_tokens: 12, cache_read_input_tokens: 7 });
+        expect(result.markdown).toContain("Total: 12 (source total)");
+      });
+
+      it.each([false, 0, null, { content: [{ type: "text", text: "native output" }] }])("preserves typed completion output %j and metadata", output => {
+        const result = parseGeminiLog(
+          [
+            JSON.stringify({ type: "tool_use", timestamp: "native-time", tool_id: "tool", tool_name: "lookup", parameters: null }),
+            JSON.stringify({ type: "tool_result", timestamp: "end-time", tool_id: "tool", status: "success", output }),
+          ].join("\n")
+        );
+        expect(result.logEntries[0].data.input).toBeNull();
+        expect(result.logEntries[0].timestamp).toBe("native-time");
+        expect(result.logEntries[1].data.output).toEqual(output);
+        expect(result.logEntries[1].data.success).toBe(true);
+        expect(result.logEntries[1].timestamp).toBe("end-time");
+      });
+
+      it("retains exact streaming text and does not concatenate across a user message", () => {
+        const result = parseGeminiLog(
+          [
+            { type: "message", role: "assistant", delta: true, content: "Hello" },
+            { type: "message", role: "assistant", delta: true, content: " " },
+            { type: "message", role: "assistant", delta: true, content: "world\n" },
+            { type: "message", role: "user", content: "private prompt" },
+            { type: "message", role: "assistant", delta: true, content: "Next" },
+          ]
+            .map(JSON.stringify)
+            .join("\n")
+        );
+        expect(result.logEntries.map(e => e.type)).toEqual(["assistant.message", "user.message", "assistant.message"]);
+        expect(result.logEntries[0].data.content).toBe("Hello world\n");
+        expect(result.markdown).not.toContain("private prompt");
+      });
+
+      it("preserves explicit errors and leaves unknown outcomes unknown", () => {
+        const result = parseGeminiLog(
+          [
+            { type: "tool_result", tool_id: "orphan", status: "success", error: { message: "failure" }, output: "" },
+            { type: "tool_result", tool_id: "unknown", output: 0 },
+            { type: "result", error: { code: "provider" } },
+          ]
+            .map(JSON.stringify)
+            .join("\n")
+        );
+        expect(result.logEntries[0].data.success).toBe(false);
+        expect(result.logEntries[1].data.success).toBeUndefined();
+        expect(result.logEntries[2].data.errors).toEqual([{ code: "provider" }]);
+      });
     });
   });
 });
