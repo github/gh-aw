@@ -68,6 +68,23 @@ describe("add_mask_redaction", () => {
     it("returns the text unchanged when there are no masked values", () => {
       expect(redactMaskedValues("plain", [])).toBe("plain");
     });
+
+    it("redacts masks exceeding the regular expression size limit", () => {
+      const mask = "x".repeat(200000);
+      expect(redactMaskedValues(`before ${mask} after ${mask}`, [mask])).toBe("before *** after ***");
+      expect(redactMaskedValues("unrelated output", [mask])).toBe("unrelated output");
+    });
+
+    it("preserves leftmost matching and supplied mask priority for overlaps", () => {
+      expect(redactMaskedValues("abc ab", ["abc", "ab"])).toBe("*** ***");
+      expect(redactMaskedValues("abc", ["ab", "abc"])).toBe("***c");
+      expect(redactMaskedValues("zabc", ["abc", "za"])).toBe("***bc");
+    });
+
+    it("does not rescan replacements or create matches across removed values", () => {
+      expect(redactMaskedValues("secret *", ["secret", "*"])).toBe("*** ***");
+      expect(redactMaskedValues("axb", ["x", "ab"])).toBe("a***b");
+    });
   });
 
   describe("applyAddMaskRedaction", () => {

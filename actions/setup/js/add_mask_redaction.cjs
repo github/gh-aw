@@ -68,16 +68,6 @@ function collectAddMaskedValues(logContent) {
 }
 
 /**
- * Escape a literal string for use inside a regular expression.
- *
- * @param {string} value
- * @returns {string}
- */
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
  * Replace all occurrences of the masked values with `***`.
  *
  * @param {string} text
@@ -86,9 +76,25 @@ function escapeRegExp(value) {
  */
 function redactMaskedValues(text, maskedValues) {
   if (!text || !maskedValues || maskedValues.length === 0) return text;
-  const escapedAlternatives = maskedValues.map(escapeRegExp).join("|");
-  const pattern = new RegExp(`(?:${escapedAlternatives})`, "g");
-  return text.replace(pattern, MASK_REPLACEMENT);
+  const values = maskedValues.filter(value => value && text.includes(value));
+  const parts = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    let next = -1;
+    let length = 0;
+    for (const value of values) {
+      const index = text.indexOf(value, cursor);
+      if (index !== -1 && (next === -1 || index < next)) {
+        next = index;
+        length = value.length;
+      }
+    }
+    if (next === -1) break;
+    parts.push(text.slice(cursor, next), MASK_REPLACEMENT);
+    cursor = next + length;
+  }
+  parts.push(text.slice(cursor));
+  return parts.join("");
 }
 
 /**

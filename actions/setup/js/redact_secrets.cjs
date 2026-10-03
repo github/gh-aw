@@ -297,7 +297,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
       } catch (cleanupError) {
         throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after runtime mask redaction failed`);
       }
-      core.warning(`Failed to process file ${filePath}: ${getErrorMessage(error)}`);
+      core.warning(`Failed to process file ${filePath}: runtime mask redaction failed`);
       core.setFailed(`${ERR_VALIDATION}: Removed artifact source after runtime mask redaction failed`);
       return 0;
     }
