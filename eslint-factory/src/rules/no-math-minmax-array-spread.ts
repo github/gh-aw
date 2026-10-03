@@ -84,6 +84,19 @@ export const noMathMinMaxArraySpreadRule = createRule({
             if (variable.defs.length !== 1 || variable.references.some(ref => ref.isWrite() && !ref.init)) return true;
             const def = variable.defs[0];
             if (def.type !== "Variable" || def.parent.kind !== "const" || def.node.id.type !== AST_NODE_TYPES.Identifier) return true;
+            // Const fixes the binding, not the array's length. Reject prior uses
+            // that could mutate or pass the array to code that mutates it.
+            if (
+              variable.references.some(ref => {
+                const identifier = ref.identifier;
+                if (ref.init || identifier === node || identifier.range[0] >= node.range[0]) return false;
+                const parent = identifier.parent;
+                if (parent.type !== AST_NODE_TYPES.MemberExpression || parent.object !== identifier || parent.computed || parent.property.type !== AST_NODE_TYPES.Identifier || parent.property.name !== "length") return true;
+                const use = parent.parent;
+                return (use.type === AST_NODE_TYPES.AssignmentExpression && use.left === parent) || (use.type === AST_NODE_TYPES.UpdateExpression && use.argument === parent);
+              })
+            )
+              return true;
             return !def.node.init || !isBoundedArrayExpression(def.node.init);
           }
           scope = scope.upper;

@@ -139,6 +139,9 @@ func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiver
 		if scannerMethodReceiverMatches(pass, stmt, "Err", scanner) {
 			return true
 		}
+		if _, returns := stmt.(*ast.ReturnStmt); returns {
+			return false
+		}
 	}
 
 	return false

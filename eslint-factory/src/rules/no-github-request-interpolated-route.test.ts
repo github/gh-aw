@@ -272,6 +272,10 @@ describe("no-github-request-interpolated-route", () => {
           errors: [{ messageId: "interpolatedRoute", data: { kind: "template literal with interpolations", client: "fallbackClient" } }],
         },
         {
+          code: "const client = github || otherClient; client.request(`GET /repos/${owner}/${repo}`, {});",
+          errors: [{ messageId: "interpolatedRoute", data: { kind: "template literal with interpolations", client: "client" } }],
+        },
+        {
           code: `const client = useTarget ? targetClient : github; client.request("GET /repos/" + owner + "/" + repo, {});`,
           errors: [{ messageId: "interpolatedRoute", data: { kind: "string concatenation expression", client: "client" } }],
         },

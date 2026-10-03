@@ -56,7 +56,12 @@ describe("no-math-minmax-array-spread", () => {
 
   it("valid: const arrays bounded by literals, filter, or slice are accepted", () => {
     cjsRuleTester.run("no-math-minmax-array-spread", noMathMinMaxArraySpreadRule, {
-      valid: [`const times = [reset, retryAt].filter(value => Number.isFinite(value)); Math.max(...times);`, `const times = [a, b]; Math.min(...times);`, `const times = [a, b, c].slice(1).filter(Boolean); Math.max(...times);`],
+      valid: [
+        `const times = [reset, retryAt].filter(value => Number.isFinite(value)); Math.max(...times);`,
+        `const times = [a, b]; Math.min(...times);`,
+        `const times = [a, b, c].slice(1).filter(Boolean); Math.max(...times);`,
+        `const times = [a, b]; if (times.length) Math.max(...times);`,
+      ],
       invalid: [],
     });
   });
@@ -67,6 +72,9 @@ describe("no-math-minmax-array-spread", () => {
       invalid: [
         { code: `const times = runs.map(run => run.duration); Math.max(...times);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
         { code: `let times = [a, b]; times = runs; Math.max(...times);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
+        { code: `const values = [a, b]; values.push(...runtimeValues); Math.max(...values);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
+        { code: `const values = [a, b]; values.length = count; Math.max(...values);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
+        { code: `const values = [a, b]; consume(values); Math.max(...values);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
         { code: `const times = [...runs, a]; Math.min(...times);`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
         { code: `function f(times) { return Math.min(...times); }`, errors: [{ messageId: "noMathMinMaxArraySpread" }] },
       ],

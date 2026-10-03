@@ -150,6 +150,22 @@ describe("no-unsafe-catch-error-property", () => {
             },
           ],
         },
+        {
+          code: `try { f(); } catch (error) { const alias = error; error = new Error(); if (error instanceof Error) console.log(alias.message); }`,
+          errors: [
+            {
+              messageId: "unsafeProperty",
+              data: { prop: "message", errorVar: "alias" },
+              suggestions: [
+                {
+                  messageId: "useGetErrorMessage",
+                  data: { errorVar: "alias" },
+                  output: `try { f(); } catch (error) { const alias = error; error = new Error(); if (error instanceof Error) console.log(getErrorMessage(alias)); }`,
+                },
+              ],
+            },
+          ],
+        },
       ],
     });
   });

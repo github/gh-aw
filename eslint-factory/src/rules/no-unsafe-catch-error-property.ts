@@ -217,6 +217,17 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
       return init?.type === AST_NODE_TYPES.Identifier && resolveVariable(init) === caught ? identifier.name : null;
     }
 
+    function catchParamUnchangedSinceAlias(frame: CatchFrame, memberExpr: TSESTree.MemberExpression): boolean {
+      if (!frame.param) return false;
+      const caught = resolveVariable(frame.param);
+      const obj = memberExpr.object;
+      if (!caught || obj.type !== AST_NODE_TYPES.Identifier) return false;
+      const alias = resolveVariable(obj);
+      const declarator = alias?.defs[0]?.node;
+      if (!declarator || declarator.type !== AST_NODE_TYPES.VariableDeclarator) return false;
+      return !caught.references.some(ref => ref.isWrite() && ref.identifier.range[0] >= declarator.range[1] && ref.identifier.range[0] < memberExpr.range[0]);
+    }
+
     return {
       CatchClause(node) {
         const param = node.param;
@@ -239,7 +250,7 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
           if (
             isGuardedByAncestorBranch(sourceCode, memberExpr, varName) ||
             hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, varName) ||
-            (varName !== frame.varName && (isGuardedByAncestorBranch(sourceCode, memberExpr, frame.varName) || hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, frame.varName))) ||
+            (varName !== frame.varName && catchParamUnchangedSinceAlias(frame, memberExpr) && (isGuardedByAncestorBranch(sourceCode, memberExpr, frame.varName) || hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, frame.varName))) ||
             isCallOrderingGuarded(sourceCode, memberExpr, frame.safeCalls)
           ) {
             continue;

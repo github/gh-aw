@@ -109,7 +109,7 @@ function isContextGithubExpression(node: TSESTree.Node): boolean {
  */
 function isOctokitSourceExpression(node: TSESTree.Node): boolean {
   if (node.type === AST_NODE_TYPES.Identifier && OCTOKIT_CLIENT_NAMES.has(node.name)) return true;
-  if (node.type === AST_NODE_TYPES.LogicalExpression && (node.operator === "||" || node.operator === "??")) return isOctokitSourceExpression(node.right);
+  if (node.type === AST_NODE_TYPES.LogicalExpression && (node.operator === "||" || node.operator === "??")) return isOctokitSourceExpression(node.left) || isOctokitSourceExpression(node.right);
   if (node.type === AST_NODE_TYPES.ConditionalExpression) return isOctokitSourceExpression(node.consequent) || isOctokitSourceExpression(node.alternate);
 
   if (node.type === AST_NODE_TYPES.CallExpression) {
