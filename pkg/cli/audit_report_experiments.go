@@ -19,6 +19,7 @@ import (
 var experimentDataLog = logger.New("cli:audit_report_experiments")
 
 // ExperimentData represents the A/B experiment assignments for a single workflow run.
+// Unrelated to ExperimentInfo, which summarizes an experiment workflow for list output.
 type ExperimentData struct {
 	// Assignments maps each experiment name to the variant selected for this run.
 	// e.g. {"caveman": "yes", "style": "concise"}

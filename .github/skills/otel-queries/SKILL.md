@@ -271,7 +271,7 @@ Start with these files when telemetry indicates an instrumentation or correlatio
 - `actions/setup/js/generate_observability_summary.cjs`
 - `actions/setup/js/aw_context.cjs`
 - `pkg/workflow/observability_otlp.go`
-- `docs/src/content/docs/guides/custom-otlp-attributes.md`
+- `docs/src/content/docs/reference/open-telemetry-attributes.mdx`
 
 ## Anti-Patterns
 

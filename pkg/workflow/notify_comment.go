@@ -66,6 +66,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 // failed-jobs reporting, the optional status-comment update, and the steering-issue step.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
+	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
@@ -109,6 +110,11 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 // conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
+	if isDispatchWorkCoordinatorEnabled(data) {
+		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
+			conclusionPerms.Set(PermissionContents, PermissionRead)
+		}
+	}
 	// When observability.otlp.github-app is configured without app-id/private-key
 	// credentials, id-token: write is needed so the conclusion job can mint the OTLP
 	// OIDC token via core.getIDToken(audience) (mirrors threat_detection_job.go).

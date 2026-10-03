@@ -69,9 +69,9 @@ If a frontmatter setting appears to be silently ignored, the field name may be m
 
 ### Compilation Failures
 
-Common fixes: validate YAML syntax (indentation and `key: value` spacing), confirm required fields such as `on:`, and check types against the schema with `gh aw compile --verbose`.
+Validate YAML syntax (especially indentation and `key: value` spacing), confirm required fields such as `on:`, and check types against the schema with `gh aw compile --verbose`.
 
-If no lock file is generated, fix the reported errors (`gh aw compile 2>&1 | grep -i error`) and confirm `.github/workflows/` is writable. If stale `.lock.yml` files remain after deleting a workflow `.md`, remove them with `gh aw compile --purge`.
+If no lock file is generated, fix the reported errors, confirm `.github/workflows/` is writable, and remove stale `.lock.yml` files with `gh aw compile --purge` after deleting a workflow `.md`.
 
 ## Import and Include Issues
 
@@ -81,7 +81,7 @@ Import paths are relative to the repository root, for example `.github/workflows
 
 ### GitHub Tools Not Available
 
-Configure GitHub access with `toolsets:` ([tools reference](/gh-aw/reference/github-tools/)). If a tool is still missing, combine toolsets such as `toolsets: [default, actions]` or inspect the resolved set with `gh aw mcp inspect <workflow>`.
+Configure GitHub access with `toolsets:` ([tools reference](/gh-aw/reference/github-tools/)). If a tool is still missing, combine toolsets such as `toolsets: [default, actions]` or inspect the resolved toolset with `gh aw mcp inspect <workflow>`.
 
 ```yaml wrap
 tools:
@@ -289,11 +289,9 @@ network:
 
 Use only [allowed expressions](/gh-aw/reference/templating/) such as `github.event.issue.number`, `github.repository`, and `steps.sanitized.outputs.text`; `secrets.*` and `env.*` are disallowed. If `steps.sanitized.outputs.text` is empty, confirm the workflow runs on issue, PR, or comment events rather than `push:`.
 
-## Build and Test Issues
+## Build, Network, and Cache Issues
 
 If the docs build fails, do a clean install (`cd docs && rm -rf node_modules package-lock.json && npm install && npm run build`) and check for malformed frontmatter, MDX syntax errors, or broken links. If tests fail after changes, run `make fmt && make lint && make test-unit` before iterating.
-
-## Network and Connectivity Issues
 
 For package registries, add ecosystem identifiers from the [Network Configuration Guide](/gh-aw/guides/network-configuration/):
 
@@ -307,11 +305,9 @@ network:
     - go          # Go modules
 ```
 
-If URLs appear as `(redacted)`, add the relevant domains to the allowed list ([Network Permissions](/gh-aw/reference/network/)), for example `allowed: [defaults, "api.example.com"]`. If remote imports fail to download, verify both network access (`curl -I https://raw.githubusercontent.com/github/gh-aw/main/README.md`) and authentication (`gh auth status`). For MCP server timeouts, prefer local servers such as `command: "node"` with `args: ["./server.js"]`.
+If URLs appear as `(redacted)`, add the relevant domains to the allowed list ([Network Permissions](/gh-aw/reference/network/)), for example `allowed: [defaults, "api.example.com"]`. If remote imports fail, verify network access and authentication. For MCP server timeouts, prefer local servers such as `command: "node"` with `args: ["./server.js"]`.
 
-## Cache Issues
-
-If a cache is not restoring, make sure the key pattern matches; caches expire after 7 days, for example `cache: { key: deps-${{ hashFiles('package-lock.json') }}, restore-keys: deps- }`. If cache memory is not persisting, configure the cache-memory MCP server with a key such as `tools.cache-memory.key: memory-${{ github.workflow }}-${{ github.run_id }}`.
+If a cache is not restoring, confirm the key pattern matches; caches expire after 7 days, for example `cache: { key: deps-${{ hashFiles('package-lock.json') }}, restore-keys: deps- }`. If cache memory is not persisting, configure the cache-memory MCP server with a key such as `tools.cache-memory.key: memory-${{ github.workflow }}-${{ github.run_id }}`.
 
 ## Integrity Filtering Blocking Expected Content
 
@@ -331,7 +327,7 @@ Use `min-integrity: unapproved` as a middle ground for community triage workflow
 
 ### Timeout Errors
 
-GitHub Actions marks the run as `timed_out` when the job exceeds `timeout-minutes` (default: 20 min). The table below maps each engine's error patterns to the right fix; after updating frontmatter, recompile with `gh aw compile`. See [Long Build Times](/gh-aw/reference/sandbox/#long-build-times) for caching strategies and self-hosted runner recommendations.
+GitHub Actions marks the run as `timed_out` when the job exceeds `timeout-minutes` (default: 20 min). Use the table below to map common engine error patterns to the correct fix, then recompile with `gh aw compile`. See [Long Build Times](/gh-aw/reference/sandbox/#long-build-times) for caching strategies and self-hosted runner recommendations.
 
 | Engine | Error Pattern | Fix Setting |
 |--------|--------------|-------------|
@@ -400,4 +396,4 @@ For a step-by-step diagnostic checklist, see the [Workflow Health Monitoring Run
 
 ## Getting Help
 
-Start with the [reference docs](/gh-aw/reference/workflow-structure/), [Error Reference](/gh-aw/troubleshooting/errors/), and [Frontmatter Reference](/gh-aw/reference/frontmatter/). If that doesn't resolve the issue, search [existing issues](https://github.com/github/gh-aw/issues) or open a new one.
+Start with the [reference docs](/gh-aw/reference/workflow-structure/), [Error Reference](/gh-aw/troubleshooting/errors/), and [Frontmatter Reference](/gh-aw/reference/frontmatter/). If that does not resolve the issue, search [existing issues](https://github.com/github/gh-aw/issues) or open a new one.
