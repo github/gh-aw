@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const marker = "<!-- gh-aw-pr-sous-chef-nudge -->";
 const statePattern = /Sous-chef state: ([a-f0-9]{64})/;
 const activeStatuses = new Set(["queued", "in_progress", "pending", "requested", "waiting"]);
-const agentPattern = /copilot|coding.agent|claude|codex|gemini|opencode|(^|[/ -])agent([/ -]|$)|^Q$/i;
+const agentPattern = /copilot|coding.agent|claude|codex|gemini|opencode|reviewer|(^|[/ -])agent([/ -]|$)|^Q$/i;
 const automationPattern = /copilot|github-actions|gh-aw-bot|\[bot\]$|^app\//i;
 const dependencyPattern = /^(?:app\/)?(?:dependabot|renovate)(?:\[bot\])?$/i;
 const failureStates = new Set(["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
@@ -80,7 +80,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   }
   const threads = unresolved.filter(thread => trustedReviewer(thread.comments.nodes[0] ?? {}));
   const feedback = threads.map(thread => {
-    const reviewerComments = thread.comments.nodes.filter(comment => trustedReviewer(comment) && login(comment) !== pr.author.login && !/copilot/i.test(login(comment)));
+    const reviewerComments = thread.comments.nodes.filter(comment => trustedReviewer(comment) && login(comment) !== (pr.author?.login ?? "") && !/copilot/i.test(login(comment)));
     // Copilot code-review feedback is actionable, unlike coding-agent replies.
     const original = thread.comments.nodes[0];
     if (original && !reviewerComments.includes(original)) reviewerComments.unshift(original);
@@ -133,7 +133,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   if (nudges.some(comment => statePattern.exec(comment.body)?.[1] === state)) {
     return { skip_reason: "unchanged" };
   }
-  if (latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) {
+  if (!branchAction && !zeroDiff && !failedChecks.length && !threads.length && !dismissReviews.length && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) {
     return { skip_reason: "unchanged_legacy" };
   }
   if (!branchAction && !zeroDiff && !failedChecks.length && !threads.length && !dismissReviews.length) {
@@ -149,7 +149,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     updatedAt: pr.updatedAt,
     changedFiles: pr.changedFiles,
     mergeStateStatus: pr.mergeStateStatus,
-    author: pr.author.login,
+    author: pr.author?.login ?? "unknown",
     state_fingerprint: state,
     failed_checks: failedChecks,
     unresolved_reviews: feedback,
@@ -170,8 +170,9 @@ function gh(args) {
   );
 }
 
-export function fetchActiveRuns(repo, api = gh) {
-  return [...activeStatuses].flatMap(status => api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs));
+export function fetchActiveRuns(repo, api = gh, branch) {
+  const branchFilter = branch ? `&branch=${encodeURIComponent(branch)}` : "";
+  return [...activeStatuses].flatMap(status => api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100${branchFilter}`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs));
 }
 
 function inspect(repo, pr, runs) {
@@ -232,8 +233,11 @@ function main() {
     ? [gh(["pr", "view", checkNumber, "--repo", repo, "--json", prFields])]
     : gh(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
   if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
-  const runs = candidates.length ? fetchActiveRuns(repo) : [];
-  const output = buildQueue(candidates, pr => (activeAgent(pr, runs) ? { skip_reason: "agent_active" } : inspect(repo, pr, runs)));
+  let runs;
+  const output = buildQueue(candidates, pr => {
+    runs ??= fetchActiveRuns(repo, gh, checkNumber ? pr.headRefName : undefined);
+    return activeAgent(pr, runs) ? { skip_reason: "agent_active" } : inspect(repo, pr, runs);
+  });
   if (checkNumber) {
     console.log(JSON.stringify(output));
     return;
@@ -245,13 +249,14 @@ function main() {
     appendFileSync(process.env.GITHUB_OUTPUT, `eligible_count=${output.prs.length}\neligible_pull_request_numbers=${JSON.stringify(output.prs.map(pr => String(pr.number)))}\n`);
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const counts = new Map();
-    for (const item of skipped) counts.set(item.skip_reason, (counts.get(item.skip_reason) ?? 0) + 1);
-    appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n`
-    );
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, formatSummary(output));
   }
+}
+
+export function formatSummary(output) {
+  const counts = new Map();
+  for (const item of output.skipped) counts.set(item.skip_reason, (counts.get(item.skip_reason) ?? 0) + 1);
+  return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
