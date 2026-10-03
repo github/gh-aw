@@ -134,7 +134,7 @@ Compaction and recovery have independent prepared snapshots and bounded retries.
 
 `terminalHistory` records each Work item's complete fact set at its first terminal decision. It and `authorizations`/`effects` are observer histories, not additional queue files or decision-making state. Authorization/effect histories are sequences, so repeated execution of the same record cannot disappear through set deduplication. One `ExternalEffect` represents entry into one attempt's ordinary safe-output batch, not one GitHub API call.
 
-`Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. Implementations must report rejected intents; the abstraction does not prescribe silently treating errors as success.
+`Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. The model admits an identity-based Work resubmission with different enqueue metadata as idempotent and checks that staging it does not change replayed facts or the first durable Work age. Other exact duplicate intents are abstracted as no append; the model does not track implementation diagnostic counts. To keep the finite search bounded, each exact intent can be staged at most once per dispatcher.
 
 JavaScript `applyTransactions` returns the candidate `transactions`, invalid intents in `rejected`, and an `idempotent` count. Exact duplicates of every kind and identity-based Work resubmissions are idempotent, not rejected, even when resubmitted Work carries a different enqueue time. Publication logs count requested intents as new, rejected, or idempotent on each attempt, independently of duplicate physical records in the source log. Retry outcomes describe only the refreshed attempt, not accumulated counts. All-no-op publication skips writes unless the log needs a protocol upgrade or canonicalization.
 
@@ -162,6 +162,7 @@ All dispatcher, worker, recovery, and compaction pushes use `Publish`. It requir
 | `SingleCompletionPerWorker`, `WorkerOneShot` | One fixed inbound Claim and at most one distinct Completion per worker; terminal worker phases never restart. |
 | `SingleEffectiveClaim` | At most one effective Claim per Work. |
 | `QueueSelection` (action property) | Every staged Claim selects the oldest available Work in the local view at that step, not necessarily the oldest at publication or completion. |
+| `WorkResubmissionNoOp` (action property) | A same-identity Work resubmission with different enqueue metadata may be staged, but does not change replayed facts or the original Work age. |
 | `WorkerOrigin`, `FinishRequired` | Worker mutations concern only the inbound Claim; authorization requires finalize. |
 | `AuthorizationSoundness`, `EffectSoundness` | Authorization follows durable Completion; effects follow authorization. |
 | `LifecycleAccounting` | Each attempt authorizes/emits at most once, without resetting its lifecycle. |
@@ -240,11 +241,11 @@ JAVA_BIN=/path/to/java \
 bash specs/work-queue/check.sh
 ```
 
-The runner checks all three positive configurations, the one-shot worker property, and oldest-available selection to exhaustion. It requires the three negative controls to fail with the named invariant or action property, not a parse/tooling failure. These controls deliberately bypass branch-version, terminal-state, or selection protection; they are not reachable behaviors of the guarded protocol. A separate guarded witness demonstrates that strict FIFO is not required. Full reports are saved under a printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
+The runner checks all three positive configurations, the one-shot worker property, Work resubmission idempotency, and oldest-available selection to exhaustion. It requires the three negative controls to fail with the named invariant or action property, not a parse/tooling failure. These controls deliberately bypass branch-version, terminal-state, or selection protection; they are not reachable behaviors of the guarded protocol. A separate guarded witness demonstrates that strict FIFO is not required. Full reports are saved under a printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
 
 | Configuration | Scope / expected result |
 |---|---|
-| `WorkQueue.cfg` | One Work, two competing Claims, two dispatchers, three workers (two share a Claim), three branch changes, four records; `Safety` holds. |
+| `WorkQueue.cfg` | One Work, two competing Claims, two dispatchers, three workers (two share a Claim), three branch changes, four records; `Safety`, `WorkerOneShot`, `QueueSelection`, and `WorkResubmissionNoOp` hold. |
 | `Recovery.cfg` | One Work, two Claims/workers, one dispatcher, four branch changes, five records; `Safety` holds through recovery/compaction interleavings. |
 | `QueueOrdering.cfg` | Two Work items, two Claims/workers/dispatchers, two branch changes, four records; `Safety`, `WorkerOneShot`, and `QueueSelection` hold across selection, retry, cancellation, and compaction interleavings. |
 | `BrokenCAS.cfg` | Bypass the branch-version check and overwrite with a stale snapshot; `TerminalPersistence` fails. |

@@ -31,7 +31,11 @@ AllFacts == {Work(w) : w \in Works}
             \cup {ClaimCancellation(c) : c \in Claims}
             \cup {WorkCancellation(w) : w \in Works}
             \cup {Completion(a) : a \in Workers}
+WorkResubmission(w) ==
+    [Work(w) EXCEPT !.enqueued = @ + WorkCount]
+WorkResubmissions == {WorkResubmission(w) : w \in Works}
 Intents == {t \in AllFacts : t.kind \in {"Work", "Claim", "WorkCancellation"}}
+           \cup WorkResubmissions
 Facts(s) == {s[i] : i \in 1..Len(s)}
 Terminals(f) == {t \in f : t.kind \in {"Completion", "WorkCancellation"}}
 WorkFacts(f, w) == {t \in f : t.work = w}
@@ -82,6 +86,9 @@ Allowed(f, t) ==
                 /\ t = Completion(t.attempt)
          [] OTHER -> FALSE
 
+IdempotentWorkResubmission(f, t) ==
+    t \in WorkResubmissions /\ Work(t.work) \in f
+
 RECURSIVE Apply(_, _), Canonical(_)
 Apply(s, intents) ==
     IF intents = <<>> THEN s
@@ -130,8 +137,10 @@ Publish(snapshot) ==
 LocalView(d) == Apply(log, dispatch[d].local)
 StageIntent(d, t) ==
     /\ dispatch[d].phase = "agent" /\ t \in Intents
+    /\ t \notin Facts(dispatch[d].local)
     /\ (t.kind # "Claim" \/ Origin(t.claim) = d)
-    /\ Allowed(Facts(LocalView(d)), t)
+    /\ (Allowed(Facts(LocalView(d)), t)
+        \/ IdempotentWorkResubmission(Facts(LocalView(d)), t))
     /\ dispatch' = [dispatch EXCEPT
          ![d].local = Append(@, t), ![d].serialized = Append(@, t)]
     /\ UNCHANGED <<log, head, workers, compact, recovery, deadRuns,
@@ -318,6 +327,13 @@ QueueSelection ==
               LET t == dispatch'[d].local[Len(dispatch'[d].local)]
               IN t.kind = "Claim" =>
                    t.work = OldestAvailable(Facts(LocalView(d)))]_vars
+WorkResubmissionNoOp ==
+    [] [\A d \in Dispatchers :
+         Len(dispatch'[d].local) > Len(dispatch[d].local) =>
+              LET t == dispatch'[d].local[Len(dispatch'[d].local)]
+              IN IdempotentWorkResubmission(Facts(LocalView(d)), t) =>
+                   Facts(Apply(log', dispatch'[d].local)) =
+                       Facts(LocalView(d))]_vars
 
 ValidFacts(f) ==
     /\ f \subseteq AllFacts
@@ -480,4 +496,5 @@ THEOREM CompactionEquivalence ==
 THEOREM ProtocolSafety == Spec => []Safety
 THEOREM WorkerCannotRestart == Spec => WorkerOneShot
 THEOREM OldestKnownWorkSelected == Spec => QueueSelection
+THEOREM WorkResubmissionPreservesFacts == Spec => WorkResubmissionNoOp
 =============================================================================
