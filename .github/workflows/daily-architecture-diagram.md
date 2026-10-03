@@ -15,7 +15,7 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-model: copilot/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 
 experiments:
   detail_level:

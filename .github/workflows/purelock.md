@@ -15,8 +15,8 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-  model-provider: github
-model: copilot/gpt-5.3-codex
+  model-provider: openai
+model: openai/gpt-6.1-sol
 strict: true
 timeout-minutes: 35
 max-turns: 60

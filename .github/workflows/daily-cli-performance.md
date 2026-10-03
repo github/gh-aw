@@ -41,7 +41,7 @@ tracker-id: daily-cli-performance
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 tools:
   cli-proxy: true
   repo-memory:

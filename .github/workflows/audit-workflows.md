@@ -111,7 +111,7 @@ evals:
   - id: issues_identified_or_noop
     question: Were issues, missing tools, errors, and improvement opportunities identified, or was noop used when no problems were found?
 
-model: openai/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 ---
 
 # Agentic Workflow Audit Agent

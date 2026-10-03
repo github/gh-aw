@@ -112,8 +112,8 @@ safe-outputs:
 timeout-minutes: 20
 engine:
   id: codex
-  model-provider: github
-model: copilot/gpt-5.3-codex
+  model-provider: openai
+model: openai/gpt-6.1-sol
 ---
 
 # Feature Grower

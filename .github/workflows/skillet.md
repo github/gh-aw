@@ -19,7 +19,7 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-model: copilot/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 imports:
   - uses: shared/pr-review-base.md
     with:

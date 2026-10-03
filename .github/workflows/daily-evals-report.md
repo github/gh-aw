@@ -11,7 +11,7 @@ permissions:
   issues: read
   pull-requests: read
 max-daily-ai-credits: 3000
-model: copilot/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 engine:
   id: codex
 tracker-id: daily-evals-report

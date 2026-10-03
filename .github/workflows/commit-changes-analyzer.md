@@ -16,7 +16,7 @@ permissions:
   issues: read
   pull-requests: read
 max-turns: 100
-model: openai/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 engine:
   id: codex
   model-provider: openai

@@ -15,7 +15,7 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-  model-provider: github
+  model-provider: openai
 features:
   gh-aw-detection: true
 timeout-minutes: 10
@@ -32,7 +32,7 @@ safe-outputs:
     max: 1
     hide-older-comments: true
   noop:
-model: copilot/gpt-5.3-codex
+model: openai/gpt-6.1-sol
 ---
 
 # Front Page Copy Guard

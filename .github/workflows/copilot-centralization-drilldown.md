@@ -30,8 +30,8 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-  model-provider: github
-model: copilot/gpt-5.3-codex
+  model-provider: openai
+model: openai/gpt-6.1-sol
 strict: true
 max-ai-credits: 120
 max-daily-ai-credits: 500
