@@ -191,6 +191,8 @@ Copilot SDK driver settings such as `COPILOT_SDK_SEND_TIMEOUT_MS` are documented
 
 `GH_AW_TIMEOUT_MINUTES` is compiler-managed. gh-aw derives it from the workflow `timeout-minutes` frontmatter value and passes it to harness and driver code so soft timeouts and SDK send timeouts stay below the GitHub Actions job timeout. Do not set `GH_AW_TIMEOUT_MINUTES` directly; set `timeout-minutes` in frontmatter instead.
 
+`GH_AW_CLAUDE_DISABLE_REPO_EDITS` is also compiler-managed. gh-aw sets it when a workflow specifies `tools.edit: false`, instructing the Claude runtime to deny workspace writes even when a more permissive permission mode is selected. Do not set this variable directly; configure `tools.edit` in workflow frontmatter.
+
 ### Setup helper process timeouts
 
 The JavaScript setup helpers bound child processes, archive operations, and setup-time network requests with positive millisecond timeouts. These defaults protect workflows from indefinitely hung setup commands, but very large repositories or artifact payloads can require larger budgets. Set the relevant variable to a positive integer number of milliseconds; unset, zero, negative, or non-numeric values use the default. Values above Node's maximum timer delay of `2147483647` ms (about 24.8 days) are clamped to that maximum.
