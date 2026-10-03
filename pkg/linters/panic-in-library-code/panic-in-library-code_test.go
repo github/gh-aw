@@ -13,5 +13,5 @@ import (
 func TestPanicInLibraryCode(t *testing.T) {
 	t.Parallel()
 	testdata := analysistest.TestData()
-	analysistest.Run(t, testdata, panicinlibrarycode.Analyzer, "panicinlibrarycode")
+	analysistest.Run(t, testdata, panicinlibrarycode.Analyzer, "panicinlibrarycode", "entrypoint")
 }

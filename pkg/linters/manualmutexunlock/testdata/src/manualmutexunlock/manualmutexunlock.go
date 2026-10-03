@@ -151,3 +151,12 @@ func GoodTwoGuardsBothDeferred(a, b *guarded) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 }
+
+func BadSiblingUnlock(mu *sync.Mutex, deferred bool) {
+	mu.Lock() // want `mutex Unlock\(\) should be deferred immediately after Lock\(\) to prevent deadlocks on panic or early return`
+	if deferred {
+		defer mu.Unlock()
+	} else {
+		mu.Unlock()
+	}
+}

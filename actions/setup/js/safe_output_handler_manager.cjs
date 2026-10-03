@@ -368,6 +368,17 @@ function wrapWithClientRebinding(type, messageHandler, handlerGithubClient) {
   };
 }
 
+async function finalizeLedgerAppend(config, messageHandlers) {
+  let ledgerAppendHandler = messageHandlers.get("ledger_append");
+  if (!ledgerAppendHandler && config.ledger_append) {
+    const ledgerAppendModule = require(HANDLER_MAP.ledger_append);
+    ledgerAppendHandler = await ledgerAppendModule.main(config.ledger_append);
+  }
+  if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
+    ledgerAppendHandler.finalize();
+  }
+}
+
 /**
  * Load and initialize handlers for enabled safe output types
  * Calls each handler's factory function (main) to get message processors
@@ -1723,6 +1734,7 @@ async function main() {
     const allMessages = [...agentOutputItems, ...fileBackedCommentMemoryMessages];
     if (allMessages.length === 0) {
       core.info("No safe-output messages available - nothing to process");
+      await finalizeLedgerAppend(config, new Map());
       if (!isStaged) ensureManifestExists();
       core.setOutput("processed_count", "0");
       setSafeOutputsStatusOutputs({ itemsSucceeded: 0, itemsFailed: 0, status: "success" });
@@ -1774,10 +1786,7 @@ async function main() {
 
     // Process all messages in order of appearance
     const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
-    const ledgerAppendHandler = messageHandlers.get("ledger_append");
-    if (ledgerAppendHandler && "finalize" in ledgerAppendHandler && typeof ledgerAppendHandler.finalize === "function") {
-      ledgerAppendHandler.finalize();
-    }
+    await finalizeLedgerAppend(config, messageHandlers);
 
     // Finalize buffered PR reviews — one review submission per distinct PR
     const registryEntries = prReviewBufferRegistry.getAllEntries();

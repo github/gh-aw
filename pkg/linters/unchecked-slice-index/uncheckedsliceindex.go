@@ -362,12 +362,22 @@ func invalidBounds(pass *analysis.Pass, cond ast.Expr, idxExpr *ast.IndexExpr) (
 	return false, false
 }
 
-// sameExpr reports whether x and y are identifiers for the same type-checker object.
+// sameExpr reports whether x and y refer to the same object or selector chain.
 func sameExpr(pass *analysis.Pass, x, y ast.Expr) bool {
-	xID, xOK := astutil.UnwrapParenExpr(x).(*ast.Ident)
-	yID, yOK := astutil.UnwrapParenExpr(y).(*ast.Ident)
-	return xOK && yOK && pass.TypesInfo.ObjectOf(xID) != nil &&
-		pass.TypesInfo.ObjectOf(xID) == pass.TypesInfo.ObjectOf(yID)
+	x = astutil.UnwrapParenExpr(x)
+	y = astutil.UnwrapParenExpr(y)
+	switch x := x.(type) {
+	case *ast.Ident:
+		y, ok := y.(*ast.Ident)
+		return ok && pass.TypesInfo.ObjectOf(x) != nil &&
+			pass.TypesInfo.ObjectOf(x) == pass.TypesInfo.ObjectOf(y)
+	case *ast.SelectorExpr:
+		y, ok := y.(*ast.SelectorExpr)
+		return ok && pass.TypesInfo.ObjectOf(x.Sel) != nil &&
+			pass.TypesInfo.ObjectOf(x.Sel) == pass.TypesInfo.ObjectOf(y.Sel) &&
+			sameExpr(pass, x.X, y.X)
+	}
+	return false
 }
 
 // isLenOf reports whether expr is the builtin len call for value.
@@ -463,6 +473,13 @@ func changedBefore(pass *analysis.Pass, block *ast.BlockStmt, node ast.Node, par
 func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Expr) bool {
 	objects := make(map[types.Object]struct{}, len(values))
 	for _, value := range values {
+		for {
+			selector, ok := astutil.UnwrapParenExpr(value).(*ast.SelectorExpr)
+			if !ok {
+				break
+			}
+			value = selector.X
+		}
 		if ident, ok := astutil.UnwrapParenExpr(value).(*ast.Ident); ok {
 			if object := pass.TypesInfo.ObjectOf(ident); object != nil {
 				objects[object] = struct{}{}
@@ -478,11 +495,18 @@ func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Exp
 			switch n := node.(type) {
 			case *ast.AssignStmt:
 				for _, lhs := range n.Lhs {
+					for _, value := range values {
+						if selectorWrite(pass, lhs, value) {
+							written = true
+							return false
+						}
+					}
 					if ident, ok := lhs.(*ast.Ident); ok {
 						if _, ok := objects[pass.TypesInfo.ObjectOf(ident)]; ok {
 							written = true
 							return false
 						}
+
 					}
 				}
 			case *ast.IncDecStmt:
@@ -500,6 +524,19 @@ func writesObjects(pass *analysis.Pass, statements []ast.Stmt, values ...ast.Exp
 		}
 	}
 	return false
+}
+
+func selectorWrite(pass *analysis.Pass, lhs, value ast.Expr) bool {
+	for {
+		if sameExpr(pass, lhs, value) {
+			return true
+		}
+		selector, ok := astutil.UnwrapParenExpr(lhs).(*ast.SelectorExpr)
+		if !ok {
+			return false
+		}
+		lhs = selector.X
+	}
 }
 
 // terminates reports whether block ends in a statement that cannot fall through.

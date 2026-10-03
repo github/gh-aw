@@ -94,7 +94,7 @@ func ReopenWithManualCloseThenDefer() error {
 	if err != nil {
 		return err
 	}
-	f.Close()               // manual close — violation for first open
+	f.Close() // manual close — violation for first open
 	f, err = os.Open("second.txt")
 	if err != nil {
 		return err
@@ -126,5 +126,18 @@ func SuppressedReopenManualClose() error {
 		return err
 	}
 	defer f.Close()
+	return nil
+}
+
+func BadSiblingClose(deferred bool) error {
+	f, err := os.Open("test.txt") // want `file Close\(\) should be deferred immediately after successful open to prevent resource leaks`
+	if err != nil {
+		return err
+	}
+	if deferred {
+		defer f.Close()
+	} else {
+		f.Close()
+	}
 	return nil
 }

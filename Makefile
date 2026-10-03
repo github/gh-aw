@@ -262,6 +262,7 @@ check-cjs-syntax:
 
 .PHONY: test-js
 test-js: build-js
+	node --test scripts/pr-sous-chef.test.mjs
 	cd actions/setup/js && npm run test:js -- --no-file-parallelism
 	cd eslint-factory && npm test
 

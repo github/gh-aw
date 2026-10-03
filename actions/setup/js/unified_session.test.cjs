@@ -57,7 +57,7 @@ describe("Unified conclusion session", () => {
     const start = events.find(event => event.type === "tool.execution_start");
     expect(start).toMatchObject({ provenance: { path: "agent-stdio.log", timestampMs: 1790899202000 }, data: { toolCallId: "call", toolName: "bash", input: { command: "pwd" } } });
     expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolCallId: "call", success: true, durationMs: 1500 });
-    expect(events.find(event => event.type === "session.result").data).toMatchObject({ totalCostUsd: 0, numTurns: 1, usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 20 } });
+    expect(events.find(event => event.type === "session.result").data).toMatchObject({ totalCostUsd: 0, numTurns: 1, usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 20 } });
     expect(events.find(event => event.type === "assistant.message").data.content).toBe("Done.");
   });
 

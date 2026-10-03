@@ -37,7 +37,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil)}
+	nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		switch stmt := n.(type) {
 		case *ast.AssignStmt:
@@ -46,6 +46,19 @@ func run(pass *analysis.Pass) (any, error) {
 				return
 			}
 			checkUncheckedFprintAssign(pass, stmt, noLintIndex)
+		case *ast.ExprStmt:
+			position := pass.Fset.PositionFor(stmt.Pos(), false)
+			if filecheck.ShouldSkipFilename(position.Filename, generatedFiles) {
+				return
+			}
+			call, ok := stmt.X.(*ast.CallExpr)
+			if !ok {
+				return
+			}
+			funcName := extractFunctionName(call)
+			if isFprintFunction(funcName) && isFprintCallReturningError(pass, call) {
+				reportUncheckedFprint(pass, call, funcName, noLintIndex)
+			}
 		}
 	})
 }

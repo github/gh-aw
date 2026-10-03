@@ -72,10 +72,11 @@ func TestConclusionJobPermissionsDerivedFromSafeOutputsIntegration(t *testing.T)
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		safeOutputsConfig string
-		wantIssues        string
-		wantActionsRead   bool
+		name                 string
+		safeOutputsConfig    string
+		wantIssues           string
+		wantActionsRead      bool
+		wantPullRequestsRead bool
 	}{
 		{
 			name: "report-failed-jobs default keeps issues write and actions read",
@@ -99,8 +100,9 @@ func TestConclusionJobPermissionsDerivedFromSafeOutputsIntegration(t *testing.T)
   create-project:
     target-owner: my-org
 `,
-			wantIssues:      "write",
-			wantActionsRead: false,
+			wantIssues:           "write",
+			wantActionsRead:      true,
+			wantPullRequestsRead: true,
 		},
 		{
 			name: "detection reporting keeps issues write without actions read",
@@ -128,6 +130,11 @@ func TestConclusionJobPermissionsDerivedFromSafeOutputsIntegration(t *testing.T)
 				assert.Equal(t, "read", perms["actions"])
 			} else {
 				assert.NotContains(t, perms, "actions")
+			}
+			if tc.wantPullRequestsRead {
+				assert.Equal(t, "read", perms["pull-requests"])
+			} else {
+				assert.NotContains(t, perms, "pull-requests")
 			}
 		})
 	}

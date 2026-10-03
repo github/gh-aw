@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 )
@@ -57,7 +58,7 @@ func analyzeAssignStmt(pass *analysis.Pass, assign *ast.AssignStmt, generatedFil
 			}
 		}
 		for _, rhs := range assign.Rhs {
-			call, ok := rhs.(*ast.CallExpr)
+			call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
 			if !ok {
 				return
 			}
@@ -81,7 +82,7 @@ func analyzeAssignStmt(pass *analysis.Pass, assign *ast.AssignStmt, generatedFil
 			}
 		}
 		for _, rhs := range assign.Rhs {
-			call, ok := rhs.(*ast.CallExpr)
+			call, ok := astutil.UnwrapParenExpr(rhs).(*ast.CallExpr)
 			if !ok {
 				return
 			}

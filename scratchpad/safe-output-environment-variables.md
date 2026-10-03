@@ -29,6 +29,14 @@ These environment variables are present in all safe output jobs:
 
 Each safe output type has additional environment variables specific to its configuration:
 
+### Conclusion Failure-Issue Classification
+
+| Variable | Description | Set When | Example |
+|----------|-------------|----------|---------|
+| `GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF` | Compiler-derived eligibility for PR merge-ref invalidation checks; `true` only when the generated default checkout is enabled without an explicit ref or repository override | Conclusion failure handler generated | `"true"` or `"false"` |
+
+The handler checks this metadata together with live PR state and failed checkout timing before suppressing a failure issue. Missing metadata disables classification. See [Invalidated PR Merge-Ref Checkout](safe-outputs-specification.md#355-invalidated-pr-merge-ref-checkout).
+
 ### Create Issue (`create-issue:`)
 
 | Variable | Description | Set When | Example |

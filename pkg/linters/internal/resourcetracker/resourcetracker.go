@@ -89,18 +89,19 @@ func (c Config[K]) run(pass *analysis.Pass) (any, error) {
 func (c Config[K]) inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *ast.BlockStmt) {
 	// Track resources keyed by the linter-provided key so that variable
 	// shadowing and distinct receivers are handled correctly.
-	tracked := make(map[K]*state)
+	tracked := make(map[K]map[token.Pos]*state)
+	reported := make(map[token.Pos]bool)
 
-	ast.Inspect(body, func(node ast.Node) bool {
-		return c.inspectNode(pass, noLintIndex, tracked, node)
-	})
+	c.walk(pass, noLintIndex, tracked, reported, body)
 
 	// Report resources cleaned up manually without a matching defer, ordered by
 	// acquisition position so diagnostics are deterministic.
-	pending := make([]*state, 0, len(tracked))
-	for _, st := range tracked {
-		if st.hasManual && !st.hasDefer {
-			pending = append(pending, st)
+	var pending []*state
+	for _, variants := range tracked {
+		for _, st := range variants {
+			if st.hasManual && !st.hasDefer && !reported[st.acquirePos] {
+				pending = append(pending, st)
+			}
 		}
 	}
 	slices.SortFunc(pending, func(a, b *state) int {
@@ -109,6 +110,56 @@ func (c Config[K]) inspectBody(pass *analysis.Pass, noLintIndex nolint.Directive
 	for _, st := range pending {
 		c.report(pass, noLintIndex, st)
 	}
+}
+
+func cloneStates[K comparable](tracked map[K]map[token.Pos]*state) map[K]map[token.Pos]*state {
+	copyOf := make(map[K]map[token.Pos]*state, len(tracked))
+	for key, variants := range tracked {
+		copyOf[key] = make(map[token.Pos]*state, len(variants))
+		for pos, st := range variants {
+			value := *st
+			copyOf[key][pos] = &value
+		}
+	}
+	return copyOf
+}
+
+func (c Config[K]) walk(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, tracked map[K]map[token.Pos]*state, reported map[token.Pos]bool, node ast.Node) {
+	ast.Inspect(node, func(n ast.Node) bool {
+		if branch, ok := n.(*ast.IfStmt); ok {
+			if branch.Init != nil {
+				c.walk(pass, noLintIndex, tracked, reported, branch.Init)
+			}
+			c.walk(pass, noLintIndex, tracked, reported, branch.Cond)
+			thenStates := cloneStates(tracked)
+			elseStates := cloneStates(tracked)
+			c.walk(pass, noLintIndex, thenStates, reported, branch.Body)
+			if branch.Else != nil {
+				c.walk(pass, noLintIndex, elseStates, reported, branch.Else)
+			}
+			for key, variants := range thenStates {
+				for pos, then := range variants {
+					if other, ok := elseStates[key][pos]; ok {
+						then.hasManual = then.hasManual || other.hasManual
+						then.hasDefer = then.hasDefer && other.hasDefer
+					}
+				}
+				tracked[key] = variants
+			}
+			for key, variants := range elseStates {
+				if tracked[key] == nil {
+					tracked[key] = make(map[token.Pos]*state)
+				}
+				for pos, st := range variants {
+					if _, ok := tracked[key][pos]; !ok {
+						tracked[key][pos] = st
+					}
+				}
+			}
+			return false
+		}
+		return c.inspectNode(pass, noLintIndex, tracked, reported, n)
+	})
 }
 
 func cmpPos(a, b token.Pos) int {
@@ -122,7 +173,7 @@ func cmpPos(a, b token.Pos) int {
 	}
 }
 
-func (c Config[K]) inspectNode(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, tracked map[K]*state, node ast.Node) bool {
+func (c Config[K]) inspectNode(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, tracked map[K]map[token.Pos]*state, reported map[token.Pos]bool, node ast.Node) bool {
 	if node == nil {
 		return false
 	}
@@ -136,16 +187,19 @@ func (c Config[K]) inspectNode(pass *analysis.Pass, noLintIndex nolint.Directive
 	for _, acquired := range c.Acquisitions(pass, node) {
 		// If this key was already tracked from a prior acquisition on the same
 		// binding, report any unresolved violation before overwriting the state.
-		if prev, exists := tracked[acquired.Key]; exists && prev.hasManual && !prev.hasDefer {
-			c.report(pass, noLintIndex, prev)
+		for _, prev := range tracked[acquired.Key] {
+			if prev.hasManual && !prev.hasDefer && !reported[prev.acquirePos] {
+				c.report(pass, noLintIndex, prev)
+				reported[prev.acquirePos] = true
+			}
 		}
-		tracked[acquired.Key] = &state{acquirePos: acquired.Pos}
+		tracked[acquired.Key] = map[token.Pos]*state{acquired.Pos: {acquirePos: acquired.Pos}}
 	}
 
 	// A cleanup call inside defer resolves the resource.
 	if deferStmt, ok := node.(*ast.DeferStmt); ok {
 		if key, ok := c.CleanupKey(pass, deferStmt.Call); ok {
-			if st, found := tracked[key]; found {
+			for _, st := range tracked[key] {
 				st.hasDefer = true
 			}
 		}
@@ -169,12 +223,12 @@ func (c Config[K]) inspectNode(pass *analysis.Pass, noLintIndex nolint.Directive
 	return true
 }
 
-func (c Config[K]) markManual(pass *analysis.Pass, tracked map[K]*state, call *ast.CallExpr) {
+func (c Config[K]) markManual(pass *analysis.Pass, tracked map[K]map[token.Pos]*state, call *ast.CallExpr) {
 	key, ok := c.CleanupKey(pass, call)
 	if !ok {
 		return
 	}
-	if st, found := tracked[key]; found {
+	for _, st := range tracked[key] {
 		st.hasManual = true
 	}
 }

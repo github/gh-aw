@@ -39,7 +39,7 @@ imports:
   - shared/graders.md
 tools:
   cli-proxy: true
-  bash: ["cat:*", "git diff:*", "git restore:*", "git status:*", grep, "head:*", jq, ls, "sed:*", tail, wc]
+  bash: ["cat:*", "git diff:*", "git diff --binary --no-ext-diff | wc -c", "git restore:*", "git status:*", grep, "head:*", jq, ls, "sed:*", tail, wc]
   github:
     mode: local
     github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -92,7 +92,9 @@ You are a security-focused code analysis agent that automatically fixes code sca
 - Edit files: use the `edit` tool
 - Do not use the Copilot `read` tool for temporary files; use allowed shell readers such as `cat`, `head`, or `sed`
 - If a tool output is saved to a temporary file because it is too large, inspect it with simple allowed shell commands such as `grep`, `head`, `jq`, `sed`, or `tail`; do not use `python3` or compound shell assignment snippets for JSON parsing
-- Create pull request: emit a `create-pull-request` safe output after edits
+- Run each allowed shell command separately; do not chain commands with `;` or `&&`, use heredocs or redirection to write files, or wrap commands in `python3`. Do not run builds or formatters through the restricted shell.
+- Write cache records with the `edit` tool, not shell redirection.
+- Create pull request: emit a `create-pull-request` safe output directly after edits; do not invoke `safeoutputs` through bash
 - Report a stalled prior attempt: emit a `create-issue` safe output (diagnostic only, never a fix)
 
 **Self-Assessment Checkpoint**: This workflow has a hard 40-minute timeout. A hang or timeout during the fix-attempt phase (steps 5-6) previously produced zero output and zero visibility. To avoid that:
@@ -185,7 +187,7 @@ Create code changes to address the security issue:
 ### 7. Create Pull Request
 
 Before emitting `create-pull-request`, preflight the complete generated patch, including binary removals:
-- Measure `git diff --binary --no-ext-diff` in bytes. The default `create-pull-request` safe-output limit is 4,096 KB (4,194,304 bytes).
+- Measure the patch in bytes with the explicitly allowed single command `git diff --binary --no-ext-diff | wc -c`. The default `create-pull-request` safe-output limit is 4,096 KB (4,194,304 bytes).
 - If the patch exceeds that limit, do not emit `create-pull-request`. Append an oversized-patch JSON record to `/tmp/gh-aw/cache-memory/fixed-alerts.jsonl` using the selected alert number, its fingerprint, measured patch size, limit, and current timestamp.
 - Discard all local edits for that attempt, emit `noop` stating that the alert was skipped because its patch exceeds 4,096 KB, and exit successfully.
 - Do not record a patch-size outcome when measurement itself fails; report that tool failure normally.
