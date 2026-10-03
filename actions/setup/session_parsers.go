@@ -10,6 +10,7 @@ import "embed"
 //go:embed js/parse_custom_log.cjs js/parse_pi_log.cjs
 //go:embed js/agent_session.cjs js/agent_session_render.cjs js/claude_session.cjs
 //go:embed js/codex_session.cjs js/codex_log_framing.cjs js/copilot_session.cjs
+//go:embed js/gemini_session.cjs
 //go:embed js/pi_session.cjs js/pi_session_redaction.cjs js/session_artifact.cjs
 //go:embed js/log_parser_bootstrap.cjs js/log_parser_format.cjs js/log_parser_shared.cjs
 //go:embed js/log_parser_step_summary_builder.cjs js/markdown_unfencing.cjs

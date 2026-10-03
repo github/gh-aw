@@ -534,7 +534,7 @@ func TestDailyCacheStrategyAnalyzerUsesCodexCompatibleModels(t *testing.T) {
 		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
 	}
 
-	if got := parsed.Frontmatter["model"]; got != "openai/gpt-5.3-codex" {
+	if got, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(got) {
 		t.Fatalf("Expected Codex-compatible base model, got %#v", got)
 	}
 
@@ -623,8 +623,12 @@ func TestDailyGoTestParallelizerUsesCodexCompatibleModel(t *testing.T) {
 	if !strings.Contains(workflow, "id: codex") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to use the Codex engine")
 	}
-	if !strings.Contains(workflow, "model: copilot/gpt-5.3-codex") {
-		t.Fatal("Expected daily-go-test-parallelizer workflow to use a Codex-compatible Copilot model")
+	parsed, err := parser.ExtractFrontmatterFromContent(workflow)
+	if err != nil {
+		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
+	}
+	if model, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(model) {
+		t.Fatalf("Expected daily-go-test-parallelizer workflow to use a Codex-compatible model, got %q", model)
 	}
 	if !strings.Contains(workflow, "Before stopping, call exactly one terminal safe-output tool") {
 		t.Fatal("Expected daily-go-test-parallelizer workflow to require a terminal safe output")
@@ -647,8 +651,12 @@ func TestDailyCLIPerformanceUsesCodexCompatibleModel(t *testing.T) {
 	if !strings.Contains(workflow, "engine:\n  id: codex\n") {
 		t.Fatal("Expected daily-cli-performance workflow to use the Codex engine")
 	}
-	if !strings.Contains(workflow, "\nmodel: openai/gpt-5.3-codex\n") {
-		t.Fatal("Expected daily-cli-performance workflow to use a Codex-compatible OpenAI model")
+	parsed, err := parser.ExtractFrontmatterFromContent(workflow)
+	if err != nil {
+		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
+	}
+	if model, _ := parsed.Frontmatter["model"].(string); !isCodexCompatibleWorkflowModel(model) {
+		t.Fatalf("Expected daily-cli-performance workflow to use a Codex-compatible model, got %q", model)
 	}
 }
 
@@ -699,9 +707,10 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 }
 
 func isCodexCompatibleWorkflowModel(model string) bool {
-	model = strings.TrimSpace(model)
+	model = strings.ToLower(strings.TrimSpace(model))
+	model, _, _ = strings.Cut(model, "?")
 	// Empty selects Codex's native default; copilot/auto is used by the inference canary.
-	return model == "" || strings.EqualFold(model, "copilot/auto") || strings.Contains(strings.ToLower(model), "codex")
+	return model == "" || model == "copilot/auto" || isCodexCompatibleModel(model)
 }
 
 func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
@@ -712,7 +721,27 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		{model: "", want: true},
 		{model: "copilot/auto", want: true},
 		{model: "copilot/gpt-5.3-codex", want: true},
+		{model: "gpt-6.1-sol", want: true},
+		{model: " Copilot/GPT-6.1-SOL?effort=high ", want: true},
+		{model: "openai/gpt-6.1-sol", want: true},
+		{model: "copilot/gpt-6.1-sol", want: true},
+		{model: "openai/gpt-6-sol", want: true},
+		{model: "copilot/gpt-6-sol", want: true},
+		{model: "openai/gpt-6-luna", want: true},
+		{model: "copilot/gpt-6-luna", want: true},
+		{model: "openai/gpt-6-astra", want: true},
+		{model: "copilot/gpt-6-astra", want: true},
+		{model: "openai/gpt-5.6-sol", want: true},
+		{model: "copilot/gpt-5.6-sol", want: true},
+		{model: "openai/gpt-5.6-terra", want: true},
+		{model: "copilot/gpt-5.6-terra", want: true},
+		{model: "openai/gpt-5.6-luna", want: true},
+		{model: "copilot/gpt-5.6-luna", want: true},
 		{model: "openai/gpt-4o", want: false},
+		{model: "copilot/mai-code-1-flash-picker", want: false},
+		{model: "copilot/gpt-6-unknown", want: false},
+		{model: "openai/gpt-6-unknown", want: false},
+		{model: "anthropic/claude-sonnet-5", want: false},
 	} {
 		t.Run(test.model, func(t *testing.T) {
 			if got := isCodexCompatibleWorkflowModel(test.model); got != test.want {
