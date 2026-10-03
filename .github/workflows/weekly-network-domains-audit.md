@@ -9,7 +9,7 @@ permissions:
   contents: read
   issues: read
 engine: pi
-model: copilot/auto
+model: copilot/gpt-6-astra
 network: defaults
 strict: true
 tracker-id: weekly-network-domains-audit

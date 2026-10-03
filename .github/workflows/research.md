@@ -17,7 +17,7 @@ permissions:
   pull-requests: read
 
 engine: pi
-model: copilot/auto
+model: copilot/gpt-6-sol
 
 network:
   allowed:

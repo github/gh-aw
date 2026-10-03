@@ -30,11 +30,12 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
+  copilot-requests: write
 max-turns: 30
-model: openai/gpt-5.4
+model: copilot/claude-opus-5
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 safe-outputs:
   add-comment:
     max: 2

@@ -15,8 +15,8 @@ permissions:
 tracker-id: daily-repo-chronicle
 engine:
   id: pi
-  model-provider: openai
-model: openai/gpt-5.4
+  model-provider: github
+model: copilot/grok-4.7
 
 timeout-minutes: 45
 

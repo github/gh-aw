@@ -20,7 +20,7 @@ permissions:
   pull-requests: read
 name: Agent Container Smoke Test
 engine: pi
-model: copilot/gpt-5.4
+model: copilot/mai-code-1.1-flash
 strict: true
 runtimes:
   node:

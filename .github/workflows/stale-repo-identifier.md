@@ -23,7 +23,7 @@ concurrency:
   job-discriminator: ${{ inputs.organization || github.run_id }}
 
 engine: pi
-model: copilot/auto
+model: copilot/gpt-5.6-luna
 strict: true
 timeout-minutes: 45
 

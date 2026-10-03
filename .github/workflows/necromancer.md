@@ -17,7 +17,7 @@ permissions:
 
 
 engine: pi
-model: copilot/auto
+model: copilot/gpt-6.1-sol
 strict: true
 timeout-minutes: 25
 network:

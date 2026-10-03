@@ -13,7 +13,7 @@ permissions:
   issues: read
 tracker-id: weekly-issue-summary
 engine: pi
-model: copilot/auto
+model: copilot/grok-4.6
 network:
   allowed:
     - defaults
