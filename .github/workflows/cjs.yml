@@ -86,7 +86,6 @@ jobs:
 
   js-tests:
     name: JS Tests (shard ${{ matrix.shard }}/4)
-    if: github.event_name != 'pull_request'
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
