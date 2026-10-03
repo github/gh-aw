@@ -16,7 +16,7 @@ export const noMathMinMaxArraySpreadRule = createRule({
     type: "problem",
     docs: {
       description:
-        "Disallow spreading a non-literal array into Math.min(...) / Math.max(...). Spreading a large array into call arguments can throw `RangeError: Maximum call stack size exceeded` once the array exceeds the engine argument limit, so arrays whose size depends on runtime data must be reduced instead.",
+        "Disallow spreading an array of unknown size into Math.min(...) / Math.max(...). Spreading a large array into call arguments can throw `RangeError: Maximum call stack size exceeded` once the array exceeds the engine argument limit, so arrays whose size depends on runtime data must be reduced instead.",
     },
     schema: [],
     messages: {
@@ -28,6 +28,7 @@ export const noMathMinMaxArraySpreadRule = createRule({
   create(context) {
     const sourceCode = context.sourceCode;
     type SourceCodeScope = ReturnType<typeof sourceCode.getScope>;
+    const BOUNDED_ARRAY_METHODS = new Set(["filter", "slice"]);
 
     /**
      * Checks whether a given identifier name is locally bound in the current scope chain,
@@ -60,11 +61,49 @@ export const noMathMinMaxArraySpreadRule = createRule({
     }
 
     /**
-     * Returns true when the spread argument has a size that is not statically bounded by
-     * the source itself. Inline array literals are always bounded, so they are excluded.
+     * Returns true unless a const binding starts with a fixed-size array literal
+     * and only passes through size-non-increasing array methods.
      */
+    function isBoundedArrayExpression(node: TSESTree.Node): boolean {
+      if (node.type === AST_NODE_TYPES.ArrayExpression) {
+        return node.elements.every(element => element?.type !== AST_NODE_TYPES.SpreadElement);
+      }
+      if (node.type === AST_NODE_TYPES.CallExpression && !node.optional && node.callee.type === AST_NODE_TYPES.MemberExpression && !node.callee.optional && !node.callee.computed) {
+        const { object, property } = node.callee;
+        return property.type === AST_NODE_TYPES.Identifier && BOUNDED_ARRAY_METHODS.has(property.name) && isBoundedArrayExpression(object);
+      }
+      return false;
+    }
+
     function isUnboundedSpreadArgument(node: TSESTree.Node): boolean {
-      return node.type === AST_NODE_TYPES.Identifier || node.type === AST_NODE_TYPES.MemberExpression || node.type === AST_NODE_TYPES.CallExpression;
+      if (node.type === AST_NODE_TYPES.Identifier) {
+        let scope: SourceCodeScope | null = sourceCode.getScope(node);
+        while (scope) {
+          const variable = scope.set.get(node.name);
+          if (variable) {
+            if (variable.defs.length !== 1 || variable.references.some(ref => ref.isWrite() && !ref.init)) return true;
+            const def = variable.defs[0];
+            if (def.type !== "Variable" || def.parent.kind !== "const" || def.node.id.type !== AST_NODE_TYPES.Identifier) return true;
+            // Const fixes the binding, not the array's length. Reject prior uses
+            // that could mutate or pass the array to code that mutates it.
+            if (
+              variable.references.some(ref => {
+                const identifier = ref.identifier;
+                if (ref.init || identifier === node || identifier.range[0] >= node.range[0]) return false;
+                const parent = identifier.parent;
+                if (parent.type !== AST_NODE_TYPES.MemberExpression || parent.object !== identifier || parent.computed || parent.property.type !== AST_NODE_TYPES.Identifier || parent.property.name !== "length") return true;
+                const use = parent.parent;
+                return (use.type === AST_NODE_TYPES.AssignmentExpression && use.left === parent) || (use.type === AST_NODE_TYPES.UpdateExpression && use.argument === parent);
+              })
+            )
+              return true;
+            return !def.node.init || !isBoundedArrayExpression(def.node.init);
+          }
+          scope = scope.upper;
+        }
+        return true;
+      }
+      return node.type === AST_NODE_TYPES.MemberExpression || node.type === AST_NODE_TYPES.CallExpression;
     }
 
     return {

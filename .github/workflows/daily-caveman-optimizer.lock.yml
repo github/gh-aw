@@ -555,7 +555,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1664,6 +1664,7 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
@@ -2717,7 +2718,7 @@ jobs:
         with:
           name: agent
           path: /tmp/gh-aw/
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'create_pull_request')
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -2748,7 +2749,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.githubusercontent.com,*.grafana.net,*.sentry.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,docs.github.com,github-cloud.githubusercontent.com,github-cloud.s3.amazonaws.com,github.blog,github.com,github.githubassets.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,lfs.github.com,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,patch-diff.githubusercontent.com,patchdiff.githubusercontent.com,ppa.launchpad.net,raw.githubusercontent.com,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"allowed_files\":[\".github/aw/**\",\".github/agents/**\"],\"draft\":false,\"expires\":72,\"labels\":[\"documentation\",\"automation\",\"prompt-quality\"],\"max\":1,\"max_patch_files\":100,\"max_patch_size\":4096,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_policy\":\"allowed\",\"title_prefix\":\"[caveman] \"},\"create_report_incomplete_issue\":{},\"ledger_request_compaction\":{\"ledgers\":[\"caveman-run-history\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"allowed_files\":[\".github/aw/**\",\".github/agents/**\"],\"draft\":false,\"expires\":72,\"labels\":[\"documentation\",\"automation\",\"prompt-quality\"],\"max\":1,\"max_patch_files\":100,\"max_patch_size\":4096,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CLAUDE.md\",\"AGENTS.md\"],\"protected_files_policy\":\"allowed\",\"title_prefix\":\"[caveman] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"run_id\",\"max_patch_kb\":10,\"max_record_kb\":4,\"max_segment_kb\":100,\"name\":\"caveman-run-history\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"date\":{\"type\":\"string\"},\"files_optimized\":{\"minimum\":0,\"type\":\"integer\"},\"files_processed\":{\"minimum\":0,\"type\":\"integer\"},\"planned_outcome\":{\"enum\":[\"pull_request_requested\",\"noop\"]},\"record_type\":{\"enum\":[\"caveman_run\"]},\"run_id\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"run_id\",\"date\",\"files_processed\",\"files_optimized\",\"planned_outcome\"],\"type\":\"object\"},\"type\":\"table\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"caveman-run-history\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
           GH_AW_CI_TRIGGER_TOKEN: ${{ secrets.GH_AW_CI_TRIGGER_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

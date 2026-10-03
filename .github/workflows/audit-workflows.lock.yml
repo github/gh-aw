@@ -558,7 +558,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1518,6 +1518,7 @@ jobs:
       actions: read
       discussions: write
       issues: write
+      pull-requests: read
     concurrency:
       group: "gh-aw-conclusion-audit-workflows"
       cancel-in-progress: false
@@ -1709,6 +1710,7 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: "1500"
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
@@ -2810,7 +2812,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.pythonhosted.org,*.sentry.io,anaconda.org,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,binstar.org,bootstrap.pypa.io,conda.anaconda.org,conda.binstar.org,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,files.pythonhosted.org,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pip.pypa.io,ppa.launchpad.net,pypi.org,pypi.python.org,repo.anaconda.com,repo.continuum.io,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[audit-workflows] \"},\"create_report_incomplete_issue\":{},\"ledger_request_compaction\":{\"ledgers\":[\"audit-history\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"upload_asset\":{\"allowed-exts\":[\".png\",\".jpg\",\".jpeg\",\".svg\"],\"branch\":\"assets/${{ github.workflow }}\",\"max\":3,\"max-size\":10240}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[audit-workflows] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"run_id\",\"max_patch_kb\":10,\"max_record_kb\":16,\"max_segment_kb\":100,\"name\":\"audit-history\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"aggregate_metrics\":{\"type\":\"object\"},\"anomaly_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"audit_window\":{\"additionalProperties\":false,\"properties\":{\"end\":{\"type\":\"string\"},\"start\":{\"type\":\"string\"}},\"type\":\"object\"},\"audited_at\":{\"type\":\"string\"},\"finding_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"outcome\":{\"enum\":[\"findings_reported\",\"noop\"]},\"recommendation_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"record_type\":{\"enum\":[\"workflow_run_audit\"]},\"recurring_finding_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"run_id\":{\"type\":\"string\"},\"runs_reviewed\":{\"minimum\":0,\"type\":\"integer\"}},\"required\":[\"record_type\",\"run_id\",\"audited_at\",\"audit_window\",\"runs_reviewed\",\"aggregate_metrics\",\"finding_ids\",\"recommendation_ids\",\"anomaly_ids\",\"recurring_finding_ids\",\"outcome\"],\"type\":\"object\"},\"type\":\"table\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"audit-history\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"upload_asset\":{\"allowed-exts\":[\".png\",\".jpg\",\".jpeg\",\".svg\"],\"branch\":\"assets/${{ github.workflow }}\",\"max\":3,\"max-size\":10240}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

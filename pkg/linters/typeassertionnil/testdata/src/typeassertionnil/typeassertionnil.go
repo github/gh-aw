@@ -73,4 +73,11 @@ type MyType struct {
 	Field string
 }
 
+type MyTypePtr = *MyType
 
+func pointerAliasAndParentheses(v interface{}) {
+	_ = v.(MyTypePtr) // want "type assertion to MyTypePtr without ok-check"
+	_ = v.((*MyType)) // want "type assertion to \\*MyType without ok-check"
+	_, ok := v.(MyTypePtr)
+	_ = ok
+}

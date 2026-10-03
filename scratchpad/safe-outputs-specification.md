@@ -385,6 +385,21 @@ Implementations MUST handle errors with:
 - **Descriptive Messages**: Clear error descriptions for debugging
 - **Graceful Degradation**: Continue processing remaining operations when possible
 
+#### 3.5.5 Invalidated PR Merge-Ref Checkout
+
+When failure-issue creation is enabled, the conclusion handler MUST suppress a failure issue for an invalidated PR merge-ref checkout only when all of these conditions hold:
+
+- The agent job failed on a `pull_request` event whose ref is `refs/pull/<number>/merge`.
+- Compiler-derived `GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF` metadata is `true`, confirming the generated default checkout has no explicit ref or repository override and is enabled.
+- A live PR lookup reports `state: closed` with a valid `closed_at` timestamp.
+- The failed `agent` job contains a failed `Checkout repository (gh-aw default)` step with a valid `completed_at` timestamp at or after PR closure.
+
+Other checkout steps, overridden checkouts, open PRs, actual agent execution failures, and checkouts completed before closure MUST remain reportable. Missing or invalid evidence and API errors MUST NOT suppress reporting.
+
+The compiler MUST grant the conclusion job `actions: read` and `pull-requests: read` whenever this classification can run, including when `report-failed-jobs` is disabled. The handler MUST warn on API failures; permission errors MUST identify these required scopes.
+
+Debug diagnostics SHOULD identify eligibility, PR closure evidence, checkout timing, and the classification result without logging secrets or complete API payloads. Confirmed suppression MUST emit an informational message.
+
 ### 3.6 Entities
 
 This subsection formalizes the primary schema types referenced throughout this section and §6, defining their fields, types, and requirement level.
@@ -1050,6 +1065,7 @@ Conforming implementations MUST include automated tests covering:
 - **T-ARC-002**: Verify read-only agent job permissions
 - **T-ARC-003**: Verify isolated execution job permissions
 - **T-ARC-004**: Verify configuration propagation to execution handlers
+- **T-ARC-005**: Verify invalidated PR merge-ref checkout suppression, conservative fallback, diagnostic logging, and required conclusion-job read permissions (§3.5.5)
 
 #### 7.1.2 Security Tests
 - **T-SEC-001**: Verify label sanitization removes @ mentions

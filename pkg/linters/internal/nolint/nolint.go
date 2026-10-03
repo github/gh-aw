@@ -56,7 +56,7 @@ func BuildDirectiveIndex(pass *analysis.Pass) DirectiveIndex {
 		}
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
-				text := strings.TrimPrefix(comment.Text, "//")
+				text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 				if !strings.HasPrefix(text, "nolint:") {
 					continue
 				}

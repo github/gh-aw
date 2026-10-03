@@ -248,6 +248,9 @@ func TestConclusionJob(t *testing.T) {
 				if !strings.Contains(stepsYAML, "GH_AW_AGENT_CONCLUSION") {
 					t.Errorf("[%s] Expected GH_AW_AGENT_CONCLUSION environment variable in conclusion job", tt.name)
 				}
+				if !strings.Contains(stepsYAML, `GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"`) {
+					t.Errorf("[%s] Expected compiler metadata for the default checkout ref in conclusion job", tt.name)
+				}
 			} else {
 				if job != nil {
 					t.Errorf("Expected no conclusion job, but got one: %v", job)
@@ -270,6 +273,31 @@ func TestConclusionJobRunsForSkillInstallFailures(t *testing.T) {
 	if !strings.Contains(condition, "needs.activation.outputs.skill_install_failure_count != ''") ||
 		!strings.Contains(condition, "needs.activation.outputs.skill_install_failure_count != '0'") {
 		t.Errorf("Expected conclusion condition to include skill installation failures, got: %q", condition)
+	}
+}
+
+func TestDefaultCheckoutUsesTriggerRef(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     *WorkflowData
+		trial    bool
+		expected bool
+	}{
+		{name: "default checkout", data: &WorkflowData{}, expected: true},
+		{name: "checkout ref override", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Ref: "main"}}}},
+		{name: "additional repository checkout", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "owner/other"}}}, expected: true},
+		{name: "wiki checkout", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Wiki: true}}}},
+		{name: "disabled checkout", data: &WorkflowData{CheckoutDisabled: true}},
+		{name: "custom checkout", data: &WorkflowData{CustomSteps: "      - uses: actions/checkout@v4\n"}},
+		{name: "trial checkout", data: &WorkflowData{}, trial: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.trialMode = tt.trial
+			assert.Equal(t, tt.expected, compiler.defaultCheckoutUsesTriggerRef(tt.data))
+		})
 	}
 }
 

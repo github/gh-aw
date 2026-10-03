@@ -43,7 +43,65 @@ describe("redact_secrets.cjs", () => {
       tempDir && fs.existsSync(tempDir) && fs.rmSync(tempDir, { recursive: !0, force: !0 });
       for (const key of Object.keys(process.env)) key.startsWith("SECRET_") && delete process.env[key];
     }),
+    it("scans large nested file lists without overflowing the call stack", () => {
+      const { findFiles } = require("./redact_secrets.cjs");
+      const child = path.join(tempDir, "aw-mcp");
+      const entries = Array.from({ length: 150000 }, (_, i) => ({
+        name: `log-${i}.jsonl`,
+        isSymbolicLink: () => false,
+        isDirectory: () => false,
+        isFile: () => true,
+      }));
+      const readdir = vi.spyOn(fs, "readdirSync").mockImplementation(dir => {
+        if (dir === child) return entries;
+        if (dir === tempDir) return [{ name: "aw-mcp", isSymbolicLink: () => false, isDirectory: () => true }];
+        throw new Error("Unexpected directory");
+      });
+      try {
+        const files = findFiles(tempDir, [".jsonl"]);
+        expect(files).toHaveLength(entries.length);
+        expect(files[0]).toBe(path.join(child, "log-0.jsonl"));
+        expect(files.at(-1)).toBe(path.join(child, "log-149999.jsonl"));
+      } finally {
+        readdir.mockRestore();
+      }
+    }),
     describe("main function integration", () => {
+      it("continues redacting artifact files when a directory is inaccessible", async () => {
+        const cache = path.join(tempDir, "aw-mcp");
+        const artifact = path.join(tempDir, "agent-stdio.log");
+        fs.mkdirSync(cache);
+        fs.writeFileSync(artifact, "secret-value");
+        process.env.GH_AW_SECRET_NAMES = "TEST_SECRET";
+        process.env.SECRET_TEST_SECRET = "secret-value";
+        const readDir = fs.readdirSync;
+        const readDirSpy = vi.spyOn(fs, "readdirSync").mockImplementation((dir, options) => {
+          if (dir === cache) throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+          return readDir(dir, options);
+        });
+        try {
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+          await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+          expect(readDirSpy).toHaveBeenCalledWith(cache, expect.anything());
+          expect(fs.readFileSync(artifact, "utf8")).toBe("***REDACTED***");
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Skipping inaccessible directory"));
+        } finally {
+          readDirSpy.mockRestore();
+        }
+      });
+      it("redacts readable MCP artifact logs", async () => {
+        const logs = path.join(tempDir, "aw-mcp", "logs");
+        const artifact = path.join(logs, "runs.json");
+        fs.mkdirSync(logs, { recursive: true });
+        fs.writeFileSync(artifact, '{"token":"secret-value"}');
+        process.env.GH_AW_SECRET_NAMES = "TEST_SECRET";
+        process.env.SECRET_TEST_SECRET = "secret-value";
+        const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+        await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+        expect(fs.readFileSync(artifact, "utf8")).toBe('{"token":"***REDACTED***"}');
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+      });
       (it("should scan for built-in patterns even when GH_AW_SECRET_NAMES is not set", async () => {
         (await eval(`(async () => { ${redactScript}; await main(); })()`),
           expect(mockCore.info).toHaveBeenCalledWith(`Starting secret redaction in /tmp/gh-aw and ${process.env.RUNNER_TEMP}/gh-aw directories`),

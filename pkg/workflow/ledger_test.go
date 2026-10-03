@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -365,6 +366,20 @@ func TestStandaloneLedgerWiresValidationArtifactAndPersistenceJobs(t *testing.T)
 	require.Contains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: config}), "ledger_append")
 	require.NotContains(t, computeEnabledToolNames(&WorkflowData{LedgerConfig: &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "cache", Type: "map"}}}}), "ledger_append")
 	require.True(t, hasHandlerManagerTypes(data))
+
+	var handlerSteps []string
+	NewCompiler().addHandlerManagerConfigEnvVar(&handlerSteps, data)
+	var handlerJSON string
+	for _, step := range handlerSteps {
+		if strings.Contains(step, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ") {
+			handlerJSON, err = strconv.Unquote(strings.TrimSpace(strings.TrimPrefix(step, "          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ")))
+			require.NoError(t, err)
+		}
+	}
+	require.NotEmpty(t, handlerJSON)
+	var handlerConfig map[string]any
+	require.NoError(t, json.Unmarshal([]byte(handlerJSON), &handlerConfig))
+	require.Equal(t, ledgerDefinitions, handlerConfig["ledger_append"].(map[string]any)["ledgers"])
 
 	job, err := NewCompiler().buildPushLedgerChangesJob(data, false)
 	require.NoError(t, err)

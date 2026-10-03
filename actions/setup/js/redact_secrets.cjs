@@ -24,21 +24,34 @@ function findFiles(dir, extensions) {
     if (!fs.existsSync(dir)) {
       return results;
     }
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isSymbolicLink()) {
-        fs.unlinkSync(fullPath);
-        core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
-      } else if (entry.isDirectory()) {
-        // Recursively search subdirectories
-        results.push(...findFiles(fullPath, extensions));
-      } else if (entry.isFile()) {
-        // Check if file has one of the target extensions
-        const ext = path.extname(entry.name).toLowerCase();
-        if (extensions.includes(ext)) {
-          results.push(fullPath);
+    const pending = [dir];
+    while (pending.length) {
+      const currentDir = pending.pop();
+      if (currentDir === undefined) break;
+      try {
+        let entries;
+        try {
+          entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+            core.warning(`Skipping inaccessible directory during secret redaction: ${currentDir}`);
+            continue;
+          }
+          throw error;
         }
+        for (const entry of entries) {
+          const fullPath = path.join(currentDir, entry.name);
+          if (entry.isSymbolicLink()) {
+            fs.unlinkSync(fullPath);
+            core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
+          } else if (entry.isDirectory()) {
+            pending.push(fullPath);
+          } else if (entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase())) {
+            results.push(fullPath);
+          }
+        }
+      } catch (error) {
+        throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${currentDir}: ${getErrorMessage(error)}`, { cause: error });
       }
     }
   } catch (error) {
@@ -421,4 +434,4 @@ async function redactFilesInDir(dir) {
   }
 }
 
-module.exports = { main, redactFilesInDir, processFile, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };
+module.exports = { main, redactFilesInDir, findFiles, processFile, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };

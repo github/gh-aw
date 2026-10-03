@@ -59,18 +59,12 @@ func analyzeTypeAssert(pass *analysis.Pass, n ast.Node, noLintIndex nolint.Direc
 		return
 	}
 
-	// Check if the asserted type is a pointer type (e.g., *SomeType)
-	_, isPointerType := typeAssert.Type.(*ast.StarExpr)
-	if !isPointerType {
-		return
-	}
-
 	// Get the type information to determine if it's truly a pointer
 	t := pass.TypesInfo.TypeOf(typeAssert.Type)
 	if t == nil {
 		return
 	}
-	if _, isPtr := t.(*types.Pointer); !isPtr {
+	if _, isPtr := types.Unalias(t).(*types.Pointer); !isPtr {
 		return
 	}
 
@@ -105,15 +99,18 @@ func isSafeTwoValueAssertion(typeAssert *ast.TypeAssertExpr, parents map[ast.Nod
 
 // getTypeName returns a string representation of a type node
 func getTypeName(typeNode ast.Expr) string {
-	if star, ok := typeNode.(*ast.StarExpr); ok {
-		if ident, ok := star.X.(*ast.Ident); ok {
+	if star, ok := astutil.UnwrapParenExpr(typeNode).(*ast.StarExpr); ok {
+		if ident, ok := astutil.UnwrapParenExpr(star.X).(*ast.Ident); ok {
 			return "*" + ident.Name
 		}
-		if sel, ok := star.X.(*ast.SelectorExpr); ok {
+		if sel, ok := astutil.UnwrapParenExpr(star.X).(*ast.SelectorExpr); ok {
 			if pkg, ok := sel.X.(*ast.Ident); ok {
 				return "*" + pkg.Name + "." + sel.Sel.Name
 			}
 		}
+	}
+	if ident, ok := astutil.UnwrapParenExpr(typeNode).(*ast.Ident); ok {
+		return ident.Name
 	}
 	return "pointer type"
 }
