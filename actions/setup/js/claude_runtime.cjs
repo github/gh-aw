@@ -2,7 +2,6 @@
 "use strict";
 
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { countPermissionDeniedIssues, extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -86,7 +85,7 @@ function claudePermissionDenials(output) {
 }
 
 /** @param {string[]} args @param {string} [managedDir] @param {string} [tempDir] */
-function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir = process.env.RUNNER_TEMP || os.tmpdir()) {
+function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir = "/tmp/gh-aw/agent") {
   if (!args.includes("--bare")) return { args, pluginDir: undefined };
   const directories = ["skills", "agents"].filter(name => {
     try {
@@ -99,6 +98,7 @@ function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir
   if (directories.length === 0) return { args, pluginDir: undefined };
   let pluginDir;
   try {
+    fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
     pluginDir = fs.mkdtempSync(path.join(tempDir, "gh-aw-claude-workflow-"));
     fs.mkdirSync(path.join(pluginDir, ".claude-plugin"));
     fs.writeFileSync(path.join(pluginDir, ".claude-plugin/plugin.json"), JSON.stringify({ name: "gh-aw-workflow", version: "1.0.0", description: "Workflow-declared skills and subagents" }), { mode: 0o600 });
@@ -115,11 +115,13 @@ function claudeRepositoryEditPolicy(args, env) {
   if (env.GH_AW_CLAUDE_DISABLE_REPO_EDITS !== "true") return args;
   const workspace = env.GITHUB_WORKSPACE;
   if (!workspace || !path.isAbsolute(workspace)) throw new Error("tools.edit: false requires an absolute GITHUB_WORKSPACE");
-  const rule = `Edit(//${workspace.replace(/^\/+|\/+$/g, "")}/**)`;
+  // Claude consults Edit(path) for file permissions, not Write/NotebookEdit/MultiEdit(path).
+  // Remove those native editors entirely, in sync with claudeDisabledTools in Go.
+  const rules = [`Edit(//${workspace.replace(/^\/+|\/+$/g, "")}/**)`, "Write", "MultiEdit", "NotebookEdit"];
   const result = [...args];
   const flag = result.indexOf("--disallowed-tools");
-  if (flag >= 0 && result[flag + 1]) result[flag + 1] += `,${rule}`;
-  else result.push("--disallowed-tools", rule);
+  if (flag >= 0 && result[flag + 1]) result[flag + 1] = [...new Set([...result[flag + 1].split(","), ...rules])].join(",");
+  else result.push("--disallowed-tools", rules.join(","));
   return result;
 }
 

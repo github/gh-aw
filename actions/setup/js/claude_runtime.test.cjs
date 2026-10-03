@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-const { claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy } = require("./claude_runtime.cjs");
+const { claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, removeClaudePlugin } = require("./claude_runtime.cjs");
 
 const assistant = { type: "assistant", session_id: "exact-session", message: { content: [{ type: "text", text: "Working" }] } };
 
@@ -57,9 +57,39 @@ ${script}
 }
 
 describe("Claude runtime contracts", () => {
-  it("denies repository writes without disabling separately scoped memory writes", () => {
-    const args = claudeRepositoryEditPolicy(["--permission-mode", "auto", "--disallowed-tools", "Bash"], { GH_AW_CLAUDE_DISABLE_REPO_EDITS: "true", GITHUB_WORKSPACE: "/workspace/repo" });
-    expect(args).toEqual(["--permission-mode", "auto", "--disallowed-tools", "Bash,Edit(//workspace/repo/**)"]);
+  it("creates bare-mode plugins in sandbox-writable scratch instead of RUNNER_TEMP", () => {
+    const managedDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-managed-test-"));
+    const priorRunnerTemp = process.env.RUNNER_TEMP;
+    let pluginDir;
+    try {
+      fs.mkdirSync(path.join(managedDir, "skills"));
+      process.env.RUNNER_TEMP = path.join(managedDir, "unmounted-runner-temp");
+      const loaded = claudeBareCapabilities(["--bare"], managedDir);
+      pluginDir = loaded.pluginDir;
+      expect(path.dirname(pluginDir)).toBe("/tmp/gh-aw/agent");
+      expect(fs.existsSync(process.env.RUNNER_TEMP)).toBe(false);
+      expect(fs.realpathSync(path.join(pluginDir, "skills"))).toBe(fs.realpathSync(path.join(managedDir, "skills")));
+    } finally {
+      if (priorRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+      else process.env.RUNNER_TEMP = priorRunnerTemp;
+      removeClaudePlugin(pluginDir);
+      fs.rmSync(managedDir, { recursive: true });
+    }
+  });
+  it.each(["dontAsk", "acceptEdits", "bypassPermissions"])("denies every native editor in %s without disabling scoped memory edits", mode => {
+    const original = ["--permission-mode", mode, "--allowed-tools", "Edit(//tmp/memory/**)", "--disallowed-tools", "Bash,Write"];
+    const args = claudeRepositoryEditPolicy(original, { GH_AW_CLAUDE_DISABLE_REPO_EDITS: "true", GITHUB_WORKSPACE: "/workspace/repo/" });
+    expect(args).toEqual(["--permission-mode", mode, "--allowed-tools", "Edit(//tmp/memory/**)", "--disallowed-tools", "Bash,Write,Edit(//workspace/repo/**),MultiEdit,NotebookEdit"]);
+    expect(original.at(-1)).toBe("Bash,Write");
+  });
+  it("adds an editor deny list when the caller has no deny flag", () => {
+    const args = claudeRepositoryEditPolicy([], { GH_AW_CLAUDE_DISABLE_REPO_EDITS: "true", GITHUB_WORKSPACE: "/workspace/repo" });
+    expect(args).toEqual(["--disallowed-tools", "Edit(//workspace/repo/**),Write,MultiEdit,NotebookEdit"]);
+  });
+  it("leaves editor-enabled runs unchanged and rejects invalid workspace paths", () => {
+    const args = ["--allowed-tools", "Edit,Write"];
+    expect(claudeRepositoryEditPolicy(args, {})).toBe(args);
+    expect(() => claudeRepositoryEditPolicy(args, { GH_AW_CLAUDE_DISABLE_REPO_EDITS: "true", GITHUB_WORKSPACE: "relative" })).toThrow("absolute GITHUB_WORKSPACE");
   });
   it("excludes model answers and tool results from failure classifiers", () => {
     const records = [assistant, { type: "user", message: { content: "unknown model fake not found" } }];

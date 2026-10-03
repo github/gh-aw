@@ -757,14 +757,14 @@ engine:
 
 ### Engine Permission Mode (`engine.permission-mode`)
 
-A first-class Claude engine setting that controls how Claude Code enforces tool access boundaries. Accepts one of four values: `acceptEdits` (default — Claude honors `--allowed-tools`; the workflow's declared `tools:` and `mcp-servers: allowed:` list is the effective tool boundary), `bypassPermissions` (Claude ignores `--allowed-tools`; the MCP gateway's `allowed:` filter becomes the sole boundary), `auto` (Claude selects the least-privileged mode that fits the workflow's tool configuration; the default when `tools.edit: false`), and `plan` (Claude presents changes for approval before applying them).
+A first-class Claude engine setting that controls approval behavior. Accepts `default`, `dontAsk`, `acceptEdits`, `auto`, `plan`, or `bypassPermissions`. The default is `dontAsk`: actions requiring approval are denied unless pre-approved by `--allowed-tools`; built-in read-only actions remain available. `acceptEdits` automatically approves edits and some filesystem commands, `auto` uses a classifier to approve additional actions, and `bypassPermissions` skips approval checks except explicit deny rules. These modes are not OS-level isolation.
 
-Previously, `bypassPermissions` was derived implicitly whenever a workflow granted unrestricted bash access (`bash: "*"`, `bash: [":*"]`, or `bash: null`), which could silently disable `--allowed-tools` enforcement. Setting `engine.permission-mode` explicitly overrides that implicit derivation and any legacy `--permission-mode` flag in `engine.args`. The compiler validates the value against the fixed enum at compile time. See [AI Engines Reference](/gh-aw/reference/engines/#claude-tool-enforcement-security-model).
+`engine.permission-mode` takes precedence over legacy `--permission-mode` arguments. Unrestricted bash does not implicitly enable `bypassPermissions`. Disabled native tools are removed, and `tools.edit: false` denies repository editing while retaining separately scoped memory edits. The sandbox provides filesystem/network isolation, and the MCP gateway enforces its `allowed:` filter independently of permission mode. See [AI Engines Reference](/gh-aw/reference/engines/#claude-tool-enforcement-security-model).
 
 ```aw wrap
 engine:
   id: claude
-  permission-mode: acceptEdits
+  permission-mode: dontAsk
 ```
 
 ### Enterprise API Endpoint (`api-target`)

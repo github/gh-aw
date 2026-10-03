@@ -22,8 +22,11 @@ func claudeDisabledTools(data *WorkflowData, allowed string) []string {
 			denied = append(denied, tool)
 		}
 	}
-	if !has("Edit") && !has("Write") {
-		denied = append(denied, "Edit", "Write", "NotebookEdit")
+	// Keep native editor removal in sync with claudeRepositoryEditPolicy in claude_runtime.cjs.
+	for _, tool := range []string{"Edit", "Write", "MultiEdit", "NotebookEdit"} {
+		if !has(tool) {
+			denied = append(denied, tool)
+		}
 	}
 	return denied
 }
