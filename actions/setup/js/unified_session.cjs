@@ -116,7 +116,7 @@ function parseEngineSession(content, engine) {
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
  * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void}} [options]
- * @returns {{events: SessionEvent[], maskedValues: string[]}}
+ * @returns {{events: import("./types/agent_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message) } = {}) {
   /** @type {SessionSource[]} */
