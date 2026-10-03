@@ -14,21 +14,23 @@ mkdir -p "$RESULTS_DIR"
 
 run_model() {
     local config="$1"
-    local invariant="${2:-}"
+    local violation="${2:-}"
+    local kind="${3:-Invariant}"
+    local expected_status="${4:-12}"
     local output="$RESULTS_DIR/$config.log"
     local status=0
     "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 2 -seed 1 -fp 0 -config "$SPEC_DIR/$config.cfg" \
         -metadir "$RESULTS_DIR/$config" "$SPEC_DIR/WorkQueue.tla" \
         >"$output" 2>&1 || status=$?
-    if [ -z "$invariant" ]; then
+    if [ -z "$violation" ]; then
         if [ "$status" -ne 0 ] || ! grep -q "Model checking completed. No error" "$output"; then
             cat "$output" >&2
             return 1
         fi
-    elif [ "$status" -ne 12 ] || ! grep -q "Invariant $invariant is violated" "$output"; then
+    elif [ "$status" -ne "$expected_status" ] || ! grep -q "$kind $violation is violated" "$output"; then
         cat "$output" >&2
-        echo "Expected a $invariant counterexample, not success or a tooling failure." >&2
+        echo "Expected a $violation counterexample, not success or a tooling failure." >&2
         return 1
     fi
     echo "$config: expected result"
@@ -37,6 +39,9 @@ run_model() {
 
 run_model WorkQueue
 run_model Recovery
+run_model QueueOrdering
 run_model BrokenCAS TerminalPersistence
 run_model BrokenTerminal TerminalFreeze
+run_model BrokenQueueSelection QueueSelection "Action property" 13
+run_model WeakOrderingWitness NoOutOfOrderClaim
 echo "Full TLC reports: $RESULTS_DIR"

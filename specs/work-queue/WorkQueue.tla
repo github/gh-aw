@@ -17,7 +17,9 @@ WorkOf(c) == ((c - 1) % WorkCount) + 1
 Inbound(a) == ((a - 1) % ClaimCount) + 1
 Origin(c) == ((c - 1) % DispatcherCount) + 1
 
-Fact(k, w, c, a) == [kind |-> k, work |-> w, claim |-> c, attempt |-> a]
+\* Work identities also abstract the stable rank of (enqueue time, Work identity).
+Fact(k, w, c, a) == [kind |-> k, work |-> w, claim |-> c, attempt |-> a,
+                     enqueued |-> IF k = "Work" THEN w ELSE 0]
 Work(w) == Fact("Work", w, 0, 0)
 Claim(c) == Fact("Claim", WorkOf(c), c, 0)
 ClaimCancellation(c) == Fact("ClaimCancellation", WorkOf(c), c, 0)
@@ -47,6 +49,14 @@ State(f, w) ==
     ELSE IF Completed(f, w) # {} THEN "completed"
     ELSE IF WorkCancellation(w) \in f THEN "cancelled"
     ELSE IF Winner(f, w) # 0 THEN "claimed" ELSE "available"
+
+Available(f) == {w \in Works : State(f, w) = "available"}
+OldestAvailable(f) ==
+    IF Available(f) = {} THEN 0
+    ELSE CHOOSE w \in Available(f) :
+         \A v \in Available(f) :
+              Work(w).enqueued < Work(v).enqueued
+              \/ (Work(w).enqueued = Work(v).enqueued /\ w <= v)
 
 Projection(f) ==
     [work |-> [w \in Works |-> State(f, w)],
@@ -118,7 +128,7 @@ Publish(snapshot) ==
     /\ Write(snapshot.candidate)
 
 LocalView(d) == Apply(log, dispatch[d].local)
-Stage(d, t) ==
+StageIntent(d, t) ==
     /\ dispatch[d].phase = "agent" /\ t \in Intents
     /\ (t.kind # "Claim" \/ Origin(t.claim) = d)
     /\ Allowed(Facts(LocalView(d)), t)
@@ -126,6 +136,10 @@ Stage(d, t) ==
          ![d].local = Append(@, t), ![d].serialized = Append(@, t)]
     /\ UNCHANGED <<log, head, workers, compact, recovery, deadRuns,
                    terminalHistory, authorizations, effects>>
+
+Stage(d, t) ==
+    /\ StageIntent(d, t)
+    /\ t.kind # "Claim" \/ t.work = OldestAvailable(Facts(LocalView(d)))
 
 PrepareDispatch(d) ==
     /\ dispatch[d].phase = "agent"
@@ -298,6 +312,13 @@ WorkerOneShot ==
          workers[a].phase \in {"done", "stopped", "failed"} =>
               workers'[a].phase = workers[a].phase]_vars
 
+QueueSelection ==
+    [] [\A d \in Dispatchers :
+         Len(dispatch'[d].local) > Len(dispatch[d].local) =>
+              LET t == dispatch'[d].local[Len(dispatch'[d].local)]
+              IN t.kind = "Claim" =>
+                   t.work = OldestAvailable(Facts(LocalView(d)))]_vars
+
 ValidFacts(f) ==
     /\ f \subseteq AllFacts
     /\ \A t \in f :
@@ -425,6 +446,10 @@ NoRecoveredOrphan ==
           ClaimCancellation(c) \in Facts(recovery.candidate) \ Facts(recovery.source)
           /\ ClaimCancellation(c) \in Facts(log))
 NoExternalEffect == effects = <<>>
+NoOutOfOrderClaim ==
+    \A c \in Claims : Claim(c) \in Facts(log) =>
+         \A w \in Available(Facts(log)) :
+              Work(WorkOf(c)).enqueued <= Work(w).enqueued
 
 Bound == head <= MaxHead /\ Len(log) <= MaxLog
 
@@ -444,6 +469,9 @@ BrokenCASSpec ==
     Init /\ [][Next \/ (\E d \in Dispatchers : UnsafeStalePush(d))]_vars
 BrokenTerminalSpec ==
     Init /\ [][Next \/ (\E c \in Claims : UnsafeLateClaim(c))]_vars
+BrokenQueueSelectionSpec ==
+    Init /\ [][Next \/ (\E d \in Dispatchers, t \in Intents :
+                             StageIntent(d, t))]_vars
 
 THEOREM ReplayDeterminism ==
     \A a, b \in Seq(AllFacts) : Facts(a) = Facts(b) => Replay(a) = Replay(b)
@@ -451,4 +479,5 @@ THEOREM CompactionEquivalence ==
     \A s \in Seq(AllFacts) : Replay(s) = Replay(Canonical(Facts(s)))
 THEOREM ProtocolSafety == Spec => []Safety
 THEOREM WorkerCannotRestart == Spec => WorkerOneShot
+THEOREM OldestKnownWorkSelected == Spec => QueueSelection
 =============================================================================
