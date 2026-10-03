@@ -5053,7 +5053,7 @@
           "examples": [true, null]
         },
         "work-queue": {
-          "description": "Read dispatch work and claim state from the immutable activation snapshot. The MCP server does not read Git; the snapshot can become stale while the agent runs.",
+          "description": "Read work queue and claim state from the immutable activation snapshot. The MCP server does not read Git; the snapshot can become stale while the agent runs.",
           "oneOf": [
             {
               "type": "boolean",

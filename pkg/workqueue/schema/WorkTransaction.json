@@ -18,6 +18,7 @@
   "unevaluatedProperties": {
     "not": {}
   },
+  "description": "Operator work-queue records used by gh aw work-queue on gh-aw-work-queue.",
   "$defs": {
     "RecordUnknown": {
       "type": "object",

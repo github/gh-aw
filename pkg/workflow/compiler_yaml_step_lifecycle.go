@@ -272,17 +272,17 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	yaml.WriteString("        run: |\n")
 	fmt.Fprintf(yaml, "          mkdir -p /tmp/gh-aw\n")
 	fmt.Fprintf(yaml, "          cp \"$GH_AW_SAFE_OUTPUTS\" /tmp/gh-aw/%s 2>/dev/null || true\n", constants.SafeOutputsFilename)
-	if isDispatchWorkCoordinatorEnabled(data) {
-		yaml.WriteString("      - name: Copy dispatch claim finish intent\n")
+	if isWorkQueueEnabled(data) {
+		yaml.WriteString("      - name: Copy work queue claim finish intent\n")
 		yaml.WriteString("        if: always()\n")
 		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}\n")
 		yaml.WriteString("        run: |\n")
-		yaml.WriteString("          finish_intent_dir=\"$(dirname \"$GH_AW_SAFE_OUTPUTS\")/dispatch-coordinator\"\n")
-		fmt.Fprintf(yaml, "          if cp \"$finish_intent_dir/dispatch-work-coordinator.finish.jsonl\" %s 2>/dev/null; then\n", constants.DispatchCoordinatorFinishIntentPath)
-		yaml.WriteString("            echo 'Dispatch coordinator: copied finish intent into agent artifact'\n")
+		yaml.WriteString("          finish_intent_dir=\"$(dirname \"$GH_AW_SAFE_OUTPUTS\")/work-queue\"\n")
+		fmt.Fprintf(yaml, "          if cp \"$finish_intent_dir/work-queue.finish.jsonl\" %s 2>/dev/null; then\n", constants.WorkQueueFinishIntentPath)
+		yaml.WriteString("            echo 'Work queue: copied finish intent into agent artifact'\n")
 		yaml.WriteString("          else\n")
-		yaml.WriteString("            echo 'Dispatch coordinator: no finish intent to copy (tool not called or file unavailable)'\n")
+		yaml.WriteString("            echo 'Work queue: no finish intent to copy (tool not called or file unavailable)'\n")
 		yaml.WriteString("          fi\n")
 	}
 

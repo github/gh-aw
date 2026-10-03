@@ -59,7 +59,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 }
 
 func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []string {
-	if !isDispatchWorkCoordinatorEnabled(data) {
+	if !isWorkQueueEnabled(data) {
 		return nil
 	}
 	steps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
@@ -75,7 +75,7 @@ func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []str
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 		"        with:\n",
 		"          script: |\n",
-		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/dispatch_work_coordinator_summary.cjs');\n",
+		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_summary.cjs');\n",
 		"            await main({ core, githubClient: github, context });\n",
 	)
 }

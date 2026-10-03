@@ -189,8 +189,8 @@ func buildStandardJSONMCPRenderers(
 		RenderLedger: func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {
 			createRenderer(isLast).RenderLedgerMCP(yaml, workflowData)
 		},
-		RenderDispatchCoordinator: func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {
-			createRenderer(isLast).RenderDispatchCoordinatorMCP(yaml, workflowData)
+		RenderWorkQueue: func(yaml *strings.Builder, isLast bool, workflowData *WorkflowData) {
+			createRenderer(isLast).RenderWorkQueueMCP(yaml, workflowData)
 		},
 		RenderMCPScripts: func(yaml *strings.Builder, mcpScripts *MCPScriptsConfig, isLast bool) {
 			createRenderer(isLast).RenderMCPScriptsMCP(yaml, mcpScripts, workflowData)

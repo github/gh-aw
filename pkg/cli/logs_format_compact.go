@@ -220,7 +220,7 @@ func renderLogsCompactToWriter(w io.Writer, data LogsData) {
 	}
 
 	// [location]
-	renderLogsDispatchCoordinatorToWriter(w, data.Runs)
+	renderLogsWorkQueueToWriter(w, data.Runs)
 	if data.LogsLocation != "" {
 		fmt.Fprintf(w, "[location] %s\n", data.LogsLocation)
 	}
@@ -400,7 +400,7 @@ func renderLogsCompactVerboseToWriter(w io.Writer, data LogsData) {
 		}
 	}
 
-	renderLogsDispatchCoordinatorToWriter(w, data.Runs)
+	renderLogsWorkQueueToWriter(w, data.Runs)
 
 	// [location]
 	if data.LogsLocation != "" {

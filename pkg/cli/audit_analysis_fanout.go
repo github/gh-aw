@@ -207,10 +207,10 @@ func launchFirewallAnalysis(g *errgroup.Group, gctx context.Context, results *au
 
 // launchSupplementalAuditAnalyses exclusively writes redactedDomainsAnalysis, rateLimitUsage, artifacts, and safeItemsCount.
 func launchSupplementalAuditAnalyses(g *errgroup.Group, gctx context.Context, results *auditAnalysisResults, runOutputDir string, verbose bool) {
-	runAuditAnalysis(g, gctx, true, "extractDispatchCoordinatorReport", "Failed to extract dispatch coordinator operations", func(v *DispatchCoordinatorReport) {
-		results.dispatchCoordinator = v
-	}, func() (*DispatchCoordinatorReport, error) {
-		return extractDispatchCoordinatorReport(runOutputDir)
+	runAuditAnalysis(g, gctx, true, "extractWorkQueueReport", "Failed to extract work queue operations", func(v *WorkQueueReport) {
+		results.workQueue = v
+	}, func() (*WorkQueueReport, error) {
+		return extractWorkQueueReport(runOutputDir)
 	})
 	runAuditAnalysis(g, gctx, verbose, "analyzeRedactedDomains", "Failed to analyze redacted domains", func(v *RedactedDomainsAnalysis) {
 		results.redactedDomainsAnalysis = v
