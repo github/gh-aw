@@ -53,7 +53,10 @@ describe("write work queue activation snapshot", () => {
     const githubClient = {
       rest: {
         git: {
-          getRef: async () => ({ data: { object: { sha: "legacy-head" } } }),
+          getRef: async ({ ref }) => {
+            if (ref !== "heads/work-queue") throw Object.assign(new Error("Not Found"), { status: 404 });
+            return { data: { object: { sha: "legacy-head" } } };
+          },
           getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
           getTree: async () => ({ data: { tree: [{ path: "work-queue.jsonl", type: "blob", sha: "blob" }] } }),
           getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(`${JSON.stringify(legacy)}\n`).toString("base64") } }),
@@ -93,8 +96,9 @@ describe("write work queue activation snapshot", () => {
     const assignment = { work_id: "w", claim_id: "c", work: { task: "test" } };
     expect(resolveWorkerAssignment({ client_payload: { aw_context: { work_queue: assignment } } }, transactions)).toEqual({ work_id: "w", claim_id: "c" });
     expect(resolveWorkerAssignment({ inputs: { aw_context: "{}" } }, transactions)).toBeNull();
-    for (const work_queue of [[], "claim", { ...assignment, work_id: "" }, { ...assignment, claim_id: "" }, { ...assignment, work: [] }]) {
+    for (const work_queue of [null, [], "claim", { ...assignment, work_id: "" }, { ...assignment, claim_id: "" }, { ...assignment, work: [] }, { ...assignment, extra: true }]) {
       expect(() => resolveWorkerAssignment({ client_payload: { aw_context: { work_queue } } }, transactions)).toThrow(/invalid shape/);
     }
+    expect(() => resolveWorkerAssignment({ client_payload: { aw_context: { work_queue: assignment, work_claim: assignment } } }, transactions)).toThrow(/cannot contain both/);
   });
 });

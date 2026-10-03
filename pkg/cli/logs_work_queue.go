@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	workQueueSnapshotFile = "work-queue.snapshot.json"
-	workQueueFinishFile   = "work-queue.finish.jsonl"
+	workQueueSnapshotFile       = "work-queue.snapshot.json"
+	workQueueFinishFile         = "work-queue.finish.jsonl"
+	legacyWorkQueueSnapshotFile = "dispatch-work-coordinator.snapshot.json"
+	legacyWorkQueueFinishFile   = "dispatch-work-coordinator.finish.jsonl"
 )
 
 // WorkQueueReport separates activation-time queue facts and agent intent
@@ -58,7 +60,10 @@ type WorkQueueOperation struct {
 
 func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 	report := &WorkQueueReport{}
-	snapshotPath := filepath.Join(runDir, workQueueSnapshotFile)
+	snapshotPath, err := workQueueArtifactPath(runDir, workQueueSnapshotFile, legacyWorkQueueSnapshotFile)
+	if err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(snapshotPath)
 	if err == nil {
 		report.Snapshot, err = parseWorkQueueSnapshot(data)
@@ -67,7 +72,11 @@ func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 		return nil, fmt.Errorf("failed to read work queue snapshot: %w", err)
 	}
 
-	report.FinishIntent, err = readWorkQueueFinishIntent(filepath.Join(runDir, workQueueFinishFile))
+	finishPath, err := workQueueArtifactPath(runDir, workQueueFinishFile, legacyWorkQueueFinishFile)
+	if err != nil {
+		return nil, err
+	}
+	report.FinishIntent, err = readWorkQueueFinishIntent(finishPath)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +88,17 @@ func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 		return nil, nil
 	}
 	return report, nil
+}
+
+func workQueueArtifactPath(runDir, current, legacy string) (string, error) {
+	path := filepath.Join(runDir, current)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return filepath.Join(runDir, legacy), nil
+		}
+		return "", fmt.Errorf("failed to inspect work queue artifact: %w", err)
+	}
+	return path, nil
 }
 
 func parseWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
@@ -254,7 +274,10 @@ func readWorkQueueStepLog(path, source string, seen map[string]struct{}) ([]Work
 		message = strings.TrimSpace(message)
 		if !strings.HasPrefix(message, "Work queue: ") &&
 			!strings.HasPrefix(message, "Work queue claim reconciliation") &&
-			!strings.HasPrefix(message, "Captured work queue snapshot (") {
+			!strings.HasPrefix(message, "Captured work queue snapshot (") &&
+			!strings.HasPrefix(message, "Dispatch coordinator: ") &&
+			!strings.HasPrefix(message, "Dispatch work claim reconciliation") &&
+			!strings.HasPrefix(message, "Captured dispatch coordinator snapshot (") {
 			continue
 		}
 		key := timestamp + "\n" + message
@@ -342,11 +365,11 @@ func isWorkQueueStepLog(source string) bool {
 		return job == base || strings.HasSuffix(job, " _ "+base)
 	}
 	switch name {
-	case "Snapshot work queue state.txt":
+	case "Snapshot work queue state.txt", "Snapshot dispatch coordinator state.txt":
 		return jobMatches("activation")
-	case "Reconcile work queue claim.txt":
+	case "Reconcile work queue claim.txt", "Reconcile dispatch work claim.txt":
 		return jobMatches("safe_outputs")
-	case "Copy work queue claim finish intent.txt":
+	case "Copy work queue claim finish intent.txt", "Copy dispatch claim finish intent.txt":
 		return jobMatches("agent")
 	default:
 		return false

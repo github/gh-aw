@@ -128,7 +128,10 @@ describe("work queue conclusion summary", () => {
     const githubClient = {
       rest: {
         git: {
-          getRef: async () => ({ data: { object: { sha: "legacy-head" } } }),
+          getRef: async ({ ref }) => {
+            if (ref !== "heads/work-queue") throw Object.assign(new Error("Not Found"), { status: 404 });
+            return { data: { object: { sha: "legacy-head" } } };
+          },
           getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
           getTree: async () => ({ data: { tree: [{ path: "work-queue.jsonl", type: "blob", sha: "blob" }] } }),
           getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(`${JSON.stringify(legacyWork)}\n`).toString("base64") } }),

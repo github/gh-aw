@@ -5,6 +5,8 @@ const { applyTransactions, parseTransactionLog, serializeTransactionLog } = requ
 
 const WORK_QUEUE_BRANCH = "work-queue";
 const WORK_QUEUE_LOG_PATH = "work-queue.jsonl";
+const LEGACY_QUEUE_BRANCH = "dispatch-coordinator";
+const LEGACY_QUEUE_LOG_PATH = "dispatch-work-coordinator.jsonl";
 const DEFAULT_MAX_RETRIES = 5;
 
 /**
@@ -51,28 +53,30 @@ function isRefConflict(error) {
  */
 async function readWorkQueueLogRaw({ githubClient, owner, repo, core: coreApi = typeof core === "undefined" ? undefined : core }) {
   coreApi?.info("Work queue: reading queue branch");
-  let head;
-  try {
-    const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${WORK_QUEUE_BRANCH}` });
-    head = response.data.object.sha;
-  } catch (error) {
-    if (isMissing(error)) {
-      coreApi?.info("Work queue: queue branch does not exist");
-      return { sha: null, transactions: [] };
-    }
-    throw new Error("Failed to read work queue branch", { cause: error });
+  const [currentHead, legacyHead] = await Promise.all([readQueueBranch(githubClient, owner, repo, WORK_QUEUE_BRANCH), readQueueBranch(githubClient, owner, repo, LEGACY_QUEUE_BRANCH)]);
+  if (currentHead && legacyHead) {
+    throw new Error("Both current and legacy work queue branches exist; reconcile storage before proceeding");
   }
-
-  if (typeof head !== "string" || !head) throw new TypeError("Work queue branch returned an invalid commit");
+  const head = currentHead || legacyHead;
+  const branch = legacyHead ? LEGACY_QUEUE_BRANCH : WORK_QUEUE_BRANCH;
+  let logPath = legacyHead ? LEGACY_QUEUE_LOG_PATH : WORK_QUEUE_LOG_PATH;
+  if (!head) {
+    coreApi?.info("Work queue: queue branch does not exist");
+    return { sha: null, transactions: [], branch, logPath };
+  }
+  if (legacyHead) coreApi?.info("Work queue: retaining legacy storage until an explicit migration");
 
   try {
     const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: head });
     const tree = await githubClient.rest.git.getTree({ owner, repo, tree_sha: commit.data.tree.sha });
-    const entry = tree.data.tree.find(item => item.path === WORK_QUEUE_LOG_PATH);
+    const entries = tree.data.tree.filter(item => item.path === WORK_QUEUE_LOG_PATH || item.path === LEGACY_QUEUE_LOG_PATH);
+    if (entries.length > 1) throw new Error("Both current and legacy work queue logs exist; reconcile storage before proceeding");
+    const entry = entries[0];
     if (!entry) {
       coreApi?.info("Work queue: queue branch has no transaction log");
-      return { sha: head, transactions: [] };
+      return { sha: head, transactions: [], branch, logPath };
     }
+    logPath = entry.path;
     if (entry.type !== "blob" || typeof entry.sha !== "string") throw new TypeError("Work queue log is not a regular file");
 
     const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: entry.sha });
@@ -82,9 +86,21 @@ async function readWorkQueueLogRaw({ githubClient, owner, repo, core: coreApi = 
     const contents = Buffer.from(blob.data.content, "base64").toString("utf8");
     const transactions = parseTransactionLog(contents);
     coreApi?.info(`Work queue: read ${transactions.length} queue transactions`);
-    return { sha: head, transactions, needsUpgrade: contents !== serializeTransactionLog(transactions) };
+    return { sha: head, transactions, branch, logPath, needsUpgrade: contents !== serializeTransactionLog(transactions) };
   } catch (error) {
     throw new Error("Failed to read work queue log", { cause: error });
+  }
+}
+
+async function readQueueBranch(githubClient, owner, repo, branch) {
+  try {
+    const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    const head = response.data.object.sha;
+    if (typeof head !== "string" || !head) throw new TypeError("Work queue branch returned an invalid commit");
+    return head;
+  } catch (error) {
+    if (isMissing(error)) return null;
+    throw new Error("Failed to read work queue branch", { cause: error });
   }
 }
 
@@ -149,7 +165,7 @@ async function applyAndPublishWorkQueueTransactions({
         owner,
         repo,
         ...(current.sha ? { base_tree: (await githubClient.rest.git.getCommit({ owner, repo, commit_sha: current.sha })).data.tree.sha } : {}),
-        tree: [{ path: WORK_QUEUE_LOG_PATH, mode: "100644", type: "blob", sha: blob.data.sha }],
+        tree: [{ path: current.logPath, mode: "100644", type: "blob", sha: blob.data.sha }],
       });
       const commit = await githubClient.rest.git.createCommit({
         owner,
@@ -163,7 +179,7 @@ async function applyAndPublishWorkQueueTransactions({
         await githubClient.rest.git.updateRef({
           owner,
           repo,
-          ref: `heads/${WORK_QUEUE_BRANCH}`,
+          ref: `heads/${current.branch}`,
           sha: commit.data.sha,
           force: false,
         });
@@ -171,7 +187,7 @@ async function applyAndPublishWorkQueueTransactions({
         await githubClient.rest.git.createRef({
           owner,
           repo,
-          ref: `refs/heads/${WORK_QUEUE_BRANCH}`,
+          ref: `refs/heads/${current.branch}`,
           sha: commit.data.sha,
         });
       }

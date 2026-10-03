@@ -35,6 +35,16 @@ the workflow runtime's versioned facts on `work-queue` from the operator CLI's
 payload/provenance records on `gh-aw-work-queue`; both use `work-queue.jsonl`,
 but the formats are not interchangeable.
 
+Compatibility reads preserve in-flight `aw_context.work_claim` assignments and
+normalize them to `work_queue`; malformed or dual assignments fail closed.
+Existing workflow storage on `dispatch-coordinator` remains authoritative, with
+checked writes to its existing log, until an explicit migration. Migration must
+quiesce all writers, drain or stop old workflows, rename the existing branch and
+log without retaining parallel copies, and deploy recompiled workflows before
+resuming. If both branch names or both log filenames exist, refuse reads and
+writes rather than choose an authority. Historical logs/audit readers retain the
+previous artifact filenames and trusted step/message patterns.
+
 The conclusion job writes a work queue activity step summary for workflows using `tools.work-queue`. It compares the activation snapshot with a read-only refresh of the durable queue, showing work and claim state counts, new transaction counts by kind, and the assigned worker's current state in a collapsed details section. These are shared-queue observations since activation, not activity attributed exclusively to the current run. Work, claim, and attempt identifiers are omitted. An unreadable snapshot or queue is reported as unavailable, not as an empty queue.
 
 For review, the [trace walkthrough](../../specs/work-queue/README.md#inspect-execution-traces) generates bounded textual TLC executions and counterexamples to deliberately false reachability witnesses. These expose competing Claims, orphan recovery, and the finalization-to-effect sequence under the guarded protocol; they are evidence of modeled possibilities, not runtime conformance or liveness guarantees.

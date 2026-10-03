@@ -5,37 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
 const { replayTransactions, serializeTransactionLog } = require("./work_queue_replay.cjs");
-const { parseInboundAwContext } = require("./aw_context.cjs");
+const { readInboundAwContext, readWorkQueueAssignment } = require("./aw_context.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 
-/**
- * @param {unknown} value
- * @returns {value is Record<string, unknown>}
- */
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function resolveWorkerAssignment(payload, transactions) {
-  const awContext = parseInboundAwContext(payload?.inputs?.aw_context) || parseInboundAwContext(payload?.client_payload?.aw_context);
-  const rawAssignment = awContext?.work_queue;
-  if (rawAssignment == null) return null;
-  if (!isRecord(rawAssignment)) {
-    throw new TypeError("work queue assignment has an invalid shape");
-  }
-  const assignment = rawAssignment;
-  if (
-    typeof assignment.work_id !== "string" ||
-    assignment.work_id.length === 0 ||
-    typeof assignment.claim_id !== "string" ||
-    assignment.claim_id.length === 0 ||
-    !assignment.work ||
-    typeof assignment.work !== "object" ||
-    Array.isArray(assignment.work)
-  ) {
-    throw new TypeError("work queue assignment has an invalid shape");
-  }
+  const assignment = readWorkQueueAssignment(readInboundAwContext(payload));
+  if (!assignment) return null;
 
   const projection = replayTransactions(transactions);
   const claim = projection.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === assignment.claim_id);

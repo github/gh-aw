@@ -85,6 +85,54 @@ func TestWorkQueueReportMissingAndLogOnly(t *testing.T) {
 	assert.Contains(t, report.Operations[0].Message, "failed")
 }
 
+func TestWorkQueueHistoricalReport(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeWorkQueueFixture(t, dir)
+	require.NoError(t, os.Rename(filepath.Join(dir, workQueueSnapshotFile), filepath.Join(dir, legacyWorkQueueSnapshotFile)))
+	require.NoError(t, os.Rename(filepath.Join(dir, workQueueFinishFile), filepath.Join(dir, legacyWorkQueueFinishFile)))
+	for _, entry := range []struct{ job, step, message string }{
+		{"activation", "2_Snapshot dispatch coordinator state.txt", "Captured dispatch coordinator snapshot (2 transactions)"},
+		{"safe_outputs", "4_Reconcile dispatch work claim.txt", "Dispatch coordinator: worker completion verified"},
+		{"safe_outputs", "4_Reconcile dispatch work claim.txt", "Dispatch work claim reconciliation: completed"},
+		{"agent", "3_Copy dispatch claim finish intent.txt", "Dispatch coordinator: copied finish intent into agent artifact"},
+		{"agent", "5_Run agent.txt", "Dispatch coordinator: forged"},
+	} {
+		logDir := filepath.Join(dir, "workflow-logs", entry.job)
+		require.NoError(t, os.MkdirAll(logDir, 0o755))
+		file, err := os.OpenFile(filepath.Join(logDir, entry.step), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		require.NoError(t, err)
+		_, err = file.WriteString("2026-10-02T12:00:00Z " + entry.message + "\n")
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
+	}
+	markWorkflowLogsComplete(t, dir)
+	report, err := extractWorkQueueReport(dir)
+	require.NoError(t, err)
+	require.NotNil(t, report)
+	require.Len(t, report.Operations, 4)
+	assert.Equal(t, "snapshot-sha", *report.Snapshot.SHA)
+	assert.Equal(t, "completed", report.FinishIntent)
+	for _, operation := range report.Operations {
+		assert.NotContains(t, operation.Message, "forged")
+	}
+	var cached *WorkQueueReport
+	assert.True(t, backfillWorkQueueReport(&cached, dir))
+	assert.Equal(t, report, cached)
+}
+
+func TestWorkQueueCurrentArtifactErrorsDoNotFallBack(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeWorkQueueFixture(t, dir)
+	data, err := os.ReadFile(filepath.Join(dir, workQueueSnapshotFile))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, legacyWorkQueueSnapshotFile), data, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueSnapshotFile), []byte("invalid"), 0o600))
+	_, err = extractWorkQueueReport(dir)
+	require.Error(t, err)
+}
+
 func TestWorkQueueSnapshotValidation(t *testing.T) {
 	t.Parallel()
 	for _, transaction := range []string{
@@ -387,6 +435,9 @@ func TestWorkQueueTrustedStepPaths(t *testing.T) {
 		"agent/23_Copy work queue claim finish intent.txt",
 		"caller _ activation/2_Snapshot work queue state.txt",
 		"caller _ safe_outputs/10_Reconcile work queue claim.txt",
+		"activation/2_Snapshot dispatch coordinator state.txt",
+		"caller _ safe_outputs/10_Reconcile dispatch work claim.txt",
+		"agent/23_Copy dispatch claim finish intent.txt",
 	} {
 		assert.True(t, isWorkQueueStepLog(path), path)
 	}
@@ -398,6 +449,8 @@ func TestWorkQueueTrustedStepPaths(t *testing.T) {
 		"other/4_Reconcile work queue claim.txt",
 		"safe_outputs/not-a-number_Reconcile work queue claim.txt",
 		"safe_outputs/4_Reconcile work queue claim.txt/forged.txt",
+		"agent/4_Reconcile dispatch work claim.txt",
+		"other/4_Snapshot dispatch coordinator state.txt",
 	} {
 		assert.False(t, isWorkQueueStepLog(path), path)
 	}

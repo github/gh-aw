@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
-const { readInboundAwContext } = require("./aw_context.cjs");
+const { readInboundAwContext, readWorkQueueAssignment } = require("./aw_context.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -156,17 +156,9 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
   return result;
 }
 
-/**
- * @param {unknown} value
- * @returns {value is Record<string, unknown>}
- */
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function renderWorkClaim(payload) {
-  const assignment = readInboundAwContext(payload)?.work_queue;
-  if (!isRecord(assignment) || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work)) {
+  const assignment = readWorkQueueAssignment(readInboundAwContext(payload));
+  if (!assignment) {
     return "";
   }
 

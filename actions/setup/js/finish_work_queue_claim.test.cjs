@@ -5,6 +5,8 @@ import os from "os";
 import path from "path";
 import { applyTransactions } from "./work_queue_replay.cjs";
 import { main, readFinishIntent, reconcileWorkerClaim, renderSummary } from "./finish_work_queue_claim.cjs";
+import { main as writeSnapshot } from "./write_work_queue_snapshot.cjs";
+import { serializeTransactionLog } from "./work_queue_replay.cjs";
 
 const worker = { work_id: "w", claim_id: "claim-a" };
 const initialTransactions = [
@@ -40,6 +42,40 @@ afterEach(() => {
 });
 
 describe("work queue claim reconciliation", () => {
+  it("keeps an in-flight legacy assignment bound through activation and reconciliation", async () => {
+    const fake = setup();
+    const snapshotPath = path.join(tempDirectory, "snapshot.json");
+    const githubClient = {
+      rest: {
+        git: {
+          getRef: async ({ ref }) => {
+            if (ref !== "heads/dispatch-coordinator") throw Object.assign(new Error("Not Found"), { status: 404 });
+            return { data: { object: { sha: "legacy-head" } } };
+          },
+          getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
+          getTree: async () => ({ data: { tree: [{ path: "dispatch-work-coordinator.jsonl", type: "blob", sha: "blob" }] } }),
+          getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(serializeTransactionLog(initialTransactions)).toString("base64") } }),
+        },
+      },
+    };
+    const context = {
+      repo: { owner: "owner", repo: "repo" },
+      runId: 123,
+      payload: { inputs: { aw_context: JSON.stringify({ work_claim: { ...worker, work: { task: "test" } } }) } },
+    };
+    await writeSnapshot({ githubClient, context, snapshotPath, core: { info: vi.fn() } });
+    expect(JSON.parse(fs.readFileSync(snapshotPath, "utf8")).worker).toEqual(worker);
+    const result = await reconcileWorkerClaim({
+      snapshotPath,
+      finishIntentPath: fake.finishIntentPath,
+      readWorkQueueLog: fake.readWorkQueueLog,
+      applyAndPublish: fake.applyAndPublish,
+      context,
+    });
+    expect(result).toEqual({ authorized: false, status: "cancelled" });
+    expect(fake.transactions).toContainEqual({ version: 1, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
+  });
+
   it("publishes and verifies Completion before authorizing safe outputs", async () => {
     const fake = setup();
     fs.writeFileSync(fake.finishIntentPath, '{"outcome":"completed"}\n');

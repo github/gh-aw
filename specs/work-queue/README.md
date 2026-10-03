@@ -63,6 +63,15 @@ records a `WorkQueueFinishIntent` containing only `outcome: "completed"` or
 `outcome: "cancelled"`. Artifacts use `work-queue.snapshot.json` and
 `work-queue.finish.jsonl`; the durable transaction file is `work-queue.jsonl`.
 
+Pre-rename `aw_context.work_claim` assignments are schema-checked and normalized
+to `work_queue`, not treated as unassigned. Existing runtime storage on
+`dispatch-coordinator` / `dispatch-work-coordinator.jsonl` is read and updated in
+place with the same checked publication protocol. It is not silently copied to
+an independent queue. Explicit migration requires quiescing all writers and old
+workflows, renaming the existing branch/log, and deploying recompiled workflows
+before resuming. Both branch names or both log filenames together are ambiguous
+and fail closed. Logs/audit retain read compatibility for historical artifacts.
+
 To regenerate the schemas with TypeSpec 1.16.0,
 install `@typespec/compiler` and `@typespec/json-schema` in a temporary directory,
 compile `transactions.tsp` from that directory with emitter options
