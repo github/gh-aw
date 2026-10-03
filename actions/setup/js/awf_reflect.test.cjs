@@ -39,7 +39,7 @@ describe("awf_reflect.cjs", () => {
   describe("constants", () => {
     it("exports expected default values", () => {
       expect(AWF_API_PROXY_REFLECT_URL).toBe("http://api-proxy:10000/reflect");
-      expect(AWF_REFLECT_OUTPUT_PATH).toBe(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "awf-reflect.json"));
+      expect(AWF_REFLECT_OUTPUT_PATH).toBe("/tmp/gh-aw/agent/awf-reflect.json");
       expect(AWF_REFLECT_TIMEOUT_MS).toBe(60000);
       expect(AWF_MODELS_URL_TIMEOUT_MS).toBe(3000);
       expect(AWF_MODELS_URL_MAX_ATTEMPTS).toBe(5);

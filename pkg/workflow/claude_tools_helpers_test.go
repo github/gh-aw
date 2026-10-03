@@ -36,9 +36,11 @@ func TestNormalizeSandboxWritablePattern(t *testing.T) {
 		want     string
 		wantOkay bool
 	}{
-		{name: "absolute directory path", input: "/tmp/cache", want: "/tmp/cache/*", wantOkay: true},
-		{name: "absolute glob path", input: "/tmp/cache/*", want: "/tmp/cache/*", wantOkay: true},
-		{name: "trim whitespace", input: "  /tmp/cache  ", want: "/tmp/cache/*", wantOkay: true},
+		{name: "absolute directory path", input: "/tmp/cache", want: "//tmp/cache/**", wantOkay: true},
+		{name: "absolute glob path", input: "/tmp/cache/*", want: "//tmp/cache/*", wantOkay: true},
+		{name: "trim whitespace", input: "  /tmp/cache  ", want: "//tmp/cache/**", wantOkay: true},
+		{name: "root directory", input: "/", want: "//**", wantOkay: true},
+		{name: "already absolute permission", input: "//tmp/cache/**", want: "//tmp/cache/**", wantOkay: true},
 		{name: "relative path rejected", input: "tmp/cache", want: "", wantOkay: false},
 		{name: "empty path rejected", input: "  ", want: "", wantOkay: false},
 	}

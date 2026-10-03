@@ -36,6 +36,7 @@ const harnessChildEnv = {
   GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
   GH_AW_HARNESS_MAX_DELAY_MS: "1",
   GH_AW_SKIP_REFLECT: "true",
+  GH_AW_CLAUDE_ALLOW_FRESH_RESTART: "true",
 };
 
 function makeHarnessTempDir(name) {
@@ -68,23 +69,23 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 
 describe("claude_harness.cjs", () => {
   describe("resolveClaudePromptFileArgs", () => {
-    it("replaces --prompt-file with ['--', content] as the last two positional args", () => {
+    it("separates prompt content from child arguments", () => {
       const promptFile = path.join(os.tmpdir(), `claude-harness-prompt-${Date.now()}.txt`);
       fs.writeFileSync(promptFile, "fix the bug", "utf8");
       try {
         const result = resolveClaudePromptFileArgs(["--print", "--prompt-file", promptFile, "--output-format", "stream-json"]);
-        expect(result).toEqual(["--print", "--output-format", "stream-json", "--", "fix the bug"]);
+        expect(result).toEqual({ args: ["--print", "--output-format", "stream-json"], prompt: "fix the bug" });
       } finally {
         fs.rmSync(promptFile);
       }
     });
 
-    it("appends -- and prompt content as the last two args", () => {
+    it("reads a prompt without adding a positional argument", () => {
       const promptFile = path.join(os.tmpdir(), `claude-harness-prompt-${Date.now()}.txt`);
       fs.writeFileSync(promptFile, "my task", "utf8");
       try {
         const result = resolveClaudePromptFileArgs(["--prompt-file", promptFile]);
-        expect(result).toEqual(["--", "my task"]);
+        expect(result).toEqual({ args: [], prompt: "my task" });
       } finally {
         fs.rmSync(promptFile);
       }
@@ -92,13 +93,11 @@ describe("claude_harness.cjs", () => {
 
     it("passes through args that have no --prompt-file", () => {
       const result = resolveClaudePromptFileArgs(["--print", "--output-format", "json"]);
-      expect(result).toEqual(["--print", "--output-format", "json"]);
+      expect(result).toEqual({ args: ["--print", "--output-format", "json"], prompt: null });
     });
 
-    it("preserves args when --prompt-file is provided without a path", () => {
-      const result = resolveClaudePromptFileArgs(["--print", "--prompt-file"]);
-      // When no path follows --prompt-file, it is preserved as-is
-      expect(result).toEqual(["--print", "--prompt-file"]);
+    it("rejects --prompt-file without a path", () => {
+      expect(() => resolveClaudePromptFileArgs(["--print", "--prompt-file"])).toThrow("--prompt-file requires");
     });
 
     it("throws when the prompt file does not exist", () => {
@@ -115,17 +114,13 @@ describe("claude_harness.cjs", () => {
       }
     });
 
-    it("places -- between --mcp-config and prompt to prevent ENAMETOOLONG (Claude Code 2.x variadic flag)", () => {
-      // Claude Code 2.x treats any non-flag positional argument that follows
-      // --mcp-config as a second config file path. A large prompt without the --
-      // separator would exceed PATH_MAX (~4096 bytes) and fail with ENAMETOOLONG.
+    it("never puts a large prompt after variadic --mcp-config", () => {
       const promptFile = path.join(os.tmpdir(), `claude-harness-prompt-${Date.now()}.txt`);
       const longPrompt = "<system>".padEnd(5000, "x");
       fs.writeFileSync(promptFile, longPrompt, "utf8");
       try {
         const result = resolveClaudePromptFileArgs(["--mcp-config", "/tmp/mcp-servers.json", "--prompt-file", promptFile]);
-        // The -- must immediately precede the prompt content, not adjacent to --mcp-config.
-        expect(result).toEqual(["--mcp-config", "/tmp/mcp-servers.json", "--", longPrompt]);
+        expect(result).toEqual({ args: ["--mcp-config", "/tmp/mcp-servers.json"], prompt: longPrompt });
       } finally {
         fs.rmSync(promptFile);
       }
@@ -200,7 +195,7 @@ describe("claude_harness.cjs", () => {
   describe("classifiableOutput", () => {
     it("drops user events while preserving result events and plain text", () => {
       const userEvent = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", content: "not logged in" }] } });
-      const resultEvent = JSON.stringify({ type: "result", result: "not logged in" });
+      const resultEvent = JSON.stringify({ type: "result", errors: ["not logged in"] });
 
       expect(classifiableOutput(`${userEvent}\n${resultEvent}\nplain-text error`)).toBe(`${resultEvent}\nplain-text error`);
       expect(isRateLimitError(classifiableOutput(JSON.stringify({ type: "user", result: "rate limiting" })))).toBe(false);
@@ -234,7 +229,7 @@ describe("claude_harness.cjs", () => {
       const resultEvent = JSON.stringify({ type: "result", result: "not logged in" });
 
       expect(isAuthenticationFailedError(classifiableOutput(userEvent))).toBe(false);
-      expect(isAuthenticationFailedError(classifiableOutput(resultEvent))).toBe(true);
+      expect(isAuthenticationFailedError(classifiableOutput(resultEvent))).toBe(false);
       expect(isAuthenticationFailedError(classifiableOutput("not logged in"))).toBe(true);
     });
 
@@ -343,11 +338,11 @@ describe("claude_harness.cjs", () => {
 
     it("distinguishes initialization output from assistant progress", () => {
       expect(hasClaudeSessionProgress('{"type":"system","subtype":"init"}\nAPI Error: Connection refused')).toBe(false);
-      expect(hasClaudeSessionProgress('{"type":"assistant","message":{"content":[{"type":"text","text":"Working"}]}}')).toBe(true);
+      expect(hasClaudeSessionProgress('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"Working"}]}}')).toBe(true);
     });
 
     it("detects progress when connection refused appears after an assistant line", () => {
-      const output = '{"type":"assistant","message":{}}\nAPI Error: Connection refused';
+      const output = '{"type":"assistant","session_id":"test-session","message":{}}\nAPI Error: Connection refused';
       expect(hasClaudeSessionProgress(output)).toBe(true);
     });
   });
@@ -499,15 +494,15 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 
 if (priorCalls === 0) {
-  process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
   process.exit(1);
 }
 
 if (priorCalls === 1) {
-  if (!args.includes("--continue")) {
+  if (!args.includes("--resume")) {
     process.stderr.write("expected --continue on first retry\\n");
     process.exit(9);
   }
@@ -515,7 +510,7 @@ if (priorCalls === 1) {
   process.exit(1);
 }
 
-if (args.includes("--continue")) {
+if (args.includes("--resume")) {
   process.stderr.write("fresh retry unexpectedly used --continue\\n");
   process.exit(9);
 }
@@ -525,8 +520,8 @@ process.exit(0);
       const { result, calls } = runHarnessWithStub({ stubScript });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, true, false]);
-      expect(calls[2].args).toContain("fix the bug");
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true, false]);
+      expect(calls[2].stdin).toBe("fix the bug");
       expect(result.stderr).toContain("failure_reason=harness_retry_path_invalid");
     }, 50000);
 
@@ -536,15 +531,15 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 
 if (priorCalls === 0) {
-  process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
   process.exit(1);
 }
 
 if (priorCalls === 1) {
-  if (!args.includes("--continue")) {
+  if (!args.includes("--resume")) {
     process.stderr.write("expected --continue on first retry\\n");
     process.exit(9);
   }
@@ -552,7 +547,7 @@ if (priorCalls === 1) {
   process.exit(1);
 }
 
-if (args.includes("--continue")) {
+if (args.includes("--resume")) {
   process.stderr.write("fresh retry unexpectedly used --continue\\n");
   process.exit(9);
 }
@@ -562,8 +557,8 @@ process.exit(0);
       const { result, calls } = runHarnessWithStub({ stubScript });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, true, false]);
-      expect(calls[2].args).toContain("fix the bug");
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true, false]);
+      expect(calls[2].stdin).toBe("fix the bug");
       expect(result.stderr).toContain("invalid JSON request body");
     }, 50000);
 
@@ -573,15 +568,15 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 
 if (priorCalls === 0) {
-  process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"partial execution before retry"}]}}\\n');
   process.exit(1);
 }
 
 if (priorCalls === 1) {
-  if (args.filter(arg => arg === "--continue").length !== 1) {
+  if (args.filter(arg => arg === "--resume").length !== 1) {
     process.stderr.write("expected exactly one --continue on first retry\\n");
     process.exit(9);
   }
@@ -589,7 +584,7 @@ if (priorCalls === 1) {
   process.exit(1);
 }
 
-if (args.includes("--continue")) {
+if (args.includes("--resume")) {
   process.stderr.write("fresh retry unexpectedly used --continue\\n");
   process.exit(9);
 }
@@ -599,7 +594,7 @@ process.exit(0);
       const { result, calls } = runHarnessWithStub({ stubScript, extraArgs: ["--continue"] });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([true, true, false]);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true, false]);
     }, 50000);
 
     it("uses a fresh retry after signal-style termination even when output is classified as an auth failure", () => {
@@ -608,7 +603,7 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 
 if (priorCalls === 0) {
   process.stdout.write('{"type":"user","message":{"content":[{"type":"tool_result","content":"not logged in"}]}}\\n');
@@ -616,7 +611,7 @@ if (priorCalls === 0) {
   process.exit(143);
 }
 
-if (args.includes("--continue")) {
+if (args.includes("--resume")) {
   process.stderr.write("signal retry unexpectedly used --continue\\n");
   process.exit(9);
 }
@@ -626,10 +621,10 @@ process.exit(0);
       const { result, calls } = runHarnessWithStub({ stubScript });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, false]);
-      expect(calls[1].args).toContain("fix the bug");
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, false]);
+      expect(calls[1].stdin).toBe("fix the bug");
       expect(result.stderr).toContain("failure_reason=cancelled_or_timed_out");
-      expect(result.stderr).toContain("isAuthenticationFailedError=true");
+      expect(result.stderr).toContain("isAuthenticationFailedError=false");
     }, 30000);
 
     it("retries a connection-refused failure before the first assistant response as a fresh run", () => {
@@ -638,7 +633,7 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls === 0) {
   process.stderr.write('{"type":"system","subtype":"init"}\\nAPI Error: Connection refused\\n');
   process.exit(1);
@@ -652,8 +647,8 @@ process.exit(0);
       });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, false]);
-      expect(calls[1].args).toContain("fix the bug");
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, false]);
+      expect(calls[1].stdin).toBe("fix the bug");
       expect(result.stderr).toContain("connection refused before first assistant response");
     });
 
@@ -663,9 +658,9 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls === 0) {
-  process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"Working"}]}}\\n');
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"Working"}]}}\\n');
   process.stderr.write("API Error: Connection refused\\n");
   process.exit(1);
 }
@@ -678,7 +673,7 @@ process.exit(0);
       });
 
       expect(result.status, result.stderr).toBe(0);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, true]);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true]);
     });
 
     it("keeps resuming with --continue when a later continue attempt is refused during its own startup", () => {
@@ -687,9 +682,9 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls === 0) {
-  process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"Working"}]}}\\n');
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"Working"}]}}\\n');
   process.stderr.write("API Error: Connection refused\\n");
   process.exit(1);
 }
@@ -707,7 +702,7 @@ process.exit(0);
 
       expect(result.status, result.stderr).toBe(0);
       expect(calls.length).toBe(3);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, true, true]);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true, true]);
     });
 
     it("retries one no-output startup failure as a fresh run by default", () => {
@@ -716,7 +711,7 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls === 0) process.exit(1);
 process.stdout.write("startup retry succeeded\\n");
 process.exit(0);
@@ -724,7 +719,7 @@ process.exit(0);
       const { result, calls } = runHarnessWithStub({ stubScript });
       expect(result.status, result.stderr).toBe(0);
       expect(calls.length).toBe(2);
-      expect(calls[1].args.includes("--continue")).toBe(false);
+      expect(calls[1].args.includes("--resume")).toBe(false);
       expect(result.stderr).toContain("no output produced — retrying startup as fresh run");
     });
 
@@ -734,12 +729,12 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls === 0) {
   process.stderr.write("mcp gateway startup failed before Claude launched\\n");
   process.exit(1);
 }
-process.stdout.write('{"type":"assistant","message":{"content":[{"type":"text","text":"started"}]}}\\n');
+process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"started"}]}}\\n');
 process.exit(0);
 `;
       const { result, calls } = runHarnessWithStub({ stubScript });
@@ -754,8 +749,8 @@ process.exit(0);
 const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
-if (args.includes("--continue")) {
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
+if (args.includes("--resume")) {
   process.stderr.write("startup retry unexpectedly used --continue\\n");
   process.exit(9);
 }
@@ -768,7 +763,7 @@ process.exit(1);
       });
       expect(result.status).toBe(1);
       expect(calls).toHaveLength(2);
-      expect(calls.map(call => call.args.includes("--continue"))).toEqual([false, false]);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, false]);
       expect(result.stderr).toContain("output produced but no Claude session progress — not retrying (startup retry budget exhausted: 1/1)");
     });
 
@@ -776,7 +771,7 @@ process.exit(1);
       const stubScript = `
 const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
-fs.appendFileSync(callsPath, JSON.stringify({ args: process.argv.slice(2) }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args: process.argv.slice(2), stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 process.exit(1);
 `;
       const { result, calls } = runHarnessWithStub({
@@ -785,7 +780,7 @@ process.exit(1);
       });
       expect(result.status).toBe(1);
       expect(calls.length).toBe(1);
-      expect(calls[0].args).toContain("fix the bug");
+      expect(calls[0].stdin).toBe("fix the bug");
       expect(result.stderr).toContain("startup retry budget exhausted: 0/0");
     });
 
@@ -795,7 +790,7 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls > 0) {
   process.stderr.write("unexpected retry after max_runs_exceeded\\n");
   process.exit(9);
@@ -818,7 +813,7 @@ const fs = require("fs");
 const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
 const args = process.argv.slice(2);
 const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
-fs.appendFileSync(callsPath, JSON.stringify({ args }) + "\\n", "utf8");
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
 if (priorCalls > 0) {
   process.stderr.write("unexpected retry after max_runs_exceeded\\n");
   process.exit(9);

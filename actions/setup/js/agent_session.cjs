@@ -205,10 +205,40 @@ function normalizeAgentSession(entries, { sourceEngine } = {}) {
  * @returns {Record<string, any>|undefined}
  */
 function selectSessionResult(events) {
+  const normalized = normalizeAgentSession(events);
+  const claudeSessions = new Map();
+  for (const event of normalized) {
+    if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || event.parent_tool_use_id || typeof event.session_id !== "string") continue;
+    claudeSessions.set(event.session_id, [...(claudeSessions.get(event.session_id) ?? []), { ...event, session_id: undefined }]);
+  }
+  if (claudeSessions.size > 1) {
+    const aggregate = { usage: {} };
+    for (const observations of claudeSessions.values()) {
+      const snapshot = selectSessionResult(observations);
+      if (!snapshot) continue;
+      accumulateSessionUsage(aggregate.usage, snapshot.usage);
+      for (const key of ["numTurns", "durationMs", "totalCostUsd"]) {
+        if (isMetric(snapshot[key])) aggregate[key] = (aggregate[key] ?? 0) + snapshot[key];
+      }
+      for (const key of ["errors", "permissionDenials"]) {
+        if (Array.isArray(snapshot[key])) aggregate[key] = [...(aggregate[key] ?? []), ...snapshot[key]];
+      }
+    }
+    for (const event of normalized) {
+      if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || event.parent_tool_use_id || typeof event.session_id === "string") continue;
+      // Unassigned diagnostics are valid evidence, but their usage may overlap a named session.
+      for (const key of ["errors", "permissionDenials"]) {
+        if (Array.isArray(event.data[key])) aggregate[key] = [...(aggregate[key] ?? []), ...structuredClone(event.data[key])];
+      }
+    }
+    aggregate.usage.input_tokens_include_cache = false;
+    return aggregate;
+  }
   /** @type {Record<string, any>|undefined} */
   let result;
-  for (const event of normalizeAgentSession(events)) {
+  for (const event of normalized) {
     if (event.type !== "session.result") continue;
+    if (event.data.sourceEngine === "claude" && event.parent_tool_use_id) continue;
     result ??= {};
     const data = event.data;
     for (const [key, value] of Object.entries(data)) {

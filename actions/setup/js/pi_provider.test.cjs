@@ -343,7 +343,7 @@ describe("pi_provider.cjs", () => {
     expect(fetchedUrls.length).toBe(2);
   });
 
-  it("logs reflect failure context when the /reflect call fails", async () => {
+  it.each(["agent_start", "agent_settled"])("logs reflect failure context in %s when the /reflect call fails", async phase => {
     process.env.GH_AW_PI_MODEL = "copilot/claude-sonnet-4";
     process.env.AWF_REFLECT_ENABLED = "1";
     global.fetch = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
@@ -357,12 +357,13 @@ describe("pi_provider.cjs", () => {
     };
 
     module.default(pi);
-    await handlers.agent_start();
+    await handlers[phase]();
 
-    const reflectOutputPath = path.join(process.env.RUNNER_TEMP || os.tmpdir(), "awf-reflect.json");
+    const reflectOutputPath = "/tmp/gh-aw/agent/awf-reflect.json";
     expect(
-      stderrOutput.some(line => line.includes(`reflect_failure phase=agent_start provider=copilot model=copilot/claude-sonnet-4 url=http://api-proxy:10000/reflect output=${reflectOutputPath} reason=request_failed error="ECONNREFUSED"`))
+      stderrOutput.some(line => line.includes(`reflect_failure phase=${phase} provider=copilot model=copilot/claude-sonnet-4 url=http://api-proxy:10000/reflect output=${reflectOutputPath} reason=request_failed error="ECONNREFUSED"`))
     ).toBe(true);
+    expect(process.exitCode).toBe(originalExitCode);
   });
 
   it("skips /reflect when AWF_REFLECT_ENABLED is not set", async () => {

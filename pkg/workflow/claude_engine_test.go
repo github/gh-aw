@@ -115,8 +115,8 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected --strict-mcp-config in CLI args even without MCP servers: %s", stepContent)
 	}
 
-	if !strings.Contains(stepContent, "--permission-mode acceptEdits") {
-		t.Errorf("Expected --permission-mode acceptEdits in CLI args: %s", stepContent)
+	if !strings.Contains(stepContent, "--permission-mode dontAsk") {
+		t.Errorf("Expected --permission-mode dontAsk in CLI args: %s", stepContent)
 	}
 
 	if !strings.Contains(stepContent, "--output-format stream-json") {
@@ -240,8 +240,7 @@ func TestClaudeEngineAllowsMountedMCPCLICommandsInRestrictedBash(t *testing.T) {
 	assert.Contains(t, stepContent, "Bash(mymcp:*)", "Expected mounted custom MCP CLI allowlist command")
 	assert.Contains(t, stepContent, "Bash(playwright-cli:*)", "Expected Playwright CLI allowlist command")
 	assert.Contains(t, stepContent, "Bash(safeoutputs:*)", "Expected mounted safeoutputs CLI allowlist command")
-	// Permission mode must be acceptEdits when bash is restricted (not wildcard)
-	assert.Contains(t, stepContent, "--permission-mode acceptEdits", "Expected acceptEdits with restricted bash")
+	assert.Contains(t, stepContent, "--permission-mode dontAsk", "Expected deterministic restricted bash permissions")
 }
 
 func TestClaudeEnginePermissionMode(t *testing.T) {
@@ -255,17 +254,17 @@ func TestClaudeEnginePermissionMode(t *testing.T) {
 		notExpectedMode string
 	}{
 		{
-			name:            "no tools — default acceptEdits",
+			name:            "no tools — default dontAsk",
 			tools:           nil,
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
-			name: "restricted bash — acceptEdits",
+			name: "restricted bash — dontAsk",
 			tools: map[string]any{
 				"bash": []any{"git", "echo"},
 			},
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
@@ -273,7 +272,7 @@ func TestClaudeEnginePermissionMode(t *testing.T) {
 			tools: map[string]any{
 				"bash": []any{"*"},
 			},
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
@@ -281,7 +280,7 @@ func TestClaudeEnginePermissionMode(t *testing.T) {
 			tools: map[string]any{
 				"bash": []any{":*"},
 			},
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
@@ -289,7 +288,7 @@ func TestClaudeEnginePermissionMode(t *testing.T) {
 			tools: map[string]any{
 				"bash": true,
 			},
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
@@ -297,15 +296,15 @@ func TestClaudeEnginePermissionMode(t *testing.T) {
 			tools: map[string]any{
 				"bash": nil,
 			},
-			expectedMode:    "acceptEdits",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "bypassPermissions",
 		},
 		{
-			name: "edit false defaults to auto permission mode",
+			name: "edit false defaults to dontAsk permission mode",
 			tools: map[string]any{
 				"edit": false,
 			},
-			expectedMode:    "auto",
+			expectedMode:    "dontAsk",
 			notExpectedMode: "acceptEdits",
 		},
 		{

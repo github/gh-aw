@@ -191,23 +191,25 @@ func resolveExternalDetectorEngineConfig(data *WorkflowData, engineID string) *E
 		return cloneThreatDetectionEngineConfig(engineID, data.SafeOutputs.ThreatDetection.EngineConfig)
 	}
 	if data.EngineConfig != nil && (data.EngineConfig.ID == "" || data.EngineConfig.ID == engineID) {
-		return &EngineConfig{
-			ID:                       engineID,
-			Version:                  data.EngineConfig.Version,
-			Command:                  data.EngineConfig.Command,
-			LLMProvider:              data.EngineConfig.LLMProvider,
-			Config:                   data.EngineConfig.Config,
-			Args:                     data.EngineConfig.Args,
-			HarnessScript:            data.EngineConfig.HarnessScript,
-			Driver:                   data.EngineConfig.Driver,
-			HarnessMaxRetries:        data.EngineConfig.HarnessMaxRetries,
-			HarnessInitialDelayMs:    data.EngineConfig.HarnessInitialDelayMs,
-			HarnessBackoffMultiplier: data.EngineConfig.HarnessBackoffMultiplier,
-			HarnessMaxDelayMs:        data.EngineConfig.HarnessMaxDelayMs,
-			HarnessWatchdogTimeoutMs: data.EngineConfig.HarnessWatchdogTimeoutMs,
-		}
+		config := cloneThreatDetectionEngineConfig(engineID, data.EngineConfig)
+		resetDetectionEngineTaskSettings(config)
+		return config
 	}
+
 	return &EngineConfig{ID: engineID}
+}
+
+func resetDetectionEngineTaskSettings(config *EngineConfig) {
+	config.Agent = ""
+	config.MaxTurns = ""
+	config.MaxRuns = 0
+	config.MaxAICredits = 0
+	config.MaxContinuations = 0
+	config.MaxToolCalls = ""
+	config.MaxToolDenials = ""
+	config.Cwd = ""
+	config.Concurrency = ""
+	config.CopilotSDK = false
 }
 
 // cloneThreatDetectionEngineConfig returns a shallow copy of source with engine ID

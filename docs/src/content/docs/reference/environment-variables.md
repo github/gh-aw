@@ -138,7 +138,7 @@ These settings apply to the built-in Copilot, Claude, and Codex harnesses.
 
 ### Shared post-result watchdog
 
-`GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` configures the post-result stdio inactivity watchdog used by the built-in Copilot and Codex harnesses. It is measured in **milliseconds**. The default is `120000` ms (2 minutes), the minimum is `50` ms, and the maximum is `600000` ms (10 minutes). Unset, non-numeric, zero, and negative values use the default; positive values outside the supported range are clamped.
+`GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` configures the post-result stdio inactivity watchdog used by the built-in Copilot, Claude, and Codex harnesses. It is measured in **milliseconds**. The default is `120000` ms (2 minutes), the minimum is `50` ms, and the maximum is `600000` ms (10 minutes). Unset, non-numeric, zero, and negative values use the default; positive values outside the supported range are clamped.
 
 The watchdog is dormant until the agent emits a terminal safe output. `noop` and ordinary task outputs such as comments, labels, pushes, and pull request creation are terminal. Diagnostic safe outputs such as `missing_tool`, `missing_data`, and `report_incomplete` are not terminal and do not arm the watchdog by themselves.
 
@@ -183,12 +183,16 @@ The warning repeats on each interval while the silence continues, and a `stall w
 | --- | --- | --- | --- | --- |
 | `GH_AW_HARNESS_LONG_RUN_TOKEN_THRESHOLD` | Copilot | `10000` | tokens; minimum `0` | Token threshold used to classify long-running partial executions as `long_run_exit` instead of a generic partial execution. Invalid or negative values use the default. |
 | `GH_AW_HARNESS_STARTUP_RETRIES` | All engine harnesses | `1` | retry attempts; range `0`-`2` | Additional fresh-run retry budget for startup failures before the harness records session progress. Invalid values use the default; out-of-range integers are clamped. `GH_AW_CLAUDE_STARTUP_RETRIES` is still accepted as a Claude-compatible fallback when the shared variable is unset. |
+| `GH_AW_CLAUDE_ALLOW_FRESH_RESTART` | Claude harness | `false` | exact string `true` enables | Opts replay-safe workflows into restarting from the original prompt after partial execution cannot be resumed. Filesystem changes and staged outputs are retained, so work may be repeated. |
+| `CLAUDE_CODE_MAX_RETRIES` | Claude CLI | `0` for primary/evals execution | retry attempts | Native CLI transient-error retries. gh-aw disables these by default because its harness owns the retry loop. Explicit `engine.env` values override this setting; external detection retains the CLI default. |
 
 Copilot SDK driver settings such as `COPILOT_SDK_SEND_TIMEOUT_MS` are documented in [Copilot SDK Support](/gh-aw/reference/engines/#copilot-sdk-support) and the [Copilot SDK Driver Specification](/gh-aw/specs/copilot-sdk-driver-specification/).
 
 ### Internal runtime variables
 
 `GH_AW_TIMEOUT_MINUTES` is compiler-managed. gh-aw derives it from the workflow `timeout-minutes` frontmatter value and passes it to harness and driver code so soft timeouts and SDK send timeouts stay below the GitHub Actions job timeout. Do not set `GH_AW_TIMEOUT_MINUTES` directly; set `timeout-minutes` in frontmatter instead.
+
+`GH_AW_CLAUDE_DISABLE_REPO_EDITS` is compiler-managed. The compiler sets it to the exact string `true` when `tools.edit: false`, overriding `engine.env` values. The built-in Claude harness denies `Edit` within `GITHUB_WORKSPACE` and removes `Write`, `MultiEdit`, and `NotebookEdit` globally, including when a permission-mode override is selected. Separately scoped memory edits remain available through `Edit`. Do not set this variable directly; configure `tools.edit` instead. Custom harnesses must implement their own edit policy.
 
 ### Setup helper process timeouts
 

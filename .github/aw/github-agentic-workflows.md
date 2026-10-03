@@ -151,6 +151,7 @@ For the full dependency-license/compliance review pattern (paths scoping, licens
 | Editing and recompilation rules | [workflow-editing.md](workflow-editing.md) |
 | Architectural and security constraints | [workflow-constraints.md](workflow-constraints.md) |
 | Common design patterns | [workflow-patterns.md](workflow-patterns.md) |
+| Git-backed work queue dispatchers, workers, and CLI inspection | [work-queue.md](work-queue.md) |
 | Frontmatter schema index | [syntax.md](syntax.md) |
 | Safe outputs index | [safe-outputs.md](safe-outputs.md) |
 | Trigger patterns | [triggers.md](triggers.md) |

@@ -44,12 +44,23 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+    outputs:
+      dependencies-changed: ${{ steps.dependencies.outputs.changed }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       with:
         fetch-depth: 2
         persist-credentials: false
+    - name: Check Go dependency changes
+      id: dependencies
+      shell: bash
+      run: |
+        if git diff --quiet HEAD^ HEAD -- go.mod go.sum; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        fi
     - name: Verify CGO/CJS workflow purity
       run: bash scripts/check-cgo-cjs-workflow-purity.sh
     - name: Cache repository checkout
@@ -139,6 +150,7 @@ jobs:
 
   test:
     name: Unit tests (${{ matrix.name }})
+    if: github.event_name != 'pull_request' || needs.checkout-cache.outputs.dependencies-changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
