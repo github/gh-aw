@@ -3,12 +3,12 @@
 
 const fs = require("fs");
 const path = require("path");
-const { CURRENT_VERSION } = require("./dispatch_work_coordinator_codemods.cjs");
-const { applyTransactions, replayTransactions } = require("./dispatch_work_coordinator_replay.cjs");
-const { applyAndPublishCoordinatorTransactions, readCoordinatorLog } = require("./dispatch_work_coordinator_store.cjs");
+const { CURRENT_VERSION } = require("./work_queue_codemods.cjs");
+const { applyTransactions, replayTransactions } = require("./work_queue_replay.cjs");
+const { applyAndPublishCoordinatorTransactions, readCoordinatorLog } = require("./work_queue_store.cjs");
 const { selectNext, validateSelection } = require("./dispatch_work_coordinator_selection.cjs");
 
-const CLAIM_INTENT_PATH = "/tmp/gh-aw/dispatch-work-coordinator.claims.jsonl";
+const CLAIM_INTENT_PATH = "/tmp/gh-aw/work-queue.claims.jsonl";
 // Kept outside downloaded agent artifacts: only this trusted job writes it.
 const PUBLISHED_CLAIMS_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "trusted-dispatch-coordinator", "published.json");
 

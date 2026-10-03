@@ -2,9 +2,9 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import { SELECTION_SCHEMA, selectNext, validateSelection } from "./dispatch_work_coordinator_selection.cjs";
-import { compactTransactions, parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
+import { compactTransactions, parseTransactionLog, serializeTransactionLog } from "./work_queue_replay.cjs";
 
-const fixtures = JSON.parse(fs.readFileSync(new URL("../../../specs/dispatch-work-coordinator/selection-fixtures.json", import.meta.url), "utf8"));
+const fixtures = JSON.parse(fs.readFileSync(new URL("../../../specs/work-queue/selection-fixtures.json", import.meta.url), "utf8"));
 
 describe("shared work-queue selection contract", () => {
   for (const test of fixtures.cases) {

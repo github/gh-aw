@@ -79,9 +79,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 		// in the unified agent artifact so they survive into the downstream job.
 		paths = append(paths, collectSafeJobArtifactPaths(data.SafeOutputs.Jobs)...)
 	}
-	if isDispatchWorkCoordinatorEnabled(data) {
-		paths = append(paths, constants.DispatchCoordinatorFinishIntentPath)
-		paths = append(paths, constants.DispatchCoordinatorClaimIntentPath)
+	if isWorkQueueEnabled(data) {
+		paths = append(paths, constants.WorkQueueFinishIntentPath)
+		paths = append(paths, constants.WorkQueueClaimIntentPath)
 	}
 
 	// Collect git patch path if safe-outputs with PR operations is configured.

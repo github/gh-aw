@@ -102,8 +102,8 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		paths = append(paths, collectGraderArtifactPaths(data.Graders)...)
 	}
 
-	if isDispatchWorkCoordinatorEnabled(data) {
-		paths = append(paths, constants.DispatchCoordinatorClaimIntentPath)
+	if isWorkQueueEnabled(data) {
+		paths = append(paths, constants.WorkQueueClaimIntentPath)
 	}
 
 	if isArcDindTopology(data) {

@@ -10,14 +10,14 @@ import (
 
 var mcpRendererBuiltinLog = logger.New("workflow:mcp_renderer_builtin")
 
-const dispatchCoordinatorMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/dispatch_work_coordinator_mcp_server.cjs"
+const workQueueMCPServerEntrypoint = "${RUNNER_TEMP}/gh-aw/actions/work_queue_mcp_server.cjs"
 
-// RenderDispatchCoordinatorMCP mounts the activation snapshot read-only and
+// RenderWorkQueueMCP mounts the activation snapshot read-only and
 // the finish-intent directory writable; the server has no Git client or credentials.
-func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Builder, workflowData *WorkflowData) {
+func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, workflowData *WorkflowData) {
 	image := resolveMCPGatewayContainerImage(constants.DefaultGhAwNodeImage, workflowData)
 	serverName := "work-queue"
-	mounts := []string{constants.DefaultGhAwMount, constants.DispatchCoordinatorSnapshotMount, constants.DispatchCoordinatorFinishIntentMount}
+	mounts := []string{constants.DefaultGhAwMount, constants.WorkQueueSnapshotMount, constants.WorkQueueFinishIntentMount}
 
 	if r.options.Format == "toml" {
 		yaml.WriteString("          \n")
@@ -26,14 +26,14 @@ func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Bu
 		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 		yaml.WriteString("          env_vars = [\"RUNNER_TEMP\"]\n")
 		yaml.WriteString("          entrypoint = \"node\"\n")
-		yaml.WriteString("          entrypointArgs = [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+		yaml.WriteString("          entrypointArgs = [\"" + workQueueMCPServerEntrypoint + "\"]\n")
 		return
 	}
 
 	yaml.WriteString("              \"" + serverName + "\": {\n")
 	if r.options.IncludeCopilotFields {
 		yaml.WriteString("                \"type\": \"stdio\",\n")
-		yaml.WriteString("                \"tools\": [\"dispatch_work_coordinator_read\", \"dispatch_claim_next\", \"dispatch_claim_finish\"],\n")
+		yaml.WriteString("                \"tools\": [\"work_queue_claim_finish\", \"work_queue_claim_next\", \"work_queue_read\"],\n")
 	}
 	yaml.WriteString("                \"container\": \"" + image + "\",\n")
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
@@ -41,7 +41,7 @@ func (r *MCPConfigRendererUnified) RenderDispatchCoordinatorMCP(yaml *strings.Bu
 	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\"\n")
 	yaml.WriteString("                },\n")
 	yaml.WriteString("                \"entrypoint\": \"node\",\n")
-	yaml.WriteString("                \"entrypointArgs\": [\"" + dispatchCoordinatorMCPServerEntrypoint + "\"]\n")
+	yaml.WriteString("                \"entrypointArgs\": [\"" + workQueueMCPServerEntrypoint + "\"]\n")
 	if r.options.IsLast {
 		yaml.WriteString("              }\n")
 	} else {

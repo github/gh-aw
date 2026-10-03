@@ -168,6 +168,37 @@ function readInboundAwContext(payload) {
 }
 
 /**
+ * @param {Record<string, unknown> | null} awContext
+ * @returns {{work_id: string, claim_id: string, work: Record<string, unknown>} | null}
+ */
+function readWorkQueueAssignment(awContext) {
+  if (!awContext) return null;
+  const hasCurrent = Object.hasOwn(awContext, "work_queue");
+  const hasLegacy = Object.hasOwn(awContext, "work_claim");
+  if (hasCurrent && hasLegacy) {
+    throw new TypeError("aw_context cannot contain both work_queue and the legacy work_claim assignment");
+  }
+  if (!hasCurrent && !hasLegacy) return null;
+  const assignment = hasCurrent ? awContext.work_queue : awContext.work_claim;
+  if (!isRecord(assignment) || Object.keys(assignment).length !== 3 || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work)) {
+    throw new TypeError("work queue assignment has an invalid shape");
+  }
+  return { work_id: assignment.work_id, claim_id: assignment.claim_id, work: assignment.work };
+}
+
+/**
+ * @param {Record<string, unknown>} awContext
+ * @returns {Record<string, unknown>}
+ */
+function normalizeWorkQueueContext(awContext) {
+  const assignment = readWorkQueueAssignment(awContext);
+  const normalized = { ...awContext };
+  delete normalized.work_claim;
+  if (assignment) normalized.work_queue = assignment;
+  return normalized;
+}
+
+/**
  * Builds the aw_context object that identifies the calling workflow run.
  * This metadata is injected into dispatched workflows that declare an
  * aw_context input, allowing them to trace back to their caller and
@@ -357,4 +388,4 @@ function buildAwContext() {
   };
 }
 
-module.exports = { buildAwContext, buildWorkflowCallId, resolveItemContext, parseInboundAwContext, readInboundAwContext };
+module.exports = { buildAwContext, buildWorkflowCallId, resolveItemContext, parseInboundAwContext, readInboundAwContext, readWorkQueueAssignment, normalizeWorkQueueContext };

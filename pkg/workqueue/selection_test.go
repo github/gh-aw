@@ -9,7 +9,7 @@ import (
 )
 
 func TestSelectionSharedConformance(t *testing.T) {
-	data, err := os.ReadFile("../../specs/dispatch-work-coordinator/selection-fixtures.json")
+	data, err := os.ReadFile("../../specs/work-queue/selection-fixtures.json")
 	if err != nil {
 		t.Fatal(err)
 	}

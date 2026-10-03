@@ -18,11 +18,11 @@ import (
 func NewWorkCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "work-queue",
-		Short: "Experimental: inspect and update a Git-backed dispatch work queue",
+		Short: "Experimental: inspect and update a Git-backed work queue",
 		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	cmd.PersistentFlags().String("repo", "", "GitHub repository owner/repo")
-	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, "Coordinator branch")
+	cmd.PersistentFlags().String("branch", workqueue.DefaultBranch, "Work queue branch")
 	cmd.PersistentFlags().Bool("json", false, "Output JSON")
 	cmd.AddCommand(workReplayCommand(), workCompactCommand(), workStatsCommand(),
 		workSubmitCommand(), workClaimCommand(), workClaimNextCommand(), workFinishCommand(),

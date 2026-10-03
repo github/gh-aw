@@ -1,7 +1,7 @@
 // @ts-check
 import { describe, expect, it } from "vitest";
-import { CODEMODS, CURRENT_VERSION, upgradeTransaction, upgradeTransactions } from "./dispatch_work_coordinator_codemods.cjs";
-import { applyTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
+import { CODEMODS, CURRENT_VERSION, upgradeTransaction, upgradeTransactions } from "./work_queue_codemods.cjs";
+import { applyTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
 import { selectNext } from "./dispatch_work_coordinator_selection.cjs";
 
 const versionTwo = [

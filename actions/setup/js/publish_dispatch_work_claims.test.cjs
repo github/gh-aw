@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { applyTransactions } from "./dispatch_work_coordinator_replay.cjs";
+import { applyTransactions } from "./work_queue_replay.cjs";
 import { publishDispatcherClaims, readClaimIntents, readPublishedAssignment } from "./publish_dispatch_work_claims.cjs";
 
 const directories = [];

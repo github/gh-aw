@@ -128,7 +128,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		case "ledger":
 			renderer.RenderLedgerMCP(&mcpConfigContent, workflowData)
 		case "work-queue":
-			renderer.RenderDispatchCoordinatorMCP(&mcpConfigContent, workflowData)
+			renderer.RenderWorkQueueMCP(&mcpConfigContent, workflowData)
 		case "mcp-scripts":
 			// Add mcp-scripts MCP server if mcp-scripts are configured and feature flag is enabled
 			hasMCPScripts := workflowData != nil && IsMCPScriptsEnabled(workflowData.MCPScripts)

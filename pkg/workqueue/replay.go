@@ -16,8 +16,8 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-const FileName = "dispatch-work-coordinator.jsonl"
-const DefaultBranch = "gh-aw-dispatch-work-coordinator"
+const FileName = "work-queue.jsonl"
+const DefaultBranch = "gh-aw-work-queue"
 const LegacyBranch = "dispatch-coordinator"
 const CurrentVersion = 3
 const MaxSequence int64 = 9007199254740991

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const { replayTransactions } = require("./dispatch_work_coordinator_replay.cjs");
+const { replayTransactions } = require("./work_queue_replay.cjs");
 
 const pointer = { type: "string", pattern: "^/(?:[^~]|~[01])*$" };
 const scalarSchema = { type: ["string", "number", "boolean", "null"] };

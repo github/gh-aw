@@ -45,7 +45,7 @@ describe("dispatch_workflow handler factory", () => {
     vi.clearAllMocks();
     process.env.GITHUB_REF = "refs/heads/main";
     delete process.env.GITHUB_HEAD_REF; // Clean up PR environment variable
-    delete process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED;
+    delete process.env.GH_AW_WORK_QUEUE_CLAIMS_VERIFIED;
     // Reset shared context to a known baseline so tests are order-independent
     global.context.ref = "refs/heads/main";
     global.context.payload = { repository: { default_branch: "main" } };
@@ -59,15 +59,15 @@ describe("dispatch_workflow handler factory", () => {
   it("builds worker context from published assignment data, never agent-selected authority", () => {
     const assignment = { work_id: "trusted-work", claim_id: "published", work: { task: "review" } };
     const readAssignment = vi.fn(() => assignment);
-    expect(buildDispatchAwContext("published", false, readAssignment).dispatch_work_coordinator).toEqual(assignment);
+    expect(buildDispatchAwContext("published", false, readAssignment).work_queue).toEqual(assignment);
     expect(readAssignment).toHaveBeenCalledWith("published");
     readAssignment.mockClear();
-    expect(buildDispatchAwContext("published", true, readAssignment)).not.toHaveProperty("dispatch_work_coordinator");
+    expect(buildDispatchAwContext("published", true, readAssignment)).not.toHaveProperty("work_queue");
     expect(readAssignment).not.toHaveBeenCalled();
   });
 
   it("does not dispatch claims to workers that lack aw_context support", async () => {
-    process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED = "true";
+    process.env.GH_AW_WORK_QUEUE_CLAIMS_VERIFIED = "true";
     const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" } });
     const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "untrusted" } }, {});
     expect(result.success).toBe(false);

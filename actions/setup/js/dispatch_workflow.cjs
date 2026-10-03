@@ -21,7 +21,7 @@ const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdRe
 function buildDispatchAwContext(claimID, staged, readAssignment = readPublishedAssignment) {
   return {
     ...buildAwContext(),
-    ...(claimID !== undefined && !staged ? { dispatch_work_coordinator: readAssignment(claimID) } : {}),
+    ...(claimID !== undefined && !staged ? { work_queue: readAssignment(claimID) } : {}),
   };
 }
 
@@ -299,7 +299,7 @@ async function main(config = {}) {
       if (queueClaimID !== undefined && (typeof queueClaimID !== "string" || !queueClaimID || isCrossRepoDispatch || !awContextWorkflows.has(workflowName))) {
         throw new Error("work_queue_claim_id requires a same-repository worker workflow with aw_context support");
       }
-      if (queueClaimID !== undefined && !isStaged && process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED !== "true") {
+      if (queueClaimID !== undefined && !isStaged && process.env.GH_AW_WORK_QUEUE_CLAIMS_VERIFIED !== "true") {
         throw new Error("work_queue_claim_id requires verified publication by tools.work-queue");
       }
       if (awContextWorkflows.has(workflowName)) {

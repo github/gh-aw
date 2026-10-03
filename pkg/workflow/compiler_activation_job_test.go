@@ -50,21 +50,21 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	}
 }
 
-func TestDispatchCoordinatorSnapshotIsPreparedAndUploaded(t *testing.T) {
+func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
-		Name:  "Coordinator",
+		Name:  "Work Queue",
 		Tools: map[string]any{"work-queue": true},
 	}
-	job, err := compiler.buildActivationJob(data, false, "", "coordinator.lock.yml")
+	job, err := compiler.buildActivationJob(data, false, "", "queue.lock.yml")
 	require.NoError(t, err)
 	require.NotNil(t, job)
 
 	steps := strings.Join(job.Steps, "")
-	snapshotStep := extractWorkflowStepByName(t, steps, "Snapshot dispatch coordinator state")
-	assert.Contains(t, snapshotStep, "write_dispatch_work_coordinator_snapshot.cjs")
+	snapshotStep := extractWorkflowStepByName(t, steps, "Snapshot work queue state")
+	assert.Contains(t, snapshotStep, "write_work_queue_snapshot.cjs")
 	uploadStep := extractWorkflowStepByName(t, steps, "Upload activation artifact")
-	assert.Contains(t, uploadStep, "/tmp/gh-aw/dispatch-work-coordinator.snapshot.json")
+	assert.Contains(t, uploadStep, "/tmp/gh-aw/work-queue.snapshot.json")
 	assert.Contains(t, job.Permissions, "contents: read")
 }
 
