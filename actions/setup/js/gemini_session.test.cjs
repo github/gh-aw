@@ -43,6 +43,111 @@ describe("Gemini CI-backed provider failures", () => {
 });
 
 // Supplemental cases below are synthetic protocol/compatibility fixtures, not CI observations.
+describe("Gemini non-init system subtype regressions", () => {
+  it.each([
+    [
+      "status text",
+      "Refreshing credentials\n",
+      [
+        ["gemini.system", undefined],
+        ["assistant.message", "Refreshing credentials\n"],
+      ],
+    ],
+    [
+      "empty status text",
+      "",
+      [
+        ["gemini.system", undefined],
+        ["assistant.message", ""],
+      ],
+    ],
+    [
+      "whitespace status text",
+      " \r\n",
+      [
+        ["gemini.system", undefined],
+        ["assistant.message", " \r\n"],
+      ],
+    ],
+    [
+      "legacy content blocks",
+      {
+        content: [
+          { type: "thinking", thinking: "Checking credentials", nativeBlock: { retained: false } },
+          { type: "text", text: "Credentials refreshed\n" },
+          { type: "text", text: "" },
+        ],
+      },
+      [
+        ["gemini.system", undefined],
+        ["assistant.reasoning", "Checking credentials"],
+        ["assistant.message", "Credentials refreshed\n"],
+        ["assistant.message", ""],
+      ],
+    ],
+  ])("delegates %s while retaining the system observation and source envelope", (_label, message, expected) => {
+    const envelope = { subtype: "status", id: "status-record", parentId: null, timestamp: 0, native: { nested: [false, null] } };
+    const records = freeze([{ type: "system", ...envelope, message, data: { nativePayload: { phase: "credentials" } } }]);
+    const original = json(records);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => [event.type, event.data.content])).toEqual(expected);
+    expect(events[0]).toEqual({ ...records[0], type: "gemini.system", data: { ...envelope, message, nativePayload: { phase: "credentials" } } });
+    for (const event of events) expect(event).toMatchObject({ ...envelope, message, data: { ...envelope, message, nativePayload: { phase: "credentials" } } });
+    if (typeof message === "object") {
+      for (const [index, block] of message.content.entries()) expect(events[index + 1].data).toMatchObject(block);
+    }
+    expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(events);
+    expect(normalizeGeminiSession(records)).toEqual(events);
+    expect(normalizeGeminiSession(events)).toEqual(events);
+    expect(normalizeGeminiSession(freeze(json(events)))).toEqual(json(events));
+    events[0].native.nested.push("output-copy");
+    events[1].data.nativePayload.phase = "output-copy";
+    if (typeof message === "object") events[1].data.nativeBlock.retained = true;
+    expect(records).toEqual(original);
+  });
+
+  it("retains a metadata-only subtype without fabricating messages, results or accounting", () => {
+    const envelope = { subtype: "checkpoint", id: "checkpoint-record", parentId: "session-record", timestamp: "2026-09-29T12:00:00Z", native: { nested: [0, false, null] } };
+    const records = freeze([{ type: "system", ...envelope, data: { nativePayload: { ready: false } } }]);
+    const original = json(records);
+    const expected = [{ type: "gemini.system", ...envelope, data: { ...envelope, nativePayload: { ready: false } } }];
+    const events = normalizeGeminiSession(records);
+    expect(events).toEqual(expected);
+    expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(expected);
+    expect(selectSessionResult(events)).toBeUndefined();
+    for (const key of ["content", "usage", "numTurns", "durationMs", "totalCostUsd", "errors"]) expect(events[0].data).not.toHaveProperty(key);
+    expect(normalizeGeminiSession(events)).toEqual(expected);
+    expect(normalizeGeminiSession(freeze(json(events)))).toEqual(json(expected));
+    events[0].data.nativePayload.ready = true;
+    expect(records).toEqual(original);
+  });
+
+  it("reports an explicit system error separately without treating diagnostic text as an assistant answer", () => {
+    const envelope = { subtype: "error", id: "error-record", parentId: "session-record", timestamp: "2026-09-29T12:00:01Z", native: { retry: false } };
+    const error = { code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } };
+    const message = { content: [{ type: "text", text: "This is a provider diagnostic, not an answer" }] };
+    const records = freeze([{ type: "system", ...envelope, message, error, data: { nativePayload: { attempt: 0 } } }]);
+    const original = json(records);
+    const payload = { ...envelope, message, error, nativePayload: { attempt: 0 } };
+    const expected = [
+      { ...records[0], type: "gemini.system", data: payload },
+      { ...records[0], type: "session.result", data: { ...payload, errors: [{ code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } }], permissionDenials: undefined } },
+    ];
+    const events = normalizeGeminiSession(records);
+    expect(events).toEqual(expected);
+    expect(events.map(event => event.type)).toEqual(["gemini.system", "session.result"]);
+    expect(parseGeminiLog(jsonl(records)).logEntries).toEqual(expected);
+    expect(selectSessionResult(events).errors).toEqual([{ code: "provider_unavailable", message: "Provider unavailable", details: { retryable: false } }]);
+    for (const key of ["content", "usage", "numTurns", "durationMs", "totalCostUsd"]) expect(events[1].data).not.toHaveProperty(key);
+    expect(normalizeGeminiSession(events)).toEqual(expected);
+    expect(normalizeGeminiSession(freeze(json(events)))).toEqual(json(expected));
+    events[0].data.nativePayload.attempt = 1;
+    events[1].data.errors[0].details.retryable = true;
+    events[1].message.content[0].text = "output-copy";
+    expect(records).toEqual(original);
+  });
+});
+
 describe("Gemini synthetic unified-session regressions", () => {
   it("T-UAS-007/009: maps complete initialization and preserves empty values and native additions", () => {
     const source = freeze({
