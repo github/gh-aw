@@ -253,11 +253,20 @@ export default defineConfig({
     "/reference/repository-package-manifest/": "/gh-aw/reference/aw-yml-package-manifest/",
   },
   integrations: [
+    // Dev-only page for the social preview image (see scripts/capture-og.mjs).
+    {
+      name: "og-preview",
+      hooks: {
+        "astro:config:setup": ({ command, injectRoute }) => {
+          if (command === "dev") injectRoute({ pattern: "/og/home", entrypoint: "./src/og/OgHome.astro" });
+        },
+      },
+    },
     sitemap(),
     mermaid(),
     starlight({
       title: "GitHub Agentic Workflows",
-      description: "Write agentic workflows in natural language using markdown files and run them as GitHub Actions workflows.",
+      description: "Intelligent GitHub repository automation with Copilot, Claude Code, Codex or Gemini. Agents triage, investigate and open pull requests safely in GitHub Actions.",
       favicon: "/favicon.svg",
       logo: {
         src: "./src/assets/agentic-workflow.svg",

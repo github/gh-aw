@@ -1,0 +1,106 @@
+---
+// Social preview image (1200×630) for the site, composed from the real hero
+// pieces. Dev-only route (/og/home/); `npm run og` screenshots it to
+// public/og-hero-1200x630.png.
+import '../styles/tokens.css';
+import '../styles/landing.css';
+import HeroBackground from '../components/landing/HeroBackground.astro';
+import HeroVAVisual from '../components/landing/HeroVAVisual.astro';
+import logoSvg from '../assets/agentic-workflow-light.svg?raw';
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Social preview</title>
+  </head>
+  <body>
+    <main class="og" data-og-ready>
+      <div class="og-bg" aria-hidden="true"><HeroBackground /></div>
+      <div class="og-text">
+        <p class="og-brand"><span class="og-logo" set:html={logoSvg} />GitHub Agentic Workflows</p>
+        <h1>
+          <span>Intelligent GitHub</span>
+          <span>repository automation,</span>
+          <span class="og-muted">with your own agents.</span>
+        </h1>
+        <p class="og-url">github.github.com/gh-aw</p>
+      </div>
+      <div class="og-visual"><HeroVAVisual /></div>
+    </main>
+  </body>
+</html>
+
+<style>
+  html,
+  body {
+    margin: 0;
+    background: var(--aw-color-bg);
+    font-family: var(--aw-font-sans);
+    color: var(--aw-color-text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .og {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    box-sizing: border-box;
+    width: 1200px;
+    height: 630px;
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    align-items: center;
+    gap: 2.5rem;
+    padding: 3.5rem 4rem;
+  }
+  .og-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+  }
+  .og-text {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+  }
+  .og-brand,
+  .og-url {
+    margin: 0;
+    font-size: var(--aw-step-1);
+    font-weight: 600;
+  }
+  .og-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .og-logo :global(svg) {
+    display: block;
+    width: 32px;
+    height: 32px;
+  }
+  .og-url {
+    font-weight: 500;
+    color: var(--aw-color-text-muted);
+  }
+  h1 {
+    margin: 0;
+    font-size: 3.5rem;
+    white-space: nowrap;
+    font-weight: 460;
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+  }
+  h1 span {
+    display: block;
+  }
+  /* The hero visual is sized for a page; scale it to fit the card height. */
+  .og-visual {
+    zoom: 0.78;
+  }
+  .og-muted {
+    color: var(--aw-color-text-muted);
+  }
+</style>

@@ -15,6 +15,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "validate-links": "astro build",
+    "og": "node scripts/capture-og.mjs",
     "generate-agent-factory": "cd .. && node scripts/generate-agent-factory.js",
     "generate-model-tables": "cd .. && node scripts/generate-model-tables.js",
     "test": "playwright test",
