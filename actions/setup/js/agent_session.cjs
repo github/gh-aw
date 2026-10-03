@@ -335,10 +335,14 @@ function transformFlatSessionEntries(records) {
 /** @param {any} usage @returns {number|undefined} */
 function sessionTokenTotal(usage) {
   if (!usage) return undefined;
-  if (isTokenCount(usage.total_tokens)) return usage.total_tokens;
-  if (!isTokenCount(usage.input_tokens) && !isTokenCount(usage.output_tokens)) return undefined;
-  const cache = usage.input_tokens_include_cache === false ? (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) : 0;
-  const total = (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + cache;
+  const totalTokens = usage.totalTokens ?? usage.total_tokens;
+  const inputTokens = usage.inputTokens ?? usage.input_tokens;
+  const outputTokens = usage.outputTokens ?? usage.output_tokens;
+  if (isTokenCount(totalTokens)) return totalTokens;
+  if (!isTokenCount(inputTokens) && !isTokenCount(outputTokens)) return undefined;
+  const cache =
+    (usage.inputTokensIncludeCache ?? usage.input_tokens_include_cache) === false ? (usage.cacheCreationInputTokens ?? usage.cache_creation_input_tokens ?? 0) + (usage.cacheReadInputTokens ?? usage.cache_read_input_tokens ?? 0) : 0;
+  const total = (inputTokens ?? 0) + (outputTokens ?? 0) + cache;
   return isTokenCount(total) ? total : undefined;
 }
 

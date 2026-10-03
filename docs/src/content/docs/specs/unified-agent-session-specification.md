@@ -223,8 +223,8 @@ opaque because its essential fields are not defined by this specification.
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
-| Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
-| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine/model/workflow/repository/run ID. No detector transcript or free-form reasons. |
+| Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
+| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -233,9 +233,15 @@ Safe-output `failures` maps to `errors`, retaining operation types, error codes,
 and messages. Copilot checkpoint `ai_credits` maps to `totalAic` and
 `premium_requests` maps to `premiumRequests`.
 Explicit failure signals MUST survive alias compaction even when another
-source field claims success. Runtime keys use camelCase, such as `serverName`, `rpcId`, `durationMs`, and
-`secretLeak`. Accounting uses a nested `usage` object with the snake_case token
-keys from Section 6. The numeric file-format version remains `1`: the
+source field claims success. Known unified payload fields use camelCase, such as
+`serverName`, `rpcId`, `durationMs`, `secretLeak`, and nested `usage.inputTokens`.
+The parser traces and original accounting artifacts continue to use the
+snake_case token keys from Section 6; unknown native extension payloads remain
+opaque. Workflow metadata has one `engineId` rather than a duplicate `engine`
+and distinguishes `requestedModel` from the observed agent model. `triggerType`
+comes from the GitHub Actions event name; `cliVersion`, `awfVersion`,
+`mcpgVersion`, and `agentVersion` come from available workflow metadata and
+are not inferred. The numeric file-format version remains `1`: the
 `type`/`data`/`provenance` envelope and JSONL framing are unchanged.
 
 **T-UAS-055 — Source provenance.** Every merged event MUST have a `provenance`
@@ -473,7 +479,7 @@ source for opaque fields.
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
-| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, and `agentVersion` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, and `agent_version`, respectively). Unavailable values are not inferred. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, `requestedModel`, and `triggerType` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, `agent_version`, `model`, and `event_name`, respectively). Unavailable values are not inferred. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 

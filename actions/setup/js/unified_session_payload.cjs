@@ -2,17 +2,18 @@
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {Record<string, string[]>} Fields */
+const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
-  total_tokens: ["total_tokens", "totalTokens"],
-  input_tokens: ["input_tokens", "inputTokens"],
-  output_tokens: ["output_tokens", "outputTokens"],
-  reasoning_output_tokens: ["reasoning_output_tokens"],
-  cache_read_input_tokens: ["cache_read_input_tokens", "cacheReadInputTokens", "cache_read_tokens"],
-  cache_creation_input_tokens: ["cache_creation_input_tokens", "cacheCreationInputTokens", "cache_write_tokens"],
-  input_tokens_include_cache: ["input_tokens_include_cache"],
-  overflowed_tokens: ["overflowed_tokens"],
+  totalTokens: ["totalTokens", "total_tokens"],
+  inputTokens: ["inputTokens", "input_tokens"],
+  outputTokens: ["outputTokens", "output_tokens"],
+  reasoningOutputTokens: ["reasoningOutputTokens", "reasoning_output_tokens", "reasoning_tokens"],
+  cacheReadInputTokens: ["cacheReadInputTokens", "cache_read_input_tokens", "cache_read_tokens"],
+  cacheCreationInputTokens: ["cacheCreationInputTokens", "cache_creation_input_tokens", "cache_write_tokens"],
+  inputTokensIncludeCache: ["inputTokensIncludeCache", "input_tokens_include_cache"],
+  overflowedTokens: ["overflowedTokens", "overflowed_tokens"],
 };
 
 /** @type {Fields} */
@@ -121,8 +122,8 @@ const EVENT_FIELDS = {
     model: ["model"],
     requestId: ["requestId", "request_id"],
     status: ["status"],
-    aic: ["aic", "ai_credits_this_response"],
-    totalAic: ["totalAic", "ai_credits_total", "ai_credits"],
+    aic: ["aic", "ai_credits_this_response", "aiCreditsThisResponse"],
+    totalAic: ["totalAic", "ai_credits_total", "ai_credits", "aiCredits"],
     premiumRequests: ["premiumRequests", "premium_requests"],
     durationMs: ["durationMs", "duration_ms"],
   },
@@ -143,13 +144,13 @@ const EVENT_FIELDS = {
     maliciousPatch: ["maliciousPatch", "malicious_patch"],
   },
   "workflow.info": {
-    engine: ["engine", "engine_id"],
-    engineId: ["engineId", "engine_id"],
+    engineId: ["engineId", "engine_id", "engine"],
     agentVersion: ["agentVersion", "agent_version"],
     cliVersion: ["cliVersion", "cli_version"],
     awfVersion: ["awfVersion", "awf_version"],
-    mcpgVersion: ["mcpgVersion", "awmg_version"],
-    model: ["model"],
+    mcpgVersion: ["mcpgVersion", "mcpg_version", "awmg_version"],
+    requestedModel: ["requestedModel", "model"],
+    triggerType: ["triggerType", "event_name"],
     workflow: ["workflow", "workflow_name"],
     repository: ["repository"],
     runId: ["runId", "run_id"],
@@ -173,13 +174,35 @@ function selectFields(value, fields) {
   return result;
 }
 
+/** @param {any} source @param {Record<string, any>} data @param {Record<string, any>} usage */
+function resolveUsageAic(source, data, usage) {
+  if (data.aic !== undefined || data.totalAic !== undefined) return;
+  const provider = data.provider ?? source.usage?.provider;
+  const model = data.model ?? source.usage?.model;
+  if (typeof provider !== "string" || typeof model !== "string" || !findModelPricing(provider, model)) return;
+  const tokens = [usage.inputTokens, usage.outputTokens, usage.cacheReadInputTokens, usage.cacheCreationInputTokens, usage.reasoningOutputTokens];
+  if (!tokens.some(value => typeof value === "number" && value > 0) || tokens.some(value => value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < 0))) return;
+  const aic = computeInferenceAIC({
+    provider,
+    model,
+    inputTokens: usage.inputTokens ?? 0,
+    outputTokens: usage.outputTokens ?? 0,
+    cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+    cacheWriteTokens: usage.cacheCreationInputTokens ?? 0,
+    reasoningTokens: usage.reasoningOutputTokens ?? 0,
+    ...(typeof usage.inputTokensIncludeCache === "boolean" ? { inputTokensIncludeCache: usage.inputTokensIncludeCache } : {}),
+  });
+  if (Number.isFinite(aic)) data.aic = aic;
+}
+
 /**
  * Compact known payloads without truncating text or changing native parser traces.
  * Unknown extension data remains opaque for forward compatibility.
  * @param {SessionEvent} event
+ * @param {string} [phase]
  * @returns {SessionEvent}
  */
-function normalizeUnifiedSessionEvent(event) {
+function normalizeUnifiedSessionEvent(event, phase = event.provenance?.phase) {
   /** @type {any} */
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
@@ -193,8 +216,13 @@ function normalizeUnifiedSessionEvent(event) {
   }
   if (["session.result", "firewall.token_usage", "usage.report"].includes(event.type)) {
     const usage = selectFields(event.type === "session.result" ? source.usage : (source.usage ?? source), USAGE_FIELDS);
+    if (Array.isArray(usage.overflowedTokens)) {
+      const aliases = Object.entries(USAGE_FIELDS);
+      usage.overflowedTokens = usage.overflowedTokens.map(name => aliases.find(([, names]) => names.includes(name))?.[0] ?? name);
+    }
     if (Object.keys(usage).length || (source.usage && typeof source.usage === "object")) data.usage = usage;
     else if (source.usage === null) data.usage = null;
+    if (event.type === "usage.report" && ["detection", "evals"].includes(phase)) resolveUsageAic(source, data, usage);
   }
   if (event.type === "tool.execution_complete" && (source.is_error === true || source.result?.isError === true || source.result?.is_error === true)) data.isError = true;
   if (event.type === "experiment.assignment") {

@@ -84,7 +84,6 @@ describe("essential unified session payloads", () => {
       data: { engine_id: "custom", agent_version: "v2", version: "v3", cli_version: "", awf_version: "", awmg_version: "", token: "omit" },
     };
     expect(normalizeUnifiedSessionEvent(source).data).toEqual({
-      engine: "custom",
       engineId: "custom",
       agentVersion: "v2",
       cliVersion: "",
@@ -92,17 +91,19 @@ describe("essential unified session payloads", () => {
       mcpgVersion: "",
     });
     expect(normalizeUnifiedSessionEvent({ type: "workflow.info", data: { engine_id: "custom", version: "v3" } }).data).toEqual({
-      engine: "custom",
       engineId: "custom",
     });
+    const metadata = normalizeUnifiedSessionEvent({ type: "workflow.info", data: { engine: "claude", model: "requested", event_name: "schedule", cli_version: "1.0", mcpg_version: "2.0" } });
+    expect(metadata.data).toEqual({ engineId: "claude", cliVersion: "1.0", mcpgVersion: "2.0", requestedModel: "requested", triggerType: "schedule" });
+    expect(normalizeUnifiedSessionEvent(metadata)).toEqual(metadata);
   });
 
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {
     const data = { provider: "copilot", inputTokens: 0, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, ai_credits_this_response: 0, ai_credits_total: 0, duration_ms: 0, opaque: "omit" };
     const runtime = normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data });
-    expect(runtime.data).toEqual({ provider: "copilot", aic: 0, totalAic: 0, durationMs: 0, usage: { input_tokens: 0, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } });
+    expect(runtime.data).toEqual({ provider: "copilot", aic: 0, totalAic: 0, durationMs: 0, usage: { inputTokens: 0, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } });
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
-    expect(agent.data).toEqual({ numTurns: 0, usage: { input_tokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"] } });
+    expect(agent.data).toEqual({ numTurns: 0, usage: { inputTokens: 0, outputTokens: 2, overflowedTokens: ["cacheReadInputTokens"] } });
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
   });
 
@@ -117,7 +118,7 @@ describe("essential unified session payloads", () => {
           status: "completed",
           sourceType: "turn.completed",
           numTurns: 1,
-          usage: { input_tokens: 10, output_tokens: 5, reasoning_output_tokens: reasoning, cache_read_input_tokens: 4, cache_creation_input_tokens: 0 },
+          usage: { inputTokens: 10, outputTokens: 5, reasoningOutputTokens: reasoning, cacheReadInputTokens: 4, cacheCreationInputTokens: 0 },
         },
       },
     ]);
