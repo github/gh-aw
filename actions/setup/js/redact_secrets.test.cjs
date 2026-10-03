@@ -44,7 +44,7 @@ describe("redact_secrets.cjs", () => {
       for (const key of Object.keys(process.env)) key.startsWith("SECRET_") && delete process.env[key];
     }),
     describe("main function integration", () => {
-      it("skips the sandbox-owned MCP cache while redacting artifact files", async () => {
+      it("continues redacting artifact files when a directory is inaccessible", async () => {
         const cache = path.join(tempDir, "aw-mcp");
         const artifact = path.join(tempDir, "agent-stdio.log");
         fs.mkdirSync(cache);
@@ -57,14 +57,27 @@ describe("redact_secrets.cjs", () => {
           return readDir(dir, options);
         });
         try {
-          const modifiedScript = redactScript.replaceAll("/tmp/gh-aw/aw-mcp", cache).replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
-          expect(readDirSpy).not.toHaveBeenCalledWith(cache, expect.anything());
+          expect(readDirSpy).toHaveBeenCalledWith(cache, expect.anything());
           expect(fs.readFileSync(artifact, "utf8")).toBe("***REDACTED***");
           expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Skipping inaccessible directory"));
         } finally {
           readDirSpy.mockRestore();
         }
+      });
+      it("redacts readable MCP artifact logs", async () => {
+        const logs = path.join(tempDir, "aw-mcp", "logs");
+        const artifact = path.join(logs, "runs.json");
+        fs.mkdirSync(logs, { recursive: true });
+        fs.writeFileSync(artifact, '{"token":"secret-value"}');
+        process.env.GH_AW_SECRET_NAMES = "TEST_SECRET";
+        process.env.SECRET_TEST_SECRET = "secret-value";
+        const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
+        await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+        expect(fs.readFileSync(artifact, "utf8")).toBe('{"token":"***REDACTED***"}');
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
       });
       (it("should scan for built-in patterns even when GH_AW_SECRET_NAMES is not set", async () => {
         (await eval(`(async () => { ${redactScript}; await main(); })()`),

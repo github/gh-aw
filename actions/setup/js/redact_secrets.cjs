@@ -24,12 +24,18 @@ function findFiles(dir, extensions) {
     if (!fs.existsSync(dir)) {
       return results;
     }
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+        core.warning(`Skipping inaccessible directory during secret redaction: ${dir}`);
+        return results;
+      }
+      throw error;
+    }
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      // MCP tool downloads are a private runtime cache, not an artifact source.
-      // The sandbox may own this directory with permissions the runner cannot traverse.
-      if (entry.isDirectory() && fullPath === "/tmp/gh-aw/aw-mcp") continue;
       if (entry.isSymbolicLink()) {
         fs.unlinkSync(fullPath);
         core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
