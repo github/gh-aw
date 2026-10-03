@@ -179,6 +179,126 @@
               },
               "additionalProperties": false
             },
+            "dispatch_coordinator": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "snapshot": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    },
+                    "sha": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "worker": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "work_id": {
+                          "type": "string"
+                        },
+                        "claim_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "work_id",
+                        "claim_id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "transactions": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "work": {
+                            "type": "string"
+                          },
+                          "claim": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "attempt": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "kind",
+                          "work",
+                          "claim",
+                          "attempt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "sha",
+                    "worker",
+                    "transactions"
+                  ],
+                  "additionalProperties": false
+                },
+                "finish_intent": {
+                  "type": "string"
+                },
+                "operations": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "timestamp": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
             "friction": {
               "type": [
                 "null",
@@ -4287,6 +4407,126 @@
                         "changed"
                       ],
                       "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "dispatch_coordinator": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "snapshot": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "version": {
+                          "type": "integer"
+                        },
+                        "sha": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "worker": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "work_id": {
+                              "type": "string"
+                            },
+                            "claim_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "work_id",
+                            "claim_id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "transactions": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "version": {
+                                "type": "integer"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "work": {
+                                "type": "string"
+                              },
+                              "claim": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "attempt": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "version",
+                              "kind",
+                              "work",
+                              "claim",
+                              "attempt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "sha",
+                        "worker",
+                        "transactions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "finish_intent": {
+                      "type": "string"
+                    },
+                    "operations": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "message",
+                          "source"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "additionalProperties": false
