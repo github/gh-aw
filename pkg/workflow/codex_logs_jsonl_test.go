@@ -115,6 +115,45 @@ func TestCodexParseLogMetricsJSONLPartialAccounting(t *testing.T) {
 	}
 }
 
+func TestCodexParseLogMetricsJSONLUsageAliases(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		log    string
+		tokens int
+	}{
+		{
+			name:   "camelCase usage fields",
+			log:    `{"type":"session.result","data":{"usage":{"inputTokens":10,"outputTokens":2,"cacheReadInputTokens":4,"cacheCreationInputTokens":3,"inputTokensIncludeCache":false}}}`,
+			tokens: 19,
+		},
+		{
+			name:   "canonical values win by presence",
+			log:    `{"type":"session.result","data":{"usage":{"input_tokens":0,"inputTokens":10,"output_tokens":2,"outputTokens":40,"total_tokens":-1,"totalTokens":100,"input_tokens_include_cache":true,"inputTokensIncludeCache":false}}}`,
+			tokens: 2,
+		},
+		{
+			name:   "camelCase overflow marker",
+			log:    `{"type":"session.result","data":{"usage":{"inputTokens":10,"outputTokens":2,"overflowedTokens":["inputTokens"]}}}`,
+			tokens: 2,
+		},
+		{
+			name:   "canonical overflow marker wins by presence",
+			log:    `{"type":"session.result","data":{"usage":{"input_tokens":10,"output_tokens":2,"overflowed_tokens":[],"overflowedTokens":["input_tokens"]}}}`,
+			tokens: 12,
+		},
+		{
+			name: "overflow marker clears prior snapshot",
+			log: `{"type":"session.result","data":{"usage":{"input_tokens":10,"output_tokens":2}}}` + "\n" +
+				`{"type":"session.result","data":{"usage":{"overflowed_tokens":["input_tokens"],"overflowedTokens":[]}}}`,
+			tokens: 2,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.tokens, NewCodexEngine().ParseLogMetrics(test.log, false).TokenUsage)
+		})
+	}
+}
+
 func TestCodexParseLogMetricsEnrichedLegacyLog(t *testing.T) {
 	log := `tool api.fetch({})
 api.fetch({}) success in 2ms:
