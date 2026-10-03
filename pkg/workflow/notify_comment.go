@@ -110,7 +110,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 // conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
 			conclusionPerms.Set(PermissionContents, PermissionRead)
 		}

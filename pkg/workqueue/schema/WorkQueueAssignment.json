@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "WorkQueueAssignment.json",
+  "type": "object",
+  "properties": {
+    "work_id": {
+      "$ref": "#/$defs/WorkQueueIdentity"
+    },
+    "claim_id": {
+      "$ref": "#/$defs/WorkQueueIdentity"
+    },
+    "work": {
+      "$ref": "#/$defs/RecordUnknown"
+    }
+  },
+  "required": ["work_id", "claim_id", "work"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Trusted inbound assignment supplied as aw_context.work_queue.",
+  "$defs": {
+    "WorkQueueIdentity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "RecordUnknown": {
+      "type": "object",
+      "properties": {},
+      "unevaluatedProperties": {}
+    }
+  }
+}

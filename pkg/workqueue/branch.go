@@ -41,11 +41,11 @@ func (b Branch) validate() error {
 	}
 	if !branchPattern.MatchString(b.Name) || strings.Contains(b.Name, "..") ||
 		strings.Contains(b.Name, "//") || strings.HasSuffix(b.Name, ".") || strings.HasSuffix(b.Name, "/") {
-		return errors.New("invalid coordinator branch")
+		return errors.New("invalid queue branch")
 	}
 	for part := range strings.SplitSeq(b.Name, "/") {
 		if strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
-			return errors.New("invalid coordinator branch")
+			return errors.New("invalid queue branch")
 		}
 	}
 	return nil
@@ -104,7 +104,7 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 		return nil, branchSnapshot{}, err
 	}
 	if ref.Ref != "refs/heads/"+b.Name || ref.Object.SHA == "" {
-		return nil, branchSnapshot{}, errors.New("invalid coordinator branch reference")
+		return nil, branchSnapshot{}, errors.New("invalid queue branch reference")
 	}
 	snapshot := branchSnapshot{head: ref.Object.SHA}
 	var commit struct {
@@ -117,7 +117,7 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 	}
 	snapshot.tree = commit.Tree.SHA
 	if snapshot.tree == "" {
-		return nil, snapshot, errors.New("coordinator commit has no tree")
+		return nil, snapshot, errors.New("queue commit has no tree")
 	}
 	transactions, err := b.readLog(ctx, snapshot.tree)
 	return transactions, snapshot, err
@@ -137,14 +137,14 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 		return nil, err
 	}
 	if tree.Truncated {
-		return nil, errors.New("coordinator tree is truncated")
+		return nil, errors.New("queue tree is truncated")
 	}
 	for _, entry := range tree.Tree {
 		if entry.Path != FileName {
 			continue
 		}
 		if entry.Type != "blob" || (entry.Mode != "100644" && entry.Mode != "100755") || entry.SHA == "" {
-			return nil, errors.New("coordinator log must be a regular file")
+			return nil, errors.New("queue log must be a regular file")
 		}
 		var blob struct {
 			Encoding string `json:"encoding"`
@@ -154,7 +154,7 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 			return nil, err
 		}
 		if blob.Encoding != "base64" {
-			return nil, errors.New("unsupported coordinator blob encoding")
+			return nil, errors.New("unsupported queue blob encoding")
 		}
 		data, err := base64.StdEncoding.DecodeString(blob.Content)
 		if err != nil {
@@ -167,7 +167,7 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 		_, err = Replay(transactions)
 		return transactions, err
 	}
-	return nil, errors.New("coordinator branch is missing " + FileName)
+	return nil, errors.New("queue branch is missing " + FileName)
 }
 
 func (b Branch) Read(ctx context.Context) ([]Transaction, error) {
@@ -205,7 +205,7 @@ func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []Tra
 		SHA string `json:"sha"`
 	}
 	if err := b.request(ctx, http.MethodPost, "git/commits", map[string]any{
-		"message": "Update dispatch work coordinator", "tree": tree.SHA, "parents": parents,
+		"message": "Update work queue", "tree": tree.SHA, "parents": parents,
 	}, &commit); err != nil {
 		return false, err
 	}
@@ -247,7 +247,7 @@ func (b Branch) Update(ctx context.Context, change func([]Transaction) ([]Transa
 			return nil, false, err
 		}
 		if attempt == maxRetries-1 {
-			return nil, false, fmt.Errorf("coordinator publication failed after %d attempts: %w", maxRetries, err)
+			return nil, false, fmt.Errorf("queue publication failed after %d attempts: %w", maxRetries, err)
 		}
 		delay := time.Duration(50*(1<<attempt)+rand.Intn(50)) * time.Millisecond
 		timer := time.NewTimer(delay)
@@ -258,5 +258,5 @@ func (b Branch) Update(ctx context.Context, change func([]Transaction) ([]Transa
 		case <-timer.C:
 		}
 	}
-	return nil, false, errors.New("coordinator publication exhausted retries")
+	return nil, false, errors.New("queue publication exhausted retries")
 }

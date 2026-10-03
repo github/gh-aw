@@ -318,7 +318,7 @@ jobs:
 
     - name: Upload unit coverage to code coverage API
       if: always() && hashFiles(format('coverage-{0}.xml', matrix.shard)) != ''
-      uses: actions/upload-code-coverage@abb5995db9e0199b0e2bb9dbd136fce4cb1ec4d3   # v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34   # v1
       with:
         file: coverage-${{ matrix.shard }}.xml
         language: Go

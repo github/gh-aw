@@ -405,6 +405,31 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("nested objects"));
   });
 
+  it.each(["work_queue", "work_claim"])("preserves a schema-checked %s assignment in normalized context", async field => {
+    const assignment = { work_id: "w", claim_id: "c", work: { task: "test", inputs: { labels: ["bug"] } } };
+    const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
+    const expected = { ...caller, work_queue: assignment };
+    for (const payload of [{ inputs: { aw_context: JSON.stringify({ ...caller, [field]: assignment }) } }, { client_payload: { aw_context: { ...caller, [field]: assignment } } }]) {
+      await main(mockCore, { ...mockContext, payload });
+      expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toEqual(expected);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(expected));
+    }
+    expect(mockCore.warning).not.toHaveBeenCalled();
+  });
+
+  it.each([null, [], "claim", { work_id: "", claim_id: "c", work: {} }, { work_id: "w", claim_id: "", work: {} }, { work_id: "w", claim_id: "c", work: [] }, { work_id: "w", claim_id: "c", work: {}, unexpected: true }])(
+    "rejects a malformed work_queue assignment without publishing context",
+    async work_queue => {
+      await main(mockCore, {
+        ...mockContext,
+        payload: { inputs: { aw_context: JSON.stringify({ repo: "org/repo", run_id: "123", workflow_id: "caller", work_queue }) } },
+      });
+      expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("work queue assignment has an invalid shape"));
+    }
+  );
+
   it("should reject aw_context missing required fields", async () => {
     const contextMissingFields = {
       ...mockContext,

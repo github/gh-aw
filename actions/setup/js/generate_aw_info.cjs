@@ -10,6 +10,7 @@ const validateLockdownRequirements = require("./validate_lockdown_requirements.c
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
+const { normalizeWorkQueueContext } = require("./aw_context.cjs");
 
 /**
  * Generate aw_info.json with workflow run metadata.
@@ -170,27 +171,35 @@ async function main(core, ctx, githubClient) {
   let expressionAwContext = "{}";
   if (awContextRaw != null) {
     try {
-      const parsed = typeof awContextRaw === "string" ? JSON.parse(awContextRaw) : awContextRaw;
+      let parsed = typeof awContextRaw === "string" ? JSON.parse(awContextRaw) : awContextRaw;
 
       // Validate: must be a plain non-null object (not an array or primitive)
       if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
         core.warning(`aw_context must be a JSON object, got: ${typeof parsed}`);
       } else {
-        // Validate: no nested objects (all values must be primitives)
-        const nestedKeys = Object.entries(parsed)
-          .filter(([, v]) => v !== null && typeof v === "object")
-          .map(([k]) => k);
-        if (nestedKeys.length > 0) {
-          core.warning(`aw_context contains nested objects for keys: ${nestedKeys.join(", ")}. Ignoring aw_context.`);
-        } else {
-          expressionAwContext = JSON.stringify(parsed);
-          // Validate: required fields must be present
-          const requiredFields = ["run_id", "repo", "workflow_id"];
-          const missingFields = requiredFields.filter(f => !(f in parsed));
-          if (missingFields.length > 0) {
-            core.warning(`aw_context is missing required fields: ${missingFields.join(", ")}. Ignoring aw_context.`);
+        try {
+          parsed = normalizeWorkQueueContext(parsed);
+        } catch (error) {
+          core.warning(`${getErrorMessage(error)}. Ignoring aw_context.`);
+          parsed = null;
+        }
+        if (parsed !== null) {
+          // Only the schema-checked queue assignment may contain nested data.
+          const nestedKeys = Object.entries(parsed)
+            .filter(([k, v]) => k !== "work_queue" && v !== null && typeof v === "object")
+            .map(([k]) => k);
+          if (nestedKeys.length > 0) {
+            core.warning(`aw_context contains nested objects for keys: ${nestedKeys.join(", ")}. Ignoring aw_context.`);
           } else {
-            awInfo.context = parsed;
+            expressionAwContext = JSON.stringify(parsed);
+            // Validate: required fields must be present
+            const requiredFields = ["run_id", "repo", "workflow_id"];
+            const missingFields = requiredFields.filter(f => !(f in parsed));
+            if (missingFields.length > 0) {
+              core.warning(`aw_context is missing required fields: ${missingFields.join(", ")}. Ignoring aw_context.`);
+            } else {
+              awInfo.context = parsed;
+            }
           }
         }
       }

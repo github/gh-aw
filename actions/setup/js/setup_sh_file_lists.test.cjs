@@ -117,13 +117,13 @@ describe("setup.sh MCP_SCRIPTS_FILES", () => {
 });
 
 describe("setup.sh SAFE_OUTPUTS_FILES", () => {
-  it("prepares the isolated dispatch coordinator finish-intent mount", () => {
-    expect(setupShContent).toContain('create_dir "${SAFE_OUTPUTS_DEST}/dispatch-coordinator"');
+  it("prepares the isolated work queue finish-intent mount", () => {
+    expect(setupShContent).toContain('create_dir "${SAFE_OUTPUTS_DEST}/work-queue"');
   });
 
-  it("includes the dispatch coordinator replay module", () => {
-    expect(safeOutputsFiles).toContain("dispatch_work_coordinator_replay.cjs");
-    expect(safeOutputsFiles).toContain("dispatch_work_coordinator_store.cjs");
+  it("includes the work queue replay module", () => {
+    expect(safeOutputsFiles).toContain("work_queue_replay.cjs");
+    expect(safeOutputsFiles).toContain("work_queue_store.cjs");
   });
 
   it("contains all transitive local dependencies (including entry point safe-outputs-mcp-server.cjs)", () => {

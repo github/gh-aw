@@ -23,7 +23,7 @@ func TestConclusionWorkQueueSummary(t *testing.T) {
 			require.NotNil(t, job)
 			steps := strings.Join(job.Steps, "")
 			if !enabled {
-				require.NotContains(t, steps, "dispatch_work_coordinator_summary.cjs")
+				require.NotContains(t, steps, "work_queue_summary.cjs")
 				require.NotContains(t, steps, "Download activation artifact for work queue summary")
 				return
 			}
@@ -32,7 +32,7 @@ func TestConclusionWorkQueueSummary(t *testing.T) {
 			require.Contains(t, steps, "Download activation artifact for work queue summary\n        if: always()")
 			require.Contains(t, steps, "Summarize work queue activity\n        if: always()")
 			require.Contains(t, steps, "Summarize work queue activity\n        if: always()\n        continue-on-error: true")
-			require.Contains(t, steps, "dispatch_work_coordinator_summary.cjs")
+			require.Contains(t, steps, "work_queue_summary.cjs")
 			require.Contains(t, steps, "await main({ core, githubClient: github, context });")
 			require.Less(t, strings.Index(steps, "Download activation artifact for work queue summary"), strings.Index(steps, "Summarize work queue activity"))
 		})

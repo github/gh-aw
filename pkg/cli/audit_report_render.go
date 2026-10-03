@@ -328,7 +328,7 @@ func renderConsoleWarnings(warnings []ValidationIssue) {
 }
 
 func renderConsoleOperationalSections(data AuditData) {
-	renderConsoleDispatchCoordinator(data.DispatchCoordinator)
+	renderConsoleWorkQueue(data.WorkQueue)
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
 	renderConsoleMissingTools(data.MissingTools)
