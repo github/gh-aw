@@ -6,6 +6,7 @@ const { boundSummaryLines, escapeSummaryText, redactSessionForPublication } = re
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
+const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
 const RUNTIME_TYPES = new Set([
   "session.format",
@@ -45,8 +46,8 @@ function isUnifiedSessionTrace(events) {
 /** @param {Array<any>} events */
 function validateSessionFileHeader(events) {
   const header = events[0];
-  if (header?.type !== "session.format" || header.provenance?.component !== "collector") throw new Error("Unified session file is missing its leading session.format header");
-  if (header.data?.version !== 1) throw new Error(`Unsupported unified session file-format version: ${sessionOutputText(header.data?.version)}`);
+  if (header?.type !== "session.format" || header.provenance?.component !== "collector") throw new Error(`${ERR_VALIDATION}: Unified session file is missing its leading session.format header`);
+  if (header.data?.version !== 1) throw new Error(`${ERR_VALIDATION}: Unsupported unified session file-format version: ${sessionOutputText(header.data?.version)}`);
 }
 
 /** @param {any} value @returns {string} */
@@ -165,7 +166,7 @@ function publicationAgentSessions(events) {
   const secrets = collectArtifactSecretValues();
   const privateCopy = redactSessionForPublication(events, value => {
     const redacted = redactManifestValue(value, secrets);
-    if (typeof redacted !== "string") throw new Error("Expected redacted session string");
+    if (typeof redacted !== "string") throw new Error(`${ERR_VALIDATION}: Expected redacted session string`);
     return redacted;
   });
   return scopedAgentSessions(privateCopy);
@@ -180,9 +181,9 @@ function publicationAgentSessions(events) {
 function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentStatistics }) {
   const headers = events.filter(event => event?.type === "session.format" && event.provenance?.component === "collector");
   if (headers.length) validateSessionFileHeader(events);
-  if (headers.length > 1) throw new Error("Unified session file contains multiple collector format headers");
+  if (headers.length > 1) throw new Error(`${ERR_VALIDATION}: Unified session file contains multiple collector format headers`);
   const redacted = redactManifestValue(events, collectArtifactSecretValues());
-  if (!Array.isArray(redacted)) throw new Error("Expected unified session events");
+  if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected unified session events`);
   const lines = ["=== Unified session ==="];
   if (headers.length) lines.push(`File format version: ${headers[0].data.version}`);
   const counts = new Map();
@@ -227,7 +228,7 @@ async function publishUnifiedSessionSummary(filePath) {
       .filter(line => line.trim())
       .map(line => JSON.parse(line));
   } catch (error) {
-    throw new Error(`Failed to read unified session for summary: ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Failed to read unified session for summary: ${getErrorMessage(error)}`, { cause: error });
   }
   validateSessionFileHeader(events);
   const { generatePlainTextSummary, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
@@ -244,7 +245,7 @@ async function publishUnifiedSessionSummary(filePath) {
       }
       fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${markdown}\n`, "utf8");
     } catch (error) {
-      throw new Error(`Failed to publish unified session step summary: ${getErrorMessage(error)}`, { cause: error });
+      throw new Error(`${ERR_SYSTEM}: Failed to publish unified session step summary: ${getErrorMessage(error)}`, { cause: error });
     }
   } else if (core.summary?.addRaw) await core.summary.addRaw(generateCopilotCliStyleSummary(events)).write();
 }

@@ -48,7 +48,7 @@ evals:
   - id: report_with_charts_created
     question: Was a report or discussion created with trending charts and quota analysis?
 
-model: copilot/gpt-5.3-codex
+model: copilot/auto
 ---
 
 # GitHub API Consumption Report Agent
@@ -79,6 +79,8 @@ Use the `agentic-workflows` MCP `logs` tool:
 
 - **Incremental** (history is already rich per the threshold in **Step T1**): `logs(start_date="-1d")`
 - **Backfill** (first run, cache miss, or sparse history per the threshold in **Step T1**): `logs(start_date="-90d")`
+- If the initial `logs` call times out or fails with a transient tool/transport error, retry that same call up to **2** more times with short backoff (about 15s, then about 45s). Do not change its parameters, timeout, or count while retrying.
+- If the initial call still fails after those retries, stop collecting and use any run directories already downloaded. Clearly mark the dataset partial. If none are available, create a discussion stating that collection failed; do not invent metrics or charts, and do not end without a safe-output action.
 - The `continuation` field is authoritative. If it is missing or `null`, stop paging even if the returned run count exactly matches your requested count.
 - Treat the run directories already present under `/tmp/gh-aw/aw-mcp/logs/` as the authoritative collected dataset. Successful continuation calls should add to that dataset; if a later continuation attempt fails, keep using the directories that are already on disk.
 - If `continuation` is present, make at most **2** additional continuation calls using the returned parameters. After each successful continuation call, re-read that response's `continuation` field before deciding whether to continue. Do **not** invent your own `before_run_id` from the earliest run in the batch.

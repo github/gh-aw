@@ -5,6 +5,7 @@ const path = require("path");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
 function redactMaskedObjectKeys(value, maskedValues) {
   if (Array.isArray(value)) return value.map(item => redactMaskedObjectKeys(item, maskedValues));
@@ -19,7 +20,7 @@ function removeFailedSessionArtifacts(files, originalError) {
   try {
     for (const file of files) if (fs.existsSync(file)) fs.unlinkSync(file);
   } catch (cleanupError) {
-    throw new AggregateError([originalError, cleanupError], `Failed to remove incomplete session artifact: ${getErrorMessage(cleanupError)}`);
+    throw new AggregateError([originalError, cleanupError], `${ERR_SYSTEM}: Failed to remove incomplete session artifact: ${getErrorMessage(cleanupError)}`);
   }
 }
 
@@ -31,7 +32,7 @@ function removeFailedSessionArtifacts(files, originalError) {
  */
 function serializeSessionArtifact(events, maskedValues = []) {
   const redacted = redactMaskedObjectKeys(redactManifestValue(events, collectArtifactSecretValues()), maskedValues);
-  if (!Array.isArray(redacted)) throw new Error("Expected a session event array");
+  if (!Array.isArray(redacted)) throw new Error(`${ERR_VALIDATION}: Expected a session event array`);
   return redacted.map(event => JSON.stringify(event, (_key, value) => (typeof value === "string" ? redactMaskedValues(value, maskedValues) : value))).join("\n") + (events.length ? "\n" : "");
 }
 
@@ -50,7 +51,7 @@ function writeSessionArtifact(outputPath, events, maskedValues = []) {
     fs.renameSync(temporaryPath, outputPath);
   } catch (error) {
     removeFailedSessionArtifacts([temporaryPath, outputPath], error);
-    throw new Error(`Failed to write session artifact ${outputPath}: ${getErrorMessage(error)}`, { cause: error });
+    throw new Error(`${ERR_SYSTEM}: Failed to write session artifact ${outputPath}: ${getErrorMessage(error)}`, { cause: error });
   }
 }
 
