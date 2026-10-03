@@ -28,6 +28,8 @@ Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one
 
 The [formal verification notes and reproducible checker](../../specs/dispatch-work-coordinator/README.md) document the invariants and assumptions. The bounded model checks support a parameterized inductive proof argument, not a mechanically checked unbounded proof or proof that a future runtime implementation refines the model.
 
+The conclusion job writes a work queue activity step summary for workflows using `tools.work-queue`. It compares the activation snapshot with a read-only refresh of the durable queue, showing work and claim state counts, new transaction counts by kind, and the assigned worker's current state in a collapsed details section. These are shared-queue observations since activation, not activity attributed exclusively to the current run. Work, claim, and attempt identifiers are omitted. An unreadable snapshot or queue is reported as unavailable, not as an empty queue.
+
 For review, the [trace walkthrough](../../specs/dispatch-work-coordinator/README.md#inspect-execution-traces) generates bounded textual TLC executions and counterexamples to deliberately false reachability witnesses. These expose competing Claims, orphan recovery, and the finalization-to-effect sequence under the guarded protocol; they are evidence of modeled possibilities, not runtime conformance or liveness guarantees.
 
 ### Alternatives Considered

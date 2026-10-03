@@ -23,8 +23,8 @@ const nodes = [
     y: 32,
     icon: 'lock',
     label: 'Private data',
-    sub: 'Secrets, tokens, private repos',
-    cut: 'Credential isolation',
+    sub: 'Secrets and credentials',
+    cut: 'Isolated sandbox',
     t: 0.44, // wide layout: where the pill sits along the spoke
     tc: 0.45, // compact layout: where the cut disc sits
   },
@@ -34,7 +34,7 @@ const nodes = [
     y: 428,
     icon: 'alert',
     label: 'Untrusted content',
-    sub: 'Issues, PR comments, web pages',
+    sub: 'Issues and PR comments',
     cut: 'Integrity filtering',
     t: 0.48,
     tc: 0.6,
@@ -45,8 +45,8 @@ const nodes = [
     y: 428,
     icon: 'globe',
     label: 'Outbound access',
-    sub: 'Network, APIs, writes',
-    cut: 'Sandboxed agent',
+    sub: 'Web pages, APIs, writes',
+    cut: 'Agent firewall',
     t: 0.48,
     tc: 0.6,
   },
@@ -98,8 +98,8 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 <div class="tri">
   {part === 'text' && <p class="tri-text">
     An agent becomes dangerous when it has private data, untrusted content and outbound access all at once.
-    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw puts six layers between
-    the agent and your repository, and three of them each block one leg of it.
+    Security researchers call it <a href={TRIFECTA_URL}>the lethal trifecta</a>. gh-aw defends in depth through six
+    security layers that prevent agents from leaking private data.
   </p>}
 
   {part === 'figure' && <figure class="tri-fig">
@@ -156,10 +156,10 @@ const outline = nodes.map((n) => `${n.x},${n.y}`).join(' ');
 
     <figcaption class="sr-only">
       Diagram of the lethal trifecta: three capabilities that are dangerous when an agent holds all of them at once.
-      Private data means secrets, tokens and private repositories. Untrusted content means issues, pull request
-      comments and web pages. Outbound access means the network, APIs and writes. Each one would reach the agent at
-      the centre, but gh-aw cuts every leg: credential isolation keeps private data away from the agent, integrity
-      filtering screens untrusted content, and the sandboxed agent restricts outbound access.
+      Private data means secrets and credentials. Untrusted content means issues and pull request comments.
+      Outbound access means web pages, APIs and writes. Each one would reach the agent at the centre, but gh-aw cuts
+      every leg: the isolated sandbox keeps private data away from the agent, integrity filtering screens untrusted
+      content, and the agent firewall restricts outbound access.
     </figcaption>
   </figure>}
 </div>

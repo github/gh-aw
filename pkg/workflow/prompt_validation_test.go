@@ -165,13 +165,17 @@ func TestComposedPromptSafeOutputsGuidanceStaysTransportNeutral(t *testing.T) {
 }
 
 // TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport verifies that engines
-// without native MCP tool-calling (EngineCapabilities.MCP == false, e.g. `pi`) are
+// without native MCP tool-calling (EngineCapabilities.MCP == false) are
 // told the safeoutputs CLI is the only transport, instead of being told the CLI is
 // an optional alternative to a direct tool call that does not exist for them.
 func TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport(t *testing.T) {
 	compiler := NewCompiler()
+	engine := NewPiEngine()
+	engine.id = "test-no-mcp"
+	engine.capabilities.MCP = false
+	require.NoError(t, compiler.engineRegistry.Register(engine))
 	data := &WorkflowData{
-		EngineConfig: &EngineConfig{ID: "pi"},
+		EngineConfig: &EngineConfig{ID: "test-no-mcp"},
 		SafeOutputs: &SafeOutputsConfig{
 			NoOp: &NoOpConfig{},
 		},
@@ -212,9 +216,13 @@ func TestComposedPromptForNonMCPEngineStatesCLIIsOnlyTransport(t *testing.T) {
 
 func TestComposedPromptForCompilerRegisteredNonMCPEngineStatesCLIIsOnlyTransport(t *testing.T) {
 	compiler := NewCompiler()
+	engine := NewPiEngine()
+	engine.id = "test-no-mcp"
+	engine.capabilities.MCP = false
+	require.NoError(t, compiler.engineRegistry.Register(engine))
 	compiler.engineCatalog.Register(&EngineDefinition{
 		ID:        "custom-no-mcp",
-		RuntimeID: "pi",
+		RuntimeID: "test-no-mcp",
 	})
 	data := &WorkflowData{
 		EngineConfig: &EngineConfig{ID: "custom-no-mcp"},

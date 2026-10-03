@@ -10,6 +10,8 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { collectAddMaskedValues, redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
 /**
  * Recursively finds all files matching the specified extensions
  * @param {string} dir - Directory to search
@@ -95,6 +97,7 @@ const MCP_GATEWAY_CONFIG_PATHS = [
       path.join("/tmp", "gh-aw/mcp-config/gateway-output.json"),
       path.join("/tmp", "gh-aw/mcp-config/mcp-servers.json"),
       path.join("/tmp", "gh-aw/mcp-config/config.toml"),
+      path.join("/tmp", "gh-aw/pi-agent-dir/mcp.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/gateway-output.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml"),
@@ -255,16 +258,26 @@ function redactStepSummaryContent(content) {
  * Process a single file for secret redaction
  * @param {string} filePath - Path to the file
  * @param {string[]} secretValues - Array of secret values to redact
+ * @param {string[]} [maskedValues] - Runtime masks collected before any file is sanitized
  * @returns {number} Number of redactions made
  */
-function processFile(filePath, secretValues) {
+function processFile(filePath, secretValues, maskedValues = []) {
   try {
     const content = fs.readFileSync(filePath, "utf8");
-
+    const encodedResult =
+      path.extname(filePath).toLowerCase() === ".html"
+        ? redactPiSessionHTML(content, text => {
+            const masked = redactArtifactMaskedValues(text, maskedValues);
+            const builtIn = redactBuiltInPatterns(masked);
+            const custom = redactSecrets(builtIn.content, secretValues);
+            return { content: custom.content, redactionCount: builtIn.redactionCount + custom.redactionCount + (masked !== text ? 1 : 0) };
+          })
+        : { content, redactionCount: 0 };
+    const runtimeRedacted = redactArtifactMaskedValues(encodedResult.content, maskedValues);
     // First, redact built-in patterns
-    const builtInResult = redactBuiltInPatterns(content);
+    const builtInResult = redactBuiltInPatterns(runtimeRedacted);
     let redacted = builtInResult.content;
-    let totalRedactions = builtInResult.redactionCount;
+    let totalRedactions = encodedResult.redactionCount + builtInResult.redactionCount + (runtimeRedacted !== encodedResult.content ? 1 : 0);
 
     // Then, redact custom secrets
     const customResult = redactSecrets(redacted, secretValues);
@@ -277,6 +290,17 @@ function processFile(filePath, secretValues) {
     }
     return totalRedactions;
   } catch (error) {
+    if (maskedValues.length || path.extname(filePath).toLowerCase() === ".html") {
+      // Uploads can run with always(); do not leave an unsanitized source behind.
+      try {
+        fs.unlinkSync(filePath);
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after runtime mask redaction failed`);
+      }
+      core.warning(`Failed to process file ${filePath}: ${getErrorMessage(error)}`);
+      core.setFailed(`${ERR_VALIDATION}: Removed artifact source after runtime mask redaction failed`);
+      return 0;
+    }
     core.warning(`Failed to process file ${filePath}: ${getErrorMessage(error)}`);
     return 0;
   }
@@ -324,16 +348,28 @@ async function main() {
     core.info("Scanning for built-in credential patterns and custom secrets");
 
     // Find all target files in /tmp/gh-aw and ${RUNNER_TEMP}/gh-aw directories
-    const targetExtensions = [".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"];
+    const targetExtensions = [".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch", ".html"];
     const tmpFiles = findFiles("/tmp/gh-aw", targetExtensions);
     const optFiles = findFiles(`${process.env.RUNNER_TEMP}/gh-aw`, targetExtensions);
-    const files = [...tmpFiles, ...optFiles];
+    const files = [...new Set([...tmpFiles, ...optFiles])];
     core.info(`Found ${files.length} file(s) to scan for secrets (${tmpFiles.length} in /tmp/gh-aw, ${optFiles.length} in ${process.env.RUNNER_TEMP}/gh-aw)`);
     let totalRedactions = 0;
     let filesWithRedactions = 0;
+    // Collect before built-in/custom redaction or bootstrap removes mask commands.
+    // Only sanitized sources cross the job boundary, never the raw mask values.
+    const masks = new Set();
+    for (const file of files.filter(file => path.basename(file) === "agent-stdio.log")) {
+      try {
+        for (const value of collectAddMaskedValues(fs.readFileSync(file, "utf8"))) masks.add(value);
+      } catch (error) {
+        for (const source of files) fs.unlinkSync(source);
+        throw new Error(`${ERR_VALIDATION}: Removed artifact sources after runtime mask collection failed`, { cause: error });
+      }
+    }
+    const maskedValues = [...masks].sort((a, b) => b.length - a.length);
     // Process each file
     for (const file of files) {
-      const redactionCount = processFile(file, secretValues);
+      const redactionCount = processFile(file, secretValues, maskedValues);
       if (redactionCount > 0) {
         filesWithRedactions++;
         totalRedactions += redactionCount;
@@ -385,4 +421,4 @@ async function redactFilesInDir(dir) {
   }
 }
 
-module.exports = { main, redactFilesInDir, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };
+module.exports = { main, redactFilesInDir, processFile, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };

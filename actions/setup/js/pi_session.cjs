@@ -176,13 +176,14 @@ function transformPiV3Entries(records) {
       assistantState = newMessageState();
       partialAssistant = false;
     } else if (raw.type === "tool_execution_start") {
-      emitCall(raw, { id: raw.toolCallId, name: raw.toolName, ...(Object.hasOwn(raw, "args") ? { arguments: raw.args } : {}) }, newMessageState());
+      emitCall(raw, { id: raw.toolCallId, name: raw.toolName, parentToolCallId: raw.parentToolCallId, ...(Object.hasOwn(raw, "args") ? { arguments: raw.args } : {}) }, newMessageState());
     } else if (raw.type === "tool_execution_end") {
       if (raw.toolCallId !== undefined && completions.has(raw.toolCallId)) continue;
       if (raw.toolCallId !== undefined) completions.add(raw.toolCallId);
       emit(raw, "tool.execution_complete", {
         toolCallId: raw.toolCallId,
         toolName: raw.toolName,
+        parentToolCallId: raw.parentToolCallId,
         result: raw.result,
         output: raw.result,
         error: raw.error ?? raw.result?.error,
@@ -190,7 +191,24 @@ function transformPiV3Entries(records) {
         durationMs: isMetric(raw.durationMs) ? raw.durationMs : undefined,
       });
     } else if (raw.type === "tool_execution_update") emit(raw, "pi.tool_execution_update", { toolCallId: raw.toolCallId, toolName: raw.toolName, input: raw.args, partialResult: raw.partialResult });
-    else if (raw.type === "agent_end") {
+    else if (
+      [
+        "agent_settled",
+        "auto_retry_start",
+        "auto_retry_end",
+        "compaction_start",
+        "compaction_end",
+        "queue_update",
+        "entry_appended",
+        "thinking_level_changed",
+        "summarization_retry_scheduled",
+        "summarization_retry_attempt_start",
+        "summarization_retry_finished",
+      ].includes(raw.type)
+    ) {
+      const { type, ...data } = raw;
+      emit(raw, `pi.${type}`, data);
+    } else if (raw.type === "agent_end") {
       const consumed = new Set();
       const messages = raw.messages ?? [];
       const lastAssistant = messages.findLastIndex(message => message?.role === "assistant");
@@ -235,10 +253,22 @@ function computePiV3Stats(records) {
   /** @type {Array<any>} */
   const errors = [];
   const seen = new Map();
+  const auxiliarySeen = new Set();
+  let compactionCount = 0;
   /** @type {any} */
   let lastReport;
   let lastWasMessageEnd = false;
   const reports = [];
+  const addAuxiliaryUsage = (key, value) => {
+    if (!value || auxiliarySeen.has(key)) return;
+    auxiliarySeen.add(key);
+    const normalized = piUsage(value);
+    for (const field of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens"]) {
+      if (isTokenCount(normalized[field])) usage[field] = (usage[field] ?? 0) + normalized[field];
+    }
+    if (isMetric(value.cost?.total)) totalCostUsd = (totalCostUsd ?? 0) + value.cost.total;
+    if (isTokenCount(value.input)) usage.input_tokens_include_cache = false;
+  };
   const addMessage = (raw, message) => {
     if (!message || message.role !== "assistant") return;
     const identity = messageIdentity(message) ?? (raw.id !== undefined && raw.type !== "agent_end" ? JSON.stringify(["record", raw.id]) : undefined);
@@ -281,6 +311,15 @@ function computePiV3Stats(records) {
       lastWasMessageEnd = false;
     } else if (raw.type === "message_end" || raw.type === "turn_end") {
       addMessage(raw, raw.message);
+      if (raw.message?.role === "toolResult") addAuxiliaryUsage(`tool:${raw.message.toolCallId}`, raw.message.usage);
+      for (const result of raw.toolResults ?? []) addAuxiliaryUsage(`tool:${result.toolCallId}`, result.usage);
+    } else if (raw.type === "compaction_end") {
+      addAuxiliaryUsage(`compaction:${compactionCount++}`, raw.result?.usage);
+      if (raw.errorMessage) errors.push(raw.errorMessage);
+    } else if (raw.type === "entry_appended" && raw.entry?.type === "usage") {
+      addAuxiliaryUsage(`usage:${raw.entry.id}`, raw.entry.usage);
+    } else if (raw.type === "auto_retry_end" && raw.success === false) {
+      errors.push(raw.finalError);
     } else if (raw.type === "agent_end") {
       const remaining = [...reports];
       for (const message of raw.messages ?? []) {

@@ -295,6 +295,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 		audit:             opts.Audit,
 		verbose:           opts.Verbose,
 		artifactFilter:    artifactFilter,
+		includeWorkQueue:  workQueueEvidenceRequested(opts.ArtifactSets),
 		startDate:         opts.StartDate,
 		endDate:           opts.EndDate,
 		checkStaleness:    true,

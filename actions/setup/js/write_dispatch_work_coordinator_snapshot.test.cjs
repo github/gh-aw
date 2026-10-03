@@ -75,13 +75,13 @@ describe("write dispatch coordinator activation snapshot", () => {
     const payload = {
       inputs: {
         aw_context: JSON.stringify({
-          dispatch_work_coordinator: { work_id: "w", claim_id: "claim-a", work: { input: "trusted" } },
+          work_claim: { work_id: "w", claim_id: "claim-a", work: { input: "trusted" } },
         }),
       },
     };
 
     expect(resolveWorkerAssignment(payload, transactions)).toEqual({ work_id: "w", claim_id: "claim-a" });
-    expect(() => resolveWorkerAssignment({ ...payload, inputs: { aw_context: JSON.stringify({ dispatch_work_coordinator: { work_id: "w", claim_id: "claim-b", work: {} } }) } }, transactions)).toThrow(/not currently effective/);
+    expect(() => resolveWorkerAssignment({ ...payload, inputs: { aw_context: JSON.stringify({ work_claim: { work_id: "w", claim_id: "claim-b", work: {} } }) } }, transactions)).toThrow(/not currently effective/);
     expect(replayTransactions(transactions).winner.w).toBe("claim-a");
   });
 });

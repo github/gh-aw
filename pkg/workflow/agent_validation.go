@@ -191,6 +191,9 @@ func (c *Compiler) validateMaxToolDenialsSupport(frontmatter map[string]any, eng
 	agentValidationLog.Printf("Validating max-tool-denials support: engine=%s, maxToolDenials=%s, copilotSDK=%v",
 		engine.GetID(), engineConfig.MaxToolDenials, engineConfig.CopilotSDK)
 
+	if engine.GetID() == string(constants.PiEngine) && (engineConfig.Driver == "" || engineConfig.Driver == "pi_agent_core_driver.cjs" || engineConfig.Driver == "pi_rpc_driver.cjs") {
+		return nil
+	}
 	if engine.GetID() != string(constants.CopilotEngine) {
 		return fmt.Errorf("max-tool-denials not supported: engine '%s' does not support max-tool-denials (supported only with engine 'copilot' and engine.copilot-sdk: true)", engine.GetID())
 	}
@@ -211,6 +214,12 @@ func (c *Compiler) validateMaxToolCallsSupport(frontmatter map[string]any, engin
 
 func validateMaxToolCallsConfig(engineConfig *EngineConfig, engine CodingAgentEngine) error {
 	if engineConfig == nil || engineConfig.MaxToolCalls == "" {
+		return nil
+	}
+	if engine.GetID() == string(constants.PiEngine) {
+		if engineConfig.Driver != "" && engineConfig.Driver != "pi_agent_core_driver.cjs" && engineConfig.Driver != "pi_rpc_driver.cjs" {
+			return errors.New("max-tool-calls requires the built-in Pi CLI, SDK, or RPC driver; custom Pi drivers cannot enforce the aggregate budget")
+		}
 		return nil
 	}
 	if engine.GetID() != string(constants.CopilotEngine) || !engineConfig.CopilotSDK {
@@ -238,24 +247,6 @@ func (c *Compiler) validateUniversalLLMConsumerModel(frontmatter map[string]any,
 
 	if _, err := resolveUniversalLLMBackendFromModel(model); err != nil {
 		return fmt.Errorf("invalid engine.model for engine '%s': %w", engine.GetID(), err)
-	}
-
-	return nil
-}
-
-// validatePiEngineRequirements validates Pi's required tool configuration.
-func (c *Compiler) validatePiEngineRequirements(tools *ToolsConfig, engine CodingAgentEngine) error {
-	if engine.GetID() != "pi" {
-		return nil
-	}
-
-	if tools == nil || tools.GitHub == nil ||
-		(tools.GitHub.Mode != GitHubMCPModeGHProxy && tools.GitHub.Mode != GitHubMCPModeCLI) {
-		return errors.New("engine 'pi' requires tools.github.mode: gh-proxy")
-	}
-
-	if !tools.CLIProxy {
-		return errors.New("engine 'pi' requires tools.cli-proxy: true")
 	}
 
 	return nil

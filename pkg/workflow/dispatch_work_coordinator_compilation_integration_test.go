@@ -85,4 +85,11 @@ Compile each dispatch-coordinator workflow phase.
 		handlerEnd += len("      - name:")
 	}
 	require.Contains(t, safeOutputs[handlerStart:handlerStart+handlerEnd], gate)
+
+	conclusion := extractJobSection(compiled, "conclusion")
+	require.Contains(t, conclusion, "contents: read")
+	require.Contains(t, conclusion, "Download activation artifact for work queue summary")
+	require.Contains(t, conclusion, "Summarize work queue activity\n        if: always()")
+	require.Contains(t, conclusion, "dispatch_work_coordinator_summary.cjs")
+	require.Contains(t, conclusion, "await main({ core, githubClient: github, context });")
 }

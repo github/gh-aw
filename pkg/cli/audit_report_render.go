@@ -328,6 +328,7 @@ func renderConsoleWarnings(warnings []ValidationIssue) {
 }
 
 func renderConsoleOperationalSections(data AuditData) {
+	renderConsoleDispatchCoordinator(data.DispatchCoordinator)
 	renderConsoleSkillActivations(data.SkillActivations)
 	renderConsoleGatewaySteeringEvents(data.GatewaySteeringEvents)
 	renderConsoleMissingTools(data.MissingTools)
@@ -341,6 +342,7 @@ func renderConsoleOperationalSections(data AuditData) {
 	if data.FirewallAnalysis != nil && data.FirewallAnalysis.TotalRequests > 0 {
 		renderCompactFirewall(data.FirewallAnalysis)
 	}
+
 }
 
 // renderConsoleFriction prints the per-driver breakdown and the individual

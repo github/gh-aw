@@ -42,6 +42,12 @@ func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics L
 	if auditData.Ledger == nil {
 		auditData.Ledger = processedRun.Ledger
 	}
+	// NoBaseline runs avoid writing audit-cache changes, including coordinator backfills.
+	if mergeDispatchCoordinatorReport(&auditData.DispatchCoordinator, processedRun.DispatchCoordinator) && !opts.NoBaseline {
+		if err := writeAuditData(runOutputDir, auditData); err != nil {
+			return err
+		}
+	}
 	if opts.Group {
 		parseAuditLogsIfRequested(runID, runOutputDir, opts)
 		return nil
@@ -64,6 +70,7 @@ func buildRenderedAuditDataFromCache(ctx context.Context, processedRun Processed
 	if auditData.Ledger == nil {
 		auditData.Ledger = processedRun.Ledger
 	}
+	mergeDispatchCoordinatorReport(&auditData.DispatchCoordinator, processedRun.DispatchCoordinator)
 	createdItems := resolveCreatedItems(runOutputDir, processedRun.SafeOutputs)
 	addAuditOutcomeSummary(ctx, &auditData, createdItems)
 	auditData.Comparison = buildRenderedAuditComparison(ctx, processedRun, createdItems, runOutputDir, opts)

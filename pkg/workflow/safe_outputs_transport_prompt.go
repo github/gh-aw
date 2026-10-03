@@ -6,6 +6,9 @@ import "strings"
 // directly. Unknown or unset engines are treated as MCP-capable, matching the default
 // engine behaviour.
 func engineSupportsMCPToolCalls(catalog *EngineCatalog, data *WorkflowData) bool {
+	if data != nil && data.EngineConfig != nil && data.EngineConfig.ID == "pi" && data.ParsedTools != nil && data.ParsedTools.CLIProxy {
+		return false
+	}
 	if data == nil || data.EngineConfig == nil || data.EngineConfig.ID == "" {
 		return true
 	}

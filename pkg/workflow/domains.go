@@ -128,9 +128,6 @@ var PiBaseDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["p
 
 // piProviderDomains maps provider prefixes to their API domains. It covers the
 // same set of providers that Pi can route through via the AWF LLM gateway.
-// Note: "google" is intentionally omitted — Pi backend resolution only supports
-// copilot, anthropic, openai, and codex; adding google here without backend
-// support would produce an inconsistent routing configuration.
 var piProviderDomains = getLoadedDomainSets().PiProviderDomains
 
 // PiDefaultDomains are the static default domains for backward compatibility when
@@ -148,12 +145,12 @@ func extractProviderFromModel(model string) (string, error) {
 	if model == "" {
 		return "", nil
 	}
-	parts := strings.SplitN(model, "/", 2)
-	if len(parts) < 2 {
+	prefix, _, hasSlash := strings.Cut(model, "/")
+	if !hasSlash {
 		// No slash: no "provider/model" format; no provider to extract.
 		return "", nil
 	}
-	provider := strings.ToLower(parts[0])
+	provider := strings.ToLower(prefix)
 	if provider == "" { //nolint:tolowerequalfold
 		return "", fmt.Errorf("invalid engine.model %q: provider prefix is empty; use provider/model format (for example: openai/gpt-4.1, anthropic/claude-sonnet-4)", model)
 	}

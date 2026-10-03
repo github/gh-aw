@@ -4359,13 +4359,13 @@
     },
     "max-tool-denials": {
       "$ref": "#/$defs/templatable_integer",
-      "description": "Copilot SDK safeguard threshold for repeated tool denials before stopping inference. Defaults to 5 when omitted. Supports GitHub Actions expressions (for example, '${{ inputs.max-tool-denials }}'). Supported only with engine 'copilot' and engine.copilot-sdk: true.",
+      "description": "Safeguard threshold for repeated tool denials before stopping inference. Supports the built-in Copilot SDK driver and Pi CLI, SDK, and RPC drivers. Defaults to 5 for Copilot SDK when omitted. Supports GitHub Actions expressions (for example, '${{ inputs.max-tool-denials }}').",
       "default": 5,
       "examples": [5, "${{ inputs.max-tool-denials }}"]
     },
     "max-tool-calls": {
       "$ref": "#/$defs/templatable_positive_integer",
-      "description": "Maximum aggregate number of tool dispatches for the workflow run, including subagents. Enforced before execution only by the built-in Copilot SDK driver. Supports GitHub Actions expressions. Not supported by other engines or custom Copilot SDK drivers/harnesses.",
+      "description": "Maximum aggregate number of tool dispatches for the workflow run, including nested calls. Enforced before execution by the built-in Copilot SDK driver and Pi CLI, SDK, and RPC drivers. Supports GitHub Actions expressions. Custom drivers cannot enforce this contract.",
       "examples": [100, "${{ inputs.max-tool-calls }}"]
     },
     "max-ai-credits": {
@@ -14760,7 +14760,7 @@
             },
             "config": {
               "type": "string",
-              "description": "Additional TOML configuration text that will be appended to the generated config.toml in the action (codex engine only)"
+              "description": "Additional engine configuration text. Codex accepts TOML appended to config.toml. Pi accepts a JSON object with settings, model metadata overrides, MCP exposure settings, and session persistence options."
             },
             "agent": {
               "type": "string",
@@ -14780,7 +14780,7 @@
             },
             "bare": {
               "type": "boolean",
-              "description": "When true, disables automatic loading of context and custom instructions by the AI engine. The engine-specific flag depends on the engine: copilot uses --no-custom-instructions (suppresses .github/AGENTS.md and user-level custom instructions), claude uses --bare (suppresses CLAUDE.md memory files), codex uses --no-system-prompt (suppresses the default system prompt), gemini sets GEMINI_SYSTEM_MD=/dev/null (overrides the built-in system prompt with an empty one). Defaults to false.",
+              "description": "When true, disables automatic loading of context and custom instructions by the AI engine. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Defaults to false.",
               "default": false
             },
             "mcp": {
