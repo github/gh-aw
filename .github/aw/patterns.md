@@ -74,6 +74,7 @@ Pattern docs base path: `https://github.com/github/gh-aw/blob/main/docs/src/cont
 ### Orchestration
 - **Load when:** The user needs orchestrator/worker architecture using reusable workflows or workflow dispatch.
 - **Pattern doc:** https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/orchestration.md
+- **Also load:** [work-queue.md](work-queue.md) when orchestration requires durable Work and Claims shared by dispatchers and workers.
 
 ### ProjectOps
 - **Load when:** The user needs intelligent routing and controlled field updates in GitHub Projects.
