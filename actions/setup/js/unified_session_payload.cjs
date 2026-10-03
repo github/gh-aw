@@ -171,20 +171,23 @@ function normalizeUnifiedSessionEvent(event) {
     if (data.error && typeof data.error === "object") data.error = selectFields(data.error, { code: ["code"], message: ["message"] });
   }
   if (["session.result", "firewall.token_usage", "usage.report"].includes(event.type)) {
-    const usage = selectFields(event.type === "session.result" ? source.usage : (source.usage ?? source), USAGE_FIELDS);
-    if (Object.keys(usage).length || (source.usage && typeof source.usage === "object")) data.usage = usage;
-    else if (source.usage === null) data.usage = null;
+    if (source.usage === null) data.usage = null;
+    else {
+      const usage = selectFields(event.type === "session.result" ? source.usage : (source.usage ?? source), USAGE_FIELDS);
+      if (Object.keys(usage).length || (source.usage && typeof source.usage === "object")) data.usage = usage;
+    }
   }
   if (event.type === "tool.execution_complete" && (source.is_error === true || source.result?.isError === true || source.result?.is_error === true)) data.isError = true;
   if (event.type === "experiment.assignment") {
     for (const key of Object.keys(data)) delete data[key];
-    data.assignments = structuredClone(source.assignments ?? source);
+    data.assignments = structuredClone(Object.hasOwn(source, "assignments") && source.assignments !== undefined ? source.assignments : source);
   }
   if (event.type === "grader.manifest" && Array.isArray(source.graders)) data.graders = source.graders.map(grader => selectFields(grader, GRADER_FIELDS));
   if (event.type === "grader.result" && Array.isArray(source.results)) data.results = source.results.map(result => selectFields(result, GRADER_FIELDS));
   if (event.type === "safe_output.error") {
-    const errors = source.errors ?? source.failures;
-    if (Array.isArray(errors)) data.errors = errors.map(error => (error && typeof error === "object" && !Array.isArray(error) ? selectFields(error, SAFE_OUTPUT_FIELDS) : structuredClone(error)));
+    const errors = Object.hasOwn(source, "errors") && source.errors !== undefined ? source.errors : source.failures;
+    if (errors !== undefined)
+      data.errors = Array.isArray(errors) ? errors.map(error => (error && typeof error === "object" && !Array.isArray(error) ? selectFields(error, SAFE_OUTPUT_FIELDS) : structuredClone(error))) : structuredClone(errors);
   }
   const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"] });
   /** @type {any} */

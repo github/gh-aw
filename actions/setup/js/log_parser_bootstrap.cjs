@@ -6,7 +6,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
-const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
+const { normalizeAgentSession, projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
@@ -273,7 +273,10 @@ async function runLogParser(options) {
       markdown = result.markdown || "";
       mcpFailures = result.mcpFailures || [];
       maxTurnsHit = result.maxTurnsHit || false;
-      logEntries = result.logEntries || null;
+      if (Array.isArray(result.logEntries)) {
+        const engine = parserName.toLowerCase();
+        logEntries = normalizeAgentSession(result.logEntries, { sourceEngine: ["claude", "copilot", "codex", "gemini", "pi"].includes(engine) ? engine : "custom" });
+      }
     }
 
     // Enrich agent-stdio.log with a normalized result entry when the engine does not

@@ -8,6 +8,8 @@ on:
       - 'actions/setup/md/**'
       - 'pkg/cli/data/models.json'
       - 'scripts/**/*.js'
+      - 'scripts/**/*.mjs'
+      - '.github/extensions/**'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'
       - '.github/workflows/ci.yml'
@@ -19,6 +21,8 @@ on:
       - 'actions/setup/md/**'
       - 'pkg/cli/data/models.json'
       - 'scripts/**/*.js'
+      - 'scripts/**/*.mjs'
+      - '.github/extensions/**'
       - 'scripts/check-cgo-cjs-workflow-purity.sh'
       - 'Makefile'
       - '.github/workflows/ci.yml'
@@ -127,6 +131,9 @@ jobs:
       - name: Run tests
         # Keep no-file-parallelism so Vitest sharding has deterministic test scheduling per shard.
         run: cd actions/setup/js && npm run test:js -- --no-file-parallelism --shard=${{ matrix.shard }}/4
+      - name: Test offline session validation
+        if: matrix.shard == 1
+        run: node --test scripts/validate-agent-sessions.test.mjs
 
   impacted-js-tests:
     needs: [checkout-cache]

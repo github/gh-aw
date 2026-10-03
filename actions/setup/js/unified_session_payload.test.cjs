@@ -127,6 +127,41 @@ describe("essential unified session payloads", () => {
     expect(normalizeUnifiedSessionEvent({ type: "assistant.message", message: { timestamp: 0 }, data: { content: "" } })).toEqual({ type: "assistant.message", timestamp: 0, data: { content: "" } });
   });
 
+  it.each(["session.result", "firewall.token_usage", "usage.report"])("preserves explicit null usage in %s over flat token aliases", type => {
+    const event = { type, data: { usage: null, input_tokens: 5, inputTokens: 10 } };
+    const original = structuredClone(event);
+    const compact = normalizeUnifiedSessionEvent(event);
+    expect(compact.data).toEqual({ usage: null });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(event).toEqual(original);
+  });
+
+  it.each([null, false, 0, "", {}, []])("preserves explicitly supplied assignment values (%j)", assignments => {
+    const event = { type: "experiment.assignment", data: { assignments, duplicate: "omit" } };
+    const original = structuredClone(event);
+    const compact = normalizeUnifiedSessionEvent(event);
+    expect(compact.data).toEqual({ assignments });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(event).toEqual(original);
+  });
+
+  it.each([null, false, 0, "", {}, []])("preserves canonical safe-output errors over failures (%j)", errors => {
+    const event = { type: "safe_output.error", data: { errors, failures: [{ type: "add_comment", error: "fallback" }] } };
+    const original = structuredClone(event);
+    const compact = normalizeUnifiedSessionEvent(event);
+    expect(compact.data).toEqual({ errors });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(event).toEqual(original);
+  });
+
+  it("treats undefined canonical fields as absent without suppressing observed aliases", () => {
+    const assignment = normalizeUnifiedSessionEvent({ type: "experiment.assignment", data: { assignments: undefined, experiment: "B" } });
+    expect(JSON.parse(JSON.stringify(assignment)).data).toEqual({ assignments: { experiment: "B" } });
+    expect(normalizeUnifiedSessionEvent({ type: "safe_output.error", data: { errors: undefined, failures: [{ type: "add_comment", error: "observed" }] } }).data).toEqual({
+      errors: [{ type: "add_comment", error: "observed" }],
+    });
+  });
+
   it("preserves authoritative Copilot checkpoint credits and explicit zero accounting", () => {
     for (const ai_credits of [0, 2.5]) {
       const compact = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "copilot", ai_credits, premium_requests: 0 } });

@@ -106,6 +106,30 @@ describe("unified session publication views", () => {
     expect(first + second).not.toContain("999");
   });
 
+  it.each([{ success: true, exitCode: 1 }, { success: true, status: "failed" }, { success: true, status: "error" }, { exitCode: 2 }, { status: "failed" }, { success: true, result: { isError: true } }])(
+    "uses the same explicit-failure outcome in statistics and chronological views (%j)",
+    data => {
+      const events = [header, event("tool.execution_complete", { toolName: "lookup", toolCallId: "call", ...data }, "agent", 0)];
+      const original = structuredClone(events);
+      for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+        expect(output).toContain("Failed Tools: 1");
+        expect(output).toContain("[failed]");
+        expect(output).not.toContain("[succeeded]");
+        expect(output).not.toContain("[outcome unknown]");
+      }
+      expect(events).toEqual(original);
+    }
+  );
+
+  it.each([
+    [{ success: true, exitCode: 0 }, "[succeeded]"],
+    [{ exitCode: 0 }, "[outcome unknown]"],
+    [{}, "[outcome unknown]"],
+  ])("does not infer success from an absent failure signal (%j)", (data, expected) => {
+    const events = [header, event("tool.execution_complete", { toolCallId: "call", ...data }, "agent", 0)];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) expect(output).toContain(expected);
+  });
+
   it("retains private pairing keys until projection so redaction cannot merge distinct tool calls", () => {
     process.env.GH_AW_SECRET_NAMES = "FIRST_ID,SECOND_ID";
     process.env.SECRET_FIRST_ID = "secret-first-tool";

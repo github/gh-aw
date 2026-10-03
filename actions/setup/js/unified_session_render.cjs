@@ -1,7 +1,7 @@
 // @ts-check
 
 const fs = require("fs");
-const { sessionOutputText } = require("./agent_session.cjs");
+const { sessionOutputText, sessionToolSuccess } = require("./agent_session.cjs");
 const { boundSummaryLines, escapeSummaryText, redactSessionForPublication } = require("./agent_session_render.cjs");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -77,7 +77,8 @@ function eventDetail(event) {
     case "tool.execution_start":
       return fields(data, ["toolName", "mcpServerName", "toolCallId"]) + " [started]";
     case "tool.execution_complete": {
-      const outcome = data.success === false || data.error != null || data.is_error === true || data.isError === true ? "failed" : data.success === true ? "succeeded" : "outcome unknown";
+      const success = sessionToolSuccess(data);
+      const outcome = success === false ? "failed" : success === true ? "succeeded" : "outcome unknown";
       return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]`;
     }
     case "session.result":

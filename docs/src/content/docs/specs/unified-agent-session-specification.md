@@ -894,6 +894,53 @@ symlinks, and decoded-secret/add-mask redaction have separate cases.
 Compiler tests cover engine artifact paths, conclusion ordering, and the usage
 upload path.
 
+### 9.6 Reusable CI corpus validation (Informative)
+
+`scripts/validate-agent-sessions.mjs` downloads retained agentic CI artifacts,
+replays the checkout's parser/normalizer and merger, and records source-local
+diagnostics. It samples smoke workflows across engines, then fills the requested
+count with recent artifact-bearing runs. It never dispatches CI or launches an
+engine.
+
+From a checkout with Node.js and an authenticated `gh` CLI:
+
+```bash
+node scripts/validate-agent-sessions.mjs --repo github/gh-aw --count 50 \
+  --output /tmp/gh-aw-session-validation
+```
+
+The command prints the generated run directory. Reuse that directory after a
+parser change without downloading the corpus again:
+
+```bash
+node scripts/validate-agent-sessions.mjs --count 50 \
+  --reuse /tmp/gh-aw-session-validation/<validation-run-id>
+```
+
+Each directory contains `manifest.json`, `report.json`, `report.md`, independent
+synthetic contract-probe results, and per-run raw, parsed, and normalized evidence.
+The report records the Git revision, a SHA-256 fingerprint of runtime parser
+sources and the validator, and whether uncommitted runtime changes were included. Historical
+artifact failures remain distinct from failures in the current replay; source
+history is never repaired in place. Warnings identify unavailable evidence, and
+accounting-only inputs do not establish message/tool protocol coverage.
+
+Exit status is `1` for incomplete coverage, blocked processing, invalid
+historical artifacts, current contract failures, or failed synthetic probes.
+Warnings alone do not fail the command. Its offline regression tests run with
+`node --test scripts/validate-agent-sessions.test.mjs` and in the CJS CI workflow.
+
+`.github/extensions/validate-agent-sessions/extension.mjs` registers the same
+implementation as the `validate-agent-sessions` dynamic workflow in Copilot.
+Its arguments are `repo`, absolute `repoPath`, absolute `outputRoot`, optional
+absolute `reuseRoot`, `count` (default `50`), and `days` (default `7`).
+The workflow journals selection, downloads, and validation with parser-fingerprint
+keys; the standalone CLI starts a fresh replay each time.
+
+Keep output outside tracked source directories. Artifacts can contain prompts,
+reasoning, and tool output: retain them as private investigation data, not public
+fixtures or reports.
+
 ## 10. Implementation Gap Matrix (Informative)
 
 These observations record the code **before** the implementation accompanying this

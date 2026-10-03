@@ -77,6 +77,26 @@ describe("Unified session bootstrap telemetry conformance", () => {
     expect(events.some(event => event.type === "result")).toBe(false);
   });
 
+  it.each(["OpenCode", "Cursor", "Crush", "Goose"])("canonicalizes %s inline parser results before telemetry, persistence and rendering", async parserName => {
+    const events = [
+      { type: "system", subtype: "init", model: null, session_id: null },
+      { type: "assistant", id: "native-message", message: { content: [{ type: "text", text: "  observed\nanswer\t\n" }] } },
+      { type: "result", num_turns: 0, usage: { input_tokens: 0 } },
+      { type: "vendor.after", data: { available: false } },
+    ];
+    const original = structuredClone(events);
+    await runLogParser({ parserName, parseLog: () => ({ markdown: "fixture", logEntries: events }) });
+    const persisted = files.get("/tmp/gh-aw/agent-session.jsonl").trimEnd().split("\n").map(JSON.parse);
+    expect(persisted.map(event => event.type)).toEqual(["session.init", "assistant.message", "session.result", "vendor.after"]);
+    expect(persisted[0].data).toMatchObject({ sourceEngine: "custom", model: null, sessionId: null });
+    expect(persisted[1]).toMatchObject({ id: "native-message", data: { content: "  observed\nanswer\t\n" } });
+    expect(persisted[2].data).toMatchObject({ numTurns: 0, usage: { input_tokens: 0 } });
+    expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", num_turns: 0, usage: { input_tokens: 0 } });
+    expect(events).toEqual(original);
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Persisted 4 canonical session events"));
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+  });
+
   it("T-UAS-047: a turn-only result does not fabricate an empty usage report", async () => {
     await parse([{ type: "session.result", data: { numTurns: 0 } }]);
     expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", num_turns: 0 });
