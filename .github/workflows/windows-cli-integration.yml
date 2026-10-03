@@ -642,25 +642,41 @@ jobs:
             echo "✅ All Windows integration jobs passed" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Create failure issue
+      - name: Checkout safe-output action
         if: steps.evaluate.outputs.failed == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          sparse-checkout: actions/setup
+          persist-credentials: false
+
+      - name: Set up safe-output action
+        if: steps.evaluate.outputs.failed == 'true'
+        uses: ./actions/setup
+
+      - name: Create failure issue through safe outputs
+        if: steps.evaluate.outputs.failed == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           FAILED_JOBS: ${{ steps.evaluate.outputs.failed_jobs }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "❌ Windows integration failure: ${FAILED_JOBS}" \
-            --body "## Windows CLI Integration Failure
-
-          **Failed jobs:** ${FAILED_JOBS}
-
-          **Run:** ${RUN_URL}
-
-          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
-
-          This issue was created automatically by the daily Windows CLI integration workflow."
+          GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/windows-failure.json
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"create_issue":{"max":1,"footer":false}}'
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const failedJobs = process.env.FAILED_JOBS;
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const date = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+            fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({items: [{
+              type: 'create_issue',
+              title: `❌ Windows integration failure: ${failedJobs}`,
+              body: `## Windows CLI Integration Failure\n\n**Failed jobs:** ${failedJobs}\n\n**Run:** ${runUrl}\n\n**Date:** ${date}\n\nThis issue was created automatically by the daily Windows CLI integration workflow.`
+            }]}));
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
+            await main();
 
       - name: Fail if any job failed
         if: steps.evaluate.outputs.failed == 'true'
