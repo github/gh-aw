@@ -17,30 +17,6 @@ const (
 	codexRunBlockIndent          = "          "
 )
 
-// writeIndentedCodexConfig adds the YAML run-block indentation to each custom
-// config line. YAML block scalar parsing strips this common indentation before
-// the shell runs, so the heredoc receives the original TOML content. Lines that
-// contain only whitespace are normalized to empty lines.
-func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
-	outputEndsWithNewline := false
-	for _, line := range strings.SplitAfter(config, "\n") {
-		if line == "" {
-			continue
-		}
-		if strings.TrimSpace(line) == "" {
-			yaml.WriteByte('\n')
-			outputEndsWithNewline = true
-			continue
-		}
-		yaml.WriteString(codexRunBlockIndent)
-		yaml.WriteString(line)
-		outputEndsWithNewline = strings.HasSuffix(line, "\n")
-	}
-	if config != "" && !outputEndsWithNewline {
-		yaml.WriteByte('\n')
-	}
-}
-
 // RenderMCPConfig generates MCP server configuration for Codex
 func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error {
 	if codexMCPLog.Enabled() {

@@ -531,64 +531,6 @@ func (e *CodexEngine) GetSquidLogsSteps(workflowData *WorkflowData) []GitHubActi
 	return defaultGetSquidLogsSteps(workflowData, codexEngineLog)
 }
 
-// expandNeutralToolsToCodexTools converts neutral tools to Codex-specific tools format
-// This ensures that playwright tools get the same allowlist as the copilot agent
-// Updated to use ToolsConfig instead of map[string]any
-func (e *CodexEngine) expandNeutralToolsToCodexTools(toolsConfig *ToolsConfig) *ToolsConfig {
-	if toolsConfig == nil {
-		return &ToolsConfig{
-			Custom: make(map[string]MCPServerConfig),
-			raw:    make(map[string]any),
-		}
-	}
-
-	// Create a copy of the tools config
-	result := &ToolsConfig{
-		GitHub:           toolsConfig.GitHub,
-		Bash:             toolsConfig.Bash,
-		WebFetch:         toolsConfig.WebFetch,
-		WebSearch:        toolsConfig.WebSearch,
-		Edit:             toolsConfig.Edit,
-		Playwright:       toolsConfig.Playwright,
-		AgenticWorkflows: toolsConfig.AgenticWorkflows,
-		CacheMemory:      toolsConfig.CacheMemory,
-		Timeout:          toolsConfig.Timeout,
-		StartupTimeout:   toolsConfig.StartupTimeout,
-		Custom:           make(map[string]MCPServerConfig),
-		raw:              make(map[string]any),
-	}
-
-	// Copy custom tools
-	maps.Copy(result.Custom, toolsConfig.Custom)
-
-	// Copy raw map
-	maps.Copy(result.raw, toolsConfig.raw)
-
-	// Playwright is a CLI tool and must not be added to the MCP configuration.
-	if toolsConfig.Playwright != nil {
-		applyCodexPlaywrightTool(result, toolsConfig.Playwright)
-	}
-
-	return result
-}
-
-func applyCodexPlaywrightTool(result *ToolsConfig, playwright *PlaywrightToolConfig) {
-	playwrightConfig := &PlaywrightToolConfig{
-		Version: playwright.Version,
-		Mode:    playwright.Mode,
-	}
-	result.Playwright = playwrightConfig
-	delete(result.raw, "playwright")
-}
-
-// expandNeutralToolsToCodexToolsFromMap is a backward compatibility wrapper
-// that accepts map[string]any instead of *ToolsConfig
-func (e *CodexEngine) expandNeutralToolsToCodexToolsFromMap(tools map[string]any) map[string]any {
-	toolsConfig, _ := ParseToolsConfig(tools)
-	result := e.expandNeutralToolsToCodexTools(toolsConfig)
-	return result.ToMap()
-}
-
 // RenderMCPConfig is implemented in codex_mcp.go
 
 // renderCodexMCPConfig is implemented in codex_mcp.go
