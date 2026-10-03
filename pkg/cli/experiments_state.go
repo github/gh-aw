@@ -33,6 +33,7 @@ type ExperimentVariantStats struct {
 }
 
 // ExperimentInfo represents a single experiment workflow for list output.
+// Unrelated to ExperimentData, which holds per-run variant assignments in audit reports.
 type ExperimentInfo struct {
 	WorkflowID  string `json:"workflow_id" console:"header:Workflow"`
 	Branch      string `json:"branch" console:"header:Branch"`

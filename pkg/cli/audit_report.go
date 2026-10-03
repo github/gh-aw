@@ -131,7 +131,8 @@ type MetricsData struct {
 	WarningCount   int                    `json:"warning_count" console:"header:Warnings"`
 }
 
-// JobData contains information about individual jobs
+// JobData is the audit report rendering of a job.
+// It is derived from, and intentionally much smaller than, the raw API mirror JobInfo.
 type JobData struct {
 	Name       string        `json:"name" console:"header:Name"`
 	Status     string        `json:"status" console:"header:Status"`
