@@ -75,6 +75,9 @@ tools as `work-queue work_queue_read '{"work":"example"}'` and
 are subcommands of the server's CLI wrapper, not standalone executables.
 Copilot advertises this wrapper when CLI mounting is active; other engines
 advertise it with `tools.cli-proxy: true`.
+Both tools return JSON serialized in MCP text content. The finish-intent file
+contains only the outcome and is readable by the runner artifact collector even
+when the MCP container runs as a different user.
 
 Pre-rename `aw_context.work_claim` assignments are schema-checked and normalized
 to `work_queue`, not treated as unassigned. Existing runtime storage on
