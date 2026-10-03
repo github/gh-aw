@@ -75,6 +75,7 @@ describe("work queue replay", () => {
         const result = applyTransactions([first], [createWorkTransaction("w")]);
         expect(result.transactions).toEqual([first]);
         expect(result.rejected).toEqual([]);
+        expect(result.idempotent).toBe(1);
       } finally {
         now.mockRestore();
       }
@@ -161,6 +162,7 @@ describe("work queue replay", () => {
 
     const applied = applyTransactions(compacted, [claim("w", "c")]);
     expect(applied.rejected).toEqual([]);
+    expect(applied.idempotent).toBe(1);
     expect(applied.transactions).toHaveLength(2);
     expect(replayTransactions(applyTransactions(transactions, [claim("w", "later")]).transactions)).toEqual(replayTransactions(applyTransactions(compacted, [claim("w", "later")]).transactions));
   });
@@ -264,6 +266,35 @@ describe("work queue replay", () => {
 });
 
 describe("work queue transaction application", () => {
+  it("counts requested new, rejected, and idempotent intents independently of duplicate source records", () => {
+    const existing = createWorkTransaction("existing", 100);
+    const submitted = createWorkTransaction("new", 200);
+    const result = applyTransactions([existing, existing], [existing, createWorkTransaction("existing", 300), submitted, submitted, claim("missing", "c"), claim("new", "c"), claim("new", "c")]);
+
+    expect(result.transactions).toEqual([existing, submitted, claim("new", "c")]);
+    expect(result.rejected).toEqual([{ transaction: claim("missing", "c"), reason: "work does not exist" }]);
+    expect(result.idempotent).toBe(4);
+  });
+
+  it("counts exact duplicates of every kind as idempotent even after terminal work", () => {
+    const transactions = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), complete("w", "b", "run"), work("cancelled"), cancelWork("cancelled")];
+    const result = applyTransactions(transactions, [...transactions, ...transactions]);
+
+    expect(result.transactions).toEqual(transactions);
+    expect(result.rejected).toEqual([]);
+    expect(result.idempotent).toBe(transactions.length * 2);
+  });
+
+  it("keeps historical Work at age zero on timestamped resubmission", () => {
+    const transactions = [work("old"), createWorkTransaction("new", 100)];
+    const result = applyTransactions(transactions, [createWorkTransaction("old", 200), createWorkTransaction("old", 0)]);
+
+    expect(result.transactions).toEqual(transactions);
+    expect(result.rejected).toEqual([]);
+    expect(result.idempotent).toBe(2);
+    expect(replayTransactions(result.transactions).available).toEqual(["old", "new"]);
+  });
+
   it("applies valid intents in order and rejects state changes after terminal work", () => {
     const result = applyTransactions([], [work("w"), claim("w", "c"), complete("w", "c", "run"), claim("w", "late"), cancelWork("w")]);
     expect(replayTransactions(result.transactions).work.w).toBe("completed");
@@ -271,6 +302,7 @@ describe("work queue transaction application", () => {
       { transaction: claim("w", "late"), reason: "work is terminal" },
       { transaction: cancelWork("w"), reason: "work is terminal" },
     ]);
+    expect(result.idempotent).toBe(0);
   });
 
   it("reports invalid intents without adding them to the durable candidate", () => {
@@ -279,6 +311,7 @@ describe("work queue transaction application", () => {
       { transaction: claim("missing", "c"), reason: "work does not exist" },
       { transaction: complete("w", "unknown", "run"), reason: "claim does not exist" },
     ]);
+    expect(result.idempotent).toBe(1);
     expect(replayTransactions(result.transactions).work.w).toBe("completed");
   });
 

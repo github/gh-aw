@@ -136,6 +136,8 @@ Compaction and recovery have independent prepared snapshots and bounded retries.
 
 `Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. Implementations must report rejected intents; the abstraction does not prescribe silently treating errors as success.
 
+JavaScript `applyTransactions` returns the candidate `transactions`, invalid intents in `rejected`, and an `idempotent` count. Exact duplicates of every kind and identity-based Work resubmissions are idempotent, not rejected, even when resubmitted Work carries a different enqueue time. Publication logs count requested intents as new, rejected, or idempotent on each attempt, independently of duplicate physical records in the source log. Retry outcomes describe only the refreshed attempt, not accumulated counts. All-no-op publication skips writes unless the log needs a protocol upgrade or canonicalization.
+
 ## Required protections
 
 **Activation snapshot:** the activation job reads the queue branch and validates any trusted inbound assignment before uploading the activation artifact. The queue MCP process receives a read-only mount of the packed snapshot plus a writable safe-output intent directory; it does not receive a Git client or repository token. Snapshot queries are informative, not authority, and may be stale.

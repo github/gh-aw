@@ -284,7 +284,9 @@ function replayTransactions(transactions) {
 
 /**
  * Applies intents in order against the current fact set. Invalid intents are
- * returned to the caller and never silently become durable facts.
+ * returned to the caller and never silently become durable facts. The
+ * idempotent count covers each requested intent already present, including
+ * Work resubmissions with different enqueue metadata; no facts are appended.
  * @param {WorkQueueTransaction[]} transactions
  * @param {WorkQueueTransaction[]} intents
  */
@@ -297,6 +299,7 @@ function applyTransactions(transactions, intents) {
   const accepted = [...facts.values()];
   /** @type {{transaction: WorkQueueTransaction, reason: string}[]} */
   const rejected = [];
+  let idempotent = 0;
 
   debugLog("applying intents", { existing: facts.size, intents: intents.length });
   intents.forEach((transaction, index) => {
@@ -307,6 +310,7 @@ function applyTransactions(transactions, intents) {
     }
     const key = transactionKey(transaction);
     if (facts.has(key)) {
+      idempotent++;
       debugLog("intent already present", { kind: transaction.kind });
       return;
     }
@@ -321,6 +325,7 @@ function applyTransactions(transactions, intents) {
     switch (transaction.kind) {
       case "Work":
         if (hasWork) {
+          idempotent++;
           debugLog("work already submitted", { kind: transaction.kind });
           return;
         }
@@ -362,8 +367,8 @@ function applyTransactions(transactions, intents) {
     debugLog("intent accepted", { kind: transaction.kind });
   });
 
-  debugLog("intent application completed", { accepted: accepted.length, rejected: rejected.length });
-  return { transactions: accepted, rejected };
+  debugLog("intent application completed", { accepted: intents.length - rejected.length - idempotent, rejected: rejected.length, idempotent });
+  return { transactions: accepted, rejected, idempotent };
 }
 
 /**
