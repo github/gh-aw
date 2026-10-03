@@ -72,6 +72,25 @@ describe("harness_retry_runner.cjs", () => {
     expect(logs.some(message => message.includes("success on attempt 1"))).toBe(true);
   });
 
+  it("never retries or suppresses cancellation", async () => {
+    const result = await runHarnessRetryLoop({
+      maxRetries: 3,
+      initialDelayMs: 1,
+      backoffMultiplier: 2,
+      maxDelayMs: 10,
+      driverStartTime: Date.now(),
+      harnessName: "Test",
+      log: () => {},
+      softTimeoutGuard: null,
+      runAttempt: async () => ({ exitCode: 143, output: "partial", hasOutput: true, cancelled: true }),
+      handleFailure: () => {
+        throw new Error("cancellation must bypass failure suppression");
+      },
+    });
+    expect(result.attempts).toBe(1);
+    expect(result.exitCode).toBe(143);
+  });
+
   it("applies exponential backoff between retry decisions", async () => {
     const sleeps = [];
     const retryModes = [];
@@ -164,6 +183,31 @@ describe("harness_retry_runner.cjs", () => {
     expect(result.attempts).toBe(0);
     expect(result.lastResult).toBeNull();
     expect(logs.some(message => message.includes("before attempt 1"))).toBe(true);
+  });
+
+  it("caps backoff at the remaining soft deadline", async () => {
+    const guard = { timeoutMinutes: 2, softDeadlineMs: Date.now() + 50000 };
+    const sleeps = [];
+    const result = await runHarnessRetryLoop({
+      maxRetries: 3,
+      initialDelayMs: 100000,
+      backoffMultiplier: 2,
+      maxDelayMs: 100000,
+      driverStartTime: Date.now(),
+      harnessName: "Test",
+      log: () => {},
+      softTimeoutGuard: guard,
+      runAttempt: async () => ({ exitCode: 1, output: "partial", hasOutput: true }),
+      handleFailure: () => ({ action: "retry" }),
+      sleepFn: async ms => {
+        sleeps.push(ms);
+        guard.softDeadlineMs = Date.now() - 1;
+      },
+    });
+    expect(sleeps[0]).toBeGreaterThan(0);
+    expect(sleeps[0]).toBeLessThanOrEqual(50000);
+    expect(result.attempts).toBe(1);
+    expect(result.exitCode).toBe(1);
   });
 
   it("stops after backoff when the soft deadline expires during sleep", async () => {

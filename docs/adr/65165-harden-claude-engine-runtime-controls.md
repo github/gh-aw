@@ -12,7 +12,7 @@ The Claude engine currently permits behavior that makes unattended workflow exec
 
 ### Decision
 
-We will make Claude unattended execution default to deterministic, least-privilege runtime controls. Claude workflows will default to `permission-mode: dontAsk`, remove disabled native tools from the allowed set, require explicit edit permission for repository changes, resume retries from the captured session instead of replaying fresh work, and refuse fresh restarts after partial execution unless workflows explicitly opt in. We will also resolve runtime timeout expressions at execution time, preserve provider and authentication policy during detection, and explicitly load workflow-declared skills and subagents in bare mode through the workflow plugin.
+We will make Claude unattended execution default to deterministic, least-privilege runtime controls. Claude workflows will default to `permission-mode: dontAsk`, remove disabled native tools from the allowed set, require explicit edit permission for repository changes, resume retries from the captured session instead of replaying fresh work, and refuse fresh restarts after partial execution unless workflows explicitly opt in. We will also resolve runtime timeout expressions at execution time, preserve provider and authentication policy during detection, and explicitly load workflow-declared skills in bare mode through the workflow plugin. Bare mode's minimal native tool set does not support automatic Skill-tool invocation or subagent delegation; workflows needing those capabilities must use non-bare execution.
 
 ### Alternatives Considered
 
@@ -38,7 +38,7 @@ This approach would keep Claude engine behavior relatively unchanged and rely on
 
 #### Neutral
 - Many lock file changes are regenerated artifacts of the runtime policy shift rather than distinct architectural decisions by themselves.
-- Bare-mode capability loading remains supported, but the loading path is now explicit through the `gh-aw-workflow` plugin rather than ambient discovery.
+- Bare-mode skills load explicitly through the `gh-aw-workflow` plugin rather than ambient discovery. Delegation requires non-bare execution.
 
 ---
 

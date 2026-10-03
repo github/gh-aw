@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -104,6 +106,186 @@ func TestShouldGeneratePRCheckoutStep_CheckoutDisabled(t *testing.T) {
 		result := ShouldGeneratePRCheckoutStep(data)
 		assert.False(t, result, "ShouldGeneratePRCheckoutStep() should return false for pull_request_target workflows to prevent refs/pull/<n>/head checkout")
 	})
+}
+
+func TestShouldGeneratePRCheckoutStep_PullRequestDisabled(t *testing.T) {
+	disabled := false
+	data := &WorkflowData{
+		Permissions: "contents: read",
+		CheckoutConfigs: []*CheckoutConfig{
+			{PullRequest: &disabled},
+		},
+	}
+
+	assert.False(t, ShouldGeneratePRCheckoutStep(data))
+}
+
+func TestShouldGeneratePRCheckoutStep_MultiCheckout(t *testing.T) {
+	tests := []struct {
+		name      string
+		checkouts []*CheckoutConfig
+		want      bool
+	}{
+		{
+			name: "external repository at root and workflow repository in subpath",
+			checkouts: []*CheckoutConfig{
+				{Repository: "${{ inputs.target_repo }}", Path: "."},
+				{Repository: "${{ github.repository }}", Path: "target"},
+			},
+		},
+		{
+			name: "literal external repository at root",
+			checkouts: []*CheckoutConfig{
+				{Repository: "other/project", Path: ".", PathExplicit: true},
+			},
+		},
+		{
+			name: "external repository at root with Windows path separators",
+			checkouts: []*CheckoutConfig{
+				{Repository: "other/project", Path: ".\\"},
+			},
+		},
+		{
+			name: "wiki repository at root",
+			checkouts: []*CheckoutConfig{
+				{Repository: "${{ github.repository }}", Wiki: true},
+			},
+		},
+		{
+			name: "workflow repository at root and external repository in subpath",
+			checkouts: []*CheckoutConfig{
+				{Repository: "${{ github.repository }}", Path: "."},
+				{Repository: "other/project", Path: "target"},
+			},
+			want: true,
+		},
+		{
+			name: "implicit workflow repository at root",
+			checkouts: []*CheckoutConfig{
+				{Path: "."},
+				{Repository: "other/project", Path: "target"},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{Permissions: "contents: read", CheckoutConfigs: tt.checkouts}
+			assert.Equal(t, tt.want, ShouldGeneratePRCheckoutStep(data))
+		})
+	}
+}
+
+func TestPRCheckoutRestoreWithMultiCheckout(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		rootRepo   string
+		wantPRStep bool
+	}{
+		{name: "target repository at root", rootRepo: "${{ inputs.target_repo }}"},
+		{name: "workflow repository at root", rootRepo: "${{ github.repository }}", wantPRStep: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			source := `---
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        type: string
+        required: true
+permissions:
+  contents: read
+checkout:
+  - repository: ` + tt.rootRepo + `
+    path: .
+  - repository: ${{ github.repository }}
+    path: target
+strict: false
+---
+Test workflow.
+`
+			path := filepath.Join(dir, "test.md")
+			if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(path); err != nil {
+				t.Fatal(err)
+			}
+			lock, err := os.ReadFile(filepath.Join(dir, "test.lock.yml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, step := range []string{
+				"- name: Checkout PR branch",
+				"- name: Restore agent config folders from base branch",
+			} {
+				assert.Equal(t, tt.wantPRStep, strings.Contains(string(lock), step), step)
+			}
+		})
+	}
+}
+
+func TestPRCheckoutRestoreWithCustomCheckout(t *testing.T) {
+	dir := t.TempDir()
+	source := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+steps:
+  - name: Checkout target repository
+    uses: actions/checkout@v4
+    with:
+      repository: other/project
+strict: false
+---
+Test workflow.
+`
+	path := filepath.Join(dir, "test.md")
+	if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "test.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotContains(t, string(lock), "- name: Checkout PR branch")
+	assert.NotContains(t, string(lock), "- name: Restore agent config folders from base branch")
+}
+
+func TestPRCheckoutRestoreCanBeDisabled(t *testing.T) {
+	dir := t.TempDir()
+	source := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+checkout:
+  pull-request: false
+strict: false
+---
+Test workflow.
+`
+	path := filepath.Join(dir, "test.md")
+	if err := os.WriteFile(path, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(dir, "test.lock.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(lock)
+	assert.Contains(t, rendered, "uses: actions/checkout@")
+	assert.NotContains(t, rendered, "- name: Checkout PR branch")
+	assert.NotContains(t, rendered, "- name: Save agent config folders for base branch restoration")
+	assert.NotContains(t, rendered, "- name: Restore agent config folders from base branch")
 }
 
 func TestResolveAgentManifestPaths(t *testing.T) {

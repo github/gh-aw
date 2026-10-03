@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCodexEngine_ResolveLLMProvider_DefaultOpenAI(t *testing.T) {
@@ -402,129 +404,26 @@ func TestCodexEngineErrorDetectionUsesGitHubScript(t *testing.T) {
 
 func TestCodexEngineRenderMCPConfig(t *testing.T) {
 	engine := NewCodexEngine()
-
-	tests := []struct {
-		name     string
-		tools    map[string]any
-		mcpTools []string
-		expected []string
-	}{
-		{
-			name: "github tool with user_agent",
-			tools: map[string]any{
-				"github": map[string]any{},
-			},
-			mcpTools: []string{"github"},
-			expected: []string{
-				`cat > "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" << GH_AW_MCP_CONFIG_NORM_EOF`,
-				"[history]",
-				"persistence = \"none\"",
-				"[otel]",
-				"metrics_exporter = \"none\"",
-				"",
-				"[shell_environment_policy]",
-				"inherit = \"core\"",
-				"include_only = [\"^CODEX_API_KEY$\", \"^GITHUB_PERSONAL_ACCESS_TOKEN$\", \"^HOME$\", \"^OPENAI_API_KEY$\", \"^PATH$\"]",
-				"",
-				"[mcp_servers.github]",
-				"user_agent = \"test-workflow\"",
-				"startup_timeout_sec = 120",
-				"tool_timeout_sec = 60",
-				fmt.Sprintf("container = \"ghcr.io/github/github-mcp-server:%s\"", constants.DefaultGitHubMCPServerVersion),
-				"env = { \"GITHUB_FEATURES\" = \"fields_param\", \"GITHUB_HOST\" = \"$GITHUB_SERVER_URL\", \"GITHUB_PERSONAL_ACCESS_TOKEN\" = \"$GH_AW_GITHUB_TOKEN\", \"GITHUB_READ_ONLY\" = \"1\", \"GITHUB_TOOLSETS\" = \"context,repos,issues,pull_requests\" }",
-				"env_vars = [\"GITHUB_FEATURES\", \"GITHUB_HOST\", \"GITHUB_PERSONAL_ACCESS_TOKEN\", \"GITHUB_READ_ONLY\", \"GITHUB_TOOLSETS\"]",
-				"GH_AW_MCP_CONFIG_NORM_EOF",
-				"",
-				"# Generate JSON config for MCP gateway",
-				"GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)",
-				"cat << GH_AW_MCP_CONFIG_NORM_EOF | \"$GH_AW_NODE\" \"${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs\"",
-				"{",
-				"\"mcpServers\": {",
-				"\"github\": {",
-				fmt.Sprintf("\"container\": \"ghcr.io/github/github-mcp-server:%s\",", constants.DefaultGitHubMCPServerVersion),
-				"\"env\": {",
-				"\"GITHUB_FEATURES\": \"fields_param\",",
-				"\"GITHUB_HOST\": \"$GITHUB_SERVER_URL\",",
-				"\"GITHUB_PERSONAL_ACCESS_TOKEN\": \"$GITHUB_MCP_SERVER_TOKEN\",",
-				"\"GITHUB_READ_ONLY\": \"1\",",
-				"\"GITHUB_TOOLSETS\": \"context,repos,issues,pull_requests\"",
-				"},",
-				"\"guard-policies\": {",
-				"\"allow-only\": {",
-				"\"min-integrity\": \"$GITHUB_MCP_GUARD_MIN_INTEGRITY\",",
-				"\"repos\": \"$GITHUB_MCP_GUARD_REPOS\"",
-				"}",
-				"}",
-				"}",
-				"},",
-				"\"gateway\": {",
-				"\"port\": $MCP_GATEWAY_PORT,",
-				"\"domain\": \"${MCP_GATEWAY_DOMAIN}\",",
-				"\"agentId\": \"${MCP_GATEWAY_AGENT_ID}\",",
-				"\"payloadDir\": \"${MCP_GATEWAY_PAYLOAD_DIR}\",",
-				"\"startupTimeout\": 120",
-				"}",
-				"}",
-				"GH_AW_MCP_CONFIG_NORM_EOF",
-				"",
-				"# Sync converter output to writable CODEX_HOME for Codex",
-				"mkdir -p /tmp/gh-aw/mcp-config",
-				"cat > \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_SHELL_POLICY_NORM_EOF",
-				"[features]",
-				"plugins = false",
-				"[shell_environment_policy]",
-				"inherit = \"core\"",
-				"include_only = [\"^CODEX_API_KEY$\", \"^GITHUB_PERSONAL_ACCESS_TOKEN$\", \"^HOME$\", \"^OPENAI_API_KEY$\", \"^PATH$\"]",
-				"GH_AW_CODEX_SHELL_POLICY_NORM_EOF",
-				"cat \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" >> \"/tmp/gh-aw/mcp-config/config.toml\"",
-				"chmod 600 \"/tmp/gh-aw/mcp-config/config.toml\"",
-				"mkdir -p \"${CODEX_HOME}\"",
-				"if [ \"/tmp/gh-aw/mcp-config/config.toml\" != \"${CODEX_HOME}/config.toml\" ]; then cp \"/tmp/gh-aw/mcp-config/config.toml\" \"${CODEX_HOME}/config.toml\"; fi",
-				"chmod 600 \"${CODEX_HOME}/config.toml\"",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var yaml strings.Builder
-			workflowData := &WorkflowData{Name: "test-workflow"}
-			if err := engine.RenderMCPConfig(&yaml, tt.tools, tt.mcpTools, workflowData); err != nil {
-				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
-			}
-
-			result := yaml.String()
-			// Normalize randomized heredoc delimiters before comparison
-			result = normalizeHeredocDelimiters(result)
-			lines := strings.Split(strings.TrimSpace(result), "\n")
-
-			// Remove indentation from both expected and actual lines for comparison
-			var normalizedResult []string
-			for _, line := range lines {
-				normalizedResult = append(normalizedResult, strings.TrimSpace(line))
-			}
-
-			var normalizedExpected []string
-			for _, line := range tt.expected {
-				normalizedExpected = append(normalizedExpected, strings.TrimSpace(line))
-			}
-
-			if len(normalizedResult) != len(normalizedExpected) {
-				t.Errorf("Expected %d lines, got %d", len(normalizedExpected), len(normalizedResult))
-				t.Errorf("Expected:\n%s", strings.Join(normalizedExpected, "\n"))
-				t.Errorf("Got:\n%s", strings.Join(normalizedResult, "\n"))
-				return
-			}
-
-			for i, expectedLine := range normalizedExpected {
-				if i < len(normalizedResult) {
-					actualLine := normalizedResult[i]
-					if actualLine != expectedLine {
-						t.Errorf("Line %d mismatch:\nExpected: %s\nActual:   %s", i+1, expectedLine, actualLine)
-					}
-				}
-			}
-		})
+	var generated strings.Builder
+	err := renderCodexMCPConfigForTest(t, engine, &generated, map[string]any{"github": map[string]any{}}, []string{"github"}, &WorkflowData{Name: "test-workflow"})
+	require.NoError(t, err)
+	config := decodeCodexBootstrap(t, generated.String())
+	assert.Equal(t, "none", config["history"].(map[string]any)["persistence"])
+	assert.Equal(t, "none", config["otel"].(map[string]any)["metrics_exporter"])
+	policy := config["shell_environment_policy"].(map[string]any)
+	assert.Equal(t, "all", policy["inherit"])
+	assert.Contains(t, policy["include_only"], "PATH")
+	server := config["mcp_servers"].(map[string]any)["github"].(map[string]any)
+	assert.Equal(t, int64(120), server["startup_timeout_sec"])
+	assert.Equal(t, int64(60), server["tool_timeout_sec"])
+	assert.Equal(t, "test-workflow", server["http_headers"].(map[string]any)["User-Agent"])
+	for _, fragment := range []string{
+		`"container": "ghcr.io/github/github-mcp-server:` + string(constants.DefaultGitHubMCPServerVersion),
+		`"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN"`,
+		`"guard-policies"`, `"allow-only"`, `"startupTimeout": 120`,
+		`start_mcp_gateway.cjs`, `GH_AW_CODEX_CONFIG=`, `cp "${RUNNER_TEMP}/gh-aw/mcp-config/config.toml" "${CODEX_HOME}/config.toml"`,
+	} {
+		assert.Contains(t, generated.String(), fragment)
 	}
 }
 
@@ -542,57 +441,20 @@ func TestCodexEngineRenderMCPConfigOpenAIProxyProvider(t *testing.T) {
 			},
 		}
 
-		if err := engine.RenderMCPConfig(&yaml, tools, mcpTools, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, mcpTools, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 
-		result := yaml.String()
-		expectedLines := []string{
-			"model_provider = \"openai-proxy\"",
-			"[model_providers.openai-proxy]",
-			"name = \"OpenAI AWF proxy\"",
-			fmt.Sprintf("base_url = \"http://%s:%d\"", constants.AWFAPIProxyContainerIP, constants.CodexLLMGatewayPort),
-			"env_key = \"CODEX_API_KEY\"",
-			"wire_api = \"responses\"",
-			"requires_openai_auth = false",
-			"supports_websockets = false",
-		}
-
-		for _, expected := range expectedLines {
-			if !strings.Contains(result, expected) {
-				t.Errorf("Expected MCP config to contain %q, got:\n%s", expected, result)
-			}
-		}
-		if !strings.Contains(result, "awk '") {
-			t.Errorf("Expected firewall-enabled config append to use awk filtering, got:\n%s", result)
-		}
-
-		normalizedResult := normalizeHeredocDelimiters(result)
-		syncStart := strings.Index(normalizedResult, "cat > \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_SHELL_POLICY_NORM_EOF")
-		if syncStart == -1 {
-			t.Fatalf("Expected config sync heredoc start in generated config, got:\n%s", normalizedResult)
-		}
-
-		syncBodyStart := strings.Index(normalizedResult[syncStart:], "\n")
-		if syncBodyStart == -1 {
-			t.Fatalf("Expected newline after config sync heredoc start, got:\n%s", normalizedResult[syncStart:])
-		}
-		syncBodyOffset := syncStart + syncBodyStart + 1
-
-		syncEnd := strings.Index(normalizedResult[syncBodyOffset:], "\n          GH_AW_CODEX_SHELL_POLICY_NORM_EOF")
-		if syncEnd == -1 {
-			t.Fatalf("Expected config sync heredoc end in generated config, got:\n%s", normalizedResult)
-		}
-
-		syncBlock := normalizedResult[syncBodyOffset : syncBodyOffset+syncEnd]
-		modelProviderIndex := strings.Index(syncBlock, "model_provider = \"openai-proxy\"")
-		shellPolicyIndex := strings.Index(syncBlock, "[shell_environment_policy]")
-		if modelProviderIndex == -1 || shellPolicyIndex == -1 {
-			t.Fatalf("Expected model_provider and shell_environment_policy in sync block, got:\n%s", syncBlock)
-		}
-		if modelProviderIndex > shellPolicyIndex {
-			t.Errorf("Expected model_provider to be emitted before [shell_environment_policy] in sync block, got:\n%s", syncBlock)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		assert.Equal(t, "openai-proxy", config["model_provider"])
+		proxy := config["model_providers"].(map[string]any)["openai-proxy"].(map[string]any)
+		assert.Equal(t, "OpenAI AWF proxy", proxy["name"])
+		assert.Equal(t, "http://"+net.JoinHostPort(constants.AWFAPIProxyContainerIP, strconv.Itoa(constants.CodexLLMGatewayPort)), proxy["base_url"])
+		assert.Equal(t, "CODEX_API_KEY", proxy["env_key"])
+		assert.Equal(t, "responses", proxy["wire_api"])
+		assert.Equal(t, false, proxy["requires_openai_auth"])
+		assert.Equal(t, false, proxy["supports_websockets"])
+		assert.NotContains(t, yaml.String(), "awk '")
 	})
 
 	t.Run("routes copilot models through the Copilot gateway port", func(t *testing.T) {
@@ -605,14 +467,13 @@ func TestCodexEngineRenderMCPConfigOpenAIProxyProvider(t *testing.T) {
 			},
 		}
 
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, []string{}, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, []string{}, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("base_url = \"http://%s:%d\"", constants.AWFAPIProxyContainerIP, constants.CopilotLLMGatewayPort)
-		if result := yaml.String(); !strings.Contains(result, expected) {
-			t.Errorf("Expected MCP config to contain %q, got:\n%s", expected, result)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		proxy := config["model_providers"].(map[string]any)["openai-proxy"].(map[string]any)
+		assert.Equal(t, "http://"+net.JoinHostPort(constants.AWFAPIProxyContainerIP, strconv.Itoa(constants.CopilotLLMGatewayPort)), proxy["base_url"])
 	})
 
 	t.Run("does not inject openai-proxy provider when firewall is disabled", func(t *testing.T) {
@@ -621,17 +482,13 @@ func TestCodexEngineRenderMCPConfigOpenAIProxyProvider(t *testing.T) {
 		var yaml strings.Builder
 		workflowData := &WorkflowData{Name: "test-workflow"}
 
-		if err := engine.RenderMCPConfig(&yaml, tools, mcpTools, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, mcpTools, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 
-		result := yaml.String()
-		if strings.Contains(result, "model_provider = \"openai-proxy\"") {
-			t.Errorf("Did not expect openai-proxy provider when firewall is disabled, got:\n%s", result)
-		}
-		if strings.Contains(result, "awk '") {
-			t.Errorf("Did not expect awk filtering when firewall is disabled, got:\n%s", result)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		assert.NotContains(t, config, "model_provider")
+		assert.NotContains(t, yaml.String(), "awk '")
 	})
 }
 
@@ -931,16 +788,13 @@ func TestCodexEngineUserAgentIdentifierConversion(t *testing.T) {
 			tools := map[string]any{"github": map[string]any{}}
 			mcpTools := []string{"github"}
 
-			if err := engine.RenderMCPConfig(&yaml, tools, mcpTools, workflowData); err != nil {
+			if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, mcpTools, workflowData); err != nil {
 				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 			}
 
-			result := yaml.String()
-			expectedUserAgentLine := "user_agent = \"" + tt.expectedUA + "\""
-
-			if !strings.Contains(result, expectedUserAgentLine) {
-				t.Errorf("Expected MCP config to contain %q, got:\n%s", expectedUserAgentLine, result)
-			}
+			config := decodeCodexBootstrap(t, yaml.String())
+			server := config["mcp_servers"].(map[string]any)["github"].(map[string]any)
+			assert.Equal(t, tt.expectedUA, server["http_headers"].(map[string]any)["User-Agent"])
 		})
 	}
 }
@@ -1004,16 +858,13 @@ func TestCodexEngineRenderMCPConfigUserAgentFromConfig(t *testing.T) {
 			tools := map[string]any{"github": map[string]any{}}
 			mcpTools := []string{"github"}
 
-			if err := engine.RenderMCPConfig(&yaml, tools, mcpTools, workflowData); err != nil {
+			if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, mcpTools, workflowData); err != nil {
 				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 			}
 
-			result := yaml.String()
-			expectedUserAgentLine := "user_agent = \"" + tt.expectedUA + "\""
-
-			if !strings.Contains(result, expectedUserAgentLine) {
-				t.Errorf("Test case: %s\nExpected MCP config to contain %q, got:\n%s", tt.description, expectedUserAgentLine, result)
-			}
+			config := decodeCodexBootstrap(t, yaml.String())
+			server := config["mcp_servers"].(map[string]any)["github"].(map[string]any)
+			assert.Equal(t, tt.expectedUA, server["http_headers"].(map[string]any)["User-Agent"], tt.description)
 		})
 	}
 }
@@ -1123,16 +974,13 @@ func TestCodexEngineRenderMCPConfigUserAgentWithHyphen(t *testing.T) {
 			tools := map[string]any{"github": map[string]any{}}
 			mcpTools := []string{"github"}
 
-			if err := engine.RenderMCPConfig(&yaml, tools, mcpTools, workflowData); err != nil {
+			if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, mcpTools, workflowData); err != nil {
 				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 			}
 
-			result := yaml.String()
-			expectedUserAgentLine := "user_agent = \"" + tt.expectedUA + "\""
-
-			if !strings.Contains(result, expectedUserAgentLine) {
-				t.Errorf("Test case: %s\nExpected MCP config to contain %q, got:\n%s", tt.description, expectedUserAgentLine, result)
-			}
+			config := decodeCodexBootstrap(t, yaml.String())
+			server := config["mcp_servers"].(map[string]any)["github"].(map[string]any)
+			assert.Equal(t, tt.expectedUA, server["http_headers"].(map[string]any)["User-Agent"], tt.description)
 		})
 	}
 }
@@ -1190,7 +1038,7 @@ func TestCodexEngineMCPScriptsSecrets(t *testing.T) {
 }
 
 // TestCodexEngineHttpMCPServerRendered verifies that HTTP MCP servers
-// are properly rendered in TOML format for Codex
+// are properly rendered for the gateway and retain native client settings.
 func TestCodexEngineHttpMCPServerRendered(t *testing.T) {
 	engine := NewCodexEngine()
 
@@ -1211,8 +1059,8 @@ func TestCodexEngineHttpMCPServerRendered(t *testing.T) {
 			mcpTools: []string{"gh-aw"},
 			// localhost URLs are rewritten to host.docker.internal when firewall is enabled (default)
 			shouldContain: []string{
-				"[mcp_servers.gh-aw]",
-				"url = \"http://host.docker.internal:8765\"",
+				`"gh-aw":`,
+				`"url": "http://host.docker.internal:8765"`,
 			},
 		},
 		{
@@ -1224,8 +1072,8 @@ func TestCodexEngineHttpMCPServerRendered(t *testing.T) {
 			},
 			mcpTools: []string{"my-http-server"},
 			shouldContain: []string{
-				"[mcp_servers.my-http-server]",
-				"url = \"https://api.example.com/mcp\"",
+				`"my-http-server":`,
+				`"url": "https://api.example.com/mcp"`,
 			},
 		},
 		{
@@ -1242,9 +1090,9 @@ func TestCodexEngineHttpMCPServerRendered(t *testing.T) {
 			},
 			mcpTools: []string{"api-server"},
 			shouldContain: []string{
-				"[mcp_servers.api-server]",
-				"url = \"https://api.example.com/mcp\"",
-				"http_headers = {",
+				`"api-server":`,
+				`"url": "https://api.example.com/mcp"`,
+				`"headers": {`,
 				"\"Authorization\" = \"Bearer token123\"",
 				"\"X-Custom\" = \"value\"",
 			},
@@ -1255,13 +1103,14 @@ func TestCodexEngineHttpMCPServerRendered(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var yaml strings.Builder
 			workflowData := &WorkflowData{Name: "test-workflow"}
-			if err := engine.RenderMCPConfig(&yaml, tt.tools, tt.mcpTools, workflowData); err != nil {
+			if err := renderCodexMCPConfigForTest(t, engine, &yaml, tt.tools, tt.mcpTools, workflowData); err != nil {
 				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 			}
 
 			result := yaml.String()
 
 			for _, expected := range tt.shouldContain {
+				expected = strings.Replace(expected, " = ", ": ", 1)
 				if !strings.Contains(result, expected) {
 					t.Errorf("Expected MCP config to contain %q, got:\n%s", expected, result)
 				}
@@ -1422,12 +1271,11 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 	t.Run("disables plugins when none are declared", func(t *testing.T) {
 		workflowData := &WorkflowData{Name: "test-workflow"}
 		var yaml strings.Builder
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, nil, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
-		if config := yaml.String(); !strings.Contains(config, "[features]") || !strings.Contains(config, "plugins = false") {
-			t.Errorf("Expected generated Codex TOML to disable plugins when none are declared, got:\n%s", config)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		assert.Equal(t, false, config["features"].(map[string]any)["plugins"])
 	})
 
 	t.Run("keeps plugins enabled when one is declared", func(t *testing.T) {
@@ -1436,7 +1284,7 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			Plugins: []string{"octo-org/example@main"},
 		}
 		var yaml strings.Builder
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, nil, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 		if config := yaml.String(); strings.Contains(config, "plugins = false") {
@@ -1452,21 +1300,13 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			},
 		}
 		var yaml strings.Builder
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, nil, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
-		config := yaml.String()
-		shellPolicyStart := strings.Index(config, "# Sync converter output")
-		shellPolicyEnd := strings.Index(config, "# Append engine-level custom Codex config")
-		shellPolicy := config[shellPolicyStart:shellPolicyEnd]
-		expectedCustomFeatures := strings.Join([]string{
-			codexRunBlockIndent + "[features]",
-			codexRunBlockIndent + "plugins = false",
-			codexRunBlockIndent + " shell_tool = false",
-		}, "\n")
-		if strings.Contains(shellPolicy, "[features]") || !strings.Contains(config, expectedCustomFeatures) {
-			t.Errorf("Expected plugin setting to be merged into custom Codex features table, got:\n%s", config)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		features := config["features"].(map[string]any)
+		assert.Equal(t, false, features["plugins"])
+		assert.Equal(t, false, features["shell_tool"])
 	})
 
 	t.Run("indents custom config inside run block heredoc", func(t *testing.T) {
@@ -1477,42 +1317,14 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 			},
 		}
 		var yaml strings.Builder
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, workflowData); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, nil, workflowData); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 
-		config := normalizeHeredocDelimiters(yaml.String())
-		startMarker := codexRunBlockIndent + "cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
-		endMarker := codexRunBlockIndent + "GH_AW_CODEX_CUSTOM_CONFIG_NORM_EOF\n"
-		start := strings.Index(config, startMarker)
-		if start < 0 {
-			t.Fatalf("custom config heredoc start marker not found in:\n%s", config)
-		}
-		start += len(startMarker)
-		end := strings.Index(config[start:], endMarker)
-		if end < 0 {
-			t.Fatalf("custom config heredoc end marker not found in:\n%s", config)
-		}
-
-		body := config[start : start+end]
-		var runtimeConfig strings.Builder
-		for _, line := range strings.SplitAfter(body, "\n") {
-			if line == "" {
-				continue
-			}
-			if line == "\n" {
-				runtimeConfig.WriteString(line)
-				continue
-			}
-			if !strings.HasPrefix(line, codexRunBlockIndent) {
-				t.Fatalf("custom config heredoc body line is not indented for YAML run block: %q\nFull body:\n%s", line, body)
-			}
-			runtimeConfig.WriteString(strings.TrimPrefix(line, codexRunBlockIndent))
-		}
-		expectedRuntimeConfig := workflowData.EngineConfig.Config + "\n"
-		if got := runtimeConfig.String(); got != expectedRuntimeConfig {
-			t.Fatalf("custom config heredoc body changed runtime TOML content:\nExpected:\n%q\nGot:\n%q", expectedRuntimeConfig, got)
-		}
+		config := decodeCodexBootstrap(t, yaml.String())
+		assert.Equal(t, "high", config["model_reasoning_effort"])
+		assert.Equal(t, "never", config["profiles"].(map[string]any)["demo"].(map[string]any)["approval_policy"])
+		assert.Contains(t, yaml.String(), "GH_AW_CODEX_CONFIG_JSON:")
 	})
 
 	t.Run("normalizes unterminated whitespace-only final config line", func(t *testing.T) {
@@ -1525,7 +1337,7 @@ func TestCodexEnginePluginConfig(t *testing.T) {
 
 	t.Run("accepts nil workflow data", func(t *testing.T) {
 		var yaml strings.Builder
-		if err := engine.RenderMCPConfig(&yaml, map[string]any{}, nil, nil); err != nil {
+		if err := renderCodexMCPConfigForTest(t, engine, &yaml, map[string]any{}, nil, nil); err != nil {
 			t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 		}
 	})
@@ -1543,9 +1355,8 @@ func TestCodexEngineWebFetch(t *testing.T) {
 			t.Fatalf("Expected 1 step, got %d", len(steps))
 		}
 		stepContent := strings.Join([]string(steps[0]), "\n")
-		if !strings.Contains(stepContent, `-c fetch="disabled"`) {
-			t.Errorf(`Expected -c fetch="disabled" config when web-fetch tool is not specified, got:\n%s`, stepContent)
-		}
+		assert.Contains(t, stepContent, `-c web_search="disabled"`)
+		assert.NotContains(t, stepContent, `-c fetch=`)
 	})
 
 	t.Run("fetch tool enabled when web-fetch tool is specified", func(t *testing.T) {
@@ -1560,9 +1371,8 @@ func TestCodexEngineWebFetch(t *testing.T) {
 			t.Fatalf("Expected 1 step, got %d", len(steps))
 		}
 		stepContent := strings.Join([]string(steps[0]), "\n")
-		if strings.Contains(stepContent, `-c fetch="disabled"`) {
-			t.Errorf(`Expected no -c fetch="disabled" config when web-fetch tool is specified, got:\n%s`, stepContent)
-		}
+		assert.NotContains(t, stepContent, `-c web_search="disabled"`)
+		assert.NotContains(t, stepContent, `-c fetch=`)
 	})
 }
 
@@ -1740,7 +1550,7 @@ func TestCodexEngineHttpMCPHeaderSecretsUseEnvVars(t *testing.T) {
 
 	var yaml strings.Builder
 	workflowData := &WorkflowData{Name: "test-workflow"}
-	if err := engine.RenderMCPConfig(&yaml, tools, []string{"datadog"}, workflowData); err != nil {
+	if err := renderCodexMCPConfigForTest(t, engine, &yaml, tools, []string{"datadog"}, workflowData); err != nil {
 		t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 	}
 
@@ -1751,9 +1561,9 @@ func TestCodexEngineHttpMCPHeaderSecretsUseEnvVars(t *testing.T) {
 	}
 
 	expected := []string{
-		`"DD_API_KEY" = "${DD_API_KEY}"`,
-		`"DD_APPLICATION_KEY" = "${DD_APPLICATION_KEY}"`,
-		`"DD_SITE" = "${DD_SITE}"`,
+		`"DD_API_KEY": "\${DD_API_KEY}"`,
+		`"DD_APPLICATION_KEY": "\${DD_APPLICATION_KEY}"`,
+		`"DD_SITE": "\${DD_SITE}"`,
 	}
 	for _, want := range expected {
 		if !strings.Contains(result, want) {

@@ -475,6 +475,11 @@ func (e *BehaviorDefinedEngine) GetLogParserScriptId() string {
 	return e.logParserScriptFilename()
 }
 
+// GetLogParserScriptSource returns the generated parser source for local parsing.
+func (e *BehaviorDefinedEngine) GetLogParserScriptSource() string {
+	return e.buildWrappedLogParserScript()
+}
+
 // buildLogParserWriteStep generates a GitHub Actions step that writes the
 // behavior-defined engine's log-parser script to
 // ${RUNNER_TEMP}/gh-aw/actions/<engine-id>_log_parser.cjs so the post-agent

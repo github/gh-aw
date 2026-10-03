@@ -1,5 +1,6 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
+import { getCollection } from 'astro:content';
 
 type BlogAuthor = {
   name?: string;
@@ -14,22 +15,33 @@ const pathname = Astro.url.pathname;
 // Detect blog posts by URL path - more reliable than entry.id   
 const isBlogPath = pathname.includes('/blog/');
 
-// Social images - use combined image for blog posts, hero for everything else
-const heroImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
-//const blogCombinedImage = 'https://github.github.com/gh-aw/blog-combined.png';
-const socialImage = heroImage;
 
 // Build enhanced OG title: "Page Title | Site Name" (target: 50-60 chars)
 const siteTitle = 'GitHub Agentic Workflows';
 const schemaWebsiteName = 'gh-aw — GitHub Agentic Workflows';
 const rawPageTitle = entry?.data?.title ?? siteTitle;
-const isHomePage = rawPageTitle === siteTitle;
+const isDocsHomePage = pathname === '/gh-aw/' || pathname === '/gh-aw/index.html';
+const isHomePage = isDocsHomePage || rawPageTitle === siteTitle;
 const ogTitle = isHomePage ? siteTitle : `${rawPageTitle} | ${siteTitle}`;
 
-// Enhanced default description (110-160 chars optimal for OG)
-const defaultDescription = 'Write agentic workflows in natural language using markdown files and run them as GitHub Actions. Automate your repository with AI agents, strong guardrails, and simple configuration.';
+// Default description (110-160 chars optimal for OG)
+const defaultDescription = 'Intelligent GitHub repository automation with Copilot, Claude Code, Codex or Gemini. Agents triage, investigate and open pull requests safely in GitHub Actions.';
 const pageDescription = entry?.data?.description || defaultDescription;
-const isDocsHomePage = pathname === '/gh-aw/' || pathname === '/gh-aw/index.html';
+
+// Social image: the site card (src/og/OgHome.astro, `npm run og`) for the home
+// page and pages outside the docs collection; otherwise the page's own card
+// from src/pages/og/[...slug].png.ts.
+// Blog index and tag pages carry entries outside the collection (or another
+// page's entry), so require a real collection entry whose id matches the URL.
+const docIds = new Set((await getCollection('docs')).map(({ id }) => id));
+const hasPageImage =
+  !isHomePage && Boolean(entry) && docIds.has(entry!.id) && pathname.replace(/\/$/, '') === `/gh-aw/${entry!.id}`;
+const socialImage = hasPageImage
+  ? `https://github.github.com/gh-aw/og/${entry!.id}.png`
+  : 'https://github.github.com/gh-aw/og-home-1200x630.png';
+const socialImageAlt = hasPageImage
+  ? `${rawPageTitle}, from the GitHub Agentic Workflows docs.`
+  : 'GitHub Agentic Workflows: intelligent GitHub repository automation, with your own agents.';
 const configuredSite = Astro.site ?? new URL('https://github.github.com');
 const siteOrigin = configuredSite.origin;
 const siteUrl = new URL(import.meta.env.BASE_URL, configuredSite).toString();
@@ -218,17 +230,20 @@ if (isBlogPost) {
 
 // Properties we override with enhanced values
 const overriddenProps = new Set([
-  'og:title', 'og:description', 'og:image', 'og:url',
+  'og:title', 'og:description', 'og:image', 'og:url', 'og:type',
   'twitter:title', 'twitter:description', 'twitter:image', 'twitter:url',
 ]);
 
-// Filter Starlight's head tags to remove OG/Twitter tags we'll override
+// Filter Starlight's head tags to remove OG/Twitter tags we'll override.
+// The home page's <title> is the site name alone, not "Home | …".
 const head = route?.head ?? [];
-const filteredHead = head.filter(({ tag, attrs }) => {
-  if (tag !== 'meta') return true;
-  const prop = attrs?.property || attrs?.name;
-  return !overriddenProps.has(prop);
-});
+const filteredHead = head
+  .filter(({ tag, attrs }) => {
+    if (tag !== 'meta') return true;
+    const prop = attrs?.property || attrs?.name;
+    return !overriddenProps.has(prop);
+  })
+  .map((item) => (isHomePage && item.tag === 'title' ? { ...item, content: siteTitle } : item));
 ---
 
 <!-- Starlight's head tags (with OG/Twitter duplicates removed) -->
@@ -241,6 +256,7 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 )}
 
 <!-- Enhanced OG tags with site name in title and social image -->
+<meta property="og:type" content={isHomePage ? 'website' : 'article'} />
 <meta property="og:title" content={ogTitle} />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={socialImage} />
@@ -248,10 +264,14 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:type" content="image/png" />
+<meta property="og:image:alt" content={socialImageAlt} />
 <meta name="twitter:title" content={ogTitle} />
 <meta name="twitter:description" content={pageDescription} />
 <meta name="twitter:image" content={socialImage} />
 <meta name="twitter:url" content={socialUrl} />
+<meta name="twitter:image:alt" content={socialImageAlt} />
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
 
 <link
   rel="preload"

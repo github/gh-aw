@@ -8,7 +8,7 @@ const { emitSoftTimeoutSignal } = require("./harness_retry_guard.cjs");
 /**
  * `nextDelayMs` overrides the delay before the immediately next attempt; following retries
  * resume exponential backoff from that delay.
- * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number }} HarnessAttemptResult
+ * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, cancelled?: boolean }} HarnessAttemptResult
  * @typedef {{ action: "retry" | "stop", exitCode?: number, nextDelayMs?: number }} HarnessFailureDecision
  */
 
@@ -76,8 +76,9 @@ async function runHarnessRetryLoop(options) {
 
     if (attempt > 0) {
       const retryMode = options.getRetryMode ? options.getRetryMode(attempt) : "fresh run";
-      options.log(`retry ${attempt}/${options.maxRetries}: sleeping ${delay}ms before next attempt (${retryMode})`);
-      await sleepFor(delay);
+      const sleepDelay = options.softTimeoutGuard ? Math.min(delay, Math.max(0, options.softTimeoutGuard.softDeadlineMs - Date.now())) : delay;
+      options.log(`retry ${attempt}/${options.maxRetries}: sleeping ${sleepDelay}ms before next attempt (${retryMode})`);
+      await sleepFor(sleepDelay);
       delay = Math.min(delay * options.backoffMultiplier, options.maxDelayMs);
       options.log(`retry ${attempt}/${options.maxRetries}: woke up, next delay will be ${delay}ms`);
       if (options.softTimeoutGuard && Date.now() >= options.softTimeoutGuard.softDeadlineMs) {
@@ -91,6 +92,11 @@ async function runHarnessRetryLoop(options) {
     const result = await options.runAttempt(attempt);
     lastResult = result;
     lastExitCode = result.exitCode;
+
+    if (result.cancelled) {
+      options.log(`attempt ${attempt + 1}: cancelled — not retrying`);
+      break;
+    }
 
     if (result.exitCode === 0) {
       options.log(`success on attempt ${attempt + 1}: totalDuration=${formatDuration(Date.now() - options.driverStartTime)}`);

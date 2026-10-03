@@ -1,12 +1,15 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./work_queue_replay.cjs";
+import { createHash } from "node:crypto";
+import selectionFixtures from "../../../specs/work-queue/selection-fixtures.json";
+import { applyTransactions, claimOldestAvailableWork, compactTransactions, createWorkTransaction, oldestAvailableWork, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./work_queue_replay.cjs";
+import { CODEMODS, CURRENT_VERSION, upgradeTransaction } from "./work_queue_codemods.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
-const cancelClaim = (workId, id) => ({ version: 1, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
-const complete = (workId, claimId, attempt) => ({ version: 1, kind: "Completion", work: workId, claim: claimId, attempt });
-const cancelWork = id => ({ version: 1, kind: "WorkCancellation", work: id, claim: null, attempt: null });
+const work = id => ({ version: CURRENT_VERSION, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: CURRENT_VERSION, kind: "Claim", work: workId, claim: id, attempt: null });
+const cancelClaim = (workId, id) => ({ version: CURRENT_VERSION, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
+const complete = (workId, claimId, attempt) => ({ version: CURRENT_VERSION, kind: "Completion", work: workId, claim: claimId, attempt });
+const cancelWork = id => ({ version: CURRENT_VERSION, kind: "WorkCancellation", work: id, claim: null, attempt: null });
 
 function permutations(items) {
   if (items.length < 2) return [items];
@@ -35,7 +38,72 @@ describe("work queue replay", () => {
       work: { w: "claimed" },
       winner: { w: "c" },
       claim: { c: "effective" },
+      available: [],
       transactions: [claim("w", "c"), work("w")],
+    });
+  });
+
+  describe("oldest-available work selection", () => {
+    for (const fixture of selectionFixtures) {
+      it(fixture.name, () => {
+        const id = task => createHash("sha256").update(JSON.stringify({ task })).digest("hex");
+        const transactions = fixture.works.flatMap(item => {
+          const workId = id(item.task);
+          const result = [item.enqueued === undefined ? work(workId) : createWorkTransaction(workId, item.enqueued)];
+          const claimId = `claim-${item.task}`;
+          if (["claimed", "completed", "released"].includes(item.state)) result.push(claim(workId, claimId));
+          if (item.state === "completed") result.push(complete(workId, claimId, `attempt-${item.task}`));
+          if (item.state === "cancelled") result.push(cancelWork(workId));
+          if (item.state === "released") result.push(cancelClaim(workId, claimId));
+          return result;
+        });
+        const expected = fixture.expected.map(id);
+        for (const log of [transactions, [...transactions].reverse(), [...transactions, ...transactions], compactTransactions(transactions), parseTransactionLog(serializeTransactionLog(transactions))]) {
+          expect(replayTransactions(log).available).toEqual(expected);
+          expect(oldestAvailableWork(log)).toBe(expected[0] ?? null);
+        }
+      });
+    }
+
+    it("captures enqueue time once and keeps original age on resubmission", () => {
+      const now = vi.spyOn(Date, "now").mockReturnValue(100);
+      try {
+        const first = createWorkTransaction("w");
+        expect(first.enqueued).toBe(100);
+        expect(Object.isFrozen(first)).toBe(true);
+        now.mockReturnValue(200);
+        const result = applyTransactions([first], [createWorkTransaction("w")]);
+        expect(result.transactions).toEqual([first]);
+        expect(result.rejected).toEqual([]);
+        expect(result.idempotent).toBe(1);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("stages successive claims from the local view without head-of-line blocking", () => {
+      let log = [createWorkTransaction("old", 1), createWorkTransaction("new", 2)];
+      const first = claimOldestAvailableWork(log, "first");
+      expect(first.work).toBe("old");
+      log = applyTransactions(log, [first]).transactions;
+      expect(claimOldestAvailableWork(log, "second").work).toBe("new");
+      expect(() => claimOldestAvailableWork([], "none")).toThrow("no available Work");
+      expect(() => claimOldestAvailableWork(log, "")).toThrow("claim must be");
+    });
+
+    it("uses UTF-8 identity order consistently with Go and handles numeric/prototype keys", () => {
+      expect(replayTransactions(["\u{10000}", "\uE000", "2", "10", "__proto__"].map(id => createWorkTransaction(id, 1))).available).toEqual(["10", "2", "__proto__", "\uE000", "\u{10000}"]);
+    });
+
+    it("rejects invalid or conflicting enqueue metadata instead of rewriting history", () => {
+      for (const enqueued of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, "1", null, undefined]) {
+        expect(() => validateTransaction({ ...work("w"), enqueued })).toThrow("enqueued");
+      }
+      expect(() => validateTransaction({ ...claim("w", "c"), enqueued: 1 })).toThrow("optional enqueued only on Work");
+      expect(() => replayTransactions([createWorkTransaction("w", 1), createWorkTransaction("w", 2)])).toThrow("conflicting enqueue metadata");
+      expect(() => replayTransactions([work("w"), createWorkTransaction("w", 1)])).toThrow("conflicting enqueue metadata");
+      expect(replayTransactions([work("w"), { ...work("w"), enqueued: 0 }]).transactions).toEqual([work("w")]);
+      expect(createWorkTransaction("maximum", Number.MAX_SAFE_INTEGER).enqueued).toBe(Number.MAX_SAFE_INTEGER);
     });
   });
 
@@ -94,6 +162,7 @@ describe("work queue replay", () => {
 
     const applied = applyTransactions(compacted, [claim("w", "c")]);
     expect(applied.rejected).toEqual([]);
+    expect(applied.idempotent).toBe(1);
     expect(applied.transactions).toHaveLength(2);
     expect(replayTransactions(applyTransactions(transactions, [claim("w", "later")]).transactions)).toEqual(replayTransactions(applyTransactions(compacted, [claim("w", "later")]).transactions));
   });
@@ -114,20 +183,55 @@ describe("work queue replay", () => {
     expect(parseTransactionLog("")).toEqual([]);
   });
 
-  it("upgrades unversioned and version-zero records to the current protocol", () => {
-    const oldWork = { kind: "Work", work: "w", claim: null, attempt: null };
-    const oldClaim = { version: 0, kind: "Claim", work: "w", claim: "c", attempt: null };
-    const upgraded = parseTransactionLog(`${JSON.stringify(oldWork)}\n${JSON.stringify(oldClaim)}\n`);
-    expect(upgraded).toEqual([work("w"), claim("w", "c")]);
-    expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog([work("w"), claim("w", "c")]));
-    expect(() => validateTransaction(oldWork)).toThrow("exactly version");
+  it("upgrades all historical kinds deterministically to v2 without inventing age", () => {
+    expect(CURRENT_VERSION).toBe(2);
+    expect(CODEMODS).toEqual([
+      { from: 0, to: 1, set: { version: 1 } },
+      { from: 1, to: 2, set: { version: 2 } },
+    ]);
+    const facts = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), complete("w", "b", "run"), work("other"), cancelWork("other")];
+    for (const version of [undefined, 0, 1]) {
+      const historical = facts.map(({ version: _, ...fact }) => (version === undefined ? fact : { version, ...fact }));
+      const before = JSON.stringify(historical);
+      const upgraded = parseTransactionLog(`${historical.map(fact => JSON.stringify(fact)).join("\n")}\n`);
+      expect(upgraded).toEqual(facts);
+      expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog(facts));
+      expect(upgradeTransaction(historical[0])).toEqual(work("w"));
+      expect(upgradeTransaction(upgradeTransaction(historical[0]))).toEqual(work("w"));
+      expect(JSON.stringify(historical)).toBe(before);
+      expect(upgraded.filter(fact => fact.kind === "Work").every(fact => !Object.hasOwn(fact, "enqueued"))).toBe(true);
+    }
+    const legacyWork = { version: 1, kind: "Work", work: "legacy", claim: null, attempt: null };
+    const upgraded = parseTransactionLog(`${JSON.stringify(createWorkTransaction("new", 1))}\n${JSON.stringify(legacyWork)}\n`);
+    expect(replayTransactions(upgraded).available).toEqual(["legacy", "new"]);
+    expect(applyTransactions(upgraded, [createWorkTransaction("legacy", 100)]).transactions).toEqual(upgraded);
+    expect(() => validateTransaction(legacyWork)).toThrow("unsupported work queue transaction version");
+    expect(() => validateTransaction({ kind: "Work", work: "w", claim: null, attempt: null })).toThrow("exactly version");
+  });
+
+  it("rejects extra metadata on closed historical versions before upgrading", () => {
+    for (const version of [undefined, 0, 1]) {
+      for (const fact of [work("w"), claim("w", "c")]) {
+        const { version: _, ...fields } = fact;
+        const historical = version === undefined ? fields : { version, ...fields };
+        for (const extra of [{ enqueued: 0 }, { enqueued: 123 }, { run_id: "run" }, { extra: true }]) {
+          expect(() => upgradeTransaction({ ...historical, ...extra })).toThrow("historical transaction must contain exactly");
+          expect(() => parseTransactionLog(`${JSON.stringify({ ...historical, ...extra })}\n`)).toThrow("historical transaction must contain exactly");
+        }
+        const missingField = { ...historical };
+        delete missingField.attempt;
+        expect(() => upgradeTransaction(missingField)).toThrow("historical transaction must contain exactly");
+      }
+    }
   });
 
   it("rejects unknown or malformed message versions and never accepts partial upgrades", () => {
-    for (const version of [-1, 1.5, "1", 2, null]) {
+    for (const version of [-1, 1.5, "1", 3, null, true, {}, Number.MAX_SAFE_INTEGER + 1]) {
       expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify({ ...claim("w", "c"), version })}\n`)).toThrow("unsupported work queue transaction version");
     }
     expect(() => parseTransactionLog(`${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null, extra: true })}\n`)).toThrow("exactly version");
+    expect(() => parseTransactionLog(`${JSON.stringify({ version: 1, kind: "Work", work: "w", claim: "invalid", attempt: null })}\n`)).toThrow("must not include");
+    expect(() => serializeTransactionLog([{ ...work("w"), version: 1 }])).toThrow("unsupported work queue transaction version");
   });
 
   it("rejects malformed JSONL records and blank lines", () => {
@@ -162,6 +266,35 @@ describe("work queue replay", () => {
 });
 
 describe("work queue transaction application", () => {
+  it("counts requested new, rejected, and idempotent intents independently of duplicate source records", () => {
+    const existing = createWorkTransaction("existing", 100);
+    const submitted = createWorkTransaction("new", 200);
+    const result = applyTransactions([existing, existing], [existing, createWorkTransaction("existing", 300), submitted, submitted, claim("missing", "c"), claim("new", "c"), claim("new", "c")]);
+
+    expect(result.transactions).toEqual([existing, submitted, claim("new", "c")]);
+    expect(result.rejected).toEqual([{ transaction: claim("missing", "c"), reason: "work does not exist" }]);
+    expect(result.idempotent).toBe(4);
+  });
+
+  it("counts exact duplicates of every kind as idempotent even after terminal work", () => {
+    const transactions = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), complete("w", "b", "run"), work("cancelled"), cancelWork("cancelled")];
+    const result = applyTransactions(transactions, [...transactions, ...transactions]);
+
+    expect(result.transactions).toEqual(transactions);
+    expect(result.rejected).toEqual([]);
+    expect(result.idempotent).toBe(transactions.length * 2);
+  });
+
+  it("keeps historical Work at age zero on timestamped resubmission", () => {
+    const transactions = [work("old"), createWorkTransaction("new", 100)];
+    const result = applyTransactions(transactions, [createWorkTransaction("old", 200), createWorkTransaction("old", 0)]);
+
+    expect(result.transactions).toEqual(transactions);
+    expect(result.rejected).toEqual([]);
+    expect(result.idempotent).toBe(2);
+    expect(replayTransactions(result.transactions).available).toEqual(["old", "new"]);
+  });
+
   it("applies valid intents in order and rejects state changes after terminal work", () => {
     const result = applyTransactions([], [work("w"), claim("w", "c"), complete("w", "c", "run"), claim("w", "late"), cancelWork("w")]);
     expect(replayTransactions(result.transactions).work.w).toBe("completed");
@@ -169,6 +302,7 @@ describe("work queue transaction application", () => {
       { transaction: claim("w", "late"), reason: "work is terminal" },
       { transaction: cancelWork("w"), reason: "work is terminal" },
     ]);
+    expect(result.idempotent).toBe(0);
   });
 
   it("reports invalid intents without adding them to the durable candidate", () => {
@@ -177,6 +311,7 @@ describe("work queue transaction application", () => {
       { transaction: claim("missing", "c"), reason: "work does not exist" },
       { transaction: complete("w", "unknown", "run"), reason: "claim does not exist" },
     ]);
+    expect(result.idempotent).toBe(1);
     expect(replayTransactions(result.transactions).work.w).toBe("completed");
   });
 

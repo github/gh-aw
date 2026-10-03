@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,23 +67,29 @@ Test mcp-scripts HTTP transport for Codex
 	}
 
 	// Verify HTTP transport in TOML config (not stdio)
-	if !strings.Contains(yamlStr, "[mcp_servers.mcpscripts]") {
+	if !strings.Contains(yamlStr, `"mcpscripts":`) {
 		t.Error("MCP Scripts server config section not found")
 	}
 
-	// Should have explicit type field
-	codexConfigSection := extractCodexConfigSection(yamlStr)
-	if !strings.Contains(codexConfigSection, `type = "http"`) {
-		t.Error("Expected type field set to 'http' in TOML format")
+	// The gateway receives upstream transport details; Codex only receives its
+	// authenticated gateway connection after conversion.
+	nativeConfig := decodeCodexBootstrap(t, yamlStr)
+	nativeServers := nativeConfig["mcp_servers"].(map[string]any)
+	if _, ok := nativeServers["mcpscripts"]; !ok {
+		t.Fatal("Expected native Codex client settings for mcpscripts")
+	}
+	codexConfigSection := extractCodexConfigSection(t, yamlStr)
+	if !strings.Contains(yamlStr, `"type": "http"`) {
+		t.Error("Expected HTTP transport in the gateway configuration")
 	}
 
 	// Should use HTTP transport (url + headers) with host.docker.internal
-	if !strings.Contains(yamlStr, `url = "http://host.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"`) {
-		t.Error("Expected HTTP URL config with host.docker.internal not found in TOML format")
+	if !strings.Contains(yamlStr, `"url": "http://host.docker.internal:$GH_AW_MCP_SCRIPTS_PORT"`) {
+		t.Error("Expected upstream MCP Scripts URL in the gateway configuration")
 	}
 
-	if !strings.Contains(yamlStr, `headers = { Authorization = "$GH_AW_MCP_SCRIPTS_API_KEY" }`) {
-		t.Error("Expected HTTP headers config not found in TOML format")
+	if !strings.Contains(yamlStr, `"Authorization": "\${GH_AW_MCP_SCRIPTS_API_KEY}"`) {
+		t.Error("Expected upstream authentication header in the gateway configuration")
 	}
 
 	// Should NOT use stdio transport (command + args to node)
@@ -104,24 +111,15 @@ Test mcp-scripts HTTP transport for Codex
 }
 
 // extractCodexConfigSection extracts the Codex MCP config section from the workflow YAML
-func extractCodexConfigSection(yamlContent string) string {
-	// Find the start of the mcpscripts config
-	start := strings.Index(yamlContent, "[mcp_servers.mcpscripts]")
-	if start == -1 {
-		return ""
+func extractCodexConfigSection(t *testing.T, yamlContent string) string {
+	t.Helper()
+	config := decodeCodexBootstrap(t, yamlContent)
+	servers := config["mcp_servers"].(map[string]any)
+	data, err := json.Marshal(servers["mcpscripts"])
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	rest := yamlContent[start:]
-	if nextSection := strings.Index(rest[len("[mcp_servers.mcpscripts]"):], "\n          ["); nextSection != -1 {
-		return rest[:len("[mcp_servers.mcpscripts]")+nextSection]
-	}
-
-	// Find the end (next heredoc marker or EOF)
-	if before, _, found := strings.Cut(rest, "EOF"); found {
-		return before
-	}
-
-	return rest
+	return string(data)
 }
 
 // TestCodexMCPScriptsWithSecretsHTTPTransport verifies that environment variables
@@ -164,7 +162,7 @@ Test mcp-scripts with secrets
 	}
 
 	yamlStr := string(lockContent)
-	codexConfigSection := extractCodexConfigSection(yamlStr)
+	codexConfigSection := extractCodexConfigSection(t, yamlStr)
 
 	// Verify tool-specific env vars are NOT in the MCP config (env_vars not supported for HTTP)
 	// They should be passed via the job's env section instead

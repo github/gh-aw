@@ -688,13 +688,37 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 		}
 
 		model, _ := parsed.Frontmatter["model"].(string)
-		if !strings.Contains(strings.ToLower(model), "codex") {
+		if !isCodexCompatibleWorkflowModel(model) {
 			t.Errorf("%s uses Codex with non-Codex model %q", path, model)
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("Failed to inspect workflows: %v", err)
+	}
+}
+
+func isCodexCompatibleWorkflowModel(model string) bool {
+	model = strings.TrimSpace(model)
+	// Empty selects Codex's native default; copilot/auto is used by the inference canary.
+	return model == "" || strings.EqualFold(model, "copilot/auto") || strings.Contains(strings.ToLower(model), "codex")
+}
+
+func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
+	for _, test := range []struct {
+		model string
+		want  bool
+	}{
+		{model: "", want: true},
+		{model: "copilot/auto", want: true},
+		{model: "copilot/gpt-5.3-codex", want: true},
+		{model: "openai/gpt-4o", want: false},
+	} {
+		t.Run(test.model, func(t *testing.T) {
+			if got := isCodexCompatibleWorkflowModel(test.model); got != test.want {
+				t.Errorf("isCodexCompatibleWorkflowModel(%q) = %t, want %t", test.model, got, test.want)
+			}
+		})
 	}
 }
 

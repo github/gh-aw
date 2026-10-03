@@ -247,6 +247,12 @@
                               "null",
                               "string"
                             ]
+                          },
+                          "enqueued": {
+                            "type": [
+                              "null",
+                              "integer"
+                            ]
                           }
                         },
                         "required": [
@@ -4478,6 +4484,12 @@
                                 "type": [
                                   "null",
                                   "string"
+                                ]
+                              },
+                              "enqueued": {
+                                "type": [
+                                  "null",
+                                  "integer"
                                 ]
                               }
                             },

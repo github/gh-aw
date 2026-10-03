@@ -6,6 +6,8 @@ const path = require("path");
 const { countPermissionDeniedIssues, extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
+const CLAUDE_RESUME_PROMPT = "Continue the interrupted task using the existing session. Preserve completed work and staged safe outputs; do not repeat them. Complete only unfinished work.";
+
 /** @param {string} output @returns {Array<Record<string, any>>} */
 function claudeRecords(output) {
   const records = [];
@@ -146,4 +148,15 @@ function removeClaudePlugin(pluginDir) {
   }
 }
 
-module.exports = { claudeRecords, claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, claudeSafeOutputsOffset, removeClaudePlugin };
+module.exports = {
+  CLAUDE_RESUME_PROMPT,
+  claudeRecords,
+  claudeFailureEvidence,
+  hasClaudeSessionProgress,
+  claudeSessionId,
+  claudePermissionDenials,
+  claudeBareCapabilities,
+  claudeRepositoryEditPolicy,
+  claudeSafeOutputsOffset,
+  removeClaudePlugin,
+};

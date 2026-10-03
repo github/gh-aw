@@ -7,6 +7,18 @@ const require = createRequire(import.meta.url);
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, isMaxRunsExceededError, isAuthenticationFailedError, parseAICreditsExceededProxyRejection, parseAPIProxyGuardRejection } = require("./harness_retry_guard.cjs");
 
 describe("harness_retry_guard.cjs", () => {
+  it.each([
+    { type: "turn.failed", error: { message: "unexpected status 403 Forbidden: Maximum AI credits exceeded (301 / 300)." } },
+    { type: "error", message: "unexpected status 403 Forbidden: Maximum AI credits exceeded (301 / 300)." },
+    { type: "turn.failed", error: { message: JSON.stringify({ error: { message: "403 Maximum AI credits exceeded (301 / 300)." } }) } },
+  ])("trusts the proxy rejection in a native Codex error envelope", event => {
+    expect(parseAICreditsExceededProxyRejection(JSON.stringify(event))).toEqual({ aiCredits: 301, maxAICredits: 300 });
+  });
+
+  it("does not trust the same wording in an ordinary Codex assistant item", () => {
+    expect(parseAICreditsExceededProxyRejection(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "403 Maximum AI credits exceeded (301 / 300)." } }))).toBeNull();
+  });
+
   it("detects the AWF API proxy cache-miss guardrail in text form", () => {
     const output = "API Error: 403 Maximum consecutive cache misses exceeded (5 / 5).";
     expect(parseAPIProxyGuardRejection(output)).toEqual({

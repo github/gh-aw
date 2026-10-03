@@ -246,6 +246,7 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	// Threat detection currently does not support the Pi engine backend.
 	// Normalize to Copilot so workflows with engine: pi still get a working detector.
 	if engineID == "pi" {
+		threatLog.Print("Normalizing pi engine to copilot for threat detection")
 		return "copilot"
 	}
 
@@ -254,7 +255,9 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	// normalized to the engine declared by their definition (engine.detection-engine),
 	// falling back to the default built-in detection engine.
 	if !isThreatDetectionCapableEngineID(engineID) {
-		return c.resolveCustomEngineDetectionEngineID(engineID)
+		resolved := c.resolveCustomEngineDetectionEngineID(engineID)
+		threatLog.Printf("Custom engine %q is not threat-detection capable; resolved to %q", engineID, resolved)
+		return resolved
 	}
 
 	return engineID

@@ -56,7 +56,17 @@ Claude Code supports native web search, bare mode, top-level `max-turns`, per-co
 
 The default permission mode is `dontAsk`: actions requiring approval run only when pre-approved. Disabled Bash/web tools are removed, and `tools.edit: false` denies repository edits even with an explicit permission-mode override. Safe outputs do not independently grant file-write access. Sandbox and MCP gateway policies provide the isolation boundaries.
 
-Bare mode skips ambient hooks, instructions, skills, and subagents. Workflow-declared skills and inline subagents are explicitly loaded through the `gh-aw-workflow` plugin; their names are plugin-qualified, such as `gh-aw-workflow:reviewer`. Top-level pinned plugins continue to load explicitly.
+Bare mode skips ambient discovery and restricts native tools to Bash, Edit, and Read in Claude Code 2.1.288. Workflow-declared skills load through the `gh-aw-workflow` plugin and can be explicitly invoked as `/gh-aw-workflow:<skill-name>`. Top-level pinned plugins continue to load explicitly. Do not rely on automatic Skill-tool invocation or subagent delegation in bare mode; use `bare: false` when the workflow needs those capabilities.
+
+The built-in harness passes a short continuation prompt when resuming an interrupted session, preserving its session ID and prior work. It uses `CLAUDE_CODE_MAX_RETRIES: 0` to leave transient-error retries to the harness; `ANTHROPIC_MAX_RETRIES` does not control the Claude CLI retry loop.
+
+For an offline native-CLI compatibility check against an installed version, run the opt-in contract suite from `actions/setup/js`:
+
+```bash
+GH_AW_CLAUDE_TEST_CLI=/absolute/path/to/claude npm run test:js -- claude_cli_live.test.cjs
+```
+
+The suite uses synthetic prompts, an isolated home directory, and a loopback Anthropic-compatible server. It does not use real credentials or external inference.
 
 ## Guided workflow authoring with Claude Code
 

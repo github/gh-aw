@@ -56,8 +56,10 @@ func generateThreatDetectionFindings(processedRun ProcessedRun) []AuditFinding {
 			}
 		}
 	}
-	verdict, found := findThreatDetectionVerdict(processedRun.Run.LogsPath)
-	usageResult, hasUsageResult := readDetectionUsageResult(processedRun.Run.LogsPath)
+	evidence := readThreatDetectionEvidence(processedRun.Run.LogsPath)
+	verdict, found := evidence.Verdict, evidence.HasVerdict
+	usageResult, hasUsageResult := evidence.Result, evidence.HasResult
+	detectionJobSkipped = detectionJobSkipped || (hasUsageResult && usageResult.JobResult == "skipped")
 	detectionExecutionNotStarted := !detectionJobSkipped && threatDetectionExecutionNotStarted(processedRun.Run)
 	findings := make([]AuditFinding, 0, 2)
 	detectionFailed := hasUsageResult && failedDetectionUsageResult(usageResult)
@@ -127,6 +129,15 @@ func failedDetectionUsageResult(result detectionUsageResult) bool {
 }
 
 func readDetectionUsageResult(runDir string) (detectionUsageResult, bool) {
+	evidence := readThreatDetectionEvidence(runDir)
+	return evidence.Result, evidence.HasResult
+}
+
+func validDetectionJobResult(result string) bool {
+	return result == "success" || result == "failure" || result == "cancelled" || result == "skipped"
+}
+
+func readLegacyDetectionUsageResult(runDir string) (detectionUsageResult, bool) {
 	if runDir == "" {
 		return detectionUsageResult{}, false
 	}
@@ -139,8 +150,7 @@ func readDetectionUsageResult(runDir string) (detectionUsageResult, bool) {
 	if err := json.NewDecoder(io.LimitReader(file, 1024*1024)).Decode(&result); err != nil {
 		return detectionUsageResult{}, false
 	}
-	return result, result.JobResult == "success" || result.JobResult == "failure" ||
-		result.JobResult == "cancelled" || result.JobResult == "skipped"
+	return result, validDetectionJobResult(result.JobResult)
 }
 
 func (v threatDetectionVerdict) threatKinds() []string {
@@ -158,6 +168,11 @@ func (v threatDetectionVerdict) threatKinds() []string {
 }
 
 func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
+	evidence := readThreatDetectionEvidence(runDir)
+	return evidence.Verdict, evidence.HasVerdict
+}
+
+func findLegacyThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 	if runDir == "" {
 		return threatDetectionVerdict{}, false
 	}

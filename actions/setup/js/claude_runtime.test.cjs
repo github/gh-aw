@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-const { claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, removeClaudePlugin } = require("./claude_runtime.cjs");
+const { CLAUDE_RESUME_PROMPT, claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, removeClaudePlugin } = require("./claude_runtime.cjs");
 
 const assistant = { type: "assistant", session_id: "exact-session", message: { content: [{ type: "text", text: "Working" }] } };
 
@@ -109,11 +109,15 @@ describe("Claude runtime contracts", () => {
     expect(calls[0]).toMatchObject({ stdinLength: 512 * 1024, timeout: "90000" });
     expect(calls[0].args.join(" ").length).toBeLessThan(100);
   });
-  it("resumes the captured session ID without re-sending the original prompt", () => {
+  it("resumes the captured session ID with continuation input rather than replaying the original prompt", () => {
     const { result, calls } = runStub(`
 if (previous === 0) {
   console.log(${JSON.stringify(JSON.stringify(assistant))});
   console.error("API Error: 529 overloaded_error");
+  process.exit(1);
+}
+if (!stdin) {
+  console.error("No deferred tool marker found; provide a prompt to continue");
   process.exit(1);
 }
 process.exit(0);
@@ -121,7 +125,8 @@ process.exit(0);
     expect(result.status).toBe(0);
     expect(calls).toHaveLength(2);
     expect(calls[1].args.slice(-2)).toEqual(["--resume", "exact-session"]);
-    expect(calls[1].stdinLength).toBe(0);
+    expect(calls[1].stdinLength).toBe(CLAUDE_RESUME_PROMPT.length);
+    expect(result.stderr).toContain("--resume exact-session");
   });
   it.each(["max_cache_misses_exceeded", "effective_tokens_limit_exceeded", "permission_denied_limit_exceeded", "model_policy_violation"])("does not retry terminal proxy guard %s", guard => {
     const { calls } = runStub(`

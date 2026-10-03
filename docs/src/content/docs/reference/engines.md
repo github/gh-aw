@@ -62,7 +62,7 @@ Not all features are available across all engines. The table below summarizes pe
 | Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
 
-`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support; Codex and Copilot require explicit `tools: web-search:` configuration. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
+`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support. Copilot requires explicit `tools.web-search`; Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
 
 ## Shared imported engines
 
@@ -90,7 +90,7 @@ Workflows can specify extended configuration for the coding agent:
 ```yaml wrap
 engine:
   id: copilot
-  version: latest                       # defaults to latest
+  version: latest                      # optional; defaults to a compiler-pinned version
   model: gpt-5                          # example override; omit to use engine default
   command: /usr/local/bin/copilot       # custom executable path
   args: ["--add-dir", "/workspace"]     # custom CLI arguments
@@ -100,7 +100,7 @@ engine:
 
 ### Pinning a Specific Engine Version
 
-By default, workflows install the latest available version of each engine CLI. To pin to a specific version, set `version` to the desired release:
+By default, workflows install a compiler-pinned version of each engine CLI. To override the pin, set `version` to the desired release:
 
 | Engine | `id` | Example `version` |
 |--------|------|-------------------|
@@ -358,7 +358,7 @@ engine:
 The `use` value must be a bare filename — no directory separators, no `..`, and no shell metacharacters. It must end with `.js`, `.cjs`, or `.mjs`. When `harness.use` is set, AWF automatically ensures Node 24 is available in the runner environment.
 
 > [!NOTE]
-> Custom harness scripts are supported by Copilot, Claude, and Codex.
+> Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
 
 **Validation rules for `harness.use`:**
 
@@ -398,7 +398,7 @@ When an expression is used, it must already be in milliseconds (GitHub Actions e
 
 The post-result watchdog is dormant until the harness observes a terminal safe output. `noop` and ordinary task outputs such as comments, labels, pushes, and pull request creation are terminal; diagnostics such as `missing_tool`, `missing_data`, and `report_incomplete` are not. Once armed, any stdout or stderr activity resets the inactivity clock. A quiet child process can still be terminated while it is doing useful work, and the harness may treat that termination as successful when a terminal safe output already exists.
 
-Claude arms the watchdog only for terminal outputs added during the current attempt. Its soft deadline also stops an active attempt before the Actions hard timeout. Resumable retries use the captured session ID and do not re-send the prompt. Fresh restarts after partial work are refused unless `engine.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART: "true"` explicitly declares the workflow replay-safe.
+Claude arms the watchdog only for terminal outputs added during the current attempt. Its soft deadline also stops an active attempt before the Actions hard timeout. Resumable retries use the captured session ID and a short continuation prompt, not the original task. Empty-input resume requires a deferred tool marker and cannot recover ordinary API-error terminations. Fresh restarts after partial work are refused unless `engine.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART: "true"` explicitly declares the workflow replay-safe.
 
 You can also set the underlying `GH_AW_HARNESS_*` env vars directly via `engine.env` when you need expression-level control, including `GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` for the post-result watchdog and `GH_AW_HARNESS_STARTUP_RETRIES` for fresh startup retries. Explicit `engine.env` values take precedence over `engine.harness` sub-key values. See [Harness Settings and Runtime Tuning Variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables) for supported env vars, units, and clamping behavior.
 
@@ -528,7 +528,7 @@ The underlying mechanism is engine-specific:
 | Engine | Effect |
 |--------|--------|
 | Copilot | Passes `--no-custom-instructions` — suppresses `.github/AGENTS.md` and user-level custom instructions |
-| Claude | Passes `--bare` — skips ambient instructions, hooks, skills, subagents, plugins, and MCP discovery; workflow-declared skills/subagents and pinned plugins load explicitly |
+| Claude | Passes `--bare` — skips ambient discovery; explicit workflow skills/pinned plugins load, but automatic Skill-tool invocation and subagent delegation are unavailable in the minimal tool set |
 | Pi | Disables automatic context, skill, prompt-template, extension, and theme discovery; explicit infrastructure extensions remain loaded |
 
 Defaults to `false`.
@@ -564,14 +564,14 @@ See [Long Build Times](/gh-aw/reference/sandbox/#long-build-times) in the Sandbo
 
 ### Per-Tool-Call Timeout (`tools.timeout`)
 
-`tools.timeout` limits how long any single tool invocation may run, in seconds. Useful when individual `bash` commands (builds, test suites) take longer than an engine's default:
+`tools.timeout` sets the per-operation limit in seconds where supported. For Codex, it limits native MCP calls rather than shell commands:
 
 ```yaml wrap
 tools:
   timeout: 300   # 5 minutes per tool call
 ```
 
-Defaults: Claude `60s`, Codex `120s`. Other engines (Copilot, Gemini) are engine-managed and not enforced by gh-aw. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration) for full documentation including `tools.startup-timeout`.
+Claude and Codex default to `60s` for tool calls. Codex's MCP startup timeout separately defaults to `120s`. Other engines (Copilot, Gemini) manage their own native tool limits. Codex resolves timeout expressions at runtime, with explicit per-server `engine.config` settings taking precedence. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration).
 
 ### Per-Engine Timeout Controls
 

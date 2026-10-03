@@ -166,6 +166,11 @@ type PluginInstallationProvider interface {
 	GetPluginInstallationSteps(workflowData *WorkflowData) []GitHubActionStep
 }
 
+// PostConfigPluginInstallationProvider installs plugin state after runtime configuration is written.
+type PostConfigPluginInstallationProvider interface {
+	GetPostConfigPluginInstallationSteps(workflowData *WorkflowData) []GitHubActionStep
+}
+
 // CapabilityProvider detects what capabilities an engine supports.
 // Engines can optionally implement this to indicate feature support.
 type CapabilityProvider interface {

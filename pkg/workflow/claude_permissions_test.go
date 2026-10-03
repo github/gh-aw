@@ -90,4 +90,19 @@ func TestClaudePermissionModeSchema(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+
+}
+
+func TestClaudeUsesNativeCLIRetryControl(t *testing.T) {
+	data := &WorkflowData{
+		Name:         "claude-cli-retries",
+		EngineConfig: &EngineConfig{ID: "claude"},
+	}
+	step := strings.Join(NewClaudeEngine().GetExecutionSteps(data, "/tmp/log")[0], "\n")
+	assert.Contains(t, step, "CLAUDE_CODE_MAX_RETRIES: 0")
+	assert.NotContains(t, step, "ANTHROPIC_MAX_RETRIES:")
+
+	data.EngineConfig.Env = map[string]string{"CLAUDE_CODE_MAX_RETRIES": "2"}
+	override := strings.Join(NewClaudeEngine().GetExecutionSteps(data, "/tmp/log")[0], "\n")
+	assert.Contains(t, override, "CLAUDE_CODE_MAX_RETRIES: 2")
 }

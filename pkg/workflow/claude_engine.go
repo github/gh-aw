@@ -454,12 +454,12 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	phase := workflowRunPhase(workflowData)
 	env["GH_AW_PHASE"] = phase
 	if phase != runPhaseDetection {
-		// Limit Anthropic SDK internal retries so terminal errors such as
+		// Limit Claude CLI internal retries so terminal errors such as
 		// 403 ai_credits_limit_exceeded are surfaced quickly to the harness.
 		// The outer harness already owns the full retry/backoff loop for 429/529.
 		// The external threat-detection path (threat-detect --engine claude) has no
-		// harness retry wrapper, so we leave SDK retries at their default there.
-		env["ANTHROPIC_MAX_RETRIES"] = "0"
+		// harness retry wrapper, so we leave CLI retries at their default there.
+		env["CLAUDE_CODE_MAX_RETRIES"] = "0"
 	}
 	if IsRelease() {
 		env["GH_AW_VERSION"] = GetVersion()

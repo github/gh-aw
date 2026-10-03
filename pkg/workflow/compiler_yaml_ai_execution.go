@@ -337,7 +337,7 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 //
 // The /reflect endpoint (served by the AWF api-proxy sidecar on port 10000) returns the
 // list of configured LLM providers together with their available model lists. The harness
-// fetches this data from inside the AWF container and writes it to /tmp/gh-aw/awf-reflect.json
+// fetches this data from inside the AWF container and writes it to /tmp/gh-aw/agent/awf-reflect.json
 // so this step can include it in the summary after the agent has completed.
 func (c *Compiler) generateAWFReflectSummary(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Print("Generating AWF reflect summary step")
@@ -540,6 +540,15 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	// Add MCP setup
 	if err := c.generateMCPSetup(yaml, data.Tools, engine, data); err != nil {
 		return nil, fmt.Errorf("MCP setup could not be generated, expected valid tool configuration in the 'tools' section: %w", err)
+	}
+
+	if installer, ok := engine.(PostConfigPluginInstallationProvider); ok {
+		for _, step := range installer.GetPostConfigPluginInstallationSteps(data) {
+			for _, line := range step {
+				yaml.WriteString(line)
+				yaml.WriteByte('\n')
+			}
+		}
 	}
 
 	// Mount MCP servers as CLI tools (runs after gateway is started)

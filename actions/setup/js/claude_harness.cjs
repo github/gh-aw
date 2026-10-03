@@ -20,15 +20,15 @@
  *   - Connection-refused failures before the first assistant response are retried as fresh
  *     runs because there is no session state to resume.
  *   - Other failures that produce no output use a separate bounded startup retry budget.
- *   - On a `--resume <id>` retry the initial prompt is omitted: Claude Code resumes the session
- *     from its on-disk state rather than re-processing the original instructions.
+ *   - On a `--resume <id>` retry a short continuation prompt replaces the original task.
+ *     Empty-input resume only works for deferred sessions, not ordinary API failures.
  *   - Retries use exponential backoff: 5s → 10s → 20s (capped at 60s) by default.
  *   - Maximum 3 retry attempts after the initial run by default.
  *
  * Prompt handling:
  *   - The harness expects a `--prompt-file <path>` argument in the args list.
  *   - For the initial run it reads the file and sends the content through stdin.
- *   - For resume retries stdin is empty.
+ *   - For resume retries stdin contains only the continuation prompt.
  *
  * Usage: node claude_harness.cjs <command> [args...]
  * Example: node claude_harness.cjs claude --print --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt
@@ -40,12 +40,21 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
 const { runProcess, formatDuration, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { applyClaudeRuntimeTimeouts } = require("./tool_timeouts.cjs");
-const { claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, claudeSafeOutputsOffset, removeClaudePlugin } = require("./claude_runtime.cjs");
+const {
+  CLAUDE_RESUME_PROMPT,
+  claudeFailureEvidence,
+  hasClaudeSessionProgress,
+  claudeSessionId,
+  claudePermissionDenials,
+  claudeBareCapabilities,
+  claudeRepositoryEditPolicy,
+  claudeSafeOutputsOffset,
+  removeClaudePlugin,
+} = require("./claude_runtime.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
-  AWF_REFLECT_OUTPUT_PATH,
   AWF_REFLECT_TIMEOUT_MS,
   AWF_MODELS_URL_TIMEOUT_MS,
   GEMINI_MODEL_NAME_PREFIX,
@@ -357,22 +366,17 @@ function stripContinueArgs(args) {
  * Build Claude child process env with provider endpoint overrides resolved from /reflect.
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-async function buildClaudeChildEnv() {
+async function buildClaudeChildEnv(reflectData) {
   const childEnv = { ...process.env };
   applyClaudeRuntimeTimeouts(childEnv);
   applyModelFallback(childEnv, "ANTHROPIC_MODEL", log);
   const provider = normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic");
-  try {
-    const raw = fs.readFileSync(AWF_REFLECT_OUTPUT_PATH, "utf8");
-    const reflectData = JSON.parse(raw);
+  if (reflectData) {
     const resolved = resolveProviderEndpointFromReflect({ provider, reflectData, logger: log });
     if (resolved && resolved.baseUrl) {
       childEnv.ANTHROPIC_BASE_URL = resolved.baseUrl;
       log(`configured ANTHROPIC_BASE_URL from /reflect for provider=${provider}: ${resolved.baseUrl}`);
     }
-  } catch (error) {
-    const err = /** @type {Error} */ error;
-    log(`warning: unable to resolve provider endpoint from /reflect: ${err.message}`);
   }
   return childEnv;
 }
@@ -418,8 +422,8 @@ async function main() {
 
   // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
   // This is best-effort: failures are logged but do not affect the agent run.
-  await fetchAWFReflect({ logger: log });
-  const childEnv = await buildClaudeChildEnv();
+  const reflection = await fetchAWFReflect({ logger: log });
+  const childEnv = await buildClaudeChildEnv(reflection.reflectData);
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
   // A noop indicates the work is complete or there is nothing to do — starting the agent
@@ -454,7 +458,7 @@ async function main() {
     harnessName: "Claude harness",
     log,
     softTimeoutGuard,
-    getRetryMode: () => (useContinueOnRetry ? "--continue" : "fresh run"),
+    getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
     runAttempt: async attempt => {
       // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
@@ -481,7 +485,7 @@ async function main() {
         log,
         logArgs,
         env: childEnv,
-        stdin: attempt > 0 && useContinueOnRetry ? undefined : (prompt ?? undefined),
+        stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),
@@ -673,6 +677,10 @@ async function main() {
       }
 
       if (attempt < maxRetries && result.hasOutput) {
+        if (!continueDisabledPermanently && !sessionId) {
+          log("partial execution produced no session ID — not retrying to avoid resuming an unrelated conversation");
+          return { action: "stop" };
+        }
         const retryWithContinue = shouldRetryWithContinue({
           attempt,
           maxRetries,
@@ -683,7 +691,7 @@ async function main() {
         });
         const reason = isOverloaded ? "overloaded_error (transient)" : isRateLimit ? "rate_limit_error (transient)" : "partial execution";
         useContinueOnRetry = retryWithContinue;
-        const retryMode = retryWithContinue ? "--continue" : "fresh run (--continue disabled permanently)";
+        const retryMode = retryWithContinue ? `--resume ${sessionId}` : "fresh run (session resume disabled permanently)";
         log(`attempt ${attempt + 1}: ${reason} — will retry with ${retryMode} (attempt ${attempt + 2}/${maxRetries + 1})`);
         return { action: "retry" };
       }

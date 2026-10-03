@@ -1,0 +1,32 @@
+---
+// Clouds-only backdrop for per-page social images (see src/pages/og/).
+// Dev-only route (/og-preview/background/); `npm run og` captures it to
+// src/og/background.png.
+import '../styles/tokens.css';
+import HeroBackground from '../components/landing/HeroBackground.astro';
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>Social preview background</title>
+  </head>
+  <body>
+    <main class="og"><HeroBackground /></main>
+  </body>
+</html>
+
+<style>
+  html,
+  body {
+    margin: 0;
+    background: var(--aw-color-bg);
+  }
+  .og {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+  }
+</style>

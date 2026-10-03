@@ -251,7 +251,8 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	// the converted MCP config can be copied into the writable Codex home directory.
 	// This matches the value set on the agent step in codex_engine.go.
 	if workflowData != nil && workflowData.AI == string(constants.CodexEngine) {
-		envVars["CODEX_HOME"] = constants.TmpMcpConfigDir
+		envVars["CODEX_HOME"] = codexHome(workflowData)
+		applyOptionalEngineToolTimeouts(envVars, workflowData)
 	}
 
 	return envVars

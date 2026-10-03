@@ -270,6 +270,14 @@ describe("writeInlineSkills", () => {
     expect(written).toContain("description: A helper skill");
   });
 
+  it("writes Codex skills as discoverable SKILL.md files", () => {
+    const content = "# Workflow\n\nMain prompt.\n\n" + skillMarker("helper") + "\n---\ndescription: A helper skill\n---\nYou are a helper.";
+    const result = writeInlineSkills(content, tmpDir, tmpDir, "codex");
+    expect(result).toBe("# Workflow\n\nMain prompt.");
+    expect(fs.existsSync(path.join(tmpDir, ".codex", "skills", "helper", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, ".codex", "skills", "helper.md"))).toBe(false);
+  });
+
   it("writes multiple skill files", () => {
     const content = ["Main.", "", skillMarker("planner"), "Planner.", "", skillMarker("executor"), "Executor."].join("\n");
 
