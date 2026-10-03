@@ -3005,6 +3005,12 @@
       "desc": "Checkout configuration for the agent job.",
       "enum": [false],
       "children": {
+        "pull-request": {
+          "type": "boolean",
+          "desc": "Set to false to disable the compiler-generated PR branch checkout and its associated base-config snapshot/restore steps.",
+          "enum": [true, false],
+          "leaf": true
+        },
         "repository": {
           "type": "string",
           "desc": "Repository to checkout in owner/repo format.",

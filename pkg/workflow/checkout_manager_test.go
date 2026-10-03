@@ -420,6 +420,19 @@ func TestParseCheckoutConfigs(t *testing.T) {
 		assert.Equal(t, 0, *configs[0].FetchDepth, "fetch-depth should be 0")
 	})
 
+	t.Run("pull-request false disables generated PR checkout", func(t *testing.T) {
+		configs, err := ParseCheckoutConfigs(map[string]any{"pull-request": false})
+		require.NoError(t, err)
+		require.Len(t, configs, 1)
+		require.NotNil(t, configs[0].PullRequest)
+		assert.False(t, *configs[0].PullRequest)
+	})
+
+	t.Run("pull-request must be a boolean", func(t *testing.T) {
+		_, err := ParseCheckoutConfigs(map[string]any{"pull-request": "false"})
+		require.ErrorContains(t, err, "checkout.pull-request must be a boolean")
+	})
+
 	t.Run("negative fetch-depth returns error", func(t *testing.T) {
 		for _, depth := range []float64{-1, -999999} {
 			raw := map[string]any{

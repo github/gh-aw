@@ -82,6 +82,14 @@ func ParseCheckoutConfigs(raw any) ([]*CheckoutConfig, error) {
 func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint:largefunc // Existing checkout parsing remains centralized.
 	cfg := &CheckoutConfig{}
 
+	if v, ok := m["pull-request"]; ok {
+		b, ok := v.(bool)
+		if !ok {
+			return nil, errors.New("checkout.pull-request must be a boolean. Example:\ncheckout:\n  pull-request: false")
+		}
+		cfg.PullRequest = &b
+	}
+
 	if v, ok := m["repository"]; ok {
 		s, ok := v.(string)
 		if !ok {

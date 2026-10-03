@@ -634,6 +634,37 @@ The diff output shows: new or removed network domains, status changes (allowed â
 
 **Options:** `--artifacts`, `--format` (pretty, markdown; default: pretty), `--json/-j`, `--output/-o`, `--repo/-r`
 
+#### `sessions`
+
+Experimental: download a unified agent session for an existing workflow run. The command writes
+`usage/aw_session.jsonl` to standard output without changing its contents. If that
+file is absent, it reconstructs the session from the agent artifact using the same
+engine parsers as `audit`, including available MCP and firewall evidence.
+Reconstruction does not fetch missing downstream artifacts; the collection record
+identifies absent components and source warnings.
+Runs from older `gh-aw` versions do not need `aw_session.jsonl` or
+`agent-session.jsonl`: native Copilot events, Pi streams, and raw engine logs are
+parsed into the current unified format. Legacy `agent-artifacts` and standalone
+`agent-stdio-log`/`agent-stdio.log` artifacts are supported, along with
+`aw-info`/`aw_info` or activation metadata.
+
+```bash wrap
+gh aw sessions download 1234567890 --repo owner/repo
+gh aw sessions download https://github.com/owner/repo/actions/runs/1234567890 --format markdown
+gh aw sessions download 1234567890 -o session.jsonl
+```
+
+**Options:** `--format` (`jsonl` or `markdown`; default: `jsonl`),
+`--output/-o` (output file), `--repo/-r` (`[HOST/]owner/repo`; defaults to the
+current repository).
+
+JSONL preserves the complete unified session payload. Markdown uses the shared,
+bounded summary renderer, omits user prompts and private tool payloads, and
+reports display truncation. Node.js is required for reconstruction and Markdown
+rendering, but not for downloading an existing unified JSONL file. Missing
+artifacts, download failures, and invalid session files return errors.
+The command and its output formats may change.
+
 #### `graders`
 
 Run one grader declared by a local workflow against a saved run payload or JSON

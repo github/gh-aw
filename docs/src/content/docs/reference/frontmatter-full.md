@@ -23167,12 +23167,20 @@ runtimes:
 # Checkout configuration for the agent job. Controls how actions/checkout is
 # invoked. Can be a single checkout configuration, an array for multiple
 # checkouts, or false to disable the default checkout step entirely (dev-mode
-# checkouts are unaffected).
+# checkouts are unaffected). Set pull-request: false in a checkout configuration
+# to disable the generated PR branch checkout and its associated base-config
+# snapshot/restore steps.
 # (optional)
 # Accepted formats:
 
 # Format 1: Single checkout configuration for the default workspace
 checkout:
+  # Set to false to disable the compiler-generated PR branch checkout and its
+  # associated base-config snapshot/restore steps. The normal repository checkout
+  # remains enabled.
+  # (optional)
+  pull-request: true
+
   # Repository to checkout in owner/repo format. Defaults to the current repository.
   # (optional)
   repository: "example-value"
