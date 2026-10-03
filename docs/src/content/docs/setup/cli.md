@@ -647,6 +647,8 @@ Runs from older `gh-aw` versions do not need `aw_session.jsonl` or
 parsed into the current unified format. Legacy `agent-artifacts` and standalone
 `agent-stdio-log`/`agent-stdio.log` artifacts are supported, along with
 `aw-info`/`aw_info` or activation metadata.
+If engine metadata was not uploaded, the command reuses audit's engine inference
+on retained agent logs, including older Copilot debug process logs.
 
 ```bash wrap
 gh aw sessions download 1234567890 --repo owner/repo

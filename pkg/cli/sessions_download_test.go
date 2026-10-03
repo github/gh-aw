@@ -205,12 +205,33 @@ func TestSessionsDownloadPreviousVersions(t *testing.T) {
 				} else {
 					require.Contains(t, output, "### Unified session")
 				}
+
 			}
 			commands, err := os.ReadFile(calls)
 			require.NoError(t, err)
 			require.Less(t, strings.Index(string(commands), "--name usage"), strings.Index(string(commands), "--name "+test.artifact))
 			require.Contains(t, string(commands), "--name "+test.metadata)
 		})
+	}
+}
+
+func TestSessionsDownloadInfersMetadataFreeCopilot(t *testing.T) {
+	requireSessionTestNode(t)
+	installSessionTestGH(t, map[string]map[string]string{
+		"agent": {
+			"agent-stdio.log":                        "● Bash\n    └ Historical tool output\n● Bash\n    └ Another output\n\nTurns: 5\nTotal usage est: 100 tokens\n",
+			"sandbox/agent/logs/process-session.log": "2026-09-07T00:00:00Z [DEBUG] data:\n{\n  \"usage\": {\"prompt_tokens\":100,\"completion_tokens\":50}\n}\n",
+		},
+	})
+	for _, format := range []string{"jsonl", "markdown"} {
+		output, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo", "--format", format)
+		require.NoError(t, err)
+		require.Contains(t, output, "tool.execution_start")
+		require.Contains(t, output, "session.result")
+		if format == "jsonl" {
+			require.NoError(t, validateSessionJSONL([]byte(output)))
+			require.Contains(t, output, `"numTurns":5`)
+		}
 	}
 }
 

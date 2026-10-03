@@ -192,10 +192,36 @@ func sessionEngine(ctx context.Context, run *parser.GitHubURLComponents, hostnam
 			return "", fmt.Errorf("failed to read session engine metadata: %w", err)
 		}
 	}
+	engineID, err := inferSessionEngineFromLogs(root)
+	if err != nil {
+		return "", err
+	}
+	if engineID != "" {
+		sessionsDownloadLog.Printf("Inferred session engine from agent logs using audit parsers: %s", engineID)
+		return engineID, nil
+	}
 	// The collector can read canonical events without engine metadata and can
 	// recognize Pi's dedicated stream. Other logs use its custom-engine parser.
 	sessionsDownloadLog.Print("No engine metadata available; using the unified collector's source detection")
 	return "", nil
+}
+
+func inferSessionEngineFromLogs(root string) (string, error) {
+	if _, engineID := inferFallbackLogMetrics(root); engineID != "" {
+		return engineID, nil
+	}
+	// Older Copilot artifacts retain debug process logs even when their stdio
+	// stream is plain text and aw_info.json was not uploaded.
+	logPath, found := findAgentLogFile(root, workflow.NewCopilotEngine())
+	if !found {
+		return "", nil
+	}
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read agent log for engine inference: %w", err)
+	}
+	_, engineID := inferBestEngineMetricsFromContent(string(content))
+	return engineID, nil
 }
 
 func formatSession(ctx context.Context, content []byte, sessionPath, format string) ([]byte, error) {
