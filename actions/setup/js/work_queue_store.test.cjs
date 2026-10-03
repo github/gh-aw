@@ -2,9 +2,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishWorkQueueTransactions, WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, readWorkQueueLog } from "./work_queue_store.cjs";
 import { claimOldestAvailableWork, createWorkTransaction, parseTransactionLog, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { CURRENT_VERSION } from "./work_queue_codemods.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ version: CURRENT_VERSION, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: CURRENT_VERSION, kind: "Claim", work: workId, claim: id, attempt: null });
 
 function createFakeGitHub() {
   const blobs = new Map();
@@ -201,6 +202,32 @@ describe("work queue Git store", () => {
     expect(fake.blobs.size).toBe(0);
   });
 
+  it("upgrades a v1 log through checked publication while preserving historical Work age", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "v1-head";
+    fake.state.transactions = [work("old")];
+    fake.state.rawContents = `${JSON.stringify({ ...work("old"), version: 1 })}\n`;
+
+    const readOnly = await readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo", publishUpgrades: false });
+    expect(readOnly.sha).toBe("v1-head");
+    expect(readOnly.transactions).toEqual([work("old")]);
+    expect(fake.blobs.size).toBe(0);
+
+    const result = await applyAndPublishWorkQueueTransactions({
+      githubClient: fake.githubClient,
+      owner: "owner",
+      repo: "repo",
+      intents: [createWorkTransaction("old", 200), createWorkTransaction("new", 100)],
+    });
+    expect(result.persisted).toBe(true);
+    expect(fake.state.updateCalls).toBe(1);
+    expect(result.transactions).toEqual([createWorkTransaction("new", 100), work("old")]);
+    expect(replayTransactions(result.transactions).available).toEqual(["old", "new"]);
+    expect([...fake.blobs.values()]).toEqual([serializeTransactionLog(result.transactions)]);
+    expect(await readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).toMatchObject({ transactions: result.transactions });
+    expect(fake.state.updateCalls).toBe(1);
+  });
+
   it("retries a concurrent upgrade against the new head", async () => {
     const fake = createFakeGitHub();
     fake.state.sha = "legacy-head";
@@ -215,13 +242,20 @@ describe("work queue Git store", () => {
   });
 
   it("never publishes an invalid or unsupported mixed-version log", async () => {
-    const fake = createFakeGitHub();
-    fake.state.sha = "invalid-head";
-    fake.state.transactions = [work("w")];
-    fake.state.rawContents = `${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null })}\n${JSON.stringify({ ...claim("w", "c"), version: 99 })}\n`;
-    await expect(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).rejects.toThrow("Failed to read work queue log");
-    expect(fake.state.updateCalls).toBe(0);
-    expect(fake.blobs.size).toBe(0);
+    for (const invalid of [
+      { ...claim("w", "c"), version: 99 },
+      { kind: "Work", work: "invalid", claim: null, attempt: null, enqueued: 1 },
+      { version: 0, kind: "Work", work: "invalid", claim: null, attempt: null, enqueued: 1 },
+      { version: 1, kind: "Work", work: "invalid", claim: null, attempt: null, enqueued: 1 },
+    ]) {
+      const fake = createFakeGitHub();
+      fake.state.sha = "invalid-head";
+      fake.state.transactions = [work("w")];
+      fake.state.rawContents = `${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null })}\n${JSON.stringify(invalid)}\n`;
+      await expect(readWorkQueueLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" })).rejects.toThrow("Failed to read work queue log");
+      expect(fake.state.updateCalls).toBe(0);
+      expect(fake.blobs.size).toBe(0);
+    }
   });
 
   it("retains live legacy storage for read-only snapshots and checked writes", async () => {
@@ -241,12 +275,12 @@ describe("work queue Git store", () => {
       githubClient: fake.githubClient,
       owner: "owner",
       repo: "repo",
-      intents: [{ version: 1, kind: "Completion", work: "w", claim: "c", attempt: "a" }],
+      intents: [{ version: CURRENT_VERSION, kind: "Completion", work: "w", claim: "c", attempt: "a" }],
       sleepFn: async () => {},
     });
     expect(result.persisted).toBe(true);
     expect(fake.state.transactions).toContainEqual(work("remote-work"));
-    expect(fake.state.transactions).toContainEqual({ version: 1, kind: "Completion", work: "w", claim: "c", attempt: "a" });
+    expect(fake.state.transactions).toContainEqual({ version: CURRENT_VERSION, kind: "Completion", work: "w", claim: "c", attempt: "a" });
     expect(fake.state.updateCalls).toBe(2);
     expect(fake.state.branch).toBe("dispatch-coordinator");
   });

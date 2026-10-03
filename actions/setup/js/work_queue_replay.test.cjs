@@ -3,12 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import selectionFixtures from "../../../specs/work-queue/selection-fixtures.json";
 import { applyTransactions, claimOldestAvailableWork, compactTransactions, createWorkTransaction, oldestAvailableWork, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./work_queue_replay.cjs";
+import { CODEMODS, CURRENT_VERSION, upgradeTransaction } from "./work_queue_codemods.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
-const cancelClaim = (workId, id) => ({ version: 1, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
-const complete = (workId, claimId, attempt) => ({ version: 1, kind: "Completion", work: workId, claim: claimId, attempt });
-const cancelWork = id => ({ version: 1, kind: "WorkCancellation", work: id, claim: null, attempt: null });
+const work = id => ({ version: CURRENT_VERSION, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: CURRENT_VERSION, kind: "Claim", work: workId, claim: id, attempt: null });
+const cancelClaim = (workId, id) => ({ version: CURRENT_VERSION, kind: "ClaimCancellation", work: workId, claim: id, attempt: null });
+const complete = (workId, claimId, attempt) => ({ version: CURRENT_VERSION, kind: "Completion", work: workId, claim: claimId, attempt });
+const cancelWork = id => ({ version: CURRENT_VERSION, kind: "WorkCancellation", work: id, claim: null, attempt: null });
 
 function permutations(items) {
   if (items.length < 2) return [items];
@@ -180,20 +181,55 @@ describe("work queue replay", () => {
     expect(parseTransactionLog("")).toEqual([]);
   });
 
-  it("upgrades unversioned and version-zero records to the current protocol", () => {
-    const oldWork = { kind: "Work", work: "w", claim: null, attempt: null };
-    const oldClaim = { version: 0, kind: "Claim", work: "w", claim: "c", attempt: null };
-    const upgraded = parseTransactionLog(`${JSON.stringify(oldWork)}\n${JSON.stringify(oldClaim)}\n`);
-    expect(upgraded).toEqual([work("w"), claim("w", "c")]);
-    expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog([work("w"), claim("w", "c")]));
-    expect(() => validateTransaction(oldWork)).toThrow("exactly version");
+  it("upgrades all historical kinds deterministically to v2 without inventing age", () => {
+    expect(CURRENT_VERSION).toBe(2);
+    expect(CODEMODS).toEqual([
+      { from: 0, to: 1, set: { version: 1 } },
+      { from: 1, to: 2, set: { version: 2 } },
+    ]);
+    const facts = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), complete("w", "b", "run"), work("other"), cancelWork("other")];
+    for (const version of [undefined, 0, 1]) {
+      const historical = facts.map(({ version: _, ...fact }) => (version === undefined ? fact : { version, ...fact }));
+      const before = JSON.stringify(historical);
+      const upgraded = parseTransactionLog(`${historical.map(fact => JSON.stringify(fact)).join("\n")}\n`);
+      expect(upgraded).toEqual(facts);
+      expect(serializeTransactionLog(upgraded)).toBe(serializeTransactionLog(facts));
+      expect(upgradeTransaction(historical[0])).toEqual(work("w"));
+      expect(upgradeTransaction(upgradeTransaction(historical[0]))).toEqual(work("w"));
+      expect(JSON.stringify(historical)).toBe(before);
+      expect(upgraded.filter(fact => fact.kind === "Work").every(fact => !Object.hasOwn(fact, "enqueued"))).toBe(true);
+    }
+    const legacyWork = { version: 1, kind: "Work", work: "legacy", claim: null, attempt: null };
+    const upgraded = parseTransactionLog(`${JSON.stringify(createWorkTransaction("new", 1))}\n${JSON.stringify(legacyWork)}\n`);
+    expect(replayTransactions(upgraded).available).toEqual(["legacy", "new"]);
+    expect(applyTransactions(upgraded, [createWorkTransaction("legacy", 100)]).transactions).toEqual(upgraded);
+    expect(() => validateTransaction(legacyWork)).toThrow("unsupported work queue transaction version");
+    expect(() => validateTransaction({ kind: "Work", work: "w", claim: null, attempt: null })).toThrow("exactly version");
+  });
+
+  it("rejects extra metadata on closed historical versions before upgrading", () => {
+    for (const version of [undefined, 0, 1]) {
+      for (const fact of [work("w"), claim("w", "c")]) {
+        const { version: _, ...fields } = fact;
+        const historical = version === undefined ? fields : { version, ...fields };
+        for (const extra of [{ enqueued: 0 }, { enqueued: 123 }, { run_id: "run" }, { extra: true }]) {
+          expect(() => upgradeTransaction({ ...historical, ...extra })).toThrow("historical transaction must contain exactly");
+          expect(() => parseTransactionLog(`${JSON.stringify({ ...historical, ...extra })}\n`)).toThrow("historical transaction must contain exactly");
+        }
+        const missingField = { ...historical };
+        delete missingField.attempt;
+        expect(() => upgradeTransaction(missingField)).toThrow("historical transaction must contain exactly");
+      }
+    }
   });
 
   it("rejects unknown or malformed message versions and never accepts partial upgrades", () => {
-    for (const version of [-1, 1.5, "1", 2, null]) {
+    for (const version of [-1, 1.5, "1", 3, null, true, {}, Number.MAX_SAFE_INTEGER + 1]) {
       expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify({ ...claim("w", "c"), version })}\n`)).toThrow("unsupported work queue transaction version");
     }
     expect(() => parseTransactionLog(`${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null, extra: true })}\n`)).toThrow("exactly version");
+    expect(() => parseTransactionLog(`${JSON.stringify({ version: 1, kind: "Work", work: "w", claim: "invalid", attempt: null })}\n`)).toThrow("must not include");
+    expect(() => serializeTransactionLog([{ ...work("w"), version: 1 }])).toThrow("unsupported work queue transaction version");
   });
 
   it("rejects malformed JSONL records and blank lines", () => {

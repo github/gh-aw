@@ -21,6 +21,7 @@ const (
 	workQueueFinishFile         = "work-queue.finish.jsonl"
 	legacyWorkQueueSnapshotFile = "dispatch-work-coordinator.snapshot.json"
 	legacyWorkQueueFinishFile   = "dispatch-work-coordinator.finish.jsonl"
+	workQueueTransactionVersion = 2
 )
 
 // WorkQueueReport separates activation-time queue facts and agent intent
@@ -152,15 +153,29 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if fields == nil {
 		return tx, errors.New("transaction must be a JSON object")
 	}
-	// The runtime upgrades unversioned historical records to version 1.
+	// Match the runtime's closed historical shapes before upgrading to v2.
 	_, hasVersion := fields["version"]
-	legacy := !hasVersion || strings.TrimSpace(string(fields["version"])) == "0"
-	if !hasVersion {
-		fields["version"] = json.RawMessage("1")
+	version := 0
+	if hasVersion {
+		if strings.TrimSpace(string(fields["version"])) == "null" {
+			return tx, errors.New("invalid transaction version")
+		}
+		if err := json.Unmarshal(fields["version"], &version); err != nil {
+			return tx, err
+		}
 	}
-	expectedFields := 5
+	if version < 0 || version > workQueueTransactionVersion {
+		return tx, errors.New("unsupported work queue transaction version")
+	}
+	expectedFields := 4
+	if hasVersion {
+		expectedFields++
+	}
 	_, hasEnqueued := fields["enqueued"]
 	if hasEnqueued {
+		if version < workQueueTransactionVersion {
+			return tx, errors.New("historical transaction must not contain enqueue metadata")
+		}
 		expectedFields++
 	}
 	if len(fields) != expectedFields || fields["kind"] == nil || fields["work"] == nil || fields["claim"] == nil || fields["attempt"] == nil {
@@ -169,13 +184,10 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if err := json.Unmarshal(data, &tx); err != nil {
 		return tx, err
 	}
-	if legacy {
-		tx.Version = 1
-	}
 	if hasEnqueued && (tx.Kind != "Work" || tx.Enqueued == nil || *tx.Enqueued < 0 || *tx.Enqueued > workqueue.MaxEnqueued) {
 		return tx, errors.New("invalid Work enqueue time")
 	}
-	if tx.Version != 1 || tx.Work == "" ||
+	if tx.Work == "" ||
 		(tx.Claim != nil && *tx.Claim == "") || (tx.Attempt != nil && *tx.Attempt == "") {
 		return tx, errors.New("invalid transaction version or identifiers")
 	}
@@ -191,6 +203,7 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if !valid {
 		return tx, fmt.Errorf("invalid %q transaction", tx.Kind)
 	}
+	tx.Version = workQueueTransactionVersion
 	return tx, nil
 }
 

@@ -49,10 +49,15 @@ The operator transaction wire format (`Transaction`) is defined in
 The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate
 each operator record before replay or publication. The workflow runtime uses a
 separate `work-queue` branch and the versioned `WorkQueueTransaction` format:
-required fields `version: 1`, `kind`, `work`, `claim`, and `attempt`, plus optional
+required fields `version: 2`, `kind`, `work`, `claim`, and `attempt`, plus optional
 `enqueued` on Work. Unused claim/attempt
 fields are explicitly `null`; identities are nonempty strings. Its loader upgrades
-unversioned/version-0 workflow records before validation and replay. These formats
+unversioned/version-0/version-1 workflow records through successive codemods before
+validation and replay. Version 1 remains the closed five-field format without
+`enqueued`; historical records with extra fields are rejected before upgrading.
+The 1-to-2 upgrade changes only the version, leaving historical Work at age zero
+without inventing enqueue metadata. The snapshot envelope version is independent
+of the transaction version. These formats
 are not interchangeable; the CLI branch also preserves Work payloads and run
 provenance, which the workflow fact format does not contain.
 

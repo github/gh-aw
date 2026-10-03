@@ -59,7 +59,7 @@ scalar WorkQueueIdentity extends string;
 
 @jsonSchema
 model WorkQueueWorkTransaction {
-  version: 1;
+  version: 2;
   kind: "Work";
   work: WorkQueueIdentity;
   claim: null;
@@ -69,7 +69,7 @@ model WorkQueueWorkTransaction {
 
 @jsonSchema
 model WorkQueueClaimTransaction {
-  version: 1;
+  version: 2;
   kind: "Claim";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
@@ -78,7 +78,7 @@ model WorkQueueClaimTransaction {
 
 @jsonSchema
 model WorkQueueClaimCancellationTransaction {
-  version: 1;
+  version: 2;
   kind: "ClaimCancellation";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
@@ -87,7 +87,7 @@ model WorkQueueClaimCancellationTransaction {
 
 @jsonSchema
 model WorkQueueWorkCancellationTransaction {
-  version: 1;
+  version: 2;
   kind: "WorkCancellation";
   work: WorkQueueIdentity;
   claim: null;
@@ -96,14 +96,14 @@ model WorkQueueWorkCancellationTransaction {
 
 @jsonSchema
 model WorkQueueCompletionTransaction {
-  version: 1;
+  version: 2;
   kind: "Completion";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
   attempt: WorkQueueIdentity;
 }
 
-@doc("Canonical version-1 workflow work-queue records stored on work-queue.")
+@doc("Canonical version-2 workflow work-queue records stored on work-queue.")
 @jsonSchema
 union WorkQueueTransaction {
   WorkQueueWorkTransaction,

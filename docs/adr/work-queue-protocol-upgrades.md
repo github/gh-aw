@@ -12,13 +12,17 @@ The [work queue ledger](64955-git-backed-work-queue-coordination.md) is durable.
 
 ### Decision
 
-Every workflow ledger message has an integer version. Define declarative codemods for successive protocol versions in `actions/setup/js/work_queue_codemods.cjs`. On load, apply the codemods in version order to older messages, then compact and validate the resulting ledger before writing it back through the queue's version-checked publication path. Reject unknown versions or messages that cannot be upgraded or validated; do not publish a partial upgrade.
+Every workflow ledger message has an integer version. Define declarative codemods for successive protocol versions in `actions/setup/js/work_queue_codemods.cjs`. On load, check older messages against their closed historical field sets, apply the codemods in version order, then compact and validate the resulting ledger before writing it back through the queue's version-checked publication path. Reject unknown versions or messages that cannot be upgraded or validated; do not publish a partial upgrade.
 
-The original unversioned messages (and explicit version 0 messages) upgrade to version 1, which retains the existing transaction fields and adds `version: 1`. New intents use version 1. Trusted write-capable readers publish the canonical upgraded log using the same fast-forward-only, retrying path as other queue writes. Read-only activation loads upgrade and validate in memory for their immutable snapshots, deferring publication until a trusted write-capable reader accesses the log.
+The original unversioned messages (and explicit version 0 messages) upgrade to version 1, which retains the existing transaction fields and adds `version: 1`. Version 1 remains exactly `version`, `kind`, `work`, `claim`, and `attempt`; it does not permit `enqueued` or other extra fields.
+
+Version 2 adds optional immutable `enqueued` metadata on Work only: Unix milliseconds in the integer range `0..9007199254740991`. The deterministic 1-to-2 codemod changes only `version` to 2. Historical Work keeps absent enqueue metadata and age zero; migration never derives timestamps from the clock or log position. New intents and serialized logs use version 2. Trusted write-capable readers publish the canonical upgraded log using the same fast-forward-only, retrying path as other queue writes. Read-only activation loads upgrade and validate in memory for their immutable snapshots, deferring publication until a trusted write-capable reader accesses the log.
 
 The canonical workflow record is the `WorkQueueTransaction` union in
-[`transactions.tsp`](../../specs/work-queue/transactions.tsp), with exactly
-`version`, `kind`, `work`, `claim`, and `attempt`. This decision covers the workflow
+[`transactions.tsp`](../../specs/work-queue/transactions.tsp), with required
+`version: 2`, `kind`, `work`, `claim`, and `attempt`, plus optional `enqueued` on
+Work. The activation snapshot envelope's separate version remains 2; it is not
+the transaction protocol version. This decision covers the workflow
 ledger on `work-queue`, not the separate operator `Transaction` format on
 `gh-aw-work-queue`.
 

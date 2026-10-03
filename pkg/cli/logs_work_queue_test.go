@@ -21,8 +21,8 @@ func writeWorkQueueFixture(t *testing.T, dir string) {
 	data, err := json.Marshal(map[string]any{
 		"version": 2, "sha": "snapshot-sha",
 		"worker": map[string]string{"work_id": "w", "claim_id": "c"},
-		"transactionLog": "{\"version\":1,\"kind\":\"Work\",\"work\":\"w\",\"claim\":null,\"attempt\":null}\n" +
-			"{\"version\":1,\"kind\":\"Claim\",\"work\":\"w\",\"claim\":\"c\",\"attempt\":null}\n",
+		"transactionLog": "{\"version\":2,\"kind\":\"Work\",\"work\":\"w\",\"claim\":null,\"attempt\":null}\n" +
+			"{\"version\":2,\"kind\":\"Claim\",\"work\":\"w\",\"claim\":\"c\",\"attempt\":null}\n",
 	})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueSnapshotFile), data, 0o600))
@@ -59,6 +59,7 @@ func TestWorkQueueReport(t *testing.T) {
 	assert.Equal(t, "snapshot-sha", *report.Snapshot.SHA)
 	assert.Equal(t, &WorkQueueWorker{WorkID: "w", ClaimID: "c"}, report.Snapshot.Worker)
 	require.Len(t, report.Snapshot.Transactions, 2)
+	assert.Equal(t, 2, report.Snapshot.Transactions[0].Version)
 	assert.Equal(t, "Claim", report.Snapshot.Transactions[1].Kind)
 	assert.Equal(t, "completed", report.FinishIntent)
 	require.Len(t, report.Operations, 3, "mirrored whole-job and step logs must not double count operations")
@@ -138,19 +139,34 @@ func TestWorkQueueSnapshotValidation(t *testing.T) {
 	for _, transaction := range []string{
 		`{"kind":"Work","work":"w","claim":null,"attempt":null}`,
 		`{"version":0,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Claim","work":"w","claim":"c","attempt":null}`,
 		`{"version":1,"kind":"ClaimCancellation","work":"w","claim":"c","attempt":null}`,
 		`{"version":1,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Completion","work":"w","claim":"c","attempt":"42-1"}`,
-		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":2,"kind":"Claim","work":"w","claim":"c","attempt":null}`,
+		`{"version":2,"kind":"ClaimCancellation","work":"w","claim":"c","attempt":null}`,
+		`{"version":2,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null}`,
+		`{"version":2,"kind":"Completion","work":"w","claim":"c","attempt":"42-1"}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740991}`,
 	} {
 		tx, err := parseWorkQueueTransaction([]byte(transaction))
 		require.NoError(t, err)
-		assert.Equal(t, 1, tx.Version)
+		assert.Equal(t, 2, tx.Version)
+		if !strings.Contains(transaction, `"enqueued"`) {
+			assert.Nil(t, tx.Enqueued, "upgrades must not invent enqueue metadata")
+		}
 	}
 	for _, transaction := range []string{
 		`null`, `{}`, `bad`,
-		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":3,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":-1,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":1.5,"kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":"1","kind":"Work","work":"w","claim":null,"attempt":null}`,
+		`{"version":false,"kind":"Work","work":"w","claim":null,"attempt":null}`,
 		`{"version":null,"kind":"Work","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Work","work":"","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Work","work":"w","claim":"c","attempt":null}`,
@@ -159,9 +175,21 @@ func TestWorkQueueSnapshotValidation(t *testing.T) {
 		`{"version":1,"kind":"Other","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Work","work":"w","claim":null,"extra":null}`,
 		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":null}`,
+		`{"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0}`,
+		`{"version":0,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"run_id":"run"}`,
 		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":-1}`,
 		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740992}`,
 		`{"version":1,"kind":"Claim","work":"w","claim":"c","attempt":null,"enqueued":123}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":null}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":-1}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740992}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0.5}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":"123"}`,
+		`{"version":2,"kind":"Claim","work":"w","claim":"c","attempt":null,"enqueued":123}`,
+		`{"version":2,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null,"enqueued":123}`,
+		`{"version":2,"kind":"Work","work":"w","claim":null,"attempt":null,"extra":true}`,
 	} {
 		_, err := parseWorkQueueTransaction([]byte(transaction))
 		require.Error(t, err, transaction)

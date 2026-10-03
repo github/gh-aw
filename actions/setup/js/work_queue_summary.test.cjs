@@ -6,14 +6,14 @@ import path from "path";
 import { main, renderSummary } from "./work_queue_summary.cjs";
 import { replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (id, claimId) => ({ version: 1, kind: "Claim", work: id, claim: claimId, attempt: null });
+const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (id, claimId) => ({ version: 2, kind: "Claim", work: id, claim: claimId, attempt: null });
 const initial = [work("done"), claim("done", "claim-a"), work("retry"), claim("retry", "claim-b"), work("cancel"), work("waiting")];
 const latest = [
   ...initial,
-  { version: 1, kind: "Completion", work: "done", claim: "claim-a", attempt: "run-1" },
-  { version: 1, kind: "ClaimCancellation", work: "retry", claim: "claim-b", attempt: null },
-  { version: 1, kind: "WorkCancellation", work: "cancel", claim: null, attempt: null },
+  { version: 2, kind: "Completion", work: "done", claim: "claim-a", attempt: "run-1" },
+  { version: 2, kind: "ClaimCancellation", work: "retry", claim: "claim-b", attempt: null },
+  { version: 2, kind: "WorkCancellation", work: "cancel", claim: null, attempt: null },
   work("new"),
   claim("new", "claim-c"),
   claim("new", "claim-d"),
@@ -98,7 +98,7 @@ describe("work queue conclusion summary", () => {
 
   it("never renders untrusted queue identifiers or attempt data", () => {
     const id = "</details>\n<script>secret</script>";
-    const summary = renderSummary(snapshot([]), replayTransactions([work(id), claim(id, "`unsafe|claim`"), { version: 1, kind: "Completion", work: id, claim: "`unsafe|claim`", attempt: "sensitive-attempt" }]));
+    const summary = renderSummary(snapshot([]), replayTransactions([work(id), claim(id, "`unsafe|claim`"), { version: 2, kind: "Completion", work: id, claim: "`unsafe|claim`", attempt: "sensitive-attempt" }]));
     expect(summary).not.toContain(id);
     expect(summary).not.toContain("unsafe");
     expect(summary).not.toContain("sensitive-attempt");

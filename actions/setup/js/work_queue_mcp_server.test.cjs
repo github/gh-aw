@@ -6,8 +6,8 @@ import path from "path";
 import { createWorkQueueFinishTool, createWorkQueueStateTool, loadWorkQueueSnapshot, readWorkQueueState } from "./work_queue_mcp_server.cjs";
 import { createWorkTransaction, serializeTransactionLog } from "./work_queue_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: 2, kind: "Claim", work: workId, claim: id, attempt: null });
 
 const tempFiles = [];
 
@@ -75,6 +75,24 @@ describe("work queue MCP snapshot", () => {
     expect(result.works.map(item => item.id)).toEqual(["z-old", "a-new", "claimed"]);
     expect(result.works.map(item => item.enqueued)).toEqual([10, 20, 1]);
     expect(readWorkQueueState(snapshot, { work: "a-new" }).next_work).toBe("z-old");
+  });
+
+  it("loads v1 Work at age zero without changing the snapshot envelope", () => {
+    const snapshotPath = writeSnapshot({
+      version: 2,
+      sha: "historical-head",
+      transactionLog: `${JSON.stringify(createWorkTransaction("new", 100))}\n${JSON.stringify({ ...work("legacy"), version: 1 })}\n`,
+      worker: null,
+    });
+    const snapshot = loadWorkQueueSnapshot(snapshotPath);
+    expect(JSON.parse(fs.readFileSync(snapshotPath, "utf8")).version).toBe(2);
+    expect(snapshot.projection.transactions).toContainEqual(work("legacy"));
+    const result = readWorkQueueState(snapshot);
+    expect(result.next_work).toBe("legacy");
+    expect(result.works.map(item => [item.id, item.enqueued])).toEqual([
+      ["legacy", 0],
+      ["new", 100],
+    ]);
   });
 
   it("rejects snapshots with an unsupported shape or invalid transaction log", () => {
