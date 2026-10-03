@@ -1,0 +1,73 @@
+# ADR-64955: Git-Backed Work Queue Coordination
+
+**Date**: 2026-10-02
+**Status**: Draft
+**Deciders**: gh-aw maintainers (review pending)
+
+---
+
+### Context
+
+The [Work Queue proposal in issue #64852](https://github.com/github/gh-aw/issues/64852) needs a durable Work queue shared by independent dispatchers and worker workflows. Concurrent Claims, stale reads, workflow failures, and compaction must not produce conflicting terminal decisions or authorize losing workers' external effects. Agent execution can be duplicated, so admission checks alone cannot establish final ownership. The design should reuse repository storage and existing workflow job boundaries rather than require an external coordination service.
+
+### Decision
+
+Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one log of immutable transactions, `work-queue.jsonl`, on a dedicated queue branch. Operators inspect and update it with `gh aw work-queue`. Derive authority through one shared deterministic replay implementation, using the issue's protocol and its [TLA+ specification](../../specs/work-queue/WorkQueue.tla) as the design baseline. The activation job snapshots the current log and branch version into the activation artifact; the work-queue MCP server mounts that snapshot read-only and never reads Git. The current MCP surface is a read-only snapshot query; mutation publication and final worker authorization remain trusted `safe_outputs` responsibilities. Preserve the existing `activation -> agent -> detection -> safe_outputs -> conclusion` topology without an additional worker job.
+
+#### Protocol commitments
+
+| Boundary | Commitment |
+|---|---|
+| Replay | The same valid transaction set produces the same projection regardless of record order, commit order, or timing. The model selects the smallest uncancelled Claim identity in a stable ordering on nonterminal Work; all consumers share arbitration. |
+| Dispatcher | Activation reads the queue branch and packages its log and version in the activation artifact. The MCP server reads only this immutable snapshot, never Git; its view may become stale during agent execution. Session-local pending-intent support and publication remain subject to trusted `safe_outputs` processing. Pending Claims do not establish durable authority. |
+| Worker | Trusted `aw_context.work_queue` supplies one immutable inbound Claim with `work_id`, `claim_id`, and a `work` payload object. Activation is an early admission check, not final authority. `work_queue_claim_finish(outcome?)` records intent without accepting authority fields; each worker records at most one Completion and has one pass through safe-output processing. |
+| External effects | Before ordinary safe outputs, refresh and replay, verify ownership, persist Completion, and confirm the terminal result. Missing finalize cancels an effective Claim; losing workers stage intents and stop without external effects. Uncertain reconciliation fails closed. |
+| Publication | Publish only if the branch still matches the version originally read. Otherwise fetch the latest log, replay it, and regenerate the proposed changes. Apply this rule to dispatchers, workers, orphan recovery, compaction, and concurrent branch initialization, with bounded retries and diagnostics. |
+| Terminal Work | Reject new state-changing transactions after Work becomes completed or cancelled. Freeze its complete fact set so late competing Claims cannot reopen the decision. |
+| Recovery and compaction | Recover unresolved Claims using trusted terminal workflow-run provenance. Generate the existing maintenance system's queue compaction job, rewrite the same canonical file, and preserve current replay and future protocol semantics. The initial model only removes duplicate records and canonicalizes order. |
+
+The [formal verification notes and reproducible checker](../../specs/work-queue/README.md) document the invariants and assumptions. The bounded model checks support a parameterized inductive proof argument, not a mechanically checked unbounded proof or proof that a future runtime implementation refines the model.
+
+Use `work-queue` for public names, branches, and artifact filenames, and
+`work_queue` for AW context fields and MCP tool prefixes. The
+[`transactions.tsp`](../../specs/work-queue/transactions.tsp) contract distinguishes
+the workflow runtime's versioned facts on `work-queue` from the operator CLI's
+payload/provenance records on `gh-aw-work-queue`; both use `work-queue.jsonl`,
+but the formats are not interchangeable.
+
+The conclusion job writes a work queue activity step summary for workflows using `tools.work-queue`. It compares the activation snapshot with a read-only refresh of the durable queue, showing work and claim state counts, new transaction counts by kind, and the assigned worker's current state in a collapsed details section. These are shared-queue observations since activation, not activity attributed exclusively to the current run. Work, claim, and attempt identifiers are omitted. An unreadable snapshot or queue is reported as unavailable, not as an empty queue.
+
+For review, the [trace walkthrough](../../specs/work-queue/README.md#inspect-execution-traces) generates bounded textual TLC executions and counterexamples to deliberately false reachability witnesses. These expose competing Claims, orphan recovery, and the finalization-to-effect sequence under the guarded protocol; they are evidence of modeled possibilities, not runtime conformance or liveness guarantees.
+
+### Alternatives Considered
+
+#### Alternative 1: An External Transactional Queue or Database
+
+An external service could provide efficient queue operations and atomic ownership changes without full-log replay or Git branch contention. It was not chosen because it would require operators to provision storage, credentials, and recovery infrastructure outside the repository. Repository-local durability and integration with existing trusted workflow boundaries are the primary drivers of this proposal.
+
+#### Alternative 2: A Mutable Current-State Snapshot
+
+A single projected-state file with version-checked updates would reduce read and replay costs and could enforce ownership through careful update rules. It was not chosen because it replaces explicit transaction history with a separate mutable-state reconciliation protocol. The append-only fact model makes arbitration, recovery, and compaction share one replay implementation and provides an inspectable transaction history.
+
+### Consequences
+
+#### Positive
+
+- Durable coordination and an auditable history remain in the repository without an additional service.
+- Shared replay, an immutable activation snapshot, and trusted publication boundaries give dispatchers, workers, recovery, and maintenance one consistent authority model.
+- The executable model and explicit invariants provide a baseline for implementation and regression testing.
+
+#### Negative
+
+- Full-log reads and replay add latency; competing writers contend on one branch and may exhaust bounded retries.
+- Duplicate-only compaction does not bound unique transaction growth or Git history size. More aggressive retention requires another equivalence proof.
+- A crash after Completion but before external effects can leave completed Work without outputs. Reliable effect delivery would require an additional idempotent delivery protocol.
+
+#### Neutral
+
+- Runtime implementation still needs broader safe-output mutation, worker-context, recovery, and maintenance integration; the read-only activation snapshot and MCP query do not imply those surfaces already exist.
+- The guarantee is a single externally effective winner, not exactly-once agent execution or atomic external operation batches. Eventual progress also requires available workflows and successful retries.
+
+---
+
+*Draft decision record for [pull request #64955](https://github.com/github/gh-aw/pull/64955). Review before changing status to Accepted.*

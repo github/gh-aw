@@ -583,7 +583,7 @@ func tryLoadCachedRunResult(
 	params concurrentRunDownloadParams,
 ) (*DownloadResult, bool) {
 	summary, ok := loadRunSummary(runOutputDir, params.verbose)
-	if !ok || dispatchCoordinatorLogsMissing(params.includeWorkQueue, runOutputDir) {
+	if !ok || workQueueLogsMissing(params.includeWorkQueue, runOutputDir) {
 		return nil, false
 	}
 	if len(params.artifactFilter) == 0 {
@@ -620,7 +620,7 @@ func tryLoadCachedRunResult(
 	safeItemsBefore := result.Run.SafeItemsCount
 	activitySummaryApplied := backfillCacheHitIfNeeded(&result, runOutputDir, params.verbose)
 	steeringBackfillApplied := backfillGatewaySteeringEventsIfNeeded(&result, runOutputDir, params.verbose)
-	dispatchBackfillApplied := backfillDispatchCoordinatorReport(&result.DispatchCoordinator, runOutputDir)
+	dispatchBackfillApplied := backfillWorkQueueReport(&result.WorkQueue, runOutputDir)
 	// If the backfill populated SafeItemsCount (i.e. it was 0 before and is now non-zero),
 	// persist the healed value back to run_summary.json so downstream readers (e.g.
 	// the api-consumption-report) see the correct count without having to fall back to
@@ -635,7 +635,7 @@ func tryLoadCachedRunResult(
 		healed.Friction = result.Friction
 		healed.SafeOutputs = result.SafeOutputs
 		healed.GatewaySteeringEvents = result.GatewaySteeringEvents
-		healed.DispatchCoordinator = result.DispatchCoordinator
+		healed.WorkQueue = result.WorkQueue
 		if err := saveRunSummary(runOutputDir, &healed, params.verbose); err != nil {
 			logsOrchestratorLog.Printf("Warning: failed to persist healed run summary for run %d: %v", result.Run.DatabaseID, err)
 		}
@@ -831,7 +831,7 @@ func applyRunBehavioralSignals(result *DownloadResult, runOutputDir string, verb
 // applyRunUsageMetrics extracts token usage, GitHub rate-limit consumption, safe-output
 // item counts, and backfills any missing activity summaries from the usage artifact.
 func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutputDir string, verbose bool, usageActivitySummary *usageActivitySummary, hasFirewallArtifact bool) {
-	backfillDispatchCoordinatorReport(&result.DispatchCoordinator, runOutputDir)
+	backfillWorkQueueReport(&result.WorkQueue, runOutputDir)
 	// token-usage.jsonl is also available in the compact usage artifact.
 	tokenUsage, tokenErr := analyzeTokenUsage(runOutputDir, verbose)
 	if tokenErr != nil && verbose {
@@ -893,7 +893,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 		GatewaySteeringEvents:   result.GatewaySteeringEvents,
 		WorkingSet:              result.WorkingSet,
 		Ledger:                  result.Ledger,
-		DispatchCoordinator:     result.DispatchCoordinator,
+		WorkQueue:               result.WorkQueue,
 		Friction:                result.Friction,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              jobDetails,
@@ -936,7 +936,7 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 			GatewaySteeringEvents:   result.GatewaySteeringEvents,
 			WorkingSet:              result.WorkingSet,
 			Ledger:                  result.Ledger,
-			DispatchCoordinator:     result.DispatchCoordinator,
+			WorkQueue:               result.WorkQueue,
 			Friction:                result.Friction,
 			GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 			JobDetails:              jobDetails,

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "WorkQueueWorkCancellationTransaction.json",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "WorkCancellation"
+    },
+    "work": {
+      "$ref": "#/$defs/WorkQueueIdentity"
+    },
+    "claim": {
+      "type": "null"
+    },
+    "attempt": {
+      "type": "null"
+    }
+  },
+  "required": ["version", "kind", "work", "claim", "attempt"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "$defs": {
+    "WorkQueueIdentity": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

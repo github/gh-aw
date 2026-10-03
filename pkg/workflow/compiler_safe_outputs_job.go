@@ -21,7 +21,7 @@ const stepNameLinePrefix = "      - name: "
 // upload-artifact staging download step block (name, continue-on-error, uses, with, name, path).
 // It must match the literal slice appended in buildPreambleTokenSteps.
 const uploadArtifactStagingDownloadStepCount = 6
-const dispatchClaimAuthorizedExpression = "steps.dispatch_claim_reconciliation.outputs.authorized == 'true'"
+const workQueueClaimAuthorizedExpression = "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
 
 // getSafeOutputsHeadApp returns the first non-nil HeadGitHubApp config from
 // create-pull-request or push-to-pull-request-branch handlers, used to generate
@@ -115,7 +115,7 @@ func messagesContainPreActivationRef(cfg *SafeOutputMessagesConfig) bool {
 // 3. Each safe output step requires from the local filesystem
 func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobName, markdownPath string) (*Job, []string, error) {
 	if data.SafeOutputs == nil {
-		if !isDispatchWorkCoordinatorEnabled(data) {
+		if !isWorkQueueEnabled(data) {
 			consolidatedSafeOutputsJobLog.Print("No safe outputs configured, skipping consolidated job")
 			return nil, nil, nil
 		}
@@ -142,7 +142,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	}
 
 	// Early return when no safe output handler steps were emitted
-	if len(safeOutputStepNames) == 0 && !isDispatchWorkCoordinatorEnabled(data) {
+	if len(safeOutputStepNames) == 0 && !isWorkQueueEnabled(data) {
 		consolidatedSafeOutputsJobLog.Print("No safe output steps were added")
 		return nil, nil, nil
 	}
@@ -174,7 +174,7 @@ func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 	if buildLedgerRequestCompactionHandlerConfig(data.LedgerConfig) != nil {
 		permissions.Set(PermissionActions, PermissionWrite)
 	}
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		// Reconciliation publishes the terminal claim transaction.
 		permissions.Set(PermissionContents, PermissionWrite)
 	}
@@ -190,7 +190,7 @@ func (c *Compiler) buildSafeOutputsSetupAndDownloadSteps(data *WorkflowData, age
 
 	steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
 	steps = append(steps, c.buildSafeOutputsDownloadSteps(data, agentArtifactPrefix)...)
-	steps = append(steps, c.buildDispatchClaimReconciliationStep(data)...)
+	steps = append(steps, c.buildWorkQueueClaimReconciliationStep(data)...)
 
 	// Configure GH_HOST for GHES/GHEC compatibility.
 	// The safe-outputs job runs as an independent GitHub Actions job and does not
@@ -249,12 +249,12 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 	// Add artifact download steps after setup.
 	// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
 			ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
 			DownloadPath: constants.TmpGhAwDirSlash,
 			SetupEnvStep: false,
-			StepName:     "Download activation artifact for dispatch coordinator",
+			StepName:     "Download activation artifact for work queue",
 		}, c.getActionPin)...)
 	}
 
@@ -282,17 +282,17 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 	return steps
 }
 
-func (c *Compiler) buildDispatchClaimReconciliationStep(data *WorkflowData) []string {
-	if !isDispatchWorkCoordinatorEnabled(data) {
+func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []string {
+	if !isWorkQueueEnabled(data) {
 		return nil
 	}
 	return []string{
-		"      - name: Reconcile dispatch work claim\n",
-		"        id: dispatch_claim_reconciliation\n",
+		"      - name: Reconcile work queue claim\n",
+		"        id: work_queue_claim_reconciliation\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 		"        with:\n",
 		"          script: |\n",
-		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/finish_dispatch_work_claim.cjs');\n",
+		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/finish_work_queue_claim.cjs');\n",
 		"            await main({ core, github, context });\n",
 	}
 }
@@ -317,8 +317,8 @@ func (c *Compiler) buildSafeOutputsUserProvidedSteps(data *WorkflowData) ([]stri
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert safe-outputs step at index %d to typed step: %w", i, err)
 		}
-		if isDispatchWorkCoordinatorEnabled(data) {
-			typedStep.If = combineGitHubIfExpressions(dispatchClaimAuthorizedExpression, typedStep.If)
+		if isWorkQueueEnabled(data) {
+			typedStep.If = combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, typedStep.If)
 		}
 		pinnedStep, err := applyActionPinToTypedStep(typedStep, data)
 		if err != nil {
@@ -351,7 +351,7 @@ func (c *Compiler) buildSafeOutputsHandlerOutputsAndActionSteps(data *WorkflowDa
 	c.appendSarifArtifactUploadStep(data, agentArtifactPrefix, &state)
 	c.appendCustomActionSteps(data, markdownPath, &state)
 	addNamedSafeOutputHandlerOutputs(data, state.outputs)
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		state.steps = gateSafeOutputSteps(state.steps)
 	}
 
@@ -378,7 +378,7 @@ func gateSafeOutputSteps(steps []string) []string {
 		for i, line := range block {
 			if existing, ok := strings.CutPrefix(line, "        if:"); ok {
 				existing = strings.TrimSpace(existing)
-				block[i] = "        if: " + combineGitHubIfExpressions(dispatchClaimAuthorizedExpression, existing) + "\n"
+				block[i] = "        if: " + combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, existing) + "\n"
 				hasCondition = true
 				break
 			}
@@ -386,7 +386,7 @@ func gateSafeOutputSteps(steps []string) []string {
 		if !hasCondition {
 			// block is non-empty because flush returned above when it was empty.
 			//nolint:uncheckedsliceindex // flush returned above for an empty block.
-			block = append([]string{block[0], "        if: " + combineGitHubIfExpressions(dispatchClaimAuthorizedExpression, "") + "\n"}, block[1:]...)
+			block = append([]string{block[0], "        if: " + combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, "") + "\n"}, block[1:]...)
 		}
 		result = append(result, block...)
 		block = nil
@@ -676,13 +676,13 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 	// Build and insert preamble token minting steps (GitHub App tokens) before checkout/safe-output steps.
 	preambleTokenSteps := c.buildPreambleTokenSteps(data, outputs)
 	if len(preambleTokenSteps) > 0 {
-		if isDispatchWorkCoordinatorEnabled(data) {
+		if isWorkQueueEnabled(data) {
 			preambleTokenSteps = gateSafeOutputSteps(preambleTokenSteps)
 		}
 		steps = c.insertPreambleTokenStepsIntoSteps(steps, preambleTokenSteps, data, agentArtifactPrefix)
 	}
 
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		finalSteps := c.appendFinalSafeOutputSteps(data, nil, agentArtifactPrefix)
 		steps = append(steps, gateSafeOutputSteps(finalSteps)...)
 	} else {
@@ -792,9 +792,9 @@ func (c *Compiler) insertPreambleTokenStepsIntoSteps(steps []string, preambleTok
 // calculatePreambleInsertIndex computes the line-offset index at which preamble token steps
 // should be inserted: after setup, OTLP mask, artifact download, and patch download steps.
 func (c *Compiler) calculatePreambleInsertIndex(steps []string, data *WorkflowData, agentArtifactPrefix string) int {
-	if isDispatchWorkCoordinatorEnabled(data) {
+	if isWorkQueueEnabled(data) {
 		for i, line := range steps {
-			if strings.Contains(line, "id: dispatch_claim_reconciliation") {
+			if strings.Contains(line, "id: work_queue_claim_reconciliation") {
 				for offset, nextLine := range steps[i+1:] {
 					if strings.HasPrefix(nextLine, stepNameLinePrefix) {
 						return i + 1 + offset

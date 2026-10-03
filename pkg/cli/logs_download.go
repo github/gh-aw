@@ -165,7 +165,7 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) error {
 	logsDownloadLog.Printf("Downloading run artifacts: run_id=%d, output_dir=%s, owner=%s, repo=%s, artifactFilter=%v", opts.runID, opts.outputDir, opts.owner, opts.repo, opts.artifactFilter)
 	shouldLogProgress := IsRunningInCI() || opts.verbose
-	opts = ensureDispatchCoordinatorLogs(ctx, opts)
+	opts = ensureWorkQueueLogs(ctx, opts)
 
 	// Check if artifacts already exist on disk (since they're immutable)
 	if fileutil.DirExists(opts.outputDir) && !fileutil.IsDirEmpty(opts.outputDir) {

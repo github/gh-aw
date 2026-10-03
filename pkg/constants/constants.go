@@ -539,14 +539,14 @@ const WorkflowsLockYmlGitAttributesEntryLegacy = WorkflowsLockYmlGlob + " lingui
 // TmpGhAwDir is the root /tmp/gh-aw directory (without trailing slash).
 const TmpGhAwDir = "/tmp/gh-aw"
 
-// DispatchCoordinatorSnapshotPath is the activation artifact mounted into the coordinator MCP server.
-const DispatchCoordinatorSnapshotPath = TmpGhAwDir + "/dispatch-work-coordinator.snapshot.json"
-const DispatchCoordinatorFinishIntentPath = TmpGhAwDir + "/dispatch-work-coordinator.finish.jsonl"
-const DispatchCoordinatorFinishIntentDir = GhAwRootDirShell + "/safeoutputs/dispatch-coordinator"
-const DispatchCoordinatorFinishIntentMount = DispatchCoordinatorFinishIntentDir + ":" + DispatchCoordinatorFinishIntentDir + ":rw"
+// WorkQueueSnapshotPath is the activation artifact mounted into the queue MCP server.
+const WorkQueueSnapshotPath = TmpGhAwDir + "/work-queue.snapshot.json"
+const WorkQueueFinishIntentPath = TmpGhAwDir + "/work-queue.finish.jsonl"
+const WorkQueueFinishIntentDir = GhAwRootDirShell + "/safeoutputs/work-queue"
+const WorkQueueFinishIntentMount = WorkQueueFinishIntentDir + ":" + WorkQueueFinishIntentDir + ":rw"
 
-// DispatchCoordinatorSnapshotMount exposes the activation snapshot read-only to the coordinator MCP server.
-const DispatchCoordinatorSnapshotMount = DispatchCoordinatorSnapshotPath + ":" + DispatchCoordinatorSnapshotPath + ":ro"
+// WorkQueueSnapshotMount exposes the activation snapshot read-only to the queue MCP server.
+const WorkQueueSnapshotMount = WorkQueueSnapshotPath + ":" + WorkQueueSnapshotPath + ":ro"
 
 // TmpGhAwDirSlash is TmpGhAwDir with a trailing slash.
 // Use for path prefix comparisons (e.g. strings.HasPrefix).
