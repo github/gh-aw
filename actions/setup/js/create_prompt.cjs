@@ -156,19 +156,17 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
   return result;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function renderWorkClaim(payload) {
   const assignment = readInboundAwContext(payload)?.dispatch_work_coordinator;
-  if (
-    !assignment ||
-    typeof assignment !== "object" ||
-    typeof assignment.work_id !== "string" ||
-    !assignment.work_id ||
-    typeof assignment.claim_id !== "string" ||
-    !assignment.claim_id ||
-    !assignment.work ||
-    typeof assignment.work !== "object" ||
-    Array.isArray(assignment.work)
-  ) {
+  if (!isRecord(assignment) || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work)) {
     return "";
   }
 
