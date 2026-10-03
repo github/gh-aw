@@ -346,7 +346,7 @@ engine:
 
 ### Custom Harness Script (`harness`)
 
-The `harness` field lets you replace the built-in Node.js wrapper used by Copilot, Claude, or Codex. Custom harnesses are responsible for their own retry, timeout, prompt-delivery, and tool-policy behavior.
+The `harness` field lets you replace the built-in Node.js harness wrapper used by Copilot, Claude, or Codex. Use this to customize startup behavior, inject pre/post hooks, or test an alternative harness implementation. Custom harnesses are responsible for their own retry, timeout, prompt-delivery, and tool-policy behavior.
 
 ```yaml wrap
 engine:
@@ -358,7 +358,7 @@ engine:
 The `use` value must be a bare filename — no directory separators, no `..`, and no shell metacharacters. It must end with `.js`, `.cjs`, or `.mjs`. When `harness.use` is set, AWF automatically ensures Node 24 is available in the runner environment.
 
 > [!NOTE]
-> Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
+> Custom harness scripts are supported by Copilot, Claude, and Codex. Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
 
 **Validation rules for `harness.use`:**
 
