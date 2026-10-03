@@ -688,7 +688,11 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 		}
 
 		model, _ := parsed.Frontmatter["model"].(string)
-		if !strings.Contains(strings.ToLower(model), "codex") {
+		if model == "" {
+			model = getDefaultAgentModel(engineID)
+		}
+		// The Codex engine also supports Copilot's auto route for its inference canary.
+		if model != "copilot/auto" && !strings.Contains(strings.ToLower(model), "codex") {
 			t.Errorf("%s uses Codex with non-Codex model %q", path, model)
 		}
 		return nil
