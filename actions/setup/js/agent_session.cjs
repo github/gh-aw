@@ -30,13 +30,15 @@ function isMetric(value) {
 function normalizeSessionUsage(usage) {
   if (!usage || typeof usage !== "object" || Array.isArray(usage)) return undefined;
   const result = { ...usage };
+  delete result.overflowedTokens;
   for (const [key, alias] of Object.entries(USAGE_ALIASES)) {
     const value = Object.hasOwn(usage, key) ? usage[key] : usage[alias];
     if (isTokenCount(value)) result[key] = value;
     else delete result[key];
   }
-  if (Array.isArray(usage.overflowed_tokens)) {
-    result.overflowed_tokens = [...new Set(usage.overflowed_tokens.filter(key => typeof key === "string" && Object.hasOwn(USAGE_ALIASES, key)))];
+  const overflowed = usage.overflowedTokens ?? usage.overflowed_tokens;
+  if (Array.isArray(overflowed)) {
+    result.overflowed_tokens = [...new Set(overflowed.map(key => Object.entries(USAGE_ALIASES).find(([name, alias]) => key === name || key === alias)?.[0]).filter(Boolean))];
     for (const key of result.overflowed_tokens) {
       delete result[key];
       delete result[USAGE_ALIASES[key]];

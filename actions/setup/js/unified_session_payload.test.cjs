@@ -4,7 +4,7 @@ import { mergeSessionSources } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeCodexSession } from "./codex_session.cjs";
-import { selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { reconcileSessionUsage, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 
 describe("essential unified session payloads", () => {
   it("removes duplicated engine envelopes without trimming significant message text", () => {
@@ -104,6 +104,10 @@ describe("essential unified session payloads", () => {
     expect(runtime.data).toEqual({ provider: "copilot", aic: 0, totalAic: 0, durationMs: 0, usage: { inputTokens: 0, outputTokens: 2, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } });
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
     expect(agent.data).toEqual({ numTurns: 0, usage: { inputTokens: 0, outputTokens: 2, overflowedTokens: ["cacheReadInputTokens"] } });
+    const reconciled = reconcileSessionUsage({ cache_read_input_tokens: 4 }, agent.data.usage);
+    expect(reconciled.cache_read_input_tokens).toBeUndefined();
+    expect(reconciled.cacheReadInputTokens).toBeUndefined();
+    expect(reconciled.overflowed_tokens).toEqual(["cache_read_input_tokens"]);
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
   });
 
