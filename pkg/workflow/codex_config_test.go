@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,6 +108,7 @@ func TestCodexNativeConfigShellEnvironment(t *testing.T) {
 		}},
 		ExcludedEnv: []string{"OMITTED"},
 	}
+
 	config, err := NewCodexEngine().buildNativeConfig(data, nil)
 	require.NoError(t, err)
 	policy := config.Defaults["shell_environment_policy"].(map[string]any)
@@ -118,6 +120,21 @@ func TestCodexNativeConfigShellEnvironment(t *testing.T) {
 	}
 	for _, name := range []string{"^PATH$", "CODEX_API_KEY", "OPENAI_API_KEY", "CUSTOM_TOKEN", "APP_TOKEN", "OMITTED"} {
 		assert.NotContains(t, names, name)
+	}
+}
+
+func TestCodexNativeConfigExcludesEnvironmentWithoutOverrides(t *testing.T) {
+	for _, env := range []map[string]string{nil, {}, {"CUSTOM_REGION": "east", "CUSTOM_MODE": "test", "PATH": "/custom/bin"}} {
+		t.Run(fmt.Sprintf("overrides-%d", len(env)), func(t *testing.T) {
+			names := codexShellEnvironmentVars(&WorkflowData{
+				EngineConfig: &EngineConfig{Env: env},
+				ExcludedEnv:  []string{"PATH", "HOME", "CUSTOM_REGION"},
+			})
+			assert.NotContains(t, names, "PATH")
+			assert.NotContains(t, names, "HOME")
+			assert.NotContains(t, names, "CUSTOM_REGION")
+			assert.Contains(t, names, "SHELL")
+		})
 	}
 }
 

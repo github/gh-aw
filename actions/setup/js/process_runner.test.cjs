@@ -60,6 +60,22 @@ describe("process_runner.cjs", () => {
   });
 
   describe("runProcess", () => {
+    it("does not signal a reaped process group after a successful close", async () => {
+      const kill = vi.spyOn(process, "kill");
+      try {
+        const result = await runProcess({
+          command: process.execPath,
+          args: ["-e", "process.stdout.write('completed')"],
+          attempt: 0,
+          log: () => {},
+        });
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe("completed");
+        expect(kill).not.toHaveBeenCalled();
+      } finally {
+        kill.mockRestore();
+      }
+    });
     it("frames stdout independently from interleaved stderr and fragmented UTF-8", async () => {
       const observed = [];
       const result = await runProcess({

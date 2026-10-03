@@ -246,9 +246,9 @@ func codexShellEnvironmentVars(workflowData *WorkflowData) []string {
 			} else {
 				delete(names, name)
 			}
-			for _, name := range workflowData.ExcludedEnv {
-				delete(names, name)
-			}
+		}
+		for _, name := range workflowData.ExcludedEnv {
+			delete(names, name)
 		}
 	}
 	return sliceutil.SortedKeys(names)

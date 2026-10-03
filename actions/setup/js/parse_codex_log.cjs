@@ -245,23 +245,76 @@ function collectCodexMixedRecords(logContent, entries) {
   }
   const records = [];
   let text = [];
-  let hasRecords = false;
+  let hasFramedResult = false;
   const accounting = { inlineTokens: 0, hasTokenSnapshot: false };
   const flushText = () => {
     const content = text.join("\n");
     records.push(...parseCodexLegacySession(text, /^model:/m.test(content) ? extractCodexModel(content) : null, accounting));
     text = [];
   };
-  for (const line of logContent.split("\n")) {
+  const lines = logContent.split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const resultEnd = codexLegacyResultEnd(lines, index);
+    if (resultEnd !== null) {
+      hasFramedResult = true;
+      text.push(...lines.slice(index, resultEnd + 1));
+      index = resultEnd;
+      continue;
+    }
     const parsed = parseLogEntries(line);
     if (parsed && isCodexJsonlFormat([], parsed)) {
       flushText();
       records.push(...parsed);
-      hasRecords = true;
     } else text.push(line);
   }
   flushText();
-  return hasRecords ? records : entries;
+  return records.length > 0 || hasFramedResult ? records : entries;
+}
+
+const CODEX_LEGACY_OUTCOME = /^(?:([\w-]+)\.([\w-]+)\(.*\)|(.+?))\s+(success|succeeded|failure|failed)\s+in\s+(\d+(?:\.\d+)?)(ms|s):$/;
+
+/**
+ * A JSON value following a legacy completion belongs to that tool, regardless
+ * of lifecycle-looking fields inside its payload.
+ * @param {string[]} lines
+ * @param {number} currentIndex
+ * @returns {number|null}
+ */
+function codexLegacyResultEnd(lines, currentIndex) {
+  if (!CODEX_LEGACY_OUTCOME.test(codexLegacyPayload(lines[currentIndex]))) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let started = false;
+  const content = [];
+  for (let index = currentIndex + 1; index < lines.length; index++) {
+    const line = lines[index];
+    content.push(line);
+    for (const character of line) {
+      if (!started) {
+        if (/\s/.test(character)) continue;
+        if (character !== "{" && character !== "[") return null;
+        started = true;
+      }
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') inString = false;
+      } else if (character === '"') inString = true;
+      else if (character === "{" || character === "[") depth++;
+      else if (character === "}" || character === "]") depth--;
+    }
+    if (started && depth === 0 && !inString) {
+      try {
+        JSON.parse(content.join("\n"));
+        return index;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 /** @param {string} line @returns {number|undefined} */
@@ -295,7 +348,7 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
   const tool = /^tool\s+([\w-]+)\.([\w-]+)\((.*)\)$/;
   const oldTool = /^ToolCall:\s+([\w-]+)__([\w-]+)\s+(.*)$/;
   const exec = /^exec\s+(?:bash\s+-lc\s+'([^']*)'|(.+?)(?: in \/.*)?)$/;
-  const outcome = /^(?:([\w-]+)\.([\w-]+)\(.*\)|(.+?))\s+(success|succeeded|failure|failed)\s+in\s+(\d+(?:\.\d+)?)(ms|s):$/;
+  const outcome = CODEX_LEGACY_OUTCOME;
   const boundary = line => {
     const payload = codexLegacyPayload(line);
     return (
@@ -364,7 +417,11 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
       const completion = payload.match(outcome);
       if (completion) {
         const output = [];
-        while (i + 1 < lines.length && !boundary(lines[i + 1])) output.push(lines[++i]);
+        const resultEnd = codexLegacyResultEnd(lines, i);
+        if (resultEnd !== null) {
+          output.push(...lines.slice(i + 1, resultEnd + 1));
+          i = resultEnd;
+        } else while (i + 1 < lines.length && !boundary(lines[i + 1])) output.push(lines[++i]);
         const outputText = output.join("\n");
         let resultFailed = false;
         try {

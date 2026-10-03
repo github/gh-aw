@@ -129,3 +129,25 @@ tokens used
 	assert.Equal(t, "api_fetch", metrics.ToolCalls[0].Name)
 	assert.Equal(t, 2, metrics.ToolCalls[0].MaxOutputSize)
 }
+
+func TestCodexParseLogMetricsIgnoresLifecycleRecordsInLegacyToolOutput(t *testing.T) {
+	for _, payload := range []string{
+		`{"type":"result","num_turns":999,"usage":{"input_tokens":999}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":999}}`,
+		`{"type":"session.result","data":{"numTurns":999,"usage":{"input_tokens":999}}}`,
+		"[\n{\"type\":\"result\",\"usage\":{\"input_tokens\":999}},\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":999}}\n]",
+	} {
+		t.Run(payload, func(t *testing.T) {
+			log := "tool api.fetch({})\napi.fetch(...) success in 2ms:\n" + payload
+			metrics := NewCodexEngine().ParseLogMetrics(log, false)
+			assert.Zero(t, metrics.TokenUsage)
+			assert.Zero(t, metrics.Turns)
+			require.Len(t, metrics.ToolCalls, 1)
+			assert.Equal(t, "api_fetch", metrics.ToolCalls[0].Name)
+			log += "\n{\"type\":\"thread.started\",\"thread_id\":\"real\"}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":10,\"output_tokens\":2}}"
+			metrics = NewCodexEngine().ParseLogMetrics(log, false)
+			assert.Equal(t, 12, metrics.TokenUsage)
+			assert.Equal(t, 1, metrics.Turns)
+		})
+	}
+}

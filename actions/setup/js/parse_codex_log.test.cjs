@@ -46,6 +46,24 @@ describe("parse_codex_log.cjs", () => {
   describe("parseCodexLog function", () => {
     const getEventData = (entries, eventType) => entries.filter(e => e.type === eventType).map(e => e.data || {});
 
+    it.each([
+      '{"type":"result","num_turns":999,"usage":{"input_tokens":999}}',
+      '{"type":"turn.completed","usage":{"input_tokens":999}}',
+      '{"type":"session.result","data":{"numTurns":999,"usage":{"input_tokens":999}}}',
+      '[\n{"type":"result","usage":{"input_tokens":999}},\n{"type":"turn.completed","usage":{"input_tokens":999}}\n]',
+    ])("keeps native-looking legacy MCP payloads out of session accounting: %s", payload => {
+      const legacy = `tool api.fetch({})\napi.fetch(...) success in 2ms:\n${payload}`;
+      const parsed = parseCodexLog(legacy);
+      expect(getEventData(parsed.logEntries, "session.result").some(data => data.usage || data.numTurns)).toBe(false);
+      expect(getEventData(parsed.logEntries, "tool.execution_complete")[0].output).toBe(payload);
+      const mixed = parseCodexLog(`${legacy}\n{"type":"thread.started","thread_id":"real"}\n{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}`);
+      const usage = getEventData(mixed.logEntries, "session.result").filter(data => data.usage);
+      expect(usage).toHaveLength(1);
+      expect(usage[0].usage.input_tokens).toBe(10);
+      expect(usage[0].usage.output_tokens).toBe(2);
+      expect(getEventData(mixed.logEntries, "tool.execution_complete")[0].output).toBe(payload);
+    });
+
     it("should parse basic tool call with success", () => {
       const logContent = `tool github.list_pull_requests({"state":"open"})
 github.list_pull_requests(...) success in 123ms:

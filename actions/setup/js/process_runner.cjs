@@ -115,6 +115,7 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
     // emits 'close' after 'error' (or vice-versa); only the first terminal event should
     // log and resolve so callers receive a deterministic result.
     let settled = false;
+    let childExited = false;
     /** @param {Awaited<ReturnType<typeof runProcess>>} result */
     function settle(result) {
       if (settled) return;
@@ -128,7 +129,7 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
       for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
       process.stdout.removeListener("drain", resumeStdout);
       process.stderr.removeListener("drain", resumeStderr);
-      signalTree("SIGKILL");
+      if (!childExited) signalTree("SIGKILL");
       resolve(result);
     }
 
@@ -443,6 +444,7 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
     }
 
     child.on("exit", (code, signal) => {
+      childExited = true;
       exitedCode = code;
       exitedSignal = signal;
       log(`attempt ${attempt + 1}: process exit event` + ` exitCode=${code ?? exitCodeForSignal(signal) ?? 1}` + (signal ? ` signal=${signal}` : ""));

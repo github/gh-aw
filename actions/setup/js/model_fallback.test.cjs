@@ -22,17 +22,17 @@ describe("Codex model arguments", () => {
     expect(() => normalizeCodexModel("copilot/gpt-5", "openai", { env: {} })).toThrow("does not match");
   });
 
-  it("honors an explicit provider override for dynamic prefixes without changing or logging credentials", () => {
+  it.each(["copilot", "github", "github-copilot", "github_models", "COPILOT"])("honors an explicit provider override for the %s alias without changing or logging credentials", prefix => {
     const env = { GH_AW_LLM_PROVIDER_EXPLICIT: "1", GH_AW_LLM_PROVIDER: "openai", OPENAI_API_KEY: "test-secret" };
     const before = { ...env };
     const logs = [];
     const options = { env, logger: message => logs.push(message) };
-    expect(normalizeCodexModel("copilot/gpt-5", "openai", options)).toBe("gpt-5");
-    expect(normalizeCodexModelArgs(["exec", "--model=copilot/gpt-5", "-"], "openai", options)).toEqual(["exec", "--model=gpt-5", "-"]);
+    expect(normalizeCodexModel(`${prefix}/gpt-5`, "openai", options)).toBe("gpt-5");
+    expect(normalizeCodexModelArgs(["exec", `--model=${prefix}/gpt-5`, "-"], "openai", options)).toEqual(["exec", "--model=gpt-5", "-"]);
     expect(env).toEqual(before);
     expect(logs.join("\n")).toContain("explicitly configured provider");
     expect(logs.join("\n")).not.toContain("test-secret");
-    expect(() => normalizeCodexModel("copilot/gpt-5", "openai", { env: {} })).toThrow("does not match");
+    expect(() => normalizeCodexModel(`${prefix}/gpt-5`, "openai", { env: {} })).toThrow("does not match");
   });
 
   it.each([{ flags: ["--model", "copilot/gpt-5"] }, { flags: ["-m", "copilot/gpt-5"] }, { flags: ["--model=copilot/gpt-5"] }])("normalizes explicit flags as well as model environment values", ({ flags }) => {

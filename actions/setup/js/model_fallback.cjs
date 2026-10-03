@@ -49,12 +49,12 @@ function injectModelFlagAfterExec(args, model) {
  * @returns {string}
  */
 function normalizeCodexModel(model, provider, options = {}) {
-  const match = /^(openai|copilot|github|anthropic)\/(.+)$/.exec(model.trim());
+  const match = /^(openai|copilot|github|github-copilot|github_models|anthropic)\/(.+)$/i.exec(model.trim());
   if (!match) return model.trim();
-  const normalize = value => (/^(copilot|github|github-copilot|github_models)$/.test(value) ? "github" : value);
+  const normalize = value => (/^(copilot|github|github-copilot|github_models)$/.test(value.toLowerCase()) ? "github" : value.toLowerCase());
   if (normalize(match[1]) !== normalize(provider.trim().toLowerCase())) {
     const env = options.env ?? process.env;
-    if (env.GH_AW_LLM_PROVIDER_EXPLICIT === "1" && ["openai", "copilot"].includes(match[1])) {
+    if (env.GH_AW_LLM_PROVIDER_EXPLICIT === "1" && ["openai", "github"].includes(normalize(match[1]))) {
       options.logger?.(`model prefix '${match[1]}' overridden by explicitly configured provider; retaining existing endpoint and credentials`);
       return match[2];
     }

@@ -280,7 +280,18 @@ func codexJSONRecords(content string) []map[string]any {
 		appendRecord(document)
 		return records
 	}
-	for line := range strings.SplitSeq(content, "\n") {
+	lines := strings.Split(content, "\n")
+	skipThrough := -1
+	for index, line := range lines {
+		if index <= skipThrough {
+			continue
+		}
+		if codexLegacyResultPattern.MatchString(codexLegacyPayload(line)) {
+			if _, end, found := codexLegacyResultJSON(lines, index); found {
+				skipThrough = end
+			}
+			continue
+		}
 		var value any
 		if json.Unmarshal([]byte(line), &value) == nil {
 			appendRecord(value)
