@@ -124,9 +124,25 @@ export interface SessionFileFormatEvent extends EventMetadata {
   data: SessionFileFormatData;
 }
 
+export interface DetectionResultData {
+  jobResult?: string;
+  conclusion?: string;
+  reason?: string;
+  promptInjection?: boolean;
+  secretLeak?: boolean;
+  maliciousPatch?: boolean;
+  [key: string]: unknown;
+}
+
+export interface DetectionResultEvent extends EventMetadata {
+  type: "detection.result";
+  data: DetectionResultData;
+}
+
 export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
 
 export interface SessionEventDataMap {
+  "detection.result": DetectionResultData;
   "session.format": SessionFileFormatData;
   "session.init": SessionInitData;
   "user.message": MessageData;

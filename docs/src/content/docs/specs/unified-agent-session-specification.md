@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.2.0"
+version: "1.3.0"
 status: Draft
 publication_date: "2026-10-02"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-02<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.2.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.3.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -224,7 +224,7 @@ opaque because its essential fields are not defined by this specification.
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
-| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
+| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine/model/workflow/repository/run ID. No detector transcript or free-form reasons. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -300,6 +300,24 @@ and count them as separate observations. Replicated firewall paths MUST select
 `sandbox/firewall/logs` before `sandbox/firewall/audit`, then supported legacy
 layouts; an existing empty authoritative file MUST suppress its older copy.
 Distinct gateway streams and events MUST remain separate observations.
+
+For `detection.result`, the sanitized conclusion result at
+`usage/detection/detection_result.json` MUST take precedence over the raw
+`threat-detection/detection_result.json` verdict. The conclusion result combines
+trusted job outputs with verdict flags extracted from structured results or
+inline detector logs. These files MUST NOT produce duplicate detection results.
+The raw structured verdict MAY be used when the conclusion result is absent.
+Provenance MUST identify the selected file; detection-log timestamps MUST NOT be
+invented for an extracted verdict.
+
+The essential detection payload is `jobResult`, `conclusion`, `reason`,
+`promptInjection`, `secretLeak`, and `maliciousPatch`, when observed. `reason` is
+the categorical conclusion reason, such as `threat_detected`, `agent_failure`,
+`parse_error`, or `detection_skipped`; it is not the detector's free-form `reasons`
+array. Missing verdict flags MUST remain absent, including skipped, cancelled,
+or failed detection without a verdict. Explicit `false` flags MUST be retained.
+Readers MUST NOT equate a successful job with a clean verdict: warn-mode
+detection can have `jobResult: "success"` and `conclusion: "warning"`.
 
 **T-UAS-059 — Partial collection.** Missing optional sources MUST be reported
 by component availability, not fabricated empty results. Malformed JSONL
@@ -772,7 +790,7 @@ agent-only inputs retain their earlier rendering behavior.
 | AWF | Network host/method/status/decision, observed token usage, steering messages, and tracker event names. |
 | Safe outputs | Requested versus execution-recorded operations, target metadata, and structured error counts. Requests are not displayed as successes. |
 | Experiments, graders, evals | Assignments/state, grader value/unit/outcome, and eval ID/answer/model. Grader scripts and raw evaluation questions are omitted. |
-| Execution, detection, collection | Recorded outcomes/verdict flags, source coverage, warnings, untimed counts, and absent components. |
+| Execution, detection, collection | Recorded outcomes/verdict flags, detection job result/conclusion/categorical reason, source coverage, warnings, untimed counts, and absent components. No detector transcript or free-form reasons. |
 | Unknown extensions | Type and provenance only; opaque payloads are not dumped. |
 
 Redaction operates on decoded publication copies before preview clipping.
@@ -1202,6 +1220,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.3.0 — Draft (2026-10-02)
+
+- Preserved detection job results, conclusions, categorical reasons, and verdict flags in unified session artifacts and publication views.
+- Preferred sanitized conclusion results over raw verdicts, covering structured and inline detectors without duplicate observations.
+- Defined absent verdict flags for skipped, cancelled, and failed detection, and excluded detector transcripts and free-form reasons.
 
 ### Version 1.1.0 — Draft (2026-10-02)
 

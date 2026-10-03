@@ -137,6 +137,7 @@ const EVENT_FIELDS = {
   "detection.result": {
     jobResult: ["jobResult", "job_result"],
     conclusion: ["conclusion"],
+    reason: ["reason"],
     promptInjection: ["promptInjection", "prompt_injection"],
     secretLeak: ["secretLeak", "secret_leak"],
     maliciousPatch: ["maliciousPatch", "malicious_patch"],

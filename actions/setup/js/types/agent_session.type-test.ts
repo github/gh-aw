@@ -1,4 +1,4 @@
-import type { CoreSessionEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
+import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
 import { createSessionEvent } from "../agent_session.cjs";
 
 const messages: CoreSessionEvent[] = [
@@ -48,6 +48,16 @@ createSessionEvent({}, "session.result", { status: true });
 createSessionEvent({}, "session.result", { sourceType: 0 });
 // @ts-expect-error Reasoning tokens are numeric.
 createSessionEvent({}, "session.result", { usage: { reasoning_output_tokens: "0" } });
+
+const detection: DetectionResultEvent = createSessionEvent({}, "detection.result", { jobResult: "success", conclusion: "warning", reason: "threat_detected", promptInjection: true, secretLeak: false, maliciousPatch: false });
+void detection;
+createSessionEvent({}, "detection.result", { jobResult: "skipped", conclusion: "skipped", reason: "" });
+// @ts-expect-error Detection verdict flags are booleans, not status strings.
+createSessionEvent({}, "detection.result", { promptInjection: "false" });
+// @ts-expect-error Detection conclusions are strings, not success flags.
+createSessionEvent({}, "detection.result", { conclusion: true });
+// @ts-expect-error Detection reason is a categorical string, not detector prose entries.
+createSessionEvent({}, "detection.result", { reason: ["private reason"] });
 
 const mergedEvent: UnifiedSessionEvent = {
   type: "mcp.rpc.response",

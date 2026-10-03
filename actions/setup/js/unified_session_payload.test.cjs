@@ -34,7 +34,11 @@ describe("essential unified session payloads", () => {
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
     ["execution.result", { exit_code: 0, duration_ms: 0, outcome: "success", extra: "omit" }, { exitCode: 0, durationMs: 0, outcome: "success" }],
-    ["detection.result", { job_result: "success", secret_leak: false, prompt_injection: false, raw: "omit" }, { jobResult: "success", secretLeak: false, promptInjection: false }],
+    [
+      "detection.result",
+      { job_result: "success", conclusion: "warning", reason: "threat_detected", secret_leak: false, prompt_injection: false, malicious_patch: true, reasons: ["PRIVATE_REASON"], raw: "omit" },
+      { jobResult: "success", conclusion: "warning", reason: "threat_detected", secretLeak: false, promptInjection: false, maliciousPatch: true },
+    ],
     ["safe_output.request", { type: "create_issue", repo: "example/repo", body: "omit", title: "omit" }, { type: "create_issue", repo: "example/repo" }],
     ["safe_output.result", { type: "create_issue", number: 0, identifier: null, body: "omit" }, { type: "create_issue", number: 0, identifier: null }],
     ["eval.result", { id: "quality", answer: false, question: "omit", model: "fixture" }, { id: "quality", answer: false, model: "fixture" }],
@@ -63,6 +67,15 @@ describe("essential unified session payloads", () => {
       expect(output).toContain("list_issues");
       expect(output).toContain("code=0");
     }
+  });
+
+  it("keeps canonical detection values, including false flags and an empty categorical reason", () => {
+    const compact = normalizeUnifiedSessionEvent({
+      type: "detection.result",
+      data: { jobResult: "failure", job_result: "success", conclusion: "failure", reason: "", promptInjection: false, prompt_injection: true, secretLeak: false, maliciousPatch: false },
+    });
+    expect(compact.data).toEqual({ jobResult: "failure", conclusion: "failure", reason: "", promptInjection: false, secretLeak: false, maliciousPatch: false });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
   });
 
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {

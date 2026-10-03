@@ -122,7 +122,7 @@ function eventDetail(event) {
     case "execution.result":
       return fields(data, ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"]);
     case "detection.result":
-      return fields(data, ["jobResult", "conclusion", "promptInjection", "secretLeak", "maliciousPatch"]);
+      return fields(data, ["jobResult", "conclusion", "reason", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
       return fields(data, ["engine", "model", "workflow", "repository", "runId"]);
     case "session.collection_warning":
