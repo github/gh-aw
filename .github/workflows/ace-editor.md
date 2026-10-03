@@ -12,8 +12,8 @@ max-daily-ai-credits: 10000
 timeout-minutes: 10
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-6.1-sol
 strict: false
 permissions:
   pull-requests: read

@@ -48,7 +48,7 @@ evals:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-6.1-sol
+model: openai/gpt-6-sol
 ---
 
 # Security Review Agent 🔒

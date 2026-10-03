@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"e5adb4d0c4dc5321be11b886ec22da4a7f77da95e3e553b34d742fdaf1b5100a","body_hash":"92e2af9145af9ca0d020c4a4e1ac1132dd206f9af0c116f43b8e9816ca084853","strict":true,"agent_id":"codex","agent_model":"openai/gpt-6.1-sol","engine_versions":{"codex":"0.159.3"}}
-# gh-aw-manifest: {"version":1,"secrets":["CODEX_API_KEY","COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN","OPENAI_API_KEY"],"actions":[{"repo":"actions/cache","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31","digest":"sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31@sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31","digest":"sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31@sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31","digest":"sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31@sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"has_pull_request":true,"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["add_comment","add_labels","create_issue","missing_data","missing_tool","noop","remove_labels","update_issue","update_pull_request"]}]}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"031e6dc6694a08348aab8e77d4854d5f7404c011f6ae76b010270b8cf546b0cc","body_hash":"92e2af9145af9ca0d020c4a4e1ac1132dd206f9af0c116f43b8e9816ca084853","strict":true,"agent_id":"codex","agent_model":"copilot/gpt-6-luna","engine_versions":{"codex":"0.159.3"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31","digest":"sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31@sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31","digest":"sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31@sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31","digest":"sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31@sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"has_pull_request":true,"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["add_comment","add_labels","create_issue","missing_data","missing_tool","noop","remove_labels","update_issue","update_pull_request"]}]}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -30,7 +30,6 @@
 #     - shared/otlp.md
 #
 # Secrets used:
-#   - CODEX_API_KEY
 #   - COPILOT_GITHUB_TOKEN
 #   - GH_AW_GITHUB_MCP_SERVER_TOKEN
 #   - GH_AW_GITHUB_TOKEN
@@ -39,7 +38,6 @@
 #   - GH_AW_OTEL_SENTRY_AUTHORIZATION
 #   - GH_AW_OTEL_SENTRY_ENDPOINT
 #   - GITHUB_TOKEN
-#   - OPENAI_API_KEY
 #
 # Custom actions used:
 #   - actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -174,7 +172,7 @@ jobs:
         env:
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
-          GH_AW_INFO_MODEL: "openai/gpt-6.1-sol"
+          GH_AW_INFO_MODEL: "copilot/gpt-6-luna"
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AGENT_VERSION: "0.159.3"
           GH_AW_INFO_WORKFLOW_NAME: "Smoke CI"
@@ -249,12 +247,11 @@ jobs:
           overwrite: true
           if-no-files-found: ignore
           retention-days: 3
-      - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
+      - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" COPILOT_GITHUB_TOKEN Codex https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
-          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
@@ -672,7 +669,7 @@ jobs:
           "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --bootstrap
         env:
           CODEX_HOME: /tmp/gh-aw/mcp-config
-          GH_AW_CODEX_CONFIG_JSON: '{"defaults":{"features":{"plugins":false},"history":{"persistence":"none"},"mcp_servers":{"github":{"http_headers":{"User-Agent":"smoke-ci"},"startup_timeout_sec":120,"tool_timeout_sec":60},"safeoutputs":{"startup_timeout_sec":120,"tool_timeout_sec":60}},"model_provider":"openai-proxy","model_providers":{"openai-proxy":{"base_url":"http://172.30.0.30:10000","env_key":"CODEX_API_KEY","name":"OpenAI AWF proxy","requires_openai_auth":false,"supports_websockets":false,"wire_api":"responses"}},"otel":{"metrics_exporter":"none"},"shell_environment_policy":{"ignore_default_excludes":false,"include_only":["ALL_PROXY","CURL_CA_BUNDLE","GITHUB_WORKSPACE","GIT_AUTHOR_EMAIL","GIT_AUTHOR_NAME","GIT_COMMITTER_EMAIL","GIT_COMMITTER_NAME","HOME","HTTPS_PROXY","HTTP_PROXY","LANG","LC_ALL","LC_CTYPE","LOGNAME","NODE_EXTRA_CA_CERTS","NO_PROXY","PATH","PLAYWRIGHT_BROWSERS_PATH","REQUESTS_CA_BUNDLE","RUNNER_TEMP","RUNNER_TOOL_CACHE","SHELL","SSL_CERT_DIR","SSL_CERT_FILE","TEMP","TMP","TMPDIR","USER","all_proxy","http_proxy","https_proxy","no_proxy"],"inherit":"all"}},"overrides":{},"disablePlugins":true}'
+          GH_AW_CODEX_CONFIG_JSON: '{"defaults":{"features":{"plugins":false},"history":{"persistence":"none"},"mcp_servers":{"github":{"http_headers":{"User-Agent":"smoke-ci"},"startup_timeout_sec":120,"tool_timeout_sec":60},"safeoutputs":{"startup_timeout_sec":120,"tool_timeout_sec":60}},"model_provider":"openai-proxy","model_providers":{"openai-proxy":{"base_url":"http://172.30.0.30:10002","env_key":"CODEX_API_KEY","name":"OpenAI AWF proxy","requires_openai_auth":false,"supports_websockets":false,"wire_api":"responses"}},"otel":{"metrics_exporter":"none"},"shell_environment_policy":{"ignore_default_excludes":false,"include_only":["ALL_PROXY","CURL_CA_BUNDLE","GITHUB_WORKSPACE","GIT_AUTHOR_EMAIL","GIT_AUTHOR_NAME","GIT_COMMITTER_EMAIL","GIT_COMMITTER_NAME","HOME","HTTPS_PROXY","HTTP_PROXY","LANG","LC_ALL","LC_CTYPE","LOGNAME","NODE_EXTRA_CA_CERTS","NO_PROXY","PATH","PLAYWRIGHT_BROWSERS_PATH","REQUESTS_CA_BUNDLE","RUNNER_TEMP","RUNNER_TOOL_CACHE","SHELL","SSL_CERT_DIR","SSL_CERT_FILE","TEMP","TMP","TMPDIR","USER","all_proxy","http_proxy","https_proxy","no_proxy"],"inherit":"all"}},"overrides":{},"disablePlugins":true}'
       - name: Prepare Safe Outputs Directories
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
@@ -1593,7 +1590,7 @@ jobs:
           GH_AW_MISSING_MODEL_PRICING_ERROR: ${{ needs.agent.outputs.missing_model_pricing_error }}
           GH_AW_MISSING_MODEL_PRICING_MODEL_NAME: ${{ needs.agent.outputs.missing_model_pricing_model_name }}
           GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
-          GH_AW_ENGINE_API_HOSTS: "api.openai.com"
+          GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
           GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
           GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
           GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
@@ -1884,7 +1881,7 @@ jobs:
       GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
       GH_AW_CALLER_WORKFLOW_ID: "${{ github.repository }}/smoke-ci"
       GH_AW_ENGINE_ID: "codex"
-      GH_AW_ENGINE_MODEL: "openai/gpt-6.1-sol"
+      GH_AW_ENGINE_MODEL: "copilot/gpt-6-luna"
       GH_AW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       GH_AW_PROJECT_UTC: "-08:00"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}

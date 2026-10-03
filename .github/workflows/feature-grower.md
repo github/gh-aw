@@ -113,7 +113,7 @@ timeout-minutes: 20
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-6.1-sol
+model: openai/gpt-5.6-terra
 ---
 
 # Feature Grower

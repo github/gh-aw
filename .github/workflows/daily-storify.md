@@ -17,7 +17,7 @@ tracker-id: daily-storify
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-6.1-sol
+model: openai/gpt-6-sol
 strict: true
 timeout-minutes: 45
 network:

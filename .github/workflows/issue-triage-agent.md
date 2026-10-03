@@ -3,8 +3,8 @@ emoji: "🔧"
 timeout-minutes: 5
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-6-sol
 strict: true
 on:
   schedule: "daily around 14:00 on weekdays"  # ~2 PM UTC, weekdays only

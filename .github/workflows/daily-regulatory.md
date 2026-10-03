@@ -15,8 +15,8 @@ permissions:
 
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-5.6-luna
 strict: true
 tracker-id: daily-regulatory
 max-ai-credits: 1000

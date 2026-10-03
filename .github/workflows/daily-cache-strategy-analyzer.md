@@ -14,7 +14,7 @@ permissions:
   pull-requests: read
   discussions: read
 tracker-id: daily-cache-strategy-analyzer
-model: openai/gpt-6.1-sol
+model: openai/gpt-6-luna
 engine:
   id: codex
   model-provider: openai

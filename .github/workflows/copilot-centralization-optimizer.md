@@ -85,8 +85,8 @@ tools:
     file-glob: ["*.json", "*.jsonl"]
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-6.1-sol
 strict: true
 sandbox:
   agent:

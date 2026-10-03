@@ -19,7 +19,7 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Drive
-model: openai/gpt-6.1-sol
+model: openai/gpt-6-astra
 engine:
   id: codex
 strict: true

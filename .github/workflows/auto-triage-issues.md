@@ -16,7 +16,7 @@ permissions:
   contents: read
   issues: read
   copilot-requests: write
-model: openai/gpt-6.1-sol
+model: openai/gpt-6-astra
 engine:
   id: codex
   model-provider: openai

@@ -31,7 +31,7 @@ permissions:
 
 engine:
   id: codex
-model: openai/gpt-6.1-sol
+model: openai/gpt-5.6-sol
 
 imports:
   # Note: markitdown.md excluded — docker.io/mcp/markitdown has Critical/High CVEs (see #49515)

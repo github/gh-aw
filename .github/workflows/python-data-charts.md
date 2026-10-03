@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 engine:
   id: codex
-model: openai/gpt-6.1-sol
+model: openai/gpt-5.6-luna
 tools:
   cli-proxy: true
   agentic-workflows:

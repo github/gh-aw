@@ -20,7 +20,7 @@ permissions:
   pull-requests: read
 engine:
   id: codex
-model: openai/gpt-6.1-sol
+model: copilot/gpt-6-luna
 imports:
   - shared/otlp.md
 tools:

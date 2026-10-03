@@ -27,10 +27,10 @@ permissions:
   pull-requests: read
 
 # AI engine configuration
-model: openai/gpt-6.1-sol
+model: copilot/gpt-5.6-sol
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 
 # Import shared reporting guidelines
 imports:

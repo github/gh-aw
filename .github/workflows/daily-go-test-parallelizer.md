@@ -13,8 +13,8 @@ permissions:
   pull-requests: read
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-5.6-terra
 strict: true
 timeout-minutes: 30
 network:

@@ -40,8 +40,8 @@ permissions:
 tracker-id: daily-cli-performance
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-6-luna
 tools:
   cli-proxy: true
   repo-memory:

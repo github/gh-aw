@@ -12,7 +12,7 @@ permissions:
 
 
 engine: codex
-model: openai/gpt-6.1-sol
+model: copilot/gpt-6.1-sol
 strict: true
 network:
   allowed:

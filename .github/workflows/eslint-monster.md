@@ -16,10 +16,10 @@ features:
   gh-aw-detection: true
 
 tracker-id: eslint-monster
-model: openai/gpt-6.1-sol
+model: copilot/gpt-6-astra
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 strict: true
 timeout-minutes: 45
 tools:

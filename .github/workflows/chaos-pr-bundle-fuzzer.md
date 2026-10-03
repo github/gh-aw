@@ -10,7 +10,7 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-model: openai/gpt-6.1-sol
+model: openai/gpt-5.6-terra
 engine:
   id: codex
   model-provider: openai

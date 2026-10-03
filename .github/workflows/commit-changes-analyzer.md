@@ -16,10 +16,10 @@ permissions:
   issues: read
   pull-requests: read
 max-turns: 100
-model: openai/gpt-6.1-sol
+model: copilot/gpt-5.6-luna
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 tools:
   cli-proxy: true
   github:

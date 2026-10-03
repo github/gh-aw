@@ -14,10 +14,10 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-model: openai/gpt-6.1-sol
+model: copilot/gpt-5.6-sol
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 strict: true
 safe-outputs:
   push-to-pull-request-branch:

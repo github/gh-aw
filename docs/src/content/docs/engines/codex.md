@@ -11,6 +11,7 @@ To select Codex as the AI engine, with inference hosted and billed through the O
 
 ```yaml
 engine: codex
+model: openai/gpt-6.1-sol
 ```
 
 To authenticate, provide a [`CODEX_API_KEY`](/gh-aw/reference/auth/#openai_api_key) or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) as a GitHub Actions repository secret.
@@ -21,13 +22,16 @@ Recompile the workflow with `gh aw compile` and commit the changes to your repos
 
 ## Selecting Codex + GitHub as the AI engine
 
-To select Codex as the AI engine, with inference hosted and billed through a GitHub Copilot subscription, add a `copilot/` model declaration. This configures Codex's BYOK provider to use GitHub Copilot inference. Select a Codex model because the Codex runtime relies on model capabilities that general-purpose models do not provide. For example:
+To select Codex as the AI engine, with inference hosted and billed through a GitHub Copilot subscription, add a `copilot/` model declaration. This configures Codex's BYOK provider to use GitHub Copilot inference. Select a Codex-compatible model available to your Copilot account. For example:
 
 ```yaml
 engine:
   id: codex
-  model: copilot/gpt-5.3-codex
+  model: copilot/gpt-6.1-sol
 ```
+
+GPT-6.1 Sol, GPT-6 Sol, GPT-6 Luna, GPT-6 Astra, and GPT-5.6 Sol, Terra, and Luna support Codex through the Responses API without a `-codex` suffix. Check [Codex model support](https://developers.openai.com/codex/models), [API pricing](https://developers.openai.com/api/docs/pricing), and [API deprecations](https://developers.openai.com/api/docs/deprecations) before pinning a model; a cached pricing entry alone does not establish availability.
+
 To authenticate:
 - For organization-billed usage, grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission).
 - Otherwise, provide a [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) secret containing a fine-grained PAT with Copilot Requests access.

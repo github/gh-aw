@@ -13,7 +13,7 @@ permissions:
 
 engine:
   id: codex
-model: openai/gpt-6.1-sol
+model: copilot/gpt-6-luna
 imports:
   - uses: shared/meta-analysis-base.md
     with:

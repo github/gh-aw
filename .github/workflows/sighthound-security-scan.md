@@ -13,8 +13,8 @@ permissions:
   copilot-requests: write
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-6.1-sol
+  model-provider: github
+model: copilot/gpt-6-sol
 strict: true
 if: needs.sighthound_scan.outputs.actionable_findings_detected == 'true'
 jobs:

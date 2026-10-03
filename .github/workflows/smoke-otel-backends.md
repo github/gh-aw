@@ -21,7 +21,7 @@ permissions:
 name: Smoke OTEL
 engine:
   id: codex
-model: openai/gpt-6.1-sol
+model: copilot/gpt-6-astra
 strict: true
 tools:
   bash: true

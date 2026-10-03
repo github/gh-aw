@@ -28,9 +28,13 @@ func TestNewModelPricingEntries(t *testing.T) {
 		{"github-copilot", "gpt-6-sol", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
 		{"github-copilot", "gpt-6-luna", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
 		{"github-copilot", "gpt-6.1-sol", 2e-6, 10e-6, 0.1e-6, 2.5e-6},
+		{"github-copilot", "gpt-5.6-terra", 2e-6, 12e-6, 0.2e-6, 2.5e-6},
+		{"github-copilot", "gpt-5.6-luna", 0.2e-6, 1.2e-6, 0.02e-6, 0.25e-6},
 		{"openai", "gpt-6-sol", 2e-6, 10e-6, 0.2e-6, 2.5e-6},
 		{"openai", "gpt-6-luna", 0.1e-6, 0.5e-6, 0.01e-6, 0.125e-6},
 		{"openai", "gpt-6.1-sol", 2e-6, 10e-6, 0.1e-6, 2.5e-6},
+		{"openai", "gpt-5.6-terra", 2e-6, 12e-6, 0.2e-6, 2.5e-6},
+		{"openai", "gpt-5.6-luna", 0.2e-6, 1.2e-6, 0.02e-6, 0.25e-6},
 	} {
 		t.Run(tt.provider+"/"+tt.model, func(t *testing.T) {
 			t.Parallel()
@@ -83,21 +87,24 @@ func TestFindGPT6AstraPricing(t *testing.T) {
 			assert.InDelta(t, 0.00001, pricing["input"], 1e-12)
 			assert.InDelta(t, 0.00005, pricing["output"], 1e-12)
 			assert.InDelta(t, 0.000001, pricing["cache_read"], 1e-12)
-			if provider == "github-copilot" {
-				assert.InDelta(t, 0.0000125, pricing["cache_write"], 1e-12)
-			}
+			assert.InDelta(t, 0.0000125, pricing["cache_write"], 1e-12)
 		})
 	}
 }
 
 func TestFindGPT56SolPricing(t *testing.T) {
 	t.Parallel()
-	pricing, ok := findModelPricing("github-copilot", "gpt-5.6-sol")
-	require.True(t, ok)
-	assert.InDelta(t, 0.000004, pricing["input"], 1e-12)
-	assert.InDelta(t, 0.00002, pricing["output"], 1e-12)
-	assert.InDelta(t, 0.0000004, pricing["cache_read"], 1e-12)
-	assert.InDelta(t, 0.000005, pricing["cache_write"], 1e-12)
+	for _, provider := range []string{"github-copilot", "openai"} {
+		t.Run(provider, func(t *testing.T) {
+			t.Parallel()
+			pricing, ok := findModelPricing(provider, "gpt-5.6-sol")
+			require.True(t, ok)
+			assert.InDelta(t, 0.000004, pricing["input"], 1e-12)
+			assert.InDelta(t, 0.00002, pricing["output"], 1e-12)
+			assert.InDelta(t, 0.0000004, pricing["cache_read"], 1e-12)
+			assert.InDelta(t, 0.000005, pricing["cache_write"], 1e-12)
+		})
+	}
 }
 
 func TestFindClaudeFable51Pricing(t *testing.T) {
