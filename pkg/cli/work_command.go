@@ -135,18 +135,17 @@ func workSubmitCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			id, payload, err := workqueue.WorkID(data)
+			tx, err := workqueue.NewWork(data)
 			if err != nil {
 				return err
 			}
-			tx := workqueue.Transaction{Kind: "Work", WorkID: id, Work: payload}
 			_, changed, err := workBranch(cmd).Update(cmd.Context(), func(current []workqueue.Transaction) ([]workqueue.Transaction, bool, error) {
 				return workqueue.Apply(current, tx)
 			})
 			if err != nil {
 				return err
 			}
-			return workPrint(cmd, map[string]any{"work_id": id, "created": changed}, fmt.Sprintf("Work %s (created: %t)", id, changed))
+			return workPrint(cmd, map[string]any{"work_id": tx.WorkID, "created": changed}, fmt.Sprintf("Work %s (created: %t)", tx.WorkID, changed))
 		},
 	}
 	cmd.Flags().String("file", "", "JSON work object path (- for stdin)")
@@ -163,13 +162,13 @@ func workID() (string, error) {
 
 func workClaimCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "claim", Short: "Add a claim with trusted owning run provenance",
+		Use: "claim", Short: "Claim the oldest available Work, or an explicit Work identity",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			workIDValue, _ := cmd.Flags().GetString("work-id")
 			runID, _ := cmd.Flags().GetString("run-id")
-			if workIDValue == "" || runID == "" {
-				return errors.New("--work-id and --run-id are required")
+			if runID == "" {
+				return errors.New("--run-id is required")
 			}
 			id, err := workID()
 			if err != nil {
@@ -177,15 +176,25 @@ func workClaimCommand() *cobra.Command {
 			}
 			tx := workqueue.Transaction{Kind: "Claim", WorkID: workIDValue, ClaimID: id, RunID: runID}
 			_, _, err = workBranch(cmd).Update(cmd.Context(), func(current []workqueue.Transaction) ([]workqueue.Transaction, bool, error) {
+				if tx.WorkID == "" {
+					selected, err := workqueue.OldestAvailable(current)
+					if err != nil {
+						return nil, false, err
+					}
+					if selected == "" {
+						return nil, false, errors.New("no available Work to claim")
+					}
+					tx.WorkID = selected
+				}
 				return workqueue.Apply(current, tx)
 			})
 			if err != nil {
 				return err
 			}
-			return workPrint(cmd, tx, fmt.Sprintf("Claim %s added to Work %s (replay to check effectiveness)", id, workIDValue))
+			return workPrint(cmd, tx, fmt.Sprintf("Claim %s added to Work %s (replay to check effectiveness)", id, tx.WorkID))
 		},
 	}
-	cmd.Flags().String("work-id", "", "Work identity")
+	cmd.Flags().String("work-id", "", "Explicit Work identity (default: oldest available)")
 	cmd.Flags().String("run-id", "", "Owning workflow run identity")
 	return cmd
 }

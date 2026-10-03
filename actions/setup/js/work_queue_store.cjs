@@ -11,7 +11,7 @@ const DEFAULT_MAX_RETRIES = 5;
 
 /**
  * @typedef {
- *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null, enqueued?: number}
  *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
@@ -147,8 +147,9 @@ async function applyAndPublishWorkQueueTransactions({
     coreApi?.info(`Work queue: queue publication attempt ${attempt + 1} of ${maxRetries + 1}`);
     const current = await readWorkQueueLogRaw({ githubClient, owner, repo, core: coreApi });
     const applied = applyTransactions(current.transactions, intents);
-    coreApi?.info(`Work queue: ${applied.transactions.length - current.transactions.length} new transactions, ${applied.rejected.length} rejected intents`);
-    if (!current.needsUpgrade && applied.transactions.length === current.transactions.length) {
+    const newIntents = intents.length - applied.rejected.length - applied.idempotent;
+    coreApi?.info(`Work queue: ${newIntents} new intents, ${applied.rejected.length} rejected intents, ${applied.idempotent} idempotent intents`);
+    if (!current.needsUpgrade && newIntents === 0) {
       coreApi?.info("Work queue: queue unchanged; publication skipped");
       return { ...applied, sha: current.sha, persisted: false };
     }

@@ -5,7 +5,7 @@ description: TLA+ model, safety proof argument, and bounded verification for the
 
 # Work Queue protocol model
 
-This TLA+ model formalizes the proposal in [issue #64852](https://github.com/github/gh-aw/issues/64852): deferred dispatcher transactions, trusted worker finalization, optimistic branch writes, orphan recovery, and compaction.
+This TLA+ model formalizes the proposal in [issue #64852](https://github.com/github/gh-aw/issues/64852): best-effort oldest-first selection, deferred dispatcher transactions, trusted worker finalization, optimistic branch writes, orphan recovery, and compaction.
 
 The design rationale and trade-offs are recorded in [ADR-64955](../../docs/adr/64955-git-backed-work-queue-coordination.md).
 
@@ -33,7 +33,7 @@ read-only snapshot MCP server with `tools.work-queue: true`.
 | `stats` | Count Work, Claims, and distinct transactions |
 | `compact` | Canonically order facts and remove only identical duplicates |
 | `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
-| `claim` | `--work-id ID --run-id RUN` |
+| `claim` | `--run-id RUN [--work-id ID]`; defaults to the oldest available Work |
 | `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
 | `cancel-work` | `--work-id ID` |
 | `cancel-claim` | `--claim-id ID` |
@@ -49,9 +49,15 @@ The operator transaction wire format (`Transaction`) is defined in
 The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate
 each operator record before replay or publication. The workflow runtime uses a
 separate `work-queue` branch and the versioned `WorkQueueTransaction` format:
-exactly `version: 1`, `kind`, `work`, `claim`, and `attempt`. Unused claim/attempt
+required fields `version: 2`, `kind`, `work`, `claim`, and `attempt`, plus optional
+`enqueued` on Work. Unused claim/attempt
 fields are explicitly `null`; identities are nonempty strings. Its loader upgrades
-unversioned/version-0 workflow records before validation and replay. These formats
+unversioned/version-0/version-1 workflow records through successive codemods before
+validation and replay. Version 1 remains the closed five-field format without
+`enqueued`; historical records with extra fields are rejected before upgrading.
+The 1-to-2 upgrade changes only the version, leaving historical Work at age zero
+without inventing enqueue metadata. The snapshot envelope version is independent
+of the transaction version. These formats
 are not interchangeable; the CLI branch also preserves Work payloads and run
 provenance, which the workflow fact format does not contain.
 
@@ -89,6 +95,7 @@ The model fixes arbitration and makes the worker lifecycle, publication guards, 
 | Boundary | Modeled rule |
 |---|---|
 | Arbitration | The least stable, uncancelled Claim identity wins on nonterminal Work. A persisted Completion fixes the winner; WorkCancellation removes authority. |
+| Queue selection | Stage a Claim for the oldest available Work in the dispatcher's local replay. Use an immutable enqueue-time key with stable Work identity as the tie-breaker; skip claimed and terminal Work. |
 | Terminal Work | Reject new state-changing transactions for completed/cancelled Work. Identical physical records may be duplicated without changing the fact set. |
 | Dispatcher | The activation job reads the queue branch and packages its log and branch version into the activation artifact. The work-queue MCP server reads only that immutable snapshot and never accesses Git; the view may be stale while the agent runs. Mutations are revalidated and published only by trusted `safe_outputs`; pending competing Claims may become durable on nonterminal Work. |
 | Worker | Each worker has one immutable inbound Claim and one pass through safe-output processing; it records at most one distinct Completion. Finalize carries no authority parameters. |
@@ -98,6 +105,20 @@ The model fixes arbitration and makes the worker lifecycle, publication guards, 
 These are protocol refinements, not claims that an implementation already enforces them. Claim ordering is by stable identity, not arrival time. Arrival order can change which transactions are accepted; it cannot change replay of the same accepted fact set.
 
 `WorkOf`, `Inbound`, and `Origin` provide small, deterministic identity mappings for TLC. `Inbound` represents validated trusted context, not agent-selected input. Claims also identify their owning run; multiple worker attempts may share one Claim/run. Payloads are abstracted to stable Work identities, assuming collision-free canonical identity and idempotent submission.
+
+### Best-effort queue ordering
+
+Each Work fact carries immutable `enqueued` metadata, set once at submission and preserved through retries, replay, and compaction. The finite model uses the Work integer as the rank of the `(enqueue time, Work identity)` key, not as a physical log position or a globally allocated sequence number.
+
+JavaScript and Go represent `enqueued` as Unix milliseconds, restricted to nonnegative integers no larger than `9007199254740991` so both languages compare exactly. Both replay projections expose an oldest-first `available` identity list, with UTF-8 Work identity as the tie-breaker. Historical Work without metadata has age zero and sorts before timestamped Work; replay never invents timestamps from record position or the current clock. Repeated submissions preserve the first durable Work fact's age, while conflicting metadata already present in the durable log is rejected.
+
+JavaScript callers construct Work with `createWorkTransaction` and select or stage Claims with `oldestAvailableWork` / `claimOldestAvailableWork`, passing their local view including earlier pending intents. Go callers use `NewWork` and `OldestAvailable`. `gh aw work-queue claim --run-id RUN` selects once from its initial view and retains that Work identity across publication retries; `--work-id ID` remains an explicit operator override. `work_queue_read` lists available Work first in enqueue order, includes enqueue metadata, and returns the snapshot's recommended `next_work` identity or `null`. This recommendation is queue-wide even when the query filters to one Work, and is not durable authority.
+
+`OldestAvailable` chooses the least key among Work whose replayed state is `available`. `Stage` applies that preference to the local view, including earlier pending intents, so a batch cannot repeatedly select the same Work. Claimed Work does not block selection of newer available Work; cancellation of its last active Claim makes it eligible again with its original age. Work and claim arbitration remain separate.
+
+Publication deliberately does **not** enforce oldest-first ordering. `Allowed` continues to accept competing Claims on nonterminal Work, and a version-conflict retry replays already selected intents without moving a Claim to another Work. An older submission can become visible after a newer item was selected; concurrent workers can also complete out of order. The model's local view is current durable facts plus pending intents at staging, but even that view may be outdated before publication. Implementations selecting from immutable activation snapshots have the same limitation.
+
+This is a queue preference, not strict FIFO, a bounded-overtaking guarantee, or a claim that reordering has a particular probability. Reordering should be uncommon with fresh views and prompt publication, but TLA+ explores adversarial schedules and does not measure frequency. No global sequence allocator, head-of-line lock, or completion barrier is introduced.
 
 ## State and job boundaries
 
@@ -113,7 +134,9 @@ Compaction and recovery have independent prepared snapshots and bounded retries.
 
 `terminalHistory` records each Work item's complete fact set at its first terminal decision. It and `authorizations`/`effects` are observer histories, not additional queue files or decision-making state. Authorization/effect histories are sequences, so repeated execution of the same record cannot disappear through set deduplication. One `ExternalEffect` represents entry into one attempt's ordinary safe-output batch, not one GitHub API call.
 
-`Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. Implementations must report rejected intents; the abstraction does not prescribe silently treating errors as success.
+`Apply` abstracts explicit rejection and idempotent no-op outcomes as no append. The model admits an identity-based Work resubmission with different enqueue metadata as idempotent and checks that staging it does not change replayed facts or the first durable Work age. Other exact duplicate intents are abstracted as no append; the model does not track implementation diagnostic counts. To keep the finite search bounded, each exact intent can be staged at most once per dispatcher.
+
+JavaScript `applyTransactions` returns the candidate `transactions`, invalid intents in `rejected`, and an `idempotent` count. Exact duplicates of every kind and identity-based Work resubmissions are idempotent, not rejected, even when resubmitted Work carries a different enqueue time. Publication logs count requested intents as new, rejected, or idempotent on each attempt, independently of duplicate physical records in the source log. Retry outcomes describe only the refreshed attempt, not accumulated counts. All-no-op publication skips writes unless the log needs a protocol upgrade or canonicalization.
 
 ## Required protections
 
@@ -138,6 +161,8 @@ All dispatcher, worker, recovery, and compaction pushes use `Publish`. It requir
 | `TerminalHistoryValid`, `TerminalFreeze` | All facts for a terminal Work item are frozen; neither late Claims nor other new transactions can change the decision. |
 | `SingleCompletionPerWorker`, `WorkerOneShot` | One fixed inbound Claim and at most one distinct Completion per worker; terminal worker phases never restart. |
 | `SingleEffectiveClaim` | At most one effective Claim per Work. |
+| `QueueSelection` (action property) | Every staged Claim selects the oldest available Work in the local view at that step, not necessarily the oldest at publication or completion. |
+| `WorkResubmissionNoOp` (action property) | A same-identity Work resubmission with different enqueue metadata may be staged, but does not change replayed facts or the original Work age. |
 | `WorkerOrigin`, `FinishRequired` | Worker mutations concern only the inbound Claim; authorization requires finalize. |
 | `AuthorizationSoundness`, `EffectSoundness` | Authorization follows durable Completion; effects follow authorization. |
 | `LifecycleAccounting` | Each attempt authorizes/emits at most once, without resetting its lifecycle. |
@@ -154,6 +179,8 @@ The argument is parameterized by the identity-domain sizes and retry limit. It d
 For finite `f`, induction on its cardinality proves `Facts(Canonical(f)) = f`. The empty case returns the empty sequence. The nonempty case emits one chosen member and recursively emits exactly the remaining members. Thus `CompactionEquivalence` follows by the replay lemma.
 
 For any intent list, induction on its length also shows that applying it to logs with equal fact sets produces equal resulting fact sets: `Allowed` depends only on facts, and append adds the same accepted fact in either case. Consequently the modeled compaction preserves future mutation decisions, not just current displayed state. It may change HEAD and provoke a retry, as any concurrent write can.
+
+`OldestAvailable` also depends only on facts and immutable Work metadata. Equal fact sets therefore give the same next selection, and compaction preserves the ordering preference even when it rearranges physical records.
 
 ### Accepted-extension lemma
 
@@ -196,7 +223,7 @@ Only `ExternalEffect` extends effect history. It requires `authorized`, then mov
 
 ### Remaining actions
 
-Agent staging changes only equal local/serialized logs. Activation snapshot capture and admission do not grant authorization; execution-time worker preparation rechecks current Git facts. Retry exhaustion changes phase to `failed` without writing or emitting effects. Run termination can stop a worker but neither invents nor removes a terminal fact or authorization. Maintenance uses the same guarded write lemmas. Every action in `Next`, and stuttering, therefore preserves the strengthened `Safety` predicate.
+Agent staging changes only equal local/serialized logs. Only `Stage` extends these sequences, and its Claim guard selects `OldestAvailable` from the preceding local view; every other action leaves them unchanged. Thus `QueueSelection` holds without imposing a publication-order invariant. Activation snapshot capture and admission do not grant authorization; execution-time worker preparation rechecks current Git facts. Retry exhaustion changes phase to `failed` without writing or emitting effects. Run termination can stop a worker but neither invents nor removes a terminal fact or authorization. Maintenance uses the same guarded write lemmas. Every action in `Next`, and stuttering, therefore preserves the strengthened `Safety` predicate.
 
 By induction on execution length, `Spec => []Safety` follows under the modeled assumptions. This is a reviewable proof argument, not a TLAPS proof certificate.
 
@@ -214,22 +241,25 @@ JAVA_BIN=/path/to/java \
 bash specs/work-queue/check.sh
 ```
 
-The runner checks both positive configurations and the one-shot worker property to exhaustion, and requires the two remaining negative controls to fail with the named invariant, not a parse/tooling failure. These controls deliberately bypass branch-version or terminal-state protection; they are not reachable behaviors of the guarded protocol. Full reports are saved under a printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
+The runner checks all three positive configurations, the one-shot worker property, Work resubmission idempotency, and oldest-available selection to exhaustion. It requires the three negative controls to fail with the named invariant or action property, not a parse/tooling failure. These controls deliberately bypass branch-version, terminal-state, or selection protection; they are not reachable behaviors of the guarded protocol. A separate guarded witness demonstrates that strict FIFO is not required. Full reports are saved under a printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
 
 | Configuration | Scope / expected result |
 |---|---|
-| `WorkQueue.cfg` | One Work, two competing Claims, two dispatchers, three workers (two share a Claim), three branch changes, four records; `Safety` holds. |
+| `WorkQueue.cfg` | One Work, two competing Claims, two dispatchers, three workers (two share a Claim), three branch changes, four records; `Safety`, `WorkerOneShot`, `QueueSelection`, and `WorkResubmissionNoOp` hold. |
 | `Recovery.cfg` | One Work, two Claims/workers, one dispatcher, four branch changes, five records; `Safety` holds through recovery/compaction interleavings. |
+| `QueueOrdering.cfg` | Two Work items, two Claims/workers/dispatchers, two branch changes, four records; `Safety`, `WorkerOneShot`, and `QueueSelection` hold across selection, retry, cancellation, and compaction interleavings. |
 | `BrokenCAS.cfg` | Bypass the branch-version check and overwrite with a stale snapshot; `TerminalPersistence` fails. |
 | `BrokenTerminal.cfg` | Bypass terminal protection and append a competing Claim after Completion; `TerminalFreeze` fails. |
+| `BrokenQueueSelection.cfg` | Bypass oldest-available selection while retaining publication safety; `QueueSelection` fails. |
+| `WeakOrderingWitness.cfg` | Under guarded `Spec`, a newer Work is claimed before an older submission becomes visible; the deliberately false `NoOutOfOrderClaim` invariant fails. |
 
-The earlier model revision completed both positive searches on 2026-10-02, checking `Safety` and `WorkerOneShot`: 3,626,825 distinct states at graph depth 33 for concurrency, and 218,926 distinct states at depth 23 for recovery. The two remaining negative controls produced the expected violations at depths 7 and 10. These counts predate the activation snapshot fields and do not constitute exhaustive verification of the current revision; rerun `check.sh` to verify the current model.
+All three positive searches completed on 2026-10-02, checking `Safety`, `WorkerOneShot`, and `QueueSelection`: 7,218,153 distinct states at graph depth 33 for concurrency, 49,087 at depth 19 for recovery, and 1,696,812 at depth 24 for two-Work ordering. The branch-version, terminal-state, and queue-selection negative controls produced their expected violations at depths 7, 10, and 4. The guarded weak-ordering witness reached an out-of-order Claim at depth 6 without a safety or selection violation.
 
 `Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
 
 ## Inspect execution traces
 
-Generate bounded textual traces of the guarded `Spec` and three reachable counterexamples to deliberately false *witness* invariants:
+Generate bounded textual traces of the guarded `Spec` and four reachable counterexamples to deliberately false *witness* invariants:
 
 ```bash
 TLA2TOOLS_JAR=/path/to/tla2tools.jar \
@@ -241,11 +271,12 @@ The script prints a temporary results directory (or uses `TLC_RESULTS_DIR` when 
 
 | Witness | What to inspect in its counterexample |
 |---|---|
-| `NoCompetingClaims` | Two Claims for one nonterminal Work are persisted; replay still selects one effective winner. |
+| `NoCompetingClaims` | Two dispatchers select the same Work in their local views before either Claim is durable. Both Claims persist, but replay still selects one effective winner. |
 | `NoRecoveredOrphan` | A run terminates, then recovery prepares and publishes its ClaimCancellation. |
 | `NoExternalEffect` | A worker finalizes, commits Completion, verifies it, and enters its output batch. |
+| `NoOutOfOrderClaim` | A dispatcher selects newer Work from its local view before staging an older submission; publication preserves the Claim rather than imposing strict FIFO. |
 
-These invariants are intentionally **not** protocol requirements: their violation demonstrates reachability of legitimate behavior under the existing guarded `Spec`. Unlike `BrokenCAS.cfg` and `BrokenTerminal.cfg`, the witness configurations do not add unsafe actions. Inspect the preceding states, not just the final state, to verify the ordering claimed by the ADR. Witnesses show that the model permits these paths; they do not establish that a runtime implementation follows them or that progress is guaranteed.
+These invariants are intentionally **not** protocol requirements: their violation demonstrates reachability of legitimate behavior under the existing guarded `Spec`. Unlike the three `Broken*.cfg` configurations, the witness configurations do not add unsafe actions. Inspect the preceding states, not just the final state, to verify the ordering claimed by the ADR. Witnesses show that the model permits these paths; they do not establish that a runtime implementation follows them or that progress is guaranteed.
 
 ## Runtime smoke coverage
 

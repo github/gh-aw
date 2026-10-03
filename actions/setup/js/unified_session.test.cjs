@@ -83,6 +83,32 @@ describe("Unified conclusion session", () => {
     expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toBe(original);
   });
 
+  it("collects available tool and engine versions from workflow metadata", () => {
+    write("aw_info.json", {
+      cli_version: "v1.2.3",
+      awf_version: "v0.4.5",
+      awmg_version: "v0.6.7",
+      engine_id: "copilot",
+      agent_version: "v2.3.4",
+      model: "fixture",
+      secret: "omit",
+    });
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.find(event => event.type === "workflow.info")).toMatchObject({
+      data: {
+        cliVersion: "v1.2.3",
+        awfVersion: "v0.4.5",
+        mcpgVersion: "v0.6.7",
+        engineId: "copilot",
+        agentVersion: "v2.3.4",
+        engine: "copilot",
+        model: "fixture",
+      },
+      provenance: { path: "aw_info.json", component: "workflow" },
+    });
+    expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
+  });
+
   it("retains native provenance, equal-time source order, and invalid/absent timestamps without mutation", () => {
     const sources = [
       {

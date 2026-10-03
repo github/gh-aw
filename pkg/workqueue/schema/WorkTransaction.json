@@ -12,6 +12,9 @@
     },
     "work": {
       "$ref": "#/$defs/RecordUnknown"
+    },
+    "enqueued": {
+      "$ref": "#/$defs/WorkQueueEnqueueTime"
     }
   },
   "required": ["kind", "work_id", "work"],
@@ -24,6 +27,11 @@
       "type": "object",
       "properties": {},
       "unevaluatedProperties": {}
+    },
+    "WorkQueueEnqueueTime": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
     }
   }
 }

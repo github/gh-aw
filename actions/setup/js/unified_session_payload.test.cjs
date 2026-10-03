@@ -78,6 +78,25 @@ describe("essential unified session payloads", () => {
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
   });
 
+  it("keeps only supplied workflow version identifiers without conflating CLI and engine versions", () => {
+    const source = {
+      type: "workflow.info",
+      data: { engine_id: "custom", agent_version: "v2", version: "v3", cli_version: "", awf_version: "", awmg_version: "", token: "omit" },
+    };
+    expect(normalizeUnifiedSessionEvent(source).data).toEqual({
+      engine: "custom",
+      engineId: "custom",
+      agentVersion: "v2",
+      cliVersion: "",
+      awfVersion: "",
+      mcpgVersion: "",
+    });
+    expect(normalizeUnifiedSessionEvent({ type: "workflow.info", data: { engine_id: "custom", version: "v3" } }).data).toEqual({
+      engine: "custom",
+      engineId: "custom",
+    });
+  });
+
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {
     const data = { provider: "copilot", inputTokens: 0, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, ai_credits_this_response: 0, ai_credits_total: 0, duration_ms: 0, opaque: "omit" };
     const runtime = normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data });

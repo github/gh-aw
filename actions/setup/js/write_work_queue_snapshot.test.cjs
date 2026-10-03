@@ -66,14 +66,15 @@ describe("write work queue activation snapshot", () => {
     await main({ githubClient, context: { repo: { owner: "owner", repo: "repo" } }, snapshotPath, core: { info: () => {} } });
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
     expect(snapshot.sha).toBe("legacy-head");
-    expect(snapshot.transactionLog).toBe(`${JSON.stringify({ version: 1, ...legacy })}\n`);
+    expect(snapshot.version).toBe(2);
+    expect(snapshot.transactionLog).toBe(`${JSON.stringify({ version: 2, ...legacy })}\n`);
   });
 
   it("admits only a trusted inbound assignment that is the current effective claim", () => {
     const transactions = [
-      { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
-      { version: 1, kind: "Claim", work: "w", claim: "claim-b", attempt: null },
-      { version: 1, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
+      { version: 2, kind: "Work", work: "w", claim: null, attempt: null },
+      { version: 2, kind: "Claim", work: "w", claim: "claim-b", attempt: null },
+      { version: 2, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
     ];
     const payload = {
       inputs: {
@@ -90,8 +91,8 @@ describe("write work queue activation snapshot", () => {
 
   it("reads work_queue from repository_dispatch context and rejects malformed assignments", () => {
     const transactions = [
-      { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
-      { version: 1, kind: "Claim", work: "w", claim: "c", attempt: null },
+      { version: 2, kind: "Work", work: "w", claim: null, attempt: null },
+      { version: 2, kind: "Claim", work: "w", claim: "c", attempt: null },
     ];
     const assignment = { work_id: "w", claim_id: "c", work: { task: "test" } };
     expect(resolveWorkerAssignment({ client_payload: { aw_context: { work_queue: assignment } } }, transactions)).toEqual({ work_id: "w", claim_id: "c" });
