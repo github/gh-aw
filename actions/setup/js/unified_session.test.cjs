@@ -252,7 +252,7 @@ describe("Unified conclusion session", () => {
   });
 
   it("falls back to the raw structured verdict when no conclusion result is available", () => {
-    write("threat-detection/detection_result.json", { prompt_injection: false, secret_leak: true, malicious_patch: false, reasons: ["PRIVATE_DETECTOR_REASON"] });
+    write("threat-detection/detection_result.json", { prompt_injection: false, secret_leak: true, malicious_patch: false, reason: "PRIVATE_RAW_REASON", reasons: ["PRIVATE_DETECTOR_REASON"] });
     const results = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "detection.result");
     expect(results).toEqual([
       {
@@ -261,6 +261,7 @@ describe("Unified conclusion session", () => {
         provenance: { component: "detection", phase: "detection", path: "threat-detection/detection_result.json", index: 0 },
       },
     ]);
+    expect(JSON.stringify(results)).not.toContain("PRIVATE_RAW_REASON");
   });
 
   it("recovers adjacent valid records, records malformed/partial coverage and skips symlinks", () => {

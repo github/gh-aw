@@ -9,6 +9,8 @@ const messages: CoreSessionEvent[] = [
   { type: "tool.execution_start", data: { toolCallId: "call", input: false } },
   { type: "tool.execution_complete", data: { toolCallId: "call", success: false, output: null } },
   { type: "session.result", data: { numTurns: 0, usage: { input_tokens: 0 }, errors: [{ code: "failed" }] } },
+  { type: "detection.result", data: { promptInjection: false } },
+  { type: "session.format", data: { version: 1 } },
 ];
 void messages;
 

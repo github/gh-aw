@@ -40,8 +40,12 @@ function mergeSessionSources(sources) {
   const events = sources.flatMap(source =>
     source.events.map((event, index) => {
       const timestampMs = sessionTimestamp(event, source.timestampUnit);
+      const normalized = normalizeUnifiedSessionEvent(event);
+      if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
+        delete normalized.data.reason;
+      }
       return {
-        ...normalizeUnifiedSessionEvent(event),
+        ...normalized,
         provenance: {
           component: source.component,
           phase: source.phase,

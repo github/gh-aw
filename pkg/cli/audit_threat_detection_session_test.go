@@ -105,6 +105,21 @@ func TestUnifiedDetectionResultPreservesOlderJobOutcomes(t *testing.T) {
 	require.Len(t, generateThreatDetectionFindings(ProcessedRun{Run: WorkflowRun{LogsPath: runDir}}), 2)
 }
 
+func TestMergeUnifiedDetectionResult(t *testing.T) {
+	t.Parallel()
+	stringPointer := func(value string) *string { return &value }
+	t.Run("unified canonical fields override legacy values", func(t *testing.T) {
+		unified := &unifiedDetectionResult{JobResult: stringPointer("skipped"), Conclusion: stringPointer(""), Reason: stringPointer("")}
+		legacy := detectionUsageResult{JobResult: "success", Conclusion: "warning", Reason: "threat_detected"}
+		assert.Equal(t, detectionUsageResult{JobResult: "skipped"}, mergeUnifiedDetectionResult(unified, legacy))
+	})
+	t.Run("legacy fields backfill missing unified values", func(t *testing.T) {
+		unified := &unifiedDetectionResult{JobResult: stringPointer("success")}
+		legacy := detectionUsageResult{Conclusion: "warning", Reason: "threat_detected"}
+		assert.Equal(t, detectionUsageResult{JobResult: "success", Conclusion: "warning", Reason: "threat_detected"}, mergeUnifiedDetectionResult(unified, legacy))
+	})
+}
+
 func TestParseUnifiedDetectionResultRejectsInvalidHeadersAndConflicts(t *testing.T) {
 	t.Parallel()
 	event := unifiedDetectionTestEvent(`{"promptInjection":false,"secretLeak":false,"maliciousPatch":false}`)
@@ -154,6 +169,18 @@ func TestParseUnifiedDetectionResultHandlesLargeAgentRecords(t *testing.T) {
 	t.Parallel()
 	content := unifiedDetectionTestHeader +
 		`{"type":"assistant.message","data":{"content":"` + strings.Repeat("x", 2*maxScannerBufferSize) + `"},"provenance":{"component":"agent"}}` + "\n" +
+		unifiedDetectionTestEvent(`{"jobResult":"success","promptInjection":false,"secretLeak":false,"maliciousPatch":false}`)
+	result, err := parseUnifiedDetectionResult(strings.NewReader(content))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "success", *result.JobResult)
+	assert.False(t, *result.SecretLeak)
+}
+
+func TestParseUnifiedDetectionResultDiscardsOversizedRecords(t *testing.T) {
+	t.Parallel()
+	content := unifiedDetectionTestHeader +
+		`{"type":"assistant.message","data":{"content":"` + strings.Repeat("x", maxUnifiedSessionLineSize) + `"},"provenance":{"component":"agent"}}` + "\n" +
 		unifiedDetectionTestEvent(`{"jobResult":"success","promptInjection":false,"secretLeak":false,"maliciousPatch":false}`)
 	result, err := parseUnifiedDetectionResult(strings.NewReader(content))
 	require.NoError(t, err)

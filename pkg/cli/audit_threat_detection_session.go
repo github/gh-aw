@@ -24,6 +24,9 @@ type unifiedDetectionResult struct {
 	MaliciousPatch  *bool   `json:"maliciousPatch"`
 }
 
+// maxUnifiedSessionLineSize bounds JSONL record allocations while allowing large agent records.
+const maxUnifiedSessionLineSize = 10 * maxScannerBufferSize
+
 type unifiedDetectionEvent struct {
 	Type       string          `json:"type"`
 	Data       json.RawMessage `json:"data"`
@@ -64,8 +67,10 @@ func parseUnifiedDetectionResult(input io.Reader) (*unifiedDetectionResult, erro
 	headerSeen := false
 	var result *unifiedDetectionResult
 	for lineNumber := 1; ; lineNumber++ {
-		line, readErr := reader.ReadBytes('\n')
-		if line = bytes.TrimSpace(line); len(line) > 0 {
+		line, oversized, readErr := readUnifiedSessionLine(reader)
+		if oversized {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping oversized unified session record on line %d", lineNumber)))
+		} else if line = bytes.TrimSpace(line); len(line) > 0 {
 			var event unifiedDetectionEvent
 			if err := json.Unmarshal(line, &event); err != nil {
 				if !headerSeen {
@@ -101,6 +106,26 @@ func parseUnifiedDetectionResult(input io.Reader) (*unifiedDetectionResult, erro
 		return nil, errors.New("unified session is missing its leading session.format header")
 	}
 	return result, nil
+}
+
+func readUnifiedSessionLine(reader *bufio.Reader) ([]byte, bool, error) {
+	var line []byte
+	oversized := false
+	for {
+		fragment, err := reader.ReadSlice('\n')
+		if !oversized {
+			if len(line)+len(fragment) > maxUnifiedSessionLineSize {
+				oversized = true
+				line = nil
+			} else {
+				line = append(line, fragment...)
+			}
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		return line, oversized, err
+	}
 }
 
 func validateUnifiedDetectionHeader(event unifiedDetectionEvent) error {
@@ -147,16 +172,8 @@ func readThreatDetectionEvidence(runDir string) threatDetectionEvidence {
 	if unified != nil {
 		auditThreatDetectionLog.Printf("Using unified-session detection evidence")
 		// Older unified files contain verdict flags only; retain separately recorded job outcomes.
-		evidence.Result, _ = readLegacyDetectionUsageResult(runDir)
-		if unified.JobResult != nil {
-			evidence.Result.JobResult = *unified.JobResult
-		}
-		if unified.Conclusion != nil {
-			evidence.Result.Conclusion = *unified.Conclusion
-		}
-		if unified.Reason != nil {
-			evidence.Result.Reason = *unified.Reason
-		}
+		legacyResult, _ := readLegacyDetectionUsageResult(runDir)
+		evidence.Result = mergeUnifiedDetectionResult(unified, legacyResult)
 		evidence.HasResult = validDetectionJobResult(evidence.Result.JobResult)
 		evidence.Verdict, evidence.HasVerdict = validateThreatDetectionVerdict(rawThreatDetectionVerdict{
 			PromptInjection: unified.PromptInjection,
@@ -165,7 +182,21 @@ func readThreatDetectionEvidence(runDir string) threatDetectionEvidence {
 		})
 		return evidence
 	}
+
 	evidence.Verdict, evidence.HasVerdict = findLegacyThreatDetectionVerdict(runDir)
 	evidence.Result, evidence.HasResult = readLegacyDetectionUsageResult(runDir)
 	return evidence
+}
+
+func mergeUnifiedDetectionResult(unified *unifiedDetectionResult, legacy detectionUsageResult) detectionUsageResult {
+	if unified.JobResult != nil {
+		legacy.JobResult = *unified.JobResult
+	}
+	if unified.Conclusion != nil {
+		legacy.Conclusion = *unified.Conclusion
+	}
+	if unified.Reason != nil {
+		legacy.Reason = *unified.Reason
+	}
+	return legacy
 }

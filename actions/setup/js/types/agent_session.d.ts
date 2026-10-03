@@ -139,7 +139,8 @@ export interface DetectionResultEvent extends EventMetadata {
   data: DetectionResultData;
 }
 
-export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
+export type CoreSessionEvent =
+  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | DetectionResultEvent;
 
 export interface SessionEventDataMap {
   "detection.result": DetectionResultData;
