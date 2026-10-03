@@ -2,14 +2,16 @@
 private: true
 emoji: "🧹"
 name: ESLint Monster
-description: Daily workflow that runs the ESLint factory against actions/setup/js, groups findings, and launches up to three Copilot agent sessions to remediate them
+description: Daily ESLint factory dispatcher that queues one task for the miner, refiner, or applier
 on:
   schedule: daily
   workflow_dispatch:
+concurrency:
+  group: eslint-factory-dispatcher
+  cancel-in-progress: false
 permissions:
   contents: read
   issues: read
-  discussions: read
   pull-requests: read
 
 features:
@@ -25,8 +27,8 @@ timeout-minutes: 45
 tools:
   cli-proxy: true
   github:
-    mode: local
-    toolsets: [default, issues, discussions]
+    mode: gh-proxy
+    toolsets: [default, issues, pull_requests]
   bash:
     - "*"
 steps:
@@ -36,14 +38,11 @@ steps:
       set -euo pipefail
       mkdir -p /tmp/gh-aw/agent
       rm -f /tmp/gh-aw/agent/lint-clean.flag
-      REPO_ROOT="$(pwd)"
-
       cd eslint-factory
       npm ci > /tmp/gh-aw/agent/eslint-factory.log 2>&1
 
       if npm run lint:setup-js >> /tmp/gh-aw/agent/eslint-factory.log 2>&1; then
         : > /tmp/gh-aw/agent/eslint-diagnostics.txt
-        : > /tmp/gh-aw/agent/skill-index.txt
         touch /tmp/gh-aw/agent/lint-clean.flag
         exit 0
       fi
@@ -51,81 +50,65 @@ steps:
       grep -E '^[^:]+:[0-9]+:[0-9]+:' /tmp/gh-aw/agent/eslint-factory.log > /tmp/gh-aw/agent/eslint-diagnostics.txt || true
       diag_count=$(wc -l < /tmp/gh-aw/agent/eslint-diagnostics.txt | tr -d ' ')
       if [ "${diag_count}" -eq 0 ]; then
-        grep -E '^[[:space:]]*[^[:space:]].*$' /tmp/gh-aw/agent/eslint-factory.log | head -n 80 > /tmp/gh-aw/agent/eslint-diagnostics.txt || true
+        echo "ESLint factory pre-check failed without diagnostics" >&2
+        exit 1
       fi
-
-      find "${REPO_ROOT}/.github/skills" -maxdepth 6 -name 'SKILL.md' | sort > /tmp/gh-aw/agent/skill-index.txt
 safe-outputs:
   create-issue:
-    expires: 7d
-    title-prefix: "[eslint-monster] "
-    labels: [automation, eslint, cookie]
-    max: 3
-  close-issue:
-    max: 10
-    required-title-prefix: "[eslint-monster] "
-    state-reason: duplicate
-  update-issue:
-    max: 10
-    title-prefix: "[eslint-monster] "
-  assign-to-agent:
-    max: 3
-    target: "*"
-    allowed: [copilot]
-  create-discussion:
-    expires: 2d
-    category: audits
-    title-prefix: "[eslint-monster] "
+    title-prefix: "[eslint-factory] "
+    labels: [automation, eslint]
     max: 1
-    close-older-discussions: true
   noop:
 imports:
-  - shared/otlp.md
   - shared/reporting.md
 evals:
-  - id: eslint_diagnostics_analyzed
-    question: Did the agent analyze the ESLint factory diagnostics and group actionable findings?
-  - id: remediation_dispatched_or_noop
-    question: Did the agent dispatch remediation for actionable findings, or use noop when the scan was clean?
+  - id: worker_selected
+    question: Did the dispatcher select the appropriate ESLint factory worker using the available evidence?
+  - id: work_queued_or_noop
+    question: Did the dispatcher queue one non-duplicate task or use noop when a task was already queued?
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}
 
-# ESLint Monster
+# ESLint Factory Dispatcher
 
-You are **ESLint Monster**, a daily remediation orchestrator for `actions/setup/js`.
+You are the daily ESLint factory dispatcher for `actions/setup/js`. GitHub issues labeled
+`eslint` with the `[eslint-factory] ` title prefix are the durable work queue. The three worker types are
+`miner`, `refiner`, and `applier`; workers poll this queue independently.
 
 ## Mission
 
-Use the pre-check output from the ESLint factory.
-
-- If lint is clean, do nothing.
-- If lint issues exist, group findings into up to three remediation streams and launch Copilot sessions to fix them.
+Choose one task each day:
+- If the pre-check found lint diagnostics, queue an `applier` task to remediate them.
+- Otherwise, if recent feedback on `eslint-factory` rules identifies a concrete false positive,
+  false negative, unsafe fix, or unclear diagnostic, queue a `refiner` task citing that feedback.
+- Otherwise, queue a `miner` task to look for one new high-signal rule in `actions/setup/js`.
 
 ## Runtime inputs
 
 Read:
 - `/tmp/gh-aw/agent/eslint-factory.log`
 - `/tmp/gh-aw/agent/eslint-diagnostics.txt`
-- `/tmp/gh-aw/agent/skill-index.txt`
 - `/tmp/gh-aw/agent/lint-clean.flag`
 
 ## Required flow
 
-1. If `/tmp/gh-aw/agent/lint-clean.flag` exists, call `noop` and stop.
-2. Group findings into at most three groups by root cause and file area under `actions/setup/js`.
-3. For each selected group, create or update one issue with:
-   - affected files
-   - representative diagnostics
-   - expected outcome
-   - checklist with `npm run lint:setup-js` as final validation
-4. Assign new execution issues to Copilot (max three assignments total).
-5. Create one daily discussion when assignments are made or existing issues were updated.
-6. If no assignments and no issue updates were made, call `noop` with a reason.
+1. Read the diagnostics and check the clean flag. If diagnostics exist, prefer the applier.
+2. If clean, review recent rule feedback (last 14 days) before choosing refiner or miner.
+3. Search open issues labeled `eslint` with the `[eslint-factory] ` prefix before creating anything. If a
+   task for the selected worker is already open, call `noop` rather than enqueueing
+   duplicate work. Check today's already completed queue tasks too, so a manual
+   rerun does not enqueue the same work twice. Do not create a second task for
+   the same findings or feedback.
+4. Create exactly one issue titled `[worker] <specific task>` (the configured
+   `[eslint-factory] ` prefix is added automatically). Include the worker name,
+   affected paths, evidence or representative diagnostics, expected outcome, and
+   validation command. For a miner, specify the target paths and rule quality bar.
+5. If the queue already contains equivalent work, call `noop` with a reason.
 
 ## Constraints
 
-- Keep all remediation work scoped to `actions/setup/js`.
-- Do not create duplicate issues for the same root-cause group.
-- Launch at most three total assignments.
-- Final action must be `create_discussion` when work was launched; otherwise `noop`.
+- Keep application scoped to `actions/setup/js` and rule changes to `eslint-factory`.
+- Never add the `cookie` label or assign agents from the dispatcher; the workers
+  own execution and close their queue item only after successful processing.
+- Do not treat an ESLint command failure without diagnostics as a remediation task.
