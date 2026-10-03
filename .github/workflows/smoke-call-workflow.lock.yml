@@ -1188,6 +1188,8 @@ jobs:
             /tmp/gh-aw/aw-prompts/prompt.txt
             /tmp/gh-aw/agent_execution.json
             /tmp/gh-aw/agent-session.jsonl
+            /tmp/gh-aw/agent-errors.jsonl
+            /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/mcp-config/logs/
             /tmp/gh-aw/redacted-urls.log
             /tmp/gh-aw/mcp-logs/

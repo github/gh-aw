@@ -7,9 +7,11 @@ const { collectArtifactSecretValues, redactManifestValue } = require("./safe_out
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
+const { validateAgentExecution } = require("./agent_execution.cjs");
 
 const RUNTIME_TYPES = new Set([
   "session.format",
+  "agent.execution",
   "session.collection",
   "session.collection_warning",
   "mcp.rpc.request",
@@ -46,6 +48,9 @@ function validateSessionFileHeader(events) {
   const header = events[0];
   if (header?.type !== "session.format" || header.provenance?.component !== "collector") throw new Error(`${ERR_VALIDATION}: Unified session file is missing its leading session.format header`);
   if (header.data?.version !== 1) throw new Error(`${ERR_VALIDATION}: Unsupported unified session file-format version: ${sessionOutputText(header.data?.version)}`);
+  const executions = events.filter(event => event.type === "agent.execution");
+  if (executions.length > 1) throw new Error(`${ERR_VALIDATION}: Unified session contains multiple agent.execution records`);
+  for (const execution of executions) validateAgentExecution(execution.data);
 }
 
 /** @param {any} value @returns {string} */
@@ -83,6 +88,8 @@ function eventDetail(event) {
     }
     case "session.result":
       return fields(data, ["numTurns", "durationMs", "totalCostUsd"]);
+    case "agent.execution":
+      return fields({ ...data, categories: JSON.stringify(data.categories), errorCodes: JSON.stringify(data.errorCodes), errorTypes: JSON.stringify(data.errorTypes) }, ["categories", "errorCodes", "errorTypes", "exitCode"]);
     case "mcp.rpc.request":
       return fields(data, ["serverName", "direction", "rpcId", "method", "toolName"]);
     case "mcp.rpc.response":
