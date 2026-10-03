@@ -160,7 +160,7 @@ type RunData struct {
 	AmbientContext             *AmbientContextMetrics     `json:"ambient_context,omitempty" console:"-"`
 	WorkingSet                 *WorkingSetMetrics         `json:"working_set,omitempty" console:"-"`
 	Ledger                     *LedgerActivity            `json:"ledger,omitempty" console:"-"`
-	DispatchCoordinator        *DispatchCoordinatorReport `json:"dispatch_coordinator,omitempty" console:"-"`
+	DispatchCoordinator        *DispatchCoordinatorReport `json:"work_queue,omitempty" console:"-"`
 	Friction                   *FrictionCostSummary       `json:"friction,omitempty" console:"-"`
 	WSRF                       string                     `json:"-" console:"header:WSRF,omitempty"`         // Working-Set Rebuild Factor, pre-formatted for table display
 	FrictionAIC                string                     `json:"-" console:"header:Friction AIC,omitempty"` // Precomputed friction cost in AI credits, pre-formatted for table display

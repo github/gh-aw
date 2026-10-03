@@ -84,13 +84,13 @@ The Friction section attributes execution-friction costs by driver and source. I
 
 The Gateway Steering Events section reports `token_steering` and `timeout_steering` warnings emitted when a run approaches its AI Credits or time limit. JSON output includes each event's type, message, and timestamp when available.
 
-The Dispatch Coordinator section reports the activation-time queue snapshot, the assigned worker's work and claim IDs, the agent's finish intent, and timestamped coordinator operations from workflow job logs. In JSON, `dispatch_coordinator.snapshot.transactions` contains the queue facts captured at activation, while `dispatch_coordinator.operations` contains this run's publication and reconciliation diagnostics with their source files. A `finish_intent` is a request, not evidence that completion was verified. The field is omitted when no coordinator evidence is available.
+The Work Queue section reports the activation-time queue snapshot, the assigned worker's work and claim IDs, the agent's finish intent, and timestamped coordinator operations from workflow job logs. In JSON, `work_queue.snapshot.transactions` contains the queue facts captured at activation, while `work_queue.operations` contains this run's publication and reconciliation diagnostics with their source files. A `finish_intent` is a request, not evidence that completion was verified. The field is omitted when no coordinator evidence is available.
 
-`audit` downloads this evidence by default. For `logs`, which defaults to compact usage downloads, select `dispatch-coordinator` (activation and agent artifacts plus workflow logs) or `all`. Both commands include `dispatch_coordinator` in their JSON reports, per run for `logs`, and preserve it in cached summaries:
+`audit` downloads this evidence by default. For `logs`, which defaults to compact usage downloads, select `work-queue` (activation and agent artifacts plus workflow logs) or `all`. Both commands include `work_queue` in their JSON reports, per run for `logs`, and preserve it in cached summaries:
 
 ```bash
-gh aw logs 1234567890 --artifacts dispatch-coordinator --json
-gh aw audit 1234567890 --artifacts dispatch-coordinator --json
+gh aw logs 1234567890 --artifacts work-queue --json
+gh aw audit 1234567890 --artifacts work-queue --json
 ```
 
 The Observability Insights section includes `skill_activations` when skill-invocation evidence is found. Each entry reports the skill name, `status` (`invoked`), the detection `source` (`agent_output` or `log_parse`), and provenance fields in JSON output. This makes it possible to distinguish skills that were merely restored or installed from skills that were actually invoked during the run.

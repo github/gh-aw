@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            2
+            3
           ]
         },
         "kind": {
@@ -179,7 +179,7 @@
               },
               "additionalProperties": false
             },
-            "dispatch_coordinator": {
+            "work_queue": {
               "type": [
                 "null",
                 "object"
@@ -4411,7 +4411,7 @@
                   },
                   "additionalProperties": false
                 },
-                "dispatch_coordinator": {
+                "work_queue": {
                   "type": [
                     "null",
                     "object"
@@ -5250,7 +5250,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            2
+            3
           ]
         },
         "kind": {
@@ -5367,7 +5367,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            2
+            3
           ]
         },
         "kind": {
@@ -5456,7 +5456,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            2
+            3
           ]
         },
         "kind": {

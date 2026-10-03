@@ -165,13 +165,13 @@ func TestDispatchCoordinatorReportPropagation(t *testing.T) {
 	assert.Contains(t, output.String(), "requested, not a verified outcome")
 	output.Reset()
 	renderLogsCompactToWriter(&output, LogsData{Runs: []RunData{runData}})
-	assert.Contains(t, output.String(), "[dispatch-coordinator] run=42")
+	assert.Contains(t, output.String(), "[work-queue] run=42")
 	jsonData, err := json.Marshal(runData)
 	require.NoError(t, err)
-	assert.Contains(t, string(jsonData), `"dispatch_coordinator":`)
+	assert.Contains(t, string(jsonData), `"work_queue":`)
 	jsonData, err = json.Marshal(RunData{})
 	require.NoError(t, err)
-	assert.NotContains(t, string(jsonData), `"dispatch_coordinator":`)
+	assert.NotContains(t, string(jsonData), `"work_queue":`)
 }
 
 func TestDispatchCoordinatorCachedAuditRequestsMissingArtifacts(t *testing.T) {
@@ -182,7 +182,7 @@ func TestDispatchCoordinatorCachedAuditRequestsMissingArtifacts(t *testing.T) {
 	}}
 	require.NoError(t, saveRunSummary(dir, summary, false))
 	require.NoError(t, markArtifactDownloaded(dir, "usage"))
-	filter := ResolveArtifactFilter([]string{"dispatch-coordinator"})
+	filter := ResolveArtifactFilter([]string{"work-queue"})
 	cfg := auditRunConfig{runID: 42, outputDir: dir, artifactFilter: filter}
 	done, skipped, err := renderCachedAuditIfAvailable(context.Background(), cfg)
 	require.NoError(t, err)
@@ -277,7 +277,7 @@ esac
 			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 			t.Setenv("DISPATCH_TEST_ARGS", argsPath)
 			t.Setenv("DISPATCH_TEST_FIXTURES", fixtures)
-			filter := ResolveArtifactFilter([]string{"dispatch-coordinator"})
+			filter := ResolveArtifactFilter([]string{"work-queue"})
 			require.Equal(t, []string{"activation", "agent"}, filter)
 			require.True(t, shouldDownloadWorkflowRunLogs(filter))
 			if cached {

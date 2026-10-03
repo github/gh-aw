@@ -285,7 +285,7 @@ func TestValidArtifactSetNames(t *testing.T) {
 	names := ValidArtifactSetNames()
 	require.NotEmpty(t, names, "ValidArtifactSetNames should return non-empty slice")
 
-	expected := []string{"all", "activation", "agent", "detection", "dispatch-coordinator", "evals", "experiment", "firewall", "github-api", "graders", "info", "mcp", "usage"}
+	expected := []string{"all", "activation", "agent", "detection", "evals", "experiment", "firewall", "github-api", "graders", "info", "mcp", "usage", "work-queue"}
 	assert.ElementsMatch(t, expected, names, "ValidArtifactSetNames should contain all known sets")
 }
 

@@ -298,7 +298,7 @@
                 },
                 "additionalProperties": false
               },
-              "dispatch_coordinator": {
+              "work_queue": {
                 "type": [
                   "null",
                   "object"

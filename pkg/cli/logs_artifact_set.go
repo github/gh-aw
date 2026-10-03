@@ -3,7 +3,7 @@
 // for filtering artifact downloads in the logs and audit commands.
 //
 // Key responsibilities:
-//   - Defining known artifact set names (all, info, agent, mcp, firewall, detection, github-api, activation)
+//   - Defining known artifact set names (all, info, agent, mcp, firewall, detection, github-api, activation, work-queue)
 //   - Mapping sets to concrete artifact name patterns
 //   - Validating artifact set inputs from CLI flags and MCP arguments
 //   - Determining whether a given artifact name matches an active filter
@@ -86,9 +86,9 @@ const (
 	// produced by the evals job (copied into usage by the conclusion job).
 	ArtifactSetEvals ArtifactSet = "evals"
 
-	// ArtifactSetDispatchCoordinator downloads queue snapshots, finish intents,
+	// ArtifactSetWorkQueue downloads queue snapshots, finish intents,
 	// and the workflow logs containing coordinator publication and reconciliation.
-	ArtifactSetDispatchCoordinator ArtifactSet = "dispatch-coordinator"
+	ArtifactSetWorkQueue ArtifactSet = "work-queue"
 )
 
 // artifactSetArtifacts maps each named set to the list of artifact base names it includes.
@@ -114,8 +114,8 @@ var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetEvals: {constants.UsageArtifactName.String()},
 	// graders: grader results are included in the usage artifact, remain part of
 	// the unified agent artifact, and are preserved in the fallback transport.
-	ArtifactSetGraders:             {constants.UsageArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
-	ArtifactSetDispatchCoordinator: {constants.ActivationArtifactName.String(), constants.AgentArtifactName.String()},
+	ArtifactSetGraders:   {constants.UsageArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+	ArtifactSetWorkQueue: {constants.ActivationArtifactName.String(), constants.AgentArtifactName.String()},
 }
 
 const maxArtifactHintExamples = 2

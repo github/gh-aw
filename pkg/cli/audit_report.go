@@ -70,7 +70,7 @@ type AuditData struct {
 	Experiments             *ExperimentData            `json:"experiments,omitempty"`
 	Graders                 *GradersData               `json:"graders,omitempty"`
 	Ledger                  *LedgerActivity            `json:"ledger,omitempty"`
-	DispatchCoordinator     *DispatchCoordinatorReport `json:"dispatch_coordinator,omitempty"`
+	DispatchCoordinator     *DispatchCoordinatorReport `json:"work_queue,omitempty"`
 	Friction                *FrictionCostSummary       `json:"friction,omitempty"`
 }
 

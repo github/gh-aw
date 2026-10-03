@@ -14,7 +14,7 @@ func renderDispatchCoordinatorToWriter(w io.Writer, report *DispatchCoordinatorR
 	if report == nil {
 		return
 	}
-	fmt.Fprintln(w, "  dispatch_coordinator:")
+	fmt.Fprintln(w, "  work_queue:")
 	if snapshot := report.Snapshot; snapshot != nil {
 		fmt.Fprintf(w, "    snapshot: %d transactions\n", len(snapshot.Transactions))
 		if snapshot.SHA != nil {
@@ -37,7 +37,7 @@ func renderLogsDispatchCoordinatorToWriter(w io.Writer, runs []RunData) {
 		if run.DispatchCoordinator == nil {
 			continue
 		}
-		fmt.Fprintf(w, "[dispatch-coordinator] run=%d workflow=%s\n", run.RunID, run.WorkflowName)
+		fmt.Fprintf(w, "[work-queue] run=%d workflow=%s\n", run.RunID, run.WorkflowName)
 		renderDispatchCoordinatorToWriter(w, run.DispatchCoordinator)
 	}
 }

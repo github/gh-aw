@@ -298,7 +298,7 @@ type RunAnalysis struct {
 	GatewaySteeringEvents   []GatewaySteeringEvent     `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
 	WorkingSet              *WorkingSetMetrics         `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
 	Ledger                  *LedgerActivity            `json:"ledger,omitempty"`                  // Recorded ledger append transactions
-	DispatchCoordinator     *DispatchCoordinatorReport `json:"dispatch_coordinator,omitempty"`
+	DispatchCoordinator     *DispatchCoordinatorReport `json:"work_queue,omitempty"`
 	Friction                *FrictionCostSummary       `json:"friction,omitempty"`                // Precomputed cost of wasted work from usage summary
 	GitHubRateLimitUsage    *GitHubRateLimitUsage      `json:"github_rate_limit_usage,omitempty"` // GitHub API quota consumption
 	JobDetails              []JobInfoWithDuration      `json:"job_details"`                       // Job execution details
