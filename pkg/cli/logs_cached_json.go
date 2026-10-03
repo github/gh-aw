@@ -21,7 +21,7 @@ import (
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 3
+const cachedLogsJSONLSchemaVersion = 4
 
 const (
 	cachedLogsJSONLKindRun          = "run"

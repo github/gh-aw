@@ -6,7 +6,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            3
+            4
           ]
         },
         "kind": {
@@ -5250,7 +5250,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            3
+            4
           ]
         },
         "kind": {
@@ -5367,7 +5367,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            3
+            4
           ]
         },
         "kind": {
@@ -5456,7 +5456,7 @@
         "schema_version": {
           "type": "integer",
           "enum": [
-            3
+            4
           ]
         },
         "kind": {

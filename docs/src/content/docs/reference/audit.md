@@ -86,7 +86,9 @@ The Gateway Steering Events section reports `token_steering` and `timeout_steeri
 
 The Work Queue section reports the activation-time queue snapshot, the assigned worker's work and claim IDs, the agent's finish intent, and timestamped coordinator operations from workflow job logs. In JSON, `work_queue.snapshot.transactions` contains the queue facts captured at activation, while `work_queue.operations` contains this run's publication and reconciliation diagnostics with their source files. A `finish_intent` is a request, not evidence that completion was verified. The field is omitted when no coordinator evidence is available.
 
-`audit` downloads this evidence by default. For `logs`, which defaults to compact usage downloads, select `work-queue` (activation and agent artifacts plus workflow logs) or `all`. Both commands include `work_queue` in their JSON reports, per run for `logs`, and preserve it in cached summaries:
+Operations are accepted only from the compiler-owned snapshot, finish-intent-copy, and claim-reconciliation step logs, not from agent stdout or whole-job log copies. Incomplete workflow-log downloads are retried before their operations are reported. Text reports escape control characters in stored identifiers.
+
+`audit` downloads this evidence by default. For `logs`, which defaults to compact usage downloads, select `work-queue` (activation and agent artifacts plus workflow logs) or `all`. Both commands include `work_queue` in their JSON reports, per run for `logs`, and preserve it in cached summaries. Usage-only logs omit the section even when a previous request cached work-queue evidence:
 
 ```bash
 gh aw logs 1234567890 --artifacts work-queue --json

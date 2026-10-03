@@ -76,6 +76,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		jobID:                  opts.JobID,
 		stepNumber:             opts.StepNumber,
 		artifactFilter:         ResolveArtifactFilter(opts.ArtifactSets),
+		includeWorkQueue:       workQueueEvidenceRequested(opts.ArtifactSets),
 		experimentFilter:       opts.ExperimentFilter,
 		variantFilter:          opts.VariantFilter,
 		runtimeFilter:          opts.RuntimeFilter,
@@ -176,10 +177,10 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	if !ok {
 		return false, false, nil
 	}
-	if dispatchCoordinatorArtifactsRequested(cfg.artifactFilter) && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
+	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
 		return false, false, nil
 	}
-	if dispatchCoordinatorLogsMissing(cfg.artifactFilter, cfg.outputDir) {
+	if dispatchCoordinatorLogsMissing(cfg.includeWorkQueue, cfg.outputDir) {
 		return false, false, nil
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
@@ -344,7 +345,7 @@ func downloadAuditArtifactsIfNeeded(ctx context.Context, cfg auditRunConfig, run
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run: %s (Status: %s, Conclusion: %s)", run.WorkflowName, run.Status, run.Conclusion)))
 	}
 	auditLog.Printf("Downloading artifacts for run %d", cfg.runID)
-	err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: cfg.runID, outputDir: cfg.outputDir, verbose: cfg.verbose, owner: cfg.owner, repo: cfg.repo, hostname: cfg.hostname, artifactFilter: cfg.artifactFilter})
+	err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: cfg.runID, outputDir: cfg.outputDir, verbose: cfg.verbose, owner: cfg.owner, repo: cfg.repo, hostname: cfg.hostname, artifactFilter: cfg.artifactFilter, includeWorkQueue: cfg.includeWorkQueue})
 	if err == nil || errors.Is(err, ErrNoArtifacts) {
 		downloadLegacyEvalsArtifactIfNeeded(ctx, cfg)
 		if errors.Is(err, ErrNoArtifacts) {

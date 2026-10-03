@@ -38,6 +38,7 @@ type concurrentRunDownloadParams struct {
 	dlOwner               string
 	dlRepo                string
 	artifactFilter        []string
+	includeWorkQueue      bool
 	evalsOnly             bool
 	storageLimit          *logsStorageLimit
 	maxGitHubAPIRateLimit int
@@ -95,6 +96,7 @@ func buildConcurrentDownloadParams(outputDir string, verbose bool, repoOverride 
 		dlOwner:                dlOwner,
 		dlRepo:                 dlRepo,
 		artifactFilter:         artifactFilter,
+		includeWorkQueue:       workQueueEvidenceRequested(artifactSets),
 		evalsOnly:              evalsOnly,
 		evalsArtifactRequested: evalsArtifactRequested,
 	}
@@ -435,7 +437,7 @@ func downloadAndTimeRunArtifacts(
 		if !shouldDownloadAgenticWorkflowRun(ctx, run, runOutputDir, perRunParams, params.verbose, result) {
 			return nil
 		}
-		if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: run.DatabaseID, outputDir: runOutputDir, verbose: params.verbose, owner: perRunParams.dlOwner, repo: perRunParams.dlRepo, hostname: perRunParams.dlHost, artifactFilter: params.artifactFilter}); err != nil {
+		if err := downloadRunArtifacts(ctx, downloadArtifactsOptions{runID: run.DatabaseID, outputDir: runOutputDir, verbose: params.verbose, owner: perRunParams.dlOwner, repo: perRunParams.dlRepo, hostname: perRunParams.dlHost, artifactFilter: params.artifactFilter, includeWorkQueue: params.includeWorkQueue}); err != nil {
 			return err
 		}
 		// When evals are requested but not found in the usage artifact (older runs
@@ -581,7 +583,7 @@ func tryLoadCachedRunResult(
 	params concurrentRunDownloadParams,
 ) (*DownloadResult, bool) {
 	summary, ok := loadRunSummary(runOutputDir, params.verbose)
-	if !ok || dispatchCoordinatorLogsMissing(params.artifactFilter, runOutputDir) {
+	if !ok || dispatchCoordinatorLogsMissing(params.includeWorkQueue, runOutputDir) {
 		return nil, false
 	}
 	if len(params.artifactFilter) == 0 {

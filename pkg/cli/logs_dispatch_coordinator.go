@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/fileutil"
 )
 
 const (
@@ -84,6 +82,15 @@ func extractDispatchCoordinatorReport(runDir string) (*DispatchCoordinatorReport
 }
 
 func parseDispatchCoordinatorSnapshot(data []byte) (*DispatchCoordinatorSnapshot, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	for _, field := range []string{"version", "sha", "worker", "transactionLog"} {
+		if _, present := fields[field]; !present {
+			return nil, fmt.Errorf("dispatch coordinator snapshot is missing %q", field)
+		}
+	}
 	var snapshot struct {
 		Version        int                        `json:"version"`
 		SHA            *string                    `json:"sha"`
@@ -193,6 +200,9 @@ func readDispatchCoordinatorFinishIntent(path string) (string, error) {
 }
 
 func extractDispatchCoordinatorOperations(logDir string) ([]DispatchCoordinatorOperation, error) {
+	if !workflowRunLogsComplete(filepath.Dir(logDir)) {
+		return nil, nil
+	}
 	var operations []DispatchCoordinatorOperation
 	seen := make(map[string]struct{})
 	err := filepath.WalkDir(logDir, func(path string, entry os.DirEntry, walkErr error) error {
@@ -202,46 +212,16 @@ func extractDispatchCoordinatorOperations(logDir string) ([]DispatchCoordinatorO
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || filepath.Ext(path) != ".txt" {
-			return nil
-		}
-		file, err := os.Open(path)
+		source, err := filepath.Rel(logDir, path)
 		if err != nil {
 			return err
 		}
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 64*1024), maxScannerBufferSize)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			timestamp, message, found := strings.Cut(line, " ")
-			if !found {
-				continue
-			}
-			if _, err := time.Parse(time.RFC3339Nano, timestamp); err != nil {
-				continue
-			}
-			message = strings.TrimSpace(message)
-			if !strings.HasPrefix(message, "Dispatch coordinator: ") &&
-				!strings.HasPrefix(message, "Dispatch work claim reconciliation") &&
-				!strings.HasPrefix(message, "Captured dispatch coordinator snapshot (") {
-				continue
-			}
-			// GitHub's archive contains both whole-job and per-step copies.
-			key := timestamp + "\n" + message
-			if _, duplicate := seen[key]; duplicate {
-				continue
-			}
-			seen[key] = struct{}{}
-			source, err := filepath.Rel(filepath.Dir(logDir), path)
-			if err != nil {
-				return err
-			}
-			operations = append(operations, DispatchCoordinatorOperation{
-				Timestamp: timestamp, Message: message, Source: filepath.ToSlash(source),
-			})
+		if entry.IsDir() || !isDispatchCoordinatorStepLog(source) {
+			return nil
 		}
-		return scanner.Err()
+		stepOperations, err := readDispatchCoordinatorStepLog(path, filepath.ToSlash(filepath.Join("workflow-logs", source)), seen)
+		operations = append(operations, stepOperations...)
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract dispatch coordinator operations: %w", err)
@@ -254,18 +234,66 @@ func extractDispatchCoordinatorOperations(logDir string) ([]DispatchCoordinatorO
 	return operations, nil
 }
 
-func backfillDispatchCoordinatorReport(report **DispatchCoordinatorReport, runDir string) bool {
-	if *report != nil && (*report).Snapshot != nil && (*report).FinishIntent != "" && len((*report).Operations) > 0 {
-		return false
+func readDispatchCoordinatorStepLog(path, source string, seen map[string]struct{}) ([]DispatchCoordinatorOperation, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
+	defer file.Close()
+	var operations []DispatchCoordinatorOperation
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), maxScannerBufferSize)
+	for scanner.Scan() {
+		timestamp, message, found := strings.Cut(strings.TrimSpace(scanner.Text()), " ")
+		if !found {
+			continue
+		}
+		if _, err := time.Parse(time.RFC3339Nano, timestamp); err != nil {
+			continue
+		}
+		message = strings.TrimSpace(message)
+		if !strings.HasPrefix(message, "Dispatch coordinator: ") &&
+			!strings.HasPrefix(message, "Dispatch work claim reconciliation") &&
+			!strings.HasPrefix(message, "Captured dispatch coordinator snapshot (") {
+			continue
+		}
+		key := timestamp + "\n" + message
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		operations = append(operations, DispatchCoordinatorOperation{
+			Timestamp: timestamp, Message: message, Source: source,
+		})
+	}
+	return operations, scanner.Err()
+}
+
+func backfillDispatchCoordinatorReport(report **DispatchCoordinatorReport, runDir string) bool {
 	extracted, err := extractDispatchCoordinatorReport(runDir)
 	if err != nil {
 		logsOrchestratorLog.Printf("Failed to extract dispatch coordinator report in %s: %v", runDir, err)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
-		return false
+		hadReport := *report != nil
+		*report = nil
+		return hadReport
 	}
 
-	return mergeDispatchCoordinatorReport(report, extracted)
+	// Rebuild operations from coordinator-owned step logs rather than trusting
+	// earlier summaries that may contain agent stdout or incomplete downloads.
+	changed := false
+	if *report != nil && !slices.Equal((*report).Operations, operationsFromCoordinatorReport(extracted)) {
+		(*report).Operations = operationsFromCoordinatorReport(extracted)
+		changed = true
+	}
+	return mergeDispatchCoordinatorReport(report, extracted) || changed
+}
+
+func operationsFromCoordinatorReport(report *DispatchCoordinatorReport) []DispatchCoordinatorOperation {
+	if report == nil {
+		return nil
+	}
+	return report.Operations
 }
 
 func mergeDispatchCoordinatorReport(report **DispatchCoordinatorReport, extracted *DispatchCoordinatorReport) bool {
@@ -292,19 +320,52 @@ func mergeDispatchCoordinatorReport(report **DispatchCoordinatorReport, extracte
 	return changed
 }
 
-func dispatchCoordinatorArtifactsRequested(filter []string) bool {
-	return slices.Contains(filter, constants.ActivationArtifactName.String()) &&
-		slices.Contains(filter, constants.AgentArtifactName.String())
+func isDispatchCoordinatorStepLog(source string) bool {
+	parts := strings.Split(filepath.ToSlash(source), "/")
+	if len(parts) != 2 {
+		return false
+	}
+	var job, file string
+	for _, part := range parts {
+		if job == "" {
+			job = part
+		} else {
+			file = part
+		}
+	}
+	number, name, found := strings.Cut(file, "_")
+	if !found || number == "" || strings.Trim(number, "0123456789") != "" {
+		return false
+	}
+	// Reusable workflows prefix job names with their caller job identity.
+	jobMatches := func(base string) bool {
+		return job == base || strings.HasSuffix(job, " _ "+base)
+	}
+	switch name {
+	case "Snapshot dispatch coordinator state.txt":
+		return jobMatches("activation")
+	case "Reconcile dispatch work claim.txt":
+		return jobMatches("safe_outputs")
+	case "Copy dispatch claim finish intent.txt":
+		return jobMatches("agent")
+	default:
+		return false
+	}
 }
 
-func dispatchCoordinatorLogsMissing(filter []string, runDir string) bool {
-	return dispatchCoordinatorArtifactsRequested(filter) &&
-		!fileutil.DirExists(filepath.Join(runDir, "workflow-logs"))
+func workQueueEvidenceRequested(sets []string) bool {
+	return len(sets) == 0 || slices.Contains(sets, string(ArtifactSetAll)) || slices.Contains(sets, string(ArtifactSetWorkQueue))
+}
+
+func dispatchCoordinatorLogsMissing(requested bool, runDir string) bool {
+	return requested && !workflowRunLogsComplete(runDir)
 }
 
 // Coordinator diagnostics need workflow logs even when artifacts are cached.
-func ensureDispatchCoordinatorLogs(ctx context.Context, opts downloadArtifactsOptions) {
-	if dispatchCoordinatorLogsMissing(opts.artifactFilter, opts.outputDir) {
+func ensureDispatchCoordinatorLogs(ctx context.Context, opts downloadArtifactsOptions) downloadArtifactsOptions {
+	opts.includeWorkQueue = opts.includeWorkQueue || len(opts.artifactFilter) == 0
+	if dispatchCoordinatorLogsMissing(opts.includeWorkQueue, opts.outputDir) {
 		downloadWorkflowRunLogsForDiagnostics(ctx, opts)
 	}
+	return opts
 }

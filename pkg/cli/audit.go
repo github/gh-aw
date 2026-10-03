@@ -43,6 +43,7 @@ type auditRunConfig struct {
 	jobID            int64
 	stepNumber       int
 	artifactFilter   []string
+	includeWorkQueue bool
 	experimentFilter string
 	variantFilter    string
 	runtimeFilter    string

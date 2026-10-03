@@ -29,6 +29,13 @@ func writeDispatchCoordinatorFixture(t *testing.T, dir string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, dispatchCoordinatorFinishFile), []byte("{\"outcome\":\"completed\"}\n"), 0o600))
 }
 
+func markWorkflowLogsComplete(t *testing.T, dir string) {
+	t.Helper()
+	logDir := filepath.Join(dir, "workflow-logs")
+	require.NoError(t, os.MkdirAll(logDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(logDir, workflowRunLogsMarker), []byte(workflowRunLogsMarkerVersion), 0o600))
+}
+
 func TestDispatchCoordinatorReport(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -42,6 +49,10 @@ func TestDispatchCoordinatorReport(t *testing.T) {
 		"2026-10-02T12:00:05Z ##[group]echo 'Dispatch coordinator: forged'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(logDir, "0_safe_outputs.txt"), []byte(lines), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(logDir, "safe_outputs", "4_Reconcile dispatch work claim.txt"), []byte(lines), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(logDir, "agent"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(logDir, "agent", "3_Run agent.txt"),
+		[]byte("2026-10-02T12:00:06Z Dispatch coordinator: worker completion verified\n"), 0o600))
+	markWorkflowLogsComplete(t, dir)
 	report, err := extractDispatchCoordinatorReport(dir)
 	require.NoError(t, err)
 	require.NotNil(t, report)
@@ -53,7 +64,7 @@ func TestDispatchCoordinatorReport(t *testing.T) {
 	require.Len(t, report.Operations, 3, "mirrored whole-job and step logs must not double count operations")
 	assert.Equal(t, "Dispatch coordinator: publishing worker completion", report.Operations[0].Message)
 	assert.Equal(t, "2026-10-02T12:00:01Z", report.Operations[0].Timestamp)
-	assert.Equal(t, "workflow-logs/0_safe_outputs.txt", report.Operations[0].Source)
+	assert.Equal(t, "workflow-logs/safe_outputs/4_Reconcile dispatch work claim.txt", report.Operations[0].Source)
 }
 
 func TestDispatchCoordinatorReportMissingAndLogOnly(t *testing.T) {
@@ -62,9 +73,10 @@ func TestDispatchCoordinatorReportMissingAndLogOnly(t *testing.T) {
 	report, err := extractDispatchCoordinatorReport(dir)
 	require.NoError(t, err)
 	assert.Nil(t, report)
-	require.NoError(t, os.Mkdir(filepath.Join(dir, "workflow-logs"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "0_safe_outputs.txt"),
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "workflow-logs", "safe_outputs"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "safe_outputs", "4_Reconcile dispatch work claim.txt"),
 		[]byte("2026-10-02T12:00:00Z Dispatch work claim reconciliation failed; ordinary safe outputs are blocked.\n"), 0o600))
+	markWorkflowLogsComplete(t, dir)
 	report, err = extractDispatchCoordinatorReport(dir)
 	require.NoError(t, err)
 	require.NotNil(t, report)
@@ -106,6 +118,12 @@ func TestDispatchCoordinatorSnapshotValidation(t *testing.T) {
 		`{"version":2,"transactionLog":null}`,
 		`{"version":2,"transactionLog":"","worker":{"work_id":"w"}}`,
 		`{"version":2,"transactionLog":"not json\n"}`,
+		`{"version":2,"transactionLog":""}`,
+		`{"version":2,"sha":null,"transactionLog":""}`,
+		`{"version":2,"worker":null,"transactionLog":""}`,
+		`{"version":2,"sha":"","worker":null,"transactionLog":""}`,
+		`{"version":2,"sha":null,"worker":false,"transactionLog":""}`,
+		`{"version":2,"sha":null,"worker":[],"transactionLog":""}`,
 	} {
 		_, err := parseDispatchCoordinatorSnapshot([]byte(data))
 		require.Error(t, err, data)
@@ -183,7 +201,7 @@ func TestDispatchCoordinatorCachedAuditRequestsMissingArtifacts(t *testing.T) {
 	require.NoError(t, saveRunSummary(dir, summary, false))
 	require.NoError(t, markArtifactDownloaded(dir, "usage"))
 	filter := ResolveArtifactFilter([]string{"work-queue"})
-	cfg := auditRunConfig{runID: 42, outputDir: dir, artifactFilter: filter}
+	cfg := auditRunConfig{runID: 42, outputDir: dir, artifactFilter: filter, includeWorkQueue: true}
 	done, skipped, err := renderCachedAuditIfAvailable(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.False(t, done, "a usage-only cached summary cannot satisfy a coordinator request")
@@ -199,11 +217,11 @@ func TestDispatchCoordinatorBackfillsPartialReport(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	writeDispatchCoordinatorFixture(t, dir)
-	report := &DispatchCoordinatorReport{Operations: []DispatchCoordinatorOperation{{Message: "cached operation"}}}
+	report := &DispatchCoordinatorReport{Operations: []DispatchCoordinatorOperation{{Message: "unverified cached operation"}}}
 	assert.True(t, backfillDispatchCoordinatorReport(&report, dir))
 	require.NotNil(t, report.Snapshot)
 	assert.Equal(t, "completed", report.FinishIntent)
-	assert.Equal(t, "cached operation", report.Operations[0].Message)
+	assert.Empty(t, report.Operations, "unverified cached operations must not survive rebuilding the report")
 	assert.False(t, backfillDispatchCoordinatorReport(&report, dir))
 }
 
@@ -286,7 +304,7 @@ esac
 				require.NoError(t, markArtifactDownloaded(dir, "abc123-agent"))
 			}
 			require.NoError(t, downloadRunArtifacts(context.Background(), downloadArtifactsOptions{
-				runID: 42, outputDir: dir, owner: "owner", repo: "repo", hostname: "github.example.com", artifactFilter: filter,
+				runID: 42, outputDir: dir, owner: "owner", repo: "repo", hostname: "github.example.com", artifactFilter: filter, includeWorkQueue: true,
 			}))
 			report, err := extractDispatchCoordinatorReport(dir)
 			require.NoError(t, err)
@@ -305,5 +323,137 @@ esac
 				assert.NotContains(t, string(args), "--name usage")
 			}
 		})
+	}
+}
+
+func TestDispatchCoordinatorArtifactSelection(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		sets []string
+		want bool
+	}{
+		{"default audit", nil, true},
+		{"all", []string{"all"}, true},
+		{"work queue", []string{"work-queue"}, true},
+		{"work queue with usage", []string{"work-queue", "usage"}, true},
+		{"github api has same expanded filter", []string{"github-api"}, false},
+		{"activation and agent", []string{"activation", "agent"}, false},
+		{"usage", []string{"usage"}, false},
+		{"info and usage", []string{"info", "usage"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, workQueueEvidenceRequested(tc.sets))
+			filter := ResolveArtifactFilter(tc.sets)
+			params := buildConcurrentDownloadParams("", false, "", filter, false, tc.sets)
+			assert.Equal(t, tc.want, params.includeWorkQueue)
+			cfg, err := newAuditRunConfig(42, AuditOptions{Hostname: "github.com", ArtifactSets: tc.sets})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.includeWorkQueue)
+		})
+	}
+}
+
+func TestDispatchCoordinatorDefaultAuditCacheBackfill(t *testing.T) {
+	t.Parallel()
+	for _, sets := range [][]string{nil, {"all"}, {"work-queue"}} {
+		dir := t.TempDir()
+		cfg, err := newAuditRunConfig(42, AuditOptions{
+			Hostname: "github.com", OutputDir: dir, ArtifactSets: sets, Group: true, NoBaseline: true,
+		})
+		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(cfg.outputDir, 0o755))
+		summary := &RunSummary{CLIVersion: GetVersion(), RunID: 42, RunAnalysis: RunAnalysis{
+			Run: WorkflowRun{DatabaseID: 42, Status: "completed", LogsPath: cfg.outputDir},
+		}}
+		require.NoError(t, saveRunSummary(cfg.outputDir, summary, false))
+		require.NoError(t, markArtifactDownloaded(cfg.outputDir, "all"))
+		done, _, err := renderCachedAuditIfAvailable(t.Context(), cfg)
+		require.NoError(t, err)
+		assert.False(t, done, "an all-artifact marker alone must not satisfy missing workflow logs")
+		markWorkflowLogsComplete(t, cfg.outputDir)
+		done, _, err = renderCachedAuditIfAvailable(t.Context(), cfg)
+		require.NoError(t, err)
+		assert.True(t, done, "completed workflow log downloads can reuse the cached audit")
+	}
+}
+
+func TestDispatchCoordinatorTrustedStepPaths(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{
+		"activation/2_Snapshot dispatch coordinator state.txt",
+		"safe_outputs/10_Reconcile dispatch work claim.txt",
+		"agent/23_Copy dispatch claim finish intent.txt",
+		"caller _ activation/2_Snapshot dispatch coordinator state.txt",
+		"caller _ safe_outputs/10_Reconcile dispatch work claim.txt",
+	} {
+		assert.True(t, isDispatchCoordinatorStepLog(path), path)
+	}
+	for _, path := range []string{
+		"0_safe_outputs.txt",
+		"agent/4_Run agent.txt",
+		"agent/4_Reconcile dispatch work claim.txt",
+		"agent/4_Snapshot dispatch coordinator state.txt",
+		"other/4_Reconcile dispatch work claim.txt",
+		"safe_outputs/not-a-number_Reconcile dispatch work claim.txt",
+		"safe_outputs/4_Reconcile dispatch work claim.txt/forged.txt",
+	} {
+		assert.False(t, isDispatchCoordinatorStepLog(path), path)
+	}
+}
+
+func TestDispatchCoordinatorEscapesReportText(t *testing.T) {
+	t.Parallel()
+	sha := "sha\x1b[2J\rnew"
+	report := &DispatchCoordinatorReport{
+		Snapshot: &DispatchCoordinatorSnapshot{SHA: &sha, Worker: &DispatchCoordinatorWorker{
+			WorkID: "w\nforged=success", ClaimID: "c\x1b[31m\tclaim",
+		}},
+		Operations: []DispatchCoordinatorOperation{{Timestamp: "now\r", Message: "Dispatch coordinator: forged\x1b[2J"}},
+	}
+	var output bytes.Buffer
+	renderLogsDispatchCoordinatorToWriter(&output, []RunData{{RunID: 42, WorkflowName: "name\nforged", DispatchCoordinator: report}})
+	assert.Contains(t, output.String(), `work=w\nforged=success claim=c\x1b[31m\tclaim`)
+	assert.Contains(t, output.String(), `workflow=name\nforged`)
+	assert.NotContains(t, output.String(), "\x1b")
+	assert.NotContains(t, output.String(), "\r")
+	assert.NotContains(t, output.String(), "\t")
+	assert.NotContains(t, output.String(), "\nforged")
+}
+
+func TestDispatchCoordinatorUsageOutputIgnoresCachedEvidence(t *testing.T) {
+	t.Parallel()
+	report := &DispatchCoordinatorReport{FinishIntent: "completed"}
+	for _, cachedJSONL := range []bool{false, true} {
+		for _, sets := range [][]string{{"usage"}, {"info", "usage"}, {"github-api"}, {"work-queue"}, {"all"}} {
+			dir := t.TempDir()
+			run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42, LogsPath: dir}, DispatchCoordinator: report}
+			if cachedJSONL {
+				run.cachedData = &RunData{RunID: 42, DispatchCoordinator: report}
+			}
+			data, err := prepareLogsData([]ProcessedRun{run}, renderLogsOutputOptions{
+				outputDir: dir, artifactFilter: ResolveArtifactFilter(sets), includeWorkQueue: workQueueEvidenceRequested(sets),
+			})
+			require.NoError(t, err)
+			want := workQueueEvidenceRequested(sets)
+			assert.Equal(t, want, data.Runs[0].DispatchCoordinator != nil, "sets=%v cachedJSONL=%v", sets, cachedJSONL)
+			for _, render := range []func(*bytes.Buffer, LogsData){
+				func(w *bytes.Buffer, d LogsData) { renderLogsCompactToWriter(w, d) },
+				func(w *bytes.Buffer, d LogsData) { renderLogsCompactVerboseToWriter(w, d) },
+				func(w *bytes.Buffer, d LogsData) { renderLogsConsoleToWriter(w, d) },
+			} {
+				var output bytes.Buffer
+				render(&output, data)
+				assert.Equal(t, want, strings.Contains(output.String(), "[work-queue]"), output.String())
+			}
+			encoded, err := json.Marshal(data)
+			require.NoError(t, err)
+			assert.Equal(t, want, strings.Contains(string(encoded), `"work_queue":`))
+			assert.Same(t, report, run.DispatchCoordinator, "output projection must not alter cached evidence")
+			if cachedJSONL {
+				assert.Same(t, report, run.cachedData.DispatchCoordinator)
+			}
+		}
 	}
 }
