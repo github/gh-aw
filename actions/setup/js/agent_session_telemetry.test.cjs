@@ -6,6 +6,7 @@ import { parseCodexLog } from "./parse_codex_log.cjs";
 const STDIO = "/tmp/gh-aw/agent-stdio.log";
 const SOURCE = "/fixture/session.jsonl";
 const codexSmoke = fs.readFileSync(new URL("./test_data/codex_ci_smoke.jsonl", import.meta.url), "utf8");
+const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
 
 describe("Unified session bootstrap telemetry conformance", () => {
   let files;
@@ -76,6 +77,26 @@ describe("Unified session bootstrap telemetry conformance", () => {
       num_turns: 1,
       usage: { input_tokens: 35078, output_tokens: 1638, cache_read_input_tokens: 18176, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
     });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+  });
+
+  it("publishes all six current Codex events and appends provider-matched compatibility usage once", async () => {
+    files.set(SOURCE, codexNoTools);
+    files.set(STDIO, codexNoTools);
+    await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
+    const published = files.get("/tmp/gh-aw/agent-session.jsonl").trimEnd().split("\n").map(JSON.parse);
+    expect(published).toEqual(JSON.parse(JSON.stringify(parseCodexLog(codexNoTools).logEntries)));
+    expect(published).toHaveLength(6);
+    expect(published.some(event => event.type.startsWith("tool."))).toBe(false);
+    expect(JSON.parse(files.get(STDIO).trimEnd().split("\n").at(-1))).toEqual({
+      type: "result",
+      num_turns: 1,
+      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    const appended = files.get(STDIO);
+    files.set(SOURCE, appended);
+    await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
+    expect(files.get(STDIO)).toBe(appended);
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
 

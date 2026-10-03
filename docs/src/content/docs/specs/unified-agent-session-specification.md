@@ -217,7 +217,7 @@ opaque because its essential fields are not defined by this specification.
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
-| Agent accounting | Turns, duration, cost, normalized `usage`, errors, and permission denials. |
+| Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message; no RPC arguments, response bodies, or error context. |
 | Firewall | Host, method, status, decision, byte count, duration; steering/tracker event, level, message, reason, and request ID. |
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
@@ -416,6 +416,8 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `numTurns` | Source-dependent nonnegative integer count of actual turns under the source's turn definition. |
 | `durationMs` | Source-dependent finite nonnegative session duration in milliseconds. |
 | `totalCostUsd` | Source-dependent finite nonnegative USD cost. Zero is a reported cost, not absence. |
+| `status` | Observed source outcome, such as Codex `completed` or `failed`; CLI turn completion does not imply task completion. |
+| `sourceType` | Native terminal or diagnostic event type when mapped, such as `turn.completed` or `turn.failed`. |
 | `usage` | Source-dependent object with token fields defined in Section 6 and preserved native additions. |
 | `errors` | Source-dependent array of session/provider error strings or objects, including an explicitly empty array. |
 | `permissionDenials` | Source-dependent array of native permission-denial records, including an explicitly empty array. |
@@ -523,6 +525,7 @@ An implementation can preserve native delta extension events and emit one corres
 | --- | --- | --- |
 | `input_tokens` | `inputTokens` | Source-reported input tokens. |
 | `output_tokens` | `outputTokens` | Source-reported output tokens. |
+| `reasoning_output_tokens` | None | Source-reported reasoning subset of output tokens; not an additional contribution to the total. |
 | `cache_creation_input_tokens` | `cacheCreationInputTokens` | Source-reported cache-creation/write input tokens. |
 | `cache_read_input_tokens` | `cacheReadInputTokens` | Source-reported cache-read input tokens. |
 

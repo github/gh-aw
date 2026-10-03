@@ -41,6 +41,14 @@ createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.
 createSessionEvent({}, "session.format", {});
 
+createSessionEvent({}, "session.result", { status: "completed", sourceType: "turn.completed", usage: { reasoning_output_tokens: 0 } });
+// @ts-expect-error Source terminal status is a string, not a completion flag.
+createSessionEvent({}, "session.result", { status: true });
+// @ts-expect-error Native source event type is a string.
+createSessionEvent({}, "session.result", { sourceType: 0 });
+// @ts-expect-error Reasoning tokens are numeric.
+createSessionEvent({}, "session.result", { usage: { reasoning_output_tokens: "0" } });
+
 const mergedEvent: UnifiedSessionEvent = {
   type: "mcp.rpc.response",
   data: { payload: { id: 0, result: false } },

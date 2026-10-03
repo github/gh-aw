@@ -10,7 +10,8 @@ const parse = records => parseCodexLog(records.map(record => (typeof record === 
 
 describe("Codex real CI trace regression", () => {
   // Sanitized excerpts: github/gh-aw/actions/runs/36909965579 (Smoke Codex) and
-  // /36850958249 (Daily Documentation Updater), artifact `agent`/agent-stdio.log.
+  // /36850958249 (Daily Documentation Updater), plus /37096302208 (Codex 0.159.3
+  // tool-free Smoke Codex turn), artifact `agent`/agent-stdio.log.
   // IDs, commands, arguments, outputs and messages replaced; shape and usage retained.
   it("preserves the live command lifecycle, model, exact text and failed exit", () => {
     const events = parseCodexLog(fixture("codex_ci_smoke")).logEntries;
@@ -44,6 +45,30 @@ describe("Codex real CI trace regression", () => {
     expect(complete.data.output).toEqual(complete.data.result);
     expect(selectSessionResult(events).errors).toEqual(["An example configuration setting is ignored.", "An example configuration setting is ignored.", "Model metadata unavailable; using fallback metadata."]);
     expect(selectSessionResult(events).usage).toMatchObject({ input_tokens: 117247, output_tokens: 1000, cache_read_input_tokens: 90112, cache_creation_input_tokens: 0 });
+  });
+
+  it("preserves the current tool-free turn without treating CLI completion as completed smoke checks", () => {
+    const content = fixture("codex_ci_no_tools");
+    const events = parseCodexLog(content).logEntries;
+    expect(events.map(event => event.type)).toEqual(["session.init", "session.result", "turn.started", "assistant.message", "assistant.message", "session.result"]);
+    expect(events[0].data).toMatchObject({ sourceEngine: "codex", model: "gpt-5.3-codex", sessionId: "sanitized-no-tools-thread" });
+    expect(events[1].data.status).toBeUndefined();
+    expect(ofType(events, "assistant.message").map(event => event.data.content)).toEqual(["I will run the required checks now.", "I cannot execute the required checks because the tools are unavailable.\n\nNo outputs were written."]);
+    expect(ofType(events, "tool.execution_start")).toEqual([]);
+    expect(ofType(events, "tool.execution_complete")).toEqual([]);
+    const result = selectSessionResult(events);
+    expect(result).toMatchObject({
+      status: "completed",
+      numTurns: 1,
+      errors: ["Model metadata unavailable; using fallback metadata."],
+      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, cached_input_tokens: 8576, cache_write_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    expect(sessionTokenTotal(result.usage)).toBe(17014);
+    expect(result.totalCostUsd).toBeUndefined();
+    expect(result.durationMs).toBeUndefined();
+    const compatibility = { type: "result", num_turns: 1, usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 } };
+    expect(selectSessionResult(parseCodexLog(`${content}${JSON.stringify(compatibility)}\n`).logEntries)).toEqual(result);
+    expect(normalizeCodexSession(events)).toEqual(events);
   });
 
   it("keeps a real-shape truncated command dangling even with a session failure", () => {

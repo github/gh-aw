@@ -9,6 +9,7 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 const req = require;
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
+const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
 
 describe("Unified conclusion session", () => {
   let root;
@@ -142,6 +143,25 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.provenance.component === "agent")).toHaveLength(1);
     expect(events.some(event => event.data.input_tokens === 999)).toBe(false);
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
+  });
+
+  it.each([false, true])("retains current Codex accounting through conclusion collection (canonical present: %j)", canonicalPresent => {
+    write("agent-stdio.log", codexNoTools);
+    if (canonicalPresent) write("agent-session.jsonl", parseEngineSession(codexNoTools, "codex"));
+    writeUnifiedSession({ rootDir: root, engine: "codex" });
+    const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    const agent = published.filter(event => event.provenance.component === "agent");
+    expect(agent.map(event => event.type)).toEqual(["session.init", "session.result", "turn.started", "assistant.message", "assistant.message", "session.result"]);
+    expect(agent[1].data).toEqual({ errors: ["Model metadata unavailable; using fallback metadata."] });
+    expect(agent.at(-1).data).toEqual({
+      status: "completed",
+      sourceType: "turn.completed",
+      numTurns: 1,
+      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    expect(agent.at(-1)).not.toHaveProperty("usage");
+    expect(agent.every(event => event.provenance.path === (canonicalPresent ? "agent-session.jsonl" : "agent-stdio.log"))).toBe(true);
+    expect(published.some(event => event.type === "session.collection_warning")).toBe(false);
   });
 
   it.each(["", "{bad\n", '{"type":"result","usage":{}}\n'])("falls back from an unusable canonical session (%j) to native events", content => {

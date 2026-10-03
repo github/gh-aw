@@ -54,6 +54,7 @@ export interface SessionUsage {
   total_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
+  reasoning_output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
   inputTokens?: number;
@@ -70,6 +71,8 @@ export interface SessionResultData {
   numTurns?: number;
   durationMs?: number;
   totalCostUsd?: number;
+  status?: string;
+  sourceType?: string;
   usage?: SessionUsage;
   errors?: JsonValue[];
   permissionDenials?: JsonValue[];

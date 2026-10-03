@@ -3,6 +3,8 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { mergeSessionSources } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
+import { normalizeCodexSession } from "./codex_session.cjs";
+import { selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 
 describe("essential unified session payloads", () => {
   it("removes duplicated engine envelopes without trimming significant message text", () => {
@@ -70,6 +72,38 @@ describe("essential unified session payloads", () => {
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
     expect(agent.data).toEqual({ numTurns: 0, usage: { input_tokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"] } });
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
+  });
+
+  it.each([0, 3])("keeps Codex terminal metadata and %i reasoning tokens without duplicate accounting", reasoning => {
+    const native = [{ type: "turn.completed", usage: { input_tokens: 10, cached_input_tokens: 4, cache_write_input_tokens: 0, output_tokens: 5, reasoning_output_tokens: reasoning } }];
+    const events = normalizeCodexSession(native);
+    const compact = events.map(normalizeUnifiedSessionEvent);
+    expect(compact).toEqual([
+      {
+        type: "session.result",
+        data: {
+          status: "completed",
+          sourceType: "turn.completed",
+          numTurns: 1,
+          usage: { input_tokens: 10, output_tokens: 5, reasoning_output_tokens: reasoning, cache_read_input_tokens: 4, cache_creation_input_tokens: 0 },
+        },
+      },
+    ]);
+    expect(normalizeUnifiedSessionEvent(compact[0])).toEqual(compact[0]);
+    expect(sessionTokenTotal(selectSessionResult(compact).usage)).toBe(15);
+    expect(events[0].data.usage.cached_input_tokens).toBe(4);
+    expect(events[0].data.usage.cache_write_input_tokens).toBe(0);
+  });
+
+  it("retains failed turns separately from nonfatal Codex diagnostics", () => {
+    const events = normalizeCodexSession([
+      { type: "item.completed", item: { id: "diagnostic", type: "error", message: "Model metadata unavailable." } },
+      { type: "turn.failed", error: { message: "Response rejected." } },
+    ]);
+    expect(events.map(normalizeUnifiedSessionEvent)).toEqual([
+      { type: "session.result", data: { errors: ["Model metadata unavailable."] } },
+      { type: "session.result", data: { status: "failed", sourceType: "turn.failed", errors: [{ message: "Response rejected." }] } },
+    ]);
   });
 
   it("retains grader decisions and safe-output errors without evaluator scripts", () => {
