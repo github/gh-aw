@@ -24,6 +24,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/deferinloop"
 	"github.com/github/gh-aw/pkg/linters/errorfwrapv"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorstringformat"
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
@@ -108,7 +109,7 @@ type docAnalyzer struct {
 //
 // Spec (README "Public API > Subpackages"):
 //
-//	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, errorfwrapv, excessivefuncparams, errormessage,
+//	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, errorfwrapv, excessivefuncparams, errormessage, errorstringformat,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
@@ -131,6 +132,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"errorfwrapv", errorfwrapv.Analyzer},
 		{"excessivefuncparams", excessivefuncparams.Analyzer},
 		{"errormessage", errormessage.Analyzer},
+		{"errorstringformat", errorstringformat.Analyzer},
 		{"errortypeassertion", errortypeassertion.Analyzer},
 		{"errstringmatch", errstringmatch.Analyzer},
 		{"execcommandwithoutcontext", execcommandwithoutcontext.Analyzer},

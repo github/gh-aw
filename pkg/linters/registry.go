@@ -16,6 +16,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/deferinloop"
 	"github.com/github/gh-aw/pkg/linters/errorfwrapv"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorstringformat"
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
@@ -103,6 +104,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ctxbackground.Analyzer,
 	deferinloop.Analyzer,
 	errormessage.Analyzer,
+	errorstringformat.Analyzer,
 	errortypeassertion.Analyzer,
 	fprintlnsprintf.Analyzer,
 	errstringmatch.Analyzer,
