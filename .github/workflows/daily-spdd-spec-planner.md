@@ -42,6 +42,7 @@ tools:
   edit: null
   bash:
     - "find specs docs scratchpad -type f -name \"*.md\""
+    - "cat /tmp/gh-aw/cache-memory/spdd-daily/rotation.json"
     - "cat specs/*.md"
     - "cat specs/**/*.md"
     - "cat docs/src/content/docs/reference/*specification*.md"
@@ -105,7 +106,7 @@ Inspect specification files from:
 
 Use the allowed shell commands above or built-in file inspection tools only for read-only analysis. Do not modify repository files.
 
-**File Discovery**: Use the allowed bash command `find specs docs scratchpad -type f -name "*.md"` to list spec files. Do not use the `glob` tool on the workspace root directory — it will be denied and consume tool-denial budget.
+**File Discovery**: Run exactly the allowed bash command `find specs docs scratchpad -type f -name "*.md"` to list spec files, then select relevant paths from its output. Do not append `grep`, `sort`, or other shell commands, chain it with other commands, or use the `glob` tool on the workspace root directory — those calls will be denied and consume tool-denial budget.
 
 ### Daily Rotation
 
@@ -113,10 +114,10 @@ Use cache-memory at `/tmp/gh-aw/cache-memory/spdd-daily/rotation.json` to rotate
 - Track `last_index`, `last_files`, `last_run`
 - Process up to 5 files per run
 - Continue from next file on the next run
-- Run a write preflight in `/tmp/gh-aw/cache-memory/spdd-daily/` and treat any permission/write failure as a setup error (do not continue)
-- If reading `rotation.json` returns a miss, confirm the file is truly absent before initializing from index 0
+- Read rotation state with the standalone allowed command `cat /tmp/gh-aw/cache-memory/spdd-daily/rotation.json`; do not combine it with `mkdir`, `ls`, `touch`, `cd`, or other shell commands
+- If reading `rotation.json` returns a miss because the file is absent, initialize from index 0
 - If `rotation.json` exists but cannot be read/written, do not reinitialize; report the setup error so existing rotation state is preserved
-- Persist rotation state using the `write` tool at that exact path (do not use shell write commands for cache updates)
+- Persist rotation state using the `write` tool at that exact path; treat a write failure as a setup error (do not use shell write commands or separate shell write preflights)
 
 ### SPDD Evaluation Rules
 
