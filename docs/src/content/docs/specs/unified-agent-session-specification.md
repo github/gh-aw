@@ -473,7 +473,7 @@ source for opaque fields.
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
-| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, and `agentVersion` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, and `agent_version`, respectively). Unavailable values are not inferred. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 

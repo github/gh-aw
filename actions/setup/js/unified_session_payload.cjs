@@ -142,7 +142,18 @@ const EVENT_FIELDS = {
     secretLeak: ["secretLeak", "secret_leak"],
     maliciousPatch: ["maliciousPatch", "malicious_patch"],
   },
-  "workflow.info": { engine: ["engine", "engine_id"], model: ["model"], workflow: ["workflow", "workflow_name"], repository: ["repository"], runId: ["runId", "run_id"] },
+  "workflow.info": {
+    engine: ["engine", "engine_id"],
+    engineId: ["engineId", "engine_id"],
+    agentVersion: ["agentVersion", "agent_version"],
+    cliVersion: ["cliVersion", "cli_version"],
+    awfVersion: ["awfVersion", "awf_version"],
+    mcpgVersion: ["mcpgVersion", "awmg_version"],
+    model: ["model"],
+    workflow: ["workflow", "workflow_name"],
+    repository: ["repository"],
+    runId: ["runId", "run_id"],
+  },
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
 EVENT_FIELDS["usage.report"] = EVENT_FIELDS["firewall.token_usage"];
