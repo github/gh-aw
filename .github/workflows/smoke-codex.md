@@ -28,7 +28,7 @@ permissions:
   pull-requests: read
 name: Smoke Codex
 engine: codex
-model: copilot/gpt-5.3-codex
+model: copilot/auto
 imports:
   - shared/gh.md
   - shared/reporting-otlp.md
