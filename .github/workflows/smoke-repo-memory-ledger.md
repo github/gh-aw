@@ -12,6 +12,9 @@ permissions:
 engine:
   id: copilot
 model: copilot/gpt-5.3-codex
+runtimes:
+  python:
+    version: "3.11"
 imports:
   - uses: shared/session-artifact-check.md
     with:
@@ -19,7 +22,6 @@ imports:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   ledger:
     smoke:
@@ -54,17 +56,23 @@ evals:
   - id: ledger_status_checked
     question: Did the agent successfully inspect repo-memory ledger status?
   - id: ledger_record_round_trip
-    question: Did the agent append or find the current run record and verify it with a ledger query?
+    question: Did the agent validate a prior persisted record and submit the current run record if absent?
 ---
 
 # Git-Backed Ledger Smoke Test
 
 Exercise the replayed read-only SQLite projection and safe-output append without editing ledger files directly.
+Use the configured Python runtime's `sqlite3` standard library with `mode=ro`
+to query the projection. It is a snapshot made before this run's safe outputs;
+accepted writes become durable only after `push_ledger_changes` succeeds.
 
 1. Query the projection at `/tmp/gh-aw/ledgers/smoke/ledger.db` for diagnostics.
    Report malformed or incomplete records, but do not fail solely because of
    unrelated historical diagnostics.
-2. Query the projection for the current run:
+2. Query `state` for prior run records. Verify any existing rows have a
+   `key` matching the JSON `workflow_run_id`, with `record_type` equal to
+   `repo_memory_ledger_smoke` and `result` equal to `passed`. An empty table
+   is expected on the first successful run. Also query for the current run:
 
    ```sql
    SELECT key, value FROM state
@@ -78,7 +86,6 @@ Exercise the replayed read-only SQLite projection and safe-output append without
    {
      "ledger": "smoke",
      "operation": "upsert",
-     "key": "${{ github.run_id }}",
      "value": {
        "record_type": "repo_memory_ledger_smoke",
        "workflow_run_id": "${{ github.run_id }}",
@@ -87,12 +94,13 @@ Exercise the replayed read-only SQLite projection and safe-output append without
    }
    ```
 
-4. Query `state` for the same run ID again. Verify it contains the expected run ID
-   and result in the JSON value. On reruns, reuse the existing row instead of appending a duplicate.
+4. Do not expect the current run's append to appear in this run's projection.
+   Verify it on the next run; on reruns, reuse an existing current-run row
+   instead of appending a duplicate.
 5. Do not inspect or modify ledger shard files directly.
 
 If every check passes, call `noop` with a brief summary. If any ledger operation
-fails or the round-trip record is incorrect, create one issue using the
+fails or a prior persisted record is incorrect, create one issue using the
 `create_issue` safe output. Include the failed check, relevant redacted error
 message, and run URL:
 `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`.

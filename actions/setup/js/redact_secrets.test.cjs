@@ -43,6 +43,29 @@ describe("redact_secrets.cjs", () => {
       tempDir && fs.existsSync(tempDir) && fs.rmSync(tempDir, { recursive: !0, force: !0 });
       for (const key of Object.keys(process.env)) key.startsWith("SECRET_") && delete process.env[key];
     }),
+    it("scans large nested file lists without overflowing the call stack", () => {
+      const { findFiles } = require("./redact_secrets.cjs");
+      const child = path.join(tempDir, "aw-mcp");
+      const entries = Array.from({ length: 150000 }, (_, i) => ({
+        name: `log-${i}.jsonl`,
+        isSymbolicLink: () => false,
+        isDirectory: () => false,
+        isFile: () => true,
+      }));
+      const readdir = vi.spyOn(fs, "readdirSync").mockImplementation(dir => {
+        if (dir === child) return entries;
+        if (dir === tempDir) return [{ name: "aw-mcp", isSymbolicLink: () => false, isDirectory: () => true }];
+        throw new Error("Unexpected directory");
+      });
+      try {
+        const files = findFiles(tempDir, [".jsonl"]);
+        expect(files).toHaveLength(entries.length);
+        expect(files[0]).toBe(path.join(child, "log-0.jsonl"));
+        expect(files.at(-1)).toBe(path.join(child, "log-149999.jsonl"));
+      } finally {
+        readdir.mockRestore();
+      }
+    }),
     describe("main function integration", () => {
       it("continues redacting artifact files when a directory is inaccessible", async () => {
         const cache = path.join(tempDir, "aw-mcp");

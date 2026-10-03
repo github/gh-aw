@@ -550,7 +550,7 @@ jobs:
         # zizmor: ignore[github_action_from_unverified_creator_used]
         uses: safedep/pmg@5ac0f275b83d9d5a9342c6aae977ec32fa330daa # v1
 
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1615,6 +1615,7 @@ jobs:
       actions: read
       discussions: write
       issues: write
+      pull-requests: read
     concurrency:
       group: "gh-aw-conclusion-dataflow-pr-discussion-dataset"
       cancel-in-progress: false
@@ -1807,6 +1808,7 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}

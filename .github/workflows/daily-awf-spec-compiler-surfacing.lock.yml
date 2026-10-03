@@ -476,7 +476,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1265,6 +1265,7 @@ jobs:
     permissions:
       actions: read
       issues: write
+      pull-requests: read
     concurrency:
       group: "gh-aw-conclusion-daily-awf-spec-compiler-surfacing"
       cancel-in-progress: false
@@ -1447,6 +1448,7 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
@@ -2455,7 +2457,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"awf\",\"compiler\",\"specifications\"],\"max\":1,\"title_prefix\":\"[awf-feature-surfacing] \"},\"create_report_incomplete_issue\":{},\"ledger_request_compaction\":{\"ledgers\":[\"awf-feature-reviews\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"awf\",\"compiler\",\"specifications\"],\"max\":1,\"title_prefix\":\"[awf-feature-surfacing] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":8,\"max_segment_kb\":100,\"name\":\"awf-feature-reviews\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"open_feature_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"outcome\":{\"enum\":[\"issue_created\",\"noop\"]},\"record_type\":{\"enum\":[\"awf_spec_surfacing_review\"]},\"reviewed_at\":{\"type\":\"string\"},\"reviewed_sha\":{\"type\":\"string\"},\"run_id\":{\"type\":\"string\"},\"schema_sha256\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"run_id\",\"reviewed_at\",\"reviewed_sha\",\"schema_sha256\",\"open_feature_ids\",\"outcome\"],\"type\":\"object\"},\"type\":\"\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"awf-feature-reviews\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

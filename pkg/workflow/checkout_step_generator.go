@@ -299,7 +299,7 @@ func (cm *CheckoutManager) GenerateDefaultCheckoutStep(
 	checkoutManagerLog.Printf("Generating default checkout step: trialMode=%t, hasOverride=%t", trialMode, override != nil)
 
 	var sb strings.Builder
-	sb.WriteString("      - name: Checkout repository\n")
+	sb.WriteString("      - name: Checkout repository (gh-aw default)\n")
 	fmt.Fprintf(&sb, "        uses: %s\n", getActionPin("actions/checkout"))
 	sb.WriteString("        with:\n")
 

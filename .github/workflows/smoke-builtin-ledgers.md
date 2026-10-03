@@ -15,10 +15,12 @@ permissions:
 engine:
   id: copilot
   model: copilot/gpt-5.3-codex
+runtimes:
+  python:
+    version: "3.11"
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 tools:
   ledger:
     log:
@@ -82,7 +84,9 @@ Exercise all built-in ledger types through their safe-output operations and veri
 the persisted state projection. Writes from a run are projected at the start of
 the next run, so validate existing state before submitting this run's writes.
 
-1. Query `/tmp/gh-aw/ledgers/{log,set,map,table,counter,notes}/ledger.db` read-only.
+1. Use the configured Python runtime's `sqlite3` standard library to query
+   `/tmp/gh-aw/ledgers/{log,set,map,table,counter,notes}/ledger.db` read-only
+   (open each database with `mode=ro`).
    Confirm each `state` table and its columns exist: `log(position, value)`,
    `set(identity, value)`, `map(key, value)`, `table(key, value)`, and
    `counter(name, value)`. Check prior values have valid shapes. For `table`,

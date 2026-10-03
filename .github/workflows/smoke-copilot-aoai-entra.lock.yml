@@ -661,7 +661,7 @@ jobs:
         name: Fetch Azure OIDC token
         run: "OIDC_TOKEN=$(curl -sS --max-time 30 \\\n  -H \"Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN\" \\\n  \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://AzureADTokenExchange\" \\\n  | jq -r '.value')\nif [ -z \"$OIDC_TOKEN\" ] || [ \"$OIDC_TOKEN\" = \"null\" ]; then\n  echo \"::error::Failed to obtain Azure OIDC token — ensure id-token: write permission is granted\"\n  exit 1\nfi\necho \"::add-mask::$OIDC_TOKEN\"\nTOKEN_DIR=\"${RUNNER_TEMP:-/tmp}/gh-aw/azure\"\nmkdir -p \"$TOKEN_DIR\"\nTOKEN_FILE=$(mktemp \"$TOKEN_DIR/oidc-token.XXXXXX\")\nchmod 600 \"$TOKEN_FILE\"\nprintf '%s' \"$OIDC_TOKEN\" > \"$TOKEN_FILE\"\necho \"GH_AW_AZURE_OIDC_TOKEN_FILE=$TOKEN_FILE\" >> \"$GITHUB_ENV\"\n"
 
-      - name: Checkout repository
+      - name: Checkout repository (gh-aw default)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -2866,6 +2866,7 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_EVALS_AIC: ${{ needs.evals.outputs.aic }}
           GH_AW_MAX_AI_CREDITS: "60"
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
           GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
           GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
