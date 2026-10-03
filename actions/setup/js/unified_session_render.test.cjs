@@ -122,13 +122,6 @@ describe("unified session publication views", () => {
     }
   });
 
-  it("continues to render legacy session.runtime records", () => {
-    const runtime = event("session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "docker" }, "workflow", 0);
-    for (const output of [generatePlainTextSummary([header, runtime]), generateCopilotCliStyleSummary([header, runtime])]) {
-      expect(output).toContain("session.runtime engine=copilot engineVersion=1.0.90 sandboxRuntime=docker");
-    }
-  });
-
   it("scopes agent pairing, snapshots and accounting without adding firewall usage", () => {
     const output = generatePlainTextSummary(trace);
     const first = output.slice(output.indexOf("Agent source: agent/session-a.jsonl"), output.indexOf("Agent source: agent/session-b.jsonl"));
