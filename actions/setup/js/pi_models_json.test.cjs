@@ -13,6 +13,7 @@ const scratchRunnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "pi-models-json-
 process.env.RUNNER_TEMP = scratchRunnerTemp;
 
 const piModelsJson = await import("./pi_models_json.cjs");
+const loadSDK = async () => ({ ModelRuntime: { create: async () => ({ getModel: () => undefined }) } });
 const { resolveProviderEndpointFromReflect } = await import("./awf_reflect.cjs");
 
 afterAll(() => {
@@ -106,7 +107,7 @@ describe("pi_models_json.cjs", () => {
           "aw-gateway": {
             baseUrl: "http://api-proxy:10000",
             api: "openai-completions",
-            apiKey: "CODEX_API_KEY",
+            apiKey: "awf-proxy",
             models: [{ id: "gpt-4.1" }],
           },
         },
@@ -192,6 +193,21 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
+    it("preserves native thinking, vision, token limits, pricing, and cache metadata", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "gpt-5.4";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10000";
+      process.env.GH_AW_LLM_PROVIDER = "openai";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.AWF_REFLECT_ENABLED;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      const metadata = { reasoning: true, input: ["text", "image"], contextWindow: 1000000, maxTokens: 32000, promptCache: { short: 300 }, cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0 } };
+      await piModelsJson.main({ loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => metadata }) } }) });
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].models).toEqual([{ ...metadata, id: "gpt-5.4" }]);
+      expect(written.providers["aw-gateway"].apiKey).toBe("awf-proxy");
+    });
+
     it.each(["openai", "codex"])("writes models.json using the live /reflect baseUrl and responses api for the %s provider", async provider => {
       process.env.GH_AW_PI_MODEL_ID = "gpt-4.1";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";
@@ -208,11 +224,11 @@ describe("pi_models_json.cjs", () => {
       };
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => reflectPayload }));
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10000");
-      expect(written.providers["aw-gateway"].apiKey).toBe("CODEX_API_KEY");
+      expect(written.providers["aw-gateway"].apiKey).toBe("awf-proxy");
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "gpt-4.1" }]);
       expect(written.providers["aw-gateway"].api).toBe("openai-responses");
       expect(fetch).toHaveBeenCalled();
@@ -230,7 +246,7 @@ describe("pi_models_json.cjs", () => {
       const fetchSpy = vi.fn();
       vi.stubGlobal("fetch", fetchSpy);
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10001");
@@ -249,7 +265,7 @@ describe("pi_models_json.cjs", () => {
 
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network unreachable")));
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].baseUrl).toBe("http://api-proxy:10002");
@@ -264,7 +280,7 @@ describe("pi_models_json.cjs", () => {
       delete process.env.AWF_REFLECT_ENABLED;
       delete process.env.GH_AW_PI_MODELS_JSON_PATH;
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
@@ -280,7 +296,7 @@ describe("pi_models_json.cjs", () => {
       delete process.env.AWF_REFLECT_ENABLED;
       delete process.env.GH_AW_PI_MODELS_JSON_PATH;
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "custom-model", contextWindow: 256000 }]);
@@ -291,7 +307,7 @@ describe("pi_models_json.cjs", () => {
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";
       process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10000";
 
-      await piModelsJson.main();
+      await piModelsJson.main({ loadSDK });
 
       expect(process.exitCode).toBe(1);
       process.exitCode = 0;

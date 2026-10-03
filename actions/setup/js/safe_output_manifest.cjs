@@ -351,6 +351,8 @@ function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_P
 }
 
 module.exports = {
+  collectArtifactSecretValues,
+  redactManifestValue,
   MANIFEST_FILE_PATH,
   TEMPORARY_ID_MAP_FILE_PATH,
   SAFE_OUTPUT_ERRORS_FILE_PATH,

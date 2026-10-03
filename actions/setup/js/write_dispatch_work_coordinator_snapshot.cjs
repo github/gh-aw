@@ -19,7 +19,7 @@ function isRecord(value) {
 
 function resolveWorkerAssignment(payload, transactions) {
   const awContext = parseInboundAwContext(payload?.inputs?.aw_context) || parseInboundAwContext(payload?.client_payload?.aw_context);
-  const rawAssignment = awContext?.dispatch_work_coordinator;
+  const rawAssignment = awContext?.work_claim;
   if (rawAssignment == null) return null;
   if (!isRecord(rawAssignment)) {
     throw new TypeError("dispatch work coordinator assignment has an invalid shape");

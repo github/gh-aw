@@ -619,6 +619,7 @@ func TestAuditUsesRunSummaryCache(t *testing.T) {
 	}
 
 	// Write a stub aw_info.json so the directory is non-empty
+	markWorkflowLogsComplete(t, runOutputDir)
 	awInfoContent := `{"engine_id": "copilot", "workflow_name": "test-workflow"}`
 	if err := os.WriteFile(filepath.Join(runOutputDir, "aw_info.json"), []byte(awInfoContent), 0644); err != nil {
 		t.Fatalf("Failed to write aw_info.json: %v", err)

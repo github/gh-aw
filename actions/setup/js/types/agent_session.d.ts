@@ -111,9 +111,20 @@ export interface SessionResultEvent extends EventMetadata {
   data: SessionResultData;
 }
 
+export interface SessionFileFormatData {
+  version: number;
+  [key: string]: unknown;
+}
+
+export interface SessionFileFormatEvent extends EventMetadata {
+  type: "session.format";
+  data: SessionFileFormatData;
+}
+
 export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
 
 export interface SessionEventDataMap {
+  "session.format": SessionFileFormatData;
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;
@@ -133,3 +144,19 @@ export interface NativeSessionEvent extends EventMetadata {
 
 export type SessionEvent = CoreSessionEvent | NativeSessionEvent;
 export type AgentSession = SessionEvent[];
+
+/** Collector metadata is separate from native engine event metadata. */
+export interface SessionProvenance {
+  component: string;
+  phase: string;
+  path: string;
+  /** Position in the source's normalized event array, not necessarily a raw line. */
+  index: number;
+  /** Ordering key only; numeric native timestamp units are schema-dependent. */
+  timestampMs?: number;
+  /** Preserves a source event's preexisting provenance field. */
+  native?: unknown;
+}
+
+export type UnifiedSessionEvent = SessionEvent & { provenance: SessionProvenance };
+export type UnifiedSession = UnifiedSessionEvent[];

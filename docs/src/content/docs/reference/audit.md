@@ -84,6 +84,17 @@ The Friction section attributes execution-friction costs by driver and source. I
 
 The Gateway Steering Events section reports `token_steering` and `timeout_steering` warnings emitted when a run approaches its AI Credits or time limit. JSON output includes each event's type, message, and timestamp when available.
 
+The Work Queue section reports the activation-time queue snapshot, the assigned worker's work and claim IDs, the agent's finish intent, and timestamped coordinator operations from workflow job logs. In JSON, `work_queue.snapshot.transactions` contains the queue facts captured at activation, while `work_queue.operations` contains this run's publication and reconciliation diagnostics with their source files. A `finish_intent` is a request, not evidence that completion was verified. The field is omitted when no coordinator evidence is available.
+
+Operations are accepted only from the compiler-owned snapshot, finish-intent-copy, and claim-reconciliation step logs, not from agent stdout or whole-job log copies. Incomplete workflow-log downloads are retried before their operations are reported. Text reports escape control characters in stored identifiers.
+
+`audit` downloads this evidence by default. For `logs`, which defaults to compact usage downloads, select `work-queue` (activation and agent artifacts plus workflow logs) or `all`. Both commands include `work_queue` in their JSON reports, per run for `logs`, and preserve it in cached summaries. Usage-only logs omit the section even when a previous request cached work-queue evidence:
+
+```bash
+gh aw logs 1234567890 --artifacts work-queue --json
+gh aw audit 1234567890 --artifacts work-queue --json
+```
+
 The Observability Insights section includes `skill_activations` when skill-invocation evidence is found. Each entry reports the skill name, `status` (`invoked`), the detection `source` (`agent_output` or `log_parse`), and provenance fields in JSON output. This makes it possible to distinguish skills that were merely restored or installed from skills that were actually invoked during the run.
 
 The Graders section is present when the run recorded deterministic grader results (`graders` declared in the workflow frontmatter). The `graders` object in JSON output lists each grader (`id`, `name`, `status`, `value`, `unit`, `passed`, and, when declared in the grader manifest, `direction` and `threshold`) plus aggregate counts: `total`, `passed`, `failed`, `error_count`, and `unavailable_count`. Grader results are read from the compact `usage` artifact (mirrored there by the conclusion job), the unified `agent` artifact, or the `agent-output-fallback` artifact, so they are available even when `--artifacts usage` narrows the download. The same `graders` object is included per run in `gh aw logs --json` output.

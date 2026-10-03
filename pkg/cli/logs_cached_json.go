@@ -21,7 +21,7 @@ import (
 
 type cachedLogsRuns map[int64]cachedLogsJSONLRunData
 
-const cachedLogsJSONLSchemaVersion = 2
+const cachedLogsJSONLSchemaVersion = 4
 
 const (
 	cachedLogsJSONLKindRun          = "run"
@@ -854,6 +854,7 @@ func processedRunFromCachedData(data RunData, audit *AuditData, outputDir string
 		TokenUsage:          data.TokenUsageSummary,
 		WorkingSet:          data.WorkingSet,
 		Ledger:              data.Ledger,
+		DispatchCoordinator: data.DispatchCoordinator,
 		Friction:            data.Friction,
 		cachedData:          &data,
 		cachedAudit:         audit,

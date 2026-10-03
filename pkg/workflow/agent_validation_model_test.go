@@ -90,39 +90,6 @@ func TestValidateUniversalLLMConsumerModel(t *testing.T) {
 	})
 }
 
-func TestValidatePiEngineRequirements(t *testing.T) {
-	compiler := NewCompiler()
-
-	t.Run("non pi engine skips validation", func(t *testing.T) {
-		err := compiler.validatePiEngineRequirements(NewTools(map[string]any{}), NewCopilotEngine())
-		assert.NoError(t, err)
-	})
-
-	t.Run("pi requires github gh-proxy mode", func(t *testing.T) {
-		err := compiler.validatePiEngineRequirements(NewTools(map[string]any{
-			"github": true,
-		}), NewPiEngine())
-		require.Error(t, err)
-		require.ErrorContains(t, err, "tools.github.mode: gh-proxy")
-	})
-
-	t.Run("pi requires cli-proxy", func(t *testing.T) {
-		err := compiler.validatePiEngineRequirements(NewTools(map[string]any{
-			"github": map[string]any{"mode": "gh-proxy"},
-		}), NewPiEngine())
-		require.Error(t, err)
-		require.ErrorContains(t, err, "tools.cli-proxy: true")
-	})
-
-	t.Run("valid pi tool config passes", func(t *testing.T) {
-		err := compiler.validatePiEngineRequirements(NewTools(map[string]any{
-			"github":    map[string]any{"mode": "gh-proxy"},
-			"cli-proxy": true,
-		}), NewPiEngine())
-		assert.NoError(t, err)
-	})
-}
-
 func TestValidateContextWindowSupport(t *testing.T) {
 	t.Run("missing context-window does not warn", func(t *testing.T) {
 		compiler := NewCompiler()

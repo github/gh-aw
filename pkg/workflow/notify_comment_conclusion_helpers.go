@@ -54,8 +54,30 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
-	steps = append(steps, buildUsageArtifactUploadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), IsDetectionJobEnabled(data.SafeOutputs), c.getActionPin)...)
+	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)
 	return steps
+}
+
+func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []string {
+	if !isDispatchWorkCoordinatorEnabled(data) {
+		return nil
+	}
+	steps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		ArtifactName: artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String(),
+		DownloadPath: constants.TmpGhAwDirSlash,
+		StepName:     "Download activation artifact for work queue summary",
+		IfCondition:  "always()",
+	}, c.getActionPin)
+	return append(steps,
+		"      - name: Summarize work queue activity\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+		"        with:\n",
+		"          script: |\n",
+		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/dispatch_work_coordinator_summary.cjs');\n",
+		"            await main({ core, githubClient: github, context });\n",
+	)
 }
 
 // buildConclusionNoOpStep builds the merged no-op handler step.

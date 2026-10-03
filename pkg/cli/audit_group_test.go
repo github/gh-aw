@@ -260,6 +260,7 @@ func writeCachedAuditRunFixture(t *testing.T, outputDir string, runID int64, fin
 		},
 	}
 	require.NoError(t, saveRunSummary(runOutputDir, summary, false))
+	markWorkflowLogsComplete(t, runOutputDir)
 
 	auditData := AuditData{
 		SchemaVersion: auditSchemaVersion,

@@ -58,7 +58,7 @@ describe("pi_provider.cjs", () => {
     expect(calls).toEqual([
       ["github-copilot", { apiKey: "copilot-token", api: "openai-completions", baseUrl: "https://copilot.example.test" }],
       ["copilot", { apiKey: "copilot-token", api: "openai-completions", baseUrl: "https://copilot.example.test" }],
-      ["anthropic", { apiKey: "anthropic-token", api: "anthropic", baseUrl: "https://anthropic.example.test" }],
+      ["anthropic", { apiKey: "anthropic-token", api: "anthropic-messages", baseUrl: "https://anthropic.example.test" }],
       ["openai", { apiKey: "codex-token", api: "openai-responses", baseUrl: "https://openai.example.test" }],
       ["codex", { apiKey: "codex-token", api: "openai-responses", baseUrl: "https://openai.example.test" }],
     ]);
@@ -169,7 +169,7 @@ describe("pi_provider.cjs", () => {
     module.default(pi);
     await handlers.before_provider_request({ type: "before_provider_request", payload: {} }, ctx);
     await handlers.after_provider_response({ type: "after_provider_response", status: 404, headers: {} }, ctx);
-    await handlers.agent_end();
+    await handlers.agent_settled();
 
     expect(process.exitCode).toBe(1);
     expect(stderrOutput.some(line => line.includes("report_incomplete emitted via safeoutputs CLI"))).toBe(true);
@@ -197,7 +197,7 @@ describe("pi_provider.cjs", () => {
     await handlers.after_provider_response({ type: "after_provider_response", status: 503, headers: {} }, ctx);
     await handlers.before_provider_request({ type: "before_provider_request", payload: {} }, ctx);
     await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
-    await handlers.agent_end();
+    await handlers.agent_settled();
 
     expect(process.exitCode).toBe(originalExitCode);
   });
@@ -235,7 +235,7 @@ describe("pi_provider.cjs", () => {
         errorMessage: "stream interrupted",
       },
     });
-    await handlers.agent_end();
+    await handlers.agent_settled();
 
     expect(process.exitCode).toBe(1);
   });
@@ -278,7 +278,7 @@ describe("pi_provider.cjs", () => {
         errorMessage: "Connection error.",
       },
     });
-    await handlers.agent_end();
+    await handlers.agent_settled();
   }
 
   it("logs assistant inference errors with the last request target", async () => {
@@ -337,7 +337,7 @@ describe("pi_provider.cjs", () => {
 
     module.default(pi);
     await handlers.agent_start();
-    await handlers.agent_end();
+    await handlers.agent_settled();
 
     expect(fetchedUrls.every(url => url === "http://api-proxy:10000/reflect")).toBe(true);
     expect(fetchedUrls.length).toBe(2);
@@ -380,7 +380,7 @@ describe("pi_provider.cjs", () => {
 
     module.default(pi);
     await handlers.agent_start();
-    await handlers.agent_end();
+    await handlers.agent_settled();
 
     expect(global.fetch).not.toHaveBeenCalled();
   });
