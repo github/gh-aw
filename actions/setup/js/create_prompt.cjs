@@ -172,7 +172,7 @@ function renderWorkClaim(payload) {
 
   const work = JSON.stringify({ id: assignment.work_id, payload: assignment.work }).replace(/</g, "\\u003c");
   const claim = JSON.stringify({ id: assignment.claim_id, work_id: assignment.work_id }).replace(/</g, "\\u003c");
-  return `<WorkQ>\n${work}\n</WorkQ>\n<WorkClaim>\n${claim}\nWhen the work is complete, call dispatch_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled". The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</WorkClaim>\n`;
+  return `<work-claim>\n${work}\n</work-claim>\n<WorkClaim>\n${claim}\nWhen the work is complete, call dispatch_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled". The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</WorkClaim>\n`;
 }
 
 /**
