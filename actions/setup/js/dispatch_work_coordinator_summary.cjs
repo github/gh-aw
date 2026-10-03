@@ -21,10 +21,11 @@ function renderSummary(snapshot, current) {
   const before = snapshot.projection;
   const baseline = new Set(before.transactions.map(transaction => JSON.stringify(transaction)));
   const added = current.transactions.filter(transaction => !baseline.has(JSON.stringify(transaction)));
+  const workCount = Object.keys(current.work).length;
   const lines = [
     "### Work queue activity",
     "",
-    `${Object.keys(current.work).length} work items in the queue; ${added.length} new transactions observed since activation.`,
+    `${workCount} work item${workCount === 1 ? "" : "s"} in the queue; ${added.length} new transaction${added.length === 1 ? "" : "s"} observed since activation.`,
     "",
     "<details>",
     "<summary>Show work queue activity</summary>",

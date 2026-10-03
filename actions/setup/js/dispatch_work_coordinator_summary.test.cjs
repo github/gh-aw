@@ -78,6 +78,14 @@ describe("dispatch coordinator conclusion summary", () => {
   });
 
   it.each([
+    [[], [work("one")], "1 work item in the queue; 1 new transaction observed since activation."],
+    [[work("one")], [work("one")], "1 work item in the queue; 0 new transactions observed since activation."],
+    [[work("one")], [work("one"), work("two")], "2 work items in the queue; 1 new transaction observed since activation."],
+  ])("pluralizes work items and new transactions independently", (before, after, expected) => {
+    expect(renderSummary(snapshot(before), replayTransactions(after))).toContain(expected);
+  });
+
+  it.each([
     ["done", "claim-a", "completed", "effective"],
     ["retry", "claim-b", "available", "cancelled"],
     ["new", "claim-d", "claimed", "superseded"],
@@ -130,7 +138,7 @@ describe("dispatch coordinator conclusion summary", () => {
     };
     await main({ ...options, githubClient });
     expect(createBlob).not.toHaveBeenCalled();
-    expect(options.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("1 work items in the queue; 1 new transactions"));
+    expect(options.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("1 work item in the queue; 1 new transaction"));
   });
 
   it("treats a missing coordinator branch as an empty queue", async () => {

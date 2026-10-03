@@ -63,7 +63,7 @@ func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []str
 		return nil
 	}
 	steps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
-		ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
+		ArtifactName: artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String(),
 		DownloadPath: constants.TmpGhAwDirSlash,
 		StepName:     "Download activation artifact for work queue summary",
 		IfCondition:  "always()",

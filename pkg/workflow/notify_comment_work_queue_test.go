@@ -50,3 +50,28 @@ func TestConclusionWorkQueueSummaryPreservesWritePermissions(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, PermissionWrite, level)
 }
+
+func TestConclusionWorkQueueSummaryArtifactPrefix(t *testing.T) {
+	for _, tc := range []struct {
+		trigger      string
+		artifactName string
+	}{
+		{trigger: "workflow_dispatch", artifactName: "activation"},
+		{trigger: "workflow_call", artifactName: "${{ needs.activation.outputs.artifact_prefix }}activation"},
+	} {
+		t.Run(tc.trigger, func(t *testing.T) {
+			data := &WorkflowData{
+				On:          tc.trigger,
+				Tools:       map[string]any{"work-queue": true},
+				SafeOutputs: &SafeOutputsConfig{},
+			}
+			job, err := NewCompiler().buildConclusionJob(data, "agent", []string{"safe_outputs"})
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			require.Contains(t, job.Needs, "activation")
+			steps := strings.Join(job.Steps, "")
+			require.Contains(t, steps, "          name: "+tc.artifactName+"\n")
+			require.NotContains(t, steps, "steps.artifact-prefix.outputs.prefix")
+		})
+	}
+}
