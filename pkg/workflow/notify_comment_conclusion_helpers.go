@@ -58,6 +58,28 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	return steps
 }
 
+func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []string {
+	if !isDispatchWorkCoordinatorEnabled(data) {
+		return nil
+	}
+	steps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
+		DownloadPath: constants.TmpGhAwDirSlash,
+		StepName:     "Download activation artifact for work queue summary",
+		IfCondition:  "always()",
+	}, c.getActionPin)
+	return append(steps,
+		"      - name: Summarize work queue activity\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+		"        with:\n",
+		"          script: |\n",
+		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/dispatch_work_coordinator_summary.cjs');\n",
+		"            await main({ core, githubClient: github, context });\n",
+	)
+}
+
 // buildConclusionNoOpStep builds the merged no-op handler step.
 func (c *Compiler) buildConclusionNoOpStep(data *WorkflowData, mainJobName string) []string {
 	// Add noop processing step if noop is configured.

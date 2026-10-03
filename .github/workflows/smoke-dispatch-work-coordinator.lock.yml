@@ -1188,6 +1188,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       actions: read
+      contents: read
       issues: write
     concurrency:
       group: "gh-aw-conclusion-smoke-dispatch-work-coordinator"
@@ -1257,6 +1258,23 @@ jobs:
           pattern: safe-outputs-items
           merge-multiple: true
           path: /tmp/gh-aw/
+      - name: Download activation artifact for work queue summary
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: activation
+          path: /tmp/gh-aw/
+      - name: Summarize work queue activity
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'dispatch_work_coordinator_summary.cjs'));
+            await main({ core, githubClient: github, context });
       - name: Process no-op messages
         id: noop
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
