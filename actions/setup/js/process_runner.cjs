@@ -79,6 +79,7 @@ function sleep(ms) {
  *   env?: NodeJS.ProcessEnv,
  *   stdin?: string | Buffer,
  *   onStdoutLine?: (line: string) => void,
+ *   onStderrLine?: (line: string) => void,
  *   shutdownGraceMs?: number,
  *   drainTimeoutMs?: number,
  *   maxCollectedOutputBytes?: number,
@@ -108,7 +109,23 @@ function sleep(ms) {
  *                 tests can use short intervals.
  * @returns {Promise<{exitCode: number, output: string, stdout: string, stderr: string, hasOutput: boolean, durationMs: number, watchdogFired: boolean, runtimeGuardFired: boolean, runtimeGuardReason: string, cancelled: boolean}>}
  */
-function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdoutLine, shutdownGraceMs = 5000, drainTimeoutMs = 2000, maxCollectedOutputBytes = Infinity, postResultWatchdog, runtimeGuard, stallWarningIntervalMs }) {
+function runProcess({
+  command,
+  args,
+  attempt,
+  log,
+  logArgs,
+  env,
+  stdin,
+  onStdoutLine,
+  onStderrLine,
+  shutdownGraceMs = 5000,
+  drainTimeoutMs = 2000,
+  maxCollectedOutputBytes = Infinity,
+  postResultWatchdog,
+  runtimeGuard,
+  stallWarningIntervalMs,
+}) {
   return new Promise(resolve => {
     const startTime = Date.now();
     // Guard against the promise being settled more than once.  On some systems Node
@@ -164,8 +181,6 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
     let stderr = "";
     const stdoutDecoder = new StringDecoder("utf8");
     const stderrDecoder = new StringDecoder("utf8");
-    let pendingStdoutLine = "";
-    let droppingStdoutLine = false;
     let stdoutPaused = false;
     let stderrPaused = false;
     function resumeStdout() {
@@ -199,20 +214,28 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
       // Complete output still goes to the parent's log streams. Keep a bounded classifier tail.
       return Buffer.from(combined).subarray(-outputLimit).toString("utf8");
     };
-    const observeStdout = text => {
-      if (!onStdoutLine) return;
-      for (const part of text.split(/(?<=\n)/)) {
-        if (!droppingStdoutLine) pendingStdoutLine += part;
-        if (pendingStdoutLine.length > 1024 * 1024) {
-          pendingStdoutLine = "";
-          droppingStdoutLine = true;
+    const lineObserver = callback => {
+      let pending = "";
+      let dropping = false;
+      return (text, final = false) => {
+        if (!callback) return;
+        for (const part of text.split(/(?<=\n)/)) {
+          if (!dropping) pending += part;
+          if (pending.length > 1024 * 1024) {
+            pending = "";
+            dropping = true;
+          }
+          if (!part.endsWith("\n")) continue;
+          if (!dropping) callback(pending.replace(/\r?\n$/, ""));
+          pending = "";
+          dropping = false;
         }
-        if (!part.endsWith("\n")) continue;
-        if (!droppingStdoutLine) onStdoutLine(pendingStdoutLine.replace(/\r?\n$/, ""));
-        pendingStdoutLine = "";
-        droppingStdoutLine = false;
-      }
+        if (final && pending && !dropping) callback(pending);
+        if (final) pending = "";
+      };
     };
+    const observeStdout = lineObserver(onStdoutLine);
+    const observeStderr = lineObserver(onStderrLine);
     /** @param {NodeJS.Signals} signal */
     function signalTree(signal) {
       if (!child.pid) return;
@@ -235,9 +258,12 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
         closedResult = { code, signal };
         return;
       }
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
-      if (pendingStdoutLine && !droppingStdoutLine && onStdoutLine) onStdoutLine(pendingStdoutLine);
+      const stdoutTail = stdoutDecoder.end();
+      const stderrTail = stderrDecoder.end();
+      stdout += stdoutTail;
+      stderr += stderrTail;
+      observeStdout(stdoutTail, true);
+      observeStderr(stderrTail, true);
       const exitCode = cancelled ? (exitCodeForSignal(cancellationSignal) ?? 1) : (code ?? exitCodeForSignal(signal) ?? 1);
       settle({
         exitCode,
@@ -353,7 +379,9 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
       /** @param {Buffer} data */ data => {
         hasOutput = true;
         stderrBytes += data.length;
-        stderr = collect(stderr, stderrDecoder.write(data));
+        const text = stderrDecoder.write(data);
+        stderr = collect(stderr, text);
+        observeStderr(text);
         recordActivity();
         if (!process.stderr.write(data) && !stderrPaused) {
           stderrPaused = true;

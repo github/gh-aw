@@ -368,7 +368,7 @@ The following tables describe the common fields in `data`. Optional native and p
 
 | Field | Value and availability |
 | --- | --- |
-| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
+| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
 | `model` | Source-dependent model string. |
 | `sessionId` | Source-dependent native session or thread identifier. |
 | `cwd` | Source-dependent working-directory string, unchanged. |
@@ -713,6 +713,33 @@ Recognized candidates include the native event envelope, Claude legacy message/i
 Delegation is deterministic. Native event recognition and per-record mixed conversion take precedence over broad fallbacks; remaining delegate ties use the existing Claude-before-Codex preference. A custom adapter MAY support additional documented engine signatures, but those signatures follow the same preservation contract. A delegated initialization MAY retain the detected engine's `sourceEngine`; custom-origin metadata, when supplied, is preserved separately. A custom engine emitting its own mapped initialization uses `sourceEngine: "custom"`.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
+
+### 7.7 OpenCode sample
+
+The unsupported OpenCode integration uses `run --format json` and the same
+parser for Actions, unified artifacts, and local session reconstruction. Its
+signature requires a string `sessionID` and a recognized event with an object
+`part` or a structured `error`; unrelated JSON and diagnostic prose are not
+assistant messages. The custom adapter also recognizes this signature.
+
+| Source observation | Canonical mapping |
+| --- | --- |
+| First recognized record for a `sessionID` | `session.init` with `sourceEngine: "opencode"` and the observed session ID. |
+| `text` / `reasoning` with `part.text` | `assistant.message` / `assistant.reasoning`, preserving whitespace. |
+| `tool_use` with `part.callID`, `part.tool`, and `part.state.input` | `tool.execution_start` with native call ID, name, and input. |
+| Tool state `completed` / `error` | Correlated `tool.execution_complete` with explicit outcome, output/error, and duration only when valid native start/end times exist. |
+| Distinct `step_finish` parts | Accumulate observed turns, cost, native `tokens.total`, `tokens.input`, `tokens.output`, `tokens.reasoning`, and `tokens.cache.read`/`write` into `session.result`. |
+| Structured `error` | Preserve `session.error` and terminal errors without inventing a turn count or successful outcome. |
+| Harness `opencode.max_turns` | Retain the explicit budget event and report `maxTurnsHit`. |
+| Native logfmt `message="server unavailable"` with a failed MCP server, or harness `opencode.mcp_failure` | Report the observed server name in `mcpFailures`; preserve harness events without interpreting arbitrary prose as failure evidence. |
+
+OpenCode envelope timestamps use milliseconds and remain unchanged, including
+when a completed tool part expands into invocation and result events. Duplicate
+parts are identified within their session, not globally. Cache-read and
+cache-write tokens are separate from the reported input count; reasoning tokens
+are an output subset, not an additional contribution to total tokens.
+Synthetic coverage lives in `parse_opencode_log.test.cjs` and
+`opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
 
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 

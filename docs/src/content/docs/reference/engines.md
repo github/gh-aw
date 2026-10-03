@@ -37,6 +37,15 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI inte
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
 
+The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
+through the selected AWF endpoint, retains configured MCP tools, and uses native
+JSONL session events for summaries and unified session artifacts. Copilot routing
+requires AWF; direct Anthropic/OpenAI BYOK is available with the sandbox disabled.
+Runtime configuration overlays preserve repository JSON/JSONC settings; OpenCode
+may add a missing `$schema` field. Runtime overrides disable
+automatic updates, sharing, default plugins, and LSP downloads; native npm plugins
+are not gh-aw Agent Plugins. The shared definition documents these limitations.
+
 ## Which engine should I choose?
 
 Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers, native MCP, codemode, and SDK/RPC execution.
