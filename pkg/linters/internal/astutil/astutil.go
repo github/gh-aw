@@ -47,7 +47,7 @@ func RhsExprForIndex(rhs []ast.Expr, idx int) (ast.Expr, bool) {
 
 // IsStringLiteral reports whether expr is a string literal.
 func IsStringLiteral(expr ast.Expr) bool {
-	lit, ok := expr.(*ast.BasicLit)
+	lit, ok := UnwrapParenExpr(expr).(*ast.BasicLit)
 	return ok && lit.Kind == token.STRING
 }
 
@@ -743,7 +743,7 @@ func UniverseErrorInterface() *types.Interface {
 
 // StringLitValue returns the unquoted string value of a string-literal AST node.
 func StringLitValue(expr ast.Expr) (string, bool) {
-	lit, ok := expr.(*ast.BasicLit)
+	lit, ok := UnwrapParenExpr(expr).(*ast.BasicLit)
 	if !ok || lit.Kind != token.STRING {
 		return "", false
 	}

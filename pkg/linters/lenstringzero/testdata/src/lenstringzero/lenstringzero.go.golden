@@ -1,5 +1,12 @@
 package lenstringzero
 
+func aliasBeforeReassignment(s string) {
+	n := len(s)
+	_ = n == 0 // want `use s == "" to check for empty string instead of n == 0`
+	n = 1
+	_ = n == 0
+}
+
 func isEmpty(s string) bool {
 	return s == "" // want `use s == "" to check for empty string instead of len\(s\) == 0`
 }

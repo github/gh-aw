@@ -111,3 +111,12 @@ func BadBothBlankedWithMultipleCalls() {
 	_, _ = fmt.Fprint(w, "line2")    // want `error return from fmt.Fprint\(\) is not checked; write failures may be silently ignored`
 	_, _ = fmt.Fprintln(w, "line3")  // want `error return from fmt.Fprintln\(\) is not checked; write failures may be silently ignored`
 }
+
+func BadBareCalls() {
+	w := &bytes.Buffer{}
+	fmt.Fprintf(w, "text")  // want `error return from fmt.Fprintf\(\) is not checked`
+	fmt.Fprint(w, "text")   // want `error return from fmt.Fprint\(\) is not checked`
+	fmt.Fprintln(w, "text") // want `error return from fmt.Fprintln\(\) is not checked`
+	// nolint:fprintferrorunchecked
+	fmt.Fprintf(w, "intentional")
+}

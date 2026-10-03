@@ -113,6 +113,7 @@ safe-outputs:
     remove-labels:
       allowed: [smoke]
     set-issue-type:
+      target: "*"
     dispatch-workflow:
       workflows:
         - haiku-printer

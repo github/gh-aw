@@ -49,17 +49,7 @@ func analyzeFuncBody(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.G
 		return
 	}
 
-	ast.Inspect(body, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.BlockStmt:
-			analyzeBlockStatements(pass, node.List, generatedFiles, noLintIndex)
-		case *ast.CaseClause:
-			analyzeBlockStatements(pass, node.Body, generatedFiles, noLintIndex)
-		case *ast.CommClause:
-			analyzeBlockStatements(pass, node.Body, generatedFiles, noLintIndex)
-		}
-		return true
-	})
+	analyzeBlockStatements(pass, body.List, nil, generatedFiles, noLintIndex)
 }
 
 // receiverRef is the comparable identity used to match Scan and Err receivers.
@@ -69,11 +59,32 @@ type receiverRef struct {
 }
 
 // analyzeBlockStatements analyzes a list of statements for scanner loops
-func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
+func analyzeBlockStatements(pass *analysis.Pass, stmts, following []ast.Stmt, generatedFiles filecheck.GeneratedIndex, noLintIndex nolint.DirectiveIndex) {
 	for i, stmt := range stmts {
 		if stmt == nil {
 			continue
 		}
+
+		rest := append(append([]ast.Stmt{}, stmts[i+1:]...), following...)
+		// A nested loop may be followed by an Err check after its enclosing
+		// statement. Do not descend into closures, which execute separately.
+		ast.Inspect(stmt, func(n ast.Node) bool {
+			if _, ok := n.(*ast.FuncLit); ok {
+				return false
+			}
+			switch nested := n.(type) {
+			case *ast.BlockStmt:
+				analyzeBlockStatements(pass, nested.List, rest, generatedFiles, noLintIndex)
+				return false
+			case *ast.CaseClause:
+				analyzeBlockStatements(pass, nested.Body, rest, generatedFiles, noLintIndex)
+				return false
+			case *ast.CommClause:
+				analyzeBlockStatements(pass, nested.Body, rest, generatedFiles, noLintIndex)
+				return false
+			}
+			return true
+		})
 
 		forStmt, ok := stmt.(*ast.ForStmt)
 		if !ok {
@@ -94,8 +105,7 @@ func analyzeBlockStatements(pass *analysis.Pass, stmts []ast.Stmt, generatedFile
 			continue
 		}
 
-		// Check if scanner.Err() is called after the loop in the same block
-		if hasScannerErrCheck(pass, stmts[i+1:], scanner) {
+		if hasScannerErrCheck(pass, rest, scanner) {
 			continue
 		}
 
@@ -128,6 +138,9 @@ func hasScannerErrCheck(pass *analysis.Pass, stmts []ast.Stmt, scanner *receiver
 
 		if scannerMethodReceiverMatches(pass, stmt, "Err", scanner) {
 			return true
+		}
+		if _, returns := stmt.(*ast.ReturnStmt); returns {
+			return false
 		}
 	}
 

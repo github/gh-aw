@@ -1305,6 +1305,20 @@ func TestCollectSafeJobArtifactPaths(t *testing.T) {
 	}, paths)
 }
 
+func TestMCPLogArtifactPathsRemainIncluded(t *testing.T) {
+	c := NewCompiler()
+	jobs := c.parseSafeJobsConfig(map[string]any{
+		"direct": map[string]any{"artifacts": []any{"/tmp/gh-aw/aw-mcp/logs/runs.json"}},
+		"broad":  map[string]any{"artifacts": []any{"/tmp/gh-aw/"}},
+	})
+
+	require.NoError(t, jobs["direct"].artifactsError)
+	require.NoError(t, jobs["broad"].artifactsError)
+	paths := collectSafeJobArtifactPaths(jobs)
+	require.Contains(t, paths, "/tmp/gh-aw/aw-mcp/logs/runs.json")
+	require.Contains(t, paths, "/tmp/gh-aw/**/*.json")
+}
+
 func TestCompileSafeJobArtifactsIncludedInAgentUpload(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "safe-job-artifacts")
 	workflowPath := filepath.Join(tmpDir, "safe-job-artifacts.md")

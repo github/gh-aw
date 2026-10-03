@@ -8,6 +8,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
@@ -28,7 +29,11 @@ func run(pass *analysis.Pass) (any, error) {
 	lenStringAliases := collectLenStringAliases(pass)
 	nodeFilter := []ast.Node{(*ast.BinaryExpr)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
-		analyzeLenStringExpr(pass, n, generatedFiles, noLintIndex, lenStringAliases)
+		expr, ok := n.(*ast.BinaryExpr)
+		if !ok {
+			return
+		}
+		analyzeLenStringExpr(pass, expr, generatedFiles, noLintIndex, lenStringAliases[expr])
 	})
 }
 
@@ -240,11 +245,16 @@ func isIntOne(expr ast.Expr) bool {
 	return ok && lit.Kind == token.INT && lit.Value == "1"
 }
 
-func collectLenStringAliases(pass *analysis.Pass) map[types.Object]ast.Expr {
+func collectLenStringAliases(pass *analysis.Pass) map[*ast.BinaryExpr]map[types.Object]ast.Expr {
 	aliases := make(map[types.Object]ast.Expr)
+	atComparison := make(map[*ast.BinaryExpr]map[types.Object]ast.Expr)
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch n := node.(type) {
+			case *ast.BinaryExpr:
+				if len(aliases) != 0 && (n.Op == token.EQL || n.Op == token.NEQ || n.Op == token.GTR || n.Op == token.GEQ || n.Op == token.LSS || n.Op == token.LEQ) {
+					atComparison[n] = maps.Clone(aliases)
+				}
 			case *ast.AssignStmt:
 				collectLenStringAliasesFromAssignStmt(pass, n, aliases)
 			case *ast.ValueSpec:
@@ -262,7 +272,7 @@ func collectLenStringAliases(pass *analysis.Pass) map[types.Object]ast.Expr {
 			return true
 		})
 	}
-	return aliases
+	return atComparison
 }
 
 func collectLenStringAliasesFromAssignStmt(pass *analysis.Pass, stmt *ast.AssignStmt, aliases map[types.Object]ast.Expr) {

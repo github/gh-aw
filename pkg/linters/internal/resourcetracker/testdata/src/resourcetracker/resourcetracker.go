@@ -78,4 +78,35 @@ func Shadowing() {
 		r := acquire() // want `resource should be released with defer`
 		r.Release()
 	}
+
+}
+
+func SiblingCleanup(deferred bool) {
+	r := acquire() // want `resource should be released with defer`
+	if deferred {
+		defer r.Release()
+	} else {
+		r.Release()
+	}
+}
+
+func DifferentBranchAcquisitions(deferred bool) {
+	var r *resource
+	if deferred {
+		r = acquire()
+		defer r.Release()
+	} else {
+		r = acquire() // want `resource should be released with defer`
+		r.Release()
+	}
+}
+
+func BothBranchAcquisitionsManual(first bool) {
+	var r *resource
+	if first {
+		r = acquire() // want `resource should be released with defer`
+	} else {
+		r = acquire() // want `resource should be released with defer`
+	}
+	r.Release()
 }

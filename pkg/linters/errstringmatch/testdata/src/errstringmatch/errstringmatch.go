@@ -12,6 +12,10 @@ func checkError(err error) bool {
 	return strings.Contains(err.Error(), "not found") // want `avoid strings\.Contains\(err\.Error\(\)`
 }
 
+func checkParenthesizedLiteral(err error) bool {
+	return strings.Contains(err.Error(), ("not found")) // want `avoid strings\.Contains\(err\.Error\(\)`
+}
+
 // flagged: same pattern with a different variable name
 func checkPermission(e error) bool {
 	return strings.Contains(e.Error(), "403") // want `avoid strings\.Contains\(err\.Error\(\)`

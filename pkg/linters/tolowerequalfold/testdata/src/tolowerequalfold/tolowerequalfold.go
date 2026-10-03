@@ -3,6 +3,13 @@ package tolowerequalfold
 
 import "strings"
 
+func aliasBeforeReassignment(name string) {
+	lower := strings.ToLower(name)
+	_ = lower == "alice" // want `use strings\.EqualFold`
+	lower = name
+	_ = lower == "alice"
+}
+
 func flaggedExamples() {
 	name := "Alice"
 
@@ -13,7 +20,8 @@ func flaggedExamples() {
 	_ = strings.ToLower(name) != "alice" // want `use strings\.EqualFold`
 
 	lower := strings.ToLower(name)
-	_ = lower == "alice" // want `use strings\.EqualFold`
+	_ = lower == "alice"   // want `use strings\.EqualFold`
+	_ = lower == ("alice") // want `use strings\.EqualFold`
 }
 
 func okExamples() {
