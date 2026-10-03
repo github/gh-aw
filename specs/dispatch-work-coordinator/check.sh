@@ -15,11 +15,12 @@ mkdir -p "$RESULTS_DIR"
 run_model() {
     local config="$1"
     local invariant="${2:-}"
+    local module="${3:-DispatchWorkCoordinator}"
     local output="$RESULTS_DIR/$config.log"
     local status=0
     "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \
         -workers 2 -seed 1 -fp 0 -config "$SPEC_DIR/$config.cfg" \
-        -metadir "$RESULTS_DIR/$config" "$SPEC_DIR/DispatchWorkCoordinator.tla" \
+        -metadir "$RESULTS_DIR/$config" "$SPEC_DIR/$module.tla" \
         >"$output" 2>&1 || status=$?
     if [ -z "$invariant" ]; then
         if [ "$status" -ne 0 ] || ! grep -q "Model checking completed. No error" "$output"; then
@@ -32,11 +33,22 @@ run_model() {
         return 1
     fi
     echo "$config: expected result"
-    grep -E "states generated|depth of the complete|Finished in" "$output"
+    grep -E "^[0-9]+ states generated|^The depth of the complete|^Finished in" "$output"
 }
 
-run_model DispatchWorkCoordinator
-run_model Recovery
-run_model BrokenCAS TerminalPersistence
-run_model BrokenTerminal TerminalFreeze
+if [ "$#" -eq 0 ]; then
+    set -- DispatchWorkCoordinator Recovery Submission Selection \
+        BrokenCAS BrokenTerminal BrokenSelection BrokenQueue
+fi
+for config in "$@"; do
+    case "$config" in
+        DispatchWorkCoordinator|Recovery|Submission) run_model "$config" ;;
+        Selection) run_model Selection "" WorkQueueSelection ;;
+        BrokenCAS) run_model BrokenCAS TerminalPersistence ;;
+        BrokenTerminal) run_model BrokenTerminal TerminalFreeze ;;
+        BrokenSelection) run_model BrokenSelection QueueStagingSoundness ;;
+        BrokenQueue) run_model BrokenQueue QueueSelectionSoundness ;;
+        *) echo "Unknown TLC configuration: $config" >&2; exit 2 ;;
+    esac
+done
 echo "Full TLC reports: $RESULTS_DIR"

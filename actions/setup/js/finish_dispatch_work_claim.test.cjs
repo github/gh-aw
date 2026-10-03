@@ -8,8 +8,8 @@ import { main, readFinishIntent, reconcileWorkerClaim, renderSummary } from "./f
 
 const worker = { work_id: "w", claim_id: "claim-a" };
 const initialTransactions = [
-  { version: 2, kind: "Work", work_id: "w", work: {}, sequence: 1 },
-  { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-a", run_id: "run-a" },
+  { version: 3, kind: "Work", work_id: "w", work: {}, sequence: 1 },
+  { version: 3, kind: "Claim", work_id: "w", claim_id: "claim-a", run_id: "run-a" },
 ];
 
 let tempDirectory;
@@ -56,7 +56,7 @@ describe("dispatch work claim reconciliation", () => {
 
     expect(result).toEqual({ authorized: true, status: "completed" });
     expect(fake.transactions).toContainEqual({
-      version: 2,
+      version: 3,
       kind: "Completion",
       work_id: "w",
       claim_id: "claim-a",
@@ -75,11 +75,11 @@ describe("dispatch work claim reconciliation", () => {
     });
 
     expect(result).toEqual({ authorized: false, status: "cancelled" });
-    expect(fake.transactions).toContainEqual({ version: 2, kind: "ClaimCancellation", work_id: "w", claim_id: "claim-a" });
+    expect(fake.transactions).toContainEqual({ version: 3, kind: "ClaimCancellation", work_id: "w", claim_id: "claim-a" });
   });
 
   it("does not publish or authorize a superseded claim", async () => {
-    const fake = setup([...initialTransactions, { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-0", run_id: "run-0" }]);
+    const fake = setup([...initialTransactions, { version: 3, kind: "Claim", work_id: "w", claim_id: "claim-0", run_id: "run-0" }]);
     const publish = vi.fn(fake.applyAndPublish);
     const result = await reconcileWorkerClaim({
       worker,

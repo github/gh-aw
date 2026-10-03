@@ -1,14 +1,29 @@
 // @ts-check
 "use strict";
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 // Keep each successive protocol transformation as data so historical upgrades
 // remain inspectable and deterministic. An absent version is the original log.
 const CODEMODS = Object.freeze([
   Object.freeze({ from: 0, to: 1, rename: Object.freeze({}), set: Object.freeze({ version: 1 }) }),
   Object.freeze({ from: 1, to: 2, rename: Object.freeze({ work: "work_id", claim: "claim_id", attempt: "attempt_id" }), set: Object.freeze({ version: 2 }) }),
+  Object.freeze({ from: 2, to: 3, rename: Object.freeze({}), set: Object.freeze({ version: 3 }) }),
 ]);
+
+function applyCodemods(message, version) {
+  let upgraded = { ...message };
+  for (let next = version; next < CURRENT_VERSION; next++) {
+    const codemod = CODEMODS.find(item => item.from === next);
+    if (!codemod || codemod.to !== next + 1) throw new TypeError("missing dispatch coordinator transaction codemod");
+    for (const [from, to] of Object.entries(codemod.rename)) {
+      if (upgraded[from] !== null) upgraded[to] = upgraded[from];
+      delete upgraded[from];
+    }
+    upgraded = { ...upgraded, ...codemod.set };
+  }
+  return upgraded;
+}
 
 function upgradeTransaction(message) {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
@@ -20,9 +35,11 @@ function upgradeTransaction(message) {
   }
   if (version === CURRENT_VERSION) return message;
   if (Object.hasOwn(message, "work_id")) {
-    if (version !== 0) throw new TypeError("unsupported dispatch coordinator transaction version");
-    return { ...message, version: CURRENT_VERSION };
+    if (version === 0) return { ...message, version: CURRENT_VERSION };
+    if (version === 2) return applyCodemods(message, version);
+    throw new TypeError("unsupported dispatch coordinator transaction version");
   }
+  if (version > 1) throw new TypeError("versioned dispatch coordinator transactions require work_id");
   const fields = Object.keys(message)
     .filter(field => field !== "version")
     .sort();
@@ -36,18 +53,7 @@ function upgradeTransaction(message) {
   if (["Claim", "ClaimCancellation"].includes(message.kind) && message.attempt !== null) {
     throw new TypeError("legacy Claim must not include an attempt");
   }
-  let upgraded = { ...message };
-  for (let next = version; next < CURRENT_VERSION; next++) {
-    const codemod = CODEMODS.find(item => item.from === next);
-    if (!codemod || codemod.to !== next + 1) {
-      throw new TypeError("missing dispatch coordinator transaction codemod");
-    }
-    for (const [from, to] of Object.entries(codemod.rename || {})) {
-      if (upgraded[from] !== null) upgraded[to] = upgraded[from];
-      delete upgraded[from];
-    }
-    upgraded = { ...upgraded, ...codemod.set };
-  }
+  const upgraded = applyCodemods(message, version);
   if (upgraded.kind === "Work") upgraded.work = { legacy_work_id: upgraded.work_id };
   if (upgraded.kind === "Claim") upgraded.run_id = `legacy:${upgraded.claim_id}`;
   return upgraded;
@@ -66,7 +72,7 @@ function upgradeTransactions(messages) {
   }
   return upgraded.map((message, index) => {
     if (message.kind !== "Work" || message.sequence !== undefined) return message;
-    if (messages[index].version === CURRENT_VERSION) throw new TypeError("work sequence is required");
+    if (messages[index].version >= 2) throw new TypeError("work sequence is required");
     if (!sequences.has(message.work_id)) {
       if (maximum === Number.MAX_SAFE_INTEGER) throw new RangeError("work queue sequence exhausted");
       sequences.set(message.work_id, ++maximum);

@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishCoordinatorTransactions, COORDINATOR_BRANCH, COORDINATOR_LOG_PATH, readCoordinatorLog } from "./dispatch_work_coordinator_store.cjs";
 import { parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
-const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
+const work = id => ({ kind: "Work", sequence: 1, version: 3, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 3, work_id: workId });
 
 function createFakeGitHub() {
   const blobs = new Map();
@@ -85,6 +85,20 @@ function createFakeGitHub() {
 }
 
 describe("dispatch work coordinator Git store", () => {
+  it("upgrades version-2 facts only through trusted publication", async () => {
+    const fake = createFakeGitHub();
+    fake.state.sha = "version-two-head";
+    fake.state.transactions = [work("w")];
+    fake.state.rawContents = `${JSON.stringify({ ...work("w"), version: 2 })}\n`;
+    const readonly = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo", publishUpgrades: false });
+    expect(readonly.transactions).toEqual([work("w")]);
+    expect(readonly.sha).toBe("version-two-head");
+    expect(fake.state.updateCalls).toBe(0);
+    const upgraded = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+    expect(upgraded.transactions).toEqual([work("w")]);
+    expect(fake.state.updateCalls).toBe(1);
+    expect([...fake.blobs.values()]).toEqual([serializeTransactionLog([work("w")])]);
+  });
   it("does not treat an unavailable repository as an empty queue", async () => {
     const fake = createFakeGitHub();
     fake.githubClient.rest.repos.get = async () => {

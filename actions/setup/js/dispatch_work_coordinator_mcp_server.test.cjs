@@ -6,8 +6,8 @@ import path from "path";
 import { createDispatchCoordinatorClaimNextTool, createDispatchCoordinatorFinishTool, createDispatchCoordinatorStateTool, loadDispatchCoordinatorSnapshot, readDispatchCoordinatorState } from "./dispatch_work_coordinator_mcp_server.cjs";
 import { serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
-const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
+const work = id => ({ kind: "Work", sequence: 1, version: 3, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 3, work_id: workId });
 
 const tempFiles = [];
 
@@ -76,9 +76,9 @@ describe("dispatch work coordinator MCP snapshot", () => {
 
   it("stages FIFO claims, tracks local reservations across restarts, and enforces group limits", () => {
     const transactions = [
-      { version: 2, kind: "Work", work_id: "z", work: { repo: "a", priority: 1 }, sequence: 1 },
-      { version: 2, kind: "Work", work_id: "a", work: { repo: "a", priority: 2 }, sequence: 2 },
-      { version: 2, kind: "Work", work_id: "b", work: { repo: "b", priority: 3 }, sequence: 3 },
+      { version: 3, kind: "Work", work_id: "z", work: { repo: "a", priority: 1 }, sequence: 1 },
+      { version: 3, kind: "Work", work_id: "a", work: { repo: "a", priority: 2 }, sequence: 2 },
+      { version: 3, kind: "Work", work_id: "b", work: { repo: "b", priority: 3 }, sequence: 3 },
     ];
     const snapshotPath = writeSnapshot({ version: 2, sha: "head", worker: null, transactionLog: serializeTransactionLog(transactions) });
     const snapshot = loadDispatchCoordinatorSnapshot(snapshotPath);

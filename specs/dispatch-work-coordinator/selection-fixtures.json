@@ -1,17 +1,17 @@
 {
   "transactions": [
-    { "version": 2, "kind": "Work", "work_id": "oldest", "work": { "kind": "review", "repo": "a", "priority": 1, "effort": 5, "a/b": { "~key": true } }, "sequence": 1 },
-    { "version": 2, "kind": "Work", "work_id": "fast", "work": { "kind": "review", "repo": "b", "priority": 10, "effort": 2, "tags": ["ready"] }, "sequence": 2 },
-    { "version": 2, "kind": "Work", "work_id": "later", "work": { "kind": "scan", "repo": "a", "priority": 5, "effort": 1 }, "sequence": 3 },
-    { "version": 2, "kind": "Work", "work_id": "busy", "work": { "kind": "scan", "repo": "c", "priority": 99 }, "sequence": 4 },
-    { "version": 2, "kind": "Claim", "work_id": "busy", "claim_id": "busy-claim", "run_id": "run-busy" },
-    { "version": 2, "kind": "Work", "work_id": "blocked", "work": { "kind": "review", "repo": "c", "priority": 100 }, "sequence": 5 },
-    { "version": 2, "kind": "Work", "work_id": "done", "work": { "kind": "review", "repo": "d", "priority": 999 }, "sequence": 6 },
-    { "version": 2, "kind": "Claim", "work_id": "done", "claim_id": "done-claim", "run_id": "run-done" },
-    { "version": 2, "kind": "Completion", "work_id": "done", "claim_id": "done-claim", "attempt_id": "done-attempt" },
-    { "version": 2, "kind": "Work", "work_id": "cancelled", "work": { "kind": "review", "repo": "e", "priority": 999 }, "sequence": 7 },
-    { "version": 2, "kind": "WorkCancellation", "work_id": "cancelled" },
-    { "version": 2, "kind": "Work", "work_id": "missing", "work": { "repo": "c", "priority": null }, "sequence": 8 }
+    { "version": 3, "kind": "Work", "work_id": "oldest", "work": { "kind": "review", "repo": "a", "priority": 1, "effort": 5, "a/b": { "~key": true } }, "sequence": 1 },
+    { "version": 3, "kind": "Work", "work_id": "fast", "work": { "kind": "review", "repo": "b", "priority": 10, "effort": 2, "tags": ["ready"] }, "sequence": 2 },
+    { "version": 3, "kind": "Work", "work_id": "later", "work": { "kind": "scan", "repo": "a", "priority": 5, "effort": 1 }, "sequence": 3 },
+    { "version": 3, "kind": "Work", "work_id": "busy", "work": { "kind": "scan", "repo": "c", "priority": 99 }, "sequence": 4 },
+    { "version": 3, "kind": "Claim", "work_id": "busy", "claim_id": "busy-claim", "run_id": "run-busy" },
+    { "version": 3, "kind": "Work", "work_id": "blocked", "work": { "kind": "review", "repo": "c", "priority": 100 }, "sequence": 5 },
+    { "version": 3, "kind": "Work", "work_id": "done", "work": { "kind": "review", "repo": "d", "priority": 999 }, "sequence": 6 },
+    { "version": 3, "kind": "Claim", "work_id": "done", "claim_id": "done-claim", "run_id": "run-done" },
+    { "version": 3, "kind": "Completion", "work_id": "done", "claim_id": "done-claim", "attempt_id": "done-attempt" },
+    { "version": 3, "kind": "Work", "work_id": "cancelled", "work": { "kind": "review", "repo": "e", "priority": 999 }, "sequence": 7 },
+    { "version": 3, "kind": "WorkCancellation", "work_id": "cancelled" },
+    { "version": 3, "kind": "Work", "work_id": "missing", "work": { "repo": "c", "priority": null }, "sequence": 8 }
   ],
   "cases": [
     { "name": "default FIFO", "selection": {}, "expected": "oldest" },

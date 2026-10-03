@@ -3,7 +3,7 @@
   "$id": "ClaimTransaction.json",
   "type": "object",
   "properties": {
-    "version": { "type": "integer", "const": 2 },
+    "version": { "type": "integer", "const": 3 },
     "kind": {
       "type": "string",
       "const": "Claim"

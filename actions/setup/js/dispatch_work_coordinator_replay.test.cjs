@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", sequence: 1, version: 2, work: { legacy_work_id: id }, work_id: id });
-const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 2, work_id: workId });
-const cancelClaim = (workId, id) => ({ claim_id: id, kind: "ClaimCancellation", version: 2, work_id: workId });
-const complete = (workId, claimId, attempt) => ({ attempt_id: attempt, claim_id: claimId, kind: "Completion", version: 2, work_id: workId });
-const cancelWork = id => ({ kind: "WorkCancellation", version: 2, work_id: id });
+const work = id => ({ kind: "Work", sequence: 1, version: 3, work: { legacy_work_id: id }, work_id: id });
+const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 3, work_id: workId });
+const cancelClaim = (workId, id) => ({ claim_id: id, kind: "ClaimCancellation", version: 3, work_id: workId });
+const complete = (workId, claimId, attempt) => ({ attempt_id: attempt, claim_id: claimId, kind: "Completion", version: 3, work_id: workId });
+const cancelWork = id => ({ kind: "WorkCancellation", version: 3, work_id: id });
 
 function permutations(items) {
   if (items.length < 2) return [items];
@@ -124,7 +124,7 @@ describe("dispatch work coordinator replay", () => {
   });
 
   it("rejects unknown or malformed message versions and never accepts partial upgrades", () => {
-    for (const version of [-1, 1.5, "1", 3, null]) {
+    for (const version of [-1, 1.5, "1", 4, null]) {
       expect(() => parseTransactionLog(`${JSON.stringify(work("w"))}\n${JSON.stringify({ ...claim("w", "c"), version })}\n`)).toThrow("unsupported dispatch coordinator transaction version");
     }
     expect(() => parseTransactionLog(`${JSON.stringify({ kind: "Work", work: "w", claim: null, attempt: null, extra: true })}\n`)).toThrow("exactly version");

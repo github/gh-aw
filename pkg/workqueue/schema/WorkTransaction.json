@@ -3,7 +3,7 @@
   "$id": "WorkTransaction.json",
   "type": "object",
   "properties": {
-    "version": { "type": "integer", "const": 2 },
+    "version": { "type": "integer", "const": 3 },
     "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "kind": {
       "type": "string",

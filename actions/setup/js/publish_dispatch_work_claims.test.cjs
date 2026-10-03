@@ -18,8 +18,8 @@ function setup(intents) {
   const publishedClaimsPath = path.join(directory, "published.json");
   fs.writeFileSync(claimIntentPath, intents.map(intent => JSON.stringify(intent)).join("\n") + "\n");
   let current = [
-    { version: 2, kind: "Work", work_id: "old", work: { repo: "a", priority: 1 }, sequence: 1 },
-    { version: 2, kind: "Work", work_id: "new", work: { repo: "b", priority: 2 }, sequence: 2 },
+    { version: 3, kind: "Work", work_id: "old", work: { repo: "a", priority: 1 }, sequence: 1 },
+    { version: 3, kind: "Work", work_id: "new", work: { repo: "b", priority: 2 }, sequence: 2 },
   ];
   const options = {
     claimIntentPath,
@@ -64,7 +64,7 @@ describe("trusted dispatcher claim publication", () => {
     const fake = setup([{ work_id: "old", claim_id: "pending", selection: {} }]);
     const publish = vi.fn(async ({ deriveIntents }) => {
       expect(deriveIntents(fake.transactions)).toHaveLength(1);
-      const competing = { version: 2, kind: "Claim", work_id: "old", claim_id: "remote", run_id: "remote-run" };
+      const competing = { version: 3, kind: "Claim", work_id: "old", claim_id: "remote", run_id: "remote-run" };
       fake.replace(applyTransactions(fake.transactions, [competing]).transactions);
       return applyTransactions(fake.transactions, deriveIntents(fake.transactions));
     });
@@ -75,7 +75,7 @@ describe("trusted dispatcher claim publication", () => {
 
   it("counts new group occupancy on every latest-state derivation", async () => {
     const fake = setup([{ work_id: "new", claim_id: "pending", selection: { group: { fields: ["/repo"] }, sort: [{ field: "/priority", direction: "desc" }] } }]);
-    fake.replace([...fake.transactions, { version: 2, kind: "Work", work_id: "remote", work: { repo: "b" }, sequence: 3 }, { version: 2, kind: "Claim", work_id: "remote", claim_id: "remote-claim", run_id: "remote-run" }]);
+    fake.replace([...fake.transactions, { version: 3, kind: "Work", work_id: "remote", work: { repo: "b" }, sequence: 3 }, { version: 3, kind: "Claim", work_id: "remote", claim_id: "remote-claim", run_id: "remote-run" }]);
     await expect(publishDispatcherClaims(fake.options)).rejects.toThrow("stale");
     expect(fake.transactions.some(transaction => transaction.claim_id === "pending")).toBe(false);
   });

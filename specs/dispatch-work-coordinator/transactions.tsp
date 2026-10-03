@@ -4,7 +4,7 @@ using TypeSpec.JsonSchema;
 
 @jsonSchema
 model WorkTransaction {
-  version?: 2;
+  version?: 3;
   kind: "Work";
   work_id: string;
   work: Record<unknown>;
@@ -15,7 +15,7 @@ model WorkTransaction {
 
 @jsonSchema
 model ClaimTransaction {
-  version?: 2;
+  version?: 3;
   kind: "Claim";
   work_id: string;
   claim_id: string;
@@ -24,7 +24,7 @@ model ClaimTransaction {
 
 @jsonSchema
 model ClaimCancellationTransaction {
-  version?: 2;
+  version?: 3;
   kind: "ClaimCancellation";
   work_id: string;
   claim_id: string;
@@ -32,14 +32,14 @@ model ClaimCancellationTransaction {
 
 @jsonSchema
 model WorkCancellationTransaction {
-  version?: 2;
+  version?: 3;
   kind: "WorkCancellation";
   work_id: string;
 }
 
 @jsonSchema
 model CompletionTransaction {
-  version?: 2;
+  version?: 3;
   kind: "Completion";
   work_id: string;
   claim_id: string;

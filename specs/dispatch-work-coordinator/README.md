@@ -77,11 +77,15 @@ which the trusted handler replaces with a verified `aw_context` assignment.
 
 ## Unified ledger and historical upgrades
 
-Both runtimes write version 2 records using `work_id`, `claim_id`, `run_id`, and
+Both runtimes write version 3 records using `work_id`, `claim_id`, `run_id`, and
 `attempt_id` as appropriate; Work carries its JSON object and FIFO `sequence`.
 Claims use the same lexicographic arbitration and terminal guards as before.
 The original runtime's unversioned/version-1 `work`/`claim`/`attempt` records and
-the CLI's unversioned payload-aware records upgrade before replay. Missing
+the CLI's unversioned payload-aware records upgrade before replay. The ordered
+version-2-to-3 codemod changes only the version field, retaining identities,
+payloads, sequences, provenance, and terminal outcomes. The activation artifact
+envelope remains version 2; its version is independent of ledger message versions.
+Missing
 sequences use first-seen Work order in the historical log and are persisted before
 compaction. Submission order already erased by historical compaction cannot be
 recovered. Legacy runtime records had no payload or provenance: retain their
@@ -120,7 +124,37 @@ The model fixes arbitration and makes the worker lifecycle, publication guards, 
 | Authorization | The winning worker verifies its newly committed Completion before outputs. Finished, stopped, and failed workers cannot restart or receive authorization again. |
 | Compaction | Canonicalize order and remove identical duplicate records only. Preserve the entire fact set, including cancelled/superseded Claim history. More aggressive compaction needs a separate proof. |
 
-These are protocol refinements, not claims that an implementation already enforces them. Claim ordering is by stable identity, not arrival time. Arrival order can change which transactions are accepted; it cannot change replay of the same accepted fact set.
+Claim arbitration remains by stable identity, not arrival time. Queue selection
+is separate: available Work is ordered by its durable FIFO sequence unless a
+policy supplies sort objectives, with Work identity as the last tie-break.
+Arrival order can change which transactions are accepted; it cannot change replay
+or selection over the same accepted fact set.
+
+### Selection and version abstractions
+
+Version 3 facts contain the same identity, payload, sequence, and provenance
+fields as the runtime ledger. Fields absent on a wire message use `0` in the
+uniform model record. Work identifiers remain integers; fixed payloads supply
+priority, cost, and group fields. Filters are represented by accepted Work sets,
+and policies cover FIFO, descending priority, compound objectives, filtered
+grouping, and group caps of one or two. JSON Pointer parsing, mixed scalar types,
+and arbitrary filter operators are covered by the shared Go/JavaScript fixtures,
+not claimed as TLA+ parser verification.
+
+`WorkIntent` has no assigned enqueue sequence. `Materialize` assigns the next
+sequence against the current fact set, including on a publication retry.
+`CaptureDispatcherSnapshot` stores an immutable activation source;
+`StageNext` selects against that source plus session-local pending intents.
+Explicit operator Claims may compete with existing Claims without a queue policy.
+Trusted `Reconcile` reruns each queued selection against the latest source and
+the preceding intents in the batch. A stale selection rejects the whole batch,
+and retries never substitute another Work identity. Existing effective Claims
+remain idempotent without authorizing a new Claim.
+
+`UpgradeMessage` models the declarative version-2-to-3 header change.
+`VersionUpgradeEquivalence` checks fact preservation and whole-batch rejection
+of an unsupported message; historical layout transformations remain covered by
+runtime codemod tests.
 
 `WorkOf`, `Inbound`, and `Origin` provide small, deterministic identity mappings for TLC. `Inbound` represents validated trusted context, not agent-selected input. Claims also identify their owning run; multiple worker attempts may share one Claim/run. Payloads are abstracted to stable Work identities, assuming collision-free canonical identity and idempotent submission.
 
@@ -159,6 +193,9 @@ All dispatcher, worker, recovery, and compaction pushes use `Publish`. It requir
 | `TypeOK`, `ValidLog` | Valid identities/references; at most one terminal transaction per Work; Completion belongs to the trusted inbound Claim and the selected claimant. |
 | `SnapshotValidity`, `SnapshotVersions`, `ActivationSnapshotValidity`, `CandidateDerivation` | A matching writer snapshot contains the current source log and an exactly regenerated candidate; activation admission reflects its immutable artifact snapshot; no snapshot is based on a future version. |
 | `Serialization` | Every locally proposed dispatcher transaction is serialized identically for safe-output processing. |
+| `ValidLog`, `FIFOSelection`, `SelectionCompaction` | Trusted submission assigns distinct contiguous FIFO ranks; available Work selection and future ranks survive compaction and record reordering. |
+| `QueueStagingSoundness`, `QueueSelectionSoundness`, `GroupSelection` | Pending choices use immutable activation views; prepared queue batches remain valid against their source, including unfiltered group occupancy. |
+| `CurrentProtocol`, `VersionUpgradeEquivalence` | Durable facts use version 3; upgrading version-2 headers preserves facts and rejects unsupported mixed batches atomically. |
 | `TerminalPersistence` | Previously committed Completion/WorkCancellation facts remain durable. |
 | `TerminalHistoryValid`, `TerminalFreeze` | All facts for a terminal Work item are frozen; neither late Claims nor other new transactions can change the decision. |
 | `SingleCompletionPerWorker`, `WorkerOneShot` | One fixed inbound Claim and at most one distinct Completion per worker; terminal worker phases never restart. |
@@ -191,11 +228,29 @@ Assume `ValidFacts(f)`. One accepted transaction preserves it:
 
 Duplicate records preserve the fact set. Induction over the serialized batch gives the same result for `Apply`.
 
+For Work, the next FIFO rank is one greater than the maximum durable rank.
+Uniqueness and contiguous ranking therefore extend with each accepted submission;
+Claims and terminal facts cannot change ranks. Since policy eligibility, group
+occupancy, objective comparisons, and FIFO ties depend only on facts, compaction
+preserves `NextWork` as well as replay.
+
+For a queued Claim, reconciliation checks that the selected Work is still the
+next eligible Work in the refreshed source and the preceding accepted intents.
+Invalid reconciliation returns the original source for the entire batch and
+moves the dispatcher to `failed`; a prepared queue candidate always has valid
+reconciliation. Ordinary operator Claims retain the existing arbitration rules
+and do not establish a global grouping guarantee.
+
+The version-2 codemod alters only `version`, so all identity, payload, rank,
+provenance, and terminal fields are retained. An unsupported record rejects the
+whole upgrade before a candidate ledger exists. These lemmas are reflected in
+the executable invariants; the parameterized theorem statements are not TLAPS proofs.
+
 ### Initial state and snapshot preservation
 
 The empty log, empty histories, zero HEAD/bases, and initial phases satisfy `Safety`.
 
-The activation artifact contains the then-current branch version and full replayable transaction log. The finite model abstracts this to the version and admission result for the worker's inbound Claim. `Activate` derives admission from the captured log and stores the snapshot version only for admitted workers; no later action changes that field. Consequently `ActivationSnapshotValidity` and the bound on activation snapshot versions are inductive, while later execution can observe a stale version. Worker preparation derives its candidate from the latest log, never the artifact. Preparing or retrying a dispatcher/worker/recovery candidate applies the accepted-extension lemma to the current log. Preparing a compaction uses the canonicalization lemma. Both the source log and its version are captured, and `CandidateDerivation` records their exact relationship to the regenerated candidate. Recovery also captures the observed terminated runs.
+The activation artifact contains the then-current branch version and full replayable transaction log. The finite model stores the dispatcher's captured source and abstracts worker activation to the version and admission result for its inbound Claim. `Activate` derives admission from the captured log and stores the snapshot version only for admitted workers; no later action changes that field. Consequently `ActivationSnapshotValidity` and the bound on activation snapshot versions are inductive, while later execution can observe a stale version. Worker preparation derives its candidate from the latest log, never the artifact. Preparing or retrying a dispatcher/worker/recovery candidate applies the accepted-extension and queue-reconciliation lemmas to the current log. Preparing a compaction uses the canonicalization lemma. Both the source log and its version are captured, and `CandidateDerivation` records their exact relationship to the regenerated candidate. Recovery also captures the observed terminated runs.
 
 A local/read/lifecycle step does not change remote facts or HEAD. A successful write either leaves the log unchanged or increases HEAD. Existing snapshot versions cannot equal the new HEAD because `SnapshotVersions` bounds them by the old HEAD. Their matching-source implications become false. Newly prepared snapshots again satisfy those implications. Therefore snapshot validity is inductive.
 
@@ -239,18 +294,58 @@ JAVA_BIN=/path/to/java \
 bash specs/dispatch-work-coordinator/check.sh
 ```
 
-The runner checks both positive configurations and the one-shot worker property to exhaustion, and requires the two remaining negative controls to fail with the named invariant, not a parse/tooling failure. These controls deliberately bypass branch-version or terminal-state protection; they are not reachable behaviors of the guarded protocol. Full reports are saved under a printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
+The runner checks four positive configurations and the one-shot worker property
+to exhaustion, and requires four negative controls to fail with the named
+invariant, not a parse/tooling failure. These controls bypass branch-version,
+terminal-state, FIFO-selection, or latest-source reconciliation guards; they are
+not reachable behaviors of the guarded protocol. Full reports are saved under a
+printed temporary path; set `TLC_RESULTS_DIR` to retain them at a chosen location.
 
 | Configuration | Scope / expected result |
 |---|---|
 | `DispatchWorkCoordinator.cfg` | One Work, two competing Claims, two dispatchers, three workers (two share a Claim), three branch changes, four records; `Safety` holds. |
 | `Recovery.cfg` | One Work, two Claims/workers, one dispatcher, four branch changes, five records; `Safety` holds through recovery/compaction interleavings. |
+| `Submission.cfg` | Two Work, two dispatchers, two branch changes, three records; submission ranks are assigned and regenerated independently of Work identity. |
+| `Selection.cfg` | Dispatcher-only `WorkQueueSelection.tla` refinement: three Work in every initial enqueue permutation, three Claims, two dispatchers, three branch changes, six records; FIFO, objectives, filtered group caps, snapshots, and stale reconciliation are checked. |
 | `BrokenCAS.cfg` | Bypass the branch-version check and overwrite with a stale snapshot; `TerminalPersistence` fails. |
 | `BrokenTerminal.cfg` | Bypass terminal protection and append a competing Claim after Completion; `TerminalFreeze` fails. |
+| `BrokenSelection.cfg` | Stage an available Work other than the FIFO choice; `QueueStagingSoundness` fails. |
+| `BrokenQueue.cfg` | Prepare a stale queued choice without reconciliation; `QueueSelectionSoundness` fails. |
 
-The earlier model revision completed both positive searches on 2026-10-02, checking `Safety` and `WorkerOneShot`: 3,626,825 distinct states at graph depth 33 for concurrency, and 218,926 distinct states at depth 23 for recovery. The two remaining negative controls produced the expected violations at depths 7 and 10. These counts predate the activation snapshot fields and do not constitute exhaustive verification of the current revision; rerun `check.sh` to verify the current model.
+The version-3 profiles completed exhaustive checking on 2026-10-02 with TLC 2.19:
 
-`Bound` constrains branch changes and physical log size, not execution depth. TLC also checks immediate successor states before pruning them. Deadlock checking is disabled because stopped/failed workflows are intentional; no fairness or liveness theorem is asserted.
+| Positive profile | Distinct states | Complete graph depth |
+|---|---:|---:|
+| `DispatchWorkCoordinator` | 9,466,659 | 33 |
+| `Recovery` | 441,032 | 23 |
+| `Submission` | 66,530 | 20 |
+| `Selection` | 23,843 | 11 |
+
+All four checked `Safety` and `WorkerOneShot` without violations. The four negative
+controls produced their expected invariant violations at depths 7, 10, 3, and 7,
+respectively. Existing competing-Claim, orphan-recovery, and external-effect
+reachability witnesses also produced the expected counterexamples. These results
+apply to the documented finite profiles, not an unbounded proof or a mechanically
+verified runtime refinement.
+
+`Bound` constrains branch changes, physical log size, and local batch size, not
+execution depth. `QueueEnabled` isolates selection actions from the baseline
+submission/worker profiles. `SeedQueue` initializes every enqueue permutation
+for the selection profile and limits its primitive operator surface to Claim
+overrides; submissions and Work cancellations remain covered by the unseeded
+profiles. The dispatcher-only selection refinement omits worker, recovery,
+compaction, and duplicate-record transitions, which remain covered by the
+baseline profiles and compaction invariants. The combined runtime interactions
+are not claimed to be exhaustively covered by this isolated profile.
+These profiles avoid redundant state expansion while retaining their checked
+invariants. TLC also checks immediate successor states
+before pruning them. Deadlock checking is disabled because stopped/failed
+workflows are intentional; no fairness or liveness theorem is asserted.
+
+To run selected profiles without rerunning an already completed search, pass
+their configuration names to the same checker, for example
+`bash specs/dispatch-work-coordinator/check.sh Selection BrokenSelection BrokenQueue`.
+The default invocation runs all profiles.
 
 ## Inspect execution traces
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -52,6 +53,17 @@ type parsedRecord struct {
 	missingSequence bool
 }
 
+var versionCodemods = [...]struct{ from, to int }{{2, 3}}
+
+func upgradeTransactionVersion(tx Transaction) Transaction {
+	for _, codemod := range versionCodemods {
+		if tx.Version == codemod.from {
+			tx.Version = codemod.to
+		}
+	}
+	return tx
+}
+
 func parseRecord(data []byte) (parsedRecord, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -72,6 +84,7 @@ func parseRecord(data []byte) (parsedRecord, error) {
 	if err := json.Unmarshal(data, &tx); err != nil {
 		return parsedRecord{}, err
 	}
+	tx = upgradeTransactionVersion(tx)
 	schemas, err := transactionSchemas()
 	if err != nil {
 		return parsedRecord{}, err
@@ -126,7 +139,9 @@ func normalizeTransactions(transactions []Transaction) ([]Transaction, error) {
 	result := slices.Clone(transactions)
 	sequences := map[string]int64{}
 	var maximum int64
-	for _, tx := range result {
+	for i, tx := range result {
+		tx = upgradeTransactionVersion(tx)
+		result[i] = tx
 		if err := validateTransaction(tx); err != nil {
 			return nil, err
 		}
@@ -172,8 +187,8 @@ func upgradeMessage(raw map[string]any) (map[string]any, error) {
 	if raw == nil {
 		return nil, errors.New("transaction must be an object")
 	}
-	if _, legacy := raw["work_id"]; legacy {
-		return raw, nil
+	if _, canonical := raw["work_id"]; canonical {
+		return upgradeCanonicalMessage(raw), nil
 	}
 	version, exists := raw["version"]
 	if exists && version != float64(0) && version != float64(1) {
@@ -209,6 +224,19 @@ func upgradeMessage(raw map[string]any) (map[string]any, error) {
 	}
 	result["version"] = CurrentVersion
 	return result, nil
+}
+
+func upgradeCanonicalMessage(raw map[string]any) map[string]any {
+	upgraded := maps.Clone(raw)
+	for _, codemod := range versionCodemods {
+		if upgraded["version"] == float64(codemod.from) {
+			upgraded["version"] = float64(codemod.to)
+		}
+	}
+	if upgraded["version"] == float64(0) {
+		upgraded["version"] = float64(CurrentVersion)
+	}
+	return upgraded
 }
 
 func validateLegacyFields(raw map[string]any, versioned bool) error {

@@ -18,7 +18,7 @@ import (
 
 const FileName = "dispatch-work-coordinator.jsonl"
 const DefaultBranch = "gh-aw-dispatch-work-coordinator"
-const CurrentVersion = 2
+const CurrentVersion = 3
 const MaxSequence int64 = 9007199254740991
 
 //go:embed schema/*.json
@@ -345,6 +345,7 @@ func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, err
 	if err != nil {
 		return nil, false, err
 	}
+	tx = upgradeTransactionVersion(tx)
 	tx, duplicate, err := prepareIntent(transactions, tx)
 	if err != nil {
 		return nil, false, err

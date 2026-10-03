@@ -64,14 +64,14 @@ describe("write dispatch coordinator activation snapshot", () => {
     await main({ githubClient, context: { repo: { owner: "owner", repo: "repo" } }, snapshotPath, core: { info: () => {} } });
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
     expect(snapshot.sha).toBe("legacy-head");
-    expect(JSON.parse(snapshot.transactionLog)).toEqual({ version: 2, kind: "Work", work_id: "w", work: { legacy_work_id: "w" }, sequence: 1 });
+    expect(JSON.parse(snapshot.transactionLog)).toEqual({ version: 3, kind: "Work", work_id: "w", work: { legacy_work_id: "w" }, sequence: 1 });
   });
 
   it("admits only a trusted inbound assignment that is the current effective claim", () => {
     const transactions = [
-      { version: 2, kind: "Work", work_id: "w", work: { input: "trusted" }, sequence: 1 },
-      { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-b", run_id: "run-b" },
-      { version: 2, kind: "Claim", work_id: "w", claim_id: "claim-a", run_id: "run-a" },
+      { version: 3, kind: "Work", work_id: "w", work: { input: "trusted" }, sequence: 1 },
+      { version: 3, kind: "Claim", work_id: "w", claim_id: "claim-b", run_id: "run-b" },
+      { version: 3, kind: "Claim", work_id: "w", claim_id: "claim-a", run_id: "run-a" },
     ];
     const payload = {
       inputs: {
