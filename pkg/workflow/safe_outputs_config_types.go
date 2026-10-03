@@ -96,6 +96,7 @@ type SafeOutputsConfig struct {
 	SetIssueType                           *SetIssueTypeConfig                    `yaml:"set-issue-type,omitempty"`               // Set the type of an issue (empty string clears the type)
 	SetIssueField                          *SetIssueFieldConfig                   `yaml:"set-issue-field,omitempty"`              // Set a single issue field value by name/value
 	DispatchWorkflow                       *DispatchWorkflowConfig                `yaml:"dispatch-workflow,omitempty"`            // Dispatch workflow_dispatch events to other workflows
+	WorkQueueEnabled                       bool                                   `yaml:"-"`                                      // Internal work-queue dispatcher flag
 	DispatchRepository                     *DispatchRepositoryConfig              `yaml:"dispatch-repository,omitempty"`          // Dispatch repository_dispatch events to external repositories; the underscore alias remains supported via parseDispatchRepositoryConfig.
 	CallWorkflow                           *CallWorkflowConfig                    `yaml:"call-workflow,omitempty"`                // Call reusable workflows via workflow_call fan-out
 	MissingTool                            *MissingToolConfig                     `yaml:"missing-tool,omitempty"`                 // Optional for reporting missing functionality

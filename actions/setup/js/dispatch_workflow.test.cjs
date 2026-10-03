@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { main } from "./dispatch_workflow.cjs";
+import { parseTransactionLog, serializeTransactionLog } from "./work_queue_replay.cjs";
 
 // Mock dependencies
 global.core = {
@@ -48,6 +49,71 @@ describe("dispatch_workflow handler factory", () => {
     // Reset shared context to a known baseline so tests are order-independent
     global.context.ref = "refs/heads/main";
     global.context.payload = { repository: { default_branch: "main" } };
+  });
+
+  function queueWithWork(workId = "task-1") {
+    let log = serializeTransactionLog([{ version: 2, kind: "Work", work: workId, claim: null, attempt: null }]);
+    let blob;
+    global.github.rest.git = {
+      getRef: vi.fn(async ({ ref }) => {
+        if (ref !== "heads/work-queue") throw Object.assign(new Error("not found"), { status: 404 });
+        return { data: { object: { sha: "head" } } };
+      }),
+      getCommit: vi.fn(async () => ({ data: { tree: { sha: "tree" } } })),
+      getTree: vi.fn(async () => ({ data: { tree: [{ path: "work-queue.jsonl", type: "blob", sha: "blob" }] } })),
+      getBlob: vi.fn(async () => ({ data: { encoding: "base64", content: Buffer.from(log).toString("base64") } })),
+      createBlob: vi.fn(async ({ content }) => {
+        blob = content;
+        return { data: { sha: "new-blob" } };
+      }),
+      createTree: vi.fn(async () => ({ data: { sha: "new-tree" } })),
+      createCommit: vi.fn(async () => ({ data: { sha: "new-head" } })),
+      updateRef: vi.fn(async () => {
+        log = blob;
+        return { data: {} };
+      }),
+    };
+    return () => parseTransactionLog(log);
+  }
+
+  it("claims available work and injects only trusted assignment into the worker", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true });
+    const result = await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" }, task: "hello", aw_context: '{"work_queue":{"claim_id":"forged"}}' } }, {});
+    expect(result.success).toBe(true);
+    const claim = transactions().find(t => t.kind === "Claim");
+    expect(claim.work).toBe("task-1");
+    const inputs = global.github.rest.actions.createWorkflowDispatch.mock.calls[0][0].inputs;
+    expect(inputs).not.toHaveProperty("work_queue");
+    expect(inputs.task).toBe("hello");
+    expect(JSON.parse(inputs.aw_context).work_queue).toEqual({ work_id: "task-1", claim_id: claim.claim, work: { id: "task-1" } });
+  });
+
+  it("rejects stale or unauthorized work without dispatching", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true };
+    const handler = await main(config);
+    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "missing" } } }, {})).success).toBe(false);
+    expect(transactions()).toHaveLength(1);
+    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+    const ordinary = await main({ ...config, work_queue_enabled: false });
+    expect((await ordinary({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
+  it("cancels the claim when dispatch fails", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    global.github.rest.actions.createWorkflowDispatch.mockRejectedValueOnce(new Error("dispatch failed"));
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true });
+    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    expect(
+      transactions()
+        .map(t => t.kind)
+        .sort()
+    ).toEqual(["Claim", "ClaimCancellation", "Work"]);
   });
 
   it("should create a handler function", async () => {

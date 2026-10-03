@@ -53,6 +53,18 @@ func TestGenerateCustomJobToolDefinitionBasic(t *testing.T) {
 	assert.Equal(t, []string{"staging", "production"}, envProp["enum"], "enum values should match")
 }
 
+func TestDispatchWorkflowWorkQueueSelector(t *testing.T) {
+	normal := generateDispatchWorkflowTool("worker", map[string]any{}, nil)
+	normalProps := normal["inputSchema"].(map[string]any)["properties"].(map[string]any)
+	assert.NotContains(t, normalProps, "work_queue")
+
+	queue := generateDispatchWorkflowTool("worker", map[string]any{}, nil, true)
+	props := queue["inputSchema"].(map[string]any)["properties"].(map[string]any)
+	selector := props["work_queue"].(map[string]any)
+	assert.Equal(t, false, selector["additionalProperties"])
+	assert.Equal(t, []string{"work_id"}, selector["required"])
+}
+
 // TestGenerateCustomJobToolDefinitionDefaultDescription tests that a default description is used when none provided.
 func TestGenerateCustomJobToolDefinitionDefaultDescription(t *testing.T) {
 	jobConfig := &SafeJobConfig{}

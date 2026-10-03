@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -29,6 +30,7 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 	if data.SafeOutputs == nil || data.SafeOutputs.DispatchWorkflow == nil {
 		return
 	}
+	data.SafeOutputs.WorkQueueEnabled = isWorkQueueEnabled(data)
 
 	if len(data.SafeOutputs.DispatchWorkflow.Workflows) == 0 {
 		return
@@ -99,7 +101,7 @@ func workflowHasAwContextInput(fileResult *findWorkflowFileResult, workflowName 
 // the workflow's defined workflow_dispatch inputs as parameters.
 // When allowedRefs is non-empty, a 'ref' parameter is added to let the agent
 // specify which branch/tag/SHA to dispatch to, validated against the configured globs.
-func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string]any, allowedRefs []string) map[string]any {
+func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string]any, allowedRefs []string, workQueueEnabled ...bool) map[string]any {
 	safeOutputsDispatchWorkflowLog.Printf("Generating dispatch-workflow tool: workflow=%s, inputs=%d, allowedRefs=%d", workflowName, len(workflowInputs), len(allowedRefs))
 
 	descriptionFormat := "Dispatch the '%s' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository."
@@ -110,13 +112,30 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 		descriptionFormat: descriptionFormat,
 		metadataKey:       "_workflow_name",
 	})
+	inputSchema, ok := tool["inputSchema"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	properties, ok := inputSchema["properties"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	if slices.Contains(workQueueEnabled, true) {
+		properties["work_queue"] = map[string]any{
+			"type":        "object",
+			"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
+			"properties": map[string]any{
+				"work_id": map[string]any{"type": "string", "minLength": 1},
+			},
+			"required":             []string{"work_id"},
+			"additionalProperties": false,
+		}
+	}
 
 	// When allowed-refs is configured, inject a 'ref' property so the agent can
 	// specify the target branch/tag/SHA. The runtime handler validates the value
 	// against the configured glob patterns before dispatching.
 	if len(allowedRefs) > 0 {
-		inputSchema, _ := tool["inputSchema"].(map[string]any)
-		properties, _ := inputSchema["properties"].(map[string]any)
 		allowedRefsDesc := strings.Join(allowedRefs, ", ")
 
 		refDesc := fmt.Sprintf("The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: %s. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.", allowedRefsDesc)
@@ -125,12 +144,11 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 			"description": refDesc,
 		}
 
-		desc, _ := tool["description"].(string)
-		tool["description"] = desc + fmt.Sprintf(" Use the 'ref' parameter to target a specific branch or tag (allowed patterns: %s).", allowedRefsDesc)
+		if desc, ok := tool["description"].(string); ok {
+			tool["description"] = desc + fmt.Sprintf(" Use the 'ref' parameter to target a specific branch or tag (allowed patterns: %s).", allowedRefsDesc)
+		}
 	}
 
-	inputSchema, _ := tool["inputSchema"].(map[string]any)
-	properties, _ := inputSchema["properties"].(map[string]any)
 	requiredCount := 0
 	if required, ok := inputSchema["required"].([]string); ok {
 		requiredCount = len(required)

@@ -67,6 +67,9 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddTemplatableStringSlice("allowed_repos", c.AllowedRepos).
 			AddTemplatableStringSlice("allowed_refs", c.AllowedRefs)
+		if cfg.WorkQueueEnabled {
+			builder.AddDefault("work_queue_enabled", true)
+		}
 
 		// Add workflow_files map if it has entries
 		if len(c.WorkflowFiles) > 0 {

@@ -15,6 +15,10 @@ const { resolveTargetRepoConfig, parseRepoSlug, validateTargetRepo } = require("
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildAwContext } = require("./aw_context.cjs");
+const { randomUUID } = require("node:crypto");
+const { readWorkQueueLog, applyAndPublishWorkQueueTransactions } = require("./work_queue_store.cjs");
+const { replayTransactions } = require("./work_queue_replay.cjs");
+const { CURRENT_VERSION } = require("./work_queue_codemods.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 
 /**
@@ -196,6 +200,9 @@ async function main(config = {}) {
       };
     }
 
+    let claim;
+    let claimPublished = false;
+    let dispatched = false;
     try {
       // Add 5 second delay between dispatches (except for the first one)
       if (lastDispatchTime > 0) {
@@ -239,6 +246,18 @@ async function main(config = {}) {
         };
       }
 
+      const selection = message.inputs?.work_queue;
+      let workId;
+      if (selection !== undefined) {
+        if (!config.work_queue_enabled || isCrossRepoDispatch || !awContextWorkflows.has(workflowName)) {
+          throw new Error("Work queue dispatch requires tools.work-queue, a same-repository worker, and a declared aw_context input");
+        }
+        if (!selection || typeof selection !== "object" || Array.isArray(selection) || Object.keys(selection).length !== 1 || typeof selection.work_id !== "string" || !selection.work_id) {
+          throw new TypeError("work_queue must contain only a non-empty work_id");
+        }
+        workId = selection.work_id;
+      }
+
       // Prepare inputs - convert all values to strings as required by workflow_dispatch
       // and resolve any #temporary_id references before dispatching
       /** @type {Record<string, string>} */
@@ -248,6 +267,7 @@ async function main(config = {}) {
         const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
         for (const [key, value] of Object.entries(message.inputs)) {
+          if (key === "work_queue" && workId !== undefined) continue;
           // Convert value to string
           let strValue;
           if (value === null || value === undefined) {
@@ -286,7 +306,7 @@ async function main(config = {}) {
 
       // Inject aw_context if the target workflow declares it as an input.
       // Only workflows listed in aw_context_workflows (populated at compile time) support this.
-      if (awContextWorkflows.has(workflowName)) {
+      if (awContextWorkflows.has(workflowName) && workId === undefined) {
         inputs["aw_context"] = JSON.stringify(buildAwContext());
       }
 
@@ -317,6 +337,33 @@ async function main(config = {}) {
         };
       }
 
+      if (workId !== undefined) {
+        const current = await readWorkQueueLog({ githubClient, owner: repo.owner, repo: repo.repo, core });
+        if (!replayTransactions(current.transactions).available.includes(workId)) {
+          throw new Error("Selected work is no longer available");
+        }
+        const runId = String(context.runId ?? process.env.GITHUB_RUN_ID ?? "").trim();
+        if (!runId) throw new Error("Cannot claim work without a dispatcher run ID");
+        claim = { version: CURRENT_VERSION, kind: "Claim", work: workId, claim: `${runId}:${randomUUID()}`, attempt: null };
+        const published = await applyAndPublishWorkQueueTransactions({
+          githubClient,
+          owner: repo.owner,
+          repo: repo.repo,
+          intents: [claim],
+          core,
+        });
+        if (published.rejected.length > 0) throw new Error("Selected work could not be claimed");
+        claimPublished = true;
+        const latest = await readWorkQueueLog({ githubClient, owner: repo.owner, repo: repo.repo, core });
+        if (replayTransactions(latest.transactions).claim[claim.claim] !== "effective") {
+          throw new Error("Selected work claim is no longer effective");
+        }
+        inputs["aw_context"] = JSON.stringify({
+          ...buildAwContext(),
+          work_queue: { work_id: workId, claim_id: claim.claim, work: { id: workId } },
+        });
+      }
+
       // Dispatch the workflow using the resolved file.
       // Request return_run_details for newer GitHub API support; fall back without it
       // for older GitHub Enterprise Server deployments that don't support the parameter.
@@ -335,7 +382,7 @@ async function main(config = {}) {
         /** @type {any} */
         const err = dispatchError;
         const status = err && typeof err === "object" ? err.status : undefined;
-        const dispatchErrMessage = typeof err?.response?.data?.message === "string" ? err.response.data.message : String(dispatchError);
+        const dispatchErrMessage = err?.response?.data?.message !== undefined ? String(err.response.data.message) : String(dispatchError);
 
         const isValidationStatus = status === 400 || status === 422;
         const mentionsReturnRunDetails = typeof dispatchErrMessage === "string" && dispatchErrMessage.toLowerCase().includes("return_run_details");
@@ -353,6 +400,7 @@ async function main(config = {}) {
           throw err;
         }
       }
+      dispatched = true;
 
       const runId = response && response.data ? response.data.workflow_run_id : undefined;
       if (runId) {
@@ -371,6 +419,19 @@ async function main(config = {}) {
         run_id: runId,
       };
     } catch (error) {
+      if (claimPublished && !dispatched) {
+        try {
+          await applyAndPublishWorkQueueTransactions({
+            githubClient,
+            owner: repo.owner,
+            repo: repo.repo,
+            intents: [{ version: CURRENT_VERSION, kind: "ClaimCancellation", work: claim.work, claim: claim.claim, attempt: null }],
+            core,
+          });
+        } catch {
+          core.warning("Failed to cancel work queue claim after dispatch failure");
+        }
+      }
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to dispatch workflow "${workflowName}": ${errorMessage}`);
 
