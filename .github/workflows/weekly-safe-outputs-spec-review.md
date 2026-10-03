@@ -16,7 +16,7 @@ permissions:
 
 tracker-id: weekly-safe-outputs-spec-review
 engine: pi
-model: copilot/auto
+model: copilot/claude-opus-5.5
 strict: true
 
 network:

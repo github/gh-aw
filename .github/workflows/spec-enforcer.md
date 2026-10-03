@@ -36,7 +36,7 @@ safe-outputs:
 description: Generates and maintains specification-driven test suites for each Go package, relying on README.md specifications rather than source code
 emoji: 📋
 max-turns: 100
-model: openai/gpt-5.3-codex
+model: openai/gpt-5.6-sol
 engine:
   id: codex
   model-provider: openai

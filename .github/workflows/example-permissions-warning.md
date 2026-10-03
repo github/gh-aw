@@ -19,8 +19,8 @@ tools:
     toolsets: [repos, issues, pull_requests]
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-5.3-codex
+  model-provider: github
+model: copilot/gpt-5.6-sol
 strict: false
 
 ---

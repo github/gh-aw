@@ -14,7 +14,7 @@ permissions:
   actions: read
   discussions: read
 tracker-id: outcome-collector
-model: copilot/gpt-5.3-codex
+model: copilot/gpt-6-astra
 engine:
   id: codex
 strict: true

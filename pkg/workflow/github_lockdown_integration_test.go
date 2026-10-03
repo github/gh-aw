@@ -116,11 +116,11 @@ tools:
 Test lockdown mode with Codex engine.
 `,
 			expected: []string{
-				`"GITHUB_LOCKDOWN_MODE" = "1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
 				`ghcr.io/github/github-mcp-server:`,
 			},
 			notExpected: []string{},
-			description: "Codex (TOML) with lockdown should render GITHUB_LOCKDOWN_MODE=1",
+			description: "Codex gateway config with lockdown should render GITHUB_LOCKDOWN_MODE=1",
 		},
 		{
 			name:   "lockdown with read-only both enabled",

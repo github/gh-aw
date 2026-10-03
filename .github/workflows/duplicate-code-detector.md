@@ -15,7 +15,7 @@ permissions:
 
 
 engine: pi
-model: copilot/auto
+model: copilot/claude-opus-4.8
 network:
   allowed:
     - defaults

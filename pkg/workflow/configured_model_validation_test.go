@@ -46,11 +46,12 @@ func TestWarnUnknownConfiguredModelsWithoutInventory(t *testing.T) {
 }
 
 func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		name        string
 		data        *WorkflowData
 		wantWarning bool
-	}{
+	}
+	tests := []testCase{
 		{
 			name: "general-purpose Copilot model",
 			data: &WorkflowData{
@@ -86,6 +87,31 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 			},
 		},
 		{
+			name: "unknown GPT Copilot model",
+			data: &WorkflowData{
+				Model:        "copilot/gpt-6-unknown",
+				EngineConfig: &EngineConfig{ID: "codex"},
+			},
+			wantWarning: true,
+		},
+		{
+			name: "explicit GitHub provider with a modern Codex model",
+			data: &WorkflowData{
+				Model: "gpt-6-sol",
+				EngineConfig: &EngineConfig{
+					ID:          "codex",
+					LLMProvider: LLMProviderGitHub,
+				},
+			},
+		},
+		{
+			name: "modern Codex model with normalized prefix and effort",
+			data: &WorkflowData{
+				Model:        " Copilot/GPT-6.1-SOL?effort=high ",
+				EngineConfig: &EngineConfig{ID: "codex"},
+			},
+		},
+		{
 			name: "runtime expression",
 			data: &WorkflowData{
 				Model:        "copilot/${{ inputs.model }}",
@@ -108,6 +134,19 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 		},
 	}
 
+	for _, model := range []string{
+		"gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-6-astra",
+		"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+	} {
+		tests = append(tests, testCase{
+			name: "modern Codex Copilot model " + model,
+			data: &WorkflowData{
+				Model:        "copilot/" + model,
+				EngineConfig: &EngineConfig{ID: "codex"},
+			},
+		})
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			compiler := NewCompiler()
@@ -126,7 +165,7 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 
 			if tt.wantWarning {
 				assert.Equal(t, 1, compiler.GetWarningCount())
-				assert.Contains(t, string(output), "Select a Codex model such as copilot/gpt-5.3-codex")
+				assert.Contains(t, string(output), "Select a supported Codex model such as copilot/gpt-6.1-sol")
 			} else {
 				assert.Zero(t, compiler.GetWarningCount())
 				assert.Empty(t, output)

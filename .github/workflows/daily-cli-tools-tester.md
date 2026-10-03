@@ -28,7 +28,7 @@ timeout-minutes: 60
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.3-codex
+model: openai/gpt-6-astra
 strict: true
 imports:
   - uses: shared/daily-audit-base.md

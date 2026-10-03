@@ -14,7 +14,7 @@ permissions:
 
 
 engine: pi
-model: copilot/auto
+model: copilot/gpt-5.4-mini
 
 tools:
   cli-proxy: true

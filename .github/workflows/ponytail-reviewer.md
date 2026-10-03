@@ -16,7 +16,7 @@ on:
     events: [pull_request_comment, pull_request_review_comment]
 engine:
   id: codex
-model: copilot/gpt-5.3-codex
+model: openai/gpt-5.6-terra
 permissions:
   contents: read
   pull-requests: read

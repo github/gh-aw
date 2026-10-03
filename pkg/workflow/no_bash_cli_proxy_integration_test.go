@@ -46,8 +46,10 @@ Add a label safely.
 		"Codex should receive the no-shell runtime setting when bash is disabled")
 	assert.Contains(t, compiled, "Mount MCP servers as CLIs",
 		"safeoutputs should still be mounted as a CLI for command-based harnesses")
-	assert.Contains(t, compiled, "[mcp_servers.safeoutputs]",
-		"safeoutputs must remain available as an MCP server")
+	assert.Contains(t, compiled, `"safeoutputs": {`,
+		"safeoutputs must remain available in the gateway MCP server config")
+	assert.Contains(t, compiled, "convert_gateway_config_codex.cjs",
+		"Codex must convert the gateway config to its native config at runtime")
 	assert.Contains(t, compiled, "<safe-output-tools>",
 		"safe output MCP guidance should remain in the prompt")
 	assert.NotContains(t, compiled, "mcp_cli_tools_with_safeoutputs_prompt.md",

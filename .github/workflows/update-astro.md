@@ -16,8 +16,8 @@ permissions:
 tracker-id: update-astro
 engine:
   id: codex
-  model-provider: openai
-model: openai/gpt-5.3-codex
+  model-provider: github
+model: copilot/gpt-5.6-sol
 strict: true
 
 timeout-minutes: 45

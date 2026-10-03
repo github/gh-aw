@@ -12,7 +12,7 @@ permissions:
 
 
   copilot-requests: write
-model: copilot/gpt-5.3-codex
+model: copilot/gpt-5.6-luna
 engine:
   id: codex
   model-provider: github

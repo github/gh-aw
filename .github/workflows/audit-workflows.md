@@ -29,7 +29,7 @@ experiments:
     issue: 43177
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 sandbox:
   agent:
     id: awf
@@ -111,7 +111,7 @@ evals:
   - id: issues_identified_or_noop
     question: Were issues, missing tools, errors, and improvement opportunities identified, or was noop used when no problems were found?
 
-model: openai/gpt-5.3-codex
+model: copilot/gpt-6-luna
 ---
 
 # Agentic Workflow Audit Agent

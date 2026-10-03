@@ -17,7 +17,7 @@ permissions:
   pull-requests: read
 
 engine: pi
-model: copilot/auto
+model: copilot/gemini-3.7-flash
 
 imports:
   - shared/ffmpeg.md

@@ -36,6 +36,31 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("reconstructs OpenCode sessions from stdio with native timestamps and tool correlation", () => {
+    write("aw_info.json", { engine_id: "opencode", agent_version: "fixture" });
+    write("agent-stdio.log", [
+      { type: "text", sessionID: "ses_fixture", timestamp: 1790899201000, part: { id: "text", text: "Done." } },
+      {
+        type: "tool_use",
+        sessionID: "ses_fixture",
+        timestamp: 1790899202000,
+        part: { id: "tool", callID: "call", tool: "bash", state: { status: "completed", input: { command: "pwd" }, output: "/workspace", time: { start: 1790899200500, end: 1790899202000 } } },
+      },
+      { type: "step_finish", sessionID: "ses_fixture", timestamp: 1790899203000, part: { id: "finish", cost: 0, tokens: { input: 10, output: 5, cache: { read: 20, write: 0 } } } },
+    ]);
+    const events = writeUnifiedSession({
+      rootDir: root,
+      warn: message => {
+        throw new Error(message);
+      },
+    });
+    const start = events.find(event => event.type === "tool.execution_start");
+    expect(start).toMatchObject({ provenance: { path: "agent-stdio.log", timestampMs: 1790899202000 }, data: { toolCallId: "call", toolName: "bash", input: { command: "pwd" } } });
+    expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolCallId: "call", success: true, durationMs: 1500 });
+    expect(events.find(event => event.type === "session.result").data).toMatchObject({ totalCostUsd: 0, numTurns: 1, usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 20 } });
+    expect(events.find(event => event.type === "assistant.message").data.content).toBe("Done.");
+  });
+
   it("merges every required component with essential payloads and timestamp ordering", () => {
     const message = { type: "assistant.message", id: "same-id", timestamp: "2026-10-02T00:00:03Z", data: { content: "Done.\n", extra: [0, false, null] }, nativeField: "preserved" };
     const rpc = { timestamp: "2026-10-02T00:00:02+00:00", event: "rpc_response", payload: { jsonrpc: "2.0", id: 0, result: { content: [{ text: "response" }] } }, server_id: "github", direction: "IN" };
@@ -91,6 +116,7 @@ describe("Unified conclusion session", () => {
       engine_id: "copilot",
       agent_version: "v2.3.4",
       model: "fixture",
+      event_name: "workflow_dispatch",
       secret: "omit",
     });
     const { events } = collectUnifiedSession({ rootDir: root });
@@ -101,12 +127,42 @@ describe("Unified conclusion session", () => {
         mcpgVersion: "v0.6.7",
         engineId: "copilot",
         agentVersion: "v2.3.4",
-        engine: "copilot",
-        model: "fixture",
+        requestedModel: "fixture",
+        triggerType: "workflow_dispatch",
       },
       provenance: { path: "aw_info.json", component: "workflow" },
     });
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
+  });
+
+  it("resolves detection and eval AIC per observation without adding overlapping checkpoints", () => {
+    write("threat-detection/detection_usage.jsonl", [
+      { provider: "openai", model: "gpt-4o-mini", input_tokens: 1000, output_tokens: 100 },
+      { provider: "openai", model: "unknown-model", input_tokens: 10 },
+      { provider: "openai", model: "gpt-4o-mini", ai_credits: 0, input_tokens: 100 },
+      { usage: { provider: "openai", model: "gpt-4o-mini", ai_credits: 0, input_tokens: 100 } },
+    ]);
+    write("evals/evals_token_usage.jsonl", [
+      { provider: "openai", model: "gpt-4o-mini", ai_credits_this_response: 0.25, input_tokens: 100 },
+      { provider: "openai", model: "gpt-4o-mini", input_tokens: 100, output_tokens: 0 },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const detection = events.filter(event => event.type === "usage.report" && event.provenance.phase === "detection");
+    const evals = events.filter(event => event.type === "usage.report" && event.provenance.phase === "evals");
+    expect(detection[0].data.aic).toBeGreaterThan(0);
+    expect(detection[0].data.usage).toEqual({ inputTokens: 1000, outputTokens: 100 });
+    expect(detection[1].data).not.toHaveProperty("aic");
+    expect(detection[2].data).toMatchObject({ totalAic: 0 });
+    expect(detection[2].data).not.toHaveProperty("aic");
+    expect(detection[3].data).toMatchObject({ provider: "openai", model: "gpt-4o-mini", totalAic: 0, usage: { inputTokens: 100 } });
+    expect(detection[3].data).not.toHaveProperty("aic");
+    expect(evals[0].data).toMatchObject({ aic: 0.25 });
+    expect(evals[1].data.aic).toBeGreaterThan(0);
+    expect(evals[1].data.usage.outputTokens).toBe(0);
+    for (const event of [...detection, ...evals]) {
+      expect(Object.keys(event.data).every(key => !key.includes("_"))).toBe(true);
+      expect(Object.keys(event.data.usage ?? {}).every(key => !key.includes("_"))).toBe(true);
+    }
   });
 
   it("retains native provenance, equal-time source order, and invalid/absent timestamps without mutation", () => {
@@ -184,7 +240,7 @@ describe("Unified conclusion session", () => {
       status: "completed",
       sourceType: "turn.completed",
       numTurns: 1,
-      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
+      usage: { inputTokens: 16847, outputTokens: 167, cacheReadInputTokens: 8576, cacheCreationInputTokens: 0, reasoningOutputTokens: 0 },
     });
     expect(agent.at(-1)).not.toHaveProperty("usage");
     expect(agent.every(event => event.provenance.path === (canonicalPresent ? "agent-session.jsonl" : "agent-stdio.log"))).toBe(true);

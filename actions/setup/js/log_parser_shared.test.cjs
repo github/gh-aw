@@ -419,6 +419,17 @@ describe("log_parser_shared.cjs", () => {
       expect(result).toContain("- Output: 300");
     });
 
+    it("normalizes camelCase usage totals and cache semantics", async () => {
+      const { generateInformationSection } = await import("./log_parser_shared.cjs");
+
+      const result = generateInformationSection({
+        usage: { inputTokens: 10, outputTokens: 2, cacheReadInputTokens: 3, inputTokensIncludeCache: false },
+      });
+
+      expect(result).toContain("- Total: 15 (input + output + separate cache)");
+      expect(result).toContain("- Cache Read: 3");
+    });
+
     it("should handle permission denials", async () => {
       const { generateInformationSection } = await import("./log_parser_shared.cjs");
 

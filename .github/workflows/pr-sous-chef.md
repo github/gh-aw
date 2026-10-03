@@ -26,10 +26,10 @@ checkout:
   fetch-depth: 0
 network:
   allowed: ["defaults", "go"]
-model: openai/gpt-5.4
+model: copilot/claude-haiku-4.5
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 strict: true
 imports:
   - shared/mcp-pagination.md

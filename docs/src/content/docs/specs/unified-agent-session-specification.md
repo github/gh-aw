@@ -223,8 +223,8 @@ opaque because its essential fields are not defined by this specification.
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
-| Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
-| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine/model/workflow/repository/run ID. No detector transcript or free-form reasons. |
+| Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
+| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -233,9 +233,15 @@ Safe-output `failures` maps to `errors`, retaining operation types, error codes,
 and messages. Copilot checkpoint `ai_credits` maps to `totalAic` and
 `premium_requests` maps to `premiumRequests`.
 Explicit failure signals MUST survive alias compaction even when another
-source field claims success. Runtime keys use camelCase, such as `serverName`, `rpcId`, `durationMs`, and
-`secretLeak`. Accounting uses a nested `usage` object with the snake_case token
-keys from Section 6. The numeric file-format version remains `1`: the
+source field claims success. Known unified payload fields use camelCase, such as
+`serverName`, `rpcId`, `durationMs`, `secretLeak`, and nested `usage.inputTokens`.
+The parser traces and original accounting artifacts continue to use the
+snake_case token keys from Section 6; unknown native extension payloads remain
+opaque. Workflow metadata has one `engineId` rather than a duplicate `engine`
+and distinguishes `requestedModel` from the observed agent model. `triggerType`
+comes from the GitHub Actions event name; `cliVersion`, `awfVersion`,
+`mcpgVersion`, and `agentVersion` come from available workflow metadata and
+are not inferred. The numeric file-format version remains `1`: the
 `type`/`data`/`provenance` envelope and JSONL framing are unchanged.
 
 **T-UAS-055 — Source provenance.** Every merged event MUST have a `provenance`
@@ -368,7 +374,7 @@ The following tables describe the common fields in `data`. Optional native and p
 
 | Field | Value and availability |
 | --- | --- |
-| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
+| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
 | `model` | Source-dependent model string. |
 | `sessionId` | Source-dependent native session or thread identifier. |
 | `cwd` | Source-dependent working-directory string, unchanged. |
@@ -473,7 +479,7 @@ source for opaque fields.
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
-| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, and `agentVersion` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, and `agent_version`, respectively). Unavailable values are not inferred. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, `requestedModel`, and `triggerType` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, `agent_version`, `model`, and `event_name`, respectively). Unavailable values are not inferred. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
@@ -713,6 +719,33 @@ Recognized candidates include the native event envelope, Claude legacy message/i
 Delegation is deterministic. Native event recognition and per-record mixed conversion take precedence over broad fallbacks; remaining delegate ties use the existing Claude-before-Codex preference. A custom adapter MAY support additional documented engine signatures, but those signatures follow the same preservation contract. A delegated initialization MAY retain the detected engine's `sourceEngine`; custom-origin metadata, when supplied, is preserved separately. A custom engine emitting its own mapped initialization uses `sourceEngine: "custom"`.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
+
+### 7.7 OpenCode sample
+
+The unsupported OpenCode integration uses `run --format json` and the same
+parser for Actions, unified artifacts, and local session reconstruction. Its
+signature requires a string `sessionID` and a recognized event with an object
+`part` or a structured `error`; unrelated JSON and diagnostic prose are not
+assistant messages. The custom adapter also recognizes this signature.
+
+| Source observation | Canonical mapping |
+| --- | --- |
+| First recognized record for a `sessionID` | `session.init` with `sourceEngine: "opencode"` and the observed session ID. |
+| `text` / `reasoning` with `part.text` | `assistant.message` / `assistant.reasoning`, preserving whitespace. |
+| `tool_use` with `part.callID`, `part.tool`, and `part.state.input` | `tool.execution_start` with native call ID, name, and input. |
+| Tool state `completed` / `error` | Correlated `tool.execution_complete` with explicit outcome, output/error, and duration only when valid native start/end times exist. |
+| Distinct `step_finish` parts | Accumulate observed turns, cost, native `tokens.total`, `tokens.input`, `tokens.output`, `tokens.reasoning`, and `tokens.cache.read`/`write` into `session.result`. |
+| Structured `error` | Preserve `session.error` and terminal errors without inventing a turn count or successful outcome. |
+| Harness `opencode.max_turns` | Retain the explicit budget event and report `maxTurnsHit`. |
+| Native logfmt `message="server unavailable"` with a failed MCP server, or harness `opencode.mcp_failure` | Report the observed server name in `mcpFailures`; preserve harness events without interpreting arbitrary prose as failure evidence. |
+
+OpenCode envelope timestamps use milliseconds and remain unchanged, including
+when a completed tool part expands into invocation and result events. Duplicate
+parts are identified within their session, not globally. Cache-read and
+cache-write tokens are separate from the reported input count; reasoning tokens
+are an output subset, not an additional contribution to total tokens.
+Synthetic coverage lives in `parse_opencode_log.test.cjs` and
+`opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
 
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 

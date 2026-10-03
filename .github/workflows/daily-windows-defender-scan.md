@@ -21,7 +21,7 @@ tracker-id: daily-windows-defender-scan
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-5.3-codex
+model: copilot/gpt-6-sol
 max-daily-ai-credits: 10000
 max-turns: 80
 timeout-minutes: 45

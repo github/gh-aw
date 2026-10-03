@@ -1,10 +1,11 @@
 // @ts-check
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { createWorkQueueFinishTool, createWorkQueueStateTool, loadWorkQueueSnapshot, readWorkQueueState } from "./work_queue_mcp_server.cjs";
 import { createWorkTransaction, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { createServer, handleMessage, registerTool } from "./mcp_server_core.cjs";
 
 const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
 const claim = (workId, id) => ({ version: 2, kind: "Claim", work: workId, claim: id, attempt: null });
@@ -40,7 +41,7 @@ describe("work queue MCP snapshot", () => {
     });
     const tool = createWorkQueueStateTool(snapshot);
     expect(tool.name).toBe("work_queue_read");
-    expect(tool.handler({ work: "missing" })).toEqual({
+    expect(JSON.parse(tool.handler({ work: "missing" }).content[0].text)).toEqual({
       snapshot_sha: "activation-head",
       next_work: null,
       works: [{ id: "missing", state: "absent", winner: null, claims: [] }],
@@ -109,7 +110,57 @@ describe("work queue MCP snapshot", () => {
     expect(tool.name).toBe("work_queue_claim_finish");
     expect(Object.keys(tool.inputSchema.properties)).toEqual(["outcome"]);
     expect(tool.inputSchema.additionalProperties).toBe(false);
-    expect(tool.handler({ outcome: "completed", work_id: "untrusted" })).toEqual({ recorded: true, outcome: "completed" });
+    expect(JSON.parse(tool.handler({ outcome: "completed", work_id: "untrusted" }).content[0].text)).toEqual({ recorded: true, outcome: "completed" });
     expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
+    expect(fs.statSync(finishPath).mode & 0o777).toBe(0o644);
+  });
+
+  it("returns queue state and finish confirmation through the stdio MCP transport", async () => {
+    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
+    const finishPath = path.join(path.dirname(snapshotPath), "finish.jsonl");
+    const server = createServer({ name: "work-queue", version: "1.0.0" });
+    server.debug = vi.fn();
+    server.writeMessage = vi.fn();
+    registerTool(server, createWorkQueueStateTool(loadWorkQueueSnapshot(snapshotPath)));
+    registerTool(server, createWorkQueueFinishTool({ finishIntentPath: finishPath }));
+
+    for (const [id, name, args, expected] of [
+      [1, "work_queue_read", { work: "missing" }, { snapshot_sha: null, next_work: null, works: [{ id: "missing", state: "absent", winner: null, claims: [] }] }],
+      [2, "work_queue_claim_finish", { outcome: "completed" }, { recorded: true, outcome: "completed" }],
+    ]) {
+      await handleMessage(server, { jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
+      expect(server.writeMessage).toHaveBeenCalledWith({
+        jsonrpc: "2.0",
+        id,
+        result: { content: [{ type: "text", text: JSON.stringify(expected) }], isError: false },
+      });
+    }
+    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
+  });
+
+  it("makes an existing owner-only intent readable for runner artifact collection", () => {
+    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
+    const finishPath = path.join(path.dirname(snapshotPath), "finish.jsonl");
+    fs.writeFileSync(finishPath, "", { mode: 0o600 });
+    const tool = createWorkQueueFinishTool({ finishIntentPath: finishPath });
+
+    tool.handler({});
+
+    expect(fs.statSync(finishPath).mode & 0o777).toBe(0o644);
+    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
+  });
+
+  it("reports filesystem failures instead of confirming a recorded finish intent", () => {
+    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
+    const tool = createWorkQueueFinishTool({ finishIntentPath: path.join(path.dirname(snapshotPath), "finish.jsonl") });
+    const error = new Error("permission denied");
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
+      throw error;
+    });
+    try {
+      expect(() => tool.handler({ outcome: "completed" })).toThrow(expect.objectContaining({ message: "Failed to record work queue finish intent", cause: error }));
+    } finally {
+      append.mockRestore();
+    }
   });
 });

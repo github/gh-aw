@@ -35,6 +35,28 @@ safe-outputs:
     close-older-issues: true
     close-older-key: "smoke-work-queue"
   noop:
+jobs:
+  verify_smoke_result:
+    needs: [agent, safe_outputs]
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    steps:
+      - name: Download smoke evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: agent
+          path: /tmp/gh-aw/
+      - name: Verify smoke result
+        run: |
+          if grep -Eq '"type"[[:space:]]*:[[:space:]]*"create_issue"' /tmp/gh-aw/safeoutputs.jsonl; then
+            echo "::error::Work queue smoke test reported a tool failure"
+            exit 1
+          fi
+          test -s /tmp/gh-aw/work-queue.finish.jsonl
+          grep -Fx '{"outcome":"completed"}' /tmp/gh-aw/work-queue.finish.jsonl
+          grep -Eq '"type"[[:space:]]*:[[:space:]]*"noop"' /tmp/gh-aw/safeoutputs.jsonl
 timeout-minutes: 10
 strict: true
 features:
@@ -47,9 +69,15 @@ Exercise the queue MCP server mounted from the activation snapshot and the
 trusted safe-output finish-intent path. This workflow has no inbound worker claim,
 so it must not mutate the durable queue log.
 
+Use the tool interface advertised in the runtime prompt. If `work-queue` is
+listed in `<mcp-clis>`, invoke `work-queue work_queue_read` and
+`work-queue work_queue_claim_finish` from bash with JSON arguments. The tool names
+are subcommands, not standalone executables.
+
 1. Call `work_queue_read` with
    `work: "__gh_aw_smoke__-${{ github.run_id }}"`. Verify the returned work is
-   `absent` and that the response includes a snapshot version.
+   `absent` and that the response includes `snapshot_sha` (which is `null` when
+   the queue branch does not exist).
 2. Call `work_queue_claim_finish` with `outcome: "completed"`. Verify it reports
    that the finish intent was recorded. Do not supply work or claim identifiers.
    The safe-output check must find this finish intent in the downloaded agent
@@ -60,3 +88,6 @@ so it must not mutate the durable queue log.
    `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`.
    Do not include snapshot contents, identifiers other than the run ID, or
    unredacted errors in the issue.
+
+The final verification job fails the run after processing any failure issue.
+Only a completed finish-intent artifact and a `noop` output count as success.

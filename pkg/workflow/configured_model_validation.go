@@ -20,20 +20,33 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 		return
 	}
 	model = strings.ToLower(model)
-	baseModel := strings.SplitN(model, "?", 2)[0]
+	baseModel, _, _ := strings.Cut(model, "?")
 	usesGitHubInference := strings.HasPrefix(baseModel, "copilot/") ||
 		NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub
-	if !usesGitHubInference || strings.Contains(baseModel, "codex") {
+	if !usesGitHubInference || isCodexCompatibleModel(baseModel) {
 		return
 	}
 
 	message := fmt.Sprintf(
-		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a Codex model such as copilot/gpt-5.3-codex",
+		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a supported Codex model such as copilot/gpt-6.1-sol",
 		data.Model,
 	)
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		formatCompilerMessage(markdownPath, "warning", message)))
 	c.IncrementWarningCount()
+}
+
+func isCodexCompatibleModel(model string) bool {
+	if strings.Contains(model, "codex") {
+		return true
+	}
+	switch codexModelID(model) {
+	case "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-6-astra",
+		"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Compiler) warnUnknownConfiguredModels(data *WorkflowData, markdownPath string) {

@@ -27,6 +27,14 @@ type codexJSONMetricsState struct {
 	turns          int
 }
 
+var codexJSONUsageAliases = map[string]string{
+	"input_tokens":                "inputTokens",
+	"output_tokens":               "outputTokens",
+	"total_tokens":                "totalTokens",
+	"cache_read_input_tokens":     "cacheReadInputTokens",
+	"cache_creation_input_tokens": "cacheCreationInputTokens",
+}
+
 // parseCodexJSONLMetrics accepts native --json records and canonical session
 // snapshots. Result projections replace accounting fields rather than adding a
 // second copy of the native turn usage.
@@ -100,18 +108,36 @@ func (state *codexJSONMetricsState) observeSnapshot(kind string, record map[stri
 }
 
 func (state *codexJSONMetricsState) applyUsage(report map[string]any, incremental bool) {
-	if overflowed, ok := report["overflowed_tokens"].([]any); ok {
+	overflowedValue, hasCanonicalOverflow := report["overflowed_tokens"]
+	if !hasCanonicalOverflow {
+		overflowedValue = report["overflowedTokens"]
+	}
+	overflowedFields := make(map[string]struct{})
+	if overflowed, ok := overflowedValue.([]any); ok {
 		for _, field := range overflowed {
 			if name, ok := field.(string); ok {
-				delete(state.usage, name)
+				for canonical, alias := range codexJSONUsageAliases {
+					if name == canonical || name == alias {
+						overflowedFields[canonical] = struct{}{}
+						delete(state.usage, canonical)
+						break
+					}
+				}
 			}
 		}
 	}
 	for _, field := range []string{"input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"} {
+		if _, overflowed := overflowedFields[field]; overflowed {
+			continue
+		}
 		state.applyUsageField(report, field, incremental)
 	}
-	if includeCache, ok := report["input_tokens_include_cache"].(bool); ok {
-		state.usage["input_tokens_include_cache"] = includeCache
+	includeCache, present := report["input_tokens_include_cache"]
+	if !present {
+		includeCache = report["inputTokensIncludeCache"]
+	}
+	if value, ok := includeCache.(bool); ok {
+		state.usage["input_tokens_include_cache"] = value
 	}
 	if total, valid := codexJSONUsageTotal(state.usage); valid {
 		state.parsed.metrics.TokenUsage = total
@@ -124,11 +150,7 @@ func (state *codexJSONMetricsState) applyUsage(report map[string]any, incrementa
 func (state *codexJSONMetricsState) applyUsageField(report map[string]any, field string, incremental bool) {
 	value, present := report[field]
 	if !present {
-		aliases := map[string]string{
-			"input_tokens": "inputTokens", "output_tokens": "outputTokens",
-			"cache_read_input_tokens": "cacheReadInputTokens", "cache_creation_input_tokens": "cacheCreationInputTokens",
-		}
-		value = report[aliases[field]]
+		value = report[codexJSONUsageAliases[field]]
 	}
 	count, valid := codexJSONTokenCount(value)
 	if !valid {

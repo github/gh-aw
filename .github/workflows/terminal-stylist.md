@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 engine: pi
-model: copilot/auto
+model: copilot/gpt-5.6-sol
 
 timeout-minutes: 10
 

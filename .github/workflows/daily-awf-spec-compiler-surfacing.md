@@ -11,10 +11,10 @@ permissions:
   issues: read
   pull-requests: read
 tracker-id: daily-awf-spec-compiler-surfacing
-model: openai/gpt-5.3-codex
+model: copilot/gpt-6-sol
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 sandbox:
   agent:
     id: awf

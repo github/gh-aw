@@ -18,10 +18,10 @@ env:
   GH_AW_HARNESS_MAX_RETRIES: "4"
 tracker-id: avenger-ci
 max-turns: 50
-model: openai/gpt-5.3-codex
+model: copilot/gpt-6-astra
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
 network:
   allowed:
     - defaults

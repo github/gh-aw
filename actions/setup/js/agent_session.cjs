@@ -7,8 +7,12 @@
 const USAGE_ALIASES = {
   input_tokens: "inputTokens",
   output_tokens: "outputTokens",
+  total_tokens: "totalTokens",
   cache_creation_input_tokens: "cacheCreationInputTokens",
   cache_read_input_tokens: "cacheReadInputTokens",
+};
+const USAGE_BOOLEAN_ALIASES = {
+  input_tokens_include_cache: "inputTokensIncludeCache",
 };
 
 /** @param {any} value @returns {boolean} */
@@ -28,15 +32,31 @@ function isMetric(value) {
 
 /** @param {any} usage @returns {Record<string, any>|undefined} */
 function normalizeSessionUsage(usage) {
+  // Usage is a named-field object; arrays cannot represent its token fields.
   if (!usage || typeof usage !== "object" || Array.isArray(usage)) return undefined;
   const result = { ...usage };
+  delete result.overflowedTokens;
   for (const [key, alias] of Object.entries(USAGE_ALIASES)) {
-    const value = Object.hasOwn(usage, key) ? usage[key] : usage[alias];
+    const hasCanonical = Object.hasOwn(usage, key);
+    const value = hasCanonical ? usage[key] : usage[alias];
     if (isTokenCount(value)) result[key] = value;
-    else delete result[key];
+    else {
+      delete result[key];
+      if (hasCanonical) delete result[alias];
+    }
   }
-  if (Array.isArray(usage.overflowed_tokens)) {
-    result.overflowed_tokens = [...new Set(usage.overflowed_tokens.filter(key => typeof key === "string" && Object.hasOwn(USAGE_ALIASES, key)))];
+  for (const [key, alias] of Object.entries(USAGE_BOOLEAN_ALIASES)) {
+    const hasCanonical = Object.hasOwn(usage, key);
+    const value = hasCanonical ? usage[key] : usage[alias];
+    if (typeof value === "boolean") result[key] = value;
+    else {
+      delete result[key];
+      if (hasCanonical) delete result[alias];
+    }
+  }
+  const overflowed = Object.hasOwn(usage, "overflowed_tokens") ? usage.overflowed_tokens : usage.overflowedTokens;
+  if (Array.isArray(overflowed)) {
+    result.overflowed_tokens = [...new Set(overflowed.map(key => Object.entries(USAGE_ALIASES).find(([name, alias]) => key === name || key === alias)?.[0]).filter(Boolean))];
     for (const key of result.overflowed_tokens) {
       delete result[key];
       delete result[USAGE_ALIASES[key]];
@@ -365,10 +385,17 @@ function transformFlatSessionEntries(records) {
 /** @param {any} usage @returns {number|undefined} */
 function sessionTokenTotal(usage) {
   if (!usage) return undefined;
-  if (isTokenCount(usage.total_tokens)) return usage.total_tokens;
-  if (!isTokenCount(usage.input_tokens) && !isTokenCount(usage.output_tokens)) return undefined;
-  const cache = usage.input_tokens_include_cache === false ? (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) : 0;
-  const total = (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + cache;
+  const totalTokens = Object.hasOwn(usage, "total_tokens") ? usage.total_tokens : usage.totalTokens;
+  const inputTokens = Object.hasOwn(usage, "input_tokens") ? usage.input_tokens : usage.inputTokens;
+  const outputTokens = Object.hasOwn(usage, "output_tokens") ? usage.output_tokens : usage.outputTokens;
+  if (isTokenCount(totalTokens)) return totalTokens;
+  if (!isTokenCount(inputTokens) && !isTokenCount(outputTokens)) return undefined;
+  const cache =
+    (Object.hasOwn(usage, "input_tokens_include_cache") ? usage.input_tokens_include_cache : usage.inputTokensIncludeCache) === false
+      ? (Object.hasOwn(usage, "cache_creation_input_tokens") ? usage.cache_creation_input_tokens : (usage.cacheCreationInputTokens ?? 0)) +
+        (Object.hasOwn(usage, "cache_read_input_tokens") ? usage.cache_read_input_tokens : (usage.cacheReadInputTokens ?? 0))
+      : 0;
+  const total = (inputTokens ?? 0) + (outputTokens ?? 0) + cache;
   return isTokenCount(total) ? total : undefined;
 }
 

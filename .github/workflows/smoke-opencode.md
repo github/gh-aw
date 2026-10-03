@@ -79,6 +79,7 @@ sandbox:
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-opencode-${{ github.run_id }}.txt` with content "Smoke test passed for OpenCode at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.
+6. **Runtime Configuration Testing**: Verify `opencode --version` matches `GH_AW_ENGINE_VERSION`. Inspect `OPENCODE_CONFIG_CONTENT` with Node.js and verify the selected model uses the `awf-proxy` provider, a provider SDK and `options.baseURL` are configured, and MCP servers use `type: "remote"` with `oauth: false`. Report only PASS/FAIL; do not print the configuration, headers, keys, or prompt.
 
 ## Output
 
