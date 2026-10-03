@@ -85,6 +85,10 @@ const (
 	// ArtifactSetEvals downloads the usage artifact, which now includes evals.jsonl
 	// produced by the evals job (copied into usage by the conclusion job).
 	ArtifactSetEvals ArtifactSet = "evals"
+
+	// ArtifactSetDispatchCoordinator downloads queue snapshots, finish intents,
+	// and the workflow logs containing coordinator publication and reconciliation.
+	ArtifactSetDispatchCoordinator ArtifactSet = "dispatch-coordinator"
 )
 
 // artifactSetArtifacts maps each named set to the list of artifact base names it includes.
@@ -110,7 +114,8 @@ var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetEvals: {constants.UsageArtifactName.String()},
 	// graders: grader results are included in the usage artifact, remain part of
 	// the unified agent artifact, and are preserved in the fallback transport.
-	ArtifactSetGraders: {constants.UsageArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+	ArtifactSetGraders:             {constants.UsageArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+	ArtifactSetDispatchCoordinator: {constants.ActivationArtifactName.String(), constants.AgentArtifactName.String()},
 }
 
 const maxArtifactHintExamples = 2

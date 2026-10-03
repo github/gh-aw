@@ -180,6 +180,7 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) error {
 	logsDownloadLog.Printf("Downloading run artifacts: run_id=%d, output_dir=%s, owner=%s, repo=%s, artifactFilter=%v", opts.runID, opts.outputDir, opts.owner, opts.repo, opts.artifactFilter)
 	shouldLogProgress := IsRunningInCI() || opts.verbose
+	ensureDispatchCoordinatorLogs(ctx, opts)
 
 	// Check if artifacts already exist on disk (since they're immutable)
 	if fileutil.DirExists(opts.outputDir) && !fileutil.IsDirEmpty(opts.outputDir) {
@@ -285,7 +286,8 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 	}
 
 	// Download and unzip workflow run logs unless caller requested usage-only mode.
-	if shouldDownloadWorkflowRunLogs(opts.artifactFilter) {
+	if shouldDownloadWorkflowRunLogs(opts.artifactFilter) &&
+		(!dispatchCoordinatorArtifactsRequested(opts.artifactFilter) || !fileutil.DirExists(filepath.Join(opts.outputDir, "workflow-logs"))) {
 		if err := downloadWorkflowRunLogs(ctx, opts.runID, opts.outputDir, opts.verbose, opts.owner, opts.repo, opts.hostname); err != nil {
 			// Log the error but don't fail the entire download process
 			// Logs may not be available for all runs (e.g., expired or deleted)

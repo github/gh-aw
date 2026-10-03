@@ -242,6 +242,7 @@ func buildProcessedRun(ctx context.Context, result DownloadResult, verbose, logF
 		TokenUsage:              result.TokenUsage,
 		WorkingSet:              result.WorkingSet,
 		Ledger:                  result.Ledger,
+		DispatchCoordinator:     result.DispatchCoordinator,
 		Friction:                result.Friction,
 		GitHubRateLimitUsage:    result.GitHubRateLimitUsage,
 		JobDetails:              result.JobDetails,

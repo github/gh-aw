@@ -79,6 +79,7 @@ type auditAnalysisResults struct {
 	tokenUsageSummary       *TokenUsageSummary
 	workingSet              *WorkingSetMetrics
 	ledger                  *LedgerActivity
+	dispatchCoordinator     *DispatchCoordinatorReport
 	friction                *FrictionCostSummary
 	redactedDomainsAnalysis *RedactedDomainsAnalysis
 	rateLimitUsage          *GitHubRateLimitUsage
