@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workqueue"
 )
 
 const (
@@ -45,11 +46,12 @@ type WorkQueueWorker struct {
 // These fields follow the runtime queue protocol, not pkg/workqueue's
 // independent CLI queue protocol.
 type WorkQueueTransaction struct {
-	Version int     `json:"version"`
-	Kind    string  `json:"kind"`
-	Work    string  `json:"work"`
-	Claim   *string `json:"claim"`
-	Attempt *string `json:"attempt"`
+	Version  int     `json:"version"`
+	Kind     string  `json:"kind"`
+	Work     string  `json:"work"`
+	Claim    *string `json:"claim"`
+	Attempt  *string `json:"attempt"`
+	Enqueued *int64  `json:"enqueued,omitempty"`
 }
 
 type WorkQueueOperation struct {
@@ -156,7 +158,12 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if !hasVersion {
 		fields["version"] = json.RawMessage("1")
 	}
-	if len(fields) != 5 || fields["kind"] == nil || fields["work"] == nil || fields["claim"] == nil || fields["attempt"] == nil {
+	expectedFields := 5
+	_, hasEnqueued := fields["enqueued"]
+	if hasEnqueued {
+		expectedFields++
+	}
+	if len(fields) != expectedFields || fields["kind"] == nil || fields["work"] == nil || fields["claim"] == nil || fields["attempt"] == nil {
 		return tx, errors.New("transaction must contain version, kind, work, claim, and attempt")
 	}
 	if err := json.Unmarshal(data, &tx); err != nil {
@@ -164,6 +171,9 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	}
 	if legacy {
 		tx.Version = 1
+	}
+	if hasEnqueued && (tx.Kind != "Work" || tx.Enqueued == nil || *tx.Enqueued < 0 || *tx.Enqueued > workqueue.MaxEnqueued) {
+		return tx, errors.New("invalid Work enqueue time")
 	}
 	if tx.Version != 1 || tx.Work == "" ||
 		(tx.Claim != nil && *tx.Claim == "") || (tx.Attempt != nil && *tx.Attempt == "") {

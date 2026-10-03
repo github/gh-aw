@@ -31,6 +31,7 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 	t.Setenv("GH_TOKEN", "test-token")
 	const remote = "owner/repo"
 	var log, pending string
+	var competingWork *workqueue.Transaction
 	head := 0
 	originalTransport := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = originalTransport })
@@ -75,8 +76,23 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 		case (r.Method == http.MethodPost && path == "git/refs") ||
 			(r.Method == http.MethodPatch && path == "git/refs/heads/"+workqueue.DefaultBranch):
 			head++
-			log = pending
-			result = map[string]string{"ref": "refs/heads/" + workqueue.DefaultBranch}
+			if competingWork != nil {
+				transactions, err := workqueue.Parse([]byte(log))
+				if err != nil {
+					return nil, err
+				}
+				data, err := workqueue.Serialize(append(transactions, *competingWork))
+				if err != nil {
+					return nil, err
+				}
+				log = string(data)
+				competingWork = nil
+				status = http.StatusConflict
+				result = map[string]string{"message": "concurrent publication"}
+			} else {
+				log = pending
+				result = map[string]string{"ref": "refs/heads/" + workqueue.DefaultBranch}
+			}
 		default:
 			t.Errorf("unexpected queue API request: %s %s", r.Method, r.URL.Path)
 			status = http.StatusNotFound
@@ -119,7 +135,20 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 	if run("submit-work", "--file", payload)["created"] != false {
 		t.Fatal("duplicate submission was not idempotent")
 	}
-	claimed := run("claim", "--work-id", workID, "--run-id", "run-1")
+	originalLog := log
+	if run("submit-work", "--file", payload)["created"] != false || log != originalLog {
+		t.Fatal("duplicate submission changed the original enqueue time")
+	}
+	older, err := workqueue.NewWork([]byte(`{"task":"late older submission"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	older.Enqueued = 1
+	competingWork = &older
+	claimed := run("claim", "--run-id", "run-1")
+	if claimed["work_id"] != workID {
+		t.Fatal("publication retry reselected the late older submission")
+	}
 	claimID := claimed["claim_id"].(string)
 	if claimID == "" {
 		t.Fatal("claim ID missing")
@@ -164,5 +193,11 @@ func TestWorkCommandEndToEndWithoutCheckout(t *testing.T) {
 	command.SetArgs([]string{"--repo", remote, "cancel-work", "--work-id", workID})
 	if err := command.Execute(); err == nil || !strings.Contains(err.Error(), "terminal") {
 		t.Fatalf("terminal work accepted cancellation: %v", err)
+	}
+	run("cancel-work", "--work-id", older.WorkID)
+	empty := NewWorkCommand()
+	empty.SetArgs([]string{"--repo", remote, "claim", "--run-id", "empty-run"})
+	if err := empty.Execute(); err == nil || !strings.Contains(err.Error(), "no available Work") {
+		t.Fatalf("empty queue did not report unavailable work: %v", err)
 	}
 }

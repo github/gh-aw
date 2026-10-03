@@ -40,6 +40,11 @@ func TestWorkQueueWorkflowSchemas(t *testing.T) {
 		invalid bool
 	}{
 		{"work", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null}`, false},
+		{"work enqueue time", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`, false},
+		{"negative enqueue time", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":-1}`, true},
+		{"unsafe enqueue time", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740992}`, true},
+		{"fractional enqueue time", "WorkQueueTransaction", `{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":0.5}`, true},
+		{"enqueue time only on work", "WorkQueueTransaction", `{"version":1,"kind":"Claim","work":"w","claim":"c","attempt":null,"enqueued":123}`, true},
 		{"claim", "WorkQueueTransaction", `{"version":1,"kind":"Claim","work":"w","claim":"c","attempt":null}`, false},
 		{"cancel claim", "WorkQueueTransaction", `{"version":1,"kind":"ClaimCancellation","work":"w","claim":"c","attempt":null}`, false},
 		{"cancel work", "WorkQueueTransaction", `{"version":1,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null}`, false},

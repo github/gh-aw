@@ -20,7 +20,7 @@ function debugLog(message, details = {}) {
 
 /**
  * @typedef {
- *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null, enqueued?: number}
  *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}
@@ -40,8 +40,12 @@ function validateTransaction(transaction) {
   /** @type {Record<string, unknown>} */
   const candidate = Object.assign(Object.create(null), transaction);
   const fields = Object.keys(candidate).sort();
-  if (fields.length !== SORTED_TRANSACTION_FIELDS.length || fields.some((field, index) => field !== SORTED_TRANSACTION_FIELDS[index])) {
-    throw new TypeError("transaction must contain exactly version, kind, work, claim, and attempt");
+  const expectedFields = candidate.kind === "Work" && Object.hasOwn(candidate, "enqueued") ? [...SORTED_TRANSACTION_FIELDS, "enqueued"].sort() : SORTED_TRANSACTION_FIELDS;
+  if (fields.length !== expectedFields.length || fields.some((field, index) => field !== expectedFields[index])) {
+    throw new TypeError("transaction must contain exactly version, kind, work, claim, and attempt, with optional enqueued only on Work");
+  }
+  if (Object.hasOwn(candidate, "enqueued") && (typeof candidate.enqueued !== "number" || !Number.isSafeInteger(candidate.enqueued) || candidate.enqueued < 0)) {
+    throw new TypeError("transaction enqueued must be a non-negative safe integer");
   }
   if (candidate.version !== CURRENT_VERSION) {
     throw new TypeError("unsupported work queue transaction version");
@@ -87,7 +91,7 @@ function validateTransaction(transaction) {
  * @returns {string}
  */
 function transactionKey(transaction) {
-  return JSON.stringify([transaction.version, transaction.kind, transaction.work, transaction.claim, transaction.attempt]);
+  return JSON.stringify([transaction.version, transaction.kind, transaction.work, transaction.claim, transaction.attempt, transaction.kind === "Work" ? (transaction.enqueued ?? 0) : 0]);
 }
 
 /**
@@ -101,6 +105,7 @@ function copyTransaction(transaction) {
     work: transaction.work,
     claim: transaction.claim,
     attempt: transaction.attempt,
+    ...(transaction.kind === "Work" && transaction.enqueued ? { enqueued: transaction.enqueued } : {}),
   });
 }
 
@@ -135,6 +140,9 @@ function collectFacts(transactions) {
   for (const transaction of facts.values()) {
     switch (transaction.kind) {
       case "Work":
+        if (works.has(transaction.work)) {
+          throw new TypeError(`work ${transaction.work} has conflicting enqueue metadata`);
+        }
         works.add(transaction.work);
         break;
       case "Claim":
@@ -208,11 +216,13 @@ function replayTransactions(transactions) {
   const cancellations = new Set();
   const completions = new Map();
   const workCancellations = new Set();
+  const enqueueTimes = new Map();
 
   for (const transaction of facts.values()) {
     switch (transaction.kind) {
       case "Work":
         works.add(transaction.work);
+        enqueueTimes.set(transaction.work, transaction.enqueued ?? 0);
         break;
       case "Claim":
         claims.set(transaction.claim, transaction.work);
@@ -256,12 +266,14 @@ function replayTransactions(transactions) {
       return [claim, state];
     })
   );
+  const available = sortedWorks.filter(work => getWorkState(work).state === "available").sort((left, right) => enqueueTimes.get(left) - enqueueTimes.get(right) || Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8")));
 
   debugLog("replay completed", { transactions: facts.size, works: works.size, claims: claims.size });
   return {
     work: Object.fromEntries(sortedWorks.map(work => [work, getWorkState(work).state])),
     winner: Object.fromEntries(sortedWorks.map(work => [work, getWorkState(work).winner])),
     claim: claimState,
+    available,
     transactions: [...facts.values()].sort((left, right) => {
       const leftKey = transactionKey(left);
       const rightKey = transactionKey(right);
@@ -308,7 +320,10 @@ function applyTransactions(transactions, intents) {
     let reason = "";
     switch (transaction.kind) {
       case "Work":
-        if (hasWork) reason = "work already exists";
+        if (hasWork) {
+          debugLog("work already submitted", { kind: transaction.kind });
+          return;
+        }
         break;
       case "Claim":
         if (!hasWork) reason = "work does not exist";
@@ -357,6 +372,41 @@ function applyTransactions(transactions, intents) {
  */
 function compactTransactions(transactions) {
   return replayTransactions(transactions).transactions;
+}
+
+/**
+ * Capture enqueue time once, before staging or publication retries.
+ * @param {string} work
+ * @param {number} [enqueued]
+ * @returns {WorkQueueTransaction}
+ */
+function createWorkTransaction(work, enqueued = Date.now()) {
+  const transaction = { version: CURRENT_VERSION, kind: "Work", work, claim: null, attempt: null, enqueued };
+  validateTransaction(transaction);
+  return copyTransaction(transaction);
+}
+
+/**
+ * @param {WorkQueueTransaction[]} transactions
+ * @returns {string | null}
+ */
+function oldestAvailableWork(transactions) {
+  return replayTransactions(transactions).available[0] ?? null;
+}
+
+/**
+ * Select from the local view, including previously staged intents. Publication
+ * revalidates this fixed Claim for safety, not FIFO.
+ * @param {WorkQueueTransaction[]} transactions
+ * @param {string} claim
+ * @returns {WorkQueueTransaction}
+ */
+function claimOldestAvailableWork(transactions, claim) {
+  const work = oldestAvailableWork(transactions);
+  if (work === null) throw new Error("no available Work to claim");
+  const transaction = { version: CURRENT_VERSION, kind: "Claim", work, claim, attempt: null };
+  validateTransaction(transaction);
+  return copyTransaction(transaction);
 }
 
 /**
@@ -409,6 +459,9 @@ function serializeTransactionLog(transactions) {
 module.exports = {
   applyTransactions,
   compactTransactions,
+  createWorkTransaction,
+  claimOldestAvailableWork,
+  oldestAvailableWork,
   parseTransactionLog,
   replayTransactions,
   serializeTransactionLog,

@@ -1,6 +1,8 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./work_queue_replay.cjs";
+import { createHash } from "node:crypto";
+import selectionFixtures from "../../../specs/work-queue/selection-fixtures.json";
+import { applyTransactions, claimOldestAvailableWork, compactTransactions, createWorkTransaction, oldestAvailableWork, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./work_queue_replay.cjs";
 
 const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
 const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
@@ -35,7 +37,71 @@ describe("work queue replay", () => {
       work: { w: "claimed" },
       winner: { w: "c" },
       claim: { c: "effective" },
+      available: [],
       transactions: [claim("w", "c"), work("w")],
+    });
+  });
+
+  describe("oldest-available work selection", () => {
+    for (const fixture of selectionFixtures) {
+      it(fixture.name, () => {
+        const id = task => createHash("sha256").update(JSON.stringify({ task })).digest("hex");
+        const transactions = fixture.works.flatMap(item => {
+          const workId = id(item.task);
+          const result = [item.enqueued === undefined ? work(workId) : createWorkTransaction(workId, item.enqueued)];
+          const claimId = `claim-${item.task}`;
+          if (["claimed", "completed", "released"].includes(item.state)) result.push(claim(workId, claimId));
+          if (item.state === "completed") result.push(complete(workId, claimId, `attempt-${item.task}`));
+          if (item.state === "cancelled") result.push(cancelWork(workId));
+          if (item.state === "released") result.push(cancelClaim(workId, claimId));
+          return result;
+        });
+        const expected = fixture.expected.map(id);
+        for (const log of [transactions, [...transactions].reverse(), [...transactions, ...transactions], compactTransactions(transactions), parseTransactionLog(serializeTransactionLog(transactions))]) {
+          expect(replayTransactions(log).available).toEqual(expected);
+          expect(oldestAvailableWork(log)).toBe(expected[0] ?? null);
+        }
+      });
+    }
+
+    it("captures enqueue time once and keeps original age on resubmission", () => {
+      const now = vi.spyOn(Date, "now").mockReturnValue(100);
+      try {
+        const first = createWorkTransaction("w");
+        expect(first.enqueued).toBe(100);
+        expect(Object.isFrozen(first)).toBe(true);
+        now.mockReturnValue(200);
+        const result = applyTransactions([first], [createWorkTransaction("w")]);
+        expect(result.transactions).toEqual([first]);
+        expect(result.rejected).toEqual([]);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("stages successive claims from the local view without head-of-line blocking", () => {
+      let log = [createWorkTransaction("old", 1), createWorkTransaction("new", 2)];
+      const first = claimOldestAvailableWork(log, "first");
+      expect(first.work).toBe("old");
+      log = applyTransactions(log, [first]).transactions;
+      expect(claimOldestAvailableWork(log, "second").work).toBe("new");
+      expect(() => claimOldestAvailableWork([], "none")).toThrow("no available Work");
+      expect(() => claimOldestAvailableWork(log, "")).toThrow("claim must be");
+    });
+
+    it("uses UTF-8 identity order consistently with Go and handles numeric/prototype keys", () => {
+      expect(replayTransactions(["\u{10000}", "\uE000", "2", "10", "__proto__"].map(id => createWorkTransaction(id, 1))).available).toEqual(["10", "2", "__proto__", "\uE000", "\u{10000}"]);
+    });
+
+    it("rejects invalid or conflicting enqueue metadata instead of rewriting history", () => {
+      for (const enqueued of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, "1", null, undefined]) {
+        expect(() => validateTransaction({ ...work("w"), enqueued })).toThrow("enqueued");
+      }
+      expect(() => validateTransaction({ ...claim("w", "c"), enqueued: 1 })).toThrow("optional enqueued only on Work");
+      expect(() => replayTransactions([createWorkTransaction("w", 1), createWorkTransaction("w", 2)])).toThrow("conflicting enqueue metadata");
+      expect(() => replayTransactions([work("w"), createWorkTransaction("w", 1)])).toThrow("conflicting enqueue metadata");
+      expect(replayTransactions([work("w"), { ...work("w"), enqueued: 0 }]).transactions).toEqual([work("w")]);
+      expect(createWorkTransaction("maximum", Number.MAX_SAFE_INTEGER).enqueued).toBe(Number.MAX_SAFE_INTEGER);
     });
   });
 

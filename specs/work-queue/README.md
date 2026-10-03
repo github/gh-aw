@@ -33,7 +33,7 @@ read-only snapshot MCP server with `tools.work-queue: true`.
 | `stats` | Count Work, Claims, and distinct transactions |
 | `compact` | Canonically order facts and remove only identical duplicates |
 | `submit-work` | `--file work.json` (or `--file -` for stdin); derives an id from the canonical JSON object |
-| `claim` | `--work-id ID --run-id RUN` |
+| `claim` | `--run-id RUN [--work-id ID]`; defaults to the oldest available Work |
 | `finish` | `--claim-id ID --attempt-id ATTEMPT [--outcome TEXT]` |
 | `cancel-work` | `--work-id ID` |
 | `cancel-claim` | `--claim-id ID` |
@@ -49,7 +49,8 @@ The operator transaction wire format (`Transaction`) is defined in
 The emitted JSON Schemas are embedded in `pkg/workqueue/schema/` and validate
 each operator record before replay or publication. The workflow runtime uses a
 separate `work-queue` branch and the versioned `WorkQueueTransaction` format:
-exactly `version: 1`, `kind`, `work`, `claim`, and `attempt`. Unused claim/attempt
+required fields `version: 1`, `kind`, `work`, `claim`, and `attempt`, plus optional
+`enqueued` on Work. Unused claim/attempt
 fields are explicitly `null`; identities are nonempty strings. Its loader upgrades
 unversioned/version-0 workflow records before validation and replay. These formats
 are not interchangeable; the CLI branch also preserves Work payloads and run
@@ -102,7 +103,11 @@ These are protocol refinements, not claims that an implementation already enforc
 
 ### Best-effort queue ordering
 
-Each Work fact carries immutable `enqueued` metadata, set once at submission and preserved through retries, replay, and compaction. The finite model uses the Work integer as the rank of the `(enqueue time, Work identity)` key, not as a physical log position or a globally allocated sequence number. This proposed metadata and selection policy are model refinements; the runtime schemas and operator commands above do not yet implement them.
+Each Work fact carries immutable `enqueued` metadata, set once at submission and preserved through retries, replay, and compaction. The finite model uses the Work integer as the rank of the `(enqueue time, Work identity)` key, not as a physical log position or a globally allocated sequence number.
+
+JavaScript and Go represent `enqueued` as Unix milliseconds, restricted to nonnegative integers no larger than `9007199254740991` so both languages compare exactly. Both replay projections expose an oldest-first `available` identity list, with UTF-8 Work identity as the tie-breaker. Historical Work without metadata has age zero and sorts before timestamped Work; replay never invents timestamps from record position or the current clock. Repeated submissions preserve the first durable Work fact's age, while conflicting metadata already present in the durable log is rejected.
+
+JavaScript callers construct Work with `createWorkTransaction` and select or stage Claims with `oldestAvailableWork` / `claimOldestAvailableWork`, passing their local view including earlier pending intents. Go callers use `NewWork` and `OldestAvailable`. `gh aw work-queue claim --run-id RUN` selects once from its initial view and retains that Work identity across publication retries; `--work-id ID` remains an explicit operator override. `work_queue_read` lists available Work first in enqueue order, includes enqueue metadata, and returns the snapshot's recommended `next_work` identity or `null`. This recommendation is queue-wide even when the query filters to one Work, and is not durable authority.
 
 `OldestAvailable` chooses the least key among Work whose replayed state is `available`. `Stage` applies that preference to the local view, including earlier pending intents, so a batch cannot repeatedly select the same Work. Claimed Work does not block selection of newer available Work; cancellation of its last active Claim makes it eligible again with its original age. Work and claim arbitration remain separate.
 

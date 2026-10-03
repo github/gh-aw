@@ -2,12 +2,17 @@ import "@typespec/json-schema";
 
 using TypeSpec.JsonSchema;
 
+@minValue(0)
+@maxValue(9007199254740991)
+scalar WorkQueueEnqueueTime extends safeint;
+
 @doc("Operator work-queue records used by gh aw work-queue on gh-aw-work-queue.")
 @jsonSchema
 model WorkTransaction {
   kind: "Work";
   work_id: string;
   work: Record<unknown>;
+  enqueued?: WorkQueueEnqueueTime;
 }
 
 @jsonSchema
@@ -59,6 +64,7 @@ model WorkQueueWorkTransaction {
   work: WorkQueueIdentity;
   claim: null;
   attempt: null;
+  enqueued?: WorkQueueEnqueueTime;
 }
 
 @jsonSchema

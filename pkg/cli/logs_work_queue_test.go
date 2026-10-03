@@ -142,6 +142,7 @@ func TestWorkQueueSnapshotValidation(t *testing.T) {
 		`{"version":1,"kind":"ClaimCancellation","work":"w","claim":"c","attempt":null}`,
 		`{"version":1,"kind":"WorkCancellation","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Completion","work":"w","claim":"c","attempt":"42-1"}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":123}`,
 	} {
 		tx, err := parseWorkQueueTransaction([]byte(transaction))
 		require.NoError(t, err)
@@ -157,6 +158,10 @@ func TestWorkQueueSnapshotValidation(t *testing.T) {
 		`{"version":1,"kind":"Completion","work":"w","claim":"c","attempt":null}`,
 		`{"version":1,"kind":"Other","work":"w","claim":null,"attempt":null}`,
 		`{"version":1,"kind":"Work","work":"w","claim":null,"extra":null}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":null}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":-1}`,
+		`{"version":1,"kind":"Work","work":"w","claim":null,"attempt":null,"enqueued":9007199254740992}`,
+		`{"version":1,"kind":"Claim","work":"w","claim":"c","attempt":null,"enqueued":123}`,
 	} {
 		_, err := parseWorkQueueTransaction([]byte(transaction))
 		require.Error(t, err, transaction)

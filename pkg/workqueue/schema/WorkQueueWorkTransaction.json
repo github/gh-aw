@@ -19,6 +19,9 @@
     },
     "attempt": {
       "type": "null"
+    },
+    "enqueued": {
+      "$ref": "#/$defs/WorkQueueEnqueueTime"
     }
   },
   "required": ["version", "kind", "work", "claim", "attempt"],
@@ -29,6 +32,11 @@
     "WorkQueueIdentity": {
       "type": "string",
       "minLength": 1
+    },
+    "WorkQueueEnqueueTime": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
     }
   }
 }

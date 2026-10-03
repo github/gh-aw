@@ -2704,6 +2704,12 @@
                           "null",
                           "string"
                         ]
+                      },
+                      "enqueued": {
+                        "type": [
+                          "null",
+                          "integer"
+                        ]
                       }
                     },
                     "required": [

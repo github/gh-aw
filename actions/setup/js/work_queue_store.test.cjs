@@ -1,7 +1,7 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishWorkQueueTransactions, WORK_QUEUE_BRANCH, WORK_QUEUE_LOG_PATH, readWorkQueueLog } from "./work_queue_store.cjs";
-import { parseTransactionLog, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { claimOldestAvailableWork, createWorkTransaction, parseTransactionLog, replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
 
 const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
 const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
@@ -85,6 +85,28 @@ function createFakeGitHub() {
 }
 
 describe("work queue Git store", () => {
+  it("preserves enqueue age and the selected Work when an older submission arrives during retry", async () => {
+    const fake = createFakeGitHub();
+    const queued = createWorkTransaction("selected", 100);
+    await applyAndPublishWorkQueueTransactions({ githubClient: fake.githubClient, owner: "owner", repo: "repo", intents: [queued] });
+    const selected = claimOldestAvailableWork(fake.state.transactions, "c");
+    const later = createWorkTransaction("later", 200);
+    fake.state.conflictOnce = true;
+    const result = await applyAndPublishWorkQueueTransactions({
+      githubClient: fake.githubClient,
+      owner: "owner",
+      repo: "repo",
+      intents: [selected, later],
+      sleepFn: async () => {},
+    });
+    expect(result.rejected).toEqual([]);
+    expect(result.transactions).toContainEqual(queued);
+    expect(result.transactions).toContainEqual(later);
+    expect(result.transactions).toContainEqual(selected);
+    expect(replayTransactions(result.transactions).available).toEqual(["remote-work", "later"]);
+    expect(fake.state.updateCalls).toBe(2);
+  });
+
   it("creates the dedicated branch and writes the canonical transaction log", async () => {
     const fake = createFakeGitHub();
     const result = await applyAndPublishWorkQueueTransactions({

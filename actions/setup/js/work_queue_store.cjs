@@ -11,7 +11,7 @@ const DEFAULT_MAX_RETRIES = 5;
 
 /**
  * @typedef {
- *   | {version: number, kind: "Work", work: string, claim: null, attempt: null}
+ *   | {version: number, kind: "Work", work: string, claim: null, attempt: null, enqueued?: number}
  *   | {version: number, kind: "Claim", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "ClaimCancellation", work: string, claim: string, attempt: null}
  *   | {version: number, kind: "Completion", work: string, claim: string, attempt: string}

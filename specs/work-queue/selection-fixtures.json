@@ -1,0 +1,39 @@
+[
+  {
+    "name": "enqueue age beats identity and physical order",
+    "works": [
+      { "task": "newer", "enqueued": 20 },
+      { "task": "older", "enqueued": 10 }
+    ],
+    "expected": ["older", "newer"]
+  },
+  {
+    "name": "equal ages use stable identity",
+    "works": [
+      { "task": "b", "enqueued": 10 },
+      { "task": "a", "enqueued": 10 }
+    ],
+    "expected": ["a", "b"]
+  },
+  {
+    "name": "legacy age is zero",
+    "works": [{ "task": "newer", "enqueued": 20 }, { "task": "legacy" }, { "task": "older", "enqueued": 10 }],
+    "expected": ["legacy", "older", "newer"]
+  },
+  {
+    "name": "claimed and terminal work is skipped and released work keeps its age",
+    "works": [
+      { "task": "claimed", "enqueued": 1, "state": "claimed" },
+      { "task": "cancelled", "enqueued": 2, "state": "cancelled" },
+      { "task": "completed", "enqueued": 3, "state": "completed" },
+      { "task": "released", "enqueued": 4, "state": "released" },
+      { "task": "newer", "enqueued": 5 }
+    ],
+    "expected": ["released", "newer"]
+  },
+  {
+    "name": "empty queue",
+    "works": [],
+    "expected": []
+  }
+]
