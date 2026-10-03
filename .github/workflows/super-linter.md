@@ -43,7 +43,7 @@ jobs:
       
       - name: Run super-linter
         # zizmor: ignore[github_action_from_unverified_creator_used]
-        uses: super-linter/super-linter@v8.7.0 # x-release-please-version
+        uses: super-linter/super-linter@v9.0.0 # x-release-please-version
         id: super-linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
