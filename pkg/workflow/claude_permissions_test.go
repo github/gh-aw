@@ -16,7 +16,7 @@ func TestClaudeRestrictivePermissions(t *testing.T) {
 	}
 	step := strings.Join(NewClaudeEngine().GetExecutionSteps(data, "/tmp/log")[0], "\n")
 	assert.Contains(t, step, "--permission-mode dontAsk")
-	assert.Contains(t, step, "--disallowed-tools AskUserQuestion,Bash,WebFetch,WebSearch,Edit,Write,NotebookEdit")
+	assert.Contains(t, step, "--disallowed-tools AskUserQuestion,Bash,WebFetch,WebSearch,Edit,Write,MultiEdit,NotebookEdit")
 	assert.NotContains(t, step, "# - Write\n")
 	assert.NotContains(t, step, "# - Bash\n")
 	assert.Contains(t, step, "mcp__safeoutputs")
@@ -32,7 +32,7 @@ func TestClaudeScopedMemoryPermissions(t *testing.T) {
 	assert.Contains(t, allowed, "Edit(//tmp/gh-aw/cache-memory/**)")
 	assert.NotContains(t, allowed, "Write(")
 	assert.NotContains(t, allowed, "MultiEdit(")
-	assert.NotContains(t, claudeDisabledTools(data, allowed), "Edit")
+	assert.Equal(t, []string{"AskUserQuestion", "WebFetch", "WebSearch", "Write", "MultiEdit", "NotebookEdit"}, claudeDisabledTools(data, allowed))
 }
 
 func TestClaudePermissionModeSchema(t *testing.T) {

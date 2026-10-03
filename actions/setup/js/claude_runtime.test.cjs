@@ -59,7 +59,7 @@ ${script}
 describe("Claude runtime contracts", () => {
   it("denies repository writes without disabling separately scoped memory writes", () => {
     const args = claudeRepositoryEditPolicy(["--permission-mode", "auto", "--disallowed-tools", "Bash"], { GH_AW_CLAUDE_DISABLE_REPO_EDITS: "true", GITHUB_WORKSPACE: "/workspace/repo" });
-    expect(args).toEqual(["--permission-mode", "auto", "--disallowed-tools", "Bash,Edit(//workspace/repo/**)"]);
+    expect(args).toEqual(["--permission-mode", "auto", "--disallowed-tools", "Bash,Edit(//workspace/repo/**),Write(//workspace/repo/**),MultiEdit(//workspace/repo/**),NotebookEdit(//workspace/repo/**)"]);
   });
   it("excludes model answers and tool results from failure classifiers", () => {
     const records = [assistant, { type: "user", message: { content: "unknown model fake not found" } }];
@@ -127,19 +127,20 @@ setInterval(() => {}, 10000);
     expect(calls).toHaveLength(1);
     expect(result.stderr).toContain("during execution");
   });
-  it("loads only workflow-managed capabilities explicitly in bare mode", () => {
+  it("loads only workflow-managed capabilities explicitly in bare mode under the mounted temp directory", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-bare-test-"));
     let pluginDir;
     try {
-      const managed = path.join(dir, "managed");
+      const managed = path.join(dir, ".claude");
       fs.mkdirSync(path.join(managed, "skills/example"), { recursive: true });
       fs.mkdirSync(path.join(managed, "agents"));
-      const loaded = claudeBareCapabilities(["--bare"], managed, dir);
+      const loaded = claudeBareCapabilities(["--bare"], managed);
       pluginDir = loaded.pluginDir;
       expect(loaded.args.slice(-2)).toEqual(["--plugin-dir", pluginDir]);
+      expect(path.dirname(pluginDir)).toBe(dir);
       expect(fs.realpathSync(path.join(pluginDir, "skills"))).toBe(fs.realpathSync(path.join(managed, "skills")));
       expect(JSON.parse(fs.readFileSync(path.join(pluginDir, ".claude-plugin/plugin.json"), "utf8")).name).toBe("gh-aw-workflow");
-      expect(claudeBareCapabilities([], managed, dir)).toEqual({ args: [], pluginDir: undefined });
+      expect(claudeBareCapabilities([], managed)).toEqual({ args: [], pluginDir: undefined });
     } finally {
       fs.rmSync(dir, { recursive: true });
     }

@@ -2,7 +2,6 @@
 "use strict";
 
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { countPermissionDeniedIssues, extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -86,7 +85,7 @@ function claudePermissionDenials(output) {
 }
 
 /** @param {string[]} args @param {string} [managedDir] @param {string} [tempDir] */
-function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir = process.env.RUNNER_TEMP || os.tmpdir()) {
+function claudeBareCapabilities(args, managedDir = "/tmp/gh-aw/.claude", tempDir = path.dirname(managedDir)) {
   if (!args.includes("--bare")) return { args, pluginDir: undefined };
   const directories = ["skills", "agents"].filter(name => {
     try {
@@ -115,11 +114,12 @@ function claudeRepositoryEditPolicy(args, env) {
   if (env.GH_AW_CLAUDE_DISABLE_REPO_EDITS !== "true") return args;
   const workspace = env.GITHUB_WORKSPACE;
   if (!workspace || !path.isAbsolute(workspace)) throw new Error("tools.edit: false requires an absolute GITHUB_WORKSPACE");
-  const rule = `Edit(//${workspace.replace(/^\/+|\/+$/g, "")}/**)`;
+  const scope = `//${workspace.replace(/^\/+|\/+$/g, "")}/**`;
+  const rules = ["Edit", "Write", "MultiEdit", "NotebookEdit"].map(tool => `${tool}(${scope})`).join(",");
   const result = [...args];
   const flag = result.indexOf("--disallowed-tools");
-  if (flag >= 0 && result[flag + 1]) result[flag + 1] += `,${rule}`;
-  else result.push("--disallowed-tools", rule);
+  if (flag >= 0 && result[flag + 1]) result[flag + 1] += `,${rules}`;
+  else result.push("--disallowed-tools", rules);
   return result;
 }
 
