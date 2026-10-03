@@ -137,12 +137,8 @@ function sandboxSessionEvent(record) {
   const mcpGatewayVersion = observedString(info.awmg_version);
   const steps = info.steps;
   const firewallType = observedString(steps && typeof steps === "object" && !Array.isArray(steps) && "firewall" in steps ? steps.firewall : undefined);
-  const engine = observedString(info.engine_id);
-  const engineVersion = observedString(info.agent_version) ?? observedString(info.version);
   /** @type {import("./types/agent_session").SessionSandboxData} */
   const data = {
-    ...(engine !== undefined ? { engine } : {}),
-    ...(engineVersion !== undefined ? { engineVersion } : {}),
     ...(runtime !== undefined ? { runtime } : {}),
     ...(typeof info.firewall_enabled === "boolean" && (info.firewall_enabled || info.sandbox_configuration_observed === true) ? { firewallEnabled: info.firewall_enabled } : {}),
     ...(firewallType !== undefined ? { firewallType } : {}),
@@ -283,7 +279,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
         const sandbox = sandboxSessionEvent(event);
         return sandbox ? [sandbox] : [];
       });
-      const infoEvents = source.events.map(event => createSessionEvent(event, "workflow.aw_info", {}));
+      const infoEvents = source.events.map(event => createSessionEvent(event, "session.info", {}));
       source.events.push(...runtimeEvents, ...infoEvents);
     }
   }

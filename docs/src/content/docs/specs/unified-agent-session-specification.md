@@ -224,9 +224,9 @@ opaque because its essential fields are not defined by this specification.
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
-| Runtime identity | Engine ID, engine CLI installation version, and sandbox runtime type. |
+| Runtime identity | Engine ID and engine CLI installation version from the selected run metadata. |
 | Sandbox configuration | Runtime, firewall enabled state/type/version, MCP gateway version, and allowed domains. |
-| Raw workflow metadata | Complete selected `aw_info.json` object in `workflow.aw_info`, including nested and future fields; publication redaction still applies. |
+| Raw workflow metadata | Complete selected `aw_info.json` object in `session.info`, including nested and future fields; publication redaction still applies. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
@@ -454,55 +454,48 @@ source for opaque fields.
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
-| `session.sandbox` | Engine CLI identity, sandbox runtime, and general sandbox configuration projected from the selected run metadata. |
-| `workflow.aw_info` | Complete selected `aw_info.json` payload, retained without field compaction. |
+| `session.sandbox` | Sandbox runtime and general sandbox configuration projected from the selected run metadata. |
+| `session.info` | Complete selected `aw_info.json` payload, retained without field compaction. |
 
-**T-UAS-067 — Engine and runtime identity.** When selected `aw_info.json`
-metadata exposes an engine ID, engine version, or sandbox configuration, the
-merger MUST emit one `session.sandbox` message with the available string fields
-`engine`, `engineVersion`, and `runtime`, along with any available sandbox
-configuration fields in T-UAS-069. `engineVersion` MUST use nonempty
-`agent_version`, falling back to nonempty `version`; it MUST NOT use
-`cli_version`, which identifies the gh-aw compiler rather than the agent CLI.
-`runtime` MUST use nonempty `agent_runtime`. An empty or missing
-selector MUST resolve to `docker` when `firewall_enabled` is explicitly `true`,
-or `none` when it is `false` and `sandbox_configuration_observed` is `true`.
-Because older metadata producers defaulted this field to `false`, without that
-marker a false value is not an observation and the runtime MUST remain omitted.
-Unavailable engine IDs and versions MUST remain omitted.
+**T-UAS-067 — Sandbox runtime.** When selected `aw_info.json` metadata exposes
+sandbox configuration, the merger MUST emit one `session.sandbox` message with
+the available fields in T-UAS-069. `runtime` MUST use nonempty `agent_runtime`.
+An empty or missing selector MUST resolve to `docker` when `firewall_enabled` is
+explicitly `true`, or `none` when it is `false` and
+`sandbox_configuration_observed` is `true`. Because metadata producers may
+default this field to `false`, without that marker a false value is not an
+observation and the runtime MUST remain omitted.
 
-The message describes the installation metadata recorded for the run, not an
-independent probe of the installed executable. It MUST retain the selected
-metadata path, workflow/activation provenance, and any observed metadata
-timestamp, without inventing collection time or an agent initialization event.
-The original `aw_info.json` takes precedence over its `usage/aw_info.json`
-mirror. With no available identity fields, the merger MUST NOT fabricate a
-metadata message. Readers MUST display the available identity fields in unified
-session views; publication redaction also applies to this message. A separate
-`session.runtime` message MUST NOT be emitted.
+The message describes sandbox settings recorded for the run, not inferred
+capabilities or an independent probe. It MUST retain the selected metadata path,
+workflow/activation provenance, and any observed metadata timestamp, without
+inventing collection time or an agent initialization event. The original
+`aw_info.json` takes precedence over its `usage/aw_info.json` mirror. With no
+available sandbox fields, the merger MUST NOT fabricate a sandbox message.
+Engine identity and version remain available in the complete `session.info`
+payload. Readers MAY display selected `engine_id` and `agent_version` fields
+from that event; publication redaction applies.
 
 ```json
-{"type":"session.sandbox","data":{"engine":"copilot","engineVersion":"1.0.90","runtime":"cloud-hypervisor"},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":1}}
+{"type":"session.sandbox","data":{"runtime":"cloud-hypervisor"},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":1}}
 ```
 
 **T-UAS-068 — Raw run metadata.** The merger MUST additionally retain the
-complete selected `aw_info.json` object as the `data` of a `workflow.aw_info`
+complete selected `aw_info.json` object as the `data` of a `session.info`
 message, including nested objects, unknown fields, and explicit empty, false,
 zero, and null values. This message is an opaque metadata observation, not the
 compact `workflow.info` projection. Source selection, provenance, observed
-timestamps, and publication redaction MUST use the same rules as the combined
-identity and sandbox message. Readers MUST NOT dump arbitrary raw metadata in
-publication summaries; they MAY display the engine, model, workflow, repository,
-and run ID.
+timestamps, and publication redaction MUST use the same source rules as the
+sandbox message. Readers MUST NOT dump arbitrary raw metadata in publication
+summaries; they MAY display engine ID, agent version, model, workflow,
+repository, and run ID.
 
 **T-UAS-069 — Sandbox configuration.** The `session.sandbox` message MUST also
-include available sandbox configuration fields below. It is the single metadata
-message combining engine identity, runtime, and sandbox configuration.
+include available sandbox configuration fields below. Engine identity and
+version remain in `session.info`, not duplicated in this projection.
 
 | Field | Source |
 | --- | --- |
-| `engine` | Nonempty `engine_id`. |
-| `engineVersion` | Nonempty `agent_version`, falling back to nonempty `version`. |
 | `runtime` | `agent_runtime`, with the same explicit/default/disabled semantics as T-UAS-067. |
 | `firewallEnabled` | Boolean `firewall_enabled`; `false` is observed only when `sandbox_configuration_observed` is `true`. |
 | `firewallType` | Nonempty `steps.firewall`. |
@@ -513,17 +506,16 @@ message combining engine identity, runtime, and sandbox configuration.
 The producer sets `sandbox_configuration_observed` when the compiler supplied
 the firewall setting, which distinguishes an explicit disabled/empty setting
 from producer defaults. Version and type fields MUST be strings. Unavailable
-configuration MUST remain omitted; when neither engine identity nor sandbox
-configuration is available, the merger MUST NOT fabricate a sandbox message.
-It MUST NOT infer unrecorded
+configuration MUST remain omitted; when no sandbox configuration is available,
+the merger MUST NOT fabricate a sandbox message. It MUST NOT infer unrecorded
 security capabilities, mounts, or container settings. Source selection,
 provenance, observed timestamps, and publication redaction MUST follow the
-runtime identity rules. Readers MUST display available sandbox fields without
+sandbox runtime rules. Readers MUST display available sandbox fields without
 arbitrary raw metadata. The complete source object remains available separately
-in `workflow.aw_info`.
+in `session.info`.
 
 ```json
-{"type":"session.sandbox","data":{"engine":"copilot","engineVersion":"1.0.90","runtime":"docker","firewallEnabled":true,"firewallType":"squid","firewallVersion":"v0.30.1","mcpGatewayVersion":"v1.0.0","allowedDomains":["example.com"]},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":1}}
+{"type":"session.sandbox","data":{"runtime":"docker","firewallEnabled":true,"firewallType":"squid","firewallVersion":"v0.30.1","mcpGatewayVersion":"v1.0.0","allowedDomains":["example.com"]},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":1}}
 ```
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
@@ -1332,9 +1324,9 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 
 ### Version 1.3.0 — Draft (2026-10-02)
 
-- Added engine identity and sandbox runtime to the unified `session.sandbox` event under T-UAS-067.
-- Defined installation-version precedence, implicit Docker and disabled-sandbox values, metadata provenance, and partial identity handling.
-- Added `workflow.aw_info` and T-UAS-068 to retain the complete run metadata JSON alongside its compact projection without exposing arbitrary metadata in summaries.
+- Retained engine identity and version in the raw metadata event and added sandbox runtime to `session.sandbox` under T-UAS-067.
+- Defined implicit Docker and disabled-sandbox values, metadata provenance, and partial sandbox handling.
+- Added `session.info` and T-UAS-068 to retain the complete run metadata JSON alongside its compact projection without exposing arbitrary metadata in summaries.
 - Added T-UAS-069 for sandbox configuration in the combined event: firewall state/type/version, MCP gateway version, and allowed domains.
 
 ### Version 1.1.0 — Draft (2026-10-02)

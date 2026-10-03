@@ -35,7 +35,7 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
-  it.each(["aw_info.json", "usage/aw_info.json"])("records engine CLI identity and sandbox runtime from %s", metadataPath => {
+  it.each(["aw_info.json", "usage/aw_info.json"])("records sandbox runtime and complete session info from %s", metadataPath => {
     const createdAt = "2026-10-02T00:00:00Z";
     write(metadataPath, { engine_id: "copilot", agent_version: "1.0.90", version: "configured", cli_version: "0.90.0", agent_runtime: "cloud-hypervisor", created_at: createdAt });
     const events = writeUnifiedSession({ rootDir: root });
@@ -44,7 +44,7 @@ describe("Unified conclusion session", () => {
       {
         type: "session.sandbox",
         timestamp: createdAt,
-        data: { engine: "copilot", engineVersion: "1.0.90", runtime: "cloud-hypervisor" },
+        data: { runtime: "cloud-hypervisor" },
         provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 1, timestampMs: Date.parse(createdAt) },
       },
     ]);
@@ -53,7 +53,7 @@ describe("Unified conclusion session", () => {
     expect(events.some(event => event.type === "session.runtime")).toBe(false);
     expect(published[0].type).toBe("session.format");
     expect(events.some(event => event.type === "session.init")).toBe(false);
-    expect(events.find(event => event.type === "workflow.aw_info")).toMatchObject({
+    expect(events.find(event => event.type === "session.info")).toMatchObject({
       data: JSON.parse(fs.readFileSync(path.join(root, metadataPath), "utf8")),
       provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 2, timestampMs: Date.parse(createdAt) },
     });
@@ -80,7 +80,7 @@ describe("Unified conclusion session", () => {
     const original = fs.readFileSync(metadataPath, "utf8");
     writeUnifiedSession({ rootDir: root });
     const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
-    const info = published.filter(event => event.type === "workflow.aw_info");
+    const info = published.filter(event => event.type === "session.info");
     expect(info).toHaveLength(1);
     expect(info[0].data).toEqual(metadata);
     expect(info[0].timestamp).toBe(metadata.created_at);
@@ -100,7 +100,7 @@ describe("Unified conclusion session", () => {
         .trimEnd()
         .split("\n")
         .map(JSON.parse)
-        .find(event => event.type === "workflow.aw_info").data
+        .find(event => event.type === "session.info").data
     ).toEqual({ future_metadata: { "***": true, nested: { "key-***-suffix": "visible" } } });
   });
 
@@ -122,7 +122,7 @@ describe("Unified conclusion session", () => {
       {
         type: "session.sandbox",
         timestamp: createdAt,
-        data: { engine: "copilot", runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com", "api.github.com"] },
+        data: { runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com", "api.github.com"] },
         provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 1, timestampMs: Date.parse(createdAt) },
       },
     ]);
@@ -184,20 +184,18 @@ describe("Unified conclusion session", () => {
   it.each([
     [
       { engine_id: "claude", agent_version: "", version: "2.1.160", cli_version: "0.90.0", agent_runtime: "", firewall_enabled: true },
-      { engine: "claude", engineVersion: "2.1.160", runtime: "docker", firewallEnabled: true },
+      { runtime: "docker", firewallEnabled: true },
     ],
     [
       { engine_id: "codex", agent_version: "0.118.0", agent_runtime: "docker-sudo-iptables", firewall_enabled: true },
-      { engine: "codex", engineVersion: "0.118.0", runtime: "docker-sudo-iptables", firewallEnabled: true },
+      { runtime: "docker-sudo-iptables", firewallEnabled: true },
     ],
     [
       { engine_id: "custom", agent_runtime: "", firewall_enabled: false, sandbox_configuration_observed: true },
-      { engine: "custom", runtime: "none", firewallEnabled: false },
+      { runtime: "none", firewallEnabled: false },
     ],
-    [{ engine_id: "custom", agent_version: "", version: "", cli_version: "0.90.0", agent_runtime: "" }, { engine: "custom" }],
-    [{ engine_id: "pi", agent_version: null, version: 1, agent_runtime: null }, { engine: "pi" }],
     [{ agent_runtime: "cloud-hypervisor" }, { runtime: "cloud-hypervisor" }],
-  ])("records partial engine and sandbox metadata without inventing unavailable values (%j)", (metadata, expected) => {
+  ])("records partial sandbox metadata without inventing unavailable values (%j)", (metadata, expected) => {
     write("aw_info.json", metadata);
     const sandbox = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "session.sandbox");
     expect(sandbox).toHaveLength(1);
@@ -206,12 +204,12 @@ describe("Unified conclusion session", () => {
     expect(sandbox[0].provenance).not.toHaveProperty("timestampMs");
   });
 
-  it.each([{}, { engine_id: "", agent_version: "", version: "", cli_version: "0.90.0", agent_runtime: "" }])("does not invent runtime identity from empty metadata (%j)", metadata => {
+  it.each([{}, { agent_runtime: "", firewall_enabled: null, awf_version: "" }])("does not fabricate sandbox events from unavailable metadata (%j)", metadata => {
     write("aw_info.json", metadata);
     expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.sandbox")).toBe(false);
   });
 
-  it("prefers original run metadata over a usage mirror and redacts combined engine and sandbox identity", () => {
+  it("prefers original run metadata and redacts session info and sandbox fields", () => {
     write("aw_info.json", { engine_id: "custom", agent_version: "opaque-mask", agent_runtime: "docker" });
     write("usage/aw_info.json", { engine_id: "copilot", agent_version: "duplicate", agent_runtime: "cloud-hypervisor" });
     write("agent-stdio.log", "::add-mask::opaque-mask\n");
@@ -225,7 +223,7 @@ describe("Unified conclusion session", () => {
         .trimEnd()
         .split("\n")
         .map(JSON.parse)
-        .find(event => event.type === "workflow.aw_info")
+        .find(event => event.type === "session.info")
     ).toMatchObject({
       data: { engine_id: "custom", agent_version: "***", agent_runtime: "docker" },
       provenance: { path: "aw_info.json" },
@@ -236,7 +234,7 @@ describe("Unified conclusion session", () => {
         .split("\n")
         .map(JSON.parse)
         .filter(event => event.type === "session.sandbox")
-    ).toEqual([expect.objectContaining({ data: { engine: "custom", engineVersion: "***", runtime: "docker" }, provenance: expect.objectContaining({ path: "aw_info.json" }) })]);
+    ).toEqual([expect.objectContaining({ data: { runtime: "docker" }, provenance: expect.objectContaining({ path: "aw_info.json" }) })]);
     expect(content).not.toContain('"type":"session.runtime"');
   });
 

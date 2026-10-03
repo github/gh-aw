@@ -35,7 +35,7 @@ const RUNTIME_TYPES = new Set([
   "execution.result",
   "detection.result",
   "workflow.info",
-  "workflow.aw_info",
+  "session.info",
 ]);
 
 /** @param {Array<any>} events @returns {boolean} */
@@ -70,7 +70,7 @@ function eventDetail(event) {
     case "session.format":
       return `version=${inline(data.version)}`;
     case "session.sandbox":
-      return fields(data, ["engine", "engineVersion", "runtime", "firewallEnabled", "firewallType", "firewallVersion", "mcpGatewayVersion", "allowedDomains"]);
+      return fields(data, ["runtime", "firewallEnabled", "firewallType", "firewallVersion", "mcpGatewayVersion", "allowedDomains"]);
     case "session.init":
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);
@@ -130,8 +130,8 @@ function eventDetail(event) {
       return fields(data, ["jobResult", "conclusion", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
       return fields(data, ["engine", "model", "workflow", "repository", "runId"]);
-    case "workflow.aw_info":
-      return fields(data, ["engine_id", "model", "workflow_name", "repository", "run_id"]);
+    case "session.info":
+      return fields(data, ["engine_id", "agent_version", "model", "workflow_name", "repository", "run_id"]);
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":

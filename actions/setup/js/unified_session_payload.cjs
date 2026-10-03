@@ -77,8 +77,6 @@ const SAFE_OUTPUT_FIELDS = {
 const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "session.sandbox": {
-    engine: ["engine"],
-    engineVersion: ["engineVersion"],
     runtime: ["runtime"],
     firewallEnabled: ["firewallEnabled"],
     firewallType: ["firewallType"],

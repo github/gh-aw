@@ -30,11 +30,7 @@ describe("essential unified session payloads", () => {
     ["tool.execution_start", { toolCallId: "call", parameters: false, input: 0, command: "", text: "duplicate" }, { toolCallId: "call", input: 0, command: "" }],
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
-    [
-      "session.sandbox",
-      { engine: "copilot", engineVersion: "1.0.90", runtime: "cloud-hypervisor", firewallEnabled: false, firewallType: "", allowedDomains: [], extra: "omit" },
-      { engine: "copilot", engineVersion: "1.0.90", runtime: "cloud-hypervisor", firewallEnabled: false, firewallType: "", allowedDomains: [] },
-    ],
+    ["session.sandbox", { runtime: "cloud-hypervisor", firewallEnabled: false, firewallType: "", allowedDomains: [], extra: "omit" }, { runtime: "cloud-hypervisor", firewallEnabled: false, firewallType: "", allowedDomains: [] }],
     [
       "session.sandbox",
       { runtime: "docker", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"], extra: "omit" },
@@ -151,8 +147,8 @@ describe("essential unified session payloads", () => {
     expect(normalizeUnifiedSessionEvent(extension)).toEqual(extension);
   });
 
-  it("retains raw aw-info metadata as an opaque payload instead of the compact workflow projection", () => {
-    const event = { type: "workflow.aw_info", data: { engine_id: "copilot", version: "1.0.90", agent_runtime: "docker", context: { run_id: 0 }, future: [false, null, ""] } };
+  it("retains raw aw-info metadata as session info instead of the compact workflow projection", () => {
+    const event = { type: "session.info", data: { engine_id: "copilot", version: "1.0.90", agent_runtime: "docker", context: { run_id: 0 }, future: [false, null, ""] } };
     const original = structuredClone(event);
     expect(normalizeUnifiedSessionEvent(event)).toEqual(event);
     expect(normalizeUnifiedSessionEvent(normalizeUnifiedSessionEvent(event))).toEqual(event);
