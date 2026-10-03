@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 
@@ -38,10 +39,21 @@ func withKnownEngineImportsForTest(t *testing.T, content []byte, downloadErr err
 
 	originalDownload := knownEngineImportsDownload
 	originalVersion := GetVersion()
+	originalAPIBaseURL := knownEngineImportsAPIBaseURL
+	originalHTTPClient := knownEngineImportsHTTPClient
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/repos/") {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"default_branch":"main"}`))
+	}))
 
 	knownEngineImportsDownload = func(context.Context) ([]byte, error) {
 		return content, downloadErr
 	}
+	knownEngineImportsAPIBaseURL = server.URL
+	knownEngineImportsHTTPClient = server.Client
 	knownEngineImportsLoaded = false
 	knownEngineImports = nil
 	SetVersion(knownEngineImportTestRef)
@@ -51,9 +63,12 @@ func withKnownEngineImportsForTest(t *testing.T, content []byte, downloadErr err
 		defer knownEngineImportsMu.Unlock()
 
 		knownEngineImportsDownload = originalDownload
+		knownEngineImportsAPIBaseURL = originalAPIBaseURL
+		knownEngineImportsHTTPClient = originalHTTPClient
 		knownEngineImportsLoaded = false
 		knownEngineImports = nil
 		SetVersion(originalVersion)
+		server.Close()
 		knownEngineImportsTestMu.Unlock()
 	})
 	cleanupRegistered = true
@@ -160,8 +175,7 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 			{"id": "aider", "import": "github/gh-aw/.github/workflows/shared/aider.md"},
 			{"id": "goose", "import": "github/gh-aw/.github/workflows/shared/goose.md"},
 			{"id": "kiro", "import": "github/gh-aw/.github/workflows/shared/kiro.md"},
-			{"id": "pydantic-ai", "import": "pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md"},
-			{"id": "custom", "import": "github/gh-aw/.github/workflows/shared/genaiscript.md"}
+			{"id": "pydantic-ai", "import": "pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md"}
 		]
 	}`), nil)
 
@@ -220,11 +234,6 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 			engineID:       "pydantic-ai",
 			wantImportPath: "pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md@main",
 		},
-		{
-			name:           "custom tip",
-			engineID:       "custom",
-			wantImportPath: "github/gh-aw/.github/workflows/shared/genaiscript.md@" + knownEngineImportTestRef,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -240,6 +249,18 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 			require.ErrorContains(t, err, "imports:", "tip should show an imports example")
 		})
 	}
+}
+
+func TestEngineCatalog_Resolve_RemovedLegacyCustom(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", knownEngineImportsPath))
+	require.NoError(t, err)
+	withKnownEngineImportsForTest(t, content, nil)
+
+	registry := NewEngineRegistry()
+	catalog := NewEngineCatalog(registry)
+	_, err = catalog.Resolve("custom", &EngineConfig{ID: "custom"})
+	require.ErrorContains(t, err, "invalid engine: custom")
+	require.NotContains(t, err.Error(), "Tip:", "removed engines must not advertise an import")
 }
 
 // TestEngineCatalog_Resolve_UnknownNoTip verifies that truly unknown engines (not in

@@ -168,13 +168,6 @@ func TestEngineConformanceCatalogCoverage(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(content, &catalog))
 	for _, entry := range catalog.Engines {
-		if entry.ID == "custom" {
-			var legacy engineDefinitionFile
-			readConformanceFrontmatter(t, "../../.github/workflows/shared/genaiscript.md", &legacy)
-			require.Nil(t, legacy.Engine.Behaviors, "a migrated GenAIScript engine needs a conformance workflow")
-			require.False(t, registry.IsValidEngine(entry.ID))
-			continue
-		}
 		ids = append(ids, entry.ID)
 	}
 	files, err := filepath.Glob("../../.github/workflows/engine-conformance-*.md")

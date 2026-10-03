@@ -51,9 +51,7 @@ Missing credentials fail activation rather than passing or skipping the suite.
 This is a configuration smoke test, not a security or model-quality evaluation.
 The tool probe checks the production MCP gateway/CLI path, not native MCP client
 support. It does not test SDK/driver profiles, plugins, permission-denial
-enforcement, or prove that a provider honored the requested model. The legacy
-GenAIScript `custom` catalog entry has no registered runtime or `behaviors`
-definition and is excluded until migrated to an executable engine definition.
+enforcement, or prove that a provider honored the requested model.
 
 ## Unsupported engine samples
 
