@@ -138,5 +138,29 @@
    "Use-case index"
   ],
   "blogged": false
+ },
+ "yutkat/github-star-organizer": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-03",
+  "score": 6,
+  "summary": "Weekly workflow filing GitHub stars into Lists with deterministic validation before GraphQL mutations.",
+  "highlights": [
+   "README.md: agent plan validated by deterministic step (dry-run repair loop)",
+   "Opens issue instead of creating Lists",
+   "Installable via gh aw add-wizard"
+  ],
+  "blogged": false
+ },
+ "Htkym/workflowVisualEditor": {
+  "kind": "extension",
+  "reviewed": "2026-10-03",
+  "score": 5,
+  "summary": "Unofficial VS Code visual designer for gh-aw markdown; Windows-only, 0 stars, Markdown stays authoritative.",
+  "highlights": [
+   "Side-by-side GUI and Markdown editor",
+   "Templates for new workflows",
+   "Never auto-installs tools"
+  ],
+  "blogged": false
  }
 }

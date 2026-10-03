@@ -1,14 +1,1 @@
-[
- {
-  "id": "yutkat/github-star-organizer",
-  "kind": "workflow-collection",
-  "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- },
- {
-  "id": "Htkym/workflowVisualEditor",
-  "kind": "extension",
-  "source": "topic:github-agentic-workflows",
-  "discovered": "2026-09-29"
- }
-]
+[]
