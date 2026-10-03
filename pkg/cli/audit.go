@@ -43,6 +43,7 @@ type auditRunConfig struct {
 	jobID            int64
 	stepNumber       int
 	artifactFilter   []string
+	includeWorkQueue bool
 	experimentFilter string
 	variantFilter    string
 	runtimeFilter    string
@@ -79,6 +80,7 @@ type auditAnalysisResults struct {
 	tokenUsageSummary       *TokenUsageSummary
 	workingSet              *WorkingSetMetrics
 	ledger                  *LedgerActivity
+	dispatchCoordinator     *DispatchCoordinatorReport
 	friction                *FrictionCostSummary
 	redactedDomainsAnalysis *RedactedDomainsAnalysis
 	rateLimitUsage          *GitHubRateLimitUsage

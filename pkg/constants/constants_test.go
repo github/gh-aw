@@ -406,7 +406,7 @@ func TestGetEngineOption_AllBuiltInEngines(t *testing.T) {
 		{string(ClaudeEngine), "Claude", AnthropicAPIKey, []string{}},
 		{string(CodexEngine), "Codex", OpenAIAPIKey, []string{CodexAPIKey}},
 		{string(GeminiEngine), "Gemini", GeminiAPIKey, nil},
-		{string(PiEngine), "Pi", CopilotGitHubToken, []string{AnthropicAPIKey, OpenAIAPIKey, CodexAPIKey}},
+		{string(PiEngine), "Pi", CopilotGitHubToken, []string{AnthropicAPIKey, OpenAIAPIKey, CodexAPIKey, GeminiAPIKey}},
 	}
 
 	for _, tt := range tests {

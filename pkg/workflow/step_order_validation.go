@@ -12,7 +12,7 @@ import (
 )
 
 // This list must stay in sync with targetExtensions in actions/setup/js/redact_secrets.cjs.
-var secretRedactionScannedExtensions = [...]string{".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"}
+var secretRedactionScannedExtensions = [...]string{".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch", ".html"}
 
 var stepOrderLog = logger.New("workflow:step_order_validation")
 

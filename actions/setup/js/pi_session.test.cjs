@@ -270,6 +270,33 @@ describe("Pi CI stream regressions", () => {
     expect(sessionTokenTotal({ ...usage, total_tokens: 14 })).toBe(14);
   });
 
+  it("includes classifier/image, compaction, and cache-warming usage once", () => {
+    const assistant = { role: "assistant", timestamp: 1, content: [], usage: { input: 100, output: 10, cost: { total: 0.1 } } };
+    const tool = { role: "toolResult", toolCallId: "image-1", content: [], usage: { input: 50, output: 2, cost: { total: 0.2 } } };
+    const stats = computePiV3Stats([
+      { type: "message_end", message: assistant },
+      { type: "message_end", message: tool },
+      { type: "turn_end", message: assistant, toolResults: [tool] },
+      { type: "compaction_end", result: { firstKeptEntryId: "entry-1", usage: { input: 200, output: 20, cost: { total: 0.3 } } } },
+      { type: "entry_appended", entry: { id: "warming-1", type: "usage", usage: { input: 5, output: 0, cost: { total: 0.01 } } } },
+    ]);
+    expect(stats).toMatchObject({ turns: 1, input_tokens: 355, output_tokens: 32 });
+    expect(stats.total_cost_usd).toBeCloseTo(0.61);
+  });
+
+  it("preserves nested tool relationships and settled/retry events", () => {
+    const events = transformPiV3Entries([
+      { type: "tool_execution_start", toolCallId: "outer/1", parentToolCallId: "outer", toolName: "bash", args: { command: "echo ok" } },
+      { type: "tool_execution_end", toolCallId: "outer/1", parentToolCallId: "outer", toolName: "bash", result: {}, isError: false },
+      { type: "auto_retry_start", attempt: 1 },
+      { type: "agent_settled" },
+    ]);
+    expect(events[0].data.parentToolCallId).toBe("outer");
+    expect(events[1].data.parentToolCallId).toBe("outer");
+    expect(events.map(event => event.type)).toContain("pi.agent_settled");
+    expect(events.map(event => event.type)).toContain("pi.auto_retry_start");
+  });
+
   it("deduplicates snapshots and diagnostics independently of object key insertion order", () => {
     const message = {
       role: "assistant",

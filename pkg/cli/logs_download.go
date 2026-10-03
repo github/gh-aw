@@ -37,13 +37,14 @@ var logsDownloadLog = logger.New("cli:logs_download")
 // verbose enables progress messages; owner, repo, hostname identify the GitHub repository;
 // artifactFilter is an optional list of artifact base names to download (nil means all).
 type downloadArtifactsOptions struct {
-	runID          int64
-	outputDir      string
-	verbose        bool
-	owner          string
-	repo           string
-	hostname       string
-	artifactFilter []string
+	runID            int64
+	outputDir        string
+	verbose          bool
+	owner            string
+	repo             string
+	hostname         string
+	artifactFilter   []string
+	includeWorkQueue bool
 }
 
 // isUsageOnlyArtifactFilter reports whether the caller requested only the compact
@@ -136,10 +137,6 @@ func fetchWorkflowRunLogsArchive(ctx context.Context, runID int64, verbose bool,
 func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string, verbose bool, owner, repo, hostname string) error {
 	logsDownloadLog.Printf("Downloading workflow run logs: run_id=%d, output_dir=%s, owner=%s, repo=%s", runID, outputDir, owner, repo)
 
-	// Create a temporary file for the zip download
-	tmpZip := filepath.Join(os.TempDir(), fmt.Sprintf("workflow-logs-%d.zip", runID))
-	defer os.RemoveAll(tmpZip)
-
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloading workflow run logs for run %d...", runID)))
 	}
@@ -152,24 +149,12 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 		return nil
 	}
 
-	// Write the downloaded zip content to temporary file
-	if err := os.WriteFile(tmpZip, output, constants.FilePermPublic); err != nil {
-		return fmt.Errorf("failed to write logs zip file: %w", err)
-	}
-
-	// Create a subdirectory for workflow logs to keep the run directory organized
-	workflowLogsDir := filepath.Join(outputDir, "workflow-logs")
-	if err := os.MkdirAll(workflowLogsDir, constants.DirPermPublic); err != nil {
-		return fmt.Errorf("failed to create workflow-logs directory: %w", err)
-	}
-
-	// Unzip the logs into the workflow-logs subdirectory
-	if err := unzipFile(tmpZip, workflowLogsDir, verbose); err != nil {
-		return fmt.Errorf("failed to unzip workflow logs: %w", err)
+	if err := storeWorkflowRunLogsArchive(output, outputDir, verbose); err != nil {
+		return err
 	}
 
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Downloaded and extracted workflow run logs to "+workflowLogsDir))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Downloaded and extracted workflow run logs to "+filepath.Join(outputDir, "workflow-logs")))
 	}
 
 	return nil
@@ -180,6 +165,7 @@ func downloadWorkflowRunLogs(ctx context.Context, runID int64, outputDir string,
 func downloadRunArtifacts(ctx context.Context, opts downloadArtifactsOptions) error {
 	logsDownloadLog.Printf("Downloading run artifacts: run_id=%d, output_dir=%s, owner=%s, repo=%s, artifactFilter=%v", opts.runID, opts.outputDir, opts.owner, opts.repo, opts.artifactFilter)
 	shouldLogProgress := IsRunningInCI() || opts.verbose
+	opts = ensureDispatchCoordinatorLogs(ctx, opts)
 
 	// Check if artifacts already exist on disk (since they're immutable)
 	if fileutil.DirExists(opts.outputDir) && !fileutil.IsDirEmpty(opts.outputDir) {
@@ -285,7 +271,8 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 	}
 
 	// Download and unzip workflow run logs unless caller requested usage-only mode.
-	if shouldDownloadWorkflowRunLogs(opts.artifactFilter) {
+	if shouldDownloadWorkflowRunLogs(opts.artifactFilter) &&
+		(!opts.includeWorkQueue || !workflowRunLogsComplete(opts.outputDir)) {
 		if err := downloadWorkflowRunLogs(ctx, opts.runID, opts.outputDir, opts.verbose, opts.owner, opts.repo, opts.hostname); err != nil {
 			// Log the error but don't fail the entire download process
 			// Logs may not be available for all runs (e.g., expired or deleted)

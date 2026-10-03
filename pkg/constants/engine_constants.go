@@ -92,7 +92,7 @@ var EngineOptions = []EngineOption{
 		Label:              "Pi",
 		Description:        "Pi AI coding agent",
 		SecretName:         CopilotGitHubToken,
-		AlternativeSecrets: []string{AnthropicAPIKey, OpenAIAPIKey, CodexAPIKey},
+		AlternativeSecrets: []string{AnthropicAPIKey, OpenAIAPIKey, CodexAPIKey, GeminiAPIKey},
 		KeyURL:             "https://github.com/settings/personal-access-tokens/new",
 		WhenNeeded:         "Pi engine workflows",
 	},

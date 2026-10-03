@@ -56,6 +56,9 @@ var engineValidationLog = logger.New("workflow:engine_validation")
 // to "latest". Unpinned "latest" versions change unpredictably and undermine
 // supply chain security guarantees.
 func (c *Compiler) validateEngineVersion(workflowData *WorkflowData) error {
+	if err := c.validatePiEngineConfig(workflowData); err != nil {
+		return err
+	}
 	if workflowData.EngineConfig == nil || workflowData.EngineConfig.Version == "" {
 		// No explicit version set; the compiler uses its own pinned default.
 		return nil
@@ -168,7 +171,7 @@ func isEngineDefinitionJSON(engineJSON string) bool {
 }
 
 // validateSingleEngineSpecification validates that only one engine field exists across all files
-func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, includedEnginesJSON []string) (string, error) {
+func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, includedEnginesJSON []string) (string, error) { //nolint:largefunc // Preserve existing engine-import validation and error precedence.
 	var allEngines []string
 	// firstIncludedRealEngine holds the raw JSON of the first non-model-only engine spec
 	// from included files. It is used below to extract the engine ID when the single

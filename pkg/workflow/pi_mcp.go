@@ -13,14 +13,10 @@ var piMCPLog = logger.New("workflow:pi_mcp")
 func (e *PiEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error {
 	piMCPLog.Printf("Rendering MCP config for Pi: tool_count=%d, mcp_tool_count=%d", len(tools), len(mcpTools))
 
-	// Pi uses the same JSON MCP format as Claude and Gemini: no Copilot-specific
-	// "type"/"tools" fields, no multi-line args. If Pi requires custom config
-	// sections (e.g., shell-policy or provider blocks) in the future, add them here
-	// similarly to how CodexEngine.RenderMCPConfig handles TOML-specific sections.
-	//
-	// Pi uses ShellMcpServersJsonPath (same as Claude/Gemini) because
-	// the Pi CLI resolves its MCP config from the shell environment path. Behavior-defined engines
-	// use TmpMcpServersJsonPath instead because their CLIs look for the
-	// config in a different location.
+	// The gateway converter emits scoped HTTP clients, which pi_runtime.cjs
+	// installs as mcp.json in the same agent directory as models and packages.
+	if !NewTools(tools).CLIProxy {
+		yaml.WriteString("          export GH_AW_PI_NATIVE_MCP=1\n")
+	}
 	return renderDefaultJSONMCPConfig(yaml, tools, mcpTools, workflowData, constants.ShellMcpServersJsonPath)
 }

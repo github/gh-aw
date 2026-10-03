@@ -325,6 +325,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		message:           message,
 		verbose:           opts.Verbose,
 		artifactFilter:    artifactFilter,
+		includeWorkQueue:  workQueueEvidenceRequested(opts.ArtifactSets),
 		apiRateLimit:      apiRateLimit,
 		apiRateLimits:     apiRateLimits,
 		cachedJSONLWriter: cachedJSONLWriter,

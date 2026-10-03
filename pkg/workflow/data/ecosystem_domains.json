@@ -347,7 +347,9 @@
     "github-copilot": "api.githubcopilot.com",
     "anthropic": "api.anthropic.com",
     "openai": "api.openai.com",
-    "codex": "api.openai.com"
+    "codex": "api.openai.com",
+    "google": "generativelanguage.googleapis.com",
+    "gemini": "generativelanguage.googleapis.com"
   },
   "sanitization-defaults": ["github.com", "localhost"]
 }

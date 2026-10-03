@@ -417,7 +417,6 @@ func (c *Compiler) validateEngineToolRequirements(frontmatter map[string]any, ag
 		func() error { return c.validateMaxToolDenialsSupport(frontmatter, agenticEngine) },
 		func() error { return c.validateMaxToolCallsSupport(frontmatter, agenticEngine) },
 		func() error { return c.validateUniversalLLMConsumerModel(frontmatter, agenticEngine) },
-		func() error { return c.validatePiEngineRequirements(parsedTools, agenticEngine) },
 		func() error { return c.validateBashCommandAllowlistSupport(tools, agenticEngine) },
 	}
 	for _, validator := range validators {

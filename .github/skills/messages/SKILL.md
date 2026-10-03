@@ -48,7 +48,7 @@ Add the new message field to `pkg/parser/schemas/main_workflow_schema.json` in t
 
 ## Step 2: Update Go Struct
 
-Add the field to `SafeOutputMessagesConfig` in `pkg/workflow/compiler.go`:
+Add the field to `SafeOutputMessagesConfig` in `pkg/workflow/safe_outputs_config_types.go`:
 
 ```go
 type SafeOutputMessagesConfig struct {
@@ -63,9 +63,13 @@ type SafeOutputMessagesConfig struct {
 - Use `camelCase` for JSON tags
 - Add `omitempty` to both tags
 
-## Step 3: Update the parser if needed
+## Step 3: Wire the field in the parser
 
-If the message needs custom parsing logic, update the workflow parser in `pkg/workflow/safe_outputs.go` or the relevant config block. Most simple string fields will be wired automatically by the existing reflection-based parser.
+Add the field to `parseMessagesConfig` in `pkg/workflow/safe_outputs_messages_config.go`. Each field is mapped explicitly; simple string fields use `extractStringFromMap`:
+
+```go
+config.MyNewMessage = extractStringFromMap(messagesMap, "my-new-message", nil)
+```
 
 ## Step 4: Create the JavaScript message module
 

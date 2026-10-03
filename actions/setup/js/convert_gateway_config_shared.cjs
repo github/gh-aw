@@ -52,7 +52,7 @@ function requireEnvVar(name) {
 }
 
 /**
- * @param {{ extraRequiredEnv?: string[] }} [options]
+ * @param {{ extraRequiredEnv?: string[], keepCLIMountedServers?: boolean }} [options]
  * @returns {{
  *   gatewayOutput: string;
  *   domain: string;
@@ -86,6 +86,7 @@ function loadGatewayContext(options = {}) {
   } catch (err) {
     throw new Error("Failed to parse GH_AW_MCP_CLI_SERVERS: " + getErrorMessage(err), { cause: err });
   }
+  if (options.keepCLIMountedServers) cliServers.clear();
 
   /** @type {Record<string, unknown>} */
   let config;
@@ -175,7 +176,7 @@ function writeSecureOutput(outputPath, output) {
  *   format: string;
  *   engine: string;
  *   outputPath: string | ((context: ReturnType<typeof loadGatewayContext>) => string);
- *   contextOptions?: { extraRequiredEnv?: string[] };
+ *   contextOptions?: { extraRequiredEnv?: string[], keepCLIMountedServers?: boolean };
  *   getTargetDomain?: (context: ReturnType<typeof loadGatewayContext>) => string;
  *   getUrlPrefix?: (context: ReturnType<typeof loadGatewayContext>) => string;
  *   transformServer: (name: string, entry: Record<string, unknown>, urlPrefix: string, context: ReturnType<typeof loadGatewayContext>) => Record<string, unknown>;
