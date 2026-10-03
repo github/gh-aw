@@ -3173,6 +3173,62 @@ describe("sendJobConclusionSpan", () => {
     expect(attrs["gh-aw.engine.id"]).toBe("custom-engine");
   });
 
+  it.each([
+    '{"type":"result","num_turns":999,"stop_reason":"max_tokens","permission_denials":[{},{}],"usage":{"input_tokens":999}}',
+    '[\n{"type":"result","num_turns":999,"stop_reason":"max_tokens","permission_denials":[{},{}],"usage":{"input_tokens":999}}\n]',
+  ])("reads real Codex telemetry without trusting framed tool payloads: %s", async payload => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    const read = vi.spyOn(fs, "readFileSync").mockImplementation(filePath => {
+      if (filePath === "/tmp/gh-aw/aw_info.json") return JSON.stringify({ engine_id: "codex" });
+      if (filePath === "/tmp/gh-aw/agent-stdio.log")
+        return `tool api.fetch({})\napi.fetch(...) success in 2ms:\n${payload}\n{"type":"thread.started","thread_id":"real"}\n{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2,"cached_input_tokens":6}}`;
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const attrs = Object.fromEntries(body.resourceSpans[0].scopeSpans[0].spans[0].attributes.map(attribute => [attribute.key, attribute.value.intValue ?? attribute.value.stringValue]));
+      expect(attrs["gh-aw.turns"]).toBe(1);
+      expect(attrs["gen_ai.usage.input_tokens"]).toBe(10);
+      expect(attrs["gen_ai.usage.output_tokens"]).toBe(2);
+      expect(attrs["gen_ai.usage.cache_read.input_tokens"]).toBe(6);
+      expect(attrs["gh-aw.permission_denied_count"]).toBe(0);
+      const reasons = body.resourceSpans[0].scopeSpans[0].spans[0].attributes.find(attribute => attribute.key === "gen_ai.response.finish_reasons");
+      expect(reasons.value.arrayValue.values).not.toContainEqual({ stringValue: "max_tokens" });
+    } finally {
+      read.mockRestore();
+    }
+  });
+
+  it("preserves genuine Codex compatibility metrics, stop reason and structured permission denials", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = "agent";
+    const read = vi.spyOn(fs, "readFileSync").mockImplementation(filePath => {
+      if (filePath === "/tmp/gh-aw/aw_info.json") return JSON.stringify({ engine_id: "codex" });
+      if (filePath === "/tmp/gh-aw/agent-stdio.log") return '{"type":"result","num_turns":3,"stop_reason":"end_turn","permission_denied_count":2,"usage":{"input_tokens":10,"output_tokens":2,"cache_read_input_tokens":6}}\n';
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+    try {
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", { startMs: 1_700_000_000_000 });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const attributes = body.resourceSpans[0].scopeSpans[0].spans[0].attributes;
+      const attrs = Object.fromEntries(attributes.map(attribute => [attribute.key, attribute.value.intValue ?? attribute.value.stringValue]));
+      expect(attrs["gh-aw.turns"]).toBe(3);
+      expect(attrs["gen_ai.usage.input_tokens"]).toBe(10);
+      expect(attrs["gen_ai.usage.output_tokens"]).toBe(2);
+      expect(attrs["gen_ai.usage.cache_read.input_tokens"]).toBe(6);
+      expect(attrs["gh-aw.permission_denied_count"]).toBe(2);
+      expect(attributes.find(attribute => attribute.key === "gen_ai.response.finish_reasons").value.arrayValue.values).toEqual([{ stringValue: "end_turn" }]);
+    } finally {
+      read.mockRestore();
+    }
+  });
+
   it("includes gen_ai.response.finish_reasons on the agent span when stop_reason is present in agent-stdio.log", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);

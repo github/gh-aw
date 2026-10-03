@@ -185,6 +185,9 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
     let exitedSignal = null;
     /** @type {NodeJS.Timeout | null} */
     let shutdownTimer = null;
+    let shutdownEscalated = false;
+    /** @type {{ code: number|null, signal: NodeJS.Signals|null }|null} */
+    let closedResult = null;
     /** @type {NodeJS.Timeout | null} */
     let drainTimer = null;
     /** @type {Array<[NodeJS.Signals, () => void]>} */
@@ -226,6 +229,12 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
     }
     function finish(code, signal) {
       if (settled) return;
+      if (shutdownTimer && !shutdownEscalated) {
+        // The CLI can close before TERM-resistant descendants exit. Complete the
+        // owned-group escalation before clearing timers and resolving the attempt.
+        closedResult = { code, signal };
+        return;
+      }
       stdout += stdoutDecoder.end();
       stderr += stderrDecoder.end();
       if (pendingStdoutLine && !droppingStdoutLine && onStdoutLine) onStdoutLine(pendingStdoutLine);
@@ -249,8 +258,13 @@ function runProcess({ command, args, attempt, log, logArgs, env, stdin, onStdout
       if (shutdownTimer) return;
       shutdownTimer = setTimeout(
         () => {
+          shutdownEscalated = true;
           log(`attempt ${attempt + 1}: shutdown grace of ${graceMs}ms expired; terminating remaining descendants`);
           signalTree("SIGKILL");
+          if (closedResult) {
+            finish(closedResult.code, closedResult.signal);
+            return;
+          }
           drainTimer = setTimeout(
             () => {
               child.stdout.destroy();

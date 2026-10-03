@@ -51,6 +51,26 @@ describe("Codex effective configuration", () => {
     expect(serializeConfig(config).match(/plugins = false/g)).toHaveLength(1);
   });
 
+  it("replaces legacy shell filters with canonical filters without mutating defaults", () => {
+    const defaults = { shell_environment_policy: { inherit: "all", ignore_default_excludes: false, include_only: ["PATH", "HOME"], exclude: ["PRIVATE_*"] } };
+    const original = structuredClone(defaults);
+    const config = mergeConfig(defaults, { shell_environment_policy: { filters: { PATH: "include" } } });
+    expect(config.shell_environment_policy).toEqual({ inherit: "all", ignore_default_excludes: false, filters: { PATH: "include" } });
+    expect(defaults).toEqual(original);
+    const output = serializeConfig(config);
+    expect(output).toContain("[shell_environment_policy.filters]");
+    expect(output).not.toContain("include_only");
+    expect(output).not.toContain("exclude =");
+  });
+
+  it.each(["include_only", "exclude"])("replaces canonical filters with the explicit legacy %s representation", key => {
+    const config = mergeConfig({ shell_environment_policy: { inherit: "all", filters: { PATH: "include" } } }, { shell_environment_policy: { [key]: ["HOME"] } });
+    expect(config.shell_environment_policy.filters).toBeUndefined();
+    expect(config.shell_environment_policy[key]).toEqual(["HOME"]);
+    expect(config.shell_environment_policy.inherit).toBe("all");
+    expect(() => mergeConfig({}, { shell_environment_policy: { filters: {}, [key]: [] } })).toThrow("cannot mix");
+  });
+
   it("keeps runtime timeouts and gives explicit per-server tuning precedence", () => {
     writeConfig({ mcp_servers: { github: { tool_timeout_sec: 180 } } });
     process.env.GH_AW_TOOL_TIMEOUT = "90";

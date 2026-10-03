@@ -9,6 +9,7 @@ const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_re
 const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
+const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -308,28 +309,31 @@ async function runLogParser(options) {
           if (fs.existsSync(stdioLogPath)) {
             const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
             if (stdioContent && !stdioContent.endsWith("\n")) newline = "\n";
-            alreadyHasResult = stdioContent.split("\n").some(line => {
-              const objectStart = line.indexOf("{");
-              const arrayStart = line.indexOf("[");
-              let start = -1;
-              if (objectStart >= 0 && arrayStart >= 0) {
-                start = Math.min(objectStart, arrayStart);
-              } else if (objectStart >= 0) {
-                start = objectStart;
-              } else {
-                start = arrayStart;
-              }
-              if (start < 0) return false;
-              try {
-                const parsed = JSON.parse(line.slice(start));
-                if (Array.isArray(parsed)) {
-                  return parsed.some(isUsableResult);
-                }
-                return isUsableResult(parsed);
-              } catch {
-                return false;
-              }
-            });
+            alreadyHasResult =
+              parserName === "Codex"
+                ? collectCodexJSONRecords(stdioContent).some(isUsableResult)
+                : stdioContent.split("\n").some(line => {
+                    const objectStart = line.indexOf("{");
+                    const arrayStart = line.indexOf("[");
+                    let start = -1;
+                    if (objectStart >= 0 && arrayStart >= 0) {
+                      start = Math.min(objectStart, arrayStart);
+                    } else if (objectStart >= 0) {
+                      start = objectStart;
+                    } else {
+                      start = arrayStart;
+                    }
+                    if (start < 0) return false;
+                    try {
+                      const parsed = JSON.parse(line.slice(start));
+                      if (Array.isArray(parsed)) {
+                        return parsed.some(isUsableResult);
+                      }
+                      return isUsableResult(parsed);
+                    } catch {
+                      return false;
+                    }
+                  });
           }
           if (!alreadyHasResult) {
             fs.mkdirSync(path.dirname(stdioLogPath), { recursive: true });

@@ -123,6 +123,57 @@ func TestCodexNativeConfigShellEnvironment(t *testing.T) {
 	}
 }
 
+func TestCodexNativeConfigCanonicalFiltersAcrossSetupModes(t *testing.T) {
+	for _, mode := range []string{"--bootstrap", "gateway", "--config-only"} {
+		t.Run(mode, func(t *testing.T) {
+			config, err := NewCodexEngine().buildNativeConfig(&WorkflowData{
+				Name: "filter-policy",
+				EngineConfig: &EngineConfig{
+					Config: "[shell_environment_policy.filters]\nPATH = \"include\"\n\"PRIVATE_*\" = \"exclude\"",
+				},
+			}, []string{"github"})
+			require.NoError(t, err)
+			payload, err := json.Marshal(config)
+			require.NoError(t, err)
+			dir := t.TempDir()
+			gatewayPath := filepath.Join(dir, "gateway.json")
+			require.NoError(t, os.WriteFile(gatewayPath, []byte(`{"mcpServers":{"github":{"headers":{"Authorization":"fixture-token"}}}}`), 0o600))
+			args := []string{"actions/setup/js/convert_gateway_config_codex.cjs"}
+			if mode != "gateway" {
+				args = append(args, mode)
+			}
+			cmd := exec.Command("node", args...)
+			cmd.Dir = filepath.Join("..", "..")
+			cmd.Env = append(os.Environ(),
+				"GH_AW_CODEX_CONFIG_JSON="+string(payload),
+				"RUNNER_TEMP="+dir,
+				"CODEX_HOME="+filepath.Join(dir, "codex-home"),
+				"MCP_GATEWAY_OUTPUT="+gatewayPath,
+				"MCP_GATEWAY_DOMAIN=gateway",
+				"MCP_GATEWAY_PORT=80",
+				"GH_AW_MCP_CLI_SERVERS=[]")
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			content, err := os.ReadFile(filepath.Join(dir, "gh-aw", "mcp-config", "config.toml"))
+			require.NoError(t, err)
+			var parsed map[string]any
+			require.NoError(t, toml.Unmarshal(content, &parsed))
+			policy := parsed["shell_environment_policy"].(map[string]any)
+			assert.Equal(t, map[string]any{"PATH": "include", "PRIVATE_*": "exclude"}, policy["filters"])
+			assert.NotContains(t, policy, "include_only")
+			assert.NotContains(t, policy, "exclude")
+			assert.Equal(t, "all", policy["inherit"])
+			assert.Equal(t, false, policy["ignore_default_excludes"])
+			assert.Equal(t, "none", parsed["otel"].(map[string]any)["metrics_exporter"])
+			if mode == "gateway" {
+				server := parsed["mcp_servers"].(map[string]any)["github"].(map[string]any)
+				assert.Equal(t, "fixture-token", server["http_headers"].(map[string]any)["Authorization"])
+				assert.Equal(t, int64(60), server["tool_timeout_sec"])
+			}
+		})
+	}
+}
+
 func TestCodexNativeConfigExcludesEnvironmentWithoutOverrides(t *testing.T) {
 	for _, env := range []map[string]string{nil, {}, {"CUSTOM_REGION": "east", "CUSTOM_MODE": "test", "PATH": "/custom/bin"}} {
 		t.Run(fmt.Sprintf("overrides-%d", len(env)), func(t *testing.T) {
@@ -151,12 +202,13 @@ func TestCodexDetectionConfigKeepsInferenceSettingsWithoutAgentMCP(t *testing.T)
 }
 
 func TestCodexModelArgumentsDoNotDuplicateCompilerModel(t *testing.T) {
-	for _, args := range [][]string{{"-m", "gpt-5.4"}, {"--model=gpt-5.4"}, {"--model", "gpt-5.4"}} {
+	for _, args := range [][]string{{"-m", "gpt-5.4"}, {"--model=gpt-5.4"}, {"--model", "gpt-5.4"}, {"-m=gpt-5.4"}, {"-mgpt-5.4"}} {
 		data := &WorkflowData{EngineConfig: &EngineConfig{Args: args}}
 		command := NewCodexEngine().buildCodexCommand(data, "codex", "codex_harness.cjs", false, "MODEL", "")
 		assert.NotContains(t, command, `${MODEL:+ --model "$MODEL"}`)
 		assert.Contains(t, command, strings.Join(args, " "))
 	}
+	assert.False(t, codexArgsSelectModel([]string{"--", "-m=prompt-text"}))
 }
 
 func TestCodexExplicitProviderMarker(t *testing.T) {
@@ -179,6 +231,8 @@ func TestCodexNativeConfigValidation(t *testing.T) {
 		"threshold = inf",
 		"threshold = 9007199254740992",
 		"date = 2026-10-02",
+		"[shell_environment_policy]\ninclude_only = [\"PATH\"]\n[shell_environment_policy.filters]\nPATH = \"include\"",
+		"[shell_environment_policy]\nexclude = [\"TOKEN\"]\n[shell_environment_policy.filters]\nPATH = \"include\"",
 	} {
 		t.Run(config, func(t *testing.T) {
 			_, err := parseCodexConfig(config)

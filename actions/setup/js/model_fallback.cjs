@@ -31,7 +31,7 @@ function applyModelFallback(env, primaryEnvVar, logger = () => {}) {
 
 function injectModelFlagAfterExec(args, model) {
   const options = args.slice(0, args.indexOf("--") === -1 ? args.length : args.indexOf("--"));
-  if (!model || options.some(arg => arg === "--model" || arg === "-m" || arg.startsWith("--model="))) {
+  if (!model || options.some(arg => arg === "--model" || arg === "-m" || modelFlagPrefix(arg))) {
     return args;
   }
   const execIndex = args.indexOf("exec");
@@ -39,6 +39,14 @@ function injectModelFlagAfterExec(args, model) {
     return [...args, "--model", model];
   }
   return [...args.slice(0, execIndex + 1), "--model", model, ...args.slice(execIndex + 1)];
+}
+
+/** @param {string} argument @returns {string|undefined} */
+function modelFlagPrefix(argument) {
+  for (const prefix of ["--model=", "-m=", "-m"]) {
+    if (argument.startsWith(prefix)) return prefix;
+  }
+  return undefined;
 }
 
 /**
@@ -70,8 +78,9 @@ function normalizeCodexModelArgs(args, provider, options = {}) {
     if (normalized[i] === "--") break;
     if (normalized[i] === "--model" || normalized[i] === "-m") {
       if (i + 1 < normalized.length) normalized[++i] = normalizeCodexModel(normalized[i], provider, options);
-    } else if (normalized[i].startsWith("--model=")) {
-      normalized[i] = `--model=${normalizeCodexModel(normalized[i].slice("--model=".length), provider, options)}`;
+    } else {
+      const prefix = modelFlagPrefix(normalized[i]);
+      if (prefix) normalized[i] = `${prefix}${normalizeCodexModel(normalized[i].slice(prefix.length), provider, options)}`;
     }
   }
   return normalized;

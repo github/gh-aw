@@ -35,6 +35,15 @@ func parseCodexConfig(config string) (map[string]any, error) {
 	if err := validateCodexConfigValues(result); err != nil {
 		return nil, err
 	}
+	if policy, ok := result["shell_environment_policy"].(map[string]any); ok {
+		if _, canonical := policy["filters"]; canonical {
+			for _, legacy := range []string{"exclude", "include_only"} {
+				if _, exists := policy[legacy]; exists {
+					return nil, fmt.Errorf("engine.config: shell_environment_policy mixes filters with %s; use either a filters table or legacy exclude/include_only arrays, not both", legacy)
+				}
+			}
+		}
+	}
 	return result, nil
 }
 

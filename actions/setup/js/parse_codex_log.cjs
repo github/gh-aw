@@ -15,6 +15,7 @@ const {
 } = require("./log_parser_shared.cjs");
 const { normalizeCodexSession, isCodexRecord } = require("./codex_session.cjs");
 const { projectSessionResult, createSessionEvent, sessionToolSuccess } = require("./agent_session.cjs");
+const { CODEX_LEGACY_OUTCOME, codexLegacyPayload, codexLegacyResultEnd } = require("./codex_log_framing.cjs");
 
 const main = createEngineLogParser({
   parserName: "Codex",
@@ -234,10 +235,10 @@ function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []
  * Keep recognized text observations beside JSON records without splitting the
  * native normalizer's lifecycle/accounting state into independent sessions.
  * @param {string} logContent
- * @param {Array<any>} entries
+ * @param {Array<any>} [entries]
  * @returns {Array<any>}
  */
-function collectCodexMixedRecords(logContent, entries) {
+function collectCodexMixedRecords(logContent, entries = parseLogEntries(logContent) ?? []) {
   try {
     if (Array.isArray(JSON.parse(logContent))) return entries;
   } catch {
@@ -272,51 +273,6 @@ function collectCodexMixedRecords(logContent, entries) {
   return records.length > 0 || hasFramedResult ? records : entries;
 }
 
-const CODEX_LEGACY_OUTCOME = /^(?:([\w-]+)\.([\w-]+)\(.*\)|(.+?))\s+(success|succeeded|failure|failed)\s+in\s+(\d+(?:\.\d+)?)(ms|s):$/;
-
-/**
- * A JSON value following a legacy completion belongs to that tool, regardless
- * of lifecycle-looking fields inside its payload.
- * @param {string[]} lines
- * @param {number} currentIndex
- * @returns {number|null}
- */
-function codexLegacyResultEnd(lines, currentIndex) {
-  if (!CODEX_LEGACY_OUTCOME.test(codexLegacyPayload(lines[currentIndex]))) return null;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  let started = false;
-  const content = [];
-  for (let index = currentIndex + 1; index < lines.length; index++) {
-    const line = lines[index];
-    content.push(line);
-    for (const character of line) {
-      if (!started) {
-        if (/\s/.test(character)) continue;
-        if (character !== "{" && character !== "[") return null;
-        started = true;
-      }
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (character === "\\") escaped = true;
-        else if (character === '"') inString = false;
-      } else if (character === '"') inString = true;
-      else if (character === "{" || character === "[") depth++;
-      else if (character === "}" || character === "]") depth--;
-    }
-    if (started && depth === 0 && !inString) {
-      try {
-        JSON.parse(content.join("\n"));
-        return index;
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
-}
-
 /** @param {string} line @returns {number|undefined} */
 function extractCodexLegacyTokens(line) {
   const payload = codexLegacyPayload(line);
@@ -326,11 +282,6 @@ function extractCodexLegacyTokens(line) {
   if (!/^\d+(?:,\d{3})*$/.test(match[1])) return undefined;
   const count = Number(match[1].replace(/,/g, ""));
   return Number.isSafeInteger(count) && count >= 0 ? count : undefined;
-}
-
-/** @param {string} line @returns {string} */
-function codexLegacyPayload(line) {
-  return line.replace(/^\[[^\]]+\]\s+/, "").replace(/^\d{4}-\d{2}-\d{2}T\S+\s+(?:DEBUG|INFO|WARN|ERROR)\s+\S+:\s*/, "");
 }
 
 /**
@@ -848,5 +799,6 @@ if (typeof module !== "undefined" && module.exports) {
     extractMCPInitialization,
     extractCodexErrorMessages,
     extractCodexModel,
+    collectCodexMixedRecords,
   };
 }

@@ -62,7 +62,7 @@ Not all features are available across all engines. The table below summarizes pe
 | Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
 
-`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support; Codex and Copilot require explicit `tools: web-search:` configuration. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
+`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support. Copilot requires explicit `tools.web-search`; Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
 
 ## Shared imported engines
 
@@ -90,7 +90,7 @@ Workflows can specify extended configuration for the coding agent:
 ```yaml wrap
 engine:
   id: copilot
-  version: latest                       # defaults to latest
+  version: latest                      # optional; defaults to a compiler-pinned version
   model: gpt-5                          # example override; omit to use engine default
   command: /usr/local/bin/copilot       # custom executable path
   args: ["--add-dir", "/workspace"]     # custom CLI arguments
@@ -562,14 +562,14 @@ See [Long Build Times](/gh-aw/reference/sandbox/#long-build-times) in the Sandbo
 
 ### Per-Tool-Call Timeout (`tools.timeout`)
 
-`tools.timeout` limits how long any single tool invocation may run, in seconds. Useful when individual `bash` commands (builds, test suites) take longer than an engine's default:
+`tools.timeout` sets the per-operation limit in seconds where supported. For Codex, it limits native MCP calls rather than shell commands:
 
 ```yaml wrap
 tools:
   timeout: 300   # 5 minutes per tool call
 ```
 
-Defaults: Claude `60s`, Codex `120s`. Other engines (Copilot, Gemini) are engine-managed and not enforced by gh-aw. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration) for full documentation including `tools.startup-timeout`.
+Claude and Codex default to `60s` for tool calls. Codex's MCP startup timeout separately defaults to `120s`. Other engines (Copilot, Gemini) manage their own native tool limits. Codex resolves timeout expressions at runtime, with explicit per-server `engine.config` settings taking precedence. See [Tool Timeout Configuration](/gh-aw/reference/tools/#tool-timeout-configuration).
 
 ### Per-Engine Timeout Controls
 

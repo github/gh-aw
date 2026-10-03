@@ -362,7 +362,10 @@ func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName,
 
 func codexArgsSelectModel(args []string) bool {
 	for _, arg := range args {
-		if arg == "-m" || arg == "--model" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m=") {
+		if arg == "--" {
+			break
+		}
+		if arg == "--model" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m") {
 			return true
 		}
 	}

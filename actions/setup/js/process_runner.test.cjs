@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createRequire } from "module";
 import { createHash } from "crypto";
+import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const {
@@ -127,6 +128,57 @@ describe("process_runner.cjs", () => {
       });
       expect(result.runtimeGuardFired).toBe(true);
       expect(result.durationMs).toBeLessThan(2000);
+    });
+
+    it.each(["guard", "watchdog", "cancellation"])("finishes %s escalation when the CLI exits before a TERM-resistant descendant", async mode => {
+      const priorHandlers = new Set(process.listeners("SIGTERM"));
+      const kill = vi.spyOn(process, "kill");
+      let parentPid;
+      let descendantPid;
+      const grandchild = "process.on('SIGTERM',()=>{});process.send('ready');setTimeout(()=>process.exit(0),4000);setInterval(()=>{},1000)";
+      try {
+        const result = await runProcess({
+          command: process.execPath,
+          args: [
+            "-e",
+            `const c=require('child_process').spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:['ignore','ignore','ignore','ipc']});c.on('message',()=>process.stdout.write(JSON.stringify({parent:process.pid,descendant:c.pid})+'\\n'));setInterval(()=>{},1000)`,
+          ],
+          attempt: 0,
+          log: () => {},
+          onStdoutLine: line => {
+            const ids = JSON.parse(line);
+            parentPid = ids.parent;
+            descendantPid = ids.descendant;
+            if (mode === "cancellation") process.listeners("SIGTERM").find(handler => !priorHandlers.has(handler))();
+          },
+          runtimeGuard: mode === "guard" ? { shouldTerminate: () => !!descendantPid, pollIntervalMs: 50, termGraceMs: 100 } : undefined,
+          postResultWatchdog: mode === "watchdog" ? { shouldArm: () => !!descendantPid, inactivityTimeoutMs: 50, pollIntervalMs: 50, termGraceMs: 100 } : undefined,
+          shutdownGraceMs: 100,
+          drainTimeoutMs: 100,
+        });
+        expect(kill.mock.calls).toContainEqual([-parentPid, "SIGKILL"]);
+        expect(result.durationMs).toBeLessThan(2500);
+        if (mode === "guard") expect(result.runtimeGuardFired).toBe(true);
+        if (mode === "watchdog") expect(result.watchdogFired).toBe(true);
+        if (mode === "cancellation") expect(result.cancelled).toBe(true);
+        let state;
+        try {
+          state = execFileSync("ps", ["-p", String(descendantPid), "-o", "stat="], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+        } catch (error) {
+          if (error.status !== 1) throw error;
+          state = "";
+        }
+        expect(state === "" || state.startsWith("Z")).toBe(true);
+      } finally {
+        if (descendantPid) {
+          try {
+            process.kill(descendantPid, "SIGKILL");
+          } catch (error) {
+            if (error.code !== "ESRCH") throw error;
+          }
+        }
+        kill.mockRestore();
+      }
     });
 
     it("bounds stdio drain after the direct child exits but a descendant remains", async () => {

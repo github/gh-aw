@@ -14,8 +14,16 @@ function mergeConfig(base, overrides) {
   return Object.fromEntries(
     keys.map(key => {
       if (!Object.hasOwn(overrides, key)) return [key, base[key]];
-      const previous = base[key];
+      let previous = base[key];
       const next = overrides[key];
+      if (key === "shell_environment_policy" && isTable(next)) {
+        const canonical = Object.hasOwn(next, "filters");
+        const legacy = Object.hasOwn(next, "include_only") || Object.hasOwn(next, "exclude");
+        if (canonical && legacy) throw new Error("Codex shell environment policy cannot mix filters with legacy exclude or include_only");
+        if (isTable(previous)) {
+          previous = Object.fromEntries(Object.entries(previous).filter(([name]) => !(canonical && ["include_only", "exclude"].includes(name)) && !(legacy && name === "filters")));
+        }
+      }
       return [key, isTable(previous) && isTable(next) ? mergeConfig(previous, next) : next];
     })
   );

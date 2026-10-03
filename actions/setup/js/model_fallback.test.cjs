@@ -5,10 +5,13 @@ const require = createRequire(import.meta.url);
 const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 
 describe("Codex model arguments", () => {
-  it.each([{ flags: ["--model", "user-model"] }, { flags: ["-m", "user-model"] }, { flags: ["--model=user-model"] }])("respects an existing model flag %j", ({ flags }) => {
-    const args = ["exec", ...flags, "-"];
-    expect(injectModelFlagAfterExec(args, "env-model")).toEqual(args);
-  });
+  it.each([{ flags: ["--model", "user-model"] }, { flags: ["-m", "user-model"] }, { flags: ["--model=user-model"] }, { flags: ["-m=user-model"] }, { flags: ["-muser-model"] }, { flags: ["--model="] }, { flags: ["-m="] }])(
+    "respects an existing model flag %j",
+    ({ flags }) => {
+      const args = ["exec", ...flags, "-"];
+      expect(injectModelFlagAfterExec(args, "env-model")).toEqual(args);
+    }
+  );
 
   it.each([
     ["copilot/gpt-5", "github", "gpt-5"],
@@ -35,9 +38,12 @@ describe("Codex model arguments", () => {
     expect(() => normalizeCodexModel(`${prefix}/gpt-5`, "openai", { env: {} })).toThrow("does not match");
   });
 
-  it.each([{ flags: ["--model", "copilot/gpt-5"] }, { flags: ["-m", "copilot/gpt-5"] }, { flags: ["--model=copilot/gpt-5"] }])("normalizes explicit flags as well as model environment values", ({ flags }) => {
-    expect(normalizeCodexModelArgs(["exec", ...flags, "-"], "github").join(" ")).not.toContain("copilot/");
-  });
+  it.each([{ flags: ["--model", "copilot/gpt-5"] }, { flags: ["-m", "copilot/gpt-5"] }, { flags: ["--model=copilot/gpt-5"] }, { flags: ["-m=copilot/gpt-5"] }, { flags: ["-mcopilot/gpt-5"] }])(
+    "normalizes explicit flags as well as model environment values",
+    ({ flags }) => {
+      expect(normalizeCodexModelArgs(["exec", ...flags, "-"], "github").join(" ")).not.toContain("copilot/");
+    }
+  );
 
   it("does not interpret a positional prompt as an option after the separator", () => {
     expect(normalizeCodexModelArgs(["exec", "--", "--model=copilot/gpt-5"], "openai")).toEqual(["exec", "--", "--model=copilot/gpt-5"]);

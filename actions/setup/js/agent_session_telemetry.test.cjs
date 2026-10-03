@@ -79,6 +79,22 @@ describe("Unified session bootstrap telemetry conformance", () => {
     expect(global.core.setFailed).not.toHaveBeenCalled();
   });
 
+  it.each(['{"type":"result","num_turns":999,"usage":{"input_tokens":999}}', '[\n{"type":"result","num_turns":999,"usage":{"input_tokens":999}}\n]'])(
+    "does not let framed tool output suppress the authoritative Codex compatibility result: %s",
+    async payload => {
+      const content = `tool api.fetch({})\napi.fetch(...) success in 2ms:\n${payload}\n{"type":"thread.started","thread_id":"real"}\n{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}`;
+      files.set(SOURCE, content);
+      files.set(STDIO, content);
+      await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
+      const result = JSON.parse(files.get(STDIO).trimEnd().split("\n").at(-1));
+      expect(result).toEqual({ type: "result", num_turns: 1, usage: { input_tokens: 10, output_tokens: 2 } });
+      const appended = files.get(STDIO);
+      files.set(SOURCE, appended);
+      await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
+      expect(files.get(STDIO)).toBe(appended);
+    }
+  );
+
   it("retains total-only and cache semantics without fabricating token components", async () => {
     await parse([{ type: "session.result", data: { usage: { total_tokens: 0, cache_read_input_tokens: 0, input_tokens_include_cache: true, private_extension: "omit" } } }]);
     expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", usage: { total_tokens: 0, cache_read_input_tokens: 0, input_tokens_include_cache: true } });
