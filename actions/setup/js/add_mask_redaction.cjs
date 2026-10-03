@@ -76,23 +76,48 @@ function collectAddMaskedValues(logContent) {
  */
 function redactMaskedValues(text, maskedValues) {
   if (!text || !maskedValues || maskedValues.length === 0) return text;
-  const values = maskedValues.filter(value => value && text.includes(value));
+  const pending = [];
+  for (let order = 0; order < maskedValues.length; order++) {
+    const value = maskedValues[order];
+    if (!value) continue;
+    const index = text.indexOf(value);
+    if (index !== -1) pending.push({ value, index, order });
+  }
+  const precedes = (a, b) => a.index < b.index || (a.index === b.index && a.order < b.order);
+  const siftDown = start => {
+    let parent = start;
+    while (parent * 2 + 1 < pending.length) {
+      let child = parent * 2 + 1;
+      if (child + 1 < pending.length && precedes(pending[child + 1], pending[child])) child++;
+      if (!precedes(pending[child], pending[parent])) break;
+      [pending[parent], pending[child]] = [pending[child], pending[parent]];
+      parent = child;
+    }
+  };
+  for (let i = Math.floor(pending.length / 2) - 1; i >= 0; i--) siftDown(i);
   const parts = [];
   let cursor = 0;
-  while (cursor < text.length) {
-    let next = -1;
-    let length = 0;
-    for (const value of values) {
-      const index = text.indexOf(value, cursor);
-      if (index !== -1 && (next === -1 || index < next)) {
-        next = index;
-        length = value.length;
+  let replacements = 0;
+  while (pending.length && cursor < text.length) {
+    const next = pending[0];
+    if (next.index >= cursor) {
+      if (next.index > cursor) {
+        if (replacements) parts.push(MASK_REPLACEMENT.repeat(replacements));
+        replacements = 0;
+        parts.push(text.slice(cursor, next.index));
       }
+      replacements++;
+      cursor = next.index + next.value.length;
     }
-    if (next === -1) break;
-    parts.push(text.slice(cursor, next), MASK_REPLACEMENT);
-    cursor = next + length;
+    // Only refresh consumed or overlapping occurrences; later candidates stay cached.
+    next.index = text.indexOf(next.value, cursor);
+    if (next.index === -1) {
+      const last = pending.pop();
+      if (pending.length) pending[0] = last;
+    }
+    siftDown(0);
   }
+  if (replacements) parts.push(MASK_REPLACEMENT.repeat(replacements));
   parts.push(text.slice(cursor));
   return parts.join("");
 }
