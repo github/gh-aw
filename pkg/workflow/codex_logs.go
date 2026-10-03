@@ -2,10 +2,9 @@ package workflow
 
 import (
 	"encoding/json"
-	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -13,209 +12,116 @@ import (
 
 var codexLogsLog = logger.New("workflow:codex_logs")
 
+var (
+	codexLegacyTokensPattern = regexp.MustCompile(`(?i)^tokens\s+used[:\s]+([\d,]+)\s*$`)
+	codexLegacyTotalPattern  = regexp.MustCompile(`\btotal_tokens:\s*([\d,]+)`)
+	codexLegacyResultPattern = regexp.MustCompile(`^(?:(.*?)\s+)?(success|succeeded|failure|failed)\s+in\s+(\d+(?:\.\d+)?)(ms|s):?\s*$`)
+	codexLegacyFramePattern  = regexp.MustCompile(`^\[[^\]]+\]\s+`)
+	codexLegacyLogPattern    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\S+\s+(?:DEBUG|INFO|WARN|ERROR)\s+\S+:\s*`)
+	codexGroupedCountPattern = regexp.MustCompile(`^\d+(?:,\d{3})*$`)
+	codexLegacyToolPattern   = regexp.MustCompile(`^ToolCall:\s+([\w-]+)__([\w-]+)\s+`)
+)
+
 // ParseLogMetrics implements engine-specific log parsing for Codex
 func (e *CodexEngine) ParseLogMetrics(logContent string, verbose bool) LogMetrics {
 	codexLogsLog.Printf("Parsing Codex log metrics: log_size=%d bytes, lines=%d", len(logContent), strings.Count(logContent, "\n")+1)
-
-	var metrics LogMetrics
-	var totalTokenUsage int
-
-	lines := strings.Split(logContent, "\n")
-	turns := 0
-	inThinkingSection := false
-	toolCallMap := make(map[string]*ToolCallInfo) // Track tool calls
-	var currentSequence []string                  // Track tool sequence
-	var lastToolName string                       // Track most recent tool for output size extraction
-
-	for i := range lines {
-		line := lines[i]
-
-		// Skip empty lines
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		// Detect thinking sections as indicators of turns
-		// Support both old format: "] thinking" and new Rust format: "thinking" (standalone line)
-		trimmedLine := strings.TrimSpace(line)
-		if strings.Contains(line, "] thinking") || trimmedLine == "thinking" {
-			if !inThinkingSection {
-				turns++
-				inThinkingSection = true
-				// Start of a new thinking section, save previous sequence if any
-				if len(currentSequence) > 0 {
-					metrics.ToolSequences = append(metrics.ToolSequences, currentSequence)
-					currentSequence = []string{}
-				}
-			}
-		} else if strings.Contains(line, "] tool") || strings.Contains(line, "] exec") || strings.Contains(line, "] codex") ||
-			strings.HasPrefix(trimmedLine, "tool ") || strings.HasPrefix(trimmedLine, "exec ") {
-			inThinkingSection = false
-		}
-
-		// Extract tool calls from Codex logs and add to sequence
-		if toolName := e.parseCodexToolCallsWithSequence(line, toolCallMap); toolName != "" {
-			currentSequence = append(currentSequence, toolName)
-			lastToolName = toolName
-		}
-
-		// Extract output size from success/failure lines followed by JSON blocks
-		if outputSize := e.extractOutputSizeFromResult(line, lines, i); outputSize > 0 && lastToolName != "" {
-			if toolInfo, exists := toolCallMap[lastToolName]; exists {
-				if outputSize > toolInfo.MaxOutputSize {
-					toolInfo.MaxOutputSize = outputSize
-					codexLogsLog.Printf("Updated %s MaxOutputSize to %d characters", lastToolName, outputSize)
-				}
-			}
-		}
-
-		// Extract Codex-specific token usage (always sum for Codex)
-		if tokenUsage := e.extractCodexTokenUsage(line); tokenUsage > 0 {
-			totalTokenUsage += tokenUsage
-		}
-
-		// Basic processing - error/warning counting moved to end of function
-	}
-
-	// Finalize metrics using shared helper
+	legacy := e.parseCodexLegacyMetrics(logContent)
+	structured := e.parseCodexJSONLMetrics(logContent)
+	legacy.mergeStructured(structured)
 	FinalizeToolMetrics(FinalizeToolMetricsOptions{
-		Metrics:         &metrics,
-		ToolCallMap:     toolCallMap,
-		CurrentSequence: currentSequence,
-		Turns:           turns,
-		TokenUsage:      totalTokenUsage,
+		Metrics:         &legacy.metrics,
+		ToolCallMap:     legacy.tools,
+		CurrentSequence: legacy.sequence,
+		Turns:           legacy.turns,
+		TokenUsage:      legacy.tokens,
 	})
-
 	codexLogsLog.Printf("Parsed Codex metrics: turns=%d, token_usage=%d, tool_calls=%d",
-		metrics.Turns, metrics.TokenUsage, len(metrics.ToolCalls))
-
-	return metrics
+		legacy.metrics.Turns, legacy.metrics.TokenUsage, len(legacy.metrics.ToolCalls))
+	return legacy.metrics
 }
 
 // parseCodexToolCallsWithSequence extracts tool call information from Codex log lines and returns tool name
 func (e *CodexEngine) parseCodexToolCallsWithSequence(line string, toolCallMap map[string]*ToolCallInfo) string {
-	trimmedLine := strings.TrimSpace(line)
-
-	// Parse tool calls: "] tool provider.method(...)" (old format)
-	// or "tool provider.method(...)" (new Rust format)
-	var toolName string
-
-	// Try old format first: "] tool provider.method(...)"
-	if strings.Contains(line, "] tool ") && strings.Contains(line, "(") {
-		if match := codexToolCallOldFormat.FindStringSubmatch(line); len(match) > 1 {
-			toolName = strings.TrimSpace(match[1])
+	name := normalizeCodexToolName(codexLegacyToolName(line))
+	if name == "" {
+		if command := codexLegacyExecCommand(line); command != "" {
+			name = "bash_" + ShortenCommand(command)
 		}
 	}
-
-	// Try new Rust format: "tool provider.method(...)"
-	if toolName == "" && strings.HasPrefix(trimmedLine, "tool ") && strings.Contains(trimmedLine, "(") {
-		if match := codexToolCallNewFormat.FindStringSubmatch(trimmedLine); len(match) > 1 {
-			toolName = strings.TrimSpace(match[1])
-		}
+	if name == "" {
+		return ""
 	}
-
-	if toolName != "" {
-		prettifiedName := PrettifyToolName(toolName)
-
-		// For Codex, format provider.method as provider_method (avoiding colons)
-		if strings.Contains(toolName, ".") {
-			parts := strings.Split(toolName, ".")
-			if len(parts) >= 2 {
-				provider := parts[0]
-				method := strings.Join(parts[1:], "_")
-				prettifiedName = fmt.Sprintf("%s_%s", provider, method)
-			}
-		}
-
-		// Initialize or update tool call info
-		if toolInfo, exists := toolCallMap[prettifiedName]; exists {
-			toolInfo.CallCount++
-		} else {
-			toolCallMap[prettifiedName] = &ToolCallInfo{
-				Name:          prettifiedName,
-				CallCount:     1,
-				MaxOutputSize: 0, // Will be updated when output is extracted from result lines
-				MaxDuration:   0, // Will be updated when duration is found
-			}
-		}
-
-		return prettifiedName
+	if toolCallMap[name] == nil {
+		toolCallMap[name] = &ToolCallInfo{Name: name}
 	}
-
-	// Parse exec commands: "] exec command" (old format)
-	// or "exec command in" (new Rust format) - treat as bash calls
-	var execCommand string
-
-	// Try old format: "] exec command in"
-	if strings.Contains(line, "] exec ") {
-		if match := codexExecCommandOldFormat.FindStringSubmatch(line); len(match) > 1 {
-			execCommand = strings.TrimSpace(match[1])
-		}
-	}
-
-	// Try new Rust format: "exec command in"
-	if execCommand == "" && strings.HasPrefix(trimmedLine, "exec ") {
-		if match := codexExecCommandNewFormat.FindStringSubmatch(trimmedLine); len(match) > 1 {
-			execCommand = strings.TrimSpace(match[1])
-		}
-	}
-
-	if execCommand != "" {
-		// Create unique bash entry with command info, avoiding colons
-		uniqueBashName := "bash_" + ShortenCommand(execCommand)
-
-		// Initialize or update tool call info
-		if toolInfo, exists := toolCallMap[uniqueBashName]; exists {
-			toolInfo.CallCount++
-		} else {
-			toolCallMap[uniqueBashName] = &ToolCallInfo{
-				Name:          uniqueBashName,
-				CallCount:     1,
-				MaxOutputSize: 0,
-				MaxDuration:   0, // Will be updated when duration is found
-			}
-		}
-
-		return uniqueBashName
-	}
-
-	// Parse duration from success/failure lines: "] success in 0.2s" or "] failure in 1.5s"
-	if strings.Contains(line, "success in") || strings.Contains(line, "failure in") || strings.Contains(line, "failed in") {
-		// Extract duration pattern like "in 0.2s", "in 1.5s"
-		if match := codexDurationPattern.FindStringSubmatch(line); len(match) > 1 {
-			if durationSeconds, err := strconv.ParseFloat(match[1], 64); err == nil {
-				duration := time.Duration(durationSeconds * float64(time.Second))
-
-				// Find the most recent tool call to associate with this duration
-				// Since we don't have direct association, we'll update the most recent entry
-				// This is a limitation of the log format, but it's the best we can do
-				e.updateMostRecentToolWithDuration(toolCallMap, duration)
-			}
-		}
-	}
-
-	return "" // No tool call found
+	toolCallMap[name].CallCount++
+	return name
 }
 
-// updateMostRecentToolWithDuration updates the tool with maximum duration
-// Since we can't perfectly correlate duration lines with specific tool calls in Codex logs,
-// we approximate by updating any tool that doesn't have a duration yet, or updating the max
-func (e *CodexEngine) updateMostRecentToolWithDuration(toolCallMap map[string]*ToolCallInfo, duration time.Duration) {
-	// Find a tool that either has no duration yet or can be updated with a larger duration
-	for _, toolInfo := range toolCallMap {
-		if toolInfo.MaxDuration == 0 || duration > toolInfo.MaxDuration {
-			toolInfo.MaxDuration = duration
-			// Only update one tool per duration line to avoid over-attribution
-			break
+func codexLegacyToolName(line string) string {
+	for _, pattern := range []*regexp.Regexp{codexToolCallOldFormat, codexToolCallNewFormat} {
+		if name := strings.TrimSpace(codexRegexpGroup(pattern.FindStringSubmatch(strings.TrimSpace(line)), 1)); name != "" {
+			return name
 		}
 	}
+	match := codexLegacyToolPattern.FindStringSubmatch(codexLegacyPayload(line))
+	if len(match) == 0 {
+		return ""
+	}
+	return codexRegexpGroup(match, 1) + "." + codexRegexpGroup(match, 2)
+}
+
+func codexRegexpGroup(matches []string, group int) string {
+	for index, match := range matches {
+		if index == group {
+			return match
+		}
+	}
+	return ""
+}
+
+func normalizeCodexToolName(name string) string {
+	return strings.ReplaceAll(PrettifyToolName(strings.TrimSpace(name)), ".", "_")
+}
+
+func codexLegacyPayload(line string) string {
+	payload := codexLegacyFramePattern.ReplaceAllString(strings.TrimSpace(line), "")
+	return codexLegacyLogPattern.ReplaceAllString(payload, "")
+}
+
+func codexLegacyExecCommand(line string) string {
+	command, found := strings.CutPrefix(codexLegacyPayload(line), "exec ")
+	if !found {
+		return ""
+	}
+	if index := strings.LastIndex(command, " in /"); index >= 0 {
+		command = command[:index]
+	}
+	return strings.TrimSpace(command)
+}
+
+func codexLegacyCommandOutputSize(lines []string, index int) int {
+	var output []string
+	for _, line := range lines[index+1:] {
+		payload := codexLegacyPayload(line)
+		if strings.HasPrefix(line, "[") || strings.HasPrefix(payload, "tool ") || strings.HasPrefix(payload, "exec ") ||
+			strings.HasPrefix(payload, "ToolCall:") || strings.HasPrefix(payload, "tokens used") ||
+			payload == "thinking" || payload == "codex" || codexLegacyResultPattern.MatchString(payload) {
+			break
+		}
+		if _, found := extractCodexLegacyTokenCount(line); found {
+			break
+		}
+		output = append(output, line)
+	}
+	return len(strings.TrimRight(strings.Join(output, "\n"), "\n"))
 }
 
 // extractOutputSizeFromResult extracts output size from success/failure result lines
 // Returns the character count of the output content if found, 0 otherwise
 func (e *CodexEngine) extractOutputSizeFromResult(line string, lines []string, currentIndex int) int {
 	// Check if this is a success or failure line
-	if !strings.Contains(line, "success in") && !strings.Contains(line, "failure in") && !strings.Contains(line, "failed in") {
+	if codexLegacyResultPattern.FindStringSubmatch(codexLegacyPayload(line)) == nil {
 		return 0
 	}
 
@@ -227,48 +133,25 @@ func (e *CodexEngine) extractOutputSizeFromResult(line string, lines []string, c
 	//   "isError": false
 	// }
 
-	var jsonLines []string
-	inJSON := false
-	braceCount := 0
-
-	// Look ahead to collect JSON block
-	for i := currentIndex + 1; i < len(lines); i++ {
-		trimmedLine := strings.TrimSpace(lines[i])
-
-		// Start of JSON block
-		if !inJSON && trimmedLine == "{" {
-			inJSON = true
-			braceCount = 1
-			jsonLines = append(jsonLines, lines[i])
-			continue
-		}
-
-		if inJSON {
-			jsonLines = append(jsonLines, lines[i])
-			// Count braces to detect end of JSON
-			braceCount += strings.Count(lines[i], "{")
-			braceCount -= strings.Count(lines[i], "}")
-
-			if braceCount == 0 {
-				break
-			}
-		}
-
-		// If we hit a non-empty line that's not part of JSON, stop
-		if !inJSON && trimmedLine != "" {
-			break
-		}
+	if result, _, found := codexLegacyResultJSON(lines, currentIndex); found {
+		return e.extractOutputSizeFromJSON(string(result))
 	}
+	return 0
+}
 
-	if len(jsonLines) == 0 {
-		return 0
+func codexLegacyResultJSON(lines []string, currentIndex int) (json.RawMessage, int, bool) {
+	content := strings.Join(lines[currentIndex+1:], "\n")
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
+		return nil, currentIndex, false
 	}
-
-	// Parse the JSON to extract content
-	jsonStr := strings.Join(jsonLines, "\n")
-	outputSize := e.extractOutputSizeFromJSON(jsonStr)
-
-	return outputSize
+	var result json.RawMessage
+	decoder := json.NewDecoder(strings.NewReader(content))
+	if decoder.Decode(&result) != nil {
+		return nil, currentIndex, false
+	}
+	end := currentIndex + 1 + strings.Count(content[:decoder.InputOffset()], "\n")
+	return result, end, true
 }
 
 // extractOutputSizeFromJSON extracts the output size from a Codex result JSON block
@@ -322,60 +205,63 @@ func (e *CodexEngine) extractOutputSizeFromJSONFallback(jsonStr string) int {
 	totalSize := 0
 
 	// Split by "text": to find text content
-	parts := strings.Split(jsonStr, "\"text\":")
-	for i := 1; i < len(parts); i++ {
-		// Find the quoted string value
-		part := strings.TrimSpace(parts[i])
-		if part == "" || part[0] != '"' {
+	for index, part := range strings.Split(jsonStr, "\"text\":") {
+		if index == 0 {
 			continue
 		}
+		totalSize += codexQuotedStringLength(strings.TrimSpace(part))
+	}
+	return totalSize
+}
 
-		// Find the closing quote, handling escaped quotes
-		inEscape := false
-		endQuote := -1
-		for j := 1; j < len(part); j++ {
-			if inEscape {
-				inEscape = false
-				continue
-			}
-			if part[j] == '\\' {
-				inEscape = true
-				continue
-			}
-			if part[j] == '"' {
-				endQuote = j
-				break
-			}
+func codexQuotedStringLength(part string) int {
+	if !strings.HasPrefix(part, `"`) {
+		return 0
+	}
+	inEscape := false
+	for index, character := range part {
+		if index == 0 {
+			continue
 		}
-
-		if endQuote > 0 {
-			textContent := part[1:endQuote]
-			totalSize += len(textContent)
+		if inEscape {
+			inEscape = false
+			continue
+		}
+		switch character {
+		case '\\':
+			inEscape = true
+		case '"':
+			return index - 1
 		}
 	}
-
-	return totalSize
+	return 0
 }
 
 // extractCodexTokenUsage extracts token usage from Codex-specific log lines
 func (e *CodexEngine) extractCodexTokenUsage(line string) int {
-	// Codex format 1: "tokens used: 13934"
-	// Use pre-compiled pattern for performance
-	if match := codexTokenUsagePattern.FindStringSubmatch(line); len(match) > 1 {
-		if count, err := strconv.Atoi(match[1]); err == nil {
-			return count
+	count, _ := extractCodexLegacyTokenCount(line)
+	return count
+}
+
+func extractCodexLegacyTokenCount(line string) (int, bool) {
+	payload := codexLegacyPayload(line)
+	for _, pattern := range []*regexp.Regexp{codexLegacyTokensPattern, codexLegacyTotalPattern} {
+		if pattern == codexLegacyTotalPattern && !strings.HasPrefix(payload, "total_tokens:") && !strings.Contains(payload, "TokenCount") {
+			continue
+		}
+		if match := pattern.FindStringSubmatch(payload); len(match) > 1 {
+			return parseCodexGroupedCount(codexRegexpGroup(match, 1))
 		}
 	}
+	return 0, false
+}
 
-	// Codex format 2: "TokenCount(TokenCountEvent { ... total_tokens: 13281 ..."
-	// This pattern appears in newer Codex logs
-	if match := codexTotalTokensPattern.FindStringSubmatch(line); len(match) > 1 {
-		if count, err := strconv.Atoi(match[1]); err == nil {
-			return count
-		}
+func parseCodexGroupedCount(value string) (int, bool) {
+	if !codexGroupedCountPattern.MatchString(value) {
+		return 0, false
 	}
-
-	return 0
+	count, err := strconv.Atoi(strings.ReplaceAll(value, ",", ""))
+	return count, err == nil && float64(count) <= 9007199254740991
 }
 
 // GetLogParserScriptId returns the JavaScript script name for parsing Codex logs

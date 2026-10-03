@@ -883,21 +883,3 @@ func writeEnclaveMCPJSON(yaml *strings.Builder, workflowData *WorkflowData, isLa
 	}
 	yaml.WriteString("\n")
 }
-
-func writeEnclaveMCPTOML(yaml *strings.Builder, workflowData *WorkflowData) {
-	yaml.WriteString("          \n")
-	fmt.Fprintf(yaml, "          [mcp_servers.%s]\n", enclaveMCPServerName)
-	yaml.WriteString("          type = \"http\"\n")
-	fmt.Fprintf(yaml, "          url = %q\n", enclaveMCPUpstreamURL)
-	fmt.Fprintf(yaml, "          headers = { Authorization = \"Bearer $%s\" }\n", enclaveMCPCapabilityEnv)
-	fmt.Fprintf(yaml, "          tools = [")
-	for i, tool := range enabledEnclaveTools(workflowData) {
-		if i > 0 {
-			yaml.WriteString(", ")
-		}
-		fmt.Fprintf(yaml, "%q", tool)
-	}
-	yaml.WriteString("]\n")
-	fmt.Fprintf(yaml, "          connectTimeout = %d\n", enclaveMCPConnectTimeout)
-	fmt.Fprintf(yaml, "          toolTimeout = %d\n", enclaveToolTimeout(workflowData))
-}

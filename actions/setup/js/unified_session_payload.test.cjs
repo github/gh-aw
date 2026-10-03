@@ -3,6 +3,8 @@ import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 import { mergeSessionSources } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
+import { normalizeCodexSession } from "./codex_session.cjs";
+import { selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 
 describe("essential unified session payloads", () => {
   it("removes duplicated engine envelopes without trimming significant message text", () => {
@@ -32,7 +34,11 @@ describe("essential unified session payloads", () => {
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
     ["execution.result", { exit_code: 0, duration_ms: 0, outcome: "success", extra: "omit" }, { exitCode: 0, durationMs: 0, outcome: "success" }],
-    ["detection.result", { job_result: "success", secret_leak: false, prompt_injection: false, raw: "omit" }, { jobResult: "success", secretLeak: false, promptInjection: false }],
+    [
+      "detection.result",
+      { job_result: "success", conclusion: "warning", reason: "threat_detected", secret_leak: false, prompt_injection: false, malicious_patch: true, reasons: ["PRIVATE_REASON"], raw: "omit" },
+      { jobResult: "success", conclusion: "warning", reason: "threat_detected", secretLeak: false, promptInjection: false, maliciousPatch: true },
+    ],
     ["safe_output.request", { type: "create_issue", repo: "example/repo", body: "omit", title: "omit" }, { type: "create_issue", repo: "example/repo" }],
     ["safe_output.result", { type: "create_issue", number: 0, identifier: null, body: "omit" }, { type: "create_issue", number: 0, identifier: null }],
     ["eval.result", { id: "quality", answer: false, question: "omit", model: "fixture" }, { id: "quality", answer: false, model: "fixture" }],
@@ -63,6 +69,15 @@ describe("essential unified session payloads", () => {
     }
   });
 
+  it("keeps canonical detection values, including false flags and an empty categorical reason", () => {
+    const compact = normalizeUnifiedSessionEvent({
+      type: "detection.result",
+      data: { jobResult: "failure", job_result: "success", conclusion: "failure", reason: "", promptInjection: false, prompt_injection: true, secretLeak: false, maliciousPatch: false },
+    });
+    expect(compact.data).toEqual({ jobResult: "failure", conclusion: "failure", reason: "", promptInjection: false, secretLeak: false, maliciousPatch: false });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+  });
+
   it("uses one accounting shape without losing zero values or adding overlapping totals", () => {
     const data = { provider: "copilot", inputTokens: 0, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, ai_credits_this_response: 0, ai_credits_total: 0, duration_ms: 0, opaque: "omit" };
     const runtime = normalizeUnifiedSessionEvent({ type: "firewall.token_usage", data });
@@ -70,6 +85,38 @@ describe("essential unified session payloads", () => {
     const agent = normalizeUnifiedSessionEvent({ type: "session.result", data: { num_turns: 0, usage: { inputTokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"], unused: 10 } } });
     expect(agent.data).toEqual({ numTurns: 0, usage: { input_tokens: 0, output_tokens: 2, overflowed_tokens: ["cache_read_input_tokens"] } });
     expect(normalizeUnifiedSessionEvent(runtime)).toEqual(runtime);
+  });
+
+  it.each([0, 3])("keeps Codex terminal metadata and %i reasoning tokens without duplicate accounting", reasoning => {
+    const native = [{ type: "turn.completed", usage: { input_tokens: 10, cached_input_tokens: 4, cache_write_input_tokens: 0, output_tokens: 5, reasoning_output_tokens: reasoning } }];
+    const events = normalizeCodexSession(native);
+    const compact = events.map(normalizeUnifiedSessionEvent);
+    expect(compact).toEqual([
+      {
+        type: "session.result",
+        data: {
+          status: "completed",
+          sourceType: "turn.completed",
+          numTurns: 1,
+          usage: { input_tokens: 10, output_tokens: 5, reasoning_output_tokens: reasoning, cache_read_input_tokens: 4, cache_creation_input_tokens: 0 },
+        },
+      },
+    ]);
+    expect(normalizeUnifiedSessionEvent(compact[0])).toEqual(compact[0]);
+    expect(sessionTokenTotal(selectSessionResult(compact).usage)).toBe(15);
+    expect(events[0].data.usage.cached_input_tokens).toBe(4);
+    expect(events[0].data.usage.cache_write_input_tokens).toBe(0);
+  });
+
+  it("retains failed turns separately from nonfatal Codex diagnostics", () => {
+    const events = normalizeCodexSession([
+      { type: "item.completed", item: { id: "diagnostic", type: "error", message: "Model metadata unavailable." } },
+      { type: "turn.failed", error: { message: "Response rejected." } },
+    ]);
+    expect(events.map(normalizeUnifiedSessionEvent)).toEqual([
+      { type: "session.result", data: { errors: ["Model metadata unavailable."] } },
+      { type: "session.result", data: { status: "failed", sourceType: "turn.failed", errors: [{ message: "Response rejected." }] } },
+    ]);
   });
 
   it("retains grader decisions and safe-output errors without evaluator scripts", () => {

@@ -14,7 +14,8 @@ const {
   formatToolUse,
 } = require("./log_parser_shared.cjs");
 const { normalizeCodexSession, isCodexRecord } = require("./codex_session.cjs");
-const { projectSessionResult, createSessionEvent } = require("./agent_session.cjs");
+const { projectSessionResult, createSessionEvent, sessionToolSuccess } = require("./agent_session.cjs");
+const { CODEX_LEGACY_OUTCOME, codexLegacyPayload, codexLegacyResultEnd } = require("./codex_log_framing.cjs");
 
 const main = createEngineLogParser({
   parserName: "Codex",
@@ -214,7 +215,7 @@ function isCodexJsonlFormat(lines, entries = parseLogEntries(lines.join("\n")) ?
  * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
 function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []) {
-  const canonicalLogEntries = normalizeCodexSession(entries, extractCodexModel(logContent));
+  const canonicalLogEntries = normalizeCodexSession(collectCodexMixedRecords(logContent, entries), extractCodexModel(logContent));
   const conversation = generateConversationMarkdown(canonicalLogEntries, {
     includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult),
@@ -231,25 +232,85 @@ function parseCodexJsonl(logContent, entries = parseLogEntries(logContent) ?? []
 }
 
 /**
+ * Keep recognized text observations beside JSON records without splitting the
+ * native normalizer's lifecycle/accounting state into independent sessions.
+ * @param {string} logContent
+ * @param {Array<any>} [entries]
+ * @returns {Array<any>}
+ */
+function collectCodexMixedRecords(logContent, entries = parseLogEntries(logContent) ?? []) {
+  try {
+    if (Array.isArray(JSON.parse(logContent))) return entries;
+  } catch {
+    // Mixed streams are not a single JSON document.
+  }
+  const records = [];
+  let text = [];
+  let hasFramedResult = false;
+  const accounting = { inlineTokens: 0, hasTokenSnapshot: false };
+  const flushText = () => {
+    const content = text.join("\n");
+    records.push(...parseCodexLegacySession(text, /^model:/m.test(content) ? extractCodexModel(content) : null, accounting));
+    text = [];
+  };
+  const lines = logContent.split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const resultEnd = codexLegacyResultEnd(lines, index);
+    if (resultEnd !== null) {
+      hasFramedResult = true;
+      text.push(...lines.slice(index, resultEnd + 1));
+      index = resultEnd;
+      continue;
+    }
+    const parsed = parseLogEntries(line);
+    if (parsed && isCodexJsonlFormat([], parsed)) {
+      flushText();
+      records.push(...parsed);
+    } else text.push(line);
+  }
+  flushText();
+  return records.length > 0 || hasFramedResult ? records : entries;
+}
+
+/** @param {string} line @returns {number|undefined} */
+function extractCodexLegacyTokens(line) {
+  const payload = codexLegacyPayload(line);
+  const totalMatch = payload.startsWith("total_tokens:") || payload.includes("TokenCount") ? payload.match(/\btotal_tokens:\s*([\d,]+)/) : null;
+  const match = payload.match(/^tokens\s+used:\s*([\d,]+)\s*$/i) ?? totalMatch;
+  if (!match) return undefined;
+  if (!/^\d+(?:,\d{3})*$/.test(match[1])) return undefined;
+  const count = Number(match[1].replace(/,/g, ""));
+  return Number.isSafeInteger(count) && count >= 0 ? count : undefined;
+}
+
+/**
  * Legacy presentation uses lookahead; canonical observations must instead remain
  * at their source positions, including orphan outcomes and dangling invocations.
  * @param {string[]} lines
  * @param {string|null} model
+ * @param {{inlineTokens: number, hasTokenSnapshot: boolean}} [accounting]
  * @returns {import("./types/agent_session").AgentSession}
  */
-function parseCodexLegacySession(lines, model) {
+function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, hasTokenSnapshot: false }) {
   /** @type {import("./types/agent_session").AgentSession} */
   const events = [];
   const metadata = /^(?:OpenAI Codex|--------|workdir:|model:|provider:|approval:|sandbox:|reasoning effort:|reasoning summaries:|DEBUG codex|INFO codex|\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+(?:DEBUG|INFO|WARN|ERROR))/;
-  const frame = /^\[[^\]]+\]\s+/;
   const tool = /^tool\s+([\w-]+)\.([\w-]+)\((.*)\)$/;
   const oldTool = /^ToolCall:\s+([\w-]+)__([\w-]+)\s+(.*)$/;
   const exec = /^exec\s+(?:bash\s+-lc\s+'([^']*)'|(.+?)(?: in \/.*)?)$/;
-  const outcome = /^(?:([\w-]+)\.([\w-]+)\(.*\)|(bash\s+-lc\s+'[^']*'))\s+(success|succeeded|failed)\s+in\s+(\d+)ms:$/;
+  const outcome = CODEX_LEGACY_OUTCOME;
   const boundary = line => {
-    const payload = line.replace(frame, "");
+    const payload = codexLegacyPayload(line);
     return (
-      /^(?:thinking|codex|user|tokens used)$/.test(payload) || metadata.test(line) || tool.test(payload) || oldTool.test(payload) || exec.test(payload) || outcome.test(payload) || /^(?:ERROR:|Reconnecting\.\.\.|total_tokens:)/.test(payload)
+      /^(?:thinking|codex|user|tokens used)$/.test(payload) ||
+      metadata.test(line) ||
+      tool.test(payload) ||
+      oldTool.test(payload) ||
+      exec.test(payload) ||
+      outcome.test(payload) ||
+      /^(?:ERROR:|Reconnecting\.\.\.)/.test(payload) ||
+      extractCodexLegacyTokens(line) !== undefined
     );
   };
   const emit = (source, type, data) => events.push(createSessionEvent(source, type, data));
@@ -259,10 +320,31 @@ function parseCodexLegacySession(lines, model) {
   }
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const payload = line.replace(frame, "");
-    const timestamp = line.match(/^\[([^\]]+)\]/)?.[1];
+    const payload = codexLegacyPayload(line);
+    const timestamp = line.match(/^\[([^\]]+)\]/)?.[1] ?? line.match(/^(\d{4}-\d{2}-\d{2}T\S+)/)?.[1];
     const source = timestamp === undefined ? {} : { timestamp };
-    if (metadata.test(line)) continue;
+    const tokens = extractCodexLegacyTokens(line);
+    if (tokens !== undefined) {
+      if (/^tokens\s+used:/i.test(payload)) {
+        accounting.inlineTokens += tokens;
+        if (!accounting.hasTokenSnapshot && Number.isSafeInteger(accounting.inlineTokens)) emit(source, "session.result", { usage: { total_tokens: accounting.inlineTokens } });
+      } else {
+        accounting.hasTokenSnapshot = true;
+        emit(source, "session.result", { usage: { total_tokens: tokens } });
+      }
+      continue;
+    }
+    if (
+      metadata.test(line) &&
+      !outcome.test(payload) &&
+      !tool.test(payload) &&
+      !oldTool.test(payload) &&
+      !exec.test(payload) &&
+      !["thinking", "codex", "user"].includes(payload) &&
+      !payload.startsWith("ERROR:") &&
+      !payload.startsWith("Reconnecting...")
+    )
+      continue;
     if (["thinking", "codex", "user"].includes(payload)) {
       const text = [];
       while (i + 1 < lines.length && !boundary(lines[i + 1])) text.push(lines[++i]);
@@ -286,24 +368,37 @@ function parseCodexLegacySession(lines, model) {
       const completion = payload.match(outcome);
       if (completion) {
         const output = [];
-        while (i + 1 < lines.length && !boundary(lines[i + 1])) output.push(lines[++i]);
+        const resultEnd = codexLegacyResultEnd(lines, i);
+        if (resultEnd !== null) {
+          output.push(...lines.slice(i + 1, resultEnd + 1));
+          i = resultEnd;
+        } else while (i + 1 < lines.length && !boundary(lines[i + 1])) output.push(lines[++i]);
+        const outputText = output.join("\n");
+        let resultFailed = false;
+        try {
+          resultFailed = sessionToolSuccess(JSON.parse(outputText)) === false;
+        } catch {
+          // Plain command output is not a structured MCP result.
+        }
         emit(source, "tool.execution_complete", {
           toolName: completion[3] !== undefined ? "bash" : completion[2],
           mcpServerName: completion[1],
-          success: completion[4] !== "failed",
-          durationMs: Number(completion[5]),
-          output: output.join("\n"),
+          success: !["failed", "failure"].includes(completion[4]) && !resultFailed,
+          durationMs: Number(completion[5]) * (completion[6] === "s" ? 1000 : 1),
+          output: outputText,
         });
       } else if (payload.startsWith("ERROR:")) {
         emit(source, "session.result", { errors: [payload.replace(/^ERROR: ?/, "")] });
       } else {
         const retry = payload.match(/^Reconnecting\.\.\.\s+(\d+)\/(\d+)\s*\((.*)\)$/);
         if (retry) emit({ ...source, reconnectAttempt: Number(retry[1]), maxReconnects: Number(retry[2]) }, "session.result", { errors: [retry[3]] });
-        else if (payload === "tokens used" && /^[\d,]+$/.test(lines[i + 1] ?? "")) {
-          emit(source, "session.result", { usage: { total_tokens: Number(lines[++i].replace(/,/g, "")) } });
-        } else {
-          const total = payload.match(/^total_tokens:\s*(\d+)/);
-          if (total) emit(source, "session.result", { usage: { total_tokens: Number(total[1]) } });
+        else if (payload === "tokens used") {
+          const count = extractCodexLegacyTokens(`tokens used: ${lines[i + 1] ?? ""}`);
+          if (count !== undefined) {
+            i++;
+            accounting.hasTokenSnapshot = true;
+            emit(source, "session.result", { usage: { total_tokens: count } });
+          }
         }
       }
     }
@@ -572,21 +667,9 @@ function parseCodexLog(logContent, parsed = parseLogEntries(logContent) ?? []) {
   markdown += "</details>\n\n<details>\n<summary>Information</summary>\n\n";
 
   // Extract metadata from Codex logs
-  let totalTokens;
-
-  // TokenCount(TokenCountEvent { ... total_tokens: 13281 ...
-  const tokenCountMatches = logContent.matchAll(/total_tokens:\s*(\d+)/g);
-  for (const match of tokenCountMatches) {
-    const tokens = parseInt(match[1], 10);
-    totalTokens = tokens;
-  }
-
-  // Also check for "tokens used\n<number>" at the end (number may have commas)
-  const finalTokensMatch = logContent.match(/tokens used\n([\d,]+)/);
-  if (finalTokensMatch) {
-    // Remove commas before parsing
-    totalTokens = parseInt(finalTokensMatch[1].replace(/,/g, ""), 10);
-  }
+  const model = extractCodexModel(logContent);
+  const canonicalLogEntries = parseCodexLegacySession(lines, model);
+  const totalTokens = projectSessionResult(canonicalLogEntries)?.usage?.total_tokens;
 
   if (totalTokens !== undefined) {
     markdown += `**Total Tokens Used:** ${totalTokens.toLocaleString()}\n\n`;
@@ -600,12 +683,8 @@ function parseCodexLog(logContent, parsed = parseLogEntries(logContent) ?? []) {
   }
   markdown += "</details>\n\n";
 
-  const model = extractCodexModel(logContent);
-
   // Check for MCP failures
   const mcpFailures = mcpInfo.servers.filter(server => server.status === "failed").map(server => server.name);
-
-  const canonicalLogEntries = parseCodexLegacySession(lines, model);
 
   return {
     markdown,
@@ -720,5 +799,6 @@ if (typeof module !== "undefined" && module.exports) {
     extractMCPInitialization,
     extractCodexErrorMessages,
     extractCodexModel,
+    collectCodexMixedRecords,
   };
 }

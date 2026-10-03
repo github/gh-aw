@@ -148,13 +148,16 @@ func TestCodexEngineWithToolsTimeout(t *testing.T) {
 			// Render MCP config
 			var configBuilder strings.Builder
 			mcpTools := []string{"github"}
-			if err := engine.RenderMCPConfig(&configBuilder, workflowData.Tools, mcpTools, workflowData); err != nil {
+			if err := renderCodexMCPConfigForTest(t, engine, &configBuilder, workflowData.Tools, mcpTools, workflowData); err != nil {
 				t.Fatalf("RenderMCPConfig returned unexpected error: %v", err)
 			}
 			configContent := configBuilder.String()
 
-			if !strings.Contains(configContent, tt.expectedTimeout) {
-				t.Errorf("Expected '%s' in MCP config, got: %s", tt.expectedTimeout, configContent)
+			config := decodeCodexBootstrap(t, configContent)
+			server := config["mcp_servers"].(map[string]any)["github"].(map[string]any)
+			expected := strings.TrimPrefix(tt.expectedTimeout, "tool_timeout_sec = ")
+			if fmt.Sprint(server["tool_timeout_sec"]) != expected {
+				t.Errorf("Expected native tool timeout %s, got %v", expected, server["tool_timeout_sec"])
 			}
 
 			// Check for GH_AW_TOOL_TIMEOUT in execution steps

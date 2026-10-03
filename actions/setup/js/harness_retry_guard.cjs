@@ -152,7 +152,10 @@ function parseAICreditsExceededProxyRejection(output) {
     if (!parsed || typeof parsed !== "object") continue;
     // prettier-ignore
     const record = /** @type {Record<string, unknown>} */ (parsed);
-    const isEngineFlaggedApiError = record.is_api_error_message === true || typeof record.error === "string";
+    const nativeError = record.error;
+    const isCodexApiError =
+      (record.type === "error" && typeof record.message === "string") || (record.type === "turn.failed" && nativeError && typeof nativeError === "object" && "message" in nativeError && typeof nativeError.message === "string");
+    const isEngineFlaggedApiError = record.is_api_error_message === true || typeof record.error === "string" || isCodexApiError;
     if (!isEngineFlaggedApiError) continue;
     const match = AI_CREDITS_EXCEEDED_PROXY_REJECTION_RE.exec(JSON.stringify(record));
     if (!match) continue;

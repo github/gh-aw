@@ -108,19 +108,32 @@ describe("runtime mask publication boundary", () => {
     expect(fs.readFileSync(sources.at(-2), "utf8")).not.toContain(builtin);
   });
 
-  it("removes a source on failed runtime-mask writes and continues sanitizing the other files", async () => {
+  it("sanitizes sources with oversized runtime masks without removing artifacts", async () => {
+    const mask = "x".repeat(200000);
+    const stdio = write("agent-stdio.log", `::add-mask::${mask}\noutput ${mask}\n`);
+    const source = write("safeoutputs.jsonl", { body: mask });
+    await redactSources();
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(core.warning).not.toHaveBeenCalled();
+    expect(fs.readFileSync(stdio, "utf8")).toBe("output ***\n");
+    expect(JSON.parse(fs.readFileSync(source, "utf8"))).toEqual({ body: "***" });
+  });
+
+  it("removes a source on failed runtime-mask writes without logging masks and continues sanitizing the other files", async () => {
     write("agent-stdio.log", `::add-mask::${opaque.replace(/%/g, "%25")}\n`);
     const failing = write("mcp-logs/first.jsonl", { credential: opaque });
     const remaining = write("safeoutputs.jsonl", { body: opaque });
     const originalWrite = fs.writeFileSync;
     vi.spyOn(fs, "writeFileSync").mockImplementation((file, ...args) => {
-      if (file === failing) throw new Error("write denied");
+      if (file === failing) throw new Error(`write denied: ${opaque}`);
       return originalWrite(file, ...args);
     });
     await redactSources();
     expect(fs.existsSync(failing)).toBe(false);
     expectSafe(JSON.parse(fs.readFileSync(remaining, "utf8")));
     expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after runtime mask redaction failed"));
+    expectSafe(core.warning.mock.calls.flat());
+    expectSafe(core.setFailed.mock.calls.flat());
   });
 
   it("removes publication sources if stdio masks cannot be read", async () => {

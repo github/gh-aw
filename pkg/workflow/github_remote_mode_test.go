@@ -12,6 +12,7 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGitHubRemoteModeConfiguration(t *testing.T) {
@@ -230,13 +231,14 @@ This is a test workflow for GitHub remote mode configuration.
 			case "remote":
 				// Codex uses TOML format, others use JSON
 				if tt.engineType == "codex" {
-					if tt.expectedURL != "" && !strings.Contains(lockContent, `url = "`+tt.expectedURL+`"`) {
-						t.Errorf("Expected URL %s but didn't find it in:\n%s", tt.expectedURL, lockContent)
+					gatewayURL := strings.Replace(tt.expectedURL, "/mcp-readonly/", "/mcp/", 1)
+					if gatewayURL != "" && !strings.Contains(lockContent, `"url": "`+gatewayURL+`"`) {
+						t.Errorf("Expected gateway upstream URL %s", gatewayURL)
 					}
-					// Check for bearer_token_env_var instead of Authorization header
-					if !strings.Contains(lockContent, `bearer_token_env_var = "GH_AW_GITHUB_TOKEN"`) {
-						t.Errorf("Expected bearer_token_env_var but didn't find it in:\n%s", lockContent)
-					}
+					assert.Contains(t, lockContent, `"type": "http"`)
+					assert.Contains(t, lockContent, `"X-MCP-Readonly": "true"`)
+					assert.Contains(t, lockContent, `GITHUB_MCP_SERVER_TOKEN: `+tt.expectedToken)
+					assert.NotContains(t, lockContent, `bearer_token_env_var =`)
 					// For read-only mode, the endpoint URL should include /mcp-readonly/
 					// No need to check for X-MCP-Readonly header since we use the endpoint URL
 					// NOTE: We do not check for absence of type = "http" here because the safe-outputs

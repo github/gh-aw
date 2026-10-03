@@ -297,11 +297,7 @@ Read a Jira issue.
 			assert.Contains(t, compiled, "getJiraIssue")
 			assert.Contains(t, compiled, "ATLASSIAN_SERVICE_ACCOUNT_API_KEY: ${{ secrets.ATLASSIAN_SERVICE_ACCOUNT_API_KEY }}")
 			assert.NotContains(t, compiled, `"token": "${{ secrets.ATLASSIAN_SERVICE_ACCOUNT_API_KEY }}"`)
-			if engine == "codex" {
-				assert.Contains(t, compiled, "Bear"+"er ${ATLASSIAN_SERVICE_ACCOUNT_API_KEY}")
-			} else {
-				assert.Contains(t, compiled, "Bear"+`er \${ATLASSIAN_SERVICE_ACCOUNT_API_KEY}`)
-			}
+			assert.Contains(t, compiled, "Bear"+`er \${ATLASSIAN_SERVICE_ACCOUNT_API_KEY}`)
 		})
 	}
 }

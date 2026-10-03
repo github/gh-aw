@@ -1,17 +1,9 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const {
-  createEngineLogParser,
-  generateConversationMarkdown,
-  generateInformationSection,
-  buildStepSummaryDetailsSection,
-  formatInitializationSummary,
-  formatToolUse,
-  convertLegacyLogEntriesToCopilotEvents,
-  parseLogEntries,
-} = require("./log_parser_shared.cjs");
-const { transformFlatSessionEntries, projectSessionResult } = require("./agent_session.cjs");
+const { createEngineLogParser, generateConversationMarkdown, generateInformationSection, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, parseLogEntries } = require("./log_parser_shared.cjs");
+const { projectSessionResult } = require("./agent_session.cjs");
+const { normalizeGeminiSession } = require("./gemini_session.cjs");
 
 const main = createEngineLogParser({
   parserName: "Gemini",
@@ -54,8 +46,7 @@ function parseGeminiLog(logContent) {
   }
 
   // Generate conversation markdown using shared function
-  const canonicalLogEntries = convertLegacyLogEntriesToCopilotEvents(logEntries, { sourceEngine: "gemini" });
-  const conversationResult = generateConversationMarkdown(canonicalLogEntries, {
+  const conversationResult = generateConversationMarkdown(logEntries, {
     includeInformation: false,
     formatToolCallback: (toolUse, toolResult) => formatToolUse(toolUse, toolResult, { includeDetailedParameters: false }),
     formatInitCallback: initEntry => formatInitializationSummary(initEntry, { includeSlashCommands: false }),
@@ -63,11 +54,11 @@ function parseGeminiLog(logContent) {
 
   let markdown = conversationResult.markdown;
 
-  markdown += generateInformationSection(projectSessionResult(canonicalLogEntries));
+  markdown += generateInformationSection(projectSessionResult(logEntries));
 
   return {
     markdown,
-    logEntries: canonicalLogEntries,
+    logEntries,
     mcpFailures: [],
     maxTurnsHit: false,
   };
@@ -75,10 +66,10 @@ function parseGeminiLog(logContent) {
 
 /**
  * @param {Array<any>} rawEntries
- * @returns {Array<any>}
+ * @returns {import("./types/agent_session").AgentSession}
  */
 function transformGeminiEntries(rawEntries) {
-  return transformFlatSessionEntries(rawEntries);
+  return normalizeGeminiSession(rawEntries);
 }
 
 // Export for testing

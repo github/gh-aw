@@ -759,6 +759,7 @@ func TestExternalDetectorCodexConfigUsesOpenAIProxyPort(t *testing.T) {
 	tests := []struct {
 		name       string
 		engineYAML string
+		wantError  string
 	}{
 		{
 			name:       "default provider",
@@ -767,6 +768,7 @@ func TestExternalDetectorCodexConfigUsesOpenAIProxyPort(t *testing.T) {
 		{
 			name:       "anthropic provider override",
 			engineYAML: "engine:\n  id: codex\n  model-provider: anthropic\n",
+			wantError:  "Responses-compatible",
 		},
 	}
 
@@ -792,7 +794,12 @@ Test workflow`
 			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
-			if err := compiler.CompileWorkflow(workflowPath); err != nil {
+			if err := compiler.CompileWorkflow(workflowPath); tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("Expected unsupported provider error containing %q, got %v", tt.wantError, err)
+				}
+				return
+			} else if err != nil {
 				t.Fatalf("Failed to compile workflow: %v", err)
 			}
 

@@ -10,7 +10,8 @@ const parse = records => parseCodexLog(records.map(record => (typeof record === 
 
 describe("Codex real CI trace regression", () => {
   // Sanitized excerpts: github/gh-aw/actions/runs/36909965579 (Smoke Codex) and
-  // /36850958249 (Daily Documentation Updater), artifact `agent`/agent-stdio.log.
+  // /36850958249 (Daily Documentation Updater), plus /37096302208 (Codex 0.159.3
+  // tool-free Smoke Codex turn), artifact `agent`/agent-stdio.log.
   // IDs, commands, arguments, outputs and messages replaced; shape and usage retained.
   it("preserves the live command lifecycle, model, exact text and failed exit", () => {
     const events = parseCodexLog(fixture("codex_ci_smoke")).logEntries;
@@ -46,6 +47,30 @@ describe("Codex real CI trace regression", () => {
     expect(selectSessionResult(events).usage).toMatchObject({ input_tokens: 117247, output_tokens: 1000, cache_read_input_tokens: 90112, cache_creation_input_tokens: 0 });
   });
 
+  it("preserves the current tool-free turn without treating CLI completion as completed smoke checks", () => {
+    const content = fixture("codex_ci_no_tools");
+    const events = parseCodexLog(content).logEntries;
+    expect(events.map(event => event.type)).toEqual(["session.init", "session.result", "turn.started", "assistant.message", "assistant.message", "session.result"]);
+    expect(events[0].data).toMatchObject({ sourceEngine: "codex", model: "gpt-5.3-codex", sessionId: "sanitized-no-tools-thread" });
+    expect(events[1].data.status).toBeUndefined();
+    expect(ofType(events, "assistant.message").map(event => event.data.content)).toEqual(["I will run the required checks now.", "I cannot execute the required checks because the tools are unavailable.\n\nNo outputs were written."]);
+    expect(ofType(events, "tool.execution_start")).toEqual([]);
+    expect(ofType(events, "tool.execution_complete")).toEqual([]);
+    const result = selectSessionResult(events);
+    expect(result).toMatchObject({
+      status: "completed",
+      numTurns: 1,
+      errors: ["Model metadata unavailable; using fallback metadata."],
+      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, cached_input_tokens: 8576, cache_write_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    expect(sessionTokenTotal(result.usage)).toBe(17014);
+    expect(result.totalCostUsd).toBeUndefined();
+    expect(result.durationMs).toBeUndefined();
+    const compatibility = { type: "result", num_turns: 1, usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 } };
+    expect(selectSessionResult(parseCodexLog(`${content}${JSON.stringify(compatibility)}\n`).logEntries)).toEqual(result);
+    expect(normalizeCodexSession(events)).toEqual(events);
+  });
+
   it("keeps a real-shape truncated command dangling even with a session failure", () => {
     const lines = fixture("codex_ci_smoke").split("\n");
     const stop = lines.findIndex(line => line.includes('"type":"item.started"'));
@@ -58,6 +83,24 @@ describe("Codex real CI trace regression", () => {
 });
 
 describe("Codex normalization contract", () => {
+  it.each(["file_change", "web_search", "todo_list", "collab_tool_call", "future_item"])("retains native %s observations without losing payloads", type => {
+    const record = { type: "item.completed", timestamp: 0, item: { id: "item_0", type, status: "failed", extension: { retained: true } } };
+    const events = normalizeCodexSession([record]);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "codex.item_snapshot", timestamp: 0, data: { item: record.item } });
+    expect(normalizeCodexSession(events)).toEqual(events);
+  });
+
+  it("reports the successful final attempt while retaining historical retry errors and usage", () => {
+    const events = normalizeCodexSession([
+      { type: "thread.started", thread_id: "first" },
+      { type: "turn.failed", error: { message: "transient" } },
+      { type: "thread.started", thread_id: "retry" },
+      { type: "turn.completed", usage: { input_tokens: 10, output_tokens: 1 } },
+    ]);
+    expect(selectSessionResult(events)).toMatchObject({ status: "completed", sourceType: "turn.completed", errors: [{ message: "transient" }], usage: { input_tokens: 10 } });
+  });
+
   it("recognizes JSON arrays and recovers adjacent supported records after malformed JSONL", () => {
     const records = [
       null,

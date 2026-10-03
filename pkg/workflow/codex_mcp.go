@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -17,26 +16,6 @@ const (
 	codexOpenAIProxyProviderName = "OpenAI AWF proxy"
 	codexRunBlockIndent          = "          "
 )
-
-func hasCodexFeaturesTable(config string) bool {
-	for line := range strings.SplitSeq(config, "\n") {
-		if strings.TrimSpace(line) == "[features]" {
-			return true
-		}
-	}
-	return false
-}
-
-func addCodexPluginConfig(config string) string {
-	lines := strings.Split(config, "\n")
-	for i, line := range lines {
-		if strings.TrimSpace(line) == "[features]" {
-			lines = append(lines[:i+1], append([]string{"plugins = false"}, lines[i+1:]...)...)
-			return strings.Join(lines, "\n")
-		}
-	}
-	return config
-}
 
 // writeIndentedCodexConfig adds the YAML run-block indentation to each custom
 // config line. YAML block scalar parsing strips this common indentation before
@@ -63,110 +42,14 @@ func writeIndentedCodexConfig(yaml *strings.Builder, config string) {
 }
 
 // RenderMCPConfig generates MCP server configuration for Codex
-func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error { //nolint:largefunc // Legacy Codex config rendering remains to be migrated.
+func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) error {
 	if codexMCPLog.Enabled() {
 		codexMCPLog.Printf("Rendering MCP config for Codex: mcp_tools=%v, tool_count=%d", mcpTools, len(tools))
 	}
 
-	// Create unified renderer with Codex-specific options
-	// Codex uses TOML format without Copilot-specific fields and multi-line args
-	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
-		return NewMCPConfigRenderer(MCPRendererOptions{
-			IncludeCopilotFields:   false, // Codex doesn't use "type" and "tools" fields
-			InlineArgs:             false, // Codex uses multi-line args format
-			Format:                 "toml",
-			IsLast:                 isLast,
-			ActionMode:             GetActionModeFromWorkflowData(workflowData),
-			WriteSinkGuardPolicies: deriveWriteSinkGuardPolicyFromWorkflow(workflowData),
-			ContainerPinMappings:   workflowData.getContainerPinMappings(),
-		})
-	}
-
-	// Build the heredoc content into a temporary buffer so we can derive the
-	// delimiter from a SHA-256 hash of the content before writing it to the YAML output.
-	var mcpConfigContent strings.Builder
-
-	// Add history configuration to disable persistence
-	mcpConfigContent.WriteString(codexRunBlockIndent + "[history]\n")
-	mcpConfigContent.WriteString(codexRunBlockIndent + "persistence = \"none\"\n")
-
-	// Codex defaults metrics_exporter to a built-in Statsig OTLP exporter that phones
-	// home to https://ab.chatgpt.com regardless of model-provider (see
-	// codex-rs/config/src/types.rs OtelConfig::default). This is unrelated to model
-	// inference routing (which correctly targets the AWF gateway for BYOK/GitHub
-	// providers) and would otherwise require allow-listing an OpenAI telemetry domain
-	// even for workflows that never talk to OpenAI directly. Disable it explicitly.
-	mcpConfigContent.WriteString(codexRunBlockIndent + "[otel]\n")
-	mcpConfigContent.WriteString(codexRunBlockIndent + "metrics_exporter = \"none\"\n")
-
-	// Add shell environment policy to control which environment variables are passed through
-	// This is a security feature to prevent accidental exposure of secrets
-	e.renderShellEnvironmentPolicy(&mcpConfigContent, tools, mcpTools)
-
-	// Expand neutral tools (like playwright: null) to include the copilot agent tools
-	expandedTools := e.expandNeutralToolsToCodexToolsFromMap(tools)
-
-	// Generate [mcp_servers] section
-	for _, toolName := range mcpTools {
-		renderer := createRenderer(false) // isLast is always false in TOML format
-		switch toolName {
-		case "github":
-			githubTool, ok := expandedTools["github"].(map[string]any)
-			if !ok {
-				// Preserve the legacy nil fallback when config is absent or not a map.
-				githubTool = nil
-			}
-			renderer.RenderGitHubMCP(&mcpConfigContent, githubTool, workflowData)
-		case "agentic-workflows":
-			renderer.RenderAgenticWorkflowsMCP(&mcpConfigContent)
-		case "safe-outputs":
-			// Add safe-outputs MCP server if safe-outputs are configured
-			hasSafeOutputs := workflowData != nil && workflowData.SafeOutputs != nil && HasSafeOutputsEnabled(workflowData.SafeOutputs)
-			if hasSafeOutputs {
-				renderer.RenderSafeOutputsMCP(&mcpConfigContent, workflowData)
-			}
-		case "ledger":
-			renderer.RenderLedgerMCP(&mcpConfigContent, workflowData)
-		case "work-queue":
-			renderer.RenderWorkQueueMCP(&mcpConfigContent, workflowData)
-		case "mcp-scripts":
-			// Add mcp-scripts MCP server if mcp-scripts are configured and feature flag is enabled
-			hasMCPScripts := workflowData != nil && IsMCPScriptsEnabled(workflowData.MCPScripts)
-			if hasMCPScripts {
-				renderer.RenderMCPScriptsMCP(&mcpConfigContent, workflowData.MCPScripts, workflowData)
-			}
-		case enclaveMCPServerName:
-			writeEnclaveMCPTOML(&mcpConfigContent, workflowData)
-		default:
-			// Handle custom MCP tools using shared helper (with adapter for isLast parameter)
-			HandleCustomMCPToolInSwitch(&mcpConfigContent, toolName, expandedTools, false, func(yaml *strings.Builder, toolName string, toolConfig map[string]any, isLast bool) error {
-				return e.renderCodexMCPConfigWithContext(yaml, toolName, toolConfig, workflowData)
-			})
-		}
-	}
-
-	// Append custom config if provided
-	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Config != "" {
-		mcpConfigContent.WriteString(codexRunBlockIndent + "\n")
-		mcpConfigContent.WriteString(codexRunBlockIndent + "# Custom configuration\n")
-		writeIndentedCodexConfig(&mcpConfigContent, workflowData.EngineConfig.Config)
-	}
-
-	// Derive the delimiter from the content so it is stable across builds.
-	delimiter := GenerateHeredocDelimiterFromContent("MCP_CONFIG", mcpConfigContent.String())
-	yaml.WriteString(codexRunBlockIndent + "cat > \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" << " + delimiter + "\n") //nolint:generatedyamlheredoc // Legacy Codex config rendering remains to be migrated.
-	yaml.WriteString(mcpConfigContent.String())
-
-	// End the heredoc for config.toml
-	yaml.WriteString(codexRunBlockIndent + delimiter + "\n")
-
-	// Also generate JSON config for MCP gateway
-	// Per MCP Gateway Specification v1.0.0 section 4.1, the gateway requires JSON input
-	// This JSON config is used by the gateway, while the TOML config above is used by Codex
+	yaml.WriteString(codexRunBlockIndent + "export GH_AW_CODEX_CONFIG=\"${RUNNER_TEMP}/gh-aw/mcp-config/codex-config.json\"\n")
 	yaml.WriteString(codexRunBlockIndent + "\n")
 	yaml.WriteString(codexRunBlockIndent + "# Generate JSON config for MCP gateway\n")
-
-	// Gateway uses JSON format without Copilot-specific fields and multi-line args
 	if err := renderStandardJSONMCPConfig(yaml, renderStandardJSONMCPConfigOptions{
 		tools:        tools,
 		mcpTools:     mcpTools,
@@ -179,66 +62,13 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		return err
 	}
 
-	// start_mcp_gateway.cjs converts the gateway output and writes Codex config to
-	// ${RUNNER_TEMP}/gh-aw/mcp-config/config.toml. Codex reads config from
-	// $CODEX_HOME/config.toml, so copy the converted config into writable CODEX_HOME
-	// and prepend shell policy (converter output does not include this section).
 	yaml.WriteString(codexRunBlockIndent + "\n")
 	yaml.WriteString(codexRunBlockIndent + "# Sync converter output to writable CODEX_HOME for Codex\n")
-	yaml.WriteString(codexRunBlockIndent + "mkdir -p /tmp/gh-aw/mcp-config\n")
-
-	// Build the shell-policy heredoc content into a temp buffer so the delimiter
-	// can be derived from a SHA-256 hash of the content for build stability.
-	var shellPolicyContent strings.Builder
-	if isFirewallEnabled(workflowData) {
-		e.renderOpenAIProxyProviderToml(&shellPolicyContent, codexRunBlockIndent, workflowData)
-	}
-	hasCustomFeatures := workflowData != nil && workflowData.EngineConfig != nil && hasCodexFeaturesTable(workflowData.EngineConfig.Config)
-	if (workflowData == nil || len(workflowData.Plugins) == 0) && !hasCustomFeatures {
-		shellPolicyContent.WriteString(codexRunBlockIndent + "[features]\n")
-		shellPolicyContent.WriteString(codexRunBlockIndent + "plugins = false\n")
-	}
-	e.renderShellEnvironmentPolicyToml(&shellPolicyContent, tools, mcpTools, codexRunBlockIndent)
-	shellPolicyDelimiter := GenerateHeredocDelimiterFromContent("CODEX_SHELL_POLICY", shellPolicyContent.String())
-	yaml.WriteString(codexRunBlockIndent + "cat > \"/tmp/gh-aw/mcp-config/config.toml\" << " + shellPolicyDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy Codex policy rendering remains to be migrated.
-	yaml.WriteString(shellPolicyContent.String())
-	yaml.WriteString(codexRunBlockIndent + shellPolicyDelimiter + "\n")
-	if isFirewallEnabled(workflowData) {
-		e.renderAppendConvertedConfigWithoutOpenAIProxy(yaml)
-	} else {
-		yaml.WriteString(codexRunBlockIndent + "cat \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" >> \"/tmp/gh-aw/mcp-config/config.toml\"\n")
-	}
-	if workflowData != nil && workflowData.EngineConfig != nil && strings.TrimSpace(workflowData.EngineConfig.Config) != "" {
-		customConfig := workflowData.EngineConfig.Config
-		if len(workflowData.Plugins) == 0 && hasCustomFeatures {
-			customConfig = addCodexPluginConfig(customConfig)
-		}
-		customConfigDelimiter := GenerateHeredocDelimiterFromContent("CODEX_CUSTOM_CONFIG", customConfig)
-		yaml.WriteString(codexRunBlockIndent + "\n")
-		yaml.WriteString(codexRunBlockIndent + "# Append engine-level custom Codex config\n")
-		yaml.WriteString(codexRunBlockIndent + "cat >> \"/tmp/gh-aw/mcp-config/config.toml\" << " + customConfigDelimiter + "\n") //nolint:generatedyamlheredoc // Legacy custom config rendering remains to be migrated.
-		writeIndentedCodexConfig(yaml, customConfig)
-		yaml.WriteString(codexRunBlockIndent + customConfigDelimiter + "\n")
-	}
-	yaml.WriteString(codexRunBlockIndent + "chmod 600 \"/tmp/gh-aw/mcp-config/config.toml\"\n")
 	yaml.WriteString(codexRunBlockIndent + "mkdir -p \"${CODEX_HOME}\"\n")
-	yaml.WriteString(codexRunBlockIndent + "if [ \"/tmp/gh-aw/mcp-config/config.toml\" != \"${CODEX_HOME}/config.toml\" ]; then cp \"/tmp/gh-aw/mcp-config/config.toml\" \"${CODEX_HOME}/config.toml\"; fi\n")
+	yaml.WriteString(codexRunBlockIndent + "if [ \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" != \"${CODEX_HOME}/config.toml\" ]; then cp \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" \"${CODEX_HOME}/config.toml\"; fi\n")
 	yaml.WriteString(codexRunBlockIndent + "chmod 600 \"${CODEX_HOME}/config.toml\"\n")
 
 	return nil
-}
-
-func (e *CodexEngine) renderOpenAIProxyProviderToml(yaml *strings.Builder, indent string, workflowData *WorkflowData) {
-	yaml.WriteString("\n")
-	yaml.WriteString(indent + "model_provider = \"" + codexOpenAIProxyProviderID + "\"\n")
-	yaml.WriteString("\n")
-	yaml.WriteString(indent + "[model_providers." + codexOpenAIProxyProviderID + "]\n")
-	yaml.WriteString(indent + "name = \"" + codexOpenAIProxyProviderName + "\"\n")
-	yaml.WriteString(indent + "base_url = \"" + e.getOpenAIProxyProviderBaseURL(workflowData) + "\"\n")
-	yaml.WriteString(indent + "env_key = \"CODEX_API_KEY\"\n")
-	yaml.WriteString(indent + "wire_api = \"responses\"\n")
-	yaml.WriteString(indent + "requires_openai_auth = false\n")
-	yaml.WriteString(indent + "supports_websockets = false\n")
 }
 
 func (e *CodexEngine) getOpenAIProxyProviderBaseURL(workflowData *WorkflowData) string {
@@ -251,48 +81,6 @@ func (e *CodexEngine) getOpenAIProxyProviderBaseURL(workflowData *WorkflowData) 
 		port = constants.CopilotLLMGatewayPort
 	}
 	return "http://" + net.JoinHostPort(constants.AWFAPIProxyContainerIP, strconv.Itoa(port))
-}
-
-func (e *CodexEngine) renderAppendConvertedConfigWithoutOpenAIProxy(yaml *strings.Builder) {
-	// The run-block indent is stripped by YAML; the extra two spaces remain in
-	// the shell string as harmless indentation inside the awk program.
-	awkBodyIndent := codexRunBlockIndent + "  "
-	yaml.WriteString(codexRunBlockIndent + "awk '\n")
-	fmt.Fprintf(yaml, "%sBEGIN { skip_openai_proxy = 0 }\n", awkBodyIndent)
-	fmt.Fprintf(yaml, "%s/^[[:space:]]*model_provider[[:space:]]*=/ { next }\n", awkBodyIndent)
-	fmt.Fprintf(yaml, "%s/^\\[model_providers\\.openai-proxy\\][[:space:]]*$/ { skip_openai_proxy = 1; next }\n", awkBodyIndent)
-	fmt.Fprintf(yaml, "%s/^\\[/ { skip_openai_proxy = 0 }\n", awkBodyIndent)
-	fmt.Fprintf(yaml, "%s!skip_openai_proxy { print }\n", awkBodyIndent)
-	yaml.WriteString(codexRunBlockIndent + "' \"${RUNNER_TEMP}/gh-aw/mcp-config/config.toml\" >> \"/tmp/gh-aw/mcp-config/config.toml\"\n")
-}
-
-// renderCodexMCPConfigWithContext generates custom MCP server configuration for a single tool in codex workflow config.toml
-// This version includes workflowData to determine if localhost URLs should be rewritten
-func (e *CodexEngine) renderCodexMCPConfigWithContext(yaml *strings.Builder, toolName string, toolConfig map[string]any, workflowData *WorkflowData) error {
-	// Determine if localhost URLs should be rewritten to host.docker.internal
-	// This is needed when firewall is enabled (agent is not disabled)
-	rewriteLocalhost := shouldRewriteLocalhostToDocker(workflowData)
-	codexMCPLog.Printf("Rendering TOML MCP config for custom tool: %s (rewrite_localhost=%v)", toolName, rewriteLocalhost)
-
-	yaml.WriteString(codexRunBlockIndent + "\n")
-	fmt.Fprintf(yaml, "%s[mcp_servers.%s]\n", codexRunBlockIndent, toolName)
-
-	// Use the shared MCP config renderer with TOML format
-	renderer := MCPConfigRenderer{
-		IndentLevel:              codexRunBlockIndent,
-		Format:                   "toml",
-		RewriteLocalhostToDocker: rewriteLocalhost,
-		GuardPolicies:            deriveWriteSinkGuardPolicyFromWorkflow(workflowData),
-		ContainerPinMappings:     workflowData.getContainerPinMappings(),
-	}
-
-	err := renderSharedMCPConfig(yaml, toolName, toolConfig, renderer)
-	if err != nil {
-		codexMCPLog.Printf("Failed to render TOML MCP config for tool %s: %v", toolName, err)
-		return err
-	}
-
-	return nil
 }
 
 // renderCodexJSONMCPConfigWithContext generates custom MCP server configuration in JSON format for gateway

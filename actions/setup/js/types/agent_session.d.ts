@@ -54,6 +54,7 @@ export interface SessionUsage {
   total_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
+  reasoning_output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
   inputTokens?: number;
@@ -70,6 +71,8 @@ export interface SessionResultData {
   numTurns?: number;
   durationMs?: number;
   totalCostUsd?: number;
+  status?: string;
+  sourceType?: string;
   usage?: SessionUsage;
   errors?: JsonValue[];
   permissionDenials?: JsonValue[];
@@ -121,9 +124,26 @@ export interface SessionFileFormatEvent extends EventMetadata {
   data: SessionFileFormatData;
 }
 
-export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
+export interface DetectionResultData {
+  jobResult?: string;
+  conclusion?: string;
+  reason?: string;
+  promptInjection?: boolean;
+  secretLeak?: boolean;
+  maliciousPatch?: boolean;
+  [key: string]: unknown;
+}
+
+export interface DetectionResultEvent extends EventMetadata {
+  type: "detection.result";
+  data: DetectionResultData;
+}
+
+export type CoreSessionEvent =
+  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | DetectionResultEvent;
 
 export interface SessionEventDataMap {
+  "detection.result": DetectionResultData;
   "session.format": SessionFileFormatData;
   "session.init": SessionInitData;
   "user.message": MessageData;

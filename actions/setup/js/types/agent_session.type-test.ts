@@ -1,4 +1,4 @@
-import type { CoreSessionEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
+import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
 import { createSessionEvent } from "../agent_session.cjs";
 
 const messages: CoreSessionEvent[] = [
@@ -9,6 +9,8 @@ const messages: CoreSessionEvent[] = [
   { type: "tool.execution_start", data: { toolCallId: "call", input: false } },
   { type: "tool.execution_complete", data: { toolCallId: "call", success: false, output: null } },
   { type: "session.result", data: { numTurns: 0, usage: { input_tokens: 0 }, errors: [{ code: "failed" }] } },
+  { type: "detection.result", data: { promptInjection: false } },
+  { type: "session.format", data: { version: 1 } },
 ];
 void messages;
 
@@ -40,6 +42,24 @@ createSessionEvent({}, "session.format", { version: 1 });
 createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.
 createSessionEvent({}, "session.format", {});
+
+createSessionEvent({}, "session.result", { status: "completed", sourceType: "turn.completed", usage: { reasoning_output_tokens: 0 } });
+// @ts-expect-error Source terminal status is a string, not a completion flag.
+createSessionEvent({}, "session.result", { status: true });
+// @ts-expect-error Native source event type is a string.
+createSessionEvent({}, "session.result", { sourceType: 0 });
+// @ts-expect-error Reasoning tokens are numeric.
+createSessionEvent({}, "session.result", { usage: { reasoning_output_tokens: "0" } });
+
+const detection: DetectionResultEvent = createSessionEvent({}, "detection.result", { jobResult: "success", conclusion: "warning", reason: "threat_detected", promptInjection: true, secretLeak: false, maliciousPatch: false });
+void detection;
+createSessionEvent({}, "detection.result", { jobResult: "skipped", conclusion: "skipped", reason: "" });
+// @ts-expect-error Detection verdict flags are booleans, not status strings.
+createSessionEvent({}, "detection.result", { promptInjection: "false" });
+// @ts-expect-error Detection conclusions are strings, not success flags.
+createSessionEvent({}, "detection.result", { conclusion: true });
+// @ts-expect-error Detection reason is a categorical string, not detector prose entries.
+createSessionEvent({}, "detection.result", { reason: ["private reason"] });
 
 const mergedEvent: UnifiedSessionEvent = {
   type: "mcp.rpc.response",

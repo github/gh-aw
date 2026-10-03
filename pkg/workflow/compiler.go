@@ -125,6 +125,10 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return err
 	}
 
+	if err := c.validateCodexCompatibility(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
 	workflowPermissions, err := c.validatePermissions(workflowData, markdownPath)
 	if err != nil {
 		return err

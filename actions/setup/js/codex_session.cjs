@@ -96,7 +96,7 @@ function normalizeCodexSession(records, model = null) {
           if ((Object.hasOwn(report, alias) || Object.hasOwn(usage, alias)) && isTokenCount(usage[field])) usage[alias] = usage[field];
         }
       }
-      emit("session.result", { numTurns: turns, usage: Object.keys(usage).length ? { ...usage } : undefined });
+      emit("session.result", { sourceType: "turn.completed", status: "completed", numTurns: turns, usage: Object.keys(usage).length ? { ...usage } : undefined });
     } else if (record.type === "turn.failed" || record.type === "error") {
       const id = record.id;
       const key = id === undefined ? undefined : JSON.stringify([scopes[index], record.type, id]);
@@ -156,6 +156,8 @@ function normalizeCodexSession(records, model = null) {
         if (key !== undefined && completedErrors.has(key)) continue;
         if (key !== undefined) completedErrors.add(key);
         emit("session.result", { errors: [Object.hasOwn(item, "message") ? item.message : item] });
+      } else {
+        emit("codex.item_snapshot", { item });
       }
     } else {
       events.push(structuredClone(record));

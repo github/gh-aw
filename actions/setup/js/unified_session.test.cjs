@@ -7,8 +7,10 @@ import { serializeSessionArtifact, writeSessionArtifact } from "./session_artifa
 import { normalizeUnifiedSessionEvent } from "./unified_session_payload.cjs";
 
 const req = require;
+const { writeDetectionUsageResult } = req("./generate_usage_activity_summary.cjs");
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
+const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
 
 describe("Unified conclusion session", () => {
   let root;
@@ -144,6 +146,25 @@ describe("Unified conclusion session", () => {
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
   });
 
+  it.each([false, true])("retains current Codex accounting through conclusion collection (canonical present: %j)", canonicalPresent => {
+    write("agent-stdio.log", codexNoTools);
+    if (canonicalPresent) write("agent-session.jsonl", parseEngineSession(codexNoTools, "codex"));
+    writeUnifiedSession({ rootDir: root, engine: "codex" });
+    const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    const agent = published.filter(event => event.provenance.component === "agent");
+    expect(agent.map(event => event.type)).toEqual(["session.init", "session.result", "turn.started", "assistant.message", "assistant.message", "session.result"]);
+    expect(agent[1].data).toEqual({ errors: ["Model metadata unavailable; using fallback metadata."] });
+    expect(agent.at(-1).data).toEqual({
+      status: "completed",
+      sourceType: "turn.completed",
+      numTurns: 1,
+      usage: { input_tokens: 16847, output_tokens: 167, cache_read_input_tokens: 8576, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    expect(agent.at(-1)).not.toHaveProperty("usage");
+    expect(agent.every(event => event.provenance.path === (canonicalPresent ? "agent-session.jsonl" : "agent-stdio.log"))).toBe(true);
+    expect(published.some(event => event.type === "session.collection_warning")).toBe(false);
+  });
+
   it.each(["", "{bad\n", '{"type":"result","usage":{}}\n'])("falls back from an unusable canonical session (%j) to native events", content => {
     const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
     write("agent-session.jsonl", content);
@@ -177,7 +198,6 @@ describe("Unified conclusion session", () => {
     ["threat-detection/execution.json", "usage/detection/execution.json"],
     ["evals/evals/execution.json", "usage/evals/execution.json"],
     ["evals/execution.json", "usage/evals/execution.json"],
-    ["threat-detection/detection_result.json", "usage/detection/detection_result.json"],
   ])("prefers original provenance from %s and retains the %s mirror fallback", (original, mirror) => {
     const observation = { value: "source", id: "source", type: "source", status: "source", model: "source", assignments: { experiment: "source" }, outcome: "source", conclusion: "source", run_id: "source" };
     const record = file => (file.endsWith(".json") ? observation : [observation]);
@@ -191,6 +211,57 @@ describe("Unified conclusion session", () => {
     const fallback = collectUnifiedSession({ rootDir: root }).events.filter(event => event.provenance.path === original || event.provenance.path === mirror);
     expect(fallback).toHaveLength(1);
     expect(fallback[0].provenance.path).toBe(mirror);
+  });
+
+  it.each(["structured", "inline"])("collects the sanitized %s detection verdict with its job outcome and categorical reason", source => {
+    const verdict = { prompt_injection: true, secret_leak: false, malicious_patch: true, reasons: ["PRIVATE_DETECTOR_REASON"] };
+    if (source === "structured") write("threat-detection/detection_result.json", verdict);
+    else write("threat-detection/detection.log", `PRIVATE_DETECTOR_TRANSCRIPT\nTHREAT_DETECTION_RESULT:${JSON.stringify(verdict)}\n`);
+    process.env.GH_AW_DETECTION_JOB_RESULT = "success";
+    process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+    process.env.GH_AW_DETECTION_REASON = "threat_detected";
+    writeDetectionUsageResult(path.join(root, "threat-detection"), path.join(root, "usage/detection/detection_result.json"));
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "detection.result")).toEqual([
+      {
+        type: "detection.result",
+        data: { jobResult: "success", conclusion: "warning", reason: "threat_detected", promptInjection: true, secretLeak: false, maliciousPatch: true },
+        provenance: { component: "detection", phase: "detection", path: "usage/detection/detection_result.json", index: 0 },
+      },
+    ]);
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).not.toContain("PRIVATE_DETECTOR_");
+    expect(writeUnifiedSession({ rootDir: root })).toEqual(events);
+  });
+
+  it.each([
+    ["success", "success", "", { prompt_injection: false, secret_leak: false, malicious_patch: false }],
+    ["failure", "failure", "agent_failure", undefined],
+    ["success", "warning", "parse_error", undefined],
+    ["cancelled", "", "", undefined],
+    ["skipped", "skipped", "detection_skipped", undefined],
+  ])("preserves detection status %s/%s without inventing absent verdict flags", (job, conclusion, reason, verdict) => {
+    process.env.GH_AW_DETECTION_JOB_RESULT = job;
+    process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
+    process.env.GH_AW_DETECTION_REASON = reason;
+    if (verdict) write("threat-detection/detection_result.json", verdict);
+    if (job === "skipped") write("threat-detection/detection_result.json", { prompt_injection: true, secret_leak: true, malicious_patch: true });
+    writeDetectionUsageResult(path.join(root, "threat-detection"), path.join(root, "usage/detection/detection_result.json"));
+    const result = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "detection.result");
+    expect(result).toHaveLength(1);
+    expect(result[0].data).toEqual({ jobResult: job, conclusion, reason, ...(verdict ? { promptInjection: false, secretLeak: false, maliciousPatch: false } : {}) });
+  });
+
+  it("falls back to the raw structured verdict when no conclusion result is available", () => {
+    write("threat-detection/detection_result.json", { prompt_injection: false, secret_leak: true, malicious_patch: false, reason: "PRIVATE_RAW_REASON", reasons: ["PRIVATE_DETECTOR_REASON"] });
+    const results = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "detection.result");
+    expect(results).toEqual([
+      {
+        type: "detection.result",
+        data: { promptInjection: false, secretLeak: true, maliciousPatch: false },
+        provenance: { component: "detection", phase: "detection", path: "threat-detection/detection_result.json", index: 0 },
+      },
+    ]);
+    expect(JSON.stringify(results)).not.toContain("PRIVATE_RAW_REASON");
   });
 
   it("recovers adjacent valid records, records malformed/partial coverage and skips symlinks", () => {
@@ -268,11 +339,15 @@ describe("Unified conclusion session", () => {
     expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).not.toContain("opaque-mask");
   });
 
+  it("uses a standardized error code for invalid session data", () => {
+    expect(() => serializeSessionArtifact({})).toThrow("ERR_VALIDATION: Expected a session event array");
+  });
+
   it("writes atomically and cleans up failed outputs without following a temporary symlink", () => {
     const output = write("usage/aw_session.jsonl", "old");
     const target = write("outside.jsonl", "unchanged");
     fs.symlinkSync(target, `${output}.tmp`);
-    expect(() => writeSessionArtifact(output, [{ type: "vendor.event", data: {} }])).toThrow();
+    expect(() => writeSessionArtifact(output, [{ type: "vendor.event", data: {} }])).toThrow("ERR_SYSTEM: Failed to write session artifact");
     expect(fs.readFileSync(target, "utf8")).toBe("unchanged");
     expect(fs.existsSync(output)).toBe(false);
     expect(fs.existsSync(`${output}.tmp`)).toBe(false);
