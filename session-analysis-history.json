@@ -153,6 +153,17 @@
       "orphan_rate_pct": 0.0,
       "data_quality": "metadata-only (conv-logs empty 40th+ day)",
       "notes": "40.0% completion +26.0pts vs 10-01; 20 success/18 action_required/8 failure/1 cancelled/3 in_progress; provenance snapped back to upper-band 85.0% bot-driven after 10-01's record-low 28.6%; true_agentic 3/4=75% (1 unexplained non-merge-triggered cancellation); 2 independent merge_invalidation_cascade events incl. 8-run cascade (2nd-largest on record) + 2x 'merge->Squad Implement Worker +7s' sub-signature same day; burst_vs_isolated 1.76x mid-range; branch_level_stuck_gate NOT bimodal today; orphan 0/28 40th healthy day; roll=91 standard run."
+    },
+    {
+      "date": "2026-10-03",
+      "sessions": 50,
+      "completion_pct": 36.0,
+      "avg_dur_min": 13.841,
+      "median_dur_min": 5.433333333333334,
+      "loops": 0,
+      "orphan_rate_pct": 0.0,
+      "data_quality": "metadata-only (conv-logs empty 41st+ day)",
+      "notes": "36.0% completion -4.0pts vs 10-02; 18 success/16 action_required/16 failure/0 cancelled-in_progress; provenance dropped to 66.7% bot-driven, below 72-86% band (5th sub-band day on record); true_agentic 6/6=100% (full recovery, no unexplained cancellations); merge_invalidation_cascade 8-run burst identical workflow set to 10-02's, ties 2nd-largest-on-record size for 2nd consecutive day; branch_level_stuck_gate cleanly stuck across 3 separate firings on copilot/restore-agent-config-folders (no bimodal flip); burst_vs_isolated 5.04x mid-to-high; orphan 0/10 41st healthy day; roll=74 standard run."
     }
   ],
   "last_updated": "2026-10-02",
