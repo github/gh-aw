@@ -688,13 +688,42 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 		}
 
 		model, _ := parsed.Frontmatter["model"].(string)
-		if !strings.Contains(strings.ToLower(model), "codex") {
+		name, _ := parsed.Frontmatter["name"].(string)
+		if !isCodexCompatibleModel(model, name) {
 			t.Errorf("%s uses Codex with non-Codex model %q", path, model)
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("Failed to inspect workflows: %v", err)
+	}
+}
+
+func isCodexCompatibleModel(model, workflowName string) bool {
+	if model == "" || strings.Contains(strings.ToLower(model), "codex") {
+		return true
+	}
+	return model == "copilot/auto" && workflowName == "Smoke GitHub Codex"
+}
+
+func TestIsCodexCompatibleModel(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		model        string
+		workflowName string
+		want         bool
+	}{
+		{name: "default model", model: "", workflowName: "Smoke Codex", want: true},
+		{name: "Codex model", model: "openai/gpt-5.3-codex", workflowName: "Example", want: true},
+		{name: "Copilot auto Codex canary", model: "copilot/auto", workflowName: "Smoke GitHub Codex", want: true},
+		{name: "other auto workflow", model: "copilot/auto", workflowName: "Example", want: false},
+		{name: "non-Codex model", model: "copilot/gpt-4.1", workflowName: "Example", want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCodexCompatibleModel(tt.model, tt.workflowName); got != tt.want {
+				t.Errorf("isCodexCompatibleModel(%q, %q) = %t, want %t", tt.model, tt.workflowName, got, tt.want)
+			}
+		})
 	}
 }
 
