@@ -7,9 +7,9 @@ sidebar:
 
 # Checkout Behavior Specification
 
-**Version**: 1.3.0<br>
+**Version**: 1.3.1<br>
 **Status**: Working Draft  
-**Publication Date**: 2026-09-26<br>
+**Publication Date**: 2026-10-03<br>
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [checkout-behavior-specification](/gh-aw/specs/checkout-behavior-specification/)  
 **Latest Published Version**: This document
@@ -224,6 +224,15 @@ When `force-clean-git-credentials: true` is set (and keep-credentials-for-push i
 - `.git/config`
 - `.git/modules/**/config`
 
+Cleanup MUST complete and its credential-removal postcondition MUST be verified
+before untrusted agent execution starts. Generated checkout-time and final
+pre-agent cleanup steps MUST NOT ignore errors. Verification MUST reject
+remaining credential helpers, HTTP authentication headers, authenticated
+remote/push/rewrite URLs, and invalid or unreadable effective git configurations.
+Verification MUST include referenced config files, MUST NOT log token values,
+and MUST remove temporary verification snapshots before returning. No git config
+files is a valid no-op; cleanup failure is not.
+
 ---
 
 ## 6. Trial Mode and Side-Repo Behavior
@@ -289,6 +298,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 - **T-CHK-015**: `push_to_pull_request_branch` uses side-repo checkout from `GH_AW_TARGET_REPO_SLUG` only when it differs from `GITHUB_REPOSITORY`; emits debug log and ignores it when they match
 - **T-CHK-016**: Workspace git-scan fallback reads `remote.origin.url` with a per-invocation `safe.directory` override (process environment unchanged), and ignores scanned repositories whose remote host is neither `GITHUB_SERVER_URL`'s host nor `github.com`
 - **T-CHK-017**: Activation sparse checkout pins supported pull-request events to the base SHA, retains non-PR and `workflow_call` fallback refs, excludes `pull_request_target`, and preserves the same-repo guard for optional App token fallback
+- **T-CHK-018**: Checkout-time and final cleanup fail closed on helper failure or residual credentials, including included config files; successful verified cleanup and the no-checkout case remain usable
 
 ### 7.2 Compliance Checklist
 
@@ -306,6 +316,7 @@ When `GH_AW_TARGET_REPO_SLUG` is set but equals `GITHUB_REPOSITORY`, the impleme
 | `push_to_pull_request_branch` side-repo cwd resolution | T-CHK-015 | C2 | Required |
 | Workspace git-scan fallback trust scoping and host constraint | T-CHK-016 | C2 | Required |
 | Activation checkout ref and fallback provenance | T-CHK-017 | C1 | Required |
+| Verified fail-closed credential cleanup | T-CHK-018 | C1/C2 | Required |
 
 ### 7.3 Safeguards
 
@@ -315,7 +326,7 @@ The following MUST-level norms govern credential and token safety during checkou
 
 2. **Manifest path rejection**: Checkout-manifest paths that are absolute or that escape the workspace root MUST be rejected before any file I/O is performed against them. The rejection MUST produce an actionable error message (see §3.4 and T-CHK-014).
 
-3. **Credential cleanup**: When `force-clean-git-credentials: true` is active and `keep-credentials-for-push` is not, all credential-bearing git config sections MUST be removed from `.git/config` and `.git/modules/**/config` before the agent step completes.
+3. **Credential cleanup**: When `force-clean-git-credentials: true` is active and `keep-credentials-for-push` is not, all credential-bearing git config sections MUST be removed from `.git/config` and `.git/modules/**/config` and their absence verified before the untrusted agent starts. Failure MUST block agent execution.
 
 4. **Scan trust scoping**: The workspace git-scan fallback MUST NOT grant process-wide git ownership trust to scanned directories, and MUST NOT bind a scanned directory to an `owner/repo` slug when its remote host is neither the host of `GITHUB_SERVER_URL` nor `github.com` (see §3.5 and T-CHK-016).
 
@@ -338,6 +349,7 @@ The following MUST-level norms govern credential and token safety during checkou
 - `actions/setup/js/find_repo_checkout.cjs`
 - `actions/setup/sh/configure_git_credentials.sh`
 - `actions/setup/sh/clean_git_credentials.sh`
+- `actions/setup/sh/verify_git_credentials.sh`
 
 ### Informative References
 
@@ -348,6 +360,11 @@ The following MUST-level norms govern credential and token safety during checkou
 ---
 
 ## 9. Change Log
+
+### Version 1.3.1 (Working Draft)
+
+- Required verified credential removal before agent execution and fail-closed
+  cleanup errors; added T-CHK-018 for cleanup failure and residual credentials.
 
 ### Version 1.3.0 (Working Draft)
 

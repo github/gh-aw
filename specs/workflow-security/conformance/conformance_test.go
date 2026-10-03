@@ -7,8 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestCompiledProfileMutations(t *testing.T) {
-	const base = `
+const minimalLock = `
 jobs:
   activation: {}
   agent:
@@ -28,6 +27,8 @@ jobs:
       - uses: actions/download-artifact@0000000000000000000000000000000000000000
         with: {name: agent}
 `
+
+func TestCompiledProfileMutations(t *testing.T) {
 	tests := []struct {
 		name, before, after, invariant string
 	}{
@@ -43,7 +44,7 @@ jobs:
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			data := base
+			data := minimalLock
 			if tc.before != "" {
 				data = strings.ReplaceAll(data, tc.before, tc.after)
 			}

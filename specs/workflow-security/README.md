@@ -12,11 +12,14 @@ detector verdicts, missing git data, and failure schedules. Negative controls
 remove individual protections to check that the corresponding invariant can
 actually detect a violation.
 
-This is a **bounded strict-policy reference model**, not a proof that every
+This is a **bounded, policy-parameterized reference model**, not a proof that every
 compiled workflow refines it. The compiled-profile verifier checks a narrow
 structural connection to real YAML. It does not verify arbitrary scripts,
-GitHub Actions expression semantics, external services, or all compiler modes.
-No confirmed product vulnerability was found in the architecture review.
+external services, or all compiler modes. Its Boolean guard analysis is
+conservative, not a complete GitHub Actions expression evaluator.
+The initial architecture review found no confirmed exploit; the subsequent
+corpus trial exposed fail-open credential cleanup, now corrected with blocking
+cleanup and independent postcondition verification.
 Synthetic counterexamples must not be filed as product vulnerabilities.
 
 ## State and execution
@@ -31,12 +34,12 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Configuration | `context`, `Activate`, `TrustedConfiguration` | Trusted activation instructions; PR-base provenance is an implementation obligation. |
 | Untrusted data | `AgentRequest`, `requestValid`, `target`, `request.private` | Declarative operation, schema validity, repository selection, and private-source classification remain separate from artifact origin. |
 | Jobs and steps | `status`, `step`, `started`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and cleanup. |
-| Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run identity, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
+| Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run and invocation identity, naming prefix, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
 | Outputs and logs | `transfers` | Artifact, output, and log channels carry independently tracked secret labels. This abstracts covered redaction, not arbitrary encoded-secret detection. |
 | Permissions | `grants`, `TokenPermissions`, `ValidatedEffects` | Repository read, issue write, content write, and inference capabilities are distinct. Workspace edits are not repository-resource writes. |
 | Apps and secrets | `live`, `revoked`, `appScope`, `appRepos`, `agentSecrets` | Read-only checkout credentials, authorized engine credentials, and privileged installation tokens have different consumers and lifetimes. |
 | Networking | `ToolCall`, `egress`, `NetworkPolicy` | Authorized GitHub/inference services, blocked destinations, and service-bound engine authentication. |
-| Git | `checkouts`, `privilegedCheckout`, `operations`, `errors` | Per-repository auth, available blobs/refs, sparse/shallow state, local operations, REST, privileged push, and explicit unavailable-data errors. |
+| Git | `checkouts`, `cleanup`, `agentBegan`, `privilegedCheckout`, `operations`, `errors` | Per-repository auth, temporary setup credentials, verified cleanup/failure, available blobs/refs, sparse/shallow state, local operations, REST, and privileged push. |
 
 The `issue` effect creates at most one validated issue in the main public
 repository. The `pull-request` effect prepares a full checkout in the privileged
@@ -50,22 +53,31 @@ must succeed. Failure before request publication causes origin validation to
 fail. Failures revoke modeled job-owned credentials; eventual platform cleanup
 is an explicit environmental assumption.
 
+`DetectionPolicy` independently declares required, disabled, or conditional
+detection. `DetectionEnabled` selects a conditional run. Required detection
+cannot be bypassed merely by omitting the job. Disabled/conditionally skipped
+configurations retain authorization, provenance, credential, and validation
+invariants but do not claim detector approval. The inactive detector is
+represented by a skipped state-machine slot, not a real runtime job.
+
 ## Evidence and invariants
 
 Reviewed baseline: `542e937dd8447172c8c484cda3a9a5716ae99245`.
 The authorities are [Security Architecture v1.1.0](../security-architecture-spec.md),
 [Compiler Threat Detection v1.0.42](../compiler-threat-detection-spec.md),
-[Checkout Behavior v1.3.0](../../docs/src/content/docs/specs/checkout-behavior-specification.md),
+[Checkout Behavior](../../docs/src/content/docs/specs/checkout-behavior-specification.md),
 and the [Safe Outputs specification](../../docs/src/content/docs/specs/safe-outputs-specification.md).
 Line references describe that baseline; symbols are the more durable mapping.
+The checkout specification's 1.3.1 amendment requires verified cleanup before
+agent execution, including the failure paths found by the corpus trial.
 
 | Predicate | Required safety condition | Architecture / threat rule | Compiler/runtime evidence |
 |---|---|---|---|
 | `TypeOK` | Every modeled job, token, checkout, channel, and request has a valid shape. | Compiler typed configuration and runtime request contracts | [`WorkflowData`](../../pkg/workflow/workflow_data.go), [`Job`](../../pkg/workflow/jobs.go), [`safe_output_validator`](../../actions/setup/js/safe_output_validator.cjs). |
 | `JobIsolation` | Agent has no repository-write grants; generated prerequisites cannot be bypassed. | A:389–398 OI-01/02; CTR-001/005 | [`validateDangerousPermissions`](../../pkg/workflow/dangerous_permissions_validation.go):23–77; [`guardIfAgainstStatusFuncBypass`](../../pkg/workflow/compiler_builtin_job_augmentation.go):391–423. |
-| `NoCredentialPersistence` | Agent-facing checkout credentials are absent after setup. | K:192–205; AR1 | [`generateCheckoutStepLines`](../../pkg/workflow/checkout_step_generator.go):543–551; [`clean_git_credentials_checkout.sh`](../../actions/setup/sh/clean_git_credentials_checkout.sh). |
-| `ArtifactProvenance` | Accepted requests come from this run's agent artifact. | AR2; OI-01/02 | [`generateUnifiedArtifactUpload`](../../pkg/workflow/compiler_yaml_artifacts.go):31–61; [`buildSafeOutputsDownloadSteps`](../../pkg/workflow/compiler_safe_outputs_job.go):246 onward. Payload validation remains necessary. |
-| `DetectionGate` | Strict detector approval precedes every effect. | A:755–759,793–797; WTD1–3 | [`buildSafeOutputsJobCondition`](../../pkg/workflow/compiler_safe_outputs_job.go):859–881; [`processMessages`](../../actions/setup/js/safe_output_handler_manager.cjs):877–963. |
+| `NoCredentialPersistence` | No retained checkout credential is accessible once the untrusted agent begins. Trusted force-clean setup may temporarily retain credentials. | K:192–205, T-CHK-018; AR1 | [`generateCheckoutCredentialsCleanupStep`](../../pkg/workflow/checkout_step_generator.go); [`verify_git_credentials.sh`](../../actions/setup/sh/verify_git_credentials.sh). |
+| `ArtifactProvenance` | Accepted requests come from this run and this invocation's agent artifact. | AR2; OI-01/02 | [`generateUnifiedArtifactUpload`](../../pkg/workflow/compiler_yaml_artifacts.go):31–61; [`buildSafeOutputsDownloadSteps`](../../pkg/workflow/compiler_safe_outputs_job.go):246 onward. Payload validation remains necessary. |
+| `DetectionGate` | When declared policy requires a detector for this run, modeled approval precedes every effect. | A:755–759,793–797; WTD1–3 | [`buildSafeOutputsJobCondition`](../../pkg/workflow/compiler_safe_outputs_job.go):859–881; [`processMessages`](../../actions/setup/js/safe_output_handler_manager.cjs):877–963. Structural checks prove job-result gating, not threat-classification correctness. |
 | `ValidatedEffects` | Only configured, revalidated, authorized safe-output effects can mutate the target. | OI-06/07/11; CTR-005/012/015 | [`resolveAndValidateRepo`](../../actions/setup/js/repo_helpers.cjs):162–204; [`processSafeOutput`](../../actions/setup/js/safe_output_processor.cjs). |
 | `AppLeastPrivilege` | Installation repositories and permissions are explicit and within this profile's grant. | A:428–440,666–674; K:157–190 | [`buildGitHubAppTokenMintStepWithMeta`](../../pkg/workflow/safe_outputs_app_config.go):427–461; [`validateAppTokenPermissions`](../../pkg/workflow/app_token_permissions_validation.go):41–100. |
 | `PrivilegedCheckoutIsolation` | Persisted push credentials exist only in a live privileged processor context. | K:175–205; AR1–4 | [`buildSharedPRCheckoutSteps`](../../pkg/workflow/compiler_safe_outputs_steps.go):32–100; [`GenerateConfigureGitCredentialsSteps`](../../pkg/workflow/checkout_step_generator.go):259–382. |
@@ -86,8 +98,12 @@ channel; it does not transform data into trusted instructions.
 
 ## Git semantics
 
-`Checkout(r)` uses that entry's token atomically during trusted setup, then
-removes persistence. `main` is sparse and shallow in the sparse profile;
+`Checkout(r)` uses that entry's token during trusted setup. `CheckoutMode`
+selects transient checkout or explicit force-clean persistence. `CleanCheckout`
+either removes and verifies credentials or fails the agent job before reasoning;
+`CheckoutComplete` cannot start the engine while credentials remain.
+The `cleanup-fail-open` mutation reproduces the historical ignored-error path.
+`main` is sparse and shallow in the sparse profile;
 `private_dependency` is full. Sparse patterns, available blobs, available refs,
 and depth are independent fields, even though the supplied small profiles
 choose them together. Configured `fetch:` is part of authenticated setup.
@@ -134,10 +150,11 @@ mutation. This does not dispatch either workflow.
 
 The results directory must not already exist. Every case includes a self-contained
 model/config, full TLC log, and saved state data. Secure configurations exhaust
-the reachable graph, not a depth-constrained prefix. There are four combinations
-of sparse/full checkout and issue/pull-request effects, seventeen deliberately
-broken protections, and six reachability witnesses, including authenticated
-push from a separate privileged checkout.
+the reachable graph, not a depth-constrained prefix. Ten positive configurations
+cover sparse/full checkout, issue/pull-request effects, force-clean lifecycle,
+reusable invocation naming, and declared detection modes. Twenty deliberately
+broken protections and eight reachability witnesses cover authenticated push,
+temporary host credentials, and a blocking cleanup failure.
 
 Counterexamples include raw `tlc-trace.json`, normalized `trace.json`, and
 `events.txt`. Negative controls also generate `source.md` and
@@ -146,7 +163,8 @@ frontmatter grant; the strict compiler must reject it. Other source seeds
 explicitly describe the hypothetical compiler/runtime mutation needed to
 realize their trace. They are not source-level exploits. Witnesses deliberately
 violate `NoSuccessfulWrite`, `NoDeniedRequest`, `NoMissingGitData`,
-`NoCrossRepoCheckout`, or `NoFailedJob` while retaining all security invariants.
+`NoCrossRepoCheckout`, `NoFailedJob`, `NoCleanupFailure`, or
+`NoTemporaryCredentials` while retaining all security invariants.
 
 The runner requires TLC exit 0 plus exhaustive-success output for secure runs,
 or exit 12 plus the **exact expected invariant** for a negative control/witness.
@@ -169,14 +187,41 @@ go run ./cmd/gh-aw-security-model --profile seed \
 ```
 
 The verifier decodes actual YAML and rejects missing job dependencies,
-repository-write agent permissions, persistent agent checkout credentials,
+repository-write agent permissions, checkout credentials without immediately
+following fail-closed cleanup and verification,
 cross-run artifact downloads, missing strict detector gates, unpinned external
 actions, wrong dependency credentials, excessive app scopes, or disabled token
-revocation. Its `daily` profile omits seed-specific token/app assertions.
-It recognizes only this profile's canonical gate expressions; it is not a
-general GitHub Actions expression interpreter. Manifest provenance, payload
+revocation. Its `daily` profile omits seed-specific token/app assertions while
+still requiring detection. The `compiled` profile reads an independent
+`gh-aw-manifest.threat_detection` declaration emitted by the compiler. Missing
+or unknown policy is an error; absent jobs cannot establish an opt-out. Reports
+include the effective policy so a disabled detector is never presented as
+equivalent assurance to required detection.
+
+Guard checks use actionlint's AST and conservative Boolean implication. An
+`always()` condition is accepted only when compiler-owned success is enforced;
+OR branches, negation, and status-function calls cannot simply bypass the check.
+Symbolic artifact names must match across producer/consumer and refer to the
+trusted activation prefix helper, not arbitrary caller-selected prefixes.
+The prefix helper hashes inputs and run attempt; identical inputs in the same
+attempt intentionally share a prefix. Caller-provided invocation uniqueness
+and hash collision resistance remain assumptions, not guarantees proved here.
+Manifest provenance, payload
 validation, redaction coverage, external network enforcement, and token expiry
 remain obligations, not facts extracted by this structural check.
+
+Validate the entire existing compiled corpus together with TLC:
+
+```bash
+go build -o /tmp/gh-aw-security-model ./cmd/gh-aw-security-model
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  python3 specs/workflow-security/check.py --results /tmp/workflow-security-corpus \
+  --verifier /tmp/gh-aw-security-model --compiled-workflows .github/workflows
+```
+
+`compiled-workflows.json` records every lock's hash, policy, outcome, and
+violations. Any structural or tooling failure fails the runner. Legacy locks
+without the explicit policy must be recompiled; they are not silently accepted.
 
 [`examples.json`](examples.json) records representative action traces generated
 by the pinned checker. Regenerate it only from a successful full run:
@@ -196,7 +241,7 @@ assumptions until real behavior disappears:
 |---|---|
 | Pre-activation actor authorization, bots, replay | A:608–660,966–1012; CTR-027/029; model trusted event identity and separate membership/checkout gates. |
 | Compiler expressions and freshness | CTR-010/016/018; model expression classification, manifest approvals, frontmatter/body hashes, legacy fallbacks, and status-function augmentation. |
-| Detection warning/disabled modes | WTD1–3; warning-mode annotated publication, push-to-PR conversion, abort-only operations, and conditional skipping are intentional separate policies. |
+| Detection warning handling | WTD1–3; disabled/conditional modes are modeled, but warning-mode annotated publication, push-to-PR conversion, and abort-only operations still need operation-specific refinement. |
 | Authorized custom steps/tools and augmented app grants | CTR-017; agent-job host secrets and explicit tool grants are legitimate. Do not assume all job secrets or permission augmentation are forbidden. |
 | Redaction coverage and exceptions | Ordering checks do not guarantee successful redaction of every artifact. Binary/unscanned exceptions and fallback `always()` uploads need explicit coverage/lifecycle states. |
 | Cache integrity and publication | CTR-019; model policy/integrity namespaces, restoration, detection-gated publication, and detection-disabled post-action saving. |

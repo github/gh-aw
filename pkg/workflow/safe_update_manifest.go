@@ -60,6 +60,13 @@ type GHAWManifestMCPServer struct {
 	Tools []string `json:"tools,omitempty"`
 }
 
+// GHAWManifestDetectionPolicy records the effective compiler policy independently
+// of the jobs, so deleting a detection job cannot masquerade as a disabled policy.
+type GHAWManifestDetectionPolicy struct {
+	Mode      string `json:"mode"`
+	Condition string `json:"condition,omitempty"`
+}
+
 // GHAWManifest is the single-line JSON payload embedded as a "# gh-aw-manifest: ..."
 // comment in generated lock files. It records the secrets, external actions, and
 // container images that were detected at the time the lock file was last compiled
@@ -79,6 +86,7 @@ type GHAWManifest struct {
 	MemoryValidationScripts     []GHAWManifestMemoryValidationScript `json:"memory_validation_scripts,omitempty"` // custom repo/cache memory validation scripts, hashed
 	MCPServers                  []GHAWManifestMCPServer              `json:"mcp_servers"`                         // MCP servers/tools exposed to the agent, independent of engine-specific allowlist syntax
 	ThreatDetectionSuppressions []ThreatDetectionSuppression         `json:"threat_detection_suppressions,omitempty"`
+	ThreatDetection             *GHAWManifestDetectionPolicy         `json:"threat_detection,omitempty"`
 }
 
 // NewGHAWManifest builds a GHAWManifest from the raw secret names, action reference
@@ -112,58 +120,13 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 	actions := parseActionRefs(actionRefs)
 	resolutionFailures := normalizeResolutionFailures(failures)
 
-	// Deduplicate container entries by image name and sort for deterministic output.
-	seenContainers := make(map[string]struct {
-	}, len(containers))
-	sortedContainers := make([]GHAWManifestContainer, 0, len(containers))
-	for _, c := range containers {
-		if c.Image != "" && !setutil.Contains(seenContainers, c.Image) {
-			seenContainers[c.Image] = struct {
-			}{}
-			sortedContainers = append(sortedContainers, c)
-		}
-	}
-	slices.SortFunc(sortedContainers, func(a, b GHAWManifestContainer) int {
-		switch {
-		case a.Image < b.Image:
-			return -1
-		case a.Image > b.Image:
-			return 1
-		default:
-			return 0
-		}
-	})
+	sortedContainers := normalizeManifestContainers(containers)
 
 	safeUpdateManifestLog.Printf("Manifest built: version=%d, secrets=%d, actions=%d, containers=%d, skills=%d",
 		currentGHAWManifestVersion, len(secrets), len(actions), len(sortedContainers), len(skillSpecs))
 
-	// Deduplicate and sort skill specs for deterministic output.
-	seenSkills := make(map[string]struct{}, len(skillSpecs))
-	sortedSkills := make([]string, 0, len(skillSpecs))
-	for _, s := range skillSpecs {
-		if s != "" && !setutil.Contains(seenSkills, s) {
-			seenSkills[s] = struct{}{}
-			sortedSkills = append(sortedSkills, s)
-		}
-	}
-	sort.Strings(sortedSkills)
-	if len(sortedSkills) == 0 {
-		sortedSkills = nil // keep JSON output clean: omitempty omits nil but not empty slice
-	}
-
-	// Deduplicate and sort plugin specs for deterministic output.
-	seenPlugins := make(map[string]struct{}, len(pluginSpecs))
-	sortedPlugins := make([]string, 0, len(pluginSpecs))
-	for _, p := range pluginSpecs {
-		if p != "" && !setutil.Contains(seenPlugins, p) {
-			seenPlugins[p] = struct{}{}
-			sortedPlugins = append(sortedPlugins, p)
-		}
-	}
-	sort.Strings(sortedPlugins)
-	if len(sortedPlugins) == 0 {
-		sortedPlugins = nil // keep JSON output clean: omitempty omits nil but not empty slice
-	}
+	sortedSkills := normalizeManifestSpecs(skillSpecs)
+	sortedPlugins := normalizeManifestSpecs(pluginSpecs)
 
 	hasPR, hasPRTarget := detectPullRequestEvents(onField)
 
@@ -179,6 +142,41 @@ func NewGHAWManifest(secretNames []string, actionRefs []string, failures []GHAWM
 		HasPullRequest:       hasPR,
 		HasPullRequestTarget: hasPRTarget,
 	}
+}
+
+func normalizeManifestSpecs(specs []string) []string {
+	seen := make(map[string]struct{}, len(specs))
+	var sorted []string
+	for _, spec := range specs {
+		if spec != "" && !setutil.Contains(seen, spec) {
+			seen[spec] = struct{}{}
+			sorted = append(sorted, spec)
+		}
+	}
+	sort.Strings(sorted)
+	return sorted
+}
+
+func normalizeManifestContainers(containers []GHAWManifestContainer) []GHAWManifestContainer {
+	seen := make(map[string]struct{}, len(containers))
+	sorted := make([]GHAWManifestContainer, 0, len(containers))
+	for _, container := range containers {
+		if container.Image != "" && !setutil.Contains(seen, container.Image) {
+			seen[container.Image] = struct{}{}
+			sorted = append(sorted, container)
+		}
+	}
+	slices.SortFunc(sorted, func(a, b GHAWManifestContainer) int {
+		switch {
+		case a.Image < b.Image:
+			return -1
+		case a.Image > b.Image:
+			return 1
+		default:
+			return 0
+		}
+	})
+	return sorted
 }
 
 func detectPullRequestEvents(onField any) (hasPR bool, hasPRTarget bool) {
@@ -381,15 +379,15 @@ func (m *GHAWManifest) ToJSON() (string, error) {
 // which is the normal state for lock files generated before this feature was
 // introduced.
 func ExtractGHAWManifestFromLockFile(content string) (*GHAWManifest, error) {
-	matches := ghawManifestPattern.FindStringSubmatch(content)
-	if len(matches) < 2 {
-		return nil, nil
+	match := ghawManifestPattern.FindString(content)
+	if _, payload, found := strings.Cut(match, ":"); found {
+		var m GHAWManifest
+		if err := json.Unmarshal([]byte(payload), &m); err != nil {
+			return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
+		}
+		safeUpdateManifestLog.Printf("Extracted gh-aw-manifest: version=%d secrets=%d actions=%d",
+			m.Version, len(m.Secrets), len(m.Actions))
+		return &m, nil
 	}
-	var m GHAWManifest
-	if err := json.Unmarshal([]byte(matches[1]), &m); err != nil {
-		return nil, fmt.Errorf("gh-aw-manifest JSON is not recognized, expected the JSON emitted by ToJSON in the lock file header: %w", err)
-	}
-	safeUpdateManifestLog.Printf("Extracted gh-aw-manifest: version=%d secrets=%d actions=%d",
-		m.Version, len(m.Secrets), len(m.Actions))
-	return &m, nil
+	return nil, nil
 }

@@ -1,5 +1,5 @@
 {
-  "model_sha256": "cec6b979fb37dc4b8f212ac3f231a819d87853073150897897fa3577a79c8647",
+  "model_sha256": "c12db196febb246909b566ec14e11633865015dd3a16d537313c48d8b7ce9445",
   "jar_sha256": "b490f45c1de08e4ff9753259a00338981b9cf464f01ca9e9cd5f19f33cf0bb92",
   "confirmed_product_bug": false,
   "examples": [
@@ -71,6 +71,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -84,6 +89,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -92,6 +99,8 @@
             "exists": true,
             "producer": "agent",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": false
@@ -100,6 +109,8 @@
             "exists": true,
             "producer": "detection",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -232,6 +243,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -245,6 +261,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -253,6 +271,8 @@
             "exists": true,
             "producer": "agent",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": false
@@ -261,6 +281,8 @@
             "exists": true,
             "producer": "detection",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -364,6 +386,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -377,6 +404,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -385,6 +414,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -393,6 +424,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -480,6 +513,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": false,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -493,6 +531,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -501,6 +541,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -509,6 +551,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -590,6 +634,11 @@
             "refs": []
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": false,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -603,6 +652,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -611,6 +662,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -619,6 +672,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -709,6 +764,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": true,
@@ -722,6 +782,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -730,6 +792,8 @@
             "exists": true,
             "producer": "agent",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": false
@@ -738,6 +802,8 @@
             "exists": true,
             "producer": "detection",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -818,9 +884,130 @@
       }
     },
     {
-      "case": "persist-credentials",
-      "classification": "synthetic-negative-control",
-      "expected_violation": "NoCredentialPersistence",
+      "case": "cleanup-failure",
+      "classification": "reachability-witness",
+      "expected_violation": "NoCleanupFailure",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:main", "CleanupFailure:main"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 1,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": [],
+        "agentSecrets": [],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "checkout-main",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          }
+        },
+        "cleanup": {
+          "main": "failed",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": false,
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "invocation": "none",
+            "prefix": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "invocation": "none",
+            "prefix": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          }
+        ],
+        "writes": [],
+        "errors": ["credential-cleanup-failed"],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "CleanupFailure:main"
+      }
+    },
+    {
+      "case": "temporary-credentials",
+      "classification": "reachability-witness",
+      "expected_violation": "NoTemporaryCredentials",
       "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:main"],
       "final_state": {
         "status": {
@@ -863,6 +1050,11 @@
             "refs": []
           }
         },
+        "cleanup": {
+          "main": "pending",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": false,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -876,6 +1068,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -884,6 +1078,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -892,6 +1088,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -925,6 +1123,133 @@
         "appScope": [],
         "appRepos": [],
         "lastEvent": "Checkout:main"
+      }
+    },
+    {
+      "case": "persist-credentials",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "NoCredentialPersistence",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:main", "Checkout:private_dependency", "CheckoutComplete"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "running",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 2,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["engine"],
+        "revoked": [],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "checkout-main",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "checkout-dependency",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "invocation": "none",
+            "prefix": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "invocation": "none",
+            "prefix": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "CheckoutComplete"
       }
     },
     {
@@ -995,6 +1320,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -1008,6 +1338,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -1016,6 +1348,8 @@
             "exists": true,
             "producer": "agent",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": false
@@ -1024,6 +1358,8 @@
             "exists": true,
             "producer": "detection",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -1137,6 +1473,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": false,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -1150,6 +1491,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -1158,6 +1501,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -1166,6 +1511,8 @@
             "exists": false,
             "producer": "none",
             "run": "none",
+            "invocation": "none",
+            "prefix": "none",
             "secret": false,
             "private": false,
             "trusted": false
@@ -1269,6 +1616,11 @@
             "refs": ["HEAD", "base"]
           }
         },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
         "privilegedCheckout": {
           "sparse": false,
           "exists": false,
@@ -1282,6 +1634,8 @@
             "exists": true,
             "producer": "activation",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true
@@ -1290,6 +1644,8 @@
             "exists": true,
             "producer": "agent",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": true,
             "trusted": false
@@ -1298,6 +1654,8 @@
             "exists": true,
             "producer": "detection",
             "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
             "secret": false,
             "private": false,
             "trusted": true

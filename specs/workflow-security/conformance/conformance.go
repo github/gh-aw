@@ -11,12 +11,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"gopkg.in/yaml.v3"
 )
 
 type document struct {
-	Permissions map[string]string `yaml:"permissions"`
-	Jobs        map[string]job    `yaml:"jobs"`
+	Permissions map[string]string                     `yaml:"permissions"`
+	Jobs        map[string]job                        `yaml:"jobs"`
+	Policy      *workflow.GHAWManifestDetectionPolicy `yaml:"-"`
 }
 
 type job struct {
@@ -24,19 +26,25 @@ type job struct {
 	If          string            `yaml:"if"`
 	Permissions map[string]string `yaml:"permissions"`
 	Steps       []step            `yaml:"steps"`
+	Outputs     map[string]string `yaml:"outputs"`
 }
 
 type step struct {
-	Uses string         `yaml:"uses"`
-	With map[string]any `yaml:"with"`
+	ID              string         `yaml:"id"`
+	Run             string         `yaml:"run"`
+	If              string         `yaml:"if"`
+	ContinueOnError any            `yaml:"continue-on-error"`
+	Uses            string         `yaml:"uses"`
+	With            map[string]any `yaml:"with"`
 }
 
 type report struct {
-	Profile     string   `json:"profile"`
-	Lock        string   `json:"lock"`
-	Conforms    bool     `json:"conforms"`
-	Obligations []string `json:"obligations"`
-	Violations  []string `json:"violations"`
+	Profile     string                                `json:"profile"`
+	Lock        string                                `json:"lock"`
+	Conforms    bool                                  `json:"conforms"`
+	Obligations []string                              `json:"obligations"`
+	Violations  []string                              `json:"violations"`
+	Detection   *workflow.GHAWManifestDetectionPolicy `json:"detection_policy"`
 }
 
 var pinnedAction = regexp.MustCompile(`^[^@]+@[0-9a-f]{40}$`)
@@ -56,42 +64,11 @@ func dependencies(node yaml.Node) ([]string, error) {
 	}
 }
 
-func checkGraph(doc document) []string {
-	var violations []string
-	for _, name := range []string{"activation", "agent", "detection", "safe_outputs"} {
-		if _, ok := doc.Jobs[name]; !ok {
-			violations = append(violations, "JobIsolation: missing "+name+" job")
-		}
-	}
-	for name, prerequisites := range map[string][]string{
-		"agent": {"activation"}, "detection": {"agent"}, "safe_outputs": {"agent", "detection"},
-	} {
-		needs, err := dependencies(doc.Jobs[name].Needs)
-		if err != nil {
-			violations = append(violations, "JobIsolation: "+name+": "+err.Error())
-			continue
-		}
-		for _, prerequisite := range prerequisites {
-			if !slices.Contains(needs, prerequisite) {
-				violations = append(violations, "JobIsolation: "+name+" lacks "+prerequisite)
-			}
-		}
-	}
-	condition := strings.Join(strings.Fields(doc.Jobs["safe_outputs"].If), " ")
-	if condition != "needs.detection.result == 'success'" &&
-		condition != "(!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'" {
-		violations = append(violations, "DetectionGate: missing explicit detection-success condition")
-	}
-	return violations
-}
-
 func checkAgent(doc document) []string {
 	var violations []string
 	agent := doc.Jobs["agent"]
-	for _, statusFunction := range []string{"always(", "failure(", "cancelled("} {
-		if strings.Contains(agent.If, statusFunction) {
-			violations = append(violations, "JobIsolation: agent condition outside implicit-success profile")
-		}
+	if err := requireJobResults(agent.If, "activation", []string{"success"}, true); err != nil {
+		violations = append(violations, "JobIsolation: "+err.Error())
 	}
 	permissions := agent.Permissions
 	if permissions == nil {
@@ -102,44 +79,7 @@ func checkAgent(doc document) []string {
 			violations = append(violations, "JobIsolation: agent write scope "+scope)
 		}
 	}
-	for _, s := range agent.Steps {
-		if strings.HasPrefix(s.Uses, "actions/checkout@") &&
-			fmt.Sprint(s.With["persist-credentials"]) != "false" {
-			violations = append(violations, "NoCredentialPersistence: agent checkout retains credentials")
-		}
-	}
-	return violations
-}
-
-func checkArtifacts(doc document) []string {
-	uploaded := map[string]struct{}{}
-	for _, s := range doc.Jobs["agent"].Steps {
-		if strings.HasPrefix(s.Uses, "actions/upload-artifact@") {
-			uploaded[fmt.Sprint(s.With["name"])] = struct{}{}
-		}
-	}
-	var violations []string
-	found := false
-	for _, s := range doc.Jobs["safe_outputs"].Steps {
-		if !strings.HasPrefix(s.Uses, "actions/download-artifact@") {
-			continue
-		}
-		if _, ok := s.With["run-id"]; ok {
-			violations = append(violations, "ArtifactProvenance: cross-run download")
-		}
-		if _, ok := s.With["repository"]; ok {
-			violations = append(violations, "ArtifactProvenance: cross-repository download")
-		}
-		name := fmt.Sprint(s.With["name"])
-		pattern := fmt.Sprint(s.With["pattern"])
-		if name == "agent" || pattern == "{agent,agent-output-fallback}" {
-			_, present := uploaded["agent"]
-			found = found || present
-		}
-	}
-	if !found {
-		violations = append(violations, "ArtifactProvenance: no matching agent artifact handoff")
-	}
+	violations = append(violations, checkCheckoutCredentials(agent.Steps)...)
 	return violations
 }
 
@@ -182,7 +122,8 @@ func checkSeed(doc document) []string {
 }
 
 func verify(doc document, profile string) []string {
-	violations := checkGraph(doc)
+	policy, violations := effectivePolicy(doc, profile)
+	violations = append(violations, checkGraph(doc, policy)...)
 	violations = append(violations, checkAgent(doc)...)
 	violations = append(violations, checkArtifacts(doc)...)
 	for name, j := range doc.Jobs {
@@ -201,10 +142,10 @@ func verify(doc document, profile string) []string {
 
 // Run verifies the compiled lock selected by the command-line flags.
 func Run() error {
-	profile := flag.String("profile", "seed", "Supported profile: seed or daily")
+	profile := flag.String("profile", "seed", "Supported profile: seed, daily, or compiled")
 	flag.Parse()
-	if flag.NArg() != 1 || (*profile != "seed" && *profile != "daily") {
-		return errors.New("usage: conformance --profile seed|daily compiled.lock.yml")
+	if flag.NArg() != 1 || (*profile != "seed" && *profile != "daily" && *profile != "compiled") {
+		return errors.New("usage: conformance --profile seed|daily|compiled compiled.lock.yml")
 	}
 	data, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
@@ -214,10 +155,18 @@ func Run() error {
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return fmt.Errorf("parse compiled YAML: %w", err)
 	}
+	manifest, err := workflow.ExtractGHAWManifestFromLockFile(string(data))
+	if err != nil {
+		return err
+	}
+	if manifest != nil {
+		doc.Policy = manifest.ThreatDetection
+	}
+	policy, _ := effectivePolicy(doc, *profile)
 	violations := verify(doc, *profile)
 	result := report{Profile: *profile, Lock: flag.Arg(0), Conforms: len(violations) == 0,
 		Obligations: []string{"JobIsolation", "NoCredentialPersistence", "ArtifactProvenance",
-			"DetectionGate", "TrustedConfiguration"}, Violations: violations}
+			"DetectionGate", "TrustedConfiguration"}, Violations: violations, Detection: policy}
 	if *profile == "seed" {
 		result.Obligations = append(result.Obligations, "GitAuthorization", "AppLeastPrivilege", "TokenLifetime")
 	}

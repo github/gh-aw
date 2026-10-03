@@ -92,7 +92,9 @@ Read the model README and evidence matrix first. Run:
 
 ```bash
 python3 -m unittest discover -s specs/workflow-security -p '*_test.py'
-python3 specs/workflow-security/check.py --results /tmp/gh-aw/agent/tla-results
+python3 specs/workflow-security/check.py --results /tmp/gh-aw/agent/tla-results \
+  --verifier /tmp/gh-aw/agent/tla-tools/verify-lock \
+  --compiled-workflows .github/workflows
 /tmp/gh-aw/agent/tla-tools/verify-lock --profile daily .github/workflows/daily-workflow-security-model.lock.yml
 ```
 
@@ -101,6 +103,9 @@ download other tools. The results directory must be new. Retain the command,
 exit status, model/config hashes, state counts, and complete reports. A parse
 error, timeout, missing tool, wrong invariant, or unfinished exploration is a
 failed investigation, not a counterexample or security success.
+The corpus uses the `compiled` profile and records explicit compiler-declared
+detection modes. The daily workflow's own `daily` profile still requires detection;
+never infer a detection opt-out from the absence of a job.
 
 Inspect open issues with `[workflow-security]` and open PRs with
 `[workflow-security-model]` before proposing a duplicate. Never close old

@@ -1,15 +1,23 @@
 ------------------------- MODULE CompiledWorkflow -------------------------
 EXTENDS Naturals, FiniteSets, Sequences, TLC
 
-CONSTANTS Fault, Profile, Effect
+CONSTANTS Fault, Profile, Effect, DetectionPolicy, DetectionEnabled, CheckoutMode, ArtifactMode
 ASSUME Fault \in {"none", "agent-write", "persist-credentials",
                  "artifact-origin", "skip-detection", "cross-repo-token",
                  "app-scope", "secret-channel", "untrusted-execution",
                  "checkout-widen", "expired-token", "network-bypass",
                  "untrusted-config", "output-limit", "private-sink",
-                 "target-authorization", "retained-push-token", "ambient-agent-fetch"}
+                 "target-authorization", "retained-push-token", "ambient-agent-fetch",
+                 "cleanup-fail-open", "artifact-invocation", "policy-downgrade"}
 ASSUME Profile \in {"sparse", "full"}
 ASSUME Effect \in {"issue", "pull-request"}
+ASSUME DetectionPolicy \in {"required", "disabled", "conditional"}
+ASSUME DetectionEnabled \in BOOLEAN
+ASSUME CheckoutMode \in {"transient", "force-clean"}
+ASSUME ArtifactMode \in {"plain", "reusable"}
+DetectionRuns == DetectionPolicy = "required" \/
+                 (DetectionPolicy = "conditional" /\ DetectionEnabled)
+ActualDetectionRuns == DetectionRuns /\ Fault # "policy-downgrade"
 
 Jobs == {"activation", "agent", "detection", "safe_outputs"}
 Repos == {"main", "private_dependency"}
@@ -22,11 +30,13 @@ Tokens == {"checkout-main", "checkout-dependency", "app-write", "engine"}
 Artifacts == {"context", "request", "verdict"}
 None == "none"
 Run == "current-run"
+Invocation == "current-invocation"
+ArtifactPrefix == IF ArtifactMode = "reusable" THEN "invocation-prefix-" ELSE ""
 Dependencies(j) ==
     CASE j = "activation" -> {}
       [] j = "agent" -> {"activation"}
       [] j = "detection" -> {"agent"}
-      [] OTHER -> {"agent", "detection"}
+      [] OTHER -> IF ActualDetectionRuns THEN {"agent", "detection"} ELSE {"agent"}
 StepCount(j) ==
     CASE j = "activation" -> 1
       [] j = "agent" -> 3
@@ -49,11 +59,13 @@ TokenPermissions(t) ==
 TokenFor(r) == IF r = "main" THEN "checkout-main" ELSE "checkout-dependency"
 
 EmptyArtifact == [exists |-> FALSE, producer |-> None, run |-> None,
+                  invocation |-> None, prefix |-> None,
                   secret |-> FALSE, private |-> FALSE, trusted |-> FALSE]
 EmptyCheckout == [exists |-> FALSE, credentials |-> None,
                   sparse |-> FALSE, shallow |-> FALSE,
                   blobs |-> {}, refs |-> {}]
 Artifact(j, trusted) == [exists |-> TRUE, producer |-> j, run |-> Run,
+                        invocation |-> Invocation, prefix |-> ArtifactPrefix,
                         secret |-> FALSE, private |-> FALSE, trusted |-> trusted]
 Transfer(j, channel, secret) ==
     [job |-> j, channel |-> channel, secret |-> secret]
@@ -70,13 +82,16 @@ DependencySatisfied(j, d) ==
     ELSE s.status[d] = "success"
 
 Init ==
-    s = [status |-> [j \in Jobs |-> "queued"],
+    s = [status |-> [j \in Jobs |-> IF j = "detection" /\ ~ActualDetectionRuns
+                                  THEN "skipped" ELSE "queued"],
          step |-> [j \in Jobs |-> 1],
          started |-> {},
          grants |-> [j \in Jobs |-> Grants(j)],
          live |-> {}, revoked |-> {},
          agentSecrets |-> {},
          checkouts |-> [r \in Repos |-> EmptyCheckout],
+         cleanup |-> [r \in Repos |-> "not-required"],
+         agentBegan |-> FALSE,
          privilegedCheckout |-> EmptyCheckout,
          artifacts |-> [a \in Artifacts |-> EmptyArtifact],
          transfers |-> {}, operations |-> {}, writes |-> {},
@@ -91,6 +106,8 @@ At(j, n) == s.status[j] = "running" /\ s.step[j] = n
 GoodOrigin(a, j) ==
     s.artifacts[a].exists /\ s.artifacts[a].producer = j
     /\ s.artifacts[a].run = Run
+    /\ s.artifacts[a].invocation = Invocation
+    /\ s.artifacts[a].prefix = ArtifactPrefix
     /\ (j = "agent" \/ s.artifacts[a].trusted)
 
 Start(j) ==
@@ -130,20 +147,37 @@ Checkout(r) ==
        IN s' = [s EXCEPT
            !.checkouts[r] =
                [exists |-> TRUE,
-                credentials |-> IF Fault = "persist-credentials" THEN t ELSE None,
+                credentials |-> IF Fault = "persist-credentials" \/ CheckoutMode = "force-clean"
+                                THEN t ELSE None,
                 sparse |-> limited, shallow |-> limited,
                 blobs |-> IF limited THEN {"README.md"}
                           ELSE {"README.md", "src/code.go"},
                 refs |-> IF limited THEN {"HEAD"} ELSE {"HEAD", "base"}],
+           !.cleanup[r] = IF CheckoutMode = "force-clean" THEN "pending" ELSE "not-required",
            !.operations = @ \cup {Operation("agent", "checkout", r, t)},
            !.lastEvent = "Checkout:" \o r]
+
+CleanCheckout(r, success) ==
+    /\ At("agent", 1) /\ s.cleanup[r] = "pending"
+    /\ s' = [s EXCEPT
+        !.cleanup[r] = IF success THEN "passed" ELSE "failed",
+        !.checkouts[r].credentials = IF success THEN None ELSE @,
+        !.status["agent"] = IF success \/ Fault = "cleanup-fail-open"
+                           THEN @ ELSE "failure",
+        !.errors = IF success THEN @ ELSE @ \cup {"credential-cleanup-failed"},
+        !.lastEvent = IF success THEN "CleanCheckout:" \o r
+                      ELSE "CleanupFailure:" \o r]
 
 CheckoutComplete ==
     /\ At("agent", 1)
     /\ \A r \in Repos: s.checkouts[r].exists
+    /\ \A r \in Repos:
+        s.checkouts[r].credentials = None \/ Fault = "persist-credentials" \/
+        (Fault = "cleanup-fail-open" /\ s.cleanup[r] = "failed")
     /\ GoodOrigin("context", "activation")
     /\ s' = [s EXCEPT
         !.live = @ \cup {"engine"},
+        !.agentBegan = TRUE,
         !.agentSecrets = @ \cup {"engine-token"},
         !.step["agent"] = 2, !.lastEvent = "CheckoutComplete"]
 
@@ -211,17 +245,19 @@ Publish ==
         !.step["agent"] = 4, !.lastEvent = "Publish"]
 
 TamperOrigin ==
-    /\ Fault = "artifact-origin"
+    /\ Fault \in {"artifact-origin", "artifact-invocation"}
     /\ At("detection", 1)
-    /\ s.artifacts["request"].run = Run
+    /\ s.artifacts["request"].run = Run /\ s.artifacts["request"].invocation = Invocation
     /\ s' = [s EXCEPT
-        !.artifacts["request"].run = "other-run",
+        !.artifacts["request"].run = IF Fault = "artifact-origin" THEN "other-run" ELSE @,
+        !.artifacts["request"].invocation =
+            IF Fault = "artifact-invocation" THEN "other-invocation" ELSE @,
         !.lastEvent = "TamperOrigin"]
 
 Consume ==
     /\ At("detection", 1)
     /\ IF GoodOrigin("request", "agent") \/
-          (Fault = "artifact-origin" /\ s.artifacts["request"].exists)
+          (Fault \in {"artifact-origin", "artifact-invocation"} /\ s.artifacts["request"].exists)
        THEN s' = [s EXCEPT
            !.step["detection"] = 2, !.lastEvent = "Consume"]
        ELSE s' = [s EXCEPT
@@ -240,8 +276,8 @@ Validate ==
     /\ LET accepted == s.requestValid
                        /\ (s.target = "main" \/ Fault = "target-authorization")
                        /\ GoodOrigin("request", "agent")
-                       /\ GoodOrigin("verdict", "detection")
-                       /\ (s.detection = "pass" \/ Fault = "skip-detection")
+                       /\ (~ActualDetectionRuns \/ GoodOrigin("verdict", "detection"))
+                       /\ (~ActualDetectionRuns \/ s.detection = "pass" \/ Fault = "skip-detection")
                        /\ (~s.artifacts["request"].private \/ Fault = "private-sink")
        IN s' = [s EXCEPT
            !.approved = accepted,
@@ -329,6 +365,7 @@ Next ==
     \/ \E j \in Jobs: Start(j) \/ Skip(j) \/ Finish(j) \/ Fail(j)
     \/ Activate
     \/ \E r \in Repos: Checkout(r)
+    \/ \E r \in Repos, success \in BOOLEAN: CleanCheckout(r, success)
     \/ CheckoutComplete
     \/ \E op \in GitOps, r \in Repos: GitOperation(op, r)
     \/ \E destination \in {"inference", "github", "blocked"}: ToolCall(destination)
@@ -353,13 +390,17 @@ TypeOK ==
         [exists: BOOLEAN, credentials: Tokens \cup {None},
          sparse: BOOLEAN, shallow: BOOLEAN,
          blobs: SUBSET {"README.md", "src/code.go"}, refs: SUBSET {"HEAD", "base"}]]
+    /\ s.cleanup \in [Repos -> {"not-required", "pending", "passed", "failed"}]
+    /\ s.agentBegan \in BOOLEAN
     /\ s.privilegedCheckout \in
         [exists: BOOLEAN, credentials: Tokens \cup {None},
          sparse: BOOLEAN, shallow: BOOLEAN,
          blobs: SUBSET {"README.md", "src/code.go"}, refs: SUBSET {"HEAD", "base"}]
     /\ s.artifacts \in [Artifacts ->
         [exists: BOOLEAN, producer: Jobs \cup {None},
-         run: {Run, None, "other-run"}, secret: BOOLEAN, private: BOOLEAN,
+         run: {Run, None, "other-run"},
+         invocation: {Invocation, None, "other-invocation"},
+         prefix: {None, "", "invocation-prefix-"}, secret: BOOLEAN, private: BOOLEAN,
          trusted: BOOLEAN]]
     /\ s.transfers \subseteq [job: Jobs, channel: Channels, secret: BOOLEAN]
     /\ s.operations \subseteq [job: Jobs, op: GitOps \cup {"checkout"},
@@ -367,7 +408,8 @@ TypeOK ==
     /\ s.writes \subseteq [job: Jobs, repo: Repos, token: Tokens,
         validated: BOOLEAN, detected: BOOLEAN,
         execution: {"trusted-handler", "agent-script"}, private: BOOLEAN]
-    /\ s.errors \subseteq {"artifact-origin", "request-rejected", "network-denied"} \cup
+    /\ s.errors \subseteq {"artifact-origin", "request-rejected", "network-denied",
+                           "credential-cleanup-failed"} \cup
         {"git-unavailable:" \o op \o ":" \o r : op \in GitOps, r \in Repos}
     /\ s.gitDone \in BOOLEAN /\ s.networkDone \in BOOLEAN
     /\ s.requestValid \in BOOLEAN /\ s.effects \in 0..2
@@ -381,11 +423,12 @@ JobIsolation ==
     /\ s.grants["agent"] \cap {"contents-write", "issues-write"} = {}
     /\ \A j \in s.started: \A d \in Dependencies(j): DependencySatisfied(j, d)
 NoCredentialPersistence ==
-    \A r \in Repos: s.checkouts[r].credentials = None
+    s.agentBegan => \A r \in Repos: s.checkouts[r].credentials = None
 ArtifactProvenance ==
-    s.step["detection"] > 1 => GoodOrigin("request", "agent")
+    /\ (s.step["detection"] > 1 => GoodOrigin("request", "agent"))
+    /\ (s.approved => GoodOrigin("request", "agent"))
 DetectionGate ==
-    \A w \in s.writes: w.detected
+    \A w \in s.writes: ~DetectionRuns \/ w.detected
 ValidatedEffects ==
     \A w \in s.writes:
         w.job = "safe_outputs" /\ w.repo = "main" /\ w.validated
@@ -438,4 +481,6 @@ NoMissingGitData ==
         "git-unavailable:" \o op \o ":" \o r \notin s.errors
 NoCrossRepoCheckout == ~s.checkouts["private_dependency"].exists
 NoFailedJob == \A j \in Jobs: s.status[j] # "failure"
+NoCleanupFailure == "credential-cleanup-failed" \notin s.errors
+NoTemporaryCredentials == \A r \in Repos: s.checkouts[r].credentials = None
 =============================================================================

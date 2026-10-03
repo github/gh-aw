@@ -2,9 +2,10 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 
-from check import MUTATIONS, ROOT, check_result, concretize, normalize_trace
+from check import MUTATIONS, ROOT, check_compiled_workflows, check_result, concretize, normalize_trace
 
 
 class ResultContractTest(unittest.TestCase):
@@ -61,6 +62,30 @@ class ResultContractTest(unittest.TestCase):
         push = next(example for example in examples["examples"] if example["case"] == "privileged-push")
         self.assertTrue(any(operation["job"] == "safe_outputs" and operation["op"] == "push"
                             for operation in push["final_state"]["operations"]))
+
+    def test_compiled_corpus_contract(self):
+        for outcome in ["success", "violation", "tool-failure", "malformed-policy"]:
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "sample.lock.yml").write_text("jobs: {}\n")
+                report = {"conforms": outcome == "success",
+                          "detection_policy": {"mode": "enabled"}}
+                if outcome == "malformed-policy":
+                    report["detection_policy"] = None
+                output = json.dumps(report)
+                code = 0 if outcome == "success" else 1
+                if outcome == "tool-failure":
+                    output, code = "not-json", 2
+                script = root / "verifier"
+                script.write_text(f"#!{sys.executable}\nimport sys\nprint({output!r})\nsys.exit({code})\n")
+                script.chmod(0o700)
+                if outcome == "success":
+                    check_compiled_workflows(script, root, root)
+                else:
+                    with self.assertRaises(RuntimeError):
+                        check_compiled_workflows(script, root, root)
+                saved = json.loads((root / "compiled-workflows.json").read_text())
+                self.assertEqual(saved["failed"], 0 if outcome == "success" else 1)
 
 
 if __name__ == "__main__":
