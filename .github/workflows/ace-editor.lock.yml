@@ -148,6 +148,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Generate agentic run info
@@ -526,6 +527,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Set runtime paths
         id: set-runtime-paths
         env:
@@ -1167,6 +1169,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
@@ -1398,6 +1401,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
@@ -1759,6 +1763,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Check command position
         id: check_command_position
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1822,6 +1827,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1935,6 +1941,7 @@ jobs:
           GH_AW_INFO_VERSION: "0.159.3"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "codex"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Download agent output artifact

@@ -261,6 +261,9 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 			if setupEngineID != "" {
 				setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
 			}
+			if hasWorkflowCallOrDispatchTrigger(data.On) {
+				setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
+			}
 		}
 		if traceID != "" {
 			setupLines = append(setupLines, fmt.Sprintf("          INPUT_TRACE_ID: %s\n", traceID))
@@ -325,7 +328,7 @@ func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowDa
 	if setupEngineID != "" {
 		setupLines = append(setupLines, fmt.Sprintf("          GH_AW_INFO_ENGINE_ID: %q\n", setupEngineID))
 	}
-	if hasWorkflowCallTrigger(data.On) {
+	if hasWorkflowCallOrDispatchTrigger(data.On) {
 		setupLines = append(setupLines, "          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}\n")
 	}
 	lines = append(lines, setupLines...)

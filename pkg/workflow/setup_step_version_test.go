@@ -141,6 +141,49 @@ func TestGenerateSetupStepIncludesVersion(t *testing.T) {
 	}
 }
 
+func TestGenerateSetupStepIncludesAWContextForCallAndDispatchTriggers(t *testing.T) {
+	tests := []struct {
+		name        string
+		on          string
+		wantContext bool
+	}{
+		{
+			name:        "workflow_dispatch",
+			on:          "\"on\":\n  workflow_dispatch:\n",
+			wantContext: true,
+		},
+		{
+			name:        "workflow_call",
+			on:          "\"on\":\n  workflow_call:\n",
+			wantContext: true,
+		},
+		{
+			name: "schedule only",
+			on: "\"on\":\n  schedule:\n" +
+				"    - cron: '0 0 * * *'\n",
+			wantContext: false,
+		},
+	}
+
+	for _, mode := range []ActionMode{ActionModeRelease, ActionModeScript} {
+		for _, tt := range tests {
+			t.Run(string(mode)+"/"+tt.name, func(t *testing.T) {
+				c := NewCompiler()
+				c.SetActionMode(mode)
+				data := &WorkflowData{Name: "my-workflow", On: tt.on}
+
+				combined := strings.Join(c.generateSetupStep(data, "github/gh-aw/actions/setup@abc123", "${{ runner.temp }}/gh-aw", false, "", ""), "")
+				if tt.wantContext && !strings.Contains(combined, "GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}") {
+					t.Fatalf("expected setup step to pass aw_context, got:\n%s", combined)
+				}
+				if !tt.wantContext && strings.Contains(combined, "GH_AW_SETUP_AW_CONTEXT") {
+					t.Fatalf("expected setup step not to pass aw_context, got:\n%s", combined)
+				}
+			})
+		}
+	}
+}
+
 func TestGenerateSetupStepIncludesAWFVersion(t *testing.T) {
 	tests := []struct {
 		name            string

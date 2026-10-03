@@ -1449,6 +1449,7 @@ describe("sendJobSetupSpan", () => {
       origin_event: "workflow_dispatch",
       root_repo: "owner/repo",
       root_workflow_id: "owner/repo/.github/workflows/smoke-call-workflow.lock.yml@refs/heads/main",
+      otel_trace_id: "0123456789abcdef0123456789abcdef",
     });
 
     const readFileSpy = vi.spyOn(fs, "readFileSync").mockImplementation(filePath => {
@@ -1458,12 +1459,14 @@ describe("sendJobSetupSpan", () => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
 
-    await sendJobSetupSpan();
+    const { traceId } = await sendJobSetupSpan();
     readFileSpy.mockRestore();
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     const span = body.resourceSpans[0].scopeSpans[0].spans[0];
     const attrs = Object.fromEntries(span.attributes.map(a => [a.key, attrValue(a)]));
+    expect(traceId).toBe("0123456789abcdef0123456789abcdef");
+    expect(span.traceId).toBe("0123456789abcdef0123456789abcdef");
     expect(attrs["gh-aw.workflow.name"]).toBe("Smoke Workflow Call");
     expect(attrs["gh-aw.episode.id"]).toBe("25280567207-1:owner/repo/.github/workflows/smoke-call-workflow.lock.yml@refs/heads/main");
     expect(attrs["gh-aw.hop.id"]).toBe("25280567207-1:owner/repo/.github/workflows/smoke-workflow-call.lock.yml@refs/heads/main");
