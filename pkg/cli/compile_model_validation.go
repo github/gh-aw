@@ -91,6 +91,7 @@ func findUnknownConfiguredModels(data *workflow.WorkflowData, inventory *activeM
 
 	add("models.allowed", data.ModelPolicyAllowed)
 	add("models.blocked", data.ModelPolicyBlocked)
+	add("model", []string{data.Model})
 
 	if engine, ok := data.RawFrontmatter["engine"].(map[string]any); ok {
 		if models, ok := engine["models"].(map[string]any); ok {

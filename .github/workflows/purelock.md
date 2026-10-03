@@ -16,7 +16,7 @@ permissions:
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-5.6-terra
+model: copilot/gpt-5.3-codex
 strict: true
 timeout-minutes: 35
 max-turns: 60

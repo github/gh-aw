@@ -39,7 +39,7 @@ imports:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.6-luna
+model: openai/gpt-5.3-codex
 ---
 
 # Workflow Normalizer

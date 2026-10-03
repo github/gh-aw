@@ -36,7 +36,7 @@ safe-outputs:
   noop: null
 description: Automatically reviews and updates documentation to ensure accuracy and completeness
 emoji: 📝
-model: copilot/gpt-6-astra
+model: copilot/gpt-5.3-codex
 engine:
   id: codex
   model-provider: github

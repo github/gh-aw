@@ -28,7 +28,7 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 	}
 
 	message := fmt.Sprintf(
-		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a supported Codex model such as copilot/gpt-6.1-sol",
+		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a supported Codex model such as copilot/gpt-5.3-codex",
 		data.Model,
 	)
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(

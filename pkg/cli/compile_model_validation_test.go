@@ -68,3 +68,31 @@ func TestFindUnknownConfiguredModelsSkipsMissingInventory(t *testing.T) {
 	}
 	assert.Empty(t, findUnknownConfiguredModels(data, nil))
 }
+
+func TestFindUnknownConfiguredModelsChecksWorkflowModel(t *testing.T) {
+	t.Parallel()
+
+	inventory := buildActiveModelInventory(modelsReport{
+		Observed: []observedModelRow{{Provider: "github-copilot", Model: "gpt-5.3-codex"}},
+	})
+	for _, tt := range []struct {
+		model       string
+		wantWarning bool
+	}{
+		{model: "copilot/gpt-5.3-codex"},
+		{model: "copilot/gpt-5.3-codex?effort=high"},
+		{model: "copilot/auto", wantWarning: true},
+		{model: "openai/gpt-5.3-codex", wantWarning: true},
+		{model: "${{ inputs.model }}"},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			issues := findUnknownConfiguredModels(&workflow.WorkflowData{Model: tt.model}, inventory)
+			if tt.wantWarning {
+				require.Len(t, issues, 1)
+				assert.Contains(t, issues[0].Message, "referenced by model")
+			} else {
+				assert.Empty(t, issues)
+			}
+		})
+	}
+}

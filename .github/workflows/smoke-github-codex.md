@@ -1,15 +1,15 @@
 ---
 private: true
 name: Smoke GitHub Codex
-description: Canary for Codex inference through Copilot auto.
-intent: Detect whether Codex can complete inference through Copilot auto.
+description: Canary for Codex inference through Copilot.
+intent: Detect whether Codex can complete inference through Copilot.
 on:
   workflow_dispatch:
 permissions:
   contents: read
   copilot-requests: write
 engine: codex
-model: copilot/auto
+model: copilot/gpt-5.3-codex
 checkout: false
 tools:
   github: false
@@ -19,7 +19,7 @@ safe-outputs:
 timeout-minutes: 5
 ---
 
-# Codex Copilot Auto Canary
+# Codex Copilot Canary
 
 Call the `noop` safe-output tool once with message `CODEX_COPILOT_AUTO_OK`.
 Do not inspect the repository, run commands, or perform any other task.

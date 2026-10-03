@@ -165,7 +165,7 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 
 			if tt.wantWarning {
 				assert.Equal(t, 1, compiler.GetWarningCount())
-				assert.Contains(t, string(output), "Select a supported Codex model such as copilot/gpt-6.1-sol")
+				assert.Contains(t, string(output), "Select a supported Codex model such as copilot/gpt-5.3-codex")
 			} else {
 				assert.Zero(t, compiler.GetWarningCount())
 				assert.Empty(t, output)
