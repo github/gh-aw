@@ -66,6 +66,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 // failed-jobs reporting, the optional status-comment update, and the steering-issue step.
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
+	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
@@ -96,6 +97,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		})...)
 	}
 	steps = append(steps, c.buildConclusionSteeringIssueStep(data, mainJobName, steeringToken)...)
+	steps = append(steps, buildUsageArtifactPublishSteps(artifactPrefixExprForDownstreamJob(data), IsDetectionJobEnabled(data.SafeOutputs), c.getActionPin)...)
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
@@ -108,6 +110,11 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 // conclusion mechanism.
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
+	if isDispatchWorkCoordinatorEnabled(data) {
+		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
+			conclusionPerms.Set(PermissionContents, PermissionRead)
+		}
+	}
 	// When observability.otlp.github-app is configured without app-id/private-key
 	// credentials, id-token: write is needed so the conclusion job can mint the OTLP
 	// OIDC token via core.getIDToken(audience) (mirrors threat_detection_job.go).
@@ -240,14 +247,19 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
 func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtifactName string, hasDetection bool, pinAction func(string) string) []string {
-	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
-	steps = append(steps, buildUsageArtifactCollectionStep(hasDetection)...)
+	return append(steps, buildUsageArtifactPublishSteps(prefix, hasDetection, pinAction)...)
+}
+
+func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction func(string) string) []string {
+	usageArtifactName := prefix + "usage"
+	steps := buildUsageArtifactCollectionStep(hasDetection)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", usageArtifactName),
 		"          path: |\n",
+		"            /tmp/gh-aw/usage/aw_session.jsonl\n",
 		"            /tmp/gh-aw/usage/aw_info.json\n",
 		"            /tmp/gh-aw/usage/aw-info.jsonl\n",
 		"            /tmp/gh-aw/usage/agent_usage.json\n",

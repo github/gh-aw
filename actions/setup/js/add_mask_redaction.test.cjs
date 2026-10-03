@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { applyAddMaskRedaction, collectAddMaskedValues, isAddMaskCommandLine, redactMaskedValues, unescapeWorkflowCommandValue } = require("./add_mask_redaction.cjs");
+const { applyAddMaskRedaction, collectAddMaskedValues, isAddMaskCommandLine, redactArtifactMaskedValues, redactMaskedValues, unescapeWorkflowCommandValue } = require("./add_mask_redaction.cjs");
 
 describe("add_mask_redaction", () => {
   describe("isAddMaskCommandLine", () => {
@@ -79,6 +79,35 @@ describe("add_mask_redaction", () => {
 
     it("returns falsy input unchanged", () => {
       expect(applyAddMaskRedaction("", ["x"])).toBe("");
+    });
+
+    describe("redactArtifactMaskedValues", () => {
+      it("redacts decoded JSON strings and keys without mutating syntax or primitives", () => {
+        const secret = 'quote"\\percent%0A';
+        const value = { [secret]: [secret, 0, false, null], nested: { output: "first\nsecond" } };
+        const masks = collectAddMaskedValues(`::add-mask::${secret.replace(/%/g, "%25")}\n::add-mask::first%0Asecond\n`);
+        const redacted = redactArtifactMaskedValues(JSON.stringify(value, null, 2) + "\n", masks);
+        expect(JSON.parse(redacted)).toEqual({ "***": ["***", 0, false, null], nested: { output: "***\n***" } });
+        expect(redacted.endsWith("\n")).toBe(true);
+        expect(value[secret][0]).toBe(secret);
+      });
+
+      it("keeps JSON valid when a short mask matches JSON punctuation", () => {
+        expect(JSON.parse(redactArtifactMaskedValues('{"text":"\\""}\n', ['"']))).toEqual({ text: "***" });
+      });
+
+      it("redacts JSONL, Unicode escapes, and malformed adjacent records", () => {
+        const content = '::add-mask::opaque\n{"data":"\\u006fpaque"}\n{"broken":"\\u006fpaque",\nplain opaque\n{"data":"safe"}\n';
+        const redacted = redactArtifactMaskedValues(content, ["opaque"]);
+        expect(redacted).toBe('{"data":"***"}\n{"broken":"***",\nplain ***\n{"data":"safe"}\n');
+      });
+
+      it("preserves untouched formatting and empty or unmasked inputs", () => {
+        const content = '  {\n    "empty": "", "zero": 0\n  }\n';
+        expect(redactArtifactMaskedValues(content, ["absent"])).toBe(content);
+        expect(redactArtifactMaskedValues(content, [])).toBe(content);
+        expect(redactArtifactMaskedValues("", ["secret"])).toBe("");
+      });
     });
   });
 });
