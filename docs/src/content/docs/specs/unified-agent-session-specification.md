@@ -319,6 +319,13 @@ or failed detection without a verdict. Explicit `false` flags MUST be retained.
 Readers MUST NOT equate a successful job with a clean verdict: warn-mode
 detection can have `jobResult: "success"` and `conclusion: "warning"`.
 
+The Go audit reader consumes version-1 `usage/aw_session.jsonl` detection
+observations with detection component and phase provenance. It uses their
+verdict flags and recorded outcomes without exposing detector prose, and retains
+legacy detection-artifact compatibility. For older unified files containing only
+verdict flags, separately recorded conclusion outcomes supply missing status
+fields. Explicit canonical fields, including an empty `reason`, take precedence.
+
 **T-UAS-059 — Partial collection.** Missing optional sources MUST be reported
 by component availability, not fabricated empty results. Malformed JSONL
 records MUST produce explicit collection warnings while preserving valid
