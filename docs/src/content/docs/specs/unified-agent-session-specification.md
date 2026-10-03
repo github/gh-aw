@@ -466,8 +466,10 @@ an engine ID, engine version, or sandbox runtime, the merger MUST emit a
 `cli_version`, which identifies the gh-aw compiler rather than the agent CLI.
 `sandboxRuntime` MUST use nonempty `agent_runtime`. An empty or missing
 selector MUST resolve to `docker` when `firewall_enabled` is explicitly `true`,
-or `none` when it is explicitly `false`. Without either observation, the runtime
-MUST remain omitted. Unavailable engine IDs and versions MUST remain omitted.
+or `none` when it is `false` and `sandbox_configuration_observed` is `true`.
+Because older metadata producers defaulted this field to `false`, without that
+marker a false value is not an observation and the runtime MUST remain omitted.
+Unavailable engine IDs and versions MUST remain omitted.
 
 The message describes the installation metadata recorded for the run, not an
 independent probe of the installed executable. It MUST retain the selected
@@ -499,19 +501,22 @@ does not replace this message.
 | Field | Source |
 | --- | --- |
 | `runtime` | `agent_runtime`, with the same explicit/default/disabled semantics as T-UAS-067. |
-| `firewallEnabled` | Boolean `firewall_enabled`, including `false`. |
+| `firewallEnabled` | Boolean `firewall_enabled`; `false` is observed only when `sandbox_configuration_observed` is `true`. |
 | `firewallType` | Nonempty `steps.firewall`. |
-| `firewallVersion` | Nonempty `awf_version`. |
+| `firewallVersion` | Nonempty `awf_version`, falling back to nonempty legacy `firewall_version`. |
 | `mcpGatewayVersion` | Nonempty `awmg_version`. |
-| `allowedDomains` | String array `allowed_domains`, including an empty array. |
+| `allowedDomains` | Nonempty string array `allowed_domains`, or an empty array when `sandbox_configuration_observed` is `true`. |
 
-Version and type fields MUST be strings. Unavailable configuration MUST remain
-omitted; without any available sandbox fields, the merger MUST NOT fabricate
-a sandbox message. It MUST NOT infer unrecorded security capabilities, mounts,
-or container settings. Source selection, provenance, observed timestamps, and
-publication redaction MUST follow the runtime identity rules. Readers MUST
-display available sandbox fields without arbitrary raw metadata. The complete
-source object remains available separately in `workflow.aw_info`.
+The producer sets `sandbox_configuration_observed` when the compiler supplied
+the firewall setting, which distinguishes an explicit disabled/empty setting
+from producer defaults. Version and type fields MUST be strings. Unavailable
+configuration MUST remain omitted; without any available sandbox fields, the
+merger MUST NOT fabricate a sandbox message. It MUST NOT infer unrecorded
+security capabilities, mounts, or container settings. Source selection,
+provenance, observed timestamps, and publication redaction MUST follow the
+runtime identity rules. Readers MUST display available sandbox fields without
+arbitrary raw metadata. The complete source object remains available separately
+in `workflow.aw_info`.
 
 ```json
 {"type":"session.sandbox","data":{"runtime":"docker","firewallEnabled":true,"firewallType":"squid","firewallVersion":"v0.30.1","mcpGatewayVersion":"v1.0.0","allowedDomains":["example.com"]},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":3}}

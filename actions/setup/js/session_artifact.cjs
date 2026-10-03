@@ -6,6 +6,14 @@ const { collectArtifactSecretValues, redactManifestValue } = require("./safe_out
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
+function redactMaskedObjectKeys(value, maskedValues) {
+  if (Array.isArray(value)) return value.map(item => redactMaskedObjectKeys(item, maskedValues));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [redactMaskedValues(key, maskedValues), redactMaskedObjectKeys(nested, maskedValues)]));
+  }
+  return value;
+}
+
 /** @param {string[]} files @param {unknown} originalError */
 function removeFailedSessionArtifacts(files, originalError) {
   try {
@@ -22,7 +30,7 @@ function removeFailedSessionArtifacts(files, originalError) {
  * @returns {string}
  */
 function serializeSessionArtifact(events, maskedValues = []) {
-  const redacted = redactManifestValue(events, collectArtifactSecretValues());
+  const redacted = redactMaskedObjectKeys(redactManifestValue(events, collectArtifactSecretValues()), maskedValues);
   if (!Array.isArray(redacted)) throw new Error("Expected a session event array");
   return redacted.map(event => JSON.stringify(event, (_key, value) => (typeof value === "string" ? redactMaskedValues(value, maskedValues) : value))).join("\n") + (events.length ? "\n" : "");
 }

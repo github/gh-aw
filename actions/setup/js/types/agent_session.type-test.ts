@@ -9,8 +9,15 @@ const messages: CoreSessionEvent[] = [
   { type: "tool.execution_start", data: { toolCallId: "call", input: false } },
   { type: "tool.execution_complete", data: { toolCallId: "call", success: false, output: null } },
   { type: "session.result", data: { numTurns: 0, usage: { input_tokens: 0 }, errors: [{ code: "failed" }] } },
+  { type: "session.format", data: { version: 1 } },
+  { type: "session.runtime", data: { engine: "copilot", engineVersion: "1.0.90" } },
+  { type: "session.sandbox", data: { firewallEnabled: false, allowedDomains: [] } },
+  { type: "workflow.aw_info", data: { nested: { futureField: true } } },
 ];
 void messages;
+
+const awInfo: SessionEventDataMap["workflow.aw_info"] = { unknown: ["opaque", false] };
+void awInfo;
 
 const completion: ToolExecutionCompleteEvent = {
   type: "tool.execution_complete",

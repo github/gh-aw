@@ -111,6 +111,7 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.event_name).toBe("push");
     expect(awInfo.staged).toBe(false);
     expect(awInfo.firewall_enabled).toBe(false);
+    expect(awInfo.sandbox_configuration_observed).toBe(true);
     expect(awInfo.features).toBeUndefined();
     expect(awInfo.created_at).toBeTruthy();
   });
@@ -277,6 +278,14 @@ describe("generate_aw_info.cjs", () => {
 
     const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
     expect(awInfo.agent_runtime).toBe("");
+  });
+
+  it("should mark sandbox metadata unobserved when the firewall setting is unavailable", async () => {
+    delete process.env.GH_AW_INFO_FIREWALL_ENABLED;
+    await main(mockCore, mockContext);
+
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(awInfo.sandbox_configuration_observed).toBe(false);
   });
 
   it("should fail when model name contains an unresolved GitHub Actions expression", async () => {

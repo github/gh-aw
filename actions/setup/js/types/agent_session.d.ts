@@ -151,12 +151,33 @@ export interface SessionSandboxEvent extends EventMetadata {
   data: SessionSandboxData;
 }
 
-export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
+export interface WorkflowAwInfoData {
+  [key: string]: unknown;
+}
+
+export interface WorkflowAwInfoEvent extends EventMetadata {
+  type: "workflow.aw_info";
+  data: WorkflowAwInfoData;
+}
+
+export type CoreSessionEvent =
+  | SessionInitEvent
+  | UserMessageEvent
+  | AssistantMessageEvent
+  | AssistantReasoningEvent
+  | ToolExecutionStartEvent
+  | ToolExecutionCompleteEvent
+  | SessionResultEvent
+  | SessionFileFormatEvent
+  | SessionRuntimeEvent
+  | SessionSandboxEvent
+  | WorkflowAwInfoEvent;
 
 export interface SessionEventDataMap {
   "session.format": SessionFileFormatData;
   "session.runtime": SessionRuntimeData;
   "session.sandbox": SessionSandboxData;
+  "workflow.aw_info": WorkflowAwInfoData;
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;

@@ -122,7 +122,7 @@ function observedString(value) {
 
 /** @param {SessionEvent["data"]} info @returns {string | undefined} */
 function observedSandboxRuntime(info) {
-  return observedString(info.agent_runtime) ?? (info.firewall_enabled === true ? "docker" : info.firewall_enabled === false ? "none" : undefined);
+  return observedString(info.agent_runtime) ?? (info.firewall_enabled === true ? "docker" : info.firewall_enabled === false && info.sandbox_configuration_observed === true ? "none" : undefined);
 }
 
 /**
@@ -155,18 +155,20 @@ function runtimeSessionEvent(record) {
 function sandboxSessionEvent(record) {
   const info = record.data;
   const runtime = observedSandboxRuntime(info);
-  const firewallVersion = observedString(info.awf_version);
+  const firewallVersion = observedString(info.awf_version) ?? observedString(info.firewall_version);
   const mcpGatewayVersion = observedString(info.awmg_version);
   const steps = info.steps;
   const firewallType = observedString(steps && typeof steps === "object" && !Array.isArray(steps) && "firewall" in steps ? steps.firewall : undefined);
   /** @type {import("./types/agent_session").SessionSandboxData} */
   const data = {
     ...(runtime !== undefined ? { runtime } : {}),
-    ...(typeof info.firewall_enabled === "boolean" ? { firewallEnabled: info.firewall_enabled } : {}),
+    ...(typeof info.firewall_enabled === "boolean" && (info.firewall_enabled || info.sandbox_configuration_observed === true) ? { firewallEnabled: info.firewall_enabled } : {}),
     ...(firewallType !== undefined ? { firewallType } : {}),
     ...(firewallVersion !== undefined ? { firewallVersion } : {}),
     ...(mcpGatewayVersion !== undefined ? { mcpGatewayVersion } : {}),
-    ...(Array.isArray(info.allowed_domains) && info.allowed_domains.every(domain => typeof domain === "string") ? { allowedDomains: structuredClone(info.allowed_domains) } : {}),
+    ...(Array.isArray(info.allowed_domains) && info.allowed_domains.every(domain => typeof domain === "string") && (info.allowed_domains.length > 0 || info.sandbox_configuration_observed === true)
+      ? { allowedDomains: structuredClone(info.allowed_domains) }
+      : {}),
   };
   if (!Object.keys(data).length) return undefined;
   return { ...record, type: "session.sandbox", data };

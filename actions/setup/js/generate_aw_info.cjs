@@ -90,6 +90,7 @@ async function main(core, ctx, githubClient) {
     staged: process.env.GH_AW_INFO_STAGED === "true",
     allowed_domains: allowedDomains,
     firewall_enabled: process.env.GH_AW_INFO_FIREWALL_ENABLED === "true",
+    sandbox_configuration_observed: process.env.GH_AW_INFO_FIREWALL_ENABLED !== undefined,
     awf_version: process.env.GH_AW_INFO_AWF_VERSION || "",
     awmg_version: process.env.GH_AW_INFO_AWMG_VERSION || "",
     agent_runtime: process.env.GH_AW_INFO_AGENT_RUNTIME || "",

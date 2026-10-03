@@ -86,6 +86,23 @@ describe("Unified conclusion session", () => {
     expect(fs.readFileSync(metadataPath, "utf8")).toBe(original);
   });
 
+  it("redacts registered values from nested aw-info property names", () => {
+    write("aw_info.json", { future_metadata: { "opaque-mask": true, nested: { "key-opaque-mask-suffix": "visible" } } });
+    write("agent-stdio.log", "::add-mask::opaque-mask\n");
+
+    writeUnifiedSession({ rootDir: root });
+
+    const content = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(content).not.toContain("opaque-mask");
+    expect(
+      content
+        .trimEnd()
+        .split("\n")
+        .map(JSON.parse)
+        .find(event => event.type === "workflow.aw_info").data
+    ).toEqual({ future_metadata: { "***": true, nested: { "key-***-suffix": "visible" } } });
+  });
+
   it.each(["aw_info.json", "usage/aw_info.json"])("records general sandbox configuration from %s with source provenance", metadataPath => {
     const createdAt = "2026-10-02T00:00:00Z";
     write(metadataPath, {
@@ -115,14 +132,15 @@ describe("Unified conclusion session", () => {
 
   it.each([
     [
-      { firewall_enabled: true, agent_runtime: "", allowed_domains: [] },
+      { sandbox_configuration_observed: true, firewall_enabled: true, agent_runtime: "", allowed_domains: [] },
       { runtime: "docker", firewallEnabled: true, allowedDomains: [] },
     ],
     [
-      { firewall_enabled: false, agent_runtime: "", awf_version: "", awmg_version: "", steps: { firewall: "" }, allowed_domains: [] },
+      { sandbox_configuration_observed: true, firewall_enabled: false, agent_runtime: "", awf_version: "", awmg_version: "", steps: { firewall: "" }, allowed_domains: [] },
       { runtime: "none", firewallEnabled: false, allowedDomains: [] },
     ],
     [{ agent_runtime: "docker-sudo-iptables" }, { runtime: "docker-sudo-iptables" }],
+    [{ firewall_version: "v0.29.0" }, { firewallVersion: "v0.29.0" }],
     [{ awmg_version: "v1.0.0" }, { mcpGatewayVersion: "v1.0.0" }],
     [{ allowed_domains: ["example.com"] }, { allowedDomains: ["example.com"] }],
     [{ agent_runtime: "docker", firewall_enabled: "false", awf_version: 1, awmg_version: null, steps: false, allowed_domains: [1] }, { runtime: "docker" }],
@@ -135,10 +153,13 @@ describe("Unified conclusion session", () => {
     expect(sandbox[0].provenance).not.toHaveProperty("timestampMs");
   });
 
-  it.each([{}, { engine_id: "custom" }, { agent_runtime: "", firewall_enabled: null, awf_version: "", awmg_version: "", steps: [], allowed_domains: null }])("does not fabricate a sandbox event without sandbox evidence (%j)", metadata => {
-    write("aw_info.json", metadata);
-    expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.sandbox")).toBe(false);
-  });
+  it.each([{}, { engine_id: "custom" }, { firewall_enabled: false, allowed_domains: [] }, { agent_runtime: "", firewall_enabled: null, awf_version: "", awmg_version: "", steps: [], allowed_domains: null }])(
+    "does not fabricate a sandbox event without sandbox evidence (%j)",
+    metadata => {
+      write("aw_info.json", metadata);
+      expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.sandbox")).toBe(false);
+    }
+  );
 
   it("selects original sandbox metadata and redacts sandbox fields before publication", () => {
     write("aw_info.json", { firewall_enabled: true, awf_version: "opaque-mask", allowed_domains: ["opaque-mask"] });
@@ -168,7 +189,7 @@ describe("Unified conclusion session", () => {
       { engine: "codex", engineVersion: "0.118.0", sandboxRuntime: "docker-sudo-iptables" },
     ],
     [
-      { engine_id: "custom", agent_runtime: "", firewall_enabled: false },
+      { engine_id: "custom", agent_runtime: "", firewall_enabled: false, sandbox_configuration_observed: true },
       { engine: "custom", sandboxRuntime: "none" },
     ],
     [{ engine_id: "custom", agent_version: "", version: "", cli_version: "0.90.0", agent_runtime: "" }, { engine: "custom" }],
