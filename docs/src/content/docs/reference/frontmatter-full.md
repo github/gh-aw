@@ -4298,9 +4298,8 @@ tools:
   # Format 2: Enable agentic-workflows tool with default settings (same as true)
   agentic-workflows: null
 
-  # Read dispatch work and claim state from the immutable activation snapshot. The
-  # MCP server does not read Git; the snapshot can become stale while the agent
-  # runs.
+  # Read work queue and claim state from the immutable activation snapshot. The MCP
+  # server does not read Git; the snapshot can become stale while the agent runs.
   # (optional)
   # Accepted formats:
 

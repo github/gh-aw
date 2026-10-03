@@ -295,7 +295,7 @@ echo "Successfully copied ${MCP_SCRIPTS_COUNT} mcp-scripts files to ${MCP_SCRIPT
 SAFE_OUTPUTS_DEST="${GH_AW_ROOT}/safeoutputs"
 debug_log "Copying safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 create_dir "${SAFE_OUTPUTS_DEST}"
-create_dir "${SAFE_OUTPUTS_DEST}/dispatch-coordinator"
+create_dir "${SAFE_OUTPUTS_DEST}/work-queue"
 
 SAFE_OUTPUTS_FILES=(
   "safe_outputs_mcp_server.cjs"
@@ -387,9 +387,9 @@ SAFE_OUTPUTS_FILES=(
   "temporary_id.cjs"
   "invocation_context_helpers.cjs"
   "data_schema_normalizer.cjs"
-  "dispatch_work_coordinator_store.cjs"
-  "dispatch_work_coordinator_replay.cjs"
-  "dispatch_work_coordinator_codemods.cjs"
+  "work_queue_store.cjs"
+  "work_queue_replay.cjs"
+  "work_queue_codemods.cjs"
 )
 
 SAFE_OUTPUTS_COUNT=0

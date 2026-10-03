@@ -468,7 +468,7 @@ jobs:
 
     - name: Upload integration coverage to code coverage API
       if: always() && vars.CODE_QUALITY_COVERAGE_ENABLED == 'true' && hashFiles(format('coverage-integration-{0}.xml', steps.run-tests.outputs.safe_name)) != ''
-      uses: actions/upload-code-coverage@abb5995db9e0199b0e2bb9dbd136fce4cb1ec4d3   # v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34   # v1
       with:
         file: coverage-integration-${{ steps.run-tests.outputs.safe_name }}.xml
         language: Go
@@ -1369,7 +1369,7 @@ jobs:
 
     - name: Upload unauthenticated coverage to code coverage API
       if: always() && vars.CODE_QUALITY_COVERAGE_ENABLED == 'true' && hashFiles('coverage-integration-unauthenticated.xml') != ''
-      uses: actions/upload-code-coverage@abb5995db9e0199b0e2bb9dbd136fce4cb1ec4d3   # v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34   # v1
       with:
         file: coverage-integration-unauthenticated.xml
         language: Go
@@ -1444,7 +1444,7 @@ jobs:
 
     - name: Upload dispatch-workflow coverage to code coverage API
       if: always() && vars.CODE_QUALITY_COVERAGE_ENABLED == 'true' && hashFiles('coverage-integration-add-dispatch-workflow.xml') != ''
-      uses: actions/upload-code-coverage@abb5995db9e0199b0e2bb9dbd136fce4cb1ec4d3   # v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34   # v1
       with:
         file: coverage-integration-add-dispatch-workflow.xml
         language: Go
@@ -1986,7 +1986,7 @@ jobs:
 
     - name: Upload redirect test coverage to code coverage API
       if: always() && vars.CODE_QUALITY_COVERAGE_ENABLED == 'true' && hashFiles(format('coverage-redirect-{0}.xml', matrix.os)) != ''
-      uses: actions/upload-code-coverage@abb5995db9e0199b0e2bb9dbd136fce4cb1ec4d3   # v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34   # v1
       with:
         file: coverage-redirect-${{ matrix.os }}.xml
         language: Go

@@ -180,7 +180,7 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	if cfg.includeWorkQueue && len(cfg.artifactFilter) > 0 && len(findMissingFilterEntries(cfg.artifactFilter, cfg.outputDir)) > 0 {
 		return false, false, nil
 	}
-	if dispatchCoordinatorLogsMissing(cfg.includeWorkQueue, cfg.outputDir) {
+	if workQueueLogsMissing(cfg.includeWorkQueue, cfg.outputDir) {
 		return false, false, nil
 	}
 	auditLog.Printf("Using cached run summary for run %d (processed at %s)", cfg.runID, summary.ProcessedAt.Format(time.RFC3339))
@@ -237,7 +237,7 @@ func auditNeedsDetectionArtifact(cfg auditRunConfig, summary *RunSummary) bool {
 }
 
 func processedRunFromSummary(summary *RunSummary, runOutputDir string) ProcessedRun {
-	backfillDispatchCoordinatorReport(&summary.DispatchCoordinator, runOutputDir)
+	backfillWorkQueueReport(&summary.WorkQueue, runOutputDir)
 	if summary.Ledger == nil {
 		if activity, err := loadUsageActivitySummary(runOutputDir); err == nil && activity != nil {
 			summary.Ledger = activity.Ledger
@@ -269,7 +269,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,
 		Ledger:                  summary.Ledger,
-		DispatchCoordinator:     summary.DispatchCoordinator,
+		WorkQueue:               summary.WorkQueue,
 		Friction:                summary.Friction,
 		GitHubRateLimitUsage:    summary.GitHubRateLimitUsage,
 		JobDetails:              summary.JobDetails,

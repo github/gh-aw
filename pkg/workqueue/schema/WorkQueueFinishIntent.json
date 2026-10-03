@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "WorkQueueFinishIntent.json",
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "completed"
+        },
+        {
+          "type": "string",
+          "const": "cancelled"
+        }
+      ]
+    }
+  },
+  "required": ["outcome"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Agent intent recorded by work_queue_claim_finish, without authority fields."
+}

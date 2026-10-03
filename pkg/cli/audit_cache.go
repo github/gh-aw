@@ -99,8 +99,8 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 		auditData, _ = buildLocalAuditData(processedRun, metrics, processedRun.MCPToolUsage)
 		auditData.CacheSource = auditCacheSourceLogs
 	}
-	if processedRun.DispatchCoordinator != nil {
-		auditData.DispatchCoordinator = processedRun.DispatchCoordinator
+	if processedRun.WorkQueue != nil {
+		auditData.WorkQueue = processedRun.WorkQueue
 	}
 	hydratedProcessedRuns := hydrateProcessedRunsWithCachedAudit(processedRuns)
 	auditData.Comparison = buildAuditComparisonForProcessedRuns(hydrateProcessedRunWithCachedAudit(processedRun), hydratedProcessedRuns)
@@ -144,8 +144,8 @@ func hydrateProcessedRunWithCachedAudit(processedRun ProcessedRun) ProcessedRun 
 	if len(processedRun.GatewaySteeringEvents) == 0 {
 		processedRun.GatewaySteeringEvents = audit.GatewaySteeringEvents
 	}
-	if processedRun.DispatchCoordinator == nil {
-		processedRun.DispatchCoordinator = audit.DispatchCoordinator
+	if processedRun.WorkQueue == nil {
+		processedRun.WorkQueue = audit.WorkQueue
 	}
 	return processedRun
 }

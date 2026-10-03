@@ -30,48 +30,48 @@ var ghaLogTimestampPrefixPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T`)
 
 // AuditData represents the complete structured audit data for a workflow run
 type AuditData struct {
-	SchemaVersion           int                        `json:"schema_version"`
-	CacheSource             auditCacheSource           `json:"cache_source,omitempty"`
-	Overview                OverviewData               `json:"overview"`
-	Comparison              *AuditComparisonData       `json:"comparison,omitempty"`
-	TaskDomain              *TaskDomainInfo            `json:"task_domain,omitempty"`
-	BehaviorFingerprint     *BehaviorFingerprint       `json:"behavior_fingerprint,omitempty"`
-	AgenticAssessments      []AgenticAssessment        `json:"agentic_assessments,omitempty"`
-	Metrics                 MetricsData                `json:"metrics"`
-	KeyFindings             []AuditFinding             `json:"key_findings,omitempty"`
-	Recommendations         []Recommendation           `json:"recommendations,omitempty"`
-	ObservabilityInsights   []ObservabilityInsight     `json:"observability_insights,omitempty"`
-	PerformanceMetrics      *PerformanceMetrics        `json:"performance_metrics,omitempty"`
-	EngineConfig            *AuditEngineConfig         `json:"engine_config,omitempty"`
-	PromptAnalysis          *PromptAnalysis            `json:"prompt_analysis,omitempty"`
-	SessionAnalysis         *SessionAnalysis           `json:"session_analysis,omitempty"`
-	SafeOutputSummary       *SafeOutputSummary         `json:"safe_output_summary,omitempty"`
-	MCPServerHealth         *MCPServerHealth           `json:"mcp_server_health,omitempty"`
-	Jobs                    []JobData                  `json:"jobs,omitempty"`
-	DownloadedFiles         []FileInfo                 `json:"downloaded_files"`
-	MissingTools            []MissingToolReport        `json:"missing_tools,omitempty"`
-	MissingData             []MissingDataReport        `json:"missing_data,omitempty"`
-	Noops                   []NoopReport               `json:"noops,omitempty"`
-	MCPFailures             []MCPFailureReport         `json:"mcp_failures,omitempty"`
-	SkillActivations        []SkillActivation          `json:"skill_activations,omitempty"`
-	GatewaySteeringEvents   []GatewaySteeringEvent     `json:"gateway_steering_events,omitempty"`
-	FirewallTokenUsage      *TokenUsageSummary         `json:"firewall_token_usage,omitempty"`
-	GitHubRateLimitUsage    *GitHubRateLimitUsage      `json:"github_rate_limit_usage,omitempty"`
-	FirewallAnalysis        *FirewallAnalysis          `json:"firewall_analysis,omitempty"`
-	PolicyAnalysis          *PolicyAnalysis            `json:"policy_analysis,omitempty"`
-	RedactedDomainsAnalysis *RedactedDomainsAnalysis   `json:"redacted_domains_analysis,omitempty"`
-	Errors                  []ValidationIssue          `json:"errors,omitempty"`
-	Warnings                []ValidationIssue          `json:"warnings,omitempty"`
-	ToolUsage               []ToolUsageInfo            `json:"tool_usage,omitempty"`
-	MCPToolUsage            *MCPToolUsageData          `json:"mcp_tool_usage,omitempty"`
-	CreatedItems            []CreatedItemReport        `json:"created_items,omitempty"`
-	Outcomes                []OutcomeReport            `json:"outcomes,omitempty"`
-	OutcomeSummary          *OutcomeSummary            `json:"outcome_summary,omitempty"`
-	Experiments             *ExperimentData            `json:"experiments,omitempty"`
-	Graders                 *GradersData               `json:"graders,omitempty"`
-	Ledger                  *LedgerActivity            `json:"ledger,omitempty"`
-	DispatchCoordinator     *DispatchCoordinatorReport `json:"work_queue,omitempty"`
-	Friction                *FrictionCostSummary       `json:"friction,omitempty"`
+	SchemaVersion           int                      `json:"schema_version"`
+	CacheSource             auditCacheSource         `json:"cache_source,omitempty"`
+	Overview                OverviewData             `json:"overview"`
+	Comparison              *AuditComparisonData     `json:"comparison,omitempty"`
+	TaskDomain              *TaskDomainInfo          `json:"task_domain,omitempty"`
+	BehaviorFingerprint     *BehaviorFingerprint     `json:"behavior_fingerprint,omitempty"`
+	AgenticAssessments      []AgenticAssessment      `json:"agentic_assessments,omitempty"`
+	Metrics                 MetricsData              `json:"metrics"`
+	KeyFindings             []AuditFinding           `json:"key_findings,omitempty"`
+	Recommendations         []Recommendation         `json:"recommendations,omitempty"`
+	ObservabilityInsights   []ObservabilityInsight   `json:"observability_insights,omitempty"`
+	PerformanceMetrics      *PerformanceMetrics      `json:"performance_metrics,omitempty"`
+	EngineConfig            *AuditEngineConfig       `json:"engine_config,omitempty"`
+	PromptAnalysis          *PromptAnalysis          `json:"prompt_analysis,omitempty"`
+	SessionAnalysis         *SessionAnalysis         `json:"session_analysis,omitempty"`
+	SafeOutputSummary       *SafeOutputSummary       `json:"safe_output_summary,omitempty"`
+	MCPServerHealth         *MCPServerHealth         `json:"mcp_server_health,omitempty"`
+	Jobs                    []JobData                `json:"jobs,omitempty"`
+	DownloadedFiles         []FileInfo               `json:"downloaded_files"`
+	MissingTools            []MissingToolReport      `json:"missing_tools,omitempty"`
+	MissingData             []MissingDataReport      `json:"missing_data,omitempty"`
+	Noops                   []NoopReport             `json:"noops,omitempty"`
+	MCPFailures             []MCPFailureReport       `json:"mcp_failures,omitempty"`
+	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`
+	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"`
+	FirewallTokenUsage      *TokenUsageSummary       `json:"firewall_token_usage,omitempty"`
+	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"`
+	FirewallAnalysis        *FirewallAnalysis        `json:"firewall_analysis,omitempty"`
+	PolicyAnalysis          *PolicyAnalysis          `json:"policy_analysis,omitempty"`
+	RedactedDomainsAnalysis *RedactedDomainsAnalysis `json:"redacted_domains_analysis,omitempty"`
+	Errors                  []ValidationIssue        `json:"errors,omitempty"`
+	Warnings                []ValidationIssue        `json:"warnings,omitempty"`
+	ToolUsage               []ToolUsageInfo          `json:"tool_usage,omitempty"`
+	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`
+	CreatedItems            []CreatedItemReport      `json:"created_items,omitempty"`
+	Outcomes                []OutcomeReport          `json:"outcomes,omitempty"`
+	OutcomeSummary          *OutcomeSummary          `json:"outcome_summary,omitempty"`
+	Experiments             *ExperimentData          `json:"experiments,omitempty"`
+	Graders                 *GradersData             `json:"graders,omitempty"`
+	Ledger                  *LedgerActivity          `json:"ledger,omitempty"`
+	WorkQueue               *WorkQueueReport         `json:"work_queue,omitempty"`
+	Friction                *FrictionCostSummary     `json:"friction,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
@@ -562,7 +562,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		Metrics:                 metricsData,
 		Friction:                inputs.processedRun.Friction,
 		Ledger:                  inputs.processedRun.Ledger,
-		DispatchCoordinator:     inputs.processedRun.DispatchCoordinator,
+		WorkQueue:               inputs.processedRun.WorkQueue,
 		KeyFindings:             inputs.findings,
 		Recommendations:         inputs.recommendations,
 		ObservabilityInsights:   inputs.observabilityInsights,
