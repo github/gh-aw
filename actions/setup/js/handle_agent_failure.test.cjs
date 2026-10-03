@@ -106,6 +106,9 @@ describe("handle_agent_failure", () => {
         await main();
         expect(global.github.rest.issues.create).not.toHaveBeenCalled();
         expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("PR merge ref was invalidated"));
+        expect(global.core.debug).toHaveBeenCalledWith("Checking PR #42 for merge-ref checkout invalidation");
+        expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref checkout timing: closed_at=2026-10-03T12:00:00.000Z, checkout_completed_at=2026-10-03T12:00:01.000Z");
+        expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation confirmed: closure preceded failed default checkout completion");
       } finally {
         delete process.env.GH_AW_AGENT_CONCLUSION;
       }
@@ -114,6 +117,7 @@ describe("handle_agent_failure", () => {
     it("does not classify a checkout that failed before the PR closed as invalidated", async () => {
       getPR.mockResolvedValue({ data: { state: "closed", closed_at: "2026-10-03T12:00:02Z" } });
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: no failed default checkout completed at or after PR closure");
     });
 
     it("does not suppress a real agent failure after closure", async () => {
@@ -135,14 +139,30 @@ describe("handle_agent_failure", () => {
       process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "false";
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
       expect(getPR).not.toHaveBeenCalled();
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation check skipped: requires a pull_request merge ref and compiler-confirmed default checkout");
     });
 
     it("does not classify open PRs or unrelated refs as invalidated", async () => {
       getPR.mockResolvedValue({ data: { state: "open", closed_at: null } });
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
       expect(listJobs).not.toHaveBeenCalled();
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: PR is not closed with a closure timestamp");
       global.context.ref = "refs/heads/main";
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("logs invalid closure timestamps without logging API payloads", async () => {
+      getPR.mockResolvedValue({ data: { state: "closed", closed_at: "invalid", body: "private PR content" } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: invalid PR closure timestamp");
+      expect(listJobs).not.toHaveBeenCalled();
+      expect(JSON.stringify(global.core.debug.mock.calls)).not.toContain("private PR content");
+    });
+
+    it("logs invalid checkout completion timestamps and keeps failures reportable", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout repository (gh-aw default)", conclusion: "failure", completed_at: "invalid" }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: invalid checkout completion timestamp");
     });
 
     it("keeps reporting when PR state cannot be checked", async () => {
