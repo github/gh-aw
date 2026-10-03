@@ -100,7 +100,7 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 		if hasStatus(err, http.StatusNotFound) {
 			if b.Name == DefaultBranch {
 				legacyBranch := b
-				legacyBranch.Name = "dispatch-coordinator"
+				legacyBranch.Name = LegacyBranch
 				transactions, snapshot, err := legacyBranch.read(ctx)
 				if snapshot.head != "" {
 					snapshot.legacy = true

@@ -15,10 +15,32 @@ import (
 
 func TestDispatchCoordinatorReconciliationPreservesStagedConfiguration(t *testing.T) {
 	compiler := NewCompiler()
-	staged := TemplatableBool("${{ inputs.staged }}")
-	data := &WorkflowData{Tools: map[string]any{"work-queue": true}, SafeOutputs: &SafeOutputsConfig{Staged: &staged}}
+	globalStaged := TemplatableBool("${{ inputs.global_staged }}")
+	handlerStaged := TemplatableBool("${{ inputs.handler_staged }}")
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": true},
+		SafeOutputs: &SafeOutputsConfig{
+			Staged: &globalStaged,
+			DispatchWorkflow: &DispatchWorkflowConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{Staged: &handlerStaged},
+			},
+		},
+	}
 	step := strings.Join(compiler.buildDispatchClaimReconciliationStep(data), "")
-	require.Contains(t, step, "GH_AW_SAFE_OUTPUTS_STAGED: ${{ inputs.staged }}")
+	require.Contains(t, step, "GH_AW_SAFE_OUTPUTS_STAGED: ${{ inputs.global_staged || inputs.handler_staged }}")
+}
+
+func TestDispatchCoordinatorFallbackArtifactIncludesClaimIntent(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": true},
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{},
+		},
+	}
+	var upload strings.Builder
+	compiler.generateAgentOutputFallbackUpload(&upload, data, "")
+	require.Contains(t, upload.String(), constants.DispatchCoordinatorClaimIntentPath)
 }
 
 func TestDispatchCoordinatorCompilationPhases(t *testing.T) {
@@ -59,7 +81,7 @@ Compile each dispatch-coordinator workflow phase.
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentMount)
 	require.Contains(t, agent, constants.DispatchCoordinatorFinishIntentPath)
 	require.Contains(t, agent, constants.DispatchCoordinatorClaimIntentPath)
-	require.Contains(t, agent, `"dispatch_claim_next"`)
+	require.Contains(t, agent, "dispatch_work_coordinator_mcp_server.cjs")
 
 	safeOutputs := extractJobSection(compiled, string(constants.SafeOutputsJobName))
 	require.Contains(t, safeOutputs, "contents: write")

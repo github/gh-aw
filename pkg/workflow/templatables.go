@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"gopkg.in/yaml.v3"
@@ -240,6 +241,36 @@ func resolveSafeOutputsStagedValue(trialMode bool, staged *TemplatableBool) *str
 		return &s
 	}
 	return templatableBoolEnvVarValue(staged)
+}
+
+func resolveCombinedSafeOutputsStagedValue(trialMode bool, staged ...*TemplatableBool) *string {
+	if trialMode {
+		value := "true"
+		return &value
+	}
+	var expressions []string
+	var singleExpression *string
+	for _, value := range staged {
+		resolved := templatableBoolEnvVarValue(value)
+		if resolved == nil {
+			continue
+		}
+		if *resolved == "true" {
+			return resolved
+		}
+		expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(*resolved, "${{"), "}}"))
+		expressions = append(expressions, expression)
+		singleExpression = resolved
+	}
+	switch len(expressions) {
+	case 0:
+		return nil
+	case 1:
+		return singleExpression
+	default:
+		value := "${{ " + strings.Join(expressions, " || ") + " }}"
+		return &value
+	}
 }
 
 // buildTemplatableEnvVar returns a YAML environment variable entry for a

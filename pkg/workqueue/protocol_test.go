@@ -66,3 +66,29 @@ func TestVersionThreeRejectsIncompleteOrFutureMessages(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkSequencesAreUniqueAndCannotOverflow(t *testing.T) {
+	duplicateSequenceLog := []byte(
+		"{\"version\":3,\"kind\":\"Work\",\"work_id\":\"work-a\",\"work\":{},\"sequence\":1}\n" +
+			"{\"version\":3,\"kind\":\"Work\",\"work_id\":\"work-b\",\"work\":{},\"sequence\":1}\n",
+	)
+	if _, err := Parse(duplicateSequenceLog); err == nil {
+		t.Fatal("expected duplicate Work sequence to be rejected")
+	}
+
+	maxSequenceWork := Transaction{
+		Version: CurrentVersion, Kind: "Work", WorkID: "work-max",
+		Work: json.RawMessage(`{}`), Sequence: MaxSequence,
+	}
+	if _, err := nextSequence([]Transaction{maxSequenceWork}); err == nil {
+		t.Fatal("expected sequence exhaustion error")
+	}
+
+	allocator := newSequenceAllocator()
+	if err := allocator.record("work-max", MaxSequence); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := allocator.allocate("work-next"); err == nil {
+		t.Fatal("expected allocation after MaxSequence to fail")
+	}
+}

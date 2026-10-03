@@ -296,11 +296,11 @@ async function main(config = {}) {
       // Inject aw_context if the target workflow declares it as an input.
       // Only workflows listed in aw_context_workflows (populated at compile time) support this.
       const queueClaimID = message.inputs?.work_queue_claim_id;
-      if (queueClaimID !== undefined && !isStaged && process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED !== "true") {
-        throw new Error("work_queue_claim_id requires verified publication by tools.work-queue");
-      }
       if (queueClaimID !== undefined && (typeof queueClaimID !== "string" || !queueClaimID || isCrossRepoDispatch || !awContextWorkflows.has(workflowName))) {
         throw new Error("work_queue_claim_id requires a same-repository worker workflow with aw_context support");
+      }
+      if (queueClaimID !== undefined && !isStaged && process.env.GH_AW_DISPATCH_CLAIMS_VERIFIED !== "true") {
+        throw new Error("work_queue_claim_id requires verified publication by tools.work-queue");
       }
       if (awContextWorkflows.has(workflowName)) {
         const awContext = buildDispatchAwContext(queueClaimID, isStaged);

@@ -46,4 +46,10 @@ describe("version 3 dispatch coordinator codemod", () => {
       expect(() => parseTransactionLog(`${JSON.stringify(versionTwo[0])}\n${JSON.stringify(transaction)}\n`)).toThrow();
     }
   });
+
+  it("rejects sequence exhaustion while assigning historical FIFO ranks", () => {
+    const maximum = { version: 3, kind: "Work", work_id: "max", work: { task: "max" }, sequence: Number.MAX_SAFE_INTEGER };
+    const historical = { version: 1, kind: "Work", work: "legacy", claim: null, attempt: null };
+    expect(() => upgradeTransactions([maximum, historical])).toThrow("sequence exhausted");
+  });
 });

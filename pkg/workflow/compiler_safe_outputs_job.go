@@ -300,7 +300,11 @@ func (c *Compiler) buildDispatchClaimReconciliationStep(data *WorkflowData) []st
 	if data.SafeOutputs != nil {
 		staged = data.SafeOutputs.Staged
 	}
-	if value := resolveSafeOutputsStagedValue(c.trialMode, staged); value != nil {
+	var handlerStaged *TemplatableBool
+	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
+		handlerStaged = data.SafeOutputs.DispatchWorkflow.Staged
+	}
+	if value := resolveCombinedSafeOutputsStagedValue(c.trialMode, staged, handlerStaged); value != nil {
 		steps = append(steps, "        env:\n")
 		steps = append(steps, buildTemplatableBoolEnvVar("GH_AW_SAFE_OUTPUTS_STAGED", value)...)
 	}

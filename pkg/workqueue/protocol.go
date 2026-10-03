@@ -53,6 +53,60 @@ type parsedRecord struct {
 	missingSequence bool
 }
 
+type sequenceAllocator struct {
+	sequences map[string]int64
+	owners    map[int64]string
+	maximum   int64
+}
+
+func newSequenceAllocator() *sequenceAllocator {
+	return &sequenceAllocator{
+		sequences: make(map[string]int64),
+		owners:    make(map[int64]string),
+	}
+}
+
+func (allocator *sequenceAllocator) record(workID string, sequence int64) error {
+	if sequence < 1 || sequence > MaxSequence {
+		return errors.New("work sequence must be a positive safe integer")
+	}
+	if existing, ok := allocator.sequences[workID]; ok {
+		if existing != sequence {
+			return fmt.Errorf("work %s has conflicting sequences", workID)
+		}
+		return nil
+	}
+	if owner, ok := allocator.owners[sequence]; ok && owner != workID {
+		return fmt.Errorf("work sequence %d is shared by Work %s and %s", sequence, owner, workID)
+	}
+	allocator.sequences[workID] = sequence
+	allocator.owners[sequence] = workID
+	allocator.maximum = max(allocator.maximum, sequence)
+	return nil
+}
+
+func (allocator *sequenceAllocator) allocate(workID string) (int64, error) {
+	if sequence, ok := allocator.sequences[workID]; ok {
+		return sequence, nil
+	}
+	sequence, err := allocator.next()
+	if err != nil {
+		return 0, err
+	}
+	if err := allocator.record(workID, sequence); err != nil {
+		return 0, err
+	}
+	return sequence, nil
+}
+
+func (allocator *sequenceAllocator) next() (int64, error) {
+	if allocator.maximum >= MaxSequence {
+		return 0, errors.New("work queue sequence exhausted")
+	}
+	allocator.maximum++
+	return allocator.maximum, nil
+}
+
 var versionCodemods = [...]struct{ from, to int }{{2, 3}}
 
 func upgradeTransactionVersion(tx Transaction) Transaction {
@@ -103,27 +157,22 @@ func parseRecord(data []byte) (parsedRecord, error) {
 }
 
 func assignHistoricalSequences(records []parsedRecord) ([]Transaction, error) {
-	sequences := map[string]int64{}
-	var maximum int64
+	allocator := newSequenceAllocator()
 	for _, record := range records {
 		tx := record.transaction
 		if tx.Kind == "Work" && !record.missingSequence {
-			sequences[tx.WorkID] = tx.Sequence
-			maximum = max(maximum, tx.Sequence)
+			if err := allocator.record(tx.WorkID, tx.Sequence); err != nil {
+				return nil, err
+			}
 		}
 	}
 	transactions := make([]Transaction, 0, len(records))
 	for _, record := range records {
 		tx := record.transaction
 		if record.missingSequence {
-			sequence, exists := sequences[tx.WorkID]
-			if !exists {
-				if maximum == MaxSequence {
-					return nil, errors.New("work queue sequence exhausted")
-				}
-				maximum++
-				sequence = maximum
-				sequences[tx.WorkID] = sequence
+			sequence, err := allocator.allocate(tx.WorkID)
+			if err != nil {
+				return nil, err
 			}
 			tx.Sequence = sequence
 		}
@@ -137,8 +186,7 @@ func assignHistoricalSequences(records []parsedRecord) ([]Transaction, error) {
 // record. Persist it before any canonical sorting or duplicate removal.
 func normalizeTransactions(transactions []Transaction) ([]Transaction, error) {
 	result := slices.Clone(transactions)
-	sequences := map[string]int64{}
-	var maximum int64
+	allocator := newSequenceAllocator()
 	for i, tx := range result {
 		tx = upgradeTransactionVersion(tx)
 		result[i] = tx
@@ -146,8 +194,9 @@ func normalizeTransactions(transactions []Transaction) ([]Transaction, error) {
 			return nil, err
 		}
 		if tx.Kind == "Work" && tx.Version == CurrentVersion {
-			sequences[tx.WorkID] = tx.Sequence
-			maximum = max(maximum, tx.Sequence)
+			if err := allocator.record(tx.WorkID, tx.Sequence); err != nil {
+				return nil, err
+			}
 		}
 	}
 	for i, tx := range result {
@@ -156,14 +205,9 @@ func normalizeTransactions(transactions []Transaction) ([]Transaction, error) {
 		}
 		tx.Version = CurrentVersion
 		if tx.Kind == "Work" {
-			sequence, ok := sequences[tx.WorkID]
-			if !ok {
-				if maximum == MaxSequence {
-					return nil, errors.New("work queue sequence exhausted")
-				}
-				maximum++
-				sequence = maximum
-				sequences[tx.WorkID] = sequence
+			sequence, err := allocator.allocate(tx.WorkID)
+			if err != nil {
+				return nil, err
 			}
 			tx.Sequence = sequence
 		}
@@ -173,14 +217,15 @@ func normalizeTransactions(transactions []Transaction) ([]Transaction, error) {
 }
 
 func nextSequence(transactions []Transaction) (int64, error) {
-	var maximum int64
+	allocator := newSequenceAllocator()
 	for _, tx := range transactions {
-		maximum = max(maximum, tx.Sequence)
+		if tx.Kind == "Work" && tx.Sequence > 0 {
+			if err := allocator.record(tx.WorkID, tx.Sequence); err != nil {
+				return 0, err
+			}
+		}
 	}
-	if maximum >= MaxSequence {
-		return 0, errors.New("work queue sequence exhausted")
-	}
-	return maximum + 1, nil
+	return allocator.next()
 }
 
 func upgradeMessage(raw map[string]any) (map[string]any, error) {

@@ -6,14 +6,18 @@ import path from "path";
 import { main, renderSummary } from "./dispatch_work_coordinator_summary.cjs";
 import { replayTransactions, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (id, claimId) => ({ version: 1, kind: "Claim", work: id, claim: claimId, attempt: null });
+const workSequences = new Map();
+const work = id => {
+  if (!workSequences.has(id)) workSequences.set(id, workSequences.size + 1);
+  return { version: 3, kind: "Work", work_id: id, work: { legacy_work_id: id }, sequence: workSequences.get(id) };
+};
+const claim = (workId, claimId) => ({ version: 3, kind: "Claim", work_id: workId, claim_id: claimId, run_id: `legacy:${claimId}` });
 const initial = [work("done"), claim("done", "claim-a"), work("retry"), claim("retry", "claim-b"), work("cancel"), work("waiting")];
 const latest = [
   ...initial,
-  { version: 1, kind: "Completion", work: "done", claim: "claim-a", attempt: "run-1" },
-  { version: 1, kind: "ClaimCancellation", work: "retry", claim: "claim-b", attempt: null },
-  { version: 1, kind: "WorkCancellation", work: "cancel", claim: null, attempt: null },
+  { version: 3, kind: "Completion", work_id: "done", claim_id: "claim-a", attempt_id: "run-1" },
+  { version: 3, kind: "ClaimCancellation", work_id: "retry", claim_id: "claim-b" },
+  { version: 3, kind: "WorkCancellation", work_id: "cancel" },
   work("new"),
   claim("new", "claim-c"),
   claim("new", "claim-d"),
@@ -127,10 +131,11 @@ describe("dispatch coordinator conclusion summary", () => {
     const createBlob = vi.fn();
     const githubClient = {
       rest: {
+        repos: { get: async () => ({ data: {} }) },
         git: {
           getRef: async () => ({ data: { object: { sha: "legacy-head" } } }),
           getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
-          getTree: async () => ({ data: { tree: [{ path: "dispatch-work-coordinator.jsonl", type: "blob", sha: "blob" }] } }),
+          getTree: async () => ({ data: { tree: [{ path: "dispatch-work-coordinator.jsonl", mode: "100644", type: "blob", sha: "blob" }] } }),
           getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(`${JSON.stringify(legacyWork)}\n`).toString("base64") } }),
           createBlob,
         },
@@ -145,6 +150,7 @@ describe("dispatch coordinator conclusion summary", () => {
     const options = setup();
     const githubClient = {
       rest: {
+        repos: { get: async () => ({ data: {} }) },
         git: {
           getRef: async () => {
             throw Object.assign(new Error("Not Found"), { status: 404 });

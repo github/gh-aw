@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applyAndPublishCoordinatorTransactions, COORDINATOR_BRANCH, COORDINATOR_LOG_PATH, readCoordinatorLog } from "./dispatch_work_coordinator_store.cjs";
 import { parseTransactionLog, serializeTransactionLog } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", sequence: 1, version: 3, work: { legacy_work_id: id }, work_id: id });
+const work = (id, sequence = 1) => ({ kind: "Work", sequence, version: 3, work: { legacy_work_id: id }, work_id: id });
 const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 3, work_id: workId });
 
 function createFakeGitHub() {
@@ -67,7 +67,7 @@ function createFakeGitHub() {
           if (state.conflictOnce) {
             state.conflictOnce = false;
             state.sha = "competing-commit";
-            state.transactions = [...state.transactions, work("remote-work")];
+            state.transactions = [...state.transactions, work("remote-work", 2)];
             state.rawContents = null;
             throw staleRef();
           }
@@ -168,7 +168,7 @@ describe("dispatch work coordinator Git store", () => {
 
     expect(result.persisted).toBe(true);
     expect(result.rejected).toEqual([]);
-    expect(fake.state.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work"), claim("w", "c")])));
+    expect(fake.state.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work", 2), claim("w", "c")])));
     expect(fake.state.updateCalls).toBe(2);
     expect(core.info).toHaveBeenCalledWith(expect.stringContaining("queue ref conflict"));
     expect(core.info).toHaveBeenCalledWith(expect.stringContaining("queue published"));
@@ -232,7 +232,7 @@ describe("dispatch work coordinator Git store", () => {
     fake.state.conflictOnce = true;
 
     const result = await readCoordinatorLog({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
-    expect(result.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work")])));
+    expect(result.transactions).toEqual(parseTransactionLog(serializeTransactionLog([work("w"), work("remote-work", 2)])));
     expect(fake.state.updateCalls).toBe(1);
     expect(fake.state.sha).toBe("competing-commit");
   });

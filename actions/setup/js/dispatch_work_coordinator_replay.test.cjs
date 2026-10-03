@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyTransactions, compactTransactions, parseTransactionLog, replayTransactions, serializeTransactionLog, validateTransaction } from "./dispatch_work_coordinator_replay.cjs";
 
-const work = id => ({ kind: "Work", sequence: 1, version: 3, work: { legacy_work_id: id }, work_id: id });
+const work = (id, sequence = 1) => ({ kind: "Work", sequence, version: 3, work: { legacy_work_id: id }, work_id: id });
 const claim = (workId, id) => ({ claim_id: id, kind: "Claim", run_id: `legacy:${id}`, version: 3, work_id: workId });
 const cancelClaim = (workId, id) => ({ claim_id: id, kind: "ClaimCancellation", version: 3, work_id: workId });
 const complete = (workId, claimId, attempt) => ({ attempt_id: attempt, claim_id: claimId, kind: "Completion", version: 3, work_id: workId });
@@ -40,7 +40,7 @@ describe("dispatch work coordinator replay", () => {
   });
 
   it("produces the same projection for every ordering of a valid fact set", () => {
-    const transactions = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), work("other")];
+    const transactions = [work("w"), claim("w", "a"), claim("w", "b"), cancelClaim("w", "a"), work("other", 2)];
     const expected = replayTransactions(transactions);
     for (const permutation of permutations(transactions)) {
       expect(replayTransactions(permutation)).toEqual(expected);
@@ -142,6 +142,11 @@ describe("dispatch work coordinator replay", () => {
     }
   });
 
+  it("rejects duplicate FIFO sequences across distinct Work identities", () => {
+    expect(() => replayTransactions([work("a", 1), work("b", 1)])).toThrow("shared by Work");
+    expect(() => compactTransactions([work("a", 1), work("b", 1)])).toThrow("shared by Work");
+  });
+
   it("rejects payload numbers that cannot cross runtimes safely", () => {
     for (const payload of [{ nested: [9007199254740992] }, { nested: { number: -9007199254740992 } }, { number: Infinity }]) {
       expect(() => validateTransaction({ ...work("w"), work: payload })).toThrow("JavaScript-safe range");
@@ -152,7 +157,7 @@ describe("dispatch work coordinator replay", () => {
   it("rejects missing references and references to a different work item", () => {
     expect(() => replayTransactions([cancelClaim("w", "missing")])).toThrow("missing work");
     expect(() => replayTransactions([work("w"), cancelClaim("w", "missing")])).toThrow("missing claim");
-    expect(() => replayTransactions([work("w"), work("other"), claim("w", "c"), complete("other", "c", "run")])).toThrow("different work");
+    expect(() => replayTransactions([work("w"), work("other", 2), claim("w", "c"), complete("other", "c", "run")])).toThrow("different work");
   });
 
   it("rejects a completion for a superseded or cancelled claim", () => {
@@ -161,10 +166,10 @@ describe("dispatch work coordinator replay", () => {
   });
 
   it("rejects conflicting claim identities, repeated attempts, and multiple terminal facts", () => {
-    expect(() => replayTransactions([work("w"), work("other"), claim("w", "c"), claim("other", "c")])).toThrow("conflicting transactions");
+    expect(() => replayTransactions([work("w"), work("other", 2), claim("w", "c"), claim("other", "c")])).toThrow("conflicting transactions");
     expect(() => replayTransactions([work("w"), claim("w", "a"), complete("w", "a", "run"), complete("w", "a", "run-2")])).toThrow("multiple terminal");
     expect(() => replayTransactions([work("w"), claim("w", "a"), complete("w", "a", "run"), cancelWork("w")])).toThrow("multiple terminal");
-    expect(() => replayTransactions([work("w"), claim("w", "a"), complete("w", "a", "run"), work("other"), claim("other", "b"), complete("other", "b", "run")])).toThrow("multiple completions");
+    expect(() => replayTransactions([work("w"), claim("w", "a"), complete("w", "a", "run"), work("other", 2), claim("other", "b"), complete("other", "b", "run")])).toThrow("multiple completions");
   });
 });
 
@@ -188,7 +193,7 @@ describe("dispatch work coordinator transaction application", () => {
   });
 
   it("rejects mutations with mismatched claim ownership", () => {
-    const result = applyTransactions([work("w"), work("other"), claim("w", "c")], [cancelClaim("other", "c"), complete("other", "c", "run")]);
+    const result = applyTransactions([work("w"), work("other", 2), claim("w", "c")], [cancelClaim("other", "c"), complete("other", "c", "run")]);
     expect(result.rejected.map(item => item.reason)).toEqual(["claim belongs to different work", "claim belongs to different work"]);
     expect(replayTransactions(result.transactions).claim.c).toBe("effective");
   });

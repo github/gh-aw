@@ -62,10 +62,14 @@ function upgradeTransaction(message) {
 function upgradeTransactions(messages) {
   const upgraded = messages.map(upgradeTransaction);
   const sequences = new Map();
+  const sequenceOwners = new Map();
   let maximum = 0;
   for (const message of upgraded) {
     if (message.kind === "Work" && message.sequence !== undefined) {
       if (!Number.isSafeInteger(message.sequence) || message.sequence < 1) throw new TypeError("work sequence must be a positive safe integer");
+      const owner = sequenceOwners.get(message.sequence);
+      if (sequenceOwners.has(message.sequence) && owner !== message.work_id) throw new TypeError(`work sequence ${message.sequence} is shared by Work ${owner} and ${message.work_id}`);
+      sequenceOwners.set(message.sequence, message.work_id);
       maximum = Math.max(maximum, message.sequence);
       sequences.set(message.work_id, message.sequence);
     }

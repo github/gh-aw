@@ -83,6 +83,15 @@ describe("dispatch_workflow handler factory", () => {
     expect(github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
+  it("validates the worker shape before requiring trusted publication", async () => {
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" } });
+    const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "forged" } }, {});
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("same-repository worker workflow");
+    expect(result.error).not.toContain("verified publication");
+    expect(github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
   it("removes the reserved claim input from staged worker dispatches", async () => {
     const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], staged: true });
     const result = await handler({ workflow_name: "worker", inputs: { work_queue_claim_id: "pending", task: "review" } }, {});
