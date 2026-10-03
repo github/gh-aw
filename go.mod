@@ -37,7 +37,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require golang.org/x/net v0.59.0
+require (
+	github.com/rhysd/actionlint v1.7.12
+	golang.org/x/net v0.59.0
+)
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -91,7 +94,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/openai/openai-go/v3 v3.52.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
-	github.com/rhysd/actionlint v1.7.12 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/securego/gosec/v2 v2.29.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
