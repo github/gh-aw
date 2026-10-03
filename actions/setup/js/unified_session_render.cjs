@@ -10,6 +10,7 @@ const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs"
 const RUNTIME_TYPES = new Set([
   "session.format",
   "session.runtime",
+  "session.sandbox",
   "session.collection",
   "session.collection_warning",
   "mcp.rpc.request",
@@ -70,6 +71,8 @@ function eventDetail(event) {
       return `version=${inline(data.version)}`;
     case "session.runtime":
       return fields(data, ["engine", "engineVersion", "sandboxRuntime"]);
+    case "session.sandbox":
+      return fields(data, ["runtime", "firewallEnabled", "firewallType", "firewallVersion", "mcpGatewayVersion", "allowedDomains"]);
     case "session.init":
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);

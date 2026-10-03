@@ -136,11 +136,27 @@ export interface SessionRuntimeEvent extends EventMetadata {
   data: SessionRuntimeData;
 }
 
+export interface SessionSandboxData {
+  runtime?: string;
+  firewallEnabled?: boolean;
+  firewallType?: string;
+  firewallVersion?: string;
+  mcpGatewayVersion?: string;
+  allowedDomains?: string[];
+  [key: string]: unknown;
+}
+
+export interface SessionSandboxEvent extends EventMetadata {
+  type: "session.sandbox";
+  data: SessionSandboxData;
+}
+
 export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
 
 export interface SessionEventDataMap {
   "session.format": SessionFileFormatData;
   "session.runtime": SessionRuntimeData;
+  "session.sandbox": SessionSandboxData;
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;

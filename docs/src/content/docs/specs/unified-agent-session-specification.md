@@ -225,6 +225,7 @@ opaque because its essential fields are not defined by this specification.
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
 | Runtime identity | Engine ID, engine CLI installation version, and sandbox runtime type. |
+| Sandbox configuration | Runtime, firewall enabled state/type/version, MCP gateway version, and allowed domains. |
 | Raw workflow metadata | Complete selected `aw_info.json` object in `workflow.aw_info`, including nested and future fields; publication redaction still applies. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
 
@@ -454,6 +455,7 @@ source for opaque fields.
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 | `session.runtime` | Engine CLI identity and sandbox runtime projected from the selected run metadata. |
+| `session.sandbox` | General sandbox configuration projected from the selected run metadata, beyond the runtime selector alone. |
 | `workflow.aw_info` | Complete selected `aw_info.json` payload, retained without field compaction. |
 
 **T-UAS-067 — Runtime identity.** When selected `aw_info.json` metadata exposes
@@ -488,6 +490,32 @@ compact `workflow.info` projection. Source selection, provenance, observed
 timestamps, and publication redaction MUST use the same rules as runtime
 identity. Readers MUST NOT dump arbitrary raw metadata in publication summaries;
 they MAY display the engine, model, workflow, repository, and run ID.
+
+**T-UAS-069 — Sandbox configuration.** When selected run metadata exposes
+sandbox configuration, the merger MUST emit a `session.sandbox` message with
+the available fields below. The runtime selector alone in `session.runtime`
+does not replace this message.
+
+| Field | Source |
+| --- | --- |
+| `runtime` | `agent_runtime`, with the same explicit/default/disabled semantics as T-UAS-067. |
+| `firewallEnabled` | Boolean `firewall_enabled`, including `false`. |
+| `firewallType` | Nonempty `steps.firewall`. |
+| `firewallVersion` | Nonempty `awf_version`. |
+| `mcpGatewayVersion` | Nonempty `awmg_version`. |
+| `allowedDomains` | String array `allowed_domains`, including an empty array. |
+
+Version and type fields MUST be strings. Unavailable configuration MUST remain
+omitted; without any available sandbox fields, the merger MUST NOT fabricate
+a sandbox message. It MUST NOT infer unrecorded security capabilities, mounts,
+or container settings. Source selection, provenance, observed timestamps, and
+publication redaction MUST follow the runtime identity rules. Readers MUST
+display available sandbox fields without arbitrary raw metadata. The complete
+source object remains available separately in `workflow.aw_info`.
+
+```json
+{"type":"session.sandbox","data":{"runtime":"docker","firewallEnabled":true,"firewallType":"squid","firewallVersion":"v0.30.1","mcpGatewayVersion":"v1.0.0","allowedDomains":["example.com"]},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":3}}
+```
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
@@ -896,6 +924,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
 | T-UAS-067 | Original/mirrored run metadata, version precedence, explicit/default/disabled sandbox runtimes, partial identity, redaction, and both summary sinks | Runtime identity uses engine installation metadata, not the gh-aw version; unavailable fields remain absent, provenance is retained, and summaries display the published identity. |
 | T-UAS-068 | Complete run metadata with nested/future fields, false/zero/null/empty values, source mirrors, secrets, and summary views | The raw metadata payload survives artifact publication without compaction or mutation; redaction still applies, and summaries omit arbitrary raw fields. |
+| T-UAS-069 | Sandbox source/mirror metadata, explicit/default/disabled runtimes, versions, firewall type/state, empty/nonempty domains, missing fields, redaction, and both summary sinks | General sandbox configuration is retained separately from runtime identity, with matching runtime semantics, explicit false/empty values, source provenance, and no fabricated settings. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -1297,6 +1326,7 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 - Added `session.runtime` and T-UAS-067 for engine CLI version and sandbox runtime identity in unified artifacts and publication views.
 - Defined installation-version precedence, implicit Docker and disabled-sandbox values, metadata provenance, and partial identity handling.
 - Added `workflow.aw_info` and T-UAS-068 to retain the complete run metadata JSON alongside its compact projection without exposing arbitrary metadata in summaries.
+- Added `session.sandbox` and T-UAS-069 for general sandbox configuration: runtime, firewall state/type/version, MCP gateway version, and allowed domains.
 
 ### Version 1.1.0 — Draft (2026-10-02)
 

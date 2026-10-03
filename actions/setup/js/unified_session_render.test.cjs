@@ -44,6 +44,12 @@ const trace = [
   event("workflow.info", { engine_id: "copilot", model: "fixture", run_id: 1 }, "workflow", 0),
   event("session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor" }, "workflow", 1),
   event("workflow.aw_info", { engine_id: "copilot", model: "fixture", workflow_name: "fixture-workflow", run_id: 1, context: { sensitive: "PRIVATE_RAW_METADATA" } }, "workflow", 2),
+  event(
+    "session.sandbox",
+    { runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"], extra: "PRIVATE_SANDBOX_METADATA" },
+    "workflow",
+    3
+  ),
   event("vendor.progress", { private: "PRIVATE_EXTENSION" }, "agent", 5, undefined, "session-a.jsonl"),
   event("session.collection_warning", { path: "gateway.jsonl", line: 2, code: "malformed_jsonl" }, "collector", 1),
   event("session.collection", { sources: [], warnings: 1, untimedEvents: 10, absentComponents: [] }, "collector", 2),
@@ -85,6 +91,8 @@ describe("unified session publication views", () => {
       expect(output).toContain("secretLeak=false");
       expect(output).toContain("engine=copilot engineVersion=1.0.90 sandboxRuntime=cloud-hypervisor");
       expect(output).toContain("engine_id=copilot model=fixture workflow_name=fixture-workflow run_id=1");
+      expect(output).toContain("runtime=cloud-hypervisor firewallEnabled=true firewallType=squid firewallVersion=v0.30.1 mcpGatewayVersion=v1.0.0 allowedDomains=");
+      expect(output).toMatch(/allowedDomains=\[\s*"example.com"\s*\]/);
       expect(output).toContain("untimedEvents=10");
       expect(output).toContain("malformed_jsonl");
       expect(output).not.toContain("PRIVATE_");
@@ -96,6 +104,13 @@ describe("unified session publication views", () => {
     const markdown = generateCopilotCliStyleSummary(trace);
     expect(markdown).toContain("Done &lt;details&gt;");
     expect(markdown).toContain("<details><summary>Unified trace details</summary>");
+  });
+
+  it("renders explicit disabled sandboxing and an empty domain list in both publication sinks", () => {
+    const sandbox = event("session.sandbox", { runtime: "none", firewallEnabled: false, allowedDomains: [] }, "workflow", 0);
+    for (const output of [generatePlainTextSummary([header, sandbox]), generateCopilotCliStyleSummary([header, sandbox])]) {
+      expect(output).toContain("session.sandbox runtime=none firewallEnabled=false allowedDomains=[]");
+    }
   });
 
   it("scopes agent pairing, snapshots and accounting without adding firewall usage", () => {
@@ -198,6 +213,8 @@ describe("unified session publication views", () => {
     expect(output).toContain("mcp.tool_call");
     expect(output).toContain("engine=copilot engineVersion=1.0.90 sandboxRuntime=docker");
     expect(output).toContain("workflow.aw_info");
+    expect(output).toContain("session.sandbox runtime=docker");
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("session.sandbox runtime=docker"));
   });
 
   it("respects the remaining byte budget of an existing step summary and still publishes logs", async () => {

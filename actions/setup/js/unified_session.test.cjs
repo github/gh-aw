@@ -86,6 +86,78 @@ describe("Unified conclusion session", () => {
     expect(fs.readFileSync(metadataPath, "utf8")).toBe(original);
   });
 
+  it.each(["aw_info.json", "usage/aw_info.json"])("records general sandbox configuration from %s with source provenance", metadataPath => {
+    const createdAt = "2026-10-02T00:00:00Z";
+    write(metadataPath, {
+      engine_id: "copilot",
+      agent_runtime: "cloud-hypervisor",
+      firewall_enabled: true,
+      awf_version: "v0.30.1",
+      awmg_version: "v1.0.0",
+      allowed_domains: ["example.com", "api.github.com"],
+      steps: { firewall: "squid", unrelated: "omit" },
+      created_at: createdAt,
+    });
+    const events = writeUnifiedSession({ rootDir: root });
+    const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    expect(published.filter(event => event.type === "session.sandbox")).toEqual([
+      {
+        type: "session.sandbox",
+        timestamp: createdAt,
+        data: { runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com", "api.github.com"] },
+        provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 3, timestampMs: Date.parse(createdAt) },
+      },
+    ]);
+    expect(events.find(event => event.type === "session.sandbox").data.runtime).toBe(events.find(event => event.type === "session.runtime").data.sandboxRuntime);
+    writeUnifiedSession({ rootDir: root });
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse)).toEqual(published);
+  });
+
+  it.each([
+    [
+      { firewall_enabled: true, agent_runtime: "", allowed_domains: [] },
+      { runtime: "docker", firewallEnabled: true, allowedDomains: [] },
+    ],
+    [
+      { firewall_enabled: false, agent_runtime: "", awf_version: "", awmg_version: "", steps: { firewall: "" }, allowed_domains: [] },
+      { runtime: "none", firewallEnabled: false, allowedDomains: [] },
+    ],
+    [{ agent_runtime: "docker-sudo-iptables" }, { runtime: "docker-sudo-iptables" }],
+    [{ awmg_version: "v1.0.0" }, { mcpGatewayVersion: "v1.0.0" }],
+    [{ allowed_domains: ["example.com"] }, { allowedDomains: ["example.com"] }],
+    [{ agent_runtime: "docker", firewall_enabled: "false", awf_version: 1, awmg_version: null, steps: false, allowed_domains: [1] }, { runtime: "docker" }],
+  ])("retains partial sandbox observations and explicit false/empty values (%j)", (metadata, expected) => {
+    write("aw_info.json", metadata);
+    const sandbox = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "session.sandbox");
+    expect(sandbox).toHaveLength(1);
+    expect(sandbox[0].data).toEqual(expected);
+    expect(sandbox[0]).not.toHaveProperty("timestamp");
+    expect(sandbox[0].provenance).not.toHaveProperty("timestampMs");
+  });
+
+  it.each([{}, { engine_id: "custom" }, { agent_runtime: "", firewall_enabled: null, awf_version: "", awmg_version: "", steps: [], allowed_domains: null }])("does not fabricate a sandbox event without sandbox evidence (%j)", metadata => {
+    write("aw_info.json", metadata);
+    expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.sandbox")).toBe(false);
+  });
+
+  it("selects original sandbox metadata and redacts sandbox fields before publication", () => {
+    write("aw_info.json", { firewall_enabled: true, awf_version: "opaque-mask", allowed_domains: ["opaque-mask"] });
+    write("usage/aw_info.json", { firewall_enabled: false, awf_version: "duplicate" });
+    write("agent-stdio.log", "::add-mask::opaque-mask\n");
+    write("agent-session.jsonl", [{ type: "assistant.message", data: { content: "done" } }]);
+    writeUnifiedSession({ rootDir: root });
+    const content = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(content).not.toContain("opaque-mask");
+    expect(content).not.toContain("duplicate");
+    expect(
+      content
+        .trimEnd()
+        .split("\n")
+        .map(JSON.parse)
+        .filter(event => event.type === "session.sandbox")
+    ).toEqual([expect.objectContaining({ data: { runtime: "docker", firewallEnabled: true, firewallVersion: "***", allowedDomains: ["***"] }, provenance: expect.objectContaining({ path: "aw_info.json" }) })]);
+  });
+
   it.each([
     [
       { engine_id: "claude", agent_version: "", version: "2.1.160", cli_version: "0.90.0", agent_runtime: "", firewall_enabled: true },
@@ -343,6 +415,7 @@ describe("Unified conclusion session", () => {
     expect(events[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
     expect(events[0].provenance).not.toHaveProperty("timestampMs");
     expect(events.some(event => event.type === "session.runtime")).toBe(false);
+    expect(events.some(event => event.type === "session.sandbox")).toBe(false);
     expect(events[1]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"], warnings: 0, untimedEvents: 0 } });
   });
 

@@ -48,6 +48,15 @@ createSessionEvent({}, "session.runtime", { engineVersion: 1 });
 // @ts-expect-error Sandbox runtime names are strings, not flags.
 createSessionEvent({}, "session.runtime", { sandboxRuntime: false });
 
+createSessionEvent({}, "session.sandbox", { runtime: "docker", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"] });
+createSessionEvent({}, "session.sandbox", { firewallEnabled: false, allowedDomains: [] });
+// @ts-expect-error Firewall enabled state is boolean, not a string.
+createSessionEvent({}, "session.sandbox", { firewallEnabled: "false" });
+// @ts-expect-error Allowed domains are strings, not numeric addresses.
+createSessionEvent({}, "session.sandbox", { allowedDomains: [1] });
+// @ts-expect-error Runtime versions are strings.
+createSessionEvent({}, "session.sandbox", { mcpGatewayVersion: 1 });
+
 createSessionEvent({}, "session.result", { status: "completed", sourceType: "turn.completed", usage: { reasoning_output_tokens: 0 } });
 // @ts-expect-error Source terminal status is a string, not a completion flag.
 createSessionEvent({}, "session.result", { status: true });

@@ -31,6 +31,12 @@ describe("essential unified session payloads", () => {
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
     ["session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor", extra: "omit" }, { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor" }],
+    ["session.sandbox", { runtime: "none", firewallEnabled: false, firewallType: "", allowedDomains: [], extra: "omit" }, { runtime: "none", firewallEnabled: false, firewallType: "", allowedDomains: [] }],
+    [
+      "session.sandbox",
+      { runtime: "docker", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"], extra: "omit" },
+      { runtime: "docker", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"] },
+    ],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],

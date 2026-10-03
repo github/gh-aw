@@ -77,6 +77,14 @@ const SAFE_OUTPUT_FIELDS = {
 const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
   "session.runtime": { engine: ["engine"], engineVersion: ["engineVersion"], sandboxRuntime: ["sandboxRuntime"] },
+  "session.sandbox": {
+    runtime: ["runtime"],
+    firewallEnabled: ["firewallEnabled"],
+    firewallType: ["firewallType"],
+    firewallVersion: ["firewallVersion"],
+    mcpGatewayVersion: ["mcpGatewayVersion"],
+    allowedDomains: ["allowedDomains"],
+  },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
   "user.message": { content: ["content"] },
   "assistant.message": { content: ["content"] },
