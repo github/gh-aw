@@ -50,6 +50,7 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 		name        string
 		data        *WorkflowData
 		wantWarning bool
+		wantMessage string
 	}{
 		{
 			name: "general-purpose Copilot model",
@@ -58,6 +59,28 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 				EngineConfig: &EngineConfig{ID: "codex"},
 			},
 			wantWarning: true,
+			wantMessage: "general-purpose Copilot models",
+		},
+		{
+			name: "Copilot auto model with effort and mixed case",
+			data: &WorkflowData{
+				Model:        " COPILOT/AUTO?effort=high ",
+				EngineConfig: &EngineConfig{ID: "codex"},
+			},
+			wantWarning: true,
+			wantMessage: "Responses API, where Copilot auto is currently rejected with model_not_supported",
+		},
+		{
+			name: "bare auto with explicit GitHub provider",
+			data: &WorkflowData{
+				Model: "auto",
+				EngineConfig: &EngineConfig{
+					ID:          "codex",
+					LLMProvider: LLMProviderGitHub,
+				},
+			},
+			wantWarning: true,
+			wantMessage: "Responses API, where Copilot auto is currently rejected with model_not_supported",
 		},
 		{
 			name: "Copilot auto model",
@@ -66,6 +89,7 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 				EngineConfig: &EngineConfig{ID: "codex"},
 			},
 			wantWarning: true,
+			wantMessage: "Responses API, where Copilot auto is currently rejected with model_not_supported",
 		},
 		{
 			name: "explicit GitHub provider",
@@ -100,6 +124,16 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 			},
 		},
 		{
+			name: "bare auto with explicit OpenAI provider",
+			data: &WorkflowData{
+				Model: "auto",
+				EngineConfig: &EngineConfig{
+					ID:          "codex",
+					LLMProvider: LLMProviderOpenAI,
+				},
+			},
+		},
+		{
 			name: "Copilot engine",
 			data: &WorkflowData{
 				Model:        "copilot/mai-code-1-flash-picker",
@@ -127,6 +161,9 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 			if tt.wantWarning {
 				assert.Equal(t, 1, compiler.GetWarningCount())
 				assert.Contains(t, string(output), "Select a Codex model such as copilot/gpt-5.3-codex")
+				if tt.wantMessage != "" {
+					assert.Contains(t, string(output), tt.wantMessage)
+				}
 			} else {
 				assert.Zero(t, compiler.GetWarningCount())
 				assert.Empty(t, output)

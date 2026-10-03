@@ -20,7 +20,7 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 		return
 	}
 	model = strings.ToLower(model)
-	baseModel := strings.SplitN(model, "?", 2)[0]
+	baseModel, _, _ := strings.Cut(model, "?")
 	usesGitHubInference := strings.HasPrefix(baseModel, "copilot/") ||
 		NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub
 	if !usesGitHubInference || strings.Contains(baseModel, "codex") {
@@ -31,6 +31,12 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 		"Codex with model %q may fail because Codex relies on capabilities that general-purpose Copilot models do not provide. Select a Codex model such as copilot/gpt-5.3-codex",
 		data.Model,
 	)
+	if codexModelID(baseModel) == "auto" {
+		message = fmt.Sprintf(
+			"Codex with model %q uses the Responses API, where Copilot auto is currently rejected with model_not_supported. Select a Codex model such as copilot/gpt-5.3-codex",
+			data.Model,
+		)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 		formatCompilerMessage(markdownPath, "warning", message)))
 	c.IncrementWarningCount()

@@ -34,6 +34,10 @@ To authenticate:
 
 GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
 
+Copilot `auto` currently rejects Codex's `/responses` requests with HTTP 400 `model_not_supported`, before inference or tool execution. Use a concrete Codex model such as `copilot/gpt-5.3-codex`; changing credentials or network permissions does not fix this protocol limitation.
+
+The [Pi engine](/gh-aw/engines/pi/) supports `copilot/auto` through `/chat/completions`. Codex requires the Responses API, so Pi's working model configuration cannot be used unchanged with Codex.
+
 Recompile the workflow with `gh aw compile` and commit the changes to your repository. The workflow will now run with Codex as the AI engine.
 
 ## Example: scheduled repository report

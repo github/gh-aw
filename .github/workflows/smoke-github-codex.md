@@ -1,15 +1,25 @@
 ---
 private: true
 name: Smoke GitHub Codex
-description: Canary for Codex inference through Copilot auto.
-intent: Detect whether Codex can complete inference through Copilot auto.
+description: Canary for Codex inference through Copilot auto, with a concrete Codex model control.
+intent: Detect whether Codex can complete inference through Copilot auto and compare a concrete Codex model.
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: Copilot model to test; use the concrete Codex model as a control.
+        type: choice
+        default: copilot/auto
+        options:
+          - copilot/auto
+          - copilot/gpt-5.3-codex
 permissions:
   contents: read
   copilot-requests: write
-engine: codex
-model: copilot/auto
+engine:
+  id: codex
+  model-provider: github
+model: ${{ inputs.model || 'copilot/auto' }}
 checkout: false
 tools:
   github: false
