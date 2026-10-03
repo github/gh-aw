@@ -120,7 +120,13 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	if !ok {
 		return tool
 	}
-	if slices.Contains(workQueueEnabled, true) {
+	_, acceptsContext := workflowInputs["aw_context"]
+	if slices.Contains(workQueueEnabled, true) && acceptsContext {
+		// The handler supplies aw_context in both ordinary and queue dispatches.
+		delete(properties, "aw_context")
+		if required, ok := inputSchema["required"].([]string); ok {
+			inputSchema["required"] = slices.DeleteFunc(required, func(name string) bool { return name == "aw_context" })
+		}
 		properties["work_queue"] = map[string]any{
 			"type":        "object",
 			"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",

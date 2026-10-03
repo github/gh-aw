@@ -49,6 +49,7 @@ describe("dispatch_workflow handler factory", () => {
     // Reset shared context to a known baseline so tests are order-independent
     global.context.ref = "refs/heads/main";
     global.context.payload = { repository: { default_branch: "main" } };
+    delete global.getOctokit;
   });
 
   function queueWithWork(workId = "task-1") {
@@ -90,6 +91,25 @@ describe("dispatch_workflow handler factory", () => {
     expect(JSON.parse(inputs.aw_context).work_queue).toEqual({ work_id: "task-1", claim_id: claim.claim, work: { id: "task-1" } });
   });
 
+  it("uses the safe-outputs job token for queue writes with a separate dispatch token", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    const dispatchClient = { rest: { actions: { createWorkflowDispatch: vi.fn().mockResolvedValue({ data: {} }) } } };
+    global.getOctokit = vi.fn().mockReturnValue(dispatchClient);
+    const handler = await main({
+      workflows: ["worker"],
+      workflow_files: { worker: ".lock.yml" },
+      aw_context_workflows: ["worker"],
+      work_queue_enabled: true,
+      "github-token": "test-only",
+    });
+    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(true);
+    expect(global.getOctokit).toHaveBeenCalledOnce();
+    expect(transactions().some(t => t.kind === "Claim")).toBe(true);
+    expect(dispatchClient.rest.actions.createWorkflowDispatch).toHaveBeenCalledOnce();
+    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
   it("rejects stale or unauthorized work without dispatching", async () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
@@ -100,6 +120,30 @@ describe("dispatch_workflow handler factory", () => {
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
     const ordinary = await main({ ...config, work_queue_enabled: false });
     expect((await ordinary({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
+  it("never claims work for an ordinary or staged dispatch", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true };
+    const ordinary = await main(config);
+    expect((await ordinary({ workflow_name: "worker", inputs: { task: "hello" } }, {})).success).toBe(true);
+    const staged = await main({ ...config, staged: true });
+    expect((await staged({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).staged).toBe(true);
+    expect(transactions().map(t => t.kind)).toEqual(["Work"]);
+    expect(global.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects queue selection for workers without aw_context and cross-repository targets", async () => {
+    const transactions = queueWithWork();
+    global.context.runId = 101;
+    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_enabled: true };
+    const noContext = await main(config);
+    expect((await noContext({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    const crossRepo = await main({ ...config, aw_context_workflows: ["worker"], "target-repo": "elsewhere/repo", allowed_repos: ["elsewhere/repo"] });
+    expect((await crossRepo({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    expect(transactions()).toHaveLength(1);
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 

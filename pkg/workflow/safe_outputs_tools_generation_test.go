@@ -58,7 +58,12 @@ func TestDispatchWorkflowWorkQueueSelector(t *testing.T) {
 	normalProps := normal["inputSchema"].(map[string]any)["properties"].(map[string]any)
 	assert.NotContains(t, normalProps, "work_queue")
 
-	queue := generateDispatchWorkflowTool("worker", map[string]any{}, nil, true)
+	withoutContext := generateDispatchWorkflowTool("worker", map[string]any{}, nil, true)
+	assert.NotContains(t, withoutContext["inputSchema"].(map[string]any)["properties"].(map[string]any), "work_queue")
+
+	queue := generateDispatchWorkflowTool("worker", map[string]any{"aw_context": map[string]any{"type": "string", "required": true}}, nil, true)
+	assert.NotContains(t, queue["inputSchema"].(map[string]any)["properties"].(map[string]any), "aw_context")
+	assert.NotContains(t, queue["inputSchema"].(map[string]any)["required"], "aw_context")
 	props := queue["inputSchema"].(map[string]any)["properties"].(map[string]any)
 	selector := props["work_queue"].(map[string]any)
 	assert.Equal(t, false, selector["additionalProperties"])

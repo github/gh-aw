@@ -33,6 +33,9 @@ async function main(config = {}) {
   const workflowFiles = config.workflow_files || {}; // Map of workflow name to file extension
   const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept aw_context input
   const githubClient = await createAuthenticatedGitHubClient(config);
+  // Queue publication uses the safe-outputs job token, not a dispatch handler's
+  // optionally scoped GitHub App token.
+  const queueClient = github;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const allowedRefPatterns = parseAllowedRefPatterns(config.allowed_refs);
   const allowedRefRegexes = allowedRefPatterns.map(pattern => globPatternToRegex(pattern, { pathMode: true, caseSensitive: true }));
@@ -338,7 +341,7 @@ async function main(config = {}) {
       }
 
       if (workId !== undefined) {
-        const current = await readWorkQueueLog({ githubClient, owner: repo.owner, repo: repo.repo, core });
+        const current = await readWorkQueueLog({ githubClient: queueClient, owner: repo.owner, repo: repo.repo, core });
         if (!replayTransactions(current.transactions).available.includes(workId)) {
           throw new Error("Selected work is no longer available");
         }
@@ -346,7 +349,7 @@ async function main(config = {}) {
         if (!runId) throw new Error("Cannot claim work without a dispatcher run ID");
         claim = { version: CURRENT_VERSION, kind: "Claim", work: workId, claim: `${runId}:${randomUUID()}`, attempt: null };
         const published = await applyAndPublishWorkQueueTransactions({
-          githubClient,
+          githubClient: queueClient,
           owner: repo.owner,
           repo: repo.repo,
           intents: [claim],
@@ -354,7 +357,7 @@ async function main(config = {}) {
         });
         if (published.rejected.length > 0) throw new Error("Selected work could not be claimed");
         claimPublished = true;
-        const latest = await readWorkQueueLog({ githubClient, owner: repo.owner, repo: repo.repo, core });
+        const latest = await readWorkQueueLog({ githubClient: queueClient, owner: repo.owner, repo: repo.repo, core });
         if (replayTransactions(latest.transactions).claim[claim.claim] !== "effective") {
           throw new Error("Selected work claim is no longer effective");
         }
@@ -422,7 +425,7 @@ async function main(config = {}) {
       if (claimPublished && !dispatched) {
         try {
           await applyAndPublishWorkQueueTransactions({
-            githubClient,
+            githubClient: queueClient,
             owner: repo.owner,
             repo: repo.repo,
             intents: [{ version: CURRENT_VERSION, kind: "ClaimCancellation", work: claim.work, claim: claim.claim, attempt: null }],
