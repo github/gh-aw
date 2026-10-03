@@ -202,7 +202,7 @@ function resolveUsageAic(source, data, usage) {
  * @param {string} [phase]
  * @returns {SessionEvent}
  */
-function normalizeUnifiedSessionEvent(event, phase = event.provenance?.phase) {
+function normalizeUnifiedSessionEvent(event, phase) {
   /** @type {any} */
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
@@ -222,7 +222,13 @@ function normalizeUnifiedSessionEvent(event, phase = event.provenance?.phase) {
     }
     if (Object.keys(usage).length || (source.usage && typeof source.usage === "object")) data.usage = usage;
     else if (source.usage === null) data.usage = null;
-    if (event.type === "usage.report" && ["detection", "evals"].includes(phase)) resolveUsageAic(source, data, usage);
+    if (event.type === "usage.report" && source.usage && typeof source.usage === "object") {
+      const nested = selectFields(source.usage, EVENT_FIELDS["usage.report"]);
+      for (const key of ["provider", "model", "aic", "totalAic", "premiumRequests"]) {
+        if (data[key] === undefined && nested[key] !== undefined) data[key] = nested[key];
+      }
+    }
+    if (event.type === "usage.report" && (phase === "detection" || phase === "evals")) resolveUsageAic(source, data, usage);
   }
   if (event.type === "tool.execution_complete" && (source.is_error === true || source.result?.isError === true || source.result?.is_error === true)) data.isError = true;
   if (event.type === "experiment.assignment") {

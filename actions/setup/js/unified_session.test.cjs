@@ -115,6 +115,7 @@ describe("Unified conclusion session", () => {
       { provider: "openai", model: "gpt-4o-mini", input_tokens: 1000, output_tokens: 100 },
       { provider: "openai", model: "unknown-model", input_tokens: 10 },
       { provider: "openai", model: "gpt-4o-mini", ai_credits: 0, input_tokens: 100 },
+      { usage: { provider: "openai", model: "gpt-4o-mini", ai_credits: 0, input_tokens: 100 } },
     ]);
     write("evals/evals_token_usage.jsonl", [
       { provider: "openai", model: "gpt-4o-mini", ai_credits_this_response: 0.25, input_tokens: 100 },
@@ -128,6 +129,8 @@ describe("Unified conclusion session", () => {
     expect(detection[1].data).not.toHaveProperty("aic");
     expect(detection[2].data).toMatchObject({ totalAic: 0 });
     expect(detection[2].data).not.toHaveProperty("aic");
+    expect(detection[3].data).toMatchObject({ provider: "openai", model: "gpt-4o-mini", totalAic: 0, usage: { inputTokens: 100 } });
+    expect(detection[3].data).not.toHaveProperty("aic");
     expect(evals[0].data).toMatchObject({ aic: 0.25 });
     expect(evals[1].data.aic).toBeGreaterThan(0);
     expect(evals[1].data.usage.outputTokens).toBe(0);
