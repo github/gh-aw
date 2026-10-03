@@ -9,6 +9,7 @@ const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs"
 
 const RUNTIME_TYPES = new Set([
   "session.format",
+  "session.runtime",
   "session.collection",
   "session.collection_warning",
   "mcp.rpc.request",
@@ -33,6 +34,7 @@ const RUNTIME_TYPES = new Set([
   "execution.result",
   "detection.result",
   "workflow.info",
+  "workflow.aw_info",
 ]);
 
 /** @param {Array<any>} events @returns {boolean} */
@@ -66,6 +68,8 @@ function eventDetail(event) {
   switch (event.type) {
     case "session.format":
       return `version=${inline(data.version)}`;
+    case "session.runtime":
+      return fields(data, ["engine", "engineVersion", "sandboxRuntime"]);
     case "session.init":
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);
@@ -125,6 +129,8 @@ function eventDetail(event) {
       return fields(data, ["jobResult", "conclusion", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
       return fields(data, ["engine", "model", "workflow", "repository", "runId"]);
+    case "workflow.aw_info":
+      return fields(data, ["engine_id", "model", "workflow_name", "repository", "run_id"]);
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":

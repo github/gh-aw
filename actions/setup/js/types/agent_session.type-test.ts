@@ -41,6 +41,13 @@ createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.
 createSessionEvent({}, "session.format", {});
 
+createSessionEvent({}, "session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "docker" });
+createSessionEvent({}, "session.runtime", { engine: "custom" });
+// @ts-expect-error Engine versions are strings, not numbers.
+createSessionEvent({}, "session.runtime", { engineVersion: 1 });
+// @ts-expect-error Sandbox runtime names are strings, not flags.
+createSessionEvent({}, "session.runtime", { sandboxRuntime: false });
+
 createSessionEvent({}, "session.result", { status: "completed", sourceType: "turn.completed", usage: { reasoning_output_tokens: 0 } });
 // @ts-expect-error Source terminal status is a string, not a completion flag.
 createSessionEvent({}, "session.result", { status: true });

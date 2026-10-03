@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.2.0"
+version: "1.3.0"
 status: Draft
 publication_date: "2026-10-02"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-02<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.2.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.3.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -224,6 +224,8 @@ opaque because its essential fields are not defined by this specification.
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
+| Runtime identity | Engine ID, engine CLI installation version, and sandbox runtime type. |
+| Raw workflow metadata | Complete selected `aw_info.json` object in `workflow.aw_info`, including nested and future fields; publication redaction still applies. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
@@ -451,6 +453,41 @@ source for opaque fields.
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
+| `session.runtime` | Engine CLI identity and sandbox runtime projected from the selected run metadata. |
+| `workflow.aw_info` | Complete selected `aw_info.json` payload, retained without field compaction. |
+
+**T-UAS-067 — Runtime identity.** When selected `aw_info.json` metadata exposes
+an engine ID, engine version, or sandbox runtime, the merger MUST emit a
+`session.runtime` message with the available string fields `engine`,
+`engineVersion`, and `sandboxRuntime`. `engineVersion` MUST use nonempty
+`agent_version`, falling back to nonempty `version`; it MUST NOT use
+`cli_version`, which identifies the gh-aw compiler rather than the agent CLI.
+`sandboxRuntime` MUST use nonempty `agent_runtime`. An empty or missing
+selector MUST resolve to `docker` when `firewall_enabled` is explicitly `true`,
+or `none` when it is explicitly `false`. Without either observation, the runtime
+MUST remain omitted. Unavailable engine IDs and versions MUST remain omitted.
+
+The message describes the installation metadata recorded for the run, not an
+independent probe of the installed executable. It MUST retain the selected
+metadata path, workflow/activation provenance, and any observed metadata
+timestamp, without inventing collection time or an agent initialization event.
+The original `aw_info.json` takes precedence over its `usage/aw_info.json`
+mirror. With no available identity fields, the merger MUST NOT fabricate a
+runtime message. Readers MUST display the available identity fields in unified
+session views; publication redaction also applies to this message.
+
+```json
+{"type":"session.runtime","data":{"engine":"copilot","engineVersion":"1.0.90","sandboxRuntime":"cloud-hypervisor"},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":1}}
+```
+
+**T-UAS-068 — Raw run metadata.** The merger MUST additionally retain the
+complete selected `aw_info.json` object as the `data` of a `workflow.aw_info`
+message, including nested objects, unknown fields, and explicit empty, false,
+zero, and null values. This message is an opaque metadata observation, not the
+compact `workflow.info` projection. Source selection, provenance, observed
+timestamps, and publication redaction MUST use the same rules as runtime
+identity. Readers MUST NOT dump arbitrary raw metadata in publication summaries;
+they MAY display the engine, model, workflow, repository, and run ID.
 
 **T-UAS-062 — Observation semantics.** A merger MUST NOT sum overlapping agent,
 firewall, or accounting observations to produce another session total. Readers
@@ -857,6 +894,8 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-051, T-UAS-052, T-UAS-053 | Conformance report and isolated test harness | Applicable IDs covered; structural/round-trip/purity assertions; no real production I/O. |
 | T-UAS-054–T-UAS-064 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; leading numeric format version; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete compact `aw_session.jsonl`, pinned format header, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
 | T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
+| T-UAS-067 | Original/mirrored run metadata, version precedence, explicit/default/disabled sandbox runtimes, partial identity, redaction, and both summary sinks | Runtime identity uses engine installation metadata, not the gh-aw version; unavailable fields remain absent, provenance is retained, and summaries display the published identity. |
+| T-UAS-068 | Complete run metadata with nested/future fields, false/zero/null/empty values, source mirrors, secrets, and summary views | The raw metadata payload survives artifact publication without compaction or mutation; redaction still applies, and summaries omit arbitrary raw fields. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -1252,6 +1291,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.3.0 — Draft (2026-10-02)
+
+- Added `session.runtime` and T-UAS-067 for engine CLI version and sandbox runtime identity in unified artifacts and publication views.
+- Defined installation-version precedence, implicit Docker and disabled-sandbox values, metadata provenance, and partial identity handling.
+- Added `workflow.aw_info` and T-UAS-068 to retain the complete run metadata JSON alongside its compact projection without exposing arbitrary metadata in summaries.
 
 ### Version 1.1.0 — Draft (2026-10-02)
 

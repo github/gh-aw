@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { isSessionEvent } = require("./agent_session.cjs");
+const { createSessionEvent, isSessionEvent } = require("./agent_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -110,6 +110,30 @@ function parseEngineSession(content, engine) {
   };
   const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;
   return require(`./${moduleName}`)[functionName](content).logEntries ?? [];
+}
+
+/**
+ * Installation metadata identifies the engine CLI, not the gh-aw compiler.
+ * An empty runtime selector uses Docker only when sandboxing is known enabled.
+ * @param {SessionEvent} record
+ * @returns {import("./types/agent_session").SessionRuntimeEvent | undefined}
+ */
+function runtimeSessionEvent(record) {
+  const info = record.data;
+  const observedString = value => (typeof value === "string" && value !== "" ? value : undefined);
+  const engine = observedString(info.engine_id);
+  const engineVersion = observedString(info.agent_version) ?? observedString(info.version);
+  const sandboxRuntime = observedString(info.agent_runtime) ?? (info.firewall_enabled === true ? "docker" : info.firewall_enabled === false ? "none" : undefined);
+  if (engine === undefined && engineVersion === undefined && sandboxRuntime === undefined) return undefined;
+  return {
+    ...record,
+    type: "session.runtime",
+    data: {
+      ...(engine !== undefined ? { engine } : {}),
+      ...(engineVersion !== undefined ? { engineVersion } : {}),
+      ...(sandboxRuntime !== undefined ? { sandboxRuntime } : {}),
+    },
+  };
 }
 
 /**
@@ -231,8 +255,17 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const metadata = choose(["aw_info.json", "usage/aw_info.json"]);
   if (metadata) {
     add(metadata, "workflow", "activation", "workflow.info");
-    const observedEngine = sources.at(-1)?.events[0]?.data.engine_id;
+    const source = sources.at(-1);
+    const observedEngine = source?.events[0]?.data.engine_id;
     if (engine === undefined && typeof observedEngine === "string") engine = observedEngine;
+    if (source) {
+      const runtimeEvents = source.events.flatMap(event => {
+        const runtime = runtimeSessionEvent(event);
+        return runtime ? [runtime] : [];
+      });
+      const infoEvents = source.events.map(event => createSessionEvent(event, "workflow.aw_info", {}));
+      source.events.push(...runtimeEvents, ...infoEvents);
+    }
   }
   const stdio = path.join(rootDir, "agent-stdio.log");
   // Masks can be registered in stdio even when native session events are preferred.

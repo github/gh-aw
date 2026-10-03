@@ -124,10 +124,23 @@ export interface SessionFileFormatEvent extends EventMetadata {
   data: SessionFileFormatData;
 }
 
+export interface SessionRuntimeData {
+  engine?: string;
+  engineVersion?: string;
+  sandboxRuntime?: string;
+  [key: string]: unknown;
+}
+
+export interface SessionRuntimeEvent extends EventMetadata {
+  type: "session.runtime";
+  data: SessionRuntimeData;
+}
+
 export type CoreSessionEvent = SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent;
 
 export interface SessionEventDataMap {
   "session.format": SessionFileFormatData;
+  "session.runtime": SessionRuntimeData;
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;

@@ -42,6 +42,8 @@ const trace = [
   event("execution.result", { outcome: "failure", duration_ms: 0 }, "execution", 0),
   event("detection.result", { conclusion: "failure", secret_leak: false, reasons: "PRIVATE_DETECTION_REASON" }, "detection", 0),
   event("workflow.info", { engine_id: "copilot", model: "fixture", run_id: 1 }, "workflow", 0),
+  event("session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor" }, "workflow", 1),
+  event("workflow.aw_info", { engine_id: "copilot", model: "fixture", workflow_name: "fixture-workflow", run_id: 1, context: { sensitive: "PRIVATE_RAW_METADATA" } }, "workflow", 2),
   event("vendor.progress", { private: "PRIVATE_EXTENSION" }, "agent", 5, undefined, "session-a.jsonl"),
   event("session.collection_warning", { path: "gateway.jsonl", line: 2, code: "malformed_jsonl" }, "collector", 1),
   event("session.collection", { sources: [], warnings: 1, untimedEvents: 10, absentComponents: [] }, "collector", 2),
@@ -81,6 +83,8 @@ describe("unified session publication views", () => {
       expect(output).toContain("answer=no");
       expect(output).toContain("durationMs=0");
       expect(output).toContain("secretLeak=false");
+      expect(output).toContain("engine=copilot engineVersion=1.0.90 sandboxRuntime=cloud-hypervisor");
+      expect(output).toContain("engine_id=copilot model=fixture workflow_name=fixture-workflow run_id=1");
       expect(output).toContain("untimedEvents=10");
       expect(output).toContain("malformed_jsonl");
       expect(output).not.toContain("PRIVATE_");
@@ -179,6 +183,7 @@ describe("unified session publication views", () => {
     const summary = path.join(directory, "summary.md");
     fs.writeFileSync(summary, "Earlier summary\n");
     process.env.GITHUB_STEP_SUMMARY = summary;
+    fs.writeFileSync(path.join(directory, "aw_info.json"), JSON.stringify({ engine_id: "copilot", agent_version: "1.0.90", agent_runtime: "docker" }));
     fs.writeFileSync(path.join(directory, "agent-session.jsonl"), JSON.stringify({ type: "assistant.message", data: { content: "done" } }) + "\n");
     fs.mkdirSync(path.join(directory, "mcp-logs"));
     fs.writeFileSync(path.join(directory, "mcp-logs", "gateway.jsonl"), JSON.stringify({ event: "tool_call", tool_name: "lookup" }) + "\n");
@@ -186,10 +191,13 @@ describe("unified session publication views", () => {
     const artifact = fs.readFileSync(path.join(directory, "usage", "aw_session.jsonl"), "utf8");
     expect(JSON.parse(artifact.split("\n")[0]).data.version).toBe(1);
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("mcp.tool_call"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("engine=copilot engineVersion=1.0.90 sandboxRuntime=docker"));
     const output = fs.readFileSync(summary, "utf8");
     expect(output.startsWith("Earlier summary\n")).toBe(true);
     expect(output).toContain("### Unified session");
     expect(output).toContain("mcp.tool_call");
+    expect(output).toContain("engine=copilot engineVersion=1.0.90 sandboxRuntime=docker");
+    expect(output).toContain("workflow.aw_info");
   });
 
   it("respects the remaining byte budget of an existing step summary and still publishes logs", async () => {

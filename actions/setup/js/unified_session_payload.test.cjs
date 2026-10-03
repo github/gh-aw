@@ -30,6 +30,7 @@ describe("essential unified session payloads", () => {
     ["tool.execution_start", { toolCallId: "call", parameters: false, input: 0, command: "", text: "duplicate" }, { toolCallId: "call", input: 0, command: "" }],
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
+    ["session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor", extra: "omit" }, { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],
     ["firewall.steering", { eventName: "token_steering", message: "budget warning", reason: null, body: "omit" }, { event: "token_steering", message: "budget warning", reason: null }],
     ["mcp.tool_call", { tool_call_id: "call", tool_name: "lookup", duration: 5, input_size: 0, output_size: 10, status: "error" }, { toolCallId: "call", toolName: "lookup", durationMs: 5, inputSize: 0, outputSize: 10, status: "error" }],
@@ -139,6 +140,14 @@ describe("essential unified session payloads", () => {
   it("keeps unknown extension payloads opaque rather than guessing their essential fields", () => {
     const extension = { type: "vendor.extension", data: { future: [false, null, 0] } };
     expect(normalizeUnifiedSessionEvent(extension)).toEqual(extension);
+  });
+
+  it("retains raw aw-info metadata as an opaque payload instead of the compact workflow projection", () => {
+    const event = { type: "workflow.aw_info", data: { engine_id: "copilot", version: "1.0.90", agent_runtime: "docker", context: { run_id: 0 }, future: [false, null, ""] } };
+    const original = structuredClone(event);
+    expect(normalizeUnifiedSessionEvent(event)).toEqual(event);
+    expect(normalizeUnifiedSessionEvent(normalizeUnifiedSessionEvent(event))).toEqual(event);
+    expect(event).toEqual(original);
   });
 
   it("keeps explicit failures when aliases or result envelopes conflict", () => {
