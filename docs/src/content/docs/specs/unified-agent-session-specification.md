@@ -626,11 +626,41 @@ An item carrying a complete invocation and result can expand to a start and comp
 | `type: "init"` with model/session fields | `session.init`, including supplied `session_id`, model, and other source metadata. |
 | `type: "message", role: "user"` | `user.message` with exact `content`. |
 | `type: "message", role: "assistant"` | `assistant.message`; `delta: true` follows 5.3. |
+| Compatible flat `type: "reasoning"` or legacy `thinking` content block | `assistant.reasoning`, retaining exact content. |
 | `type: "tool_use"` with `tool_name`, `tool_id`, `parameters` | Start with native name, ID, and arguments. |
 | `type: "tool_result"` with `tool_id`, `status`, `output` | Completion with native output type and outcome; preserve explicit error fields. |
 | `type: "result"` with recognized `stats`/error metadata | `session.result`; map supplied `input_tokens`, `output_tokens`, `cached` → cache-read tokens, and `duration_ms`. |
+| `type: "error"` with a message/error payload | Retain `gemini.error`; severity `error` or an unspecified severity also exposes a separate `session.result.errors` observation. A warning remains a warning, not an inferred session failure. |
 
 Native tool-call counts and other statistics remain compatible extension data. Turn count, USD cost, and cache-creation usage remain absent unless a supported source field actually supplies them.
+
+`gemini_session.cjs` normalizes these observations behind the existing
+`parseGeminiLog`/`transformGeminiEntries` entry points. Gemini stream statistics
+are cumulative snapshots, including per-model diagnostic totals; they are not
+per-turn contributions. `cached` is included in `input_tokens`, recorded by
+`usage.input_tokens_include_cache: true`; per-model totals are retained without
+adding them again. Failed terminal statuses without a separate error payload
+retain their status as an explicit diagnostic. Permission-denial arrays remain
+separate from tool errors.
+
+Adjacent deltas coalesce only when their metadata envelopes are identical.
+Differing native IDs, timestamps, channels, or additions retain separate core
+fragments. Supplemental compatible inputs with an explicit `message_id`,
+`messageId`, or legacy `message.id` can identify a full-message snapshot:
+`gemini.message_snapshot` retains its native payload. An unchanged snapshot adds
+no core content; an append-only snapshot adds only its unreported suffix. A
+rewritten or shortened snapshot retires the matching message/channel/block's
+earlier core fragments to opaque `gemini.message_observation` events, retaining
+exact original source envelopes in `data.observations`, and emits the full
+authoritative core content at the snapshot position. Tool observations and
+unrelated identities remain in place, without duplicate or stale answers.
+For a full legacy content-array snapshot, a rewrite, removal, reordering,
+insertion before existing content, or extension before an unchanged sibling
+replaces all visible text/reasoning fragments of that message; supplied blocks
+are emitted in their authoritative array order.
+An empty final array retains the snapshot but emits no fabricated text.
+Gemini's flat stream has no native message identity; a record's event `id` or
+repeated anonymous text does not establish snapshot coverage.
 
 ### 7.5 Pi
 
@@ -856,6 +886,7 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
+| Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal
@@ -870,6 +901,25 @@ logs provide the success-path evidence. Additional usage, delta, and error cases
 documented SDK shapes. The failed Smoke Copilot workflow failed in downstream safe
 outputs, not in its recorded agent session. A failed workflow does not by itself
 establish a failed agent session (T-UAS-048).
+
+The two Gemini spending-cap samples contain only initialization, a user prompt,
+and a terminal provider error. Their reported zero token counts and duration are
+retained; neither exposes a turn count, USD cost, assistant answer, reasoning,
+or tool activity. The successful run `36078916290` supplies a sanitized
+nine-observation lifecycle excerpt with original IDs and timestamps, assistant
+fragments, native tool outcome shapes (including an empty successful output and
+one failed tool), and exact reported full-session accounting. Its original trace
+contains 208 observations: 33 assistant fragments, 86 tool starts, 86 tool
+completions (85 successful and one failed), initialization, a user prompt, and a
+terminal result. Full-session accounting is retained from that result, not
+inferred from the excerpt's activity.
+
+Five additional sampled Smoke Gemini runs
+(`37083329446`, `36812703528`, `36798614887`, `36762043435`, `36745457680`)
+contained no supported agent observations. Explicit-message-identity snapshots,
+reasoning, permission-denial, mixed-input, and other source-unobserved regressions
+remain explicitly synthetic. No CI run or paid engine was launched to generate
+evidence.
 
 The shared `agent_session.test.cjs` suite exercises all six adapters, including Gemini
 and custom engines. `agent_session_telemetry.test.cjs` uses a mocked filesystem for
