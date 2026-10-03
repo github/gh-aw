@@ -337,7 +337,8 @@ type DownloadResult struct {
 	storageReserved bool
 }
 
-// JobInfo represents basic information about a workflow job
+// JobInfo mirrors a job object from the GitHub Actions Jobs API.
+// For the slimmed-down audit report view of a job, see JobData.
 type JobInfo struct {
 	ID              int64     `json:"id,omitempty"`
 	RunID           int64     `json:"run_id,omitempty"`
