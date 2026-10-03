@@ -176,10 +176,29 @@ func goodClosureInsideLoop(scanner *bufio.Scanner) error {
 			for scanner.Scan() {
 				println(scanner.Text())
 			}
+
 			if err := scanner.Err(); err != nil {
 				panic(err)
 			}
 		}()
 	}
 	return nil
+}
+
+func goodErrAfterIf(scanner *bufio.Scanner, enabled bool) error {
+	if enabled {
+		for scanner.Scan() {
+			println(scanner.Text())
+		}
+	}
+	return scanner.Err()
+}
+
+func goodErrAfterOuterLoop(scanner *bufio.Scanner) error {
+	for i := 0; i < 1; i++ {
+		for scanner.Scan() {
+			println(scanner.Text())
+		}
+	}
+	return scanner.Err()
 }

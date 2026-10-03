@@ -260,6 +260,33 @@ describe("no-github-request-interpolated-route", () => {
     });
   });
 
+  it("invalid: fallback and ternary client aliases are recognized", () => {
+    cjsRuleTester.run("no-github-request-interpolated-route", noGithubRequestInterpolatedRouteRule, {
+      valid: [
+        `const client = options.targetGithubClient || github; client.request("GET /repos/{owner}/{repo}", { owner, repo });`,
+        `const client = options.targetGithubClient || otherClient; client.request(\`GET /repos/\${owner}/\${repo}\`, {});`,
+      ],
+      invalid: [
+        {
+          code: "const fallbackClient = options.targetGithubClient || github; fallbackClient.request(`GET /repos/${owner}/${repo}`, { owner, repo });",
+          errors: [{ messageId: "interpolatedRoute", data: { kind: "template literal with interpolations", client: "fallbackClient" } }],
+        },
+        {
+          code: `const client = useTarget ? targetClient : github; client.request("GET /repos/" + owner + "/" + repo, {});`,
+          errors: [{ messageId: "interpolatedRoute", data: { kind: "string concatenation expression", client: "client" } }],
+        },
+        {
+          code: "const client = useTarget ? github : targetClient; client.request(`GET /repos/${owner}/${repo}`, {});",
+          errors: [{ messageId: "interpolatedRoute", data: { kind: "template literal with interpolations", client: "client" } }],
+        },
+        {
+          code: "const client = options.client ?? context.github; client.request(`GET /repos/${owner}/${repo}`, {});",
+          errors: [{ messageId: "interpolatedRoute", data: { kind: "template literal with interpolations", client: "client" } }],
+        },
+      ],
+    });
+  });
+
   it("invalid: const alias of getOctokit() result is flagged", () => {
     cjsRuleTester.run("no-github-request-interpolated-route", noGithubRequestInterpolatedRouteRule, {
       valid: [],

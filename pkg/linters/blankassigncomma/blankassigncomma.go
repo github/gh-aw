@@ -8,10 +8,12 @@ package blankassigncomma
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 )
@@ -56,6 +58,10 @@ func checkBlankAssignComma(pass *analysis.Pass, n ast.Node, generatedFiles filec
 		}
 	}
 
+	if isHashWriteString(pass, assign) {
+		return
+	}
+
 	blankCount := len(assign.Lhs)
 
 	position := pass.Fset.PositionFor(assign.Pos(), false)
@@ -75,4 +81,27 @@ func checkBlankAssignComma(pass *analysis.Pass, n ast.Node, generatedFiles filec
 			blankCount,
 		),
 	})
+}
+
+func isHashWriteString(pass *analysis.Pass, assign *ast.AssignStmt) bool {
+	if len(assign.Rhs) != 1 {
+		return false
+	}
+	call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
+	if !ok || len(call.Args) != 2 {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "WriteString" || !astutil.IsPkgSelector(pass, sel, "io") {
+		return false
+	}
+	named, ok := pass.TypesInfo.TypeOf(call.Args[0]).(*types.Named) //nolint:uncheckedsliceindex // len(call.Args) is checked above
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != "hash" {
+		return false
+	}
+	switch named.Obj().Name() {
+	case "Hash", "Hash32", "Hash64":
+		return true
+	}
+	return false
 }

@@ -6,8 +6,9 @@ const UNSAFE_PROPERTIES = new Set(["message", "stack", "code", "status", "cause"
 
 interface CatchFrame {
   varName: string;
+  param?: TSESTree.Identifier;
   safeCalls: TSESTree.CallExpression[];
-  unsafeNodes: Array<{ node: TSESTree.MemberExpression; prop: string }>;
+  unsafeNodes: Array<{ node: TSESTree.MemberExpression; prop: string; varName: string }>;
 }
 
 function isInstanceofExprCheck(node: TSESTree.Expression, varName: string): boolean {
@@ -193,6 +194,29 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
     const sourceCode = context.sourceCode;
     const catchStack: CatchFrame[] = [];
 
+    function resolveVariable(identifier: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
+      let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(identifier);
+      while (scope) {
+        const variable = scope.set.get(identifier.name);
+        if (variable) return variable;
+        scope = scope.upper;
+      }
+      return undefined;
+    }
+
+    function caughtName(identifier: TSESTree.Identifier, frame: CatchFrame): string | null {
+      if (!frame.param) return null;
+      const caught = resolveVariable(frame.param);
+      const variable = resolveVariable(identifier);
+      if (!caught || !variable) return null;
+      if (variable === caught) return identifier.name;
+      if (variable.defs.length !== 1 || variable.references.some(ref => ref.isWrite() && !ref.init)) return null;
+      const def = variable.defs[0];
+      if (def.type !== "Variable" || def.parent.kind !== "const" || def.node.id.type !== AST_NODE_TYPES.Identifier) return null;
+      const init = def.node.init;
+      return init?.type === AST_NODE_TYPES.Identifier && resolveVariable(init) === caught ? identifier.name : null;
+    }
+
     return {
       CatchClause(node) {
         const param = node.param;
@@ -204,19 +228,23 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
           return;
         }
 
-        catchStack.push({ varName: param.name, safeCalls: [], unsafeNodes: [] });
+        catchStack.push({ varName: param.name, param, safeCalls: [], unsafeNodes: [] });
       },
 
       "CatchClause:exit"() {
         const frame = catchStack.pop();
         if (!frame || !frame.varName) return;
 
-        for (const { node: memberExpr, prop } of frame.unsafeNodes) {
-          if (isGuardedByAncestorBranch(sourceCode, memberExpr, frame.varName) || isCallOrderingGuarded(sourceCode, memberExpr, frame.safeCalls) || hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, frame.varName)) {
+        for (const { node: memberExpr, prop, varName } of frame.unsafeNodes) {
+          if (
+            isGuardedByAncestorBranch(sourceCode, memberExpr, varName) ||
+            hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, varName) ||
+            (varName !== frame.varName && (isGuardedByAncestorBranch(sourceCode, memberExpr, frame.varName) || hasPriorEarlyExitInstanceofGuard(sourceCode, memberExpr, frame.varName))) ||
+            isCallOrderingGuarded(sourceCode, memberExpr, frame.safeCalls)
+          ) {
             continue;
           }
 
-          const { varName } = frame;
           const parent = memberExpr.parent;
           const isChained =
             parent != null &&
@@ -258,7 +286,7 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
         if (!top || !top.varName) return;
 
         const firstArg = node.arguments[0];
-        if (node.callee.type === AST_NODE_TYPES.Identifier && node.callee.name === "getErrorMessage" && node.arguments.length >= 1 && firstArg.type === AST_NODE_TYPES.Identifier && firstArg.name === top.varName) {
+        if (node.callee.type === AST_NODE_TYPES.Identifier && node.callee.name === "getErrorMessage" && firstArg?.type === AST_NODE_TYPES.Identifier && caughtName(firstArg, top)) {
           top.safeCalls.push(node);
         }
       },
@@ -273,18 +301,18 @@ export const noUnsafeCatchErrorPropertyRule = createRule({
         const obj = node.object;
         const prop = node.property;
 
-        if (obj.type !== AST_NODE_TYPES.Identifier || obj.name !== top.varName) return;
+        if (obj.type !== AST_NODE_TYPES.Identifier || !caughtName(obj, top)) return;
 
         // Non-computed dot access: err.message / err.stack / err.code / err.status / err.cause / err.name
         if (!node.computed && prop.type === AST_NODE_TYPES.Identifier && UNSAFE_PROPERTIES.has(prop.name)) {
-          top.unsafeNodes.push({ node, prop: prop.name });
+          top.unsafeNodes.push({ node, prop: prop.name, varName: obj.name });
           return;
         }
 
         // Computed string-literal access: err["message"] / err["stack"] / err["status"] / etc.
         // Dynamic access (err[prop]) is kept out of scope intentionally.
         if (node.computed && prop.type === AST_NODE_TYPES.Literal && typeof prop.value === "string" && UNSAFE_PROPERTIES.has(prop.value)) {
-          top.unsafeNodes.push({ node, prop: prop.value });
+          top.unsafeNodes.push({ node, prop: prop.value, varName: obj.name });
         }
       },
     };
