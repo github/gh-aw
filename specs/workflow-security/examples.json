@@ -1,0 +1,1369 @@
+{
+  "model_sha256": "cec6b979fb37dc4b8f212ac3f231a819d87853073150897897fa3577a79c8647",
+  "jar_sha256": "b490f45c1de08e4ff9753259a00338981b9cf464f01ca9e9cd5f19f33cf0bb92",
+  "confirmed_product_bug": false,
+  "examples": [
+    {
+      "case": "successful-write",
+      "classification": "reachability-witness",
+      "expected_violation": "NoSuccessfulWrite",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "PrepareEffect:issue",
+        "Execute"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "running"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 5
+        },
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["app-write"],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [
+          {
+            "private": false,
+            "job": "safe_outputs",
+            "repo": "main",
+            "token": "app-write",
+            "validated": true,
+            "detected": true,
+            "execution": "trusted-handler"
+          }
+        ],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 1,
+        "requestValid": true,
+        "target": "main",
+        "detection": "pass",
+        "approved": true,
+        "appScope": ["issues-write"],
+        "appRepos": ["main"],
+        "lastEvent": "Execute"
+      }
+    },
+    {
+      "case": "denied-request",
+      "classification": "reachability-witness",
+      "expected_violation": "NoDeniedRequest",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "running"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 2
+        },
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [],
+        "errors": ["request-rejected"],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 0,
+        "requestValid": false,
+        "target": "main",
+        "detection": "pass",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Validate"
+      }
+    },
+    {
+      "case": "missing-git-data",
+      "classification": "reachability-witness",
+      "expected_violation": "NoMissingGitData",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:main", "Checkout:private_dependency", "CheckoutComplete", "Git:show-base:main"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "running",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 2,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["engine"],
+        "revoked": [],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          }
+        ],
+        "writes": [],
+        "errors": ["git-unavailable:show-base:main"],
+        "gitDone": true,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Git:show-base:main"
+      }
+    },
+    {
+      "case": "cross-repo-checkout",
+      "classification": "reachability-witness",
+      "expected_violation": "NoCrossRepoCheckout",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:private_dependency"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "running",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 1,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": [],
+        "agentSecrets": [],
+        "checkouts": {
+          "main": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Checkout:private_dependency"
+      }
+    },
+    {
+      "case": "failed-job",
+      "classification": "reachability-witness",
+      "expected_violation": "NoFailedJob",
+      "events": ["Init", "Start:activation", "Fail:activation"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "failure",
+          "agent": "queued",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 1,
+          "agent": 1,
+          "safe_outputs": 1
+        },
+        "started": ["activation"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": [],
+        "agentSecrets": [],
+        "checkouts": {
+          "main": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [],
+        "operations": [],
+        "writes": [],
+        "errors": [],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Fail:activation"
+      }
+    },
+    {
+      "case": "privileged-push",
+      "classification": "reachability-witness",
+      "expected_violation": "NoSuccessfulWrite",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "PrepareEffect:pull-request",
+        "Execute"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "running"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 5
+        },
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "contents-write"]
+        },
+        "live": ["app-write"],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": true,
+          "credentials": "app-write",
+          "shallow": false,
+          "blobs": ["README.md", "src/code.go"],
+          "refs": ["HEAD", "base"]
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          },
+          {
+            "job": "safe_outputs",
+            "op": "checkout",
+            "repo": "main",
+            "token": "app-write"
+          },
+          {
+            "job": "safe_outputs",
+            "op": "push",
+            "repo": "main",
+            "token": "app-write"
+          }
+        ],
+        "writes": [
+          {
+            "private": false,
+            "job": "safe_outputs",
+            "repo": "main",
+            "token": "app-write",
+            "validated": true,
+            "detected": true,
+            "execution": "trusted-handler"
+          }
+        ],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 1,
+        "requestValid": true,
+        "target": "main",
+        "detection": "pass",
+        "approved": true,
+        "appScope": ["contents-write"],
+        "appRepos": ["main"],
+        "lastEvent": "Execute"
+      }
+    },
+    {
+      "case": "persist-credentials",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "NoCredentialPersistence",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:main"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "running",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 1,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": [],
+        "agentSecrets": [],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "checkout-main",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Checkout:main"
+      }
+    },
+    {
+      "case": "skip-detection",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "DetectionGate",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:deny",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "PrepareEffect:issue",
+        "Execute"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "running"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 5
+        },
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["app-write"],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [
+          {
+            "private": false,
+            "job": "safe_outputs",
+            "repo": "main",
+            "token": "app-write",
+            "validated": true,
+            "detected": false,
+            "execution": "trusted-handler"
+          }
+        ],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 1,
+        "requestValid": true,
+        "target": "main",
+        "detection": "deny",
+        "approved": true,
+        "appScope": ["issues-write"],
+        "appRepos": ["main"],
+        "lastEvent": "Execute"
+      }
+    },
+    {
+      "case": "cross-repo-token",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "GitAuthorization",
+      "events": ["Init", "Start:activation", "Activate", "Finish:activation", "Start:agent", "Checkout:private_dependency"],
+      "final_state": {
+        "status": {
+          "detection": "queued",
+          "activation": "success",
+          "agent": "running",
+          "safe_outputs": "queued"
+        },
+        "step": {
+          "detection": 1,
+          "activation": 2,
+          "agent": 1,
+          "safe_outputs": 1
+        },
+        "started": ["activation", "agent"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": [],
+        "agentSecrets": [],
+        "checkouts": {
+          "main": {
+            "sparse": false,
+            "exists": false,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": [],
+            "refs": []
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": false,
+            "producer": "none",
+            "run": "none",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-main"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": false,
+        "networkDone": false,
+        "egress": [],
+        "effects": 0,
+        "requestValid": false,
+        "target": "none",
+        "detection": "pending",
+        "approved": false,
+        "appScope": [],
+        "appRepos": [],
+        "lastEvent": "Checkout:private_dependency"
+      }
+    },
+    {
+      "case": "private-sink",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "PrivateSinkPolicy",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "PrepareEffect:issue",
+        "Execute"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "running"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 5
+        },
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["app-write"],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "secret": false,
+            "private": true,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [
+          {
+            "private": true,
+            "job": "safe_outputs",
+            "repo": "main",
+            "token": "app-write",
+            "validated": true,
+            "detected": true,
+            "execution": "trusted-handler"
+          }
+        ],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 1,
+        "requestValid": true,
+        "target": "main",
+        "detection": "pass",
+        "approved": true,
+        "appScope": ["issues-write"],
+        "appRepos": ["main"],
+        "lastEvent": "Execute"
+      }
+    }
+  ]
+}
