@@ -152,7 +152,7 @@ describe("Gemini synthetic unified-session regressions", () => {
   });
 
   it("retains identified final snapshots without duplicating streamed content, even across tools", () => {
-    const events = normalizeGeminiSession([
+    const records = freeze([
       { type: "message", role: "assistant", message_id: "a", delta: true, content: "Hello " },
       { type: "message", role: "assistant", message_id: "a", delta: true, content: "world" },
       { type: "tool_use", tool_id: "call", tool_name: "lookup", parameters: {} },
@@ -161,12 +161,364 @@ describe("Gemini synthetic unified-session regressions", () => {
       { type: "message", role: "assistant", message_id: "a", content: "corrected text", timestamp: "correction" },
       { type: "message", role: "assistant", message_id: "b", content: "Hello world!\n" },
     ]);
-    expect(events.map(event => event.type)).toEqual(["assistant.message", "tool.execution_start", "gemini.message_snapshot", "assistant.message", "gemini.message_snapshot", "gemini.message_snapshot", "assistant.message"]);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => event.type)).toEqual([
+      "gemini.message_observation",
+      "tool.execution_start",
+      "gemini.message_snapshot",
+      "gemini.message_observation",
+      "gemini.message_snapshot",
+      "gemini.message_snapshot",
+      "assistant.message",
+      "assistant.message",
+    ]);
     expect(events[0].data.content).toBe("Hello world");
+    expect(events[0].data.observations).toEqual(records.slice(0, 2));
     expect(events[2].data.content).toBe("Hello world!\n");
-    expect(events[3]).toMatchObject({ timestamp: "final", data: { content: "!\n" } });
+    expect(events[3]).toMatchObject({ timestamp: "final", data: { content: "!\n", observations: [records[3]] } });
     expect(events[5].data.content).toBe("corrected text");
-    expect(events[6].data.content).toBe("Hello world!\n");
+    expect(events[6]).toMatchObject({ type: "assistant.message", timestamp: "correction", data: { content: "corrected text" } });
+    expect(events[7].data.content).toBe("Hello world!\n");
+  });
+
+  it.each([
+    [{ message_id: "answer" }, "Hellp", "Hello", "Hellp"],
+    [{ messageId: "answer" }, "Keep this; remove obsolete detail.", "Keep this.", "obsolete detail"],
+    [{ message_id: "answer" }, "- first\n- second", "first, second\n", "- first"],
+    [{ messageId: "answer" }, "Remove all text.", "", "Remove all text."],
+  ])("surfaces authoritative corrected/shortened/reflowed content for %j", (identity, streamed, final, stale) => {
+    const records = freeze([
+      { type: "message", role: "assistant", ...identity, delta: true, content: streamed, id: "delta", timestamp: 1, native: { nested: [false, null] } },
+      { type: "tool_use", tool_id: "lookup", tool_name: "lookup", parameters: {} },
+      { type: "message", role: "assistant", ...identity, content: final, id: "final", timestamp: 2, native: { corrected: true } },
+      { type: "tool_result", tool_id: "lookup", output: "lookup result", status: "success" },
+      { type: "message", role: "assistant", ...identity, content: final, id: "repeat", timestamp: 3 },
+    ]);
+    const original = json(records);
+    const parsed = parseGeminiLog(jsonl(records));
+    const events = normalizeGeminiSession(records);
+    expect(parsed.logEntries).toEqual(events);
+    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "tool.execution_start", "gemini.message_snapshot", "assistant.message", "tool.execution_complete", "gemini.message_snapshot"]);
+    expect(events[0]).toMatchObject({ id: "delta", timestamp: 1, native: records[0].native, data: { content: streamed, delta: true, observations: [records[0]] } });
+    expect(events[3]).toMatchObject({ id: "final", timestamp: 2, native: records[2].native, data: { content: final } });
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual([final]);
+    for (const summary of [parsed.markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      if (final) expect(summary).toContain(final.trim());
+      expect(summary).not.toContain(stale);
+    }
+    expect(normalizeGeminiSession(records)).toEqual(events);
+    expect(normalizeGeminiSession(events)).toEqual(events);
+    expect(normalizeGeminiSession(json(events))).toEqual(json(events));
+    events[0].data.observations[0].native.nested.push("output-copy");
+    events[3].data.native.corrected = false;
+    expect(records).toEqual(original);
+  });
+
+  it("preserves exact coalesced deltas and all subsequent snapshots across repeated corrections", () => {
+    const records = freeze([
+      { type: "message", role: "assistant", message_id: "answer", delta: true, content: "Hell" },
+      { type: "message", role: "assistant", message_id: "answer", delta: true, content: "p" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Hello", timestamp: "spelling" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Hello", timestamp: "repeat-spelling" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Hello world", timestamp: "suffix" },
+      { type: "tool_use", tool_id: "call", tool_name: "lookup", parameters: {} },
+      { type: "message", role: "assistant", message_id: "answer", content: "Hi", timestamp: "shorter" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Hi", timestamp: "repeat-shorter" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Goodbye", timestamp: "rewrite" },
+      { type: "message", role: "assistant", message_id: "answer", content: "Goodbye", timestamp: "final" },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Goodbye"]);
+    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([records.slice(0, 2), [records[2]], [records[4]], [records[6]]]);
+    expect(events.filter(event => event.type === "gemini.message_snapshot").map(event => event.timestamp)).toEqual(["spelling", "repeat-spelling", "suffix", "shorter", "repeat-shorter", "rewrite", "final"]);
+    expect(events.findIndex(event => event.type === "tool.execution_start")).toBeLessThan(events.findIndex(event => event.type === "assistant.message"));
+    for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(summary).toContain("Goodbye");
+      for (const stale of ["Hellp", "Hello", "world", "Hi"]) expect(summary).not.toContain(stale);
+    }
+    expect(normalizeGeminiSession(events)).toEqual(events);
+  });
+
+  it("retires only matching message IDs and channels, leaving tools at their source positions", () => {
+    const records = freeze([
+      { type: "message", role: "assistant", message_id: "same", channel: "analysis", delta: true, content: "analysis content" },
+      { type: "message", role: "assistant", message_id: "same", channel: "final", delta: true, content: "wrong" },
+      { type: "message", role: "assistant", message_id: "other", channel: "final", delta: true, content: "other answer" },
+      { type: "reasoning", message_id: "same", channel: "final", delta: true, content: "independent reasoning" },
+      { type: "tool_use", tool_id: "call", tool_name: "lookup", parameters: {} },
+      { type: "message", role: "assistant", message_id: "same", channel: "final", content: "right" },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "gemini.message_observation", "assistant.message", "assistant.reasoning", "tool.execution_start", "gemini.message_snapshot", "assistant.message"]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["analysis content", "other answer", "right"]);
+    expect(events[1].data.observations).toEqual([records[1]]);
+    expect(events[3].data.content).toBe("independent reasoning");
+  });
+
+  it("corrects legacy text and reasoning blocks independently without hiding mixed native blocks", () => {
+    const records = freeze([
+      { type: "message", role: "assistant", message_id: "flat", delta: true, content: "Hellp" },
+      { type: "assistant", message: { id: "flat", content: [{ type: "text", text: "Hello" }] } },
+      {
+        type: "assistant",
+        id: "legacy-delta",
+        delta: true,
+        message: {
+          id: "mixed",
+          content: [
+            { type: "thinking", thinking: "stale reasoning" },
+            { type: "text", text: "stale first", native: false },
+            { type: "tool_use", id: "call", name: "lookup", input: null },
+            { type: "json", json: { count: 0 } },
+            { type: "text", text: "unchanged second" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        id: "legacy-final",
+        message: {
+          id: "mixed",
+          content: [
+            { type: "thinking", thinking: "final reasoning" },
+            { type: "text", text: "final first", native: true },
+            { type: "tool_result", tool_use_id: "call", content: false, is_error: false },
+            { type: "json", json: { count: 1 } },
+            { type: "text", text: "unchanged second" },
+          ],
+        },
+      },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => event.type)).toEqual([
+      "gemini.message_observation",
+      "gemini.message_snapshot",
+      "assistant.message",
+      "gemini.message_observation",
+      "gemini.message_observation",
+      "tool.execution_start",
+      "gemini.content_block",
+      "gemini.message_observation",
+      "gemini.message_snapshot",
+      "assistant.reasoning",
+      "assistant.message",
+      "tool.execution_complete",
+      "gemini.content_block",
+      "assistant.message",
+    ]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello", "final first", "unchanged second"]);
+    expect(events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual(["final reasoning"]);
+    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([[records[0]], [records[2]], [records[2]], [records[2]]]);
+    expect(events[11].data).toMatchObject({ toolCallId: "call", toolName: "lookup", output: false, success: true });
+    expect(events[12].data.json).toEqual({ count: 1 });
+    for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(summary).toContain("final first");
+      expect(summary).toContain("unchanged second");
+      expect(summary.indexOf("final first")).toBeLessThan(summary.indexOf("unchanged second"));
+      for (const stale of ["Hellp", "stale reasoning", "stale first"]) expect(summary).not.toContain(stale);
+    }
+    expect(normalizeGeminiSession(events)).toEqual(events);
+  });
+
+  it.each([
+    ["unchanged sibling", ["Hello", "world"]],
+    ["removed sibling", ["Hello"]],
+    ["inserted middle block", ["Hellp", "inserted", "world"]],
+    ["inserted leading block", ["inserted", "Hellp", "world"]],
+    ["reordered blocks", ["world", "Hellp"]],
+    ["empty final array", []],
+  ])("replaces an authoritative legacy array with %s in source order", (_name, finalText) => {
+    const records = freeze([
+      {
+        type: "assistant",
+        id: "stream",
+        timestamp: 1,
+        delta: true,
+        native: { retained: false },
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "Hellp" },
+            { type: "text", text: "world" },
+          ],
+        },
+      },
+      { type: "message", role: "assistant", message_id: "other", delta: true, content: "other answer" },
+      { type: "tool_use", tool_id: "call", tool_name: "lookup", parameters: {} },
+      { type: "assistant", id: "final", timestamp: 2, message: { id: "answer", content: finalText.map(text => ({ type: "text", text })) } },
+      { type: "tool_result", tool_id: "call", output: false, status: "success" },
+      { type: "assistant", id: "repeat", timestamp: 3, message: { id: "answer", content: finalText.map(text => ({ type: "text", text })) } },
+    ]);
+    const original = json(records);
+    const events = normalizeGeminiSession(records);
+    const answer = events.filter(event => event.type === "assistant.message" && event.data.message?.id === "answer");
+    expect(answer.map(event => event.data.content)).toEqual(finalText);
+    expect(answer.every(event => event.id === "final" && event.timestamp === 2)).toBe(true);
+    const retired = events.filter(event => event.type === "gemini.message_observation");
+    expect(retired).toHaveLength(2);
+    for (const event of retired) expect(event).toMatchObject({ id: "stream", timestamp: 1, native: { retained: false }, data: { observations: [records[0]] } });
+    expect(events.filter(event => event.type === "gemini.message_snapshot").map(event => event.id)).toEqual(["final", "repeat"]);
+    expect(events.filter(event => event.type === "assistant.message" && event.data.message_id === "other").map(event => event.data.content)).toEqual(["other answer"]);
+    expect(events.filter(event => event.type.startsWith("tool.")).map(event => event.type)).toEqual(["tool.execution_start", "tool.execution_complete"]);
+    const snapshotPosition = events.findIndex(event => event.id === "final");
+    const toolPositions = events.flatMap((event, index) => (event.type.startsWith("tool.") ? [index] : []));
+    expect(toolPositions[0]).toBeLessThan(snapshotPosition);
+    expect(toolPositions[1]).toBeGreaterThan(snapshotPosition + answer.length);
+    for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      for (const stale of ["Hellp", "world"].filter(text => !finalText.includes(text))) expect(summary).not.toContain(stale);
+      const positions = finalText.map(text => summary.indexOf(text));
+      expect(positions.every(position => position >= 0)).toBe(true);
+      expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    }
+    expect(normalizeGeminiSession(events)).toEqual(events);
+    expect(normalizeGeminiSession(json(events))).toEqual(json(events));
+    retired[0].data.observations[0].message.content[0].text = "output-copy";
+    expect(records).toEqual(original);
+  });
+
+  it("keeps unchanged and trailing-prefix legacy snapshots free of duplicate core content", () => {
+    const records = freeze([
+      {
+        type: "assistant",
+        delta: true,
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "first" },
+            { type: "text", text: "second" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "first" },
+            { type: "text", text: "second!" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "first" },
+            { type: "text", text: "second!" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "first" },
+            { type: "text", text: "second!" },
+            { type: "text", text: "third" },
+          ],
+        },
+      },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["first", "second", "!", "third"]);
+    expect(events.filter(event => event.type === "gemini.message_snapshot")).toHaveLength(3);
+    expect(events.filter(event => event.type === "gemini.message_observation")).toEqual([]);
+  });
+
+  it("replaces an earlier-block append-only snapshot in authoritative order without repeated core content", () => {
+    const records = freeze([
+      {
+        type: "assistant",
+        delta: true,
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "one" },
+            { type: "text", text: "two" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        id: "final",
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "one!" },
+            { type: "text", text: "two" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        id: "repeat",
+        message: {
+          id: "answer",
+          content: [
+            { type: "text", text: "one!" },
+            { type: "text", text: "two" },
+          ],
+        },
+      },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "gemini.message_observation", "gemini.message_snapshot", "assistant.message", "assistant.message", "gemini.message_snapshot"]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["one!", "two"]);
+    expect(events.filter(event => event.type === "gemini.message_observation").map(event => event.data.observations)).toEqual([[records[0]], [records[0]]]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.id)).toEqual(["final", "final"]);
+    for (const summary of [parseGeminiLog(jsonl(records)).markdown, generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(summary.indexOf("one!")).toBeLessThan(summary.indexOf("two"));
+      expect(summary.match(/one!/g)).toHaveLength(1);
+      expect(summary.match(/two/g)).toHaveLength(1);
+    }
+    expect(normalizeGeminiSession(events)).toEqual(events);
+  });
+
+  it("preserves efficient suffix-only reconciliation for ordered flat single-message snapshots", () => {
+    const events = normalizeGeminiSession(
+      freeze([
+        { type: "message", role: "assistant", message_id: "answer", delta: true, content: "one" },
+        { type: "message", role: "assistant", message_id: "answer", delta: true, content: "two" },
+        { type: "message", role: "assistant", message_id: "answer", content: "onetwo!" },
+        { type: "message", role: "assistant", message_id: "answer", content: "onetwo!" },
+      ])
+    );
+    expect(events.map(event => event.type)).toEqual(["assistant.message", "gemini.message_snapshot", "assistant.message", "gemini.message_snapshot"]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["onetwo", "!"]);
+  });
+
+  it("retains tools when inserted text replaces a legacy tool slot before an unchanged sibling", () => {
+    const records = freeze([
+      {
+        type: "assistant",
+        delta: true,
+        message: {
+          id: "answer",
+          content: [
+            { type: "thinking", thinking: "thinking" },
+            { type: "tool_use", id: "call", name: "lookup", input: null },
+            { type: "text", text: "answer" },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        message: {
+          id: "answer",
+          content: [
+            { type: "thinking", thinking: "thinking" },
+            { type: "text", text: "inserted" },
+            { type: "text", text: "answer" },
+          ],
+        },
+      },
+    ]);
+    const events = normalizeGeminiSession(records);
+    expect(events.map(event => event.type)).toEqual(["gemini.message_observation", "tool.execution_start", "gemini.message_observation", "gemini.message_snapshot", "assistant.reasoning", "assistant.message", "assistant.message"]);
+    expect(events.slice(4).map(event => event.data.content)).toEqual(["thinking", "inserted", "answer"]);
+    expect(events[1].data).toMatchObject({ toolCallId: "call", toolName: "lookup", input: null });
   });
 
   it("does not assume an event ID or anonymous full message is a final snapshot", () => {
@@ -209,15 +561,16 @@ describe("Gemini synthetic unified-session regressions", () => {
       "assistant.message",
       "gemini.message_snapshot",
       "assistant.message",
-      "assistant.reasoning",
-      "assistant.message",
-      "assistant.message",
+      "gemini.message_observation",
+      "gemini.message_observation",
+      "gemini.message_observation",
       "gemini.message_snapshot",
       "assistant.reasoning",
       "assistant.message",
+      "assistant.message",
     ]);
-    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello", "\n", "one", "two", "!"]);
-    expect(events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual([" think", "\n"]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello", "\n", "one!", "two"]);
+    expect(events.filter(event => event.type === "assistant.reasoning").map(event => event.data.content)).toEqual([" think\n"]);
   });
 
   it.each([false, 0, "", null, [], {}, { content: [{ type: "json", json: { count: 0 } }] }])("T-UAS-005/012/013: preserves structured/falsy arguments and output %j", value => {

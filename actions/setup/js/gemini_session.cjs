@@ -2,7 +2,9 @@
 
 const { createSessionEvent, isSessionEvent, normalizeAgentSession, normalizeSessionUsage, isTokenCount, isMetric, sessionToolSuccess } = require("./agent_session.cjs");
 
-/** @typedef {{signature: string, event: import("./types/agent_session").SessionEvent}} GeminiDelta */
+/** @typedef {{event: import("./types/agent_session").SessionEvent, observations: Array<any>}} GeminiFragment */
+/** @typedef {GeminiFragment & {signature: string}} GeminiDelta */
+/** @typedef {{text: string, fragments: GeminiFragment[], scope: string|undefined, position: number}} GeminiMessage */
 
 /** @param {any} source @returns {Record<string, any>} */
 function sourceFields(source) {
@@ -70,6 +72,7 @@ function normalizeGeminiSession(records) {
   const events = [];
   if (!Array.isArray(records)) return events;
   const tools = new Map();
+  /** @type {Map<string, GeminiMessage>} */
   const messages = new Map();
   let session = 0;
   let sessionId;
@@ -77,10 +80,55 @@ function normalizeGeminiSession(records) {
   let previousDelta;
   let snapshotEmitted = false;
   const correlationKey = (source, id) => JSON.stringify([session, supplied(source, ["sessionId", "session_id"], supplied(source.data ?? {}, ["sessionId", "session_id"], sessionId)), source.parent_tool_use_id, id]);
+  const messageScope = source => {
+    const id = supplied(source, ["messageId", "message_id"], source.message?.id);
+    return id === undefined ? undefined : JSON.stringify([correlationKey(source, id), source.channel, source.type === "user" || source.role === "user"]);
+  };
+  const messageKey = (scope, role, position) => JSON.stringify([scope, role, position]);
   const emit = (source, type, data) => {
     const event = createSessionEvent(source, type, { ...sourceFields(source), ...data });
     events.push(event);
     return event;
+  };
+  /** @param {GeminiMessage} message */
+  const retireMessage = message => {
+    // Exact native envelopes survive even when adjacent deltas were coalesced.
+    for (const fragment of message.fragments) {
+      fragment.event.type = "gemini.message_observation";
+      fragment.event.data = { ...fragment.event.data, observations: fragment.observations };
+    }
+    message.fragments = [];
+  };
+  const reconcileContentBlocks = (source, content) => {
+    const scope = messageScope(source);
+    if (scope === undefined || source.delta === true) return;
+    const observed = [...messages].filter(([, message]) => message.scope === scope);
+    if (!content.length) {
+      emit(source, "gemini.message_snapshot", sourceFields(source));
+      snapshotEmitted = true;
+    }
+    if (!observed.length) return;
+    /** @type {Map<string, {text: string, position: number}>} */
+    const suppliedBlocks = new Map();
+    for (const [position, block] of content.entries()) {
+      if (block?.type === "text" && typeof block.text === "string") suppliedBlocks.set(messageKey(scope, source.type === "user" || source.role === "user" ? "user" : "assistant", position), { text: block.text, position });
+      else if (block?.type === "thinking" && typeof block.thinking === "string") suppliedBlocks.set(messageKey(scope, "reasoning", position), { text: block.thinking, position });
+    }
+    const lastPosition = observed.reduce((last, [, message]) => Math.max(last, message.position), -Infinity);
+    const divergent =
+      observed.some(([key, message]) => {
+        const block = suppliedBlocks.get(key);
+        return !block || !block.text.startsWith(message.text) || (block.text !== message.text && block.position < lastPosition);
+      }) || [...suppliedBlocks].some(([key, block]) => !messages.has(key) && block.position < lastPosition);
+    if (!divergent) return;
+    if (!snapshotEmitted) emit(source, "gemini.message_snapshot", sourceFields(source));
+    snapshotEmitted = true;
+    // A full array's rewrite, removal, or insertion before a sibling replaces
+    // the whole visible message, so unchanged siblings keep their source order.
+    for (const [key, message] of observed) {
+      retireMessage(message);
+      messages.delete(key);
+    }
   };
   const reportError = source => {
     const errors = Array.isArray(source.errors) ? [...source.errors] : [];
@@ -106,27 +154,37 @@ function normalizeGeminiSession(records) {
     const type = role === "user" ? "user.message" : role === "reasoning" ? "assistant.reasoning" : "assistant.message";
     // Flat stream-json has no message identity. Only an explicit message ID
     // establishes that a later full message covers previously observed deltas.
-    const id = supplied(source, ["messageId", "message_id"], source.message?.id);
-    const key = id === undefined ? undefined : JSON.stringify([correlationKey(source, id), role, position]);
+    const scope = messageScope(source);
+    const key = scope === undefined ? undefined : messageKey(scope, role, position);
     const observed = key === undefined ? undefined : messages.get(key);
     if (source.delta !== true && observed !== undefined) {
       if (!snapshotEmitted) emit(source, "gemini.message_snapshot", sourceFields(source));
       snapshotEmitted = true;
-      if (text.startsWith(observed) && text !== observed) emit(source, type, { ...fields, content: text.slice(observed.length) });
-      if (text.startsWith(observed)) messages.set(key, text);
-      return;
+      if (text === observed.text) return;
+      if (text.startsWith(observed.text)) {
+        const event = emit(source, type, { ...fields, content: text.slice(observed.text.length) });
+        observed.fragments.push({ event, observations: [structuredClone(source)] });
+        observed.text = text;
+        return;
+      }
+      retireMessage(observed);
     }
-    if (key !== undefined) messages.set(key, source.delta === true ? (observed ?? "") + text : text);
+    const message = observed ?? { text: "", fragments: [], scope, position };
+    message.text = source.delta === true ? message.text + text : text;
+    if (key !== undefined) messages.set(key, message);
     const { content: ignored, ...metadata } = source;
     const signature = JSON.stringify(metadata);
     // Coalesce only indistinguishable adjacent envelopes; differing timestamps,
     // IDs, channels, or native additions retain their own ordered fragments.
     if (source.delta === true && lastDelta?.signature === signature && lastDelta.event.type === type && typeof lastDelta.event.data.content === "string") {
       lastDelta.event.data.content += text;
+      lastDelta.observations.push(structuredClone(source));
       previousDelta = lastDelta;
     } else {
       const event = emit(source, type, { ...fields, content: text });
-      if (source.delta === true) previousDelta = { signature, event };
+      const fragment = { event, observations: [structuredClone(source)] };
+      if (key !== undefined) message.fragments.push(fragment);
+      if (source.delta === true) previousDelta = { signature, ...fragment };
     }
   };
   const emitBlock = (source, block, position) => {
@@ -194,6 +252,7 @@ function normalizeGeminiSession(records) {
       }
       const content = record.message === undefined ? record.content : typeof record.message === "string" ? record.message : record.message?.content;
       if (Array.isArray(content)) {
+        reconcileContentBlocks(record, content);
         for (const [position, block] of content.entries()) emitBlock(record, block, position);
         continue;
       }

@@ -644,11 +644,20 @@ Adjacent deltas coalesce only when their metadata envelopes are identical.
 Differing native IDs, timestamps, channels, or additions retain separate core
 fragments. Supplemental compatible inputs with an explicit `message_id`,
 `messageId`, or legacy `message.id` can identify a full-message snapshot:
-`gemini.message_snapshot` retains its native payload, and only an observed
-unreported suffix becomes additional core content. Contradictory snapshots
-remain native observations, not duplicated answers. Gemini's flat stream has
-no native message identity; a record's event `id` or repeated anonymous text
-does not establish snapshot coverage.
+`gemini.message_snapshot` retains its native payload. An unchanged snapshot adds
+no core content; an append-only snapshot adds only its unreported suffix. A
+rewritten or shortened snapshot retires the matching message/channel/block's
+earlier core fragments to opaque `gemini.message_observation` events, retaining
+exact original source envelopes in `data.observations`, and emits the full
+authoritative core content at the snapshot position. Tool observations and
+unrelated identities remain in place, without duplicate or stale answers.
+For a full legacy content-array snapshot, a rewrite, removal, reordering,
+insertion before existing content, or extension before an unchanged sibling
+replaces all visible text/reasoning fragments of that message; supplied blocks
+are emitted in their authoritative array order.
+An empty final array retains the snapshot but emits no fabricated text.
+Gemini's flat stream has no native message identity; a record's event `id` or
+repeated anonymous text does not establish snapshot coverage.
 
 ### 7.5 Pi
 
@@ -874,7 +883,7 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
-| Gemini | [Smoke Gemini September 29](https://github.com/github/gh-aw/actions/runs/36504829912) and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs` |
+| Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal
@@ -890,14 +899,24 @@ documented SDK shapes. The failed Smoke Copilot workflow failed in downstream sa
 outputs, not in its recorded agent session. A failed workflow does not by itself
 establish a failed agent session (T-UAS-048).
 
-Both Gemini samples contain only initialization, a user prompt, and a terminal
-provider spending-cap error. Their reported zero token counts and duration are
+The two Gemini spending-cap samples contain only initialization, a user prompt,
+and a terminal provider error. Their reported zero token counts and duration are
 retained; neither exposes a turn count, USD cost, assistant answer, reasoning,
-or tool activity. Five additional sampled Smoke Gemini runs
+or tool activity. The successful run `36078916290` supplies a sanitized
+nine-observation lifecycle excerpt with original IDs and timestamps, assistant
+fragments, native tool outcome shapes (including an empty successful output and
+one failed tool), and exact reported full-session accounting. Its original trace
+contains 208 observations: 33 assistant fragments, 86 tool starts, 86 tool
+completions (85 successful and one failed), initialization, a user prompt, and a
+terminal result. Full-session accounting is retained from that result, not
+inferred from the excerpt's activity.
+
+Five additional sampled Smoke Gemini runs
 (`37083329446`, `36812703528`, `36798614887`, `36762043435`, `36745457680`)
-contained no supported agent observations. Streaming, snapshot, tool lifecycle,
-permission-denial, mixed-input, and nonzero-accounting regressions are explicitly
-synthetic. No CI run or paid engine was launched to generate evidence.
+contained no supported agent observations. Explicit-message-identity snapshots,
+reasoning, permission-denial, mixed-input, and other source-unobserved regressions
+remain explicitly synthetic. No CI run or paid engine was launched to generate
+evidence.
 
 The shared `agent_session.test.cjs` suite exercises all six adapters, including Gemini
 and custom engines. `agent_session_telemetry.test.cjs` uses a mocked filesystem for
