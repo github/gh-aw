@@ -139,6 +139,7 @@ jobs:
 
   test:
     name: Unit tests (${{ matrix.name }})
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:

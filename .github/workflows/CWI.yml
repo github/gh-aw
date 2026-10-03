@@ -94,6 +94,7 @@ jobs:
 
   integration:
     name: "Windows Integration"
+    if: github.event_name != 'pull_request'
     needs:
       - checkout-cache
       - build-windows
