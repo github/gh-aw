@@ -24,6 +24,12 @@ func hasWorkflowCallTrigger(onSection string) bool {
 	return strings.Contains(onSection, "workflow_call")
 }
 
+// hasWorkflowCallOrDispatchTrigger reports whether the workflow accepts aw_context
+// through either a reusable-workflow input or workflow_dispatch input.
+func hasWorkflowCallOrDispatchTrigger(onSection string) bool {
+	return onSectionHasAnyTrigger(onSection, "workflow_call", "workflow_dispatch")
+}
+
 // generateArtifactPrefixStep creates a step that computes a stable, unique artifact name
 // prefix from a hash of the workflow_call inputs and the run attempt. This ensures artifact
 // names do not clash when the same reusable workflow is called multiple times within a
