@@ -27,6 +27,41 @@ For PR-driven linter generation (derive a rule from a specific pull request patt
 
 `make golint-custom` builds `cmd/linters` and runs it against `./cmd/...` and `./pkg/...`.
 
+## Common AST pitfalls
+
+### Unwrap parenthesized expressions
+
+Expressions wrapped in parentheses appear as `*ast.ParenExpr`. Unwrap expressions before
+asserting their AST type or comparing identifiers, so forms such as `(nil)` and `(err)` are
+handled like `nil` and `err`. Use the shared helper:
+
+```go
+if ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident); ok && ident.Name == "nil" {
+	// Handle nil.
+}
+```
+
+### Match all relevant statement shapes
+
+Semantically similar calls can appear in different statement nodes. A call that discards a
+result may be a bare `*ast.ExprStmt` or part of an `*ast.AssignStmt`; filtering only for one
+shape misses the other. Include and handle each relevant node shape:
+
+```go
+nodeFilter := []ast.Node{(*ast.AssignStmt)(nil), (*ast.ExprStmt)(nil)}
+return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
+	switch stmt := n.(type) {
+	case *ast.AssignStmt:
+		analyzeAssign(stmt)
+	case *ast.ExprStmt:
+		analyzeExpr(stmt)
+	}
+})
+```
+
+Before submitting a linter, check expression-shape assertions for parenthesis unwrapping and
+verify its node filter covers relevant equivalent syntax forms.
+
 ## Coverage-aware perf gating
 
 For linters that flag micro-optimizations (allocation/perf rules), only apply them on lines that

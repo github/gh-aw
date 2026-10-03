@@ -7,11 +7,12 @@ import { applyTransactions } from "./work_queue_replay.cjs";
 import { main, readFinishIntent, reconcileWorkerClaim, renderSummary } from "./finish_work_queue_claim.cjs";
 import { main as writeSnapshot } from "./write_work_queue_snapshot.cjs";
 import { serializeTransactionLog } from "./work_queue_replay.cjs";
+import { CURRENT_VERSION } from "./work_queue_codemods.cjs";
 
 const worker = { work_id: "w", claim_id: "claim-a" };
 const initialTransactions = [
-  { version: 1, kind: "Work", work: "w", claim: null, attempt: null },
-  { version: 1, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
+  { version: CURRENT_VERSION, kind: "Work", work: "w", claim: null, attempt: null },
+  { version: CURRENT_VERSION, kind: "Claim", work: "w", claim: "claim-a", attempt: null },
 ];
 
 let tempDirectory;
@@ -73,7 +74,7 @@ describe("work queue claim reconciliation", () => {
       context,
     });
     expect(result).toEqual({ authorized: false, status: "cancelled" });
-    expect(fake.transactions).toContainEqual({ version: 1, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
+    expect(fake.transactions).toContainEqual({ version: CURRENT_VERSION, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
   });
 
   it("publishes and verifies Completion before authorizing safe outputs", async () => {
@@ -92,7 +93,7 @@ describe("work queue claim reconciliation", () => {
 
     expect(result).toEqual({ authorized: true, status: "completed" });
     expect(fake.transactions).toContainEqual({
-      version: 1,
+      version: CURRENT_VERSION,
       kind: "Completion",
       work: "w",
       claim: "claim-a",
@@ -111,11 +112,11 @@ describe("work queue claim reconciliation", () => {
     });
 
     expect(result).toEqual({ authorized: false, status: "cancelled" });
-    expect(fake.transactions).toContainEqual({ version: 1, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
+    expect(fake.transactions).toContainEqual({ version: CURRENT_VERSION, kind: "ClaimCancellation", work: "w", claim: "claim-a", attempt: null });
   });
 
   it("does not publish or authorize a superseded claim", async () => {
-    const fake = setup([...initialTransactions, { version: 1, kind: "Claim", work: "w", claim: "claim-0", attempt: null }]);
+    const fake = setup([...initialTransactions, { version: CURRENT_VERSION, kind: "Claim", work: "w", claim: "claim-0", attempt: null }]);
     const publish = vi.fn(fake.applyAndPublish);
     const result = await reconcileWorkerClaim({
       worker,

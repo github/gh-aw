@@ -78,16 +78,19 @@ func TestWebFetchClaudeAllowedTools(t *testing.T) {
 }
 
 // TestWebFetchCodexNativeFetchTool tests that a Codex workflow with web-fetch uses
-// the native fetch tool (no -c fetch="disabled") instead of an mcp/fetch container.
+// the native browsing tool instead of an mcp/fetch container.
 func TestWebFetchCodexNativeFetchTool(t *testing.T) {
 	lockContent := compileWebFetchWorkflow(t, "codex")
 	if strings.Contains(lockContent, `-c fetch="disabled"`) {
 		t.Errorf(`Expected Codex workflow with web-fetch to NOT have -c fetch="disabled", but it did`)
 	}
+	if strings.Contains(lockContent, `-c web_search="disabled"`) {
+		t.Error("Expected web-fetch to enable Codex's shared search/browsing tool")
+	}
 }
 
 // TestCodexFetchDisabledByDefault tests that a Codex workflow without web-fetch
-// disables the native fetch tool with -c fetch="disabled".
+// disables the shared native search/browsing tool.
 func TestCodexFetchDisabledByDefault(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 
@@ -122,8 +125,8 @@ Run some bash commands.
 	}
 
 	lockContent := string(lockData)
-	if !strings.Contains(lockContent, `-c fetch="disabled"`) {
-		t.Errorf(`Expected Codex workflow without web-fetch to have -c fetch="disabled", but it didn't`)
+	if !strings.Contains(lockContent, `-c web_search="disabled"`) {
+		t.Error("Expected Codex workflow without web tools to disable native browsing")
 	}
 }
 

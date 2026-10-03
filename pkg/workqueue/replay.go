@@ -57,15 +57,17 @@ type Transaction struct {
 	RunID     string          `json:"run_id,omitempty"`
 	AttemptID string          `json:"attempt_id,omitempty"`
 	Outcome   string          `json:"outcome,omitempty"`
+	Enqueued  int64           `json:"enqueued,omitempty"`
 }
 
 type WorkState struct {
-	WorkID  string          `json:"work_id"`
-	Work    json.RawMessage `json:"work"`
-	State   string          `json:"state"`
-	Winner  string          `json:"winner,omitempty"`
-	Claims  []ClaimState    `json:"claims"`
-	Outcome string          `json:"outcome,omitempty"`
+	WorkID   string          `json:"work_id"`
+	Work     json.RawMessage `json:"work"`
+	State    string          `json:"state"`
+	Winner   string          `json:"winner,omitempty"`
+	Claims   []ClaimState    `json:"claims"`
+	Outcome  string          `json:"outcome,omitempty"`
+	Enqueued int64           `json:"enqueued"`
 }
 
 type ClaimState struct {
@@ -85,8 +87,9 @@ type Stats struct {
 }
 
 type Projection struct {
-	Works []WorkState `json:"works"`
-	Stats Stats       `json:"stats"`
+	Works     []WorkState `json:"works"`
+	Available []string    `json:"available"`
+	Stats     Stats       `json:"stats"`
 }
 
 func WorkID(payload []byte) (string, json.RawMessage, error) {
@@ -268,14 +271,14 @@ func validateReferences(f replayFacts, transactions []Transaction) error {
 }
 
 func Replay(transactions []Transaction) (Projection, error) {
-	result := Projection{Works: []WorkState{}}
+	result := Projection{Works: []WorkState{}, Available: []string{}}
 	f, count, err := collectFacts(transactions)
 	if err != nil {
 		return result, err
 	}
 	result.Stats.Transactions = count
 	for id, tx := range f.works {
-		state := WorkState{WorkID: id, Work: tx.Work, State: "available", Claims: []ClaimState{}}
+		state := WorkState{WorkID: id, Work: tx.Work, State: "available", Claims: []ClaimState{}, Enqueued: tx.Enqueued}
 		for _, claim := range f.claims {
 			if claim.WorkID != id {
 				continue
@@ -321,6 +324,7 @@ func Replay(transactions []Transaction) (Projection, error) {
 		}
 	}
 	slices.SortFunc(result.Works, func(a, b WorkState) int { return strings.Compare(a.WorkID, b.WorkID) })
+	result.Available = availableWorkIDs(result.Works)
 	result.Stats.Work, result.Stats.Claims = len(f.works), len(f.claims)
 	return result, nil
 }
@@ -355,7 +359,7 @@ func Apply(transactions []Transaction, tx Transaction) ([]Transaction, bool, err
 	}
 	if tx.Kind == "Work" {
 		if state != nil {
-			return nil, false, fmt.Errorf("work %s already exists", tx.WorkID)
+			return transactions, false, nil
 		}
 	} else if state == nil {
 		return nil, false, fmt.Errorf("work %s does not exist", tx.WorkID)

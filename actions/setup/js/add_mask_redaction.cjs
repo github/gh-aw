@@ -68,16 +68,6 @@ function collectAddMaskedValues(logContent) {
 }
 
 /**
- * Escape a literal string for use inside a regular expression.
- *
- * @param {string} value
- * @returns {string}
- */
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
  * Replace all occurrences of the masked values with `***`.
  *
  * @param {string} text
@@ -86,9 +76,50 @@ function escapeRegExp(value) {
  */
 function redactMaskedValues(text, maskedValues) {
   if (!text || !maskedValues || maskedValues.length === 0) return text;
-  const escapedAlternatives = maskedValues.map(escapeRegExp).join("|");
-  const pattern = new RegExp(`(?:${escapedAlternatives})`, "g");
-  return text.replace(pattern, MASK_REPLACEMENT);
+  const pending = [];
+  for (let order = 0; order < maskedValues.length; order++) {
+    const value = maskedValues[order];
+    if (!value) continue;
+    const index = text.indexOf(value);
+    if (index !== -1) pending.push({ value, index, order });
+  }
+  const precedes = (a, b) => a.index < b.index || (a.index === b.index && a.order < b.order);
+  const siftDown = start => {
+    let parent = start;
+    while (parent * 2 + 1 < pending.length) {
+      let child = parent * 2 + 1;
+      if (child + 1 < pending.length && precedes(pending[child + 1], pending[child])) child++;
+      if (!precedes(pending[child], pending[parent])) break;
+      [pending[parent], pending[child]] = [pending[child], pending[parent]];
+      parent = child;
+    }
+  };
+  for (let i = Math.floor(pending.length / 2) - 1; i >= 0; i--) siftDown(i);
+  const parts = [];
+  let cursor = 0;
+  let replacements = 0;
+  while (pending.length && cursor < text.length) {
+    const next = pending[0];
+    if (next.index >= cursor) {
+      if (next.index > cursor) {
+        if (replacements) parts.push(MASK_REPLACEMENT.repeat(replacements));
+        replacements = 0;
+        parts.push(text.slice(cursor, next.index));
+      }
+      replacements++;
+      cursor = next.index + next.value.length;
+    }
+    // Only refresh consumed or overlapping occurrences; later candidates stay cached.
+    next.index = text.indexOf(next.value, cursor);
+    if (next.index === -1) {
+      const last = pending.pop();
+      if (pending.length) pending[0] = last;
+    }
+    siftDown(0);
+  }
+  if (replacements) parts.push(MASK_REPLACEMENT.repeat(replacements));
+  parts.push(text.slice(cursor));
+  return parts.join("");
 }
 
 /**

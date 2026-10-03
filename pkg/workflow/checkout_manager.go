@@ -37,6 +37,10 @@ var checkoutManagerLog = logger.New("workflow:checkout_manager")
 //	      app-id: ${{ vars.APP_ID }}
 //	      private-key: ${{ secrets.APP_PRIVATE_KEY }}
 type CheckoutConfig struct {
+	// PullRequest controls generation of the compiler-generated PR branch checkout
+	// and its paired agent-config snapshot/restore steps. False disables those steps.
+	PullRequest *bool `json:"-"`
+
 	// Repository to checkout in owner/repo format. Defaults to the current repository.
 	Repository string `json:"repository,omitempty"`
 

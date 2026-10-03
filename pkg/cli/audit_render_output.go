@@ -19,6 +19,7 @@ import (
 func renderAuditReport(ctx context.Context, processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData, opts AuditOptions) error {
 	runID := processedRun.Run.DatabaseID
 	runOutputDir := opts.OutputDir
+	auditLog.Printf("Rendering audit report for run %d (noBaseline=%t, group=%t)", runID, opts.NoBaseline, opts.Group)
 	processedRun.Run.SafeItemsCount = len(resolveCreatedItems(runOutputDir, processedRun.SafeOutputs))
 	auditData, ok := loadCachedAuditData(runOutputDir, processedRun.Run, auditCacheSourceFull)
 	if ok {
@@ -139,6 +140,7 @@ func parseAuditLogsIfRequested(runID int64, runOutputDir string, opts AuditOptio
 	if !opts.Parse {
 		return
 	}
+	auditLog.Printf("Parsing agent and firewall logs for run %d", runID)
 	parseAgentLogIfRequested(runID, runOutputDir, opts.Verbose)
 	parseFirewallLogsIfRequested(runID, runOutputDir, opts.Verbose)
 }
@@ -181,6 +183,7 @@ func renderAuditCompletion(runOutputDir string, jsonOutput bool) {
 	if jsonOutput {
 		return
 	}
+	auditLog.Printf("Audit complete for %s", runOutputDir)
 	absOutputDir, _ := filepath.Abs(runOutputDir)
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Audit complete. Logs saved to "+absOutputDir))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Tip: use --artifacts to select specific artifact sets (agent, firewall, mcp, activation, detection, etc.)"))

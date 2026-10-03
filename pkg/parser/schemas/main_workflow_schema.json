@@ -13415,7 +13415,7 @@
       "additionalProperties": false
     },
     "checkout": {
-      "description": "Checkout configuration for the agent job. Controls how actions/checkout is invoked. Can be a single checkout configuration, an array for multiple checkouts, or false to disable the default checkout step entirely (dev-mode checkouts are unaffected).",
+      "description": "Checkout configuration for the agent job. Controls how actions/checkout is invoked. Can be a single checkout configuration, an array for multiple checkouts, or false to disable the default checkout step entirely (dev-mode checkouts are unaffected). Set pull-request: false in a checkout configuration to disable the generated PR branch checkout and its associated base-config snapshot/restore steps.",
       "oneOf": [
         {
           "$ref": "#/$defs/checkoutConfig",
@@ -14760,7 +14760,7 @@
             },
             "config": {
               "type": "string",
-              "description": "Additional engine configuration text. Codex accepts TOML appended to config.toml. Pi accepts a JSON object with settings, model metadata overrides, MCP exposure settings, and session persistence options."
+              "description": "Additional engine configuration text. Codex accepts TOML structurally merged into config.toml. Pi accepts a JSON object with settings, model metadata overrides, MCP exposure settings, and session persistence options."
             },
             "agent": {
               "type": "string",
@@ -14780,7 +14780,7 @@
             },
             "bare": {
               "type": "boolean",
-              "description": "When true, disables automatic loading of context and custom instructions by the AI engine. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Defaults to false.",
+              "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
             "mcp": {
@@ -14973,7 +14973,7 @@
             },
             "bare": {
               "type": "boolean",
-              "description": "When true, disables automatic loading of context and custom instructions by the AI engine. The engine-specific flag depends on the engine: copilot uses --no-custom-instructions, claude uses --bare, codex uses --no-system-prompt, gemini sets GEMINI_SYSTEM_MD=/dev/null. Defaults to false.",
+              "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             }
           },
@@ -15862,6 +15862,10 @@
       "description": "Configuration for a single actions/checkout step",
       "additionalProperties": false,
       "properties": {
+        "pull-request": {
+          "type": "boolean",
+          "description": "Set to false to disable the compiler-generated PR branch checkout and its associated base-config snapshot/restore steps. The normal repository checkout remains enabled."
+        },
         "repository": {
           "type": "string",
           "description": "Repository to checkout in owner/repo format. Defaults to the current repository.",

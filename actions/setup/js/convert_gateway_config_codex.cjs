@@ -23,9 +23,8 @@ require("./shim.cjs");
  */
 
 const path = require("path");
-const { runGatewayConversion } = require("./convert_gateway_config_shared.cjs");
-
-const OUTPUT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml");
+const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable } = require("./codex_config.cjs");
 
 /**
  * @param {string} name
@@ -34,23 +33,45 @@ const OUTPUT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-conf
  * @returns {string}
  */
 function toCodexTomlSection(name, value, urlPrefix) {
-  const url = `${urlPrefix}/mcp/${name}`;
+  const url = `${urlPrefix}/mcp/${encodeURIComponent(name)}`;
   const rawHeaders = value.headers;
   /** @type {Record<string, string>} */
   const headers = rawHeaders && typeof rawHeaders === "object" && !Array.isArray(rawHeaders) ? Object.fromEntries(Object.entries(rawHeaders).filter(([, headerValue]) => typeof headerValue === "string")) : {};
   const authKey = headers.Authorization || "";
-  let section = `[mcp_servers.${name}]\n`;
-  section += `url = "${url}"\n`;
-  section += `http_headers = { Authorization = "${authKey}" }\n`;
+  let section = `[mcp_servers.${/^[A-Za-z0-9_-]+$/.test(name) ? name : JSON.stringify(name)}]\n`;
+  section += `url = ${tomlValue(url)}\n`;
+  section += `http_headers = { Authorization = ${tomlValue(authKey)} }\n`;
   section += "\n";
   return section;
 }
 
 function main() {
+  const outputPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml");
+  if (process.argv.includes("--bootstrap")) {
+    const compiled = loadCompiledConfig();
+    const overrides = expandConfigEnv(compiled.overrides);
+    if (!isTable(overrides)) throw new Error("Invalid Codex configuration overrides");
+    compiled.overrides = overrides;
+    compiled.envExpanded = true;
+    let config = mergeConfig(compiled.defaults, compiled.overrides);
+    if (compiled.disablePlugins) config = mergeConfig(config, { features: { plugins: false } });
+    const output = serializeConfig(config);
+    writeSecureOutput(outputPath, output);
+    writeSecureOutput(path.join(path.dirname(outputPath), "codex-config.json"), JSON.stringify(compiled));
+    return output;
+  }
+  if (process.argv.includes("--config-only")) {
+    const output = serializeConfig(buildConfig({}, ""));
+    writeSecureOutput(outputPath, output);
+    const home = process.env.CODEX_HOME;
+    if (!home) throw new Error("CODEX_HOME is required to configure Codex");
+    writeSecureOutput(path.join(home, "config.toml"), output);
+    return output;
+  }
   return runGatewayConversion({
     format: "Codex TOML",
     engine: "Codex",
-    outputPath: OUTPUT_PATH,
+    outputPath,
     getUrlPrefix: ({ domain, port }) => {
       if (domain === "host.docker.internal") {
         core.info("Resolving host.docker.internal to gateway IP: 172.30.0.1");
@@ -60,11 +81,7 @@ function main() {
     },
     transformServer: (_name, entry) => entry,
     serialize: (servers, _context, urlPrefix) => {
-      let toml = '[history]\npersistence = "none"\n\n';
-      for (const [name, value] of Object.entries(servers)) {
-        toml += toCodexTomlSection(name, value, urlPrefix);
-      }
-      return toml;
+      return serializeConfig(buildConfig(servers, urlPrefix));
     },
   });
 }

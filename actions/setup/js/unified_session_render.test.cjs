@@ -40,7 +40,7 @@ const trace = [
   event("eval.result", { id: "builds", answer: "no", question: "PRIVATE_EVAL_QUESTION" }, "eval", 0),
   event("usage.report", { input_tokens: 999, output_tokens: 50 }, "usage", 0),
   event("execution.result", { outcome: "failure", duration_ms: 0 }, "execution", 0),
-  event("detection.result", { conclusion: "failure", secret_leak: false, reasons: "PRIVATE_DETECTION_REASON" }, "detection", 0),
+  event("detection.result", { job_result: "success", conclusion: "warning", reason: "threat_detected", prompt_injection: true, secret_leak: false, malicious_patch: false, reasons: "PRIVATE_DETECTION_REASON" }, "detection", 0),
   event("workflow.info", { engine_id: "copilot", model: "fixture", run_id: 1 }, "workflow", 0),
   event("vendor.progress", { private: "PRIVATE_EXTENSION" }, "agent", 5, undefined, "session-a.jsonl"),
   event("session.collection_warning", { path: "gateway.jsonl", line: 2, code: "malformed_jsonl" }, "collector", 1),
@@ -81,6 +81,7 @@ describe("unified session publication views", () => {
       expect(output).toContain("answer=no");
       expect(output).toContain("durationMs=0");
       expect(output).toContain("secretLeak=false");
+      expect(output).toContain("jobResult=success conclusion=warning reason=threat_detected promptInjection=true secretLeak=false maliciousPatch=false");
       expect(output).toContain("untimedEvents=10");
       expect(output).toContain("malformed_jsonl");
       expect(output).not.toContain("PRIVATE_");
@@ -137,12 +138,12 @@ describe("unified session publication views", () => {
   });
 
   it("rejects unsupported, missing or misplaced version headers without assuming compatibility", () => {
-    expect(() => validateSessionFileHeader([])).toThrow("missing");
+    expect(() => validateSessionFileHeader([])).toThrow("ERR_VALIDATION: Unified session file is missing");
     for (const version of [0, "1", 2, undefined]) {
-      expect(() => generatePlainTextSummary([{ ...header, data: { version } }])).toThrow("Unsupported");
+      expect(() => generatePlainTextSummary([{ ...header, data: { version } }])).toThrow("ERR_VALIDATION: Unsupported");
     }
-    expect(() => generateCopilotCliStyleSummary([trace[1], header])).toThrow("missing");
-    expect(() => generatePlainTextSummary([header, header])).toThrow("multiple");
+    expect(() => generateCopilotCliStyleSummary([trace[1], header])).toThrow("ERR_VALIDATION: Unified session file is missing");
+    expect(() => generatePlainTextSummary([header, header])).toThrow("ERR_VALIDATION: Unified session file contains multiple");
   });
 
   it("redacts escaped secret leaves before shortening previews and neutralizes hostile markup/fences", () => {
@@ -209,7 +210,7 @@ describe("unified session publication views", () => {
     const source = path.join(directory, "aw_session.jsonl");
     fs.writeFileSync(source, JSON.stringify(header) + "\n");
     process.env.GITHUB_STEP_SUMMARY = path.join(directory, "absent", "summary.md");
-    await expect(publishUnifiedSessionSummary(source)).rejects.toThrow("Failed to publish unified session");
+    await expect(publishUnifiedSessionSummary(source)).rejects.toThrow("ERR_SYSTEM: Failed to publish unified session");
     expect(fs.readFileSync(source, "utf8")).toBe(JSON.stringify(header) + "\n");
   });
 });

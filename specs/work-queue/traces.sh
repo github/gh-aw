@@ -31,7 +31,8 @@ RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 
 for entry in "CompetingClaimsWitness NoCompetingClaims" \
              "RecoveryWitness NoRecoveredOrphan" \
-             "ExternalEffectWitness NoExternalEffect"; do
+             "ExternalEffectWitness NoExternalEffect" \
+             "WeakOrderingWitness NoOutOfOrderClaim"; do
     read -r config invariant <<<"$entry"
     status=0
     "$JAVA_BIN" -XX:+UseParallelGC -Xmx1g -cp "$TLA2TOOLS_JAR" tlc2.TLC \

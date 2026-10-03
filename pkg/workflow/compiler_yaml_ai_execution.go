@@ -542,6 +542,15 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		return nil, fmt.Errorf("MCP setup could not be generated, expected valid tool configuration in the 'tools' section: %w", err)
 	}
 
+	if installer, ok := engine.(PostConfigPluginInstallationProvider); ok {
+		for _, step := range installer.GetPostConfigPluginInstallationSteps(data) {
+			for _, line := range step {
+				yaml.WriteString(line)
+				yaml.WriteByte('\n')
+			}
+		}
+	}
+
 	// Mount MCP servers as CLI tools (runs after gateway is started)
 	c.generateMCPCLIMountStep(yaml, data)
 

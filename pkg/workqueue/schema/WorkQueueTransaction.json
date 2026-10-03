@@ -18,5 +18,5 @@
       "$ref": "WorkQueueCompletionTransaction.json"
     }
   ],
-  "description": "Canonical version-1 workflow work-queue records stored on work-queue."
+  "description": "Canonical version-2 workflow work-queue records stored on work-queue."
 }

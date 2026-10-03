@@ -139,6 +139,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Generate agentic run info
@@ -472,6 +473,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Set runtime paths
         id: set-runtime-paths
         env:
@@ -1277,6 +1279,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download agent output artifact
         id: download-agent-output
         continue-on-error: true
@@ -1577,6 +1580,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download activation artifact
         continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1879,6 +1883,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Mask OTLP telemetry headers
         run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Download agent output artifact
@@ -1974,6 +1979,7 @@ jobs:
           GH_AW_INFO_VERSION: "2.1.286"
           GH_AW_INFO_AWF_VERSION: "v0.28.31"
           GH_AW_INFO_ENGINE_ID: "claude"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
       - name: Download cache-memory artifact (default)
         id: download_cache_default
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

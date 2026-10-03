@@ -303,7 +303,7 @@ function closeUnterminatedSkillMarkers(content) {
  *
  * Each AI engine stores its skill definitions in a different location:
  *   claude   → .claude/skills/<name>.md
- *   codex    → .codex/skills/<name>.md
+ *   codex    → .codex/skills/<name>/SKILL.md
  *   gemini   → .gemini/skills/<name>.md
  *   copilot  → .github/skills/<name>/SKILL.md  (default)
  *   others   → .github/skills/<name>/SKILL.md  (fallback)
@@ -316,7 +316,7 @@ function getEngineSkillTarget(engineId) {
     case "claude":
       return { dir: ".claude/skills", ext: ".md" };
     case "codex":
-      return { dir: ".codex/skills", ext: ".md" };
+      return { dir: ".codex/skills", ext: "/SKILL.md" };
     case "gemini":
       return { dir: ".gemini/skills", ext: ".md" };
     default:
@@ -330,7 +330,7 @@ function getEngineSkillTarget(engineId) {
  *
  * The target directory and filename extension are determined by engineId:
  *   - claude  → <base>/.claude/skills/<name>.md
- *   - codex   → <base>/.codex/skills/<name>.md
+ *   - codex   → <base>/.codex/skills/<name>/SKILL.md
  *   - gemini  → <base>/.gemini/skills/<name>.md
  *   - default → <base>/.github/skills/<name>/SKILL.md
  *

@@ -9,6 +9,7 @@ const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_re
 const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
+const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -291,48 +292,48 @@ async function runLogParser(options) {
     //  3. All errors are non-fatal – telemetry enrichment must never break workflows.
     if (logEntries && Array.isArray(logEntries)) {
       const resultEntry = projectSessionResult(logEntries);
-      if (resultEntry && (isTokenCount(resultEntry.num_turns) || isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens))) {
+      const tokenFields = ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens", "reasoning_output_tokens"];
+      const usage = Object.fromEntries(tokenFields.filter(field => isTokenCount(resultEntry?.usage?.[field])).map(field => [field, resultEntry.usage[field]]));
+      if (Object.keys(usage).length && typeof resultEntry?.usage?.input_tokens_include_cache === "boolean") usage.input_tokens_include_cache = resultEntry.usage.input_tokens_include_cache;
+      if (resultEntry && (isTokenCount(resultEntry.num_turns) || Object.keys(usage).length)) {
         const normalizedResultEntry = {
           type: "result",
           num_turns: resultEntry.num_turns,
-          usage:
-            isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens)
-              ? {
-                  input_tokens: resultEntry.usage?.input_tokens,
-                  output_tokens: resultEntry.usage?.output_tokens,
-                }
-              : undefined,
+          usage: Object.keys(usage).length ? usage : undefined,
         };
         const stdioLogPath = AGENT_STDIO_LOG_PATH;
         try {
           let alreadyHasResult = false;
           let newline = "";
-          const isUsableResult = entry => entry?.type === "result" && (isTokenCount(entry.num_turns) || isTokenCount(entry.usage?.input_tokens) || isTokenCount(entry.usage?.output_tokens));
+          const isUsableResult = entry => entry?.type === "result" && (isTokenCount(entry.num_turns) || tokenFields.some(field => isTokenCount(entry.usage?.[field])));
           if (fs.existsSync(stdioLogPath)) {
             const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
             if (stdioContent && !stdioContent.endsWith("\n")) newline = "\n";
-            alreadyHasResult = stdioContent.split("\n").some(line => {
-              const objectStart = line.indexOf("{");
-              const arrayStart = line.indexOf("[");
-              let start = -1;
-              if (objectStart >= 0 && arrayStart >= 0) {
-                start = Math.min(objectStart, arrayStart);
-              } else if (objectStart >= 0) {
-                start = objectStart;
-              } else {
-                start = arrayStart;
-              }
-              if (start < 0) return false;
-              try {
-                const parsed = JSON.parse(line.slice(start));
-                if (Array.isArray(parsed)) {
-                  return parsed.some(isUsableResult);
-                }
-                return isUsableResult(parsed);
-              } catch {
-                return false;
-              }
-            });
+            alreadyHasResult =
+              parserName === "Codex"
+                ? collectCodexJSONRecords(stdioContent).some(isUsableResult)
+                : stdioContent.split("\n").some(line => {
+                    const objectStart = line.indexOf("{");
+                    const arrayStart = line.indexOf("[");
+                    let start = -1;
+                    if (objectStart >= 0 && arrayStart >= 0) {
+                      start = Math.min(objectStart, arrayStart);
+                    } else if (objectStart >= 0) {
+                      start = objectStart;
+                    } else {
+                      start = arrayStart;
+                    }
+                    if (start < 0) return false;
+                    try {
+                      const parsed = JSON.parse(line.slice(start));
+                      if (Array.isArray(parsed)) {
+                        return parsed.some(isUsableResult);
+                      }
+                      return isUsableResult(parsed);
+                    } catch {
+                      return false;
+                    }
+                  });
           }
           if (!alreadyHasResult) {
             fs.mkdirSync(path.dirname(stdioLogPath), { recursive: true });

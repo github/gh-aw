@@ -56,3 +56,15 @@ func TestInvalidateCompleteArtifactDownloadMarker(t *testing.T) {
 	require.NoError(t, invalidateCompleteArtifactDownloadMarker(runDir))
 	assert.NoFileExists(t, marker)
 }
+
+func TestAuditNeedsDetectionArtifactWithUnifiedSession(t *testing.T) {
+	t.Parallel()
+	runDir := writeUnifiedDetectionTestSession(t, unifiedDetectionTestHeader+unifiedDetectionTestEvent(`{"jobResult":"success","conclusion":"warning","reason":"parse_error"}`))
+	summary := &RunSummary{RunAnalysis: RunAnalysis{
+		JobDetails: []JobInfoWithDuration{{JobInfo: JobInfo{Name: "detection", Conclusion: "success"}}},
+	}}
+	cfg := auditRunConfig{outputDir: runDir}
+	assert.False(t, auditNeedsDetectionArtifact(cfg, summary))
+	cfg.artifactFilter = []string{"detection"}
+	assert.True(t, auditNeedsDetectionArtifact(cfg, summary))
+}

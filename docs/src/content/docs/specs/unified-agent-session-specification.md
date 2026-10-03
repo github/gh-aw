@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.2.0"
+version: "1.3.0"
 status: Draft
 publication_date: "2026-10-02"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.2.0<br>
+**Version**: 1.3.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-02<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.2.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.3.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -217,14 +217,14 @@ opaque because its essential fields are not defined by this specification.
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
-| Agent accounting | Turns, duration, cost, normalized `usage`, errors, and permission denials. |
+| Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message; no RPC arguments, response bodies, or error context. |
 | Firewall | Host, method, status, decision, byte count, duration; steering/tracker event, level, message, reason, and request ID. |
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
 | Experiments | Run ID, assignments, and counts. |
 | Graders and evals | Grader IDs/names, values, units, statuses, decisions, thresholds, and errors; eval ID, answer, model, and error. No grader scripts or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. |
-| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection verdicts, engine/model/workflow/repository/run ID. |
+| Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine/model/workflow/repository/run ID. No detector transcript or free-form reasons. |
 
 Known payload aliases MUST use one canonical key, preferring an explicitly
 present canonical value even when it is `false`, `0`, `null`, or empty.
@@ -300,6 +300,31 @@ and count them as separate observations. Replicated firewall paths MUST select
 `sandbox/firewall/logs` before `sandbox/firewall/audit`, then supported legacy
 layouts; an existing empty authoritative file MUST suppress its older copy.
 Distinct gateway streams and events MUST remain separate observations.
+
+For `detection.result`, the sanitized conclusion result at
+`usage/detection/detection_result.json` MUST take precedence over the raw
+`threat-detection/detection_result.json` verdict. The conclusion result combines
+trusted job outputs with verdict flags extracted from structured results or
+inline detector logs. These files MUST NOT produce duplicate detection results.
+The raw structured verdict MAY be used when the conclusion result is absent.
+Provenance MUST identify the selected file; detection-log timestamps MUST NOT be
+invented for an extracted verdict.
+
+The essential detection payload is `jobResult`, `conclusion`, `reason`,
+`promptInjection`, `secretLeak`, and `maliciousPatch`, when observed. `reason` is
+the categorical conclusion reason, such as `threat_detected`, `agent_failure`,
+`parse_error`, or `detection_skipped`; it is not the detector's free-form `reasons`
+array. Missing verdict flags MUST remain absent, including skipped, cancelled,
+or failed detection without a verdict. Explicit `false` flags MUST be retained.
+Readers MUST NOT equate a successful job with a clean verdict: warn-mode
+detection can have `jobResult: "success"` and `conclusion: "warning"`.
+
+The Go audit reader consumes version-1 `usage/aw_session.jsonl` detection
+observations with detection component and phase provenance. It uses their
+verdict flags and recorded outcomes without exposing detector prose, and retains
+legacy detection-artifact compatibility. For older unified files containing only
+verdict flags, separately recorded conclusion outcomes supply missing status
+fields. Explicit canonical fields, including an empty `reason`, take precedence.
 
 **T-UAS-059 — Partial collection.** Missing optional sources MUST be reported
 by component availability, not fabricated empty results. Malformed JSONL
@@ -416,6 +441,8 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 | `numTurns` | Source-dependent nonnegative integer count of actual turns under the source's turn definition. |
 | `durationMs` | Source-dependent finite nonnegative session duration in milliseconds. |
 | `totalCostUsd` | Source-dependent finite nonnegative USD cost. Zero is a reported cost, not absence. |
+| `status` | Observed source outcome, such as Codex `completed` or `failed`; CLI turn completion does not imply task completion. |
+| `sourceType` | Native terminal or diagnostic event type when mapped, such as `turn.completed` or `turn.failed`. |
 | `usage` | Source-dependent object with token fields defined in Section 6 and preserved native additions. |
 | `errors` | Source-dependent array of session/provider error strings or objects, including an explicitly empty array. |
 | `permissionDenials` | Source-dependent array of native permission-denial records, including an explicitly empty array. |
@@ -446,7 +473,7 @@ source for opaque fields.
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
-| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
+| `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, and `agentVersion` from `aw_info.json` (`cli_version`, `awf_version`, `awmg_version`, `engine_id`, and `agent_version`, respectively). Unavailable values are not inferred. |
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 
@@ -523,6 +550,7 @@ An implementation can preserve native delta extension events and emit one corres
 | --- | --- | --- |
 | `input_tokens` | `inputTokens` | Source-reported input tokens. |
 | `output_tokens` | `outputTokens` | Source-reported output tokens. |
+| `reasoning_output_tokens` | None | Source-reported reasoning subset of output tokens; not an additional contribution to the total. |
 | `cache_creation_input_tokens` | `cacheCreationInputTokens` | Source-reported cache-creation/write input tokens. |
 | `cache_read_input_tokens` | `cacheReadInputTokens` | Source-reported cache-read input tokens. |
 
@@ -623,11 +651,41 @@ An item carrying a complete invocation and result can expand to a start and comp
 | `type: "init"` with model/session fields | `session.init`, including supplied `session_id`, model, and other source metadata. |
 | `type: "message", role: "user"` | `user.message` with exact `content`. |
 | `type: "message", role: "assistant"` | `assistant.message`; `delta: true` follows 5.3. |
+| Compatible flat `type: "reasoning"` or legacy `thinking` content block | `assistant.reasoning`, retaining exact content. |
 | `type: "tool_use"` with `tool_name`, `tool_id`, `parameters` | Start with native name, ID, and arguments. |
 | `type: "tool_result"` with `tool_id`, `status`, `output` | Completion with native output type and outcome; preserve explicit error fields. |
 | `type: "result"` with recognized `stats`/error metadata | `session.result`; map supplied `input_tokens`, `output_tokens`, `cached` → cache-read tokens, and `duration_ms`. |
+| `type: "error"` with a message/error payload | Retain `gemini.error`; severity `error` or an unspecified severity also exposes a separate `session.result.errors` observation. A warning remains a warning, not an inferred session failure. |
 
 Native tool-call counts and other statistics remain compatible extension data. Turn count, USD cost, and cache-creation usage remain absent unless a supported source field actually supplies them.
+
+`gemini_session.cjs` normalizes these observations behind the existing
+`parseGeminiLog`/`transformGeminiEntries` entry points. Gemini stream statistics
+are cumulative snapshots, including per-model diagnostic totals; they are not
+per-turn contributions. `cached` is included in `input_tokens`, recorded by
+`usage.input_tokens_include_cache: true`; per-model totals are retained without
+adding them again. Failed terminal statuses without a separate error payload
+retain their status as an explicit diagnostic. Permission-denial arrays remain
+separate from tool errors.
+
+Adjacent deltas coalesce only when their metadata envelopes are identical.
+Differing native IDs, timestamps, channels, or additions retain separate core
+fragments. Supplemental compatible inputs with an explicit `message_id`,
+`messageId`, or legacy `message.id` can identify a full-message snapshot:
+`gemini.message_snapshot` retains its native payload. An unchanged snapshot adds
+no core content; an append-only snapshot adds only its unreported suffix. A
+rewritten or shortened snapshot retires the matching message/channel/block's
+earlier core fragments to opaque `gemini.message_observation` events, retaining
+exact original source envelopes in `data.observations`, and emits the full
+authoritative core content at the snapshot position. Tool observations and
+unrelated identities remain in place, without duplicate or stale answers.
+For a full legacy content-array snapshot, a rewrite, removal, reordering,
+insertion before existing content, or extension before an unchanged sibling
+replaces all visible text/reasoning fragments of that message; supplied blocks
+are emitted in their authoritative array order.
+An empty final array retains the snapshot but emits no fabricated text.
+Gemini's flat stream has no native message identity; a record's event `id` or
+repeated anonymous text does not establish snapshot coverage.
 
 ### 7.5 Pi
 
@@ -769,7 +827,7 @@ agent-only inputs retain their earlier rendering behavior.
 | AWF | Network host/method/status/decision, observed token usage, steering messages, and tracker event names. |
 | Safe outputs | Requested versus execution-recorded operations, target metadata, and structured error counts. Requests are not displayed as successes. |
 | Experiments, graders, evals | Assignments/state, grader value/unit/outcome, and eval ID/answer/model. Grader scripts and raw evaluation questions are omitted. |
-| Execution, detection, collection | Recorded outcomes/verdict flags, source coverage, warnings, untimed counts, and absent components. |
+| Execution, detection, collection | Recorded outcomes/verdict flags, detection job result/conclusion/categorical reason, source coverage, warnings, untimed counts, and absent components. No detector transcript or free-form reasons. |
 | Unknown extensions | Type and provenance only; opaque payloads are not dumped. |
 
 Redaction operates on decoded publication copies before preview clipping.
@@ -853,6 +911,7 @@ payloads with harmless examples.
 | Codex | [Smoke Codex](https://github.com/github/gh-aw/actions/runs/36909965579) and [Daily Documentation Updater](https://github.com/github/gh-aw/actions/runs/36850958249) | `agent-stdio.log` | `test_data/codex_ci_smoke.jsonl`, `test_data/codex_ci_mcp.jsonl`, `codex_session.test.cjs` |
 | Copilot | [Smoke Copilot success](https://github.com/github/gh-aw/actions/runs/36798242962) and [failure](https://github.com/github/gh-aw/actions/runs/36946387975) | `events.jsonl` in the failed run's `copilot-session-state/`; process and stdio logs in the successful run | `copilot_session.test.cjs`, `parse_copilot_log.test.cjs` |
 | Pi | [Chronicle success](https://github.com/github/gh-aw/actions/runs/36884805242) and [Tree Map failure](https://github.com/github/gh-aw/actions/runs/36447274044) | `pi-streaming.jsonl` | `fixtures/pi_ci_stream.cjs`, `pi_session.test.cjs` |
+| Gemini | [Smoke Gemini success](https://github.com/github/gh-aw/actions/runs/36078916290), [spending-cap failure September 29](https://github.com/github/gh-aw/actions/runs/36504829912), and [September 27](https://github.com/github/gh-aw/actions/runs/36283760088) | `agent-stdio.log` | `fixtures/gemini_ci_sessions.cjs`, `gemini_session.test.cjs`, `fixtures/gemini_ci_lifecycle.cjs`, `gemini_ci_lifecycle.test.cjs` |
 
 Paths in the corpus column are relative to `actions/setup/js/`. Supplemental cases
 cover features absent from the samples: Claude streaming wrappers, Codex terminal
@@ -867,6 +926,25 @@ logs provide the success-path evidence. Additional usage, delta, and error cases
 documented SDK shapes. The failed Smoke Copilot workflow failed in downstream safe
 outputs, not in its recorded agent session. A failed workflow does not by itself
 establish a failed agent session (T-UAS-048).
+
+The two Gemini spending-cap samples contain only initialization, a user prompt,
+and a terminal provider error. Their reported zero token counts and duration are
+retained; neither exposes a turn count, USD cost, assistant answer, reasoning,
+or tool activity. The successful run `36078916290` supplies a sanitized
+nine-observation lifecycle excerpt with original IDs and timestamps, assistant
+fragments, native tool outcome shapes (including an empty successful output and
+one failed tool), and exact reported full-session accounting. Its original trace
+contains 208 observations: 33 assistant fragments, 86 tool starts, 86 tool
+completions (85 successful and one failed), initialization, a user prompt, and a
+terminal result. Full-session accounting is retained from that result, not
+inferred from the excerpt's activity.
+
+Five additional sampled Smoke Gemini runs
+(`37083329446`, `36812703528`, `36798614887`, `36762043435`, `36745457680`)
+contained no supported agent observations. Explicit-message-identity snapshots,
+reasoning, permission-denial, mixed-input, and other source-unobserved regressions
+remain explicitly synthetic. No CI run or paid engine was launched to generate
+evidence.
 
 The shared `agent_session.test.cjs` suite exercises all six adapters, including Gemini
 and custom engines. `agent_session_telemetry.test.cjs` uses a mocked filesystem for
@@ -1199,6 +1277,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.3.0 — Draft (2026-10-02)
+
+- Preserved detection job results, conclusions, categorical reasons, and verdict flags in unified session artifacts and publication views.
+- Preferred sanitized conclusion results over raw verdicts, covering structured and inline detectors without duplicate observations.
+- Defined absent verdict flags for skipped, cancelled, and failed detection, and excluded detector transcripts and free-form reasons.
 
 ### Version 1.1.0 — Draft (2026-10-02)
 

@@ -40,7 +40,7 @@ function readWorkQueueState(snapshot, args = {}) {
     throw new TypeError("work must be a non-empty string when provided");
   }
 
-  const workIds = args.work === undefined ? Object.keys(snapshot.projection.work) : [args.work];
+  const workIds = args.work === undefined ? [...snapshot.projection.available, ...Object.keys(snapshot.projection.work).filter(work => !snapshot.projection.available.includes(work))] : [args.work];
   const works = workIds.map(work => {
     if (!Object.hasOwn(snapshot.projection.work, work)) {
       return { id: work, state: "absent", winner: null, claims: [] };
@@ -54,18 +54,20 @@ function readWorkQueueState(snapshot, args = {}) {
     return {
       id: work,
       state: snapshot.projection.work[work],
+      enqueued: snapshot.projection.transactions.find(transaction => transaction.kind === "Work" && transaction.work === work)?.enqueued ?? 0,
       winner: snapshot.projection.winner[work],
       claims,
     };
   });
 
-  return { snapshot_sha: snapshot.sha, works };
+  return { snapshot_sha: snapshot.sha, next_work: snapshot.projection.available[0] ?? null, works };
 }
 
 function createWorkQueueStateTool(snapshot) {
   return {
     name: "work_queue_read",
-    description: "Read the immutable work queue snapshot captured during workflow activation. This view may be stale during agent execution; safe-output processing rechecks authority before publishing changes.",
+    description:
+      "Read the immutable work queue snapshot captured during workflow activation. Available Work is ordered oldest-first; next_work recommends the oldest available item. This view may be stale during agent execution; safe-output processing rechecks authority before publishing changes without enforcing FIFO.",
     inputSchema: {
       type: "object",
       properties: {

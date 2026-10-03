@@ -186,7 +186,12 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	targets := map[string]*AWFAPITargetConfig{}
 
-	if openaiTarget := extractAPIProxyTargetHost(config.WorkflowData, "OPENAI_BASE_URL", firewallConfig); openaiTarget != "" {
+	openaiTarget := extractAPIProxyTargetHost(config.WorkflowData, "OPENAI_BASE_URL", firewallConfig)
+	codexOpenAITarget := config.EngineName == "codex" && NewCodexEngine().ResolveLLMProvider(config.WorkflowData) == LLMProviderOpenAI
+	if codexOpenAITarget && config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.APITarget != "" {
+		openaiTarget = config.WorkflowData.EngineConfig.APITarget
+	}
+	if openaiTarget != "" {
 		targets["openai"] = &AWFAPITargetConfig{Host: openaiTarget}
 		awfConfigLog.Printf("API proxy: custom openai target=%s", openaiTarget)
 	}
@@ -210,7 +215,11 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		}
 		awfConfigLog.Printf("API proxy: custom %s authHeader=%s", provider, authHeader)
 	}
-	if copilotTarget := GetCopilotAPITarget(config.WorkflowData); copilotTarget != "" {
+	copilotTarget := GetCopilotAPITarget(config.WorkflowData)
+	if codexOpenAITarget && config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.APITarget != "" {
+		copilotTarget = ""
+	}
+	if copilotTarget != "" {
 		targets["copilot"] = &AWFAPITargetConfig{Host: copilotTarget}
 		awfConfigLog.Printf("API proxy: custom copilot target=%s", copilotTarget)
 	}

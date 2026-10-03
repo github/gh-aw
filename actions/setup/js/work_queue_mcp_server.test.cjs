@@ -4,10 +4,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { createWorkQueueFinishTool, createWorkQueueStateTool, loadWorkQueueSnapshot, readWorkQueueState } from "./work_queue_mcp_server.cjs";
-import { serializeTransactionLog } from "./work_queue_replay.cjs";
+import { createWorkTransaction, serializeTransactionLog } from "./work_queue_replay.cjs";
 
-const work = id => ({ version: 1, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 1, kind: "Claim", work: workId, claim: id, attempt: null });
+const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
+const claim = (workId, id) => ({ version: 2, kind: "Claim", work: workId, claim: id, attempt: null });
 
 const tempFiles = [];
 
@@ -35,12 +35,14 @@ describe("work queue MCP snapshot", () => {
 
     expect(readWorkQueueState(snapshot)).toEqual({
       snapshot_sha: "activation-head",
-      works: [{ id: "w", state: "claimed", winner: "c", claims: [{ id: "c", state: "effective" }] }],
+      next_work: null,
+      works: [{ id: "w", state: "claimed", enqueued: 0, winner: "c", claims: [{ id: "c", state: "effective" }] }],
     });
     const tool = createWorkQueueStateTool(snapshot);
     expect(tool.name).toBe("work_queue_read");
     expect(tool.handler({ work: "missing" })).toEqual({
       snapshot_sha: "activation-head",
+      next_work: null,
       works: [{ id: "missing", state: "absent", winner: null, claims: [] }],
     });
   });
@@ -55,8 +57,42 @@ describe("work queue MCP snapshot", () => {
 
     expect(readWorkQueueState(loadWorkQueueSnapshot(snapshotPath), { work: "constructor" })).toEqual({
       snapshot_sha: null,
-      works: [{ id: "constructor", state: "claimed", winner: "toString", claims: [{ id: "toString", state: "effective" }] }],
+      next_work: null,
+      works: [{ id: "constructor", state: "claimed", enqueued: 0, winner: "toString", claims: [{ id: "toString", state: "effective" }] }],
     });
+  });
+
+  it("recommends and lists available work oldest-first from the immutable snapshot", () => {
+    const snapshotPath = writeSnapshot({
+      version: 2,
+      sha: "old-head",
+      transactionLog: serializeTransactionLog([createWorkTransaction("a-new", 20), createWorkTransaction("z-old", 10), createWorkTransaction("claimed", 1), claim("claimed", "c")]),
+      worker: null,
+    });
+    const snapshot = loadWorkQueueSnapshot(snapshotPath);
+    const result = readWorkQueueState(snapshot);
+    expect(result.next_work).toBe("z-old");
+    expect(result.works.map(item => item.id)).toEqual(["z-old", "a-new", "claimed"]);
+    expect(result.works.map(item => item.enqueued)).toEqual([10, 20, 1]);
+    expect(readWorkQueueState(snapshot, { work: "a-new" }).next_work).toBe("z-old");
+  });
+
+  it("loads v1 Work at age zero without changing the snapshot envelope", () => {
+    const snapshotPath = writeSnapshot({
+      version: 2,
+      sha: "historical-head",
+      transactionLog: `${JSON.stringify(createWorkTransaction("new", 100))}\n${JSON.stringify({ ...work("legacy"), version: 1 })}\n`,
+      worker: null,
+    });
+    const snapshot = loadWorkQueueSnapshot(snapshotPath);
+    expect(JSON.parse(fs.readFileSync(snapshotPath, "utf8")).version).toBe(2);
+    expect(snapshot.projection.transactions).toContainEqual(work("legacy"));
+    const result = readWorkQueueState(snapshot);
+    expect(result.next_work).toBe("legacy");
+    expect(result.works.map(item => [item.id, item.enqueued])).toEqual([
+      ["legacy", 0],
+      ["new", 100],
+    ]);
   });
 
   it("rejects snapshots with an unsupported shape or invalid transaction log", () => {

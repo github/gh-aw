@@ -2,12 +2,17 @@ import "@typespec/json-schema";
 
 using TypeSpec.JsonSchema;
 
+@minValue(0)
+@maxValue(9007199254740991)
+scalar WorkQueueEnqueueTime extends safeint;
+
 @doc("Operator work-queue records used by gh aw work-queue on gh-aw-work-queue.")
 @jsonSchema
 model WorkTransaction {
   kind: "Work";
   work_id: string;
   work: Record<unknown>;
+  enqueued?: WorkQueueEnqueueTime;
 }
 
 @jsonSchema
@@ -54,16 +59,17 @@ scalar WorkQueueIdentity extends string;
 
 @jsonSchema
 model WorkQueueWorkTransaction {
-  version: 1;
+  version: 2;
   kind: "Work";
   work: WorkQueueIdentity;
   claim: null;
   attempt: null;
+  enqueued?: WorkQueueEnqueueTime;
 }
 
 @jsonSchema
 model WorkQueueClaimTransaction {
-  version: 1;
+  version: 2;
   kind: "Claim";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
@@ -72,7 +78,7 @@ model WorkQueueClaimTransaction {
 
 @jsonSchema
 model WorkQueueClaimCancellationTransaction {
-  version: 1;
+  version: 2;
   kind: "ClaimCancellation";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
@@ -81,7 +87,7 @@ model WorkQueueClaimCancellationTransaction {
 
 @jsonSchema
 model WorkQueueWorkCancellationTransaction {
-  version: 1;
+  version: 2;
   kind: "WorkCancellation";
   work: WorkQueueIdentity;
   claim: null;
@@ -90,14 +96,14 @@ model WorkQueueWorkCancellationTransaction {
 
 @jsonSchema
 model WorkQueueCompletionTransaction {
-  version: 1;
+  version: 2;
   kind: "Completion";
   work: WorkQueueIdentity;
   claim: WorkQueueIdentity;
   attempt: WorkQueueIdentity;
 }
 
-@doc("Canonical version-1 workflow work-queue records stored on work-queue.")
+@doc("Canonical version-2 workflow work-queue records stored on work-queue.")
 @jsonSchema
 union WorkQueueTransaction {
   WorkQueueWorkTransaction,

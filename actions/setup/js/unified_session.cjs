@@ -6,6 +6,7 @@ const { isSessionEvent } = require("./agent_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
+const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -40,8 +41,12 @@ function mergeSessionSources(sources) {
   const events = sources.flatMap(source =>
     source.events.map((event, index) => {
       const timestampMs = sessionTimestamp(event, source.timestampUnit);
+      const normalized = normalizeUnifiedSessionEvent(event);
+      if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
+        delete normalized.data.reason;
+      }
       return {
-        ...normalizeUnifiedSessionEvent(event),
+        ...normalized,
         provenance: {
           component: source.component,
           phase: source.phase,
@@ -116,7 +121,7 @@ function parseEngineSession(content, engine) {
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
  * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void}} [options]
- * @returns {{events: SessionEvent[], maskedValues: string[]}}
+ * @returns {{events: import("./types/agent_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message) } = {}) {
   /** @type {SessionSource[]} */
@@ -147,7 +152,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       for (const mask of collectAddMaskedValues(content)) masks.add(mask);
       return content;
     } catch (error) {
-      throw new Error(`Failed to read unified session source ${path.relative(rootDir, file)}: ${getErrorMessage(error)}`, { cause: error });
+      throw new Error(`${ERR_SYSTEM}: Failed to read unified session source ${path.relative(rootDir, file)}: ${getErrorMessage(error)}`, { cause: error });
     }
   };
   const records = file => {
@@ -193,7 +198,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       } else if (type) {
         events.push({ type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}), ...(record.created_at !== undefined ? { created_at: record.created_at } : {}) });
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
-      else throw new Error(`Missing event mapping for ${component}`);
+      else throw new Error(`${ERR_VALIDATION}: Missing event mapping for ${component}`);
     }
     sources.push({ component, phase, path: path.relative(rootDir, file), events, timestampUnit });
     return events.length;
@@ -217,7 +222,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     try {
       entries = fs.readdirSync(directory, { withFileTypes: true });
     } catch (error) {
-      throw new Error(`Failed to enumerate unified session sources ${path.relative(rootDir, directory)}: ${getErrorMessage(error)}`, { cause: error });
+      throw new Error(`${ERR_SYSTEM}: Failed to enumerate unified session sources ${path.relative(rootDir, directory)}: ${getErrorMessage(error)}`, { cause: error });
     }
     for (const entry of entries.sort((a, b) => (a.name === b.name ? 0 : a.name < b.name ? -1 : 1))) {
       const file = path.join(directory, entry.name);
@@ -286,7 +291,8 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     [["agent_execution.json", "usage/agent/execution.json"], "execution", "agent", "execution.result"],
     [["threat-detection/execution.json", "usage/detection/execution.json"], "execution", "detection", "execution.result"],
     [["evals/evals/execution.json", "evals/execution.json", "usage/evals/execution.json"], "execution", "evals", "execution.result"],
-    [["threat-detection/detection_result.json", "usage/detection/detection_result.json"], "detection", "detection", "detection.result"],
+    // The sanitized conclusion result includes job outcomes as well as structured or inline verdicts.
+    [["usage/detection/detection_result.json", "threat-detection/detection_result.json"], "detection", "detection", "detection.result"],
   ];
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);

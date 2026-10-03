@@ -67,6 +67,7 @@ func parseAPIProxySteeringLog(filePath string) (*apiProxySteeringLog, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
+	tokenUsageLog.Printf("Parsed %d steering event type(s) from %s", len(log.eventCounts), filePath)
 	return log, nil
 }
 
@@ -76,6 +77,7 @@ func extractGatewaySteeringEvents(runDir string) ([]GatewaySteeringEvent, error)
 		return nil, err
 	}
 	if len(log.entries) == 0 {
+		tokenUsageLog.Printf("No steering entries found in %s", runDir)
 		return nil, nil
 	}
 

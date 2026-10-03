@@ -449,9 +449,12 @@ func TestClaudePluginInstallation(t *testing.T) {
 
 func TestCodexPluginInstallation(t *testing.T) {
 	engine := NewCodexEngine()
+	installationSteps := func(data *WorkflowData) []GitHubActionStep {
+		return append(engine.GetPluginInstallationSteps(data), engine.GetPostConfigPluginInstallationSteps(data)...)
+	}
 
 	t.Run("registers a pinned root plugin as a local marketplace", func(t *testing.T) {
-		steps := engine.GetPluginInstallationSteps(&WorkflowData{
+		steps := installationSteps(&WorkflowData{
 			Plugins: []string{"octo-org/agent-plugin@" + testPluginSHA},
 		})
 
@@ -467,10 +470,11 @@ func TestCodexPluginInstallation(t *testing.T) {
 		assert.Contains(t, install, `--arg path "."`)
 		assert.Contains(t, install, "codex plugin marketplace add \"./.gh-aw-plugins/plugin-0\"")
 		assert.Contains(t, install, `codex plugin add "$PLUGIN_NAME@gh-aw-plugin-0"`)
+		assert.Contains(t, install, "CODEX_HOME: /tmp/gh-aw/mcp-config")
 	})
 
 	t.Run("registers a plugin from a repository subpath", func(t *testing.T) {
-		steps := engine.GetPluginInstallationSteps(&WorkflowData{
+		steps := installationSteps(&WorkflowData{
 			Plugins: []string{"octo-org/agent-plugins/plugins/example@" + testPluginSHA},
 		})
 
@@ -481,7 +485,7 @@ func TestCodexPluginInstallation(t *testing.T) {
 	})
 
 	t.Run("uses a custom engine command", func(t *testing.T) {
-		steps := engine.GetPluginInstallationSteps(&WorkflowData{
+		steps := installationSteps(&WorkflowData{
 			EngineConfig: &EngineConfig{Command: "/opt/codex"},
 			Plugins:      []string{"octo-org/agent-plugin@" + testPluginSHA},
 		})
