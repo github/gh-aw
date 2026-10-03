@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Pydantic AI
-description: Run the shared configuration conformance suite with Pydantic AI.
+description: Dispatch-only worker for the Pydantic AI configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-pydantic-ai
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

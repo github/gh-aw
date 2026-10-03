@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance DeepSeek Harness
-description: Run the shared configuration conformance suite with DeepSeek Harness.
+description: Dispatch-only worker for the DeepSeek Harness configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-deepseek-harness
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

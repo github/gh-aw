@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Goose
-description: Run the shared configuration conformance suite with Goose.
+description: Dispatch-only worker for the Goose configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-goose
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

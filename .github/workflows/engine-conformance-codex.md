@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Codex
-description: Run the shared configuration conformance suite with Codex.
+description: Dispatch-only worker for the Codex configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-codex
+  cancel-in-progress: false
 permissions:
   contents: read
 strict: true

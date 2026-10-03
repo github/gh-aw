@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Copilot
-description: Run the shared configuration conformance suite with Copilot CLI.
+description: Dispatch-only worker for the Copilot CLI configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-copilot
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

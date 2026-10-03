@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Kiro
-description: Run the shared configuration conformance suite with Kiro CLI.
+description: Dispatch-only worker for the Kiro CLI configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-kiro
+  cancel-in-progress: false
 permissions:
   contents: read
 strict: true

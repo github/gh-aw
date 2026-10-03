@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Cursor
-description: Run the shared configuration conformance suite with Cursor Agent.
+description: Dispatch-only worker for the Cursor Agent configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-cursor
+  cancel-in-progress: false
 permissions:
   contents: read
 strict: true

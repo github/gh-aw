@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Claude
-description: Run the shared configuration conformance suite with Claude Code.
+description: Dispatch-only worker for the Claude Code configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-claude
+  cancel-in-progress: false
 permissions:
   contents: read
 strict: true

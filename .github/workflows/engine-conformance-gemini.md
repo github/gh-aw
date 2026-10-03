@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Gemini
-description: Run the shared configuration conformance suite with Gemini CLI.
+description: Dispatch-only worker for the Gemini CLI configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-gemini
+  cancel-in-progress: false
 permissions:
   contents: read
 strict: true

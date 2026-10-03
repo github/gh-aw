@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance OpenCode
-description: Run the shared configuration conformance suite with OpenCode.
+description: Dispatch-only worker for the OpenCode configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-opencode
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

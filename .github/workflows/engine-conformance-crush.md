@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Crush
-description: Run the shared configuration conformance suite with Crush.
+description: Dispatch-only worker for the Crush configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-crush
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

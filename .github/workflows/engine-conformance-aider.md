@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Aider
-description: Run the shared configuration conformance suite with Aider.
+description: Dispatch-only worker for the Aider configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-aider
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write

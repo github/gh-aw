@@ -1,8 +1,11 @@
 ---
 name: Engine Conformance Pi
-description: Run the shared configuration conformance suite with Pi.
+description: Dispatch-only worker for the Pi configuration conformance suite.
 on:
   workflow_dispatch:
+concurrency:
+  group: engine-conformance-pi
+  cancel-in-progress: false
 permissions:
   contents: read
   copilot-requests: write
