@@ -137,12 +137,12 @@ describe("unified session publication views", () => {
   });
 
   it("rejects unsupported, missing or misplaced version headers without assuming compatibility", () => {
-    expect(() => validateSessionFileHeader([])).toThrow("missing");
+    expect(() => validateSessionFileHeader([])).toThrow("ERR_VALIDATION: Unified session file is missing");
     for (const version of [0, "1", 2, undefined]) {
-      expect(() => generatePlainTextSummary([{ ...header, data: { version } }])).toThrow("Unsupported");
+      expect(() => generatePlainTextSummary([{ ...header, data: { version } }])).toThrow("ERR_VALIDATION: Unsupported");
     }
-    expect(() => generateCopilotCliStyleSummary([trace[1], header])).toThrow("missing");
-    expect(() => generatePlainTextSummary([header, header])).toThrow("multiple");
+    expect(() => generateCopilotCliStyleSummary([trace[1], header])).toThrow("ERR_VALIDATION: Unified session file is missing");
+    expect(() => generatePlainTextSummary([header, header])).toThrow("ERR_VALIDATION: Unified session file contains multiple");
   });
 
   it("redacts escaped secret leaves before shortening previews and neutralizes hostile markup/fences", () => {
@@ -209,7 +209,7 @@ describe("unified session publication views", () => {
     const source = path.join(directory, "aw_session.jsonl");
     fs.writeFileSync(source, JSON.stringify(header) + "\n");
     process.env.GITHUB_STEP_SUMMARY = path.join(directory, "absent", "summary.md");
-    await expect(publishUnifiedSessionSummary(source)).rejects.toThrow("Failed to publish unified session");
+    await expect(publishUnifiedSessionSummary(source)).rejects.toThrow("ERR_SYSTEM: Failed to publish unified session");
     expect(fs.readFileSync(source, "utf8")).toBe(JSON.stringify(header) + "\n");
   });
 });

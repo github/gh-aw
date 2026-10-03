@@ -288,11 +288,15 @@ describe("Unified conclusion session", () => {
     expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).not.toContain("opaque-mask");
   });
 
+  it("uses a standardized error code for invalid session data", () => {
+    expect(() => serializeSessionArtifact({})).toThrow("ERR_VALIDATION: Expected a session event array");
+  });
+
   it("writes atomically and cleans up failed outputs without following a temporary symlink", () => {
     const output = write("usage/aw_session.jsonl", "old");
     const target = write("outside.jsonl", "unchanged");
     fs.symlinkSync(target, `${output}.tmp`);
-    expect(() => writeSessionArtifact(output, [{ type: "vendor.event", data: {} }])).toThrow();
+    expect(() => writeSessionArtifact(output, [{ type: "vendor.event", data: {} }])).toThrow("ERR_SYSTEM: Failed to write session artifact");
     expect(fs.readFileSync(target, "utf8")).toBe("unchanged");
     expect(fs.existsSync(output)).toBe(false);
     expect(fs.existsSync(`${output}.tmp`)).toBe(false);
