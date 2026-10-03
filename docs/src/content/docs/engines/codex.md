@@ -34,6 +34,8 @@ To authenticate:
 
 GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
 
+When using `model: copilot/auto`, Codex sends the built-in `gpt-5-codex` model alias to the AWF proxy. The proxy selects an available Codex-family model from the Copilot catalog rather than forwarding `auto` to the Copilot Responses endpoint, which rejects it. This is catalog-based selection, not Copilot's native task-based Auto selection. If no compatible model is available, select a concrete Copilot Codex model instead.
+
 Recompile the workflow with `gh aw compile` and commit the changes to your repository. The workflow will now run with Codex as the AI engine.
 
 ## Example: scheduled repository report

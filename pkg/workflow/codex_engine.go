@@ -101,6 +101,14 @@ func codexModelID(model string) string {
 	return model
 }
 
+func codexExecutionModel(model string, provider LLMProvider) string {
+	if provider == LLMProviderGitHub && strings.EqualFold(strings.TrimSpace(model), "copilot/auto") {
+		// Copilot's /responses endpoint rejects "auto"; select a Codex model from the catalog.
+		return "gpt-5-codex"
+	}
+	return codexModelID(model)
+}
+
 // GetRequiredSecretNames returns the list of secrets required by the Codex engine
 // and any common MCP secrets.
 func (e *CodexEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
@@ -500,7 +508,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 		if containsExpression(workflowData.Model) {
 			env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpression(modelEnvVar, compilerenv.DefaultModelCodex, constants.CodexDefaultModel)
 		}
-		model := codexModelID(workflowData.Model)
+		model := codexExecutionModel(workflowData.Model, provider)
 		codexEngineLog.Printf("Setting %s env var for model: %s", modelEnvVar, model)
 		env[modelEnvVar] = model
 	} else {

@@ -78,6 +78,8 @@ func TestCodexEngine_ResolveLLMProviderFromModel(t *testing.T) {
 func TestCodexModelID(t *testing.T) {
 	tests := map[string]string{
 		"copilot/auto":          "auto",
+		"Copilot/AUTO":          "AUTO",
+		"openai/auto":           "auto",
 		"copilot/gpt-5.4":       "gpt-5.4",
 		"gpt-5-codex":           "gpt-5-codex",
 		"openai/gpt-5.3-codex":  "gpt-5.3-codex",
@@ -113,7 +115,7 @@ func TestCodexEngineCopilotModelUsesGitHubInference(t *testing.T) {
 		`COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}`,
 		constants.CopilotBYOKDummyAPIKeyEnvVar + `: ` + constants.CopilotBYOKDummyAPIKey,
 		`export CODEX_API_KEY="$` + constants.CopilotBYOKDummyAPIKeyEnvVar + `"`,
-		`GH_AW_MODEL_AGENT_CODEX: auto`,
+		`GH_AW_MODEL_AGENT_CODEX: gpt-5-codex`,
 		`${GH_AW_MODEL_AGENT_CODEX:+ --model "$GH_AW_MODEL_AGENT_CODEX"}`,
 	}
 	for _, value := range expected {
@@ -148,6 +150,9 @@ func TestCodexEngineCopilotModelUsesGitHubActionsToken(t *testing.T) {
 	if !strings.Contains(stepContent, `COPILOT_GITHUB_TOKEN: ${{ github.token }}`) {
 		t.Errorf("expected GitHub Actions token for the Copilot provider, got:\n%s", stepContent)
 	}
+	if !strings.Contains(stepContent, `GH_AW_MODEL_AGENT_CODEX: gpt-5-codex`) {
+		t.Errorf("expected Copilot auto to resolve through the Codex-only alias, got:\n%s", stepContent)
+	}
 	if !strings.Contains(stepContent, `export CODEX_API_KEY="$`+constants.CopilotBYOKDummyAPIKeyEnvVar+`"`) {
 		t.Errorf("expected Codex to use the BYOK sentinel, got:\n%s", stepContent)
 	}
@@ -156,6 +161,18 @@ func TestCodexEngineCopilotModelUsesGitHubActionsToken(t *testing.T) {
 	}
 	if step := engine.GetSecretValidationStep(workflowData); len(step) != 0 {
 		t.Fatalf("expected secret validation to be skipped, got:\n%s", strings.Join(step, "\n"))
+	}
+}
+
+func TestCodexAutoModelExplicitOpenAIProviderDoesNotUseCopilotAlias(t *testing.T) {
+	engine := NewCodexEngine()
+	data := &WorkflowData{
+		Model:        "copilot/auto",
+		EngineConfig: &EngineConfig{ID: "codex", LLMProvider: LLMProviderOpenAI},
+	}
+	env := engine.buildCodexExecutionEnv(data, true, true, constants.EnvVarModelAgentCodex)
+	if env[constants.EnvVarModelAgentCodex] != "auto" {
+		t.Fatalf("explicit OpenAI provider must not use Copilot model alias: %q", env[constants.EnvVarModelAgentCodex])
 	}
 }
 

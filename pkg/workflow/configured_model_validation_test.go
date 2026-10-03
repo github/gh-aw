@@ -65,6 +65,13 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 				Model:        "copilot/auto",
 				EngineConfig: &EngineConfig{ID: "codex"},
 			},
+		},
+		{
+			name: "Copilot auto with OpenAI override",
+			data: &WorkflowData{
+				Model:        "copilot/auto",
+				EngineConfig: &EngineConfig{ID: "codex", LLMProvider: LLMProviderOpenAI},
+			},
 			wantWarning: true,
 		},
 		{

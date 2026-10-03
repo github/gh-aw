@@ -20,9 +20,12 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 		return
 	}
 	model = strings.ToLower(model)
-	baseModel := strings.SplitN(model, "?", 2)[0]
+	baseModel, _, _ := strings.Cut(model, "?")
 	usesGitHubInference := strings.HasPrefix(baseModel, "copilot/") ||
 		NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub
+	if baseModel == "copilot/auto" && NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
+		return
+	}
 	if !usesGitHubInference || strings.Contains(baseModel, "codex") {
 		return
 	}
