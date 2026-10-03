@@ -145,6 +145,117 @@ func okMutuallyExclusiveBranches(cond bool) string {
 	if cond {
 		return buf.String()
 	}
+
 	buf.WriteString("more")
 	return buf.String()
+}
+
+func nestedReuse(cond bool) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	if cond {
+		buf.WriteString("second") // want "buf is reused without calling Reset"
+	}
+}
+
+func loopReuse() {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	for i := 0; i < 1; i++ {
+		buf.WriteString("second") // want "buf is reused without calling Reset"
+	}
+}
+
+func nestedReset(cond bool) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	if cond {
+		buf.Reset()
+		buf.WriteString("second")
+	}
+}
+
+func mutuallyExclusiveSwitch(mode int) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	switch mode {
+	case 0:
+		_ = buf.String()
+	default:
+		buf.WriteString("second")
+	}
+}
+
+func allSwitchArmsReset(mode int) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	switch mode {
+	case 0:
+		buf.Reset()
+	default:
+		buf.Reset()
+	}
+	buf.WriteString("second")
+}
+
+func mutuallyExclusiveSelect(ch <-chan struct{}) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	select {
+	case <-ch:
+		_ = buf.String()
+	default:
+		buf.WriteString("second")
+	}
+}
+
+func mutuallyExclusiveIf(cond bool) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	if cond {
+		_ = buf.String()
+	} else {
+		buf.WriteString("second")
+	}
+}
+
+func switchFallthroughReuse(mode int) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	switch mode {
+	case 0:
+		_ = buf.String()
+		fallthrough
+	case 1:
+		buf.WriteString("second") // want "buf is reused without calling Reset"
+	}
+}
+
+func resetOnlyOnContinuingArm(cond bool) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	if cond {
+		buf.Reset()
+	} else {
+		return
+	}
+	buf.WriteString("second")
+}
+
+func allSelectArmsReset(left, right <-chan struct{}) {
+	var buf bytes.Buffer
+	buf.WriteString("first")
+	_ = buf.String()
+	select {
+	case <-left:
+		buf.Reset()
+	case <-right:
+		buf.Reset()
+	}
+	buf.WriteString("second")
 }

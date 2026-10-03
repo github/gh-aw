@@ -18,7 +18,8 @@ func BadExprStmtClose() {
 // BadBlankAssignClose assigns Close() error to blank identifier.
 func BadBlankAssignClose() {
 	f, _ := os.Open("file.txt")
-	_ = f.Close() // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	_ = f.Close()   // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	_ = (f.Close()) // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 }
 
 // BadMultiReturnIgnore ignores Close() error in multi-return assignment.
@@ -45,6 +46,8 @@ func (MultiResultCloser) Close() (int, error) {
 func BadMultiReturnClose() {
 	closer := MultiResultCloser{}
 	value, _ := closer.Close() // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
+	_ = value
+	value, _ = (closer.Close()) // want `Close\(\) error is explicitly discarded; resource cleanup failures may be silently ignored`
 	_ = value
 }
 

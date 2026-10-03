@@ -156,6 +156,7 @@ func SuppressedAcrossReassignment(client *http.Client, req1, req2 *http.Request)
 	if err != nil {
 		return err
 	}
+
 	resp.Body.Close()
 
 	resp, err = client.Do(req2)
@@ -164,4 +165,38 @@ func SuppressedAcrossReassignment(client *http.Client, req1, req2 *http.Request)
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+func BadSiblingClose(client *http.Client, req *http.Request, fast bool) error {
+	resp, err := client.Do(req) // want `HTTP response Body\.Close\(\) should be deferred immediately after receiving the response to prevent resource leaks`
+	if err != nil {
+		return err
+	}
+	if fast {
+		resp.Body.Close()
+	} else {
+		defer resp.Body.Close()
+	}
+	return nil
+}
+
+func DifferentBranchResponses(client *http.Client, req *http.Request, deferred bool) {
+	var resp *http.Response
+	if deferred {
+		resp, _ = client.Do(req)
+		defer resp.Body.Close()
+	} else {
+		resp, _ = client.Do(req) // want `HTTP response Body\.Close\(\) should be deferred immediately after receiving the response to prevent resource leaks`
+		resp.Body.Close()
+	}
+}
+
+func BothBranchResponsesManual(client *http.Client, req *http.Request, first bool) {
+	var resp *http.Response
+	if first {
+		resp, _ = client.Do(req) // want `HTTP response Body\.Close\(\) should be deferred immediately after receiving the response to prevent resource leaks`
+	} else {
+		resp, _ = client.Do(req) // want `HTTP response Body\.Close\(\) should be deferred immediately after receiving the response to prevent resource leaks`
+	}
+	resp.Body.Close()
 }

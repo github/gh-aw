@@ -20,7 +20,7 @@ var Analyzer = analyzerutil.New("osexitinlibrary", "reports os.Exit calls inside
 func run(pass *analysis.Pass) (any, error) {
 	pkgPath := pass.Pkg.Path()
 	// Skip packages under cmd/ entry-points — they are allowed to call os.Exit.
-	if strings.HasSuffix(pkgPath, "/main") || strings.Contains(pkgPath, "/cmd/") {
+	if pass.Pkg.Name() == "main" || strings.HasSuffix(pkgPath, "/main") || strings.Contains(pkgPath, "/cmd/") {
 		return nil, nil
 	}
 

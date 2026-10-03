@@ -16,7 +16,8 @@ type myKey struct{}
 
 // flagged: nil passed as context.Context
 func BadNilContext() {
-	takesCtx(nil) // want `nil passed as context\.Context; use context\.Background\(\) or context\.TODO\(\) instead`
+	takesCtx(nil)   // want `nil passed as context\.Context; use context\.Background\(\) or context\.TODO\(\) instead`
+	takesCtx((nil)) // want `nil passed as context\.Context; use context\.Background\(\) or context\.TODO\(\) instead`
 }
 
 // flagged: nil in first of two params

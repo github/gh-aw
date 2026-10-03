@@ -20,29 +20,42 @@ const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
  */
 function findFiles(dir, extensions) {
   const results = [];
-  if (!fs.existsSync(dir)) {
-    return results;
-  }
-  const pending = [dir];
-  while (pending.length) {
-    const currentDir = pending.pop();
-    if (currentDir === undefined) break;
-    try {
-      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(currentDir, entry.name);
-        if (entry.isSymbolicLink()) {
-          fs.unlinkSync(fullPath);
-          core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
-        } else if (entry.isDirectory()) {
-          pending.push(fullPath);
-        } else if (entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase())) {
-          results.push(fullPath);
-        }
-      }
-    } catch (error) {
-      throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${currentDir}: ${getErrorMessage(error)}`, { cause: error });
+  try {
+    if (!fs.existsSync(dir)) {
+      return results;
     }
+    const pending = [dir];
+    while (pending.length) {
+      const currentDir = pending.pop();
+      if (currentDir === undefined) break;
+      try {
+        let entries;
+        try {
+          entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+            core.warning(`Skipping inaccessible directory during secret redaction: ${currentDir}`);
+            continue;
+          }
+          throw error;
+        }
+        for (const entry of entries) {
+          const fullPath = path.join(currentDir, entry.name);
+          if (entry.isSymbolicLink()) {
+            fs.unlinkSync(fullPath);
+            core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
+          } else if (entry.isDirectory()) {
+            pending.push(fullPath);
+          } else if (entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase())) {
+            results.push(fullPath);
+          }
+        }
+      } catch (error) {
+        throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${currentDir}: ${getErrorMessage(error)}`, { cause: error });
+      }
+    }
+  } catch (error) {
+    throw new Error(`${ERR_VALIDATION}: Failed to scan directory ${dir}: ${getErrorMessage(error)}`, { cause: error });
   }
   return results;
 }

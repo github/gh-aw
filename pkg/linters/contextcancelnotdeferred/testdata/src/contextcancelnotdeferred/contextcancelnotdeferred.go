@@ -61,3 +61,12 @@ func GoodNoLint(parent context.Context) error {
 	cancel()
 	return nil
 }
+
+func BadSiblingCancel(parent context.Context, deferred bool) {
+	_, cancel := context.WithCancel(parent) // want `context cancel function should be deferred immediately after context.WithCancel/WithTimeout/WithDeadline`
+	if deferred {
+		defer cancel()
+	} else {
+		cancel()
+	}
+}

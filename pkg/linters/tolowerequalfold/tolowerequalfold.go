@@ -8,6 +8,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -63,14 +64,15 @@ func run(pass *analysis.Pass) (any, error) {
 		if arg, ok := caseConvArg(pass, expr.Y); ok && sameOperand(pass, expr.X, arg) {
 			return
 		}
-		if arg, ok := caseConvAliasArg(pass, expr.X, caseConvAliases); ok && sameOperand(pass, arg, expr.Y) {
+		aliases := caseConvAliases[expr]
+		if arg, ok := caseConvAliasArg(pass, expr.X, aliases); ok && sameOperand(pass, arg, expr.Y) {
 			return
 		}
-		if arg, ok := caseConvAliasArg(pass, expr.Y, caseConvAliases); ok && sameOperand(pass, expr.X, arg) {
+		if arg, ok := caseConvAliasArg(pass, expr.Y, aliases); ok && sameOperand(pass, expr.X, arg) {
 			return
 		}
 
-		if isEquivalentToEqualFold(pass, expr, caseConvAliases) {
+		if isEquivalentToEqualFold(pass, expr, aliases) {
 			if nolint.HasDirectiveForLinter(pass.Fset.PositionFor(expr.Pos(), false), noLintIndex, "tolowerequalfold") {
 				return
 			}
@@ -144,11 +146,16 @@ type caseConvAliasInfo struct {
 	arg      ast.Expr
 }
 
-func collectCaseConvAliases(pass *analysis.Pass) map[types.Object]caseConvAliasInfo {
+func collectCaseConvAliases(pass *analysis.Pass) map[*ast.BinaryExpr]map[types.Object]caseConvAliasInfo {
 	aliases := make(map[types.Object]caseConvAliasInfo)
+	atComparison := make(map[*ast.BinaryExpr]map[types.Object]caseConvAliasInfo)
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch n := node.(type) {
+			case *ast.BinaryExpr:
+				if len(aliases) != 0 && (n.Op == token.EQL || n.Op == token.NEQ) {
+					atComparison[n] = maps.Clone(aliases)
+				}
 			case *ast.AssignStmt:
 				collectAliasesFromAssignStmt(pass, n, aliases)
 			case *ast.ValueSpec:
@@ -166,7 +173,7 @@ func collectCaseConvAliases(pass *analysis.Pass) map[types.Object]caseConvAliasI
 			return true
 		})
 	}
-	return aliases
+	return atComparison
 }
 
 func collectAliasesFromAssignStmt(pass *analysis.Pass, stmt *ast.AssignStmt, aliases map[types.Object]caseConvAliasInfo) {

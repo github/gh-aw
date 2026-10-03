@@ -122,7 +122,7 @@ func calleeSignature(pass *analysis.Pass, call *ast.CallExpr) *types.Signature {
 
 // isBuiltinNil reports whether expr is the predeclared nil identifier.
 func isBuiltinNil(pass *analysis.Pass, expr ast.Expr) bool {
-	ident, ok := expr.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(expr).(*ast.Ident)
 	if !ok || ident.Name != "nil" {
 		return false
 	}

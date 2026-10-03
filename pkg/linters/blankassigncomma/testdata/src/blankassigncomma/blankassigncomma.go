@@ -1,5 +1,11 @@
 package blankassigncomma
 
+import (
+	"hash"
+	"hash/fnv"
+	"io"
+)
+
 func good() {
 	// Single blank is OK (common pattern for ignoring single return value)
 	_ = someFunction()
@@ -34,6 +40,20 @@ func bad() {
 
 	// Three blanks is also bad
 	_, _, _ = someFunction3() // want `assignment with 3 blank identifiers`
+}
+
+func goodHashWriteString() {
+	h := fnv.New64a()
+	// hash.Hash.Write never returns an error in practice.
+	_, _ = io.WriteString(h, "content")
+}
+
+func goodHashInterface(h hash.Hash) {
+	_, _ = io.WriteString(h, "content")
+}
+
+func badOtherWriteString(w io.Writer) {
+	_, _ = io.WriteString(w, "content") // want `assignment with 2 blank identifiers`
 }
 
 func someFunction() interface{} {
