@@ -60,6 +60,92 @@ describe("process_runner.cjs", () => {
   });
 
   describe("runProcess", () => {
+    it("frames stdout independently from interleaved stderr and fragmented UTF-8", async () => {
+      const observed = [];
+      const result = await runProcess({
+        command: process.execPath,
+        args: [
+          "-e",
+          `const b=Buffer.from('{"type":"turn.failed","error":{"message":"🐙 invalid_request_error"}}\\n');const split=b.indexOf(Buffer.from('🐙'))+2;process.stdout.write(b.subarray(0,split));setTimeout(()=>process.stderr.write('progress\\n'),30);setTimeout(()=>process.stdout.write(b.subarray(split)),60);`,
+        ],
+        attempt: 0,
+        log: () => {},
+        onStdoutLine: line => observed.push(JSON.parse(line)),
+      });
+      expect(observed[0].error.message).toBe("🐙 invalid_request_error");
+      expect(result.stdout).toContain("🐙");
+      expect(result.stderr).toBe("progress\n");
+      expect(
+        result.output
+          .split("\n")
+          .filter(Boolean)
+          .map(line => (line.startsWith("{") ? JSON.parse(line).type : line))
+      ).toEqual(["turn.failed", "progress"]);
+    });
+
+    it("bounds collected classifier output without truncating forwarded output", async () => {
+      const writes = [];
+      const original = process.stdout.write;
+      process.stdout.write = chunk => {
+        writes.push(Buffer.from(chunk));
+        return true;
+      };
+      try {
+        const result = await runProcess({ command: process.execPath, args: ["-e", "process.stdout.write('x'.repeat(10000)+'tail')"], attempt: 0, log: () => {}, maxCollectedOutputBytes: 1024 });
+        expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(1024);
+        expect(result.stdout.endsWith("tail")).toBe(true);
+        expect(Buffer.concat(writes).length).toBe(10004);
+      } finally {
+        process.stdout.write = original;
+      }
+    });
+
+    it("kills descendants holding inherited stdio when the runtime guard fires", async () => {
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", `require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});process.stdout.write('ready\\n');setInterval(()=>{},1000);`],
+        attempt: 0,
+        log: () => {},
+        runtimeGuard: { shouldTerminate: () => true, pollIntervalMs: 100, termGraceMs: 100 },
+        drainTimeoutMs: 100,
+      });
+      expect(result.runtimeGuardFired).toBe(true);
+      expect(result.durationMs).toBeLessThan(2000);
+    });
+
+    it("bounds stdio drain after the direct child exits but a descendant remains", async () => {
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", `const c=require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});c.unref();`],
+        attempt: 0,
+        log: () => {},
+        drainTimeoutMs: 100,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.durationMs).toBeLessThan(2000);
+    });
+
+    it("preserves cancellation even when a child handles SIGTERM and exits zero", async () => {
+      let scheduled = false;
+      const originalHandlers = new Set(process.listeners("SIGTERM"));
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", "process.on('SIGTERM',()=>process.exit(0));process.stdout.write('ready\\n');setInterval(()=>{},1000);"],
+        attempt: 0,
+        log: () => {},
+        onStdoutLine: () => {
+          if (!scheduled) {
+            scheduled = true;
+            process.listeners("SIGTERM").find(handler => !originalHandlers.has(handler))();
+          }
+        },
+        shutdownGraceMs: 100,
+        drainTimeoutMs: 100,
+      });
+      expect(result.cancelled).toBe(true);
+      expect(result.exitCode).toBe(143);
+    });
+
     it("resolves with exitCode 0 for a successful command", async () => {
       const logs = [];
       const result = await runProcess({
@@ -335,15 +421,19 @@ describe("process_runner.cjs", () => {
     it("escalates to SIGKILL after the grace period even when the poll interval is longer", async () => {
       const logs = [];
       const started = Date.now();
+      let ready = false;
       const result = await runProcess({
         command: process.execPath,
         // Ignores SIGTERM, so only SIGKILL can stop it.
-        args: ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 50);"],
+        args: ["-e", "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 50);"],
         attempt: 0,
         log: msg => logs.push(msg),
+        onStdoutLine: () => {
+          ready = true;
+        },
         runtimeGuard: {
-          shouldTerminate: () => ({ terminate: true, reason: "kill escalation test" }),
-          pollIntervalMs: 50,
+          shouldTerminate: () => ({ terminate: ready, reason: "kill escalation test" }),
+          pollIntervalMs: 1000,
           // Grace period is far shorter than the poll interval below would allow.
           termGraceMs: 150,
         },

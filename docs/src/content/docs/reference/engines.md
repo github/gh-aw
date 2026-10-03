@@ -57,7 +57,7 @@ Not all features are available across all engines. The table below summarizes pe
 | `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ (no-op; already bare) |
-| `engine.harness` (custom harness script) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `engine.harness` (custom harness script) | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Per-command `tools.bash` allowlist | ✅ | ✅ | ❌ (disable only) | ✅ | ❌ |
 | Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -100,7 +100,7 @@ engine:
 
 ### Pinning a Specific Engine Version
 
-By default, workflows install the latest available version of each engine CLI. To pin to a specific version, set `version` to the desired release:
+By default, workflows install a compiler-pinned version of each engine CLI. To override the pin, set `version` to the desired release:
 
 | Engine | `id` | Example `version` |
 |--------|------|-------------------|
@@ -346,7 +346,7 @@ engine:
 
 ### Custom Harness Script (`harness`)
 
-The `harness` field lets you replace the built-in Node.js harness wrapper that the Copilot engine uses to launch the CLI. Use this when you need to customize startup behavior, inject pre/post hooks, or test an alternative harness implementation.
+The `harness` field lets you replace the built-in Node.js harness wrapper used by Copilot, Claude, or Codex. Use this when you need to customize startup behavior, inject pre/post hooks, or test an alternative harness implementation.
 
 ```yaml wrap
 engine:
@@ -358,7 +358,7 @@ engine:
 The `use` value must be a bare filename — no directory separators, no `..`, and no shell metacharacters. It must end with `.js`, `.cjs`, or `.mjs`. When `harness.use` is set, AWF automatically ensures Node 24 is available in the runner environment.
 
 > [!NOTE]
-> `engine.harness` is currently only applied during Copilot engine execution. Setting it on other engines has no effect.
+> Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
 
 **Validation rules for `harness.use`:**
 

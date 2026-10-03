@@ -7,13 +7,15 @@ description: Select and authenticate OpenAI Codex as the AI engine for GitHub Ag
 
 ## Selecting Codex + OpenAI as the AI engine
 
-To select Codex as the AI engine, with inference hosted and and billed through an OpenAI subscription, add this to the workflow frontmatter:
+To select Codex as the AI engine, with inference hosted and billed through the OpenAI API, add this to the workflow frontmatter:
 
 ```yaml
 engine: codex
 ```
 
 To authenticate, provide a [`CODEX_API_KEY`](/gh-aw/reference/auth/#openai_api_key) or [`OPENAI_API_KEY`](/gh-aw/reference/auth/#openai_api_key) as a GitHub Actions repository secret.
+
+ChatGPT subscription login is not configured by this integration.
 
 Recompile the workflow with `gh aw compile` and commit the changes to your repository. The workflow will now run with Codex as the AI engine.
 
@@ -29,6 +31,8 @@ engine:
 To authenticate:
 - For organization-billed usage, grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission).
 - Otherwise, provide a [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) secret containing a fine-grained PAT with Copilot Requests access.
+
+GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
 
 Recompile the workflow with `gh aw compile` and commit the changes to your repository. The workflow will now run with Codex as the AI engine.
 
@@ -63,9 +67,28 @@ Analyze the repository and create a concise daily status report covering:
 
 ## Capabilities and limitations
 
-Codex supports native web search when `tools.web-search` is enabled and can disable shell execution completely. Codex cannot enforce a nonempty per-command `tools.bash` allowlist and does not support bare mode, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+Codex enables its shared native search/browsing tool when either `tools.web-search` or `tools.web-fetch` is enabled. Search and page fetching cannot be disabled independently; use `network.hosted-web` to restrict hosted retrieval. Codex can disable shell execution completely but cannot enforce a nonempty per-command `tools.bash` allowlist.
+
+Codex does not support bare mode, Copilot-style `max-continuations`, or native `engine.agent` selection. `engine.harness.use` can select a replacement harness that has been provisioned in the setup-action directory before execution. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
 When a workflow does not declare any `plugins`, GitHub Agentic Workflows writes [`features.plugins=false`](https://developers.openai.com/codex/config-reference/#features) to Codex's generated `config.toml`. This prevents Codex from contacting the ChatGPT plugin catalog or synchronizing the curated plugin repository at startup. Codex does not provide a narrower setting that disables only startup synchronization, so workflows that declare Agent Plugins keep the plugin subsystem and its startup checks enabled. Directly configured MCP servers are unaffected.
+
+Plugins are registered after configuration generation in the same `CODEX_HOME` used for execution. Inline skills use `.codex/skills/<name>/SKILL.md`.
+
+## Custom Codex configuration
+
+`engine.config` accepts TOML that is parsed and structurally merged with the generated configuration. Root settings remain at the root, and table settings preserve unrelated defaults:
+
+```yaml wrap
+engine:
+  id: codex
+  config: |
+    model_reasoning_effort = "high"
+```
+
+Generated configuration disables the default metrics exporter and preserves native MCP timeouts and client headers. MCP connections and the AWF provider's connection settings remain gateway-managed; configure upstream servers through `mcp-servers` and inference endpoints through `engine.api-target` or `engine.env.OPENAI_BASE_URL`.
+
+Use `${ENV_VAR}` inside TOML strings to reference an environment value configured through `engine.env`. GitHub Actions expressions are not accepted directly inside `engine.config`. The native integration supports OpenAI Responses-compatible inference and GitHub inference; an Anthropic backend requires a Responses-compatible bridge configured as an OpenAI endpoint.
 
 ## GitHub Agentic Workflows vs. running Codex directly in Actions
 

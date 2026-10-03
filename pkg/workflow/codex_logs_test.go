@@ -5,6 +5,7 @@ package workflow
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -381,4 +382,46 @@ func TestCodexExtractOutputSizeFromJSONFallback(t *testing.T) {
 
 	// Fallback should still extract the text
 	assert.Positive(t, result, "Fallback should extract some text")
+}
+
+func TestCodexParseLogMetricsLegacyInterleavedResults(t *testing.T) {
+	log := `tool api.first({})
+tool api.second({})
+api.first({}) success in 0.2s:
+{"content":[{"text":"braces } { are text"}]}
+2025-08-31T12:37:33.000Z INFO codex_core: api.second({}) failure in 175ms:
+{
+  "content": [{"text": "other"}]
+}
+exec echo example in /work
+echo example succeeded in 2ms:
+example
+tokens used
+1,234`
+	metrics := NewCodexEngine().ParseLogMetrics(log, false)
+	assert.Equal(t, 1234, metrics.TokenUsage)
+	require.Len(t, metrics.ToolCalls, 3)
+	tools := make(map[string]ToolCallInfo)
+	for _, tool := range metrics.ToolCalls {
+		tools[tool.Name] = tool
+	}
+	assert.Equal(t, 200*time.Millisecond, tools["api_first"].MaxDuration)
+	assert.Equal(t, len("braces } { are text"), tools["api_first"].MaxOutputSize)
+	assert.Equal(t, 175*time.Millisecond, tools["api_second"].MaxDuration)
+	assert.Equal(t, len("other"), tools["api_second"].MaxOutputSize)
+	assert.Equal(t, 2*time.Millisecond, tools["bash_echo example"].MaxDuration)
+	assert.Equal(t, len("example"), tools["bash_echo example"].MaxOutputSize)
+}
+
+func TestCodexParseLogMetricsLegacyResultPayloadIsNotAccounting(t *testing.T) {
+	log := `tool api.fetch({})
+api.fetch({}) success in 2ms:
+{
+  "content": [{"text": "total_tokens: 123\n] thinking\n] tool api.fake({})"}]
+}`
+	metrics := NewCodexEngine().ParseLogMetrics(log, false)
+	assert.Zero(t, metrics.TokenUsage)
+	assert.Zero(t, metrics.Turns)
+	require.Len(t, metrics.ToolCalls, 1)
+	assert.Equal(t, "api_fetch", metrics.ToolCalls[0].Name)
 }

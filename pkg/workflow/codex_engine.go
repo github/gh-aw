@@ -9,7 +9,6 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -34,13 +33,8 @@ const detectionResultFilePath = "/tmp/gh-aw/threat-detection/detection_result.js
 
 // Pre-compiled regexes for Codex log parsing (performance optimization)
 var (
-	codexToolCallOldFormat    = regexp.MustCompile(`\] tool ([^(]+)\(`)
-	codexToolCallNewFormat    = regexp.MustCompile(`^tool ([^(]+)\(`)
-	codexExecCommandOldFormat = regexp.MustCompile(`\] exec (.+?) in`)
-	codexExecCommandNewFormat = regexp.MustCompile(`^exec (.+?) in`)
-	codexDurationPattern      = regexp.MustCompile(`in\s+(\d+(?:\.\d+)?)\s*s`)
-	codexTokenUsagePattern    = regexp.MustCompile(`(?i)tokens\s+used[:\s]+(\d+)`)
-	codexTotalTokensPattern   = regexp.MustCompile(`total_tokens:\s*(\d+)`)
+	codexToolCallOldFormat = regexp.MustCompile(`\] tool ([^(]+)\(`)
+	codexToolCallNewFormat = regexp.MustCompile(`^tool ([^(]+)\(`)
 )
 
 // CodexEngine represents the Codex agentic engine
@@ -208,34 +202,42 @@ func codexPluginMarketplaceName(index int) string {
 	return fmt.Sprintf("gh-aw-plugin-%d", index)
 }
 
-// GetPluginInstallationSteps checks out pinned Agent Plugins and registers each one as a
-// single-plugin local Codex marketplace, since the Codex CLI only installs plugins through
-// "codex plugin add <name>@<marketplace>" and has no flag to load a bare plugin directory.
-// For each checked-out plugin this writes a ".agents/plugins/marketplace.json" manifest
-// inside the checkout that points back at the plugin's own directory, reads the plugin's
-// declared name from its "plugin.json" manifest, then runs "codex plugin marketplace add"
-// followed by "codex plugin add".
+// GetPluginInstallationSteps checks out plugins before pre-agent steps.
 func (e *CodexEngine) GetPluginInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
+	return generatePluginInstallationSteps(workflowData, pluginInstallSpec{})
+}
+
+// GetPostConfigPluginInstallationSteps registers plugins in the execution home without
+// allowing subsequent configuration generation to overwrite their marketplace state.
+func (e *CodexEngine) GetPostConfigPluginInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
+	if workflowData == nil {
+		return nil
+	}
 	commandName := e.codexCommandName(workflowData)
-	return generatePluginInstallationSteps(workflowData, pluginInstallSpec{
-		CustomInstall: func(parsed parsedSkillRefSpec, checkoutPath, installPath string, index int) []GitHubActionStep {
-			marketplaceName := codexPluginMarketplaceName(index)
-			pluginSubpath := pluginRepoSubpath(parsed)
-			manifestPath := path.Join(checkoutPath, pluginSubpath, "plugin.json")
-			marketplaceDir := path.Join(checkoutPath, ".agents/plugins")
-			marketplaceManifestPath := path.Join(marketplaceDir, "marketplace.json")
-			installCommand := strings.Join([]string{
-				fmt.Sprintf("PLUGIN_NAME=$(jq -r %s %q)", `'.name // empty'`, manifestPath),
-				fmt.Sprintf(`if [ -z "$PLUGIN_NAME" ]; then echo %s; exit 1; fi`, shellEscapeArg(fmt.Sprintf("::error::Agent plugin %s is missing a \"name\" in plugin.json", parsed.repoPath))),
-				fmt.Sprintf("mkdir -p %q", marketplaceDir),
-				fmt.Sprintf("jq -n --arg name \"$PLUGIN_NAME\" --arg path %q '{name: %q, plugins: [{name: $name, source: {source: \"local\", path: $path}}]}' > %q", pluginSubpath, marketplaceName, marketplaceManifestPath),
-				fmt.Sprintf("%s plugin marketplace add %q", commandName, "./"+checkoutPath),
-				fmt.Sprintf(`%s plugin add "$PLUGIN_NAME@%s"`, commandName, marketplaceName),
-			}, "\n")
-			installStep := []string{"      - name: Install agent plugin " + parsed.repoPath}
-			return []GitHubActionStep{FormatStepWithCommandAndEnv(installStep, installCommand, nil)}
-		},
-	})
+	var steps []GitHubActionStep
+	for index, plugin := range workflowData.Plugins {
+		parsed := parseSkillRefSpec(plugin)
+		if !parsed.isRemote || parsed.ref == "" {
+			continue
+		}
+		checkoutPath := pluginCheckoutPath(index)
+		marketplaceName := codexPluginMarketplaceName(index)
+		pluginSubpath := pluginRepoSubpath(parsed)
+		manifestPath := path.Join(checkoutPath, pluginSubpath, "plugin.json")
+		marketplaceDir := path.Join(checkoutPath, ".agents/plugins")
+		marketplaceManifestPath := path.Join(marketplaceDir, "marketplace.json")
+		installCommand := strings.Join([]string{
+			fmt.Sprintf("PLUGIN_NAME=$(jq -r %s %q)", `'.name // empty'`, manifestPath),
+			fmt.Sprintf(`if [ -z "$PLUGIN_NAME" ]; then echo %s; exit 1; fi`, shellEscapeArg(fmt.Sprintf("::error::Agent plugin %s is missing a \"name\" in plugin.json", parsed.repoPath))),
+			fmt.Sprintf("mkdir -p %q", marketplaceDir),
+			fmt.Sprintf("jq -n --arg name \"$PLUGIN_NAME\" --arg path %q '{name: %q, plugins: [{name: $name, source: {source: \"local\", path: $path}}]}' > %q", pluginSubpath, marketplaceName, marketplaceManifestPath),
+			fmt.Sprintf("%s plugin marketplace add %q", commandName, "./"+checkoutPath),
+			fmt.Sprintf(`%s plugin add "$PLUGIN_NAME@%s"`, commandName, marketplaceName),
+		}, "\n")
+		installStep := []string{"      - name: Install agent plugin " + parsed.repoPath}
+		steps = append(steps, FormatStepWithCommandAndEnv(installStep, installCommand, map[string]string{"CODEX_HOME": codexHome(workflowData)}))
+	}
+	return steps
 }
 
 // GetDeclaredOutputFiles returns the output files that Codex may produce.
@@ -324,17 +326,16 @@ func (e *CodexEngine) codexHarnessScriptName(workflowData *WorkflowData) string 
 
 func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName, harnessScriptName string, firewallEnabled bool, modelEnvVar, structuredOutputParam string) string {
 	modelParam := fmt.Sprintf(`${%s:+ --model "$%s"}`, modelEnvVar, modelEnvVar)
+	if workflowData.EngineConfig != nil && codexArgsSelectModel(workflowData.EngineConfig.Args) {
+		modelParam = ""
+	}
 	executionPolicyParam := ` --sandbox workspace-write --skip-git-repo-check -c approval_policy="never" `
 	if firewallEnabled {
 		executionPolicyParam = " --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check "
 	}
 	webSearchParam := ` -c web_search="disabled"`
-	if workflowData.ParsedTools != nil && workflowData.ParsedTools.WebSearch != nil {
+	if workflowData.ParsedTools != nil && (workflowData.ParsedTools.WebSearch != nil || workflowData.ParsedTools.WebFetch != nil) {
 		webSearchParam = ""
-	}
-	webFetchParam := ` -c fetch="disabled"`
-	if workflowData.ParsedTools != nil && workflowData.ParsedTools.WebFetch != nil {
-		webFetchParam = ""
 	}
 	shellToolParam := ""
 	if workflowData.BashDisabled {
@@ -352,11 +353,20 @@ func (e *CodexEngine) buildCodexCommand(workflowData *WorkflowData, commandName,
 	}
 	if harnessScriptName != "" {
 		execPrefix := fmt.Sprintf(`%s %s/%s %s`, nodeRuntimeResolutionCommand, SetupActionDestinationShell, harnessScriptName, commandName)
-		return fmt.Sprintf("%s exec%s%s%s%s%s%s%s --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt",
-			execPrefix, modelParam, webSearchParam, webFetchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)
+		return fmt.Sprintf("%s exec%s%s%s%s%s%s --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt",
+			execPrefix, modelParam, webSearchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)
 	}
-	return getWorkspaceCommandPrefixFor(workflowData.EngineConfig) + fmt.Sprintf("%s exec%s%s%s%s%s%s%s \"$INSTRUCTION\"",
-		commandName, modelParam, webSearchParam, webFetchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)
+	return getWorkspaceCommandPrefixFor(workflowData.EngineConfig) + fmt.Sprintf("%s exec%s%s%s%s%s%s -- \"$INSTRUCTION\"",
+		commandName, modelParam, webSearchParam, shellToolParam, executionPolicyParam, structuredOutputParam, customArgsParam)
+}
+
+func codexArgsSelectModel(args []string) bool {
+	for _, arg := range args {
+		if arg == "-m" || arg == "--model" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m=") {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *CodexEngine) buildCodexExecutionCommand(workflowData *WorkflowData, logFile, codexCommand, harnessScriptName, detectionSchemaWriteCmd string, firewallEnabled bool) string {
@@ -443,7 +453,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	resolvedGitHubToken := resolveGitHubToken("")
 	provider := e.ResolveLLMProvider(workflowData)
 	env := map[string]string{
-		"CODEX_HOME":                   constants.TmpMcpConfigDir,
+		"CODEX_HOME":                   codexHome(workflowData),
 		"GH_AW_GITHUB_TOKEN":           resolvedGitHubToken,
 		"GH_AW_LLM_PROVIDER":           string(provider),
 		"GH_AW_MCP_CONFIG":             constants.CodexMcpConfigTomlPath,
@@ -472,6 +482,9 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applySafeOutputEnvToMap(env, workflowData)
 	applyDefaultMaxAICreditsEnvToMap(env, workflowData)
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.LLMProvider != "" {
+		env["GH_AW_LLM_PROVIDER_EXPLICIT"] = "1"
+	}
 	applyTraceContextEnvToMap(env)
 	if firewallEnabled {
 		maps.Copy(env, getGitIdentityEnvVars())
@@ -492,6 +505,9 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)
+	if !firewallEnabled && provider == LLMProviderOpenAI && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
+		env["OPENAI_BASE_URL"] = "https://" + path.Join(workflowData.EngineConfig.APITarget, "v1")
+	}
 	applyMCPScriptsSecretEnv(env, workflowData)
 	return env
 }
@@ -568,101 +584,6 @@ func (e *CodexEngine) expandNeutralToolsToCodexToolsFromMap(tools map[string]any
 	toolsConfig, _ := ParseToolsConfig(tools)
 	result := e.expandNeutralToolsToCodexTools(toolsConfig)
 	return result.ToMap()
-}
-
-func (e *CodexEngine) getShellEnvironmentPolicyVars(tools map[string]any, mcpTools []string) []string {
-	// Collect all environment variables needed by MCP servers
-	envVars := make(map[string]struct{})
-
-	// Always include core environment variables
-	envVars["PATH"] = struct{}{}
-	envVars["HOME"] = struct{}{}
-
-	// Add CODEX_API_KEY for authentication
-	envVars["CODEX_API_KEY"] = struct{}{}
-	envVars["OPENAI_API_KEY"] = struct{}{} // Fallback for CODEX_API_KEY
-
-	// Check each MCP tool for required environment variables
-	for _, toolName := range mcpTools {
-		addMCPToolEnvVars(toolName, tools, envVars)
-	}
-
-	sortedEnvVars := sliceutil.SortedKeys(envVars)
-
-	// Codex expects regex patterns for shell_environment_policy.include_only, not literal names.
-	// Anchor each variable name to avoid accidental substring matches (for example "PATH" matching "PATH_SUFFIX").
-	var includeOnlyPatterns []string
-	for _, envVar := range sortedEnvVars {
-		includeOnlyPatterns = append(includeOnlyPatterns, "^"+regexp.QuoteMeta(envVar)+"$")
-	}
-	return includeOnlyPatterns
-}
-
-// addMCPToolEnvVars adds the environment variables required by the named MCP tool
-// to the envVars set. For custom tools, it reads the "env" configuration map.
-func addMCPToolEnvVars(toolName string, tools map[string]any, envVars map[string]struct{}) {
-	switch toolName {
-	case "github":
-		// GitHub MCP server needs GITHUB_PERSONAL_ACCESS_TOKEN
-		envVars["GITHUB_PERSONAL_ACCESS_TOKEN"] = struct{}{}
-	case "agentic-workflows":
-		// Agentic workflows MCP server needs GITHUB_TOKEN
-		envVars["GITHUB_TOKEN"] = struct{}{}
-	case "safe-outputs":
-		// Safe outputs MCP server needs several environment variables
-		envVars["GH_AW_SAFE_OUTPUTS"] = struct{}{}
-		envVars["GH_AW_ASSETS_BRANCH"] = struct{}{}
-		envVars["GH_AW_ASSETS_MAX_SIZE_KB"] = struct{}{}
-		envVars["GH_AW_ASSETS_ALLOWED_EXTS"] = struct{}{}
-		envVars["GITHUB_REPOSITORY"] = struct{}{}
-		envVars["GITHUB_SERVER_URL"] = struct{}{}
-	default:
-		// For custom MCP tools, check if they have env configuration
-		if toolValue, ok := tools[toolName]; ok {
-			if toolConfig, ok := toolValue.(map[string]any); ok {
-				// Extract environment variable names from env configuration
-				if env, hasEnv := toolConfig["env"].(map[string]any); hasEnv {
-					for envKey := range env {
-						envVars[envKey] = struct{}{}
-					}
-				}
-			}
-		}
-	}
-}
-
-// renderShellEnvironmentPolicy generates the [shell_environment_policy] section for config.toml
-// This controls which environment variables are passed through to MCP servers for security
-func (e *CodexEngine) renderShellEnvironmentPolicy(yaml *strings.Builder, tools map[string]any, mcpTools []string) {
-	sortedEnvVars := e.getShellEnvironmentPolicyVars(tools, mcpTools)
-
-	// Render [shell_environment_policy] section
-	yaml.WriteString("          \n")
-	yaml.WriteString("          [shell_environment_policy]\n")
-	yaml.WriteString("          inherit = \"core\"\n")
-	yaml.WriteString("          include_only = [")
-	for i, envVar := range sortedEnvVars {
-		if i > 0 {
-			yaml.WriteString(", ")
-		}
-		yaml.WriteString("\"" + envVar + "\"")
-	}
-	yaml.WriteString("]\n")
-}
-
-func (e *CodexEngine) renderShellEnvironmentPolicyToml(yaml *strings.Builder, tools map[string]any, mcpTools []string, indent string) {
-	sortedEnvVars := e.getShellEnvironmentPolicyVars(tools, mcpTools)
-
-	yaml.WriteString(indent + "[shell_environment_policy]\n")
-	yaml.WriteString(indent + "inherit = \"core\"\n")
-	yaml.WriteString(indent + "include_only = [")
-	for i, envVar := range sortedEnvVars {
-		if i > 0 {
-			yaml.WriteString(", ")
-		}
-		yaml.WriteString("\"" + envVar + "\"")
-	}
-	yaml.WriteString("]\n")
 }
 
 // RenderMCPConfig is implemented in codex_mcp.go

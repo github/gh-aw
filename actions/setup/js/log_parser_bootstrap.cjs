@@ -291,23 +291,20 @@ async function runLogParser(options) {
     //  3. All errors are non-fatal – telemetry enrichment must never break workflows.
     if (logEntries && Array.isArray(logEntries)) {
       const resultEntry = projectSessionResult(logEntries);
-      if (resultEntry && (isTokenCount(resultEntry.num_turns) || isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens))) {
+      const tokenFields = ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "total_tokens", "reasoning_output_tokens"];
+      const usage = Object.fromEntries(tokenFields.filter(field => isTokenCount(resultEntry?.usage?.[field])).map(field => [field, resultEntry.usage[field]]));
+      if (Object.keys(usage).length && typeof resultEntry?.usage?.input_tokens_include_cache === "boolean") usage.input_tokens_include_cache = resultEntry.usage.input_tokens_include_cache;
+      if (resultEntry && (isTokenCount(resultEntry.num_turns) || Object.keys(usage).length)) {
         const normalizedResultEntry = {
           type: "result",
           num_turns: resultEntry.num_turns,
-          usage:
-            isTokenCount(resultEntry.usage?.input_tokens) || isTokenCount(resultEntry.usage?.output_tokens)
-              ? {
-                  input_tokens: resultEntry.usage?.input_tokens,
-                  output_tokens: resultEntry.usage?.output_tokens,
-                }
-              : undefined,
+          usage: Object.keys(usage).length ? usage : undefined,
         };
         const stdioLogPath = AGENT_STDIO_LOG_PATH;
         try {
           let alreadyHasResult = false;
           let newline = "";
-          const isUsableResult = entry => entry?.type === "result" && (isTokenCount(entry.num_turns) || isTokenCount(entry.usage?.input_tokens) || isTokenCount(entry.usage?.output_tokens));
+          const isUsableResult = entry => entry?.type === "result" && (isTokenCount(entry.num_turns) || tokenFields.some(field => isTokenCount(entry.usage?.[field])));
           if (fs.existsSync(stdioLogPath)) {
             const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
             if (stdioContent && !stdioContent.endsWith("\n")) newline = "\n";

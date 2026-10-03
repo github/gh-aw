@@ -115,6 +115,16 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 	// Codex with AWF firewall enabled requires MCP config generation to set its OpenAI proxy
 	// provider, even when no MCP tools are configured (e.g. threat-detection jobs).
 	needsSetupWithoutMCPTools := len(mcpTools) == 0 && engine.GetID() == "codex" && isFirewallEnabled(workflowData)
+	if codex, ok := engine.(*CodexEngine); ok {
+		step, err := codex.renderConfigurationStep(workflowData, mcpTools, len(mcpTools) == 0 && !needsSetupWithoutMCPTools)
+		if err != nil {
+			return err
+		}
+		for _, line := range step {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
+	}
 	if len(mcpTools) == 0 && !needsSetupWithoutMCPTools {
 		mcpSetupGeneratorLog.Print("No MCP tools configured, skipping MCP setup")
 		return nil

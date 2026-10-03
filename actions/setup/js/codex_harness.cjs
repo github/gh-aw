@@ -5,13 +5,12 @@
  *
  * Wraps the OpenAI Codex CLI command with retry logic for failures that occur after the
  * session has been partially executed.  Passes all arguments to the codex subprocess,
- * forwarding stdout/stderr; stdin is closed since the prompt is delivered via
- * --prompt-file, not stdin.
+ * forwarding stdout/stderr and delivering --prompt-file contents through stdin.
  *
  * Retry policy:
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the
- *     session is considered partially executed.  The driver retries with a fresh run
- *     because Codex does not support a --continue-style session resumption.
+ *     session is considered partially executed. Eligible retries resume the exact observed
+ *     thread; failures after staged task output are never replayed.
  *   - Rate-limit errors (HTTP 429 / "rate_limit_exceeded") and server errors (HTTP 500,
  *     503) are well-known transient failure modes and are logged explicitly, but
  *     any partial-execution failure is retried — not just those specific errors.
@@ -24,8 +23,7 @@
  *
  * Prompt handling:
  *   - The harness expects a `--prompt-file <path>` argument in the args list.
- *   - It reads the file and appends the content as the last positional argument, which is
- *     where the Codex CLI (`codex exec`) expects the prompt.
+ *   - It reads the file and supplies `-` as the prompt argument, passing contents through stdin.
  *   - The `--prompt-file` flag is a harness-only argument and is not forwarded to codex.
  *
  * Usage: node codex_harness.cjs <command> [args...]
@@ -56,7 +54,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
-const { applyModelFallback, injectModelFlagAfterExec } = require("./model_fallback.cjs");
+const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
@@ -345,6 +343,32 @@ function resolveCodexPromptFileArgs(args) {
 }
 
 /**
+ * Keep prompt contents out of argv. `-` is Codex's explicit stdin prompt.
+ * @param {string[]} args
+ * @returns {{ args: string[], stdin?: string }}
+ */
+function resolveCodexPromptInput(args) {
+  if (!args.includes("--prompt-file")) return { args };
+  if (args.at(-1) === "--prompt-file") throw new Error("--prompt-file requires a readable file path");
+  const resolved = resolveCodexPromptFileArgs(args);
+  const stdin = resolved.pop();
+  return { args: [...resolved, "-"], stdin };
+}
+
+/**
+ * Resume only an exact, observed thread that was allowed to persist.
+ * @param {string[]} args
+ * @param {string} threadId
+ * @returns {string[] | null}
+ */
+function buildCodexResumeArgs(args, threadId) {
+  if (args[0] !== "exec" || args.at(-1) !== "-" || args.some(arg => ["resume", "fork", "review", "--", "--ephemeral", "--last"].includes(arg)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(threadId))
+    return null;
+  // Exec-only options remain before the subcommand, preserving permissions and configuration.
+  return [...args.slice(0, -1), "resume", threadId, "-"];
+}
+
+/**
  * Inject `--json` after `exec` in the args list so that Codex streams structured
  * JSON Lines (JSONL) to stdout.  This enables machine-readable output for CI
  * pipelines without changing how stderr progress output works.
@@ -530,7 +554,7 @@ function configureCodexProviderFromReflect(options) {
     log(`configured OPENAI_BASE_URL from /reflect for provider=${provider}: ${resolved.baseUrl}`);
     if (codexConfigPath) {
       const tomlContent = fs.readFileSync(codexConfigPath, "utf8");
-      const providerSectionPattern = /\[model_providers\.openai-proxy\][\s\S]*?(?:\n\[|$)/;
+      const providerSectionPattern = /\[model_providers\.openai-proxy\][\s\S]*?(?=\n\[|$)/;
       const baseLine = `base_url = "${resolved.baseUrl}"`;
       if (providerSectionPattern.test(tomlContent)) {
         const rewritten = tomlContent.replace(providerSectionPattern, section => {
@@ -660,9 +684,10 @@ function evaluateContextRebuildCircuitBreakerForAttempt(workingSet, config, opti
 
 /**
  * Main entry point: run codex with retry logic for transient API failures.
- * Codex does not support --continue session resumption, so all retries are fresh runs.
+ * Eligible retries use Codex's native exact-session resume command.
  */
 async function main() {
+  const driverStartTime = Date.now();
   const [, , command, ...args] = process.argv;
 
   if (!command) {
@@ -700,8 +725,10 @@ async function main() {
   // Resolve the prompt for the initial run (reads --prompt-file content).
   // A missing or unreadable prompt file is treated as a fatal startup error.
   let resolvedArgs;
+  let promptInput;
   try {
-    resolvedArgs = resolveCodexPromptFileArgs(args);
+    promptInput = resolveCodexPromptInput(args);
+    resolvedArgs = promptInput.args;
   } catch (err) {
     const e = /** @type {Error} */ err;
     log(`fatal: ${e.message}`);
@@ -709,14 +736,18 @@ async function main() {
   }
 
   const codexModelEnvVar = getCodexModelEnvVar(process.env);
-  const resolvedModel = codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "";
+  const modelOptions = { env: process.env, logger: log };
+  const resolvedModel = normalizeCodexModel(codexModelEnvVar ? applyModelFallback(process.env, codexModelEnvVar, log) : "", process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
+  if (codexModelEnvVar && resolvedModel) {
+    process.env[codexModelEnvVar] = resolvedModel;
+    codexChildEnv[codexModelEnvVar] = resolvedModel;
+  }
+  resolvedArgs = normalizeCodexModelArgs(resolvedArgs, process.env.GH_AW_LLM_PROVIDER || "openai", modelOptions);
   resolvedArgs = injectModelFlagAfterExec(resolvedArgs, resolvedModel);
 
-  // Safe arg list for logging: when --prompt-file was present, the last element of
-  // resolvedArgs is the resolved prompt content. Replace it with a placeholder so that
-  // task instructions are never written to stderr or captured in agent logs.
+  // Prompts remain on stdin; use a placeholder in the argument diagnostic.
   const hadPromptFile = args.includes("--prompt-file");
-  const safeArgs = hadPromptFile && resolvedArgs.length > 0 ? [...resolvedArgs.slice(0, -1), "<prompt omitted>"] : resolvedArgs;
+  const safeArgs = hadPromptFile && resolvedArgs.length > 0 ? [...resolvedArgs.slice(0, -1), "<prompt via stdin>"] : resolvedArgs;
 
   // Inject --json after `exec` to stream structured JSONL events to stdout, making
   // Codex output machine-readable in CI without affecting the stderr progress stream.
@@ -751,13 +782,14 @@ async function main() {
   }
 
   let lastExitCode = 1;
-  const driverStartTime = Date.now();
-  // Soft-timeout guard: polled at the top of the retry loop and after each backoff sleep.
-  // It does not preempt a running attempt — if a single invocation runs past the soft
-  // deadline the guard fires on the next iteration. Individual attempts are expected to
-  // complete within the SOFT_TIMEOUT_BUFFER_MS window.
+  // The deadline includes preflight time and is checked both between and during attempts.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   const contextRebuildCircuitBreaker = resolveContextRebuildCircuitBreakerConfig(process.env);
+  /** @type {string[] | null} */
+  let resumeArgs = null;
+  let lastThreadId = "";
+  const tokenUsagePaths = process.env.GH_AW_CODEX_TOKEN_USAGE_PATH ? [process.env.GH_AW_CODEX_TOKEN_USAGE_PATH] : TOKEN_USAGE_PATHS;
+  const resumePrompt = "Continue the interrupted task using the existing session. Preserve previously staged safe outputs; do not emit them again. Complete only unfinished work.";
   log(
     `context-rebuild circuit breaker: enabled=${contextRebuildCircuitBreaker.enabled}` +
       ` maxRebuildFactor=${contextRebuildCircuitBreaker.maxRebuildFactor}` +
@@ -773,34 +805,54 @@ async function main() {
     harnessName: "Codex harness",
     log,
     softTimeoutGuard,
-    getRetryMode: () => "fresh run",
+    getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async attempt => {
+      const terminalErrors = [];
+      let nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
       // Track the file size before this attempt so the watchdog only arms on output
       // written by this attempt, not by a previous retry.
       const safeOutputsByteOffset = safeOutputsPath ? getSafeOutputsByteOffset(safeOutputsPath) : 0;
 
       const result = await runProcess({
         command,
-        args: resolvedArgs,
+        args: resumeArgs || resolvedArgs,
         attempt,
         log,
-        logArgs: safeArgs,
+        logArgs: resumeArgs ? [...resumeArgs.slice(0, -1), "<resume prompt via stdin>"] : safeArgs,
         env: codexEnv,
-        runtimeGuard: contextRebuildCircuitBreaker.enabled
-          ? {
-              pollIntervalMs: contextRebuildCircuitBreaker.pollIntervalMs,
-              termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
-              shouldTerminate: async () =>
-                evaluateContextRebuildCircuitBreakerForAttempt(
-                  await readWorkingSetFromTokenUsage(TOKEN_USAGE_PATHS),
-                  {
-                    maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
-                    minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
-                  },
-                  { safeOutputsPath, safeOutputsByteOffset, logger: log }
-                ),
+        stdin: resumeArgs ? resumePrompt : promptInput.stdin,
+        maxCollectedOutputBytes: 4 * 1024 * 1024,
+        onStdoutLine: line => {
+          try {
+            const event = JSON.parse(line);
+            if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
+            if (event.type === "turn.failed" || event.type === "error") {
+              terminalErrors.push(line);
+              if (terminalErrors.length > 8) terminalErrors.shift();
             }
-          : undefined,
+          } catch {}
+        },
+        runtimeGuard:
+          contextRebuildCircuitBreaker.enabled || softTimeoutGuard
+            ? {
+                pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
+                termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+                shouldTerminate: async () => {
+                  if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
+                  if (!contextRebuildCircuitBreaker.enabled) return false;
+                  if (Date.now() < nextContextCheckAt) return false;
+                  nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
+                  return evaluateContextRebuildCircuitBreakerForAttempt(
+                    await readWorkingSetFromTokenUsage(tokenUsagePaths),
+                    {
+                      maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
+                      minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
+                    },
+                    { safeOutputsPath, safeOutputsByteOffset, logger: log }
+                  );
+                },
+              }
+            : undefined,
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () =>
@@ -814,6 +866,8 @@ async function main() {
             }
           : undefined,
       });
+      const missingErrors = terminalErrors.filter(line => !result.output.includes(line));
+      if (missingErrors.length) result.output = `${missingErrors.join("\n")}\n${result.output}`;
       // A guard-terminated run must never be reported as a success: Codex may handle SIGTERM
       // and exit cleanly, and `runHarnessRetryLoop` short-circuits on exitCode 0 before
       // `handleFailure` runs. Normalize the exit code so the failure handler always sees it.
@@ -884,6 +938,12 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(result.output);
+      if (nonRetryableGuard.apiProxyGuardRejection) {
+        const guard = nonRetryableGuard.apiProxyGuardRejection.guard;
+        emitInfrastructureIncomplete(`AWF API proxy rejected the request: ${guard}`, { logger: log });
+        log(`attempt ${attempt + 1}: ${guard} — not retrying (terminal proxy guard)`);
+        return { action: "stop" };
+      }
       const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
       if (proxyAICreditsRejection) {
         log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
@@ -921,6 +981,11 @@ async function main() {
 
       if (isMissingApiKey) {
         log(`attempt ${attempt + 1}: missing API key — not retrying (configure CODEX_API_KEY or OPENAI_API_KEY)`);
+        return { action: "stop" };
+      }
+
+      if (result.exitCode === 2 && /^error:/m.test(result.output) && /\bUsage:\s*codex\b/i.test(result.output)) {
+        log(`attempt ${attempt + 1}: Codex rejected command-line arguments — not retrying (startup configuration error)`);
         return { action: "stop" };
       }
 
@@ -965,9 +1030,17 @@ async function main() {
       }
 
       const isTransient = isRateLimit || isServer;
+      // An interrupted run may already have staged irreversible work. Neither a fresh
+      // prompt nor a model continuation can guarantee that those outputs are not repeated.
+      if (safeOutputsPath && hasExpectedSafeOutputs(safeOutputsPath, { logger: log })) {
+        emitInfrastructureIncomplete("Codex failed after staging task output. Preserving existing outputs and stopping to avoid replaying completed work.", { logger: log });
+        log(`attempt ${attempt + 1}: task output already staged — preserving output and not retrying`);
+        return { action: "stop" };
+      }
       if (attempt < MAX_RETRIES && (result.hasOutput || isTransient)) {
+        resumeArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
         const reason = isRateLimit ? "rate_limit_exceeded (transient)" : isServer ? "server_error (transient)" : "partial execution";
-        log(`attempt ${attempt + 1}: ${reason} — will retry as fresh run (attempt ${attempt + 2}/${MAX_RETRIES + 1})`);
+        log(`attempt ${attempt + 1}: ${reason} — will retry as ${resumeArgs ? `resume ${lastThreadId}` : "fresh run"} (attempt ${attempt + 2}/${MAX_RETRIES + 1})`);
         return { action: "retry" };
       }
 
@@ -984,17 +1057,20 @@ async function main() {
 
   // Fetch AWF API proxy reflection data and persist to disk for post-run step summary.
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. no api-proxy running in sandbox or test mode).
-  if (process.env.AWF_REFLECT_ENABLED === "1") {
+  if (!retryRun.lastResult?.cancelled && process.env.AWF_REFLECT_ENABLED === "1") {
     await fetchAWFReflect({ logger: log });
   }
 
   log(`done: exitCode=${lastExitCode} totalDuration=${formatDuration(Date.now() - driverStartTime)}`);
-  process.exit(lastExitCode);
+  // Let queued parent stdout/stderr writes drain instead of truncating large transcripts.
+  process.exitCode = lastExitCode;
 }
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     resolveCodexPromptFileArgs,
+    resolveCodexPromptInput,
+    buildCodexResumeArgs,
     injectJsonFlag,
     isRateLimitError,
     isTokenPerMinuteRateLimitError,

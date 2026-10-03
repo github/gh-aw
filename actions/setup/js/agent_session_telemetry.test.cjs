@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import { runLogParser } from "./log_parser_bootstrap.cjs";
+import { parseCodexLog } from "./parse_codex_log.cjs";
 
 const STDIO = "/tmp/gh-aw/agent-stdio.log";
 const SOURCE = "/fixture/session.jsonl";
+const codexSmoke = fs.readFileSync(new URL("./test_data/codex_ci_smoke.jsonl", import.meta.url), "utf8");
 
 describe("Unified session bootstrap telemetry conformance", () => {
   let files;
@@ -64,6 +66,22 @@ describe("Unified session bootstrap telemetry conformance", () => {
   it("T-UAS-047: zero is retained and absent output tokens/turns stay absent", async () => {
     await parse([{ type: "session.result", data: { usage: { input_tokens: 0 } } }]);
     expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", usage: { input_tokens: 0 } });
+  });
+
+  it("preserves the default Codex JSONL cache accounting in runtime telemetry", async () => {
+    files.set(SOURCE, codexSmoke);
+    await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
+    expect(JSON.parse(files.get(STDIO))).toMatchObject({
+      type: "result",
+      num_turns: 1,
+      usage: { input_tokens: 35078, output_tokens: 1638, cache_read_input_tokens: 18176, cache_creation_input_tokens: 0, reasoning_output_tokens: 0 },
+    });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
+  });
+
+  it("retains total-only and cache semantics without fabricating token components", async () => {
+    await parse([{ type: "session.result", data: { usage: { total_tokens: 0, cache_read_input_tokens: 0, input_tokens_include_cache: true, private_extension: "omit" } } }]);
+    expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", usage: { total_tokens: 0, cache_read_input_tokens: 0, input_tokens_include_cache: true } });
   });
 
   it("persists canonical events for conclusion without a legacy telemetry result or input mutation", async () => {

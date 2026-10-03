@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 describe("parse_codex_log.cjs", () => {
   let mockCore;
@@ -867,6 +868,89 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
       expect(generateCopilotCliStyleSummary(result.logEntries)).toContain(errorMessage);
       expect(result.markdown).toContain("**Errors:**");
       expect(result.markdown).toContain(errorMessage);
+    });
+
+    describe("production observability regressions", () => {
+      it("preserves text failures and reconnects interleaved with native JSONL", () => {
+        const result = parseCodexLog(
+          ['{"type":"thread.started","thread_id":"thread"}', "ERROR: Model access denied", "Reconnecting... 1/5 (connection lost)", '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}'].join("\n")
+        );
+        const { projectSessionResult } = require("./agent_session.cjs");
+        expect(projectSessionResult(result.logEntries)).toMatchObject({ num_turns: 1, errors: ["Model access denied", "connection lost"], usage: { input_tokens: 10, output_tokens: 2 } });
+        expect(result.logEntries.find(event => event.reconnectAttempt === 1)?.maxReconnects).toBe(5);
+        expect(generateCopilotCliStyleSummary(result.logEntries)).toContain("Model access denied");
+      });
+
+      it("preserves native lifecycle correlation across interleaved text diagnostics", () => {
+        const result = parseCodexLog(
+          [
+            '{"type":"thread.started","thread_id":"thread"}',
+            '{"type":"item.started","item":{"id":"call","type":"mcp_tool_call","server":"github","tool":"lookup","arguments":{}}}',
+            "ERROR: connection interrupted",
+            '{"type":"item.completed","item":{"id":"call","type":"mcp_tool_call","result":{"isError":true,"content":[{"text":"denied"}]},"status":"failed"}}',
+          ].join("\n")
+        );
+        expect(result.logEntries.filter(event => event.type === "tool.execution_start")).toHaveLength(1);
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")?.data).toMatchObject({ toolCallId: "call", toolName: "lookup", success: false });
+      });
+
+      it("retains a legacy conversation after stdio telemetry enrichment", () => {
+        const result = parseCodexLog(
+          ["model: o4-mini", "tool api.fetch({})", "api.fetch({}) success in 2ms:", '{"content":[{"text":"ok"}]}', "tokens used", "100", '{"type":"result","num_turns":1,"usage":{"input_tokens":80,"output_tokens":20}}'].join("\n")
+        );
+        expect(result.logEntries.map(event => event.type)).toEqual(["session.init", "tool.execution_start", "tool.execution_complete", "session.result", "session.result"]);
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")?.data.output).toBe('{"content":[{"text":"ok"}]}');
+        expect(generateCopilotCliStyleSummary(result.logEntries)).toContain("api-fetch");
+      });
+
+      it.each([
+        ["tokens used: 12,345", 12345],
+        ["TokenCount(TokenCountEvent { total_tokens: 13281 })", 13281],
+        ["2025-08-31T12:37:33.000Z DEBUG codex_core: TokenCount(TokenCountEvent { total_tokens: 13281 })", 13281],
+        ["total_tokens: 100\ntotal_tokens: 200", 200],
+        ["[2025-08-13T04:38:03] tokens used: 32,169\n[2025-08-13T04:38:06] tokens used: 28,828\ntokens used: 5,000", 65997],
+      ])("retains canonical legacy accounting for %s", (content, expected) => {
+        const { projectSessionResult } = require("./agent_session.cjs");
+        expect(projectSessionResult(parseCodexLog(`model: o4-mini\n${content}`).logEntries)?.usage.total_tokens).toBe(expected);
+      });
+
+      it.each([
+        ["failure in 100ms", false, 100],
+        ["success in 0.2s", true, 200],
+        ["succeeded in 2ms", true, 2],
+      ])("retains outcome and duration for %s", (status, success, durationMs) => {
+        const result = parseCodexLog(`tool api.fetch({})\napi.fetch({}) ${status}:\n{"content":[{"text":"ok"}]}`);
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")?.data).toMatchObject({ success, durationMs });
+      });
+
+      it("lets an explicit MCP result error override transport success", () => {
+        const result = parseCodexLog('tool api.fetch({})\napi.fetch({}) success in 2ms:\n{"content":[{"text":"denied"}],"isError":true}');
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")?.data.success).toBe(false);
+        expect(generateCopilotCliStyleSummary(result.logEntries)).toContain("Failed Tools: 1");
+      });
+
+      it("retains Rust-prefixed outcome identity and observed timing", () => {
+        const result = parseCodexLog('tool api.fetch({})\n2025-08-31T12:37:33.000Z INFO codex_core: api.fetch({}) success in 0.2s:\n{"content":[{"text":"ok"}]}');
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")).toMatchObject({ timestamp: "2025-08-31T12:37:33.000Z", data: { toolName: "fetch", success: true, durationMs: 200 } });
+      });
+
+      it("retains plain exec command outcomes", () => {
+        const result = parseCodexLog("exec example-check in /work\nexample-check failed in 12ms:\ncommand not found");
+        expect(result.logEntries.find(event => event.type === "tool.execution_complete")?.data).toMatchObject({ toolName: "bash", success: false, durationMs: 12, output: "command not found" });
+      });
+
+      it.each([
+        ["codex_ci_smoke", 36716, 18176],
+        ["codex_ci_mcp", 118247, 90112],
+      ])("preserves current default JSONL accounting from %s", (name, total, cache) => {
+        const { projectSessionResult, sessionTokenTotal } = require("./agent_session.cjs");
+        const result = projectSessionResult(parseCodexLog(readFileSync(new URL(`./test_data/${name}.jsonl`, import.meta.url), "utf8")).logEntries);
+        expect(result.num_turns).toBe(1);
+        expect(sessionTokenTotal(result.usage)).toBe(total);
+        expect(result.usage.cache_read_input_tokens).toBe(cache);
+        expect(result.duration_ms).toBeUndefined();
+        expect(result.total_cost_usd).toBeUndefined();
+      });
     });
   });
 });

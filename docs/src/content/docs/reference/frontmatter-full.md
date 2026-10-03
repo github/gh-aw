@@ -2836,13 +2836,10 @@ engine:
   args: []
     # Array of strings
 
-  # When true, disables automatic loading of context and custom instructions by the
-  # AI engine. The engine-specific flag depends on the engine: copilot uses
-  # --no-custom-instructions (suppresses .github/AGENTS.md and user-level custom
-  # instructions), claude uses --bare (suppresses CLAUDE.md memory files), codex
-  # uses --no-system-prompt (suppresses the default system prompt), gemini sets
-  # GEMINI_SYSTEM_MD=/dev/null (overrides the built-in system prompt with an empty
-  # one). Defaults to false.
+  # When true, disables automatic loading of context and custom instructions where
+  # supported: Copilot uses --no-custom-instructions and Claude uses --bare. Pi is
+  # already bare. Codex and Gemini do not support this option and emit a warning.
+  # Defaults to false.
   # (optional)
   bare: true
 
@@ -2994,10 +2991,10 @@ engine:
       body-inject:
         {}
 
-  # When true, disables automatic loading of context and custom instructions by the
-  # AI engine. The engine-specific flag depends on the engine: copilot uses
-  # --no-custom-instructions, claude uses --bare, codex uses --no-system-prompt,
-  # gemini sets GEMINI_SYSTEM_MD=/dev/null. Defaults to false.
+  # When true, disables automatic loading of context and custom instructions where
+  # supported: Copilot uses --no-custom-instructions and Claude uses --bare. Pi is
+  # already bare. Codex and Gemini do not support this option and emit a warning.
+  # Defaults to false.
   # (optional)
   bare: true
 
@@ -21217,13 +21214,10 @@ safe-outputs:
       args: []
         # Array of strings
 
-      # When true, disables automatic loading of context and custom instructions by the
-      # AI engine. The engine-specific flag depends on the engine: copilot uses
-      # --no-custom-instructions (suppresses .github/AGENTS.md and user-level custom
-      # instructions), claude uses --bare (suppresses CLAUDE.md memory files), codex
-      # uses --no-system-prompt (suppresses the default system prompt), gemini sets
-      # GEMINI_SYSTEM_MD=/dev/null (overrides the built-in system prompt with an empty
-      # one). Defaults to false.
+      # When true, disables automatic loading of context and custom instructions where
+      # supported: Copilot uses --no-custom-instructions and Claude uses --bare. Pi is
+      # already bare. Codex and Gemini do not support this option and emit a warning.
+      # Defaults to false.
       # (optional)
       bare: true
 
@@ -21375,10 +21369,10 @@ safe-outputs:
           body-inject:
             {}
 
-      # When true, disables automatic loading of context and custom instructions by the
-      # AI engine. The engine-specific flag depends on the engine: copilot uses
-      # --no-custom-instructions, claude uses --bare, codex uses --no-system-prompt,
-      # gemini sets GEMINI_SYSTEM_MD=/dev/null. Defaults to false.
+      # When true, disables automatic loading of context and custom instructions where
+      # supported: Copilot uses --no-custom-instructions and Claude uses --bare. Pi is
+      # already bare. Codex and Gemini do not support this option and emit a warning.
+      # Defaults to false.
       # (optional)
       bare: true
 

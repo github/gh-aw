@@ -58,6 +58,24 @@ describe("Codex real CI trace regression", () => {
 });
 
 describe("Codex normalization contract", () => {
+  it.each(["file_change", "web_search", "todo_list", "collab_tool_call", "future_item"])("retains native %s observations without losing payloads", type => {
+    const record = { type: "item.completed", timestamp: 0, item: { id: "item_0", type, status: "failed", extension: { retained: true } } };
+    const events = normalizeCodexSession([record]);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "codex.item_snapshot", timestamp: 0, data: { item: record.item } });
+    expect(normalizeCodexSession(events)).toEqual(events);
+  });
+
+  it("reports the successful final attempt while retaining historical retry errors and usage", () => {
+    const events = normalizeCodexSession([
+      { type: "thread.started", thread_id: "first" },
+      { type: "turn.failed", error: { message: "transient" } },
+      { type: "thread.started", thread_id: "retry" },
+      { type: "turn.completed", usage: { input_tokens: 10, output_tokens: 1 } },
+    ]);
+    expect(selectSessionResult(events)).toMatchObject({ status: "completed", sourceType: "turn.completed", errors: [{ message: "transient" }], usage: { input_tokens: 10 } });
+  });
+
   it("recognizes JSON arrays and recovers adjacent supported records after malformed JSONL", () => {
     const records = [
       null,

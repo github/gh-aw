@@ -316,13 +316,16 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 	case *ClaudeEngine:
 		return []string{"api.anthropic.com"}
 	case *CodexEngine:
-		if resolveEngineLLMProvider(data, LLMProviderOpenAI) == LLMProviderGitHub {
+		if NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
 			return []string{
 				"api.enterprise.githubcopilot.com",
 				"api.githubcopilot.com",
 				"api.business.githubcopilot.com",
 				"api.individual.githubcopilot.com",
 			}
+		}
+		if target := extractAPITargetHost(data, "OPENAI_BASE_URL"); target != "" {
+			return []string{target}
 		}
 		return []string{"api.openai.com"}
 	case *GeminiEngine:
