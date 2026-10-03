@@ -3063,6 +3063,14 @@ engine:
       # GitHub Actions secret name exposed to the engine runtime.
       secret: "example-value"
 
+  # Default execution environment for a behavior-defined engine. Applied before AWF
+  # configuration is built, so provider base URLs configure custom gateway upstreams
+  # and secret-valued variables are excluded from the agent. Workflow engine.env
+  # entries override these defaults.
+  # (optional)
+  env:
+    {}
+
   # Provider metadata for the engine
   # (optional)
   provider:
@@ -21503,6 +21511,14 @@ safe-outputs:
 
           # GitHub Actions secret name exposed to the engine runtime.
           secret: "example-value"
+
+      # Default execution environment for a behavior-defined engine. Applied before AWF
+      # configuration is built, so provider base URLs configure custom gateway upstreams
+      # and secret-valued variables are excluded from the agent. Workflow engine.env
+      # entries override these defaults.
+      # (optional)
+      env:
+        {}
 
       # Provider metadata for the engine
       # (optional)

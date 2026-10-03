@@ -73,6 +73,7 @@ const REFLECT_PROVIDER_ANTHROPIC = "anthropic";
 
 /**
  * @typedef {{
+ *   base_url?: string | null,
  *   configured?: boolean,
  *   models_url?: string | null,
  *   port?: number | null,
@@ -751,10 +752,19 @@ function inferWireApiForModel(providerType, modelName, catalogEntryOrModelsJson)
  * Prefers the origin of `models_url`; falls back to `http://api-proxy:<port>`.
  * Returns an empty string when neither is available.
  *
- * @param {{ models_url?: string | null, port?: number | null }} endpoint
+ * @param {ReflectEndpoint} endpoint
  * @returns {string}
  */
 function endpointBaseUrl(endpoint) {
+  if (typeof endpoint.base_url === "string" && endpoint.base_url) {
+    try {
+      const parsed = new URL(endpoint.base_url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+      return rewriteAPIProxyURLForHostBridge(`${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`);
+    } catch {
+      return "";
+    }
+  }
   if (typeof endpoint.models_url === "string" && endpoint.models_url) {
     try {
       return rewriteAPIProxyURLForHostBridge(new URL(endpoint.models_url).origin);
@@ -801,6 +811,7 @@ function deriveBaseUrlFromModelsURL(modelsUrl, env = process.env, readFileSync =
  *   provider?: string,
  *   reflectData: ReflectData | null | undefined,
  *   logger?: (msg: string) => void,
+ *   requireProviderMatch?: boolean,
  * }} options
  * @returns {{ provider: string, endpointProvider: string, port: number|null, baseUrl: string } | null}
  */
@@ -835,7 +846,12 @@ function resolveProviderEndpointFromReflect(options) {
     return normalized === provider;
   };
 
-  const matched = endpoints.find(ep => typeof ep?.provider === "string" && endpointProviderMatches(ep.provider)) || endpoints[0];
+  const providerEndpoint = endpoints.find(ep => typeof ep?.provider === "string" && endpointProviderMatches(ep.provider));
+  if (!providerEndpoint && options?.requireProviderMatch) {
+    logger(`awf-reflect: no configured endpoint found for provider=${provider}`);
+    return null;
+  }
+  const matched = providerEndpoint || endpoints[0];
   const baseUrl = endpointBaseUrl(matched);
   if (!baseUrl) {
     logger(`awf-reflect: matched provider=${provider} but could not derive baseUrl`);

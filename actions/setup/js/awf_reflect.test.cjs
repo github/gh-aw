@@ -390,6 +390,75 @@ describe("awf_reflect.cjs", () => {
           baseUrl: "http://api-proxy:10000",
         });
       });
+
+      it("requires a matching configured provider when requested", () => {
+        const logs = [];
+        const resolved = resolveProviderEndpointFromReflect({
+          provider: "openai",
+          requireProviderMatch: true,
+          reflectData: {
+            endpoints: [
+              { provider: "openai", configured: false, port: 10000 },
+              { provider: "copilot", configured: true, port: 10002 },
+            ],
+          },
+          logger: message => logs.push(message),
+        });
+        expect(resolved).toBeNull();
+        expect(logs.some(message => message.includes("no configured endpoint found for provider=openai"))).toBe(true);
+      });
+
+      it("preserves provider aliases with strict matching", () => {
+        const resolved = resolveProviderEndpointFromReflect({
+          provider: "github",
+          requireProviderMatch: true,
+          reflectData: { endpoints: [{ provider: "copilot", configured: true, port: 12002 }] },
+          logger: () => {},
+        });
+        expect(resolved?.baseUrl).toBe("http://api-proxy:12002");
+      });
+
+      it("prefers the authoritative base_url over models_url and port", () => {
+        const resolved = resolveProviderEndpointFromReflect({
+          provider: "openai",
+          requireProviderMatch: true,
+          reflectData: {
+            endpoints: [{ provider: "openai", configured: true, base_url: "http://api-proxy:12005/", models_url: "http://api-proxy:10000/v1/models", port: 10000 }],
+          },
+          logger: () => {},
+        });
+        expect(resolved?.baseUrl).toBe("http://api-proxy:12005");
+      });
+
+      it.each(["invalid URL", "file:///tmp/endpoint"])("rejects invalid authoritative base_url %s without fallback", baseUrl => {
+        expect(
+          resolveProviderEndpointFromReflect({
+            provider: "openai",
+            requireProviderMatch: true,
+            reflectData: { endpoints: [{ provider: "openai", configured: true, base_url: baseUrl, port: 10000 }] },
+            logger: () => {},
+          })
+        ).toBeNull();
+      });
+
+      it("applies the host bridge rewrite to base_url", () => {
+        const aliasesDir = fs.mkdtempSync(path.join(os.tmpdir(), "reflect-cursor-alias-"));
+        const aliasesPath = path.join(aliasesDir, "aliases");
+        fs.writeFileSync(aliasesPath, "api-proxy localhost\n");
+        vi.stubEnv("HOSTALIASES", aliasesPath);
+        try {
+          const resolved = resolveProviderEndpointFromReflect({
+            provider: "openai",
+            requireProviderMatch: true,
+            reflectData: { endpoints: [{ provider: "openai", configured: true, base_url: "http://api-proxy:12005" }] },
+            logger: () => {},
+          });
+          expect(resolved?.baseUrl).toBe("http://host.docker.internal:12005");
+        } finally {
+          vi.unstubAllEnvs();
+          fs.rmSync(aliasesDir, { recursive: true, force: true });
+        }
+      });
     });
 
     describe("resolveOpenAICompatibleEndpointFromReflect", () => {

@@ -77,18 +77,20 @@ const {
 
 The harness must:
 
-1. check `AWF_REFLECT_ENABLED` before using the AWF endpoint
+1. require `AWF_REFLECT_ENABLED=1`; fail rather than enabling direct inference when AWF is disabled
 2. call `fetchAWFReflect()` and require a successful response
 3. select the requested provider from `GH_AW_LLM_PROVIDER`
-4. use only an endpoint with `configured: true`
-5. map the resolved URL into the CLI's documented environment variable, flag, or config key
+4. use only an endpoint with `configured: true` for the requested provider (`requireProviderMatch: true`); never fall back to another provider
+5. map the reflected `base_url` into every inference/control endpoint environment variable, flag, or config key used by the CLI
 6. transform and validate the selected model using the discovered provider's syntax
 7. read the prompt from `GH_AW_PROMPT`, spawn the CLI without shell interpolation, and preserve its exit status
 8. fail with an actionable message when endpoint or model resolution is impossible
 
 Use `resolveProviderEndpointFromReflect()` when the CLI accepts a base URL. Use `resolveOpenAICompatibleEndpointFromReflect()` when it needs an OpenAI-compatible host and request path separately, as in the shared Goose harness. Use `resolveMultiProviderFromReflect()` only when the CLI consumes a generated multi-provider catalog. Parse `/reflect` directly only when the shared helpers cannot represent the engine's contract.
 
-`AWF_REFLECT_ENABLED=1` only indicates that reflection is available; it does not configure the CLI. The harness must fetch and apply the result. When AWF is disabled, preserve the CLI's documented environment-based fallback or fail clearly if the engine cannot run without reflection. See [LLM API Endpoint Discovery](llms.md) for the response shape and model-discovery behavior.
+`AWF_REFLECT_ENABLED=1` only indicates that reflection is available; it does not configure the CLI. The harness must fetch and apply the result. All LLM inference must use the gateway: do not use direct provider URLs, add direct inference domains to the network allowlist as a workaround, or fall back to native provider configuration when discovery fails.
+
+Configure a custom upstream through `engine.env.OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL`; gh-aw translates it to AWF's provider target and base path. Bind the provider key on the runner for the sidecar and pass only a placeholder to the CLI. Consult the pinned AWF `awf-config-spec.md` and `api-proxy-sidecar.md` for custom target and authentication semantics. Native-protocol pass-through does not imply protocol conversion, model-policy enforcement, or token accounting; verify and document those controls separately. See [LLM API Endpoint Discovery](llms.md) for the response shape and model-discovery behavior.
 
 ## Generate MCP configuration only when needed
 
@@ -141,6 +143,7 @@ engine:
 - `experimental: true` should be set for engines that are not yet considered stable.
 - `provider` and `models` describe provider defaults and supported model metadata.
 - `auth` declares engine-specific secret bindings forwarded into the runtime environment.
+- `env` supplies definition defaults applied before AWF configuration is built; use it for custom gateway upstream URLs and runner-side credential bindings. Workflow `engine.env` overrides take precedence.
 - `behaviors.capabilities` advertises runtime support such as `max-turns`, `tools-allowlist`, or `native-agent-file`.
 - `behaviors.manifest` lists engine-owned files and path prefixes that affect runtime behavior.
 - `behaviors.installation` defines CLI installation and optional verification steps.

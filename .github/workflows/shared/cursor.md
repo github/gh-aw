@@ -10,6 +10,10 @@ engine:
   auth:
     - role: api-key
       secret: CURSOR_API_KEY
+  env:
+    OPENAI_BASE_URL: https://api2.cursor.sh
+    OPENAI_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+    CURSOR_API_KEY: awf-proxy
   behaviors:
     supported-env-var-keys:
       - CURSOR_API_KEY
@@ -29,10 +33,6 @@ engine:
         - api.github.com
         - objects.githubusercontent.com
         - downloads.cursor.com
-        - api2.cursor.sh
-        - agentn.global.api5.cursor.sh
-      provider-domains:
-        cursor: api2.cursor.sh
     execution:
       command-name: cursor-agent
       args:
@@ -93,10 +93,11 @@ engine:
         fs.chmodSync(configPath, 0o600);
     harness-script: |
       const { createHash } = require("crypto");
-      const { existsSync, mkdtempSync, readFileSync, rmSync } = require("fs");
+      const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require("fs");
       const { tmpdir } = require("os");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
+      const { fetchAWFReflect, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
 
       const [, ...commandArgs] = process.argv.slice(2);
       const installDir = mkdtempSync(join(tmpdir(), "cursor-agent-"));
@@ -118,40 +119,73 @@ engine:
       };
       const log = message => process.stderr.write(`[cursor-harness] ${message}\n`);
 
-      try {
-        if (!process.env.CURSOR_API_KEY && process.env.SECRET_CURSOR_API_KEY) {
-          process.env.CURSOR_API_KEY = process.env.SECRET_CURSOR_API_KEY;
+      const main = async () => {
+        try {
+          if (process.env.AWF_REFLECT_ENABLED !== "1") {
+            throw new Error("Cursor requires the AWF LLM gateway; enable sandbox.agent: awf");
+          }
+          const result = await fetchAWFReflect({ logger: log });
+          if (!result.ok || !result.reflectData) {
+            throw new Error(`Unable to discover the Cursor LLM endpoint from /reflect: ${result.reason || "empty response"}`);
+          }
+          const endpoint = resolveProviderEndpointFromReflect({
+            provider: "openai",
+            reflectData: result.reflectData,
+            requireProviderMatch: true,
+            logger: log,
+          });
+          if (!endpoint?.baseUrl) {
+            throw new Error("No configured OpenAI gateway endpoint found in AWF /reflect; configure the Cursor custom upstream and CURSOR_API_KEY secret");
+          }
+
+          const release = releases[process.arch];
+          if (!release) throw new Error(`Unsupported Cursor Agent architecture: ${process.arch}`);
+          const releaseURL = `https://downloads.cursor.com/lab/${version}/linux/${release.arch}/agent-cli-package.tar.gz`;
+
+          fail(spawnSync("curl", ["--fail", "--location", "--silent", "--show-error", "--output", archive, releaseURL], { stdio: "inherit" }), "Cursor Agent download");
+          if (createHash("sha256").update(readFileSync(archive)).digest("hex") !== release.checksum) {
+            throw new Error("Cursor Agent download checksum did not match");
+          }
+          fail(spawnSync("tar", ["-xzf", archive, "-C", installDir], { stdio: "inherit" }), "Cursor Agent extraction");
+
+          const executable = join(installDir, "dist-package", "cursor-agent");
+          if (!existsSync(executable)) throw new Error("Cursor Agent executable was not found in the release archive");
+          fail(spawnSync(executable, ["--version"], { stdio: "inherit" }), "Cursor Agent verification");
+
+          const promptPath = process.env.GH_AW_PROMPT;
+          if (!promptPath) throw new Error("GH_AW_PROMPT is required");
+          const prompt = readFileSync(promptPath, "utf8");
+          const selectedModel = process.env.CURSOR_MODEL;
+          const model = selectedModel?.includes("/") ? selectedModel.slice(selectedModel.indexOf("/") + 1) : selectedModel;
+          const modelArgs = model ? ["--model", model] : [];
+          const configDir = join(installDir, "config");
+          mkdirSync(configDir, { recursive: true, mode: 0o700 });
+          writeFileSync(join(configDir, "cli-config.json"), JSON.stringify({
+            version: 1,
+            editor: { vimMode: false },
+            permissions: { allow: [], deny: [] },
+            network: { useHttp1ForAgent: true },
+          }), { mode: 0o600 });
+          const gatewayArgs = ["--endpoint", endpoint.baseUrl, "--agent-endpoint", endpoint.baseUrl, "--http-version", "1.1"];
+          fail(spawnSync(executable, [...commandArgs, ...modelArgs, ...gatewayArgs, prompt], {
+            stdio: "inherit",
+            env: {
+              ...process.env,
+              CURSOR_API_KEY: "awf-proxy",
+              CURSOR_CONFIG_DIR: configDir,
+              CURSOR_API_ENDPOINT: endpoint.baseUrl,
+              CURSOR_API_BASE_URL: endpoint.baseUrl,
+            },
+          }), "Cursor Agent execution");
+        } finally {
+          rmSync(installDir, { recursive: true, force: true });
         }
-        const release = releases[process.arch];
-        if (!release) throw new Error(`Unsupported Cursor Agent architecture: ${process.arch}`);
-        const releaseURL = `https://downloads.cursor.com/lab/${version}/linux/${release.arch}/agent-cli-package.tar.gz`;
+      };
 
-        fail(spawnSync("curl", ["--fail", "--location", "--silent", "--show-error", "--output", archive, releaseURL], { stdio: "inherit" }), "Cursor Agent download");
-        if (createHash("sha256").update(readFileSync(archive)).digest("hex") !== release.checksum) {
-          throw new Error("Cursor Agent download checksum did not match");
-        }
-        fail(spawnSync("tar", ["-xzf", archive, "-C", installDir], { stdio: "inherit" }), "Cursor Agent extraction");
-
-        const executable = join(installDir, "dist-package", "cursor-agent");
-        if (!existsSync(executable)) throw new Error("Cursor Agent executable was not found in the release archive");
-        fail(spawnSync(executable, ["--version"], { stdio: "inherit" }), "Cursor Agent verification");
-
-        const promptPath = process.env.GH_AW_PROMPT;
-        if (!promptPath) throw new Error("GH_AW_PROMPT is required");
-        const prompt = readFileSync(promptPath, "utf8");
-        const selectedModel = process.env.CURSOR_MODEL;
-        const model = selectedModel?.includes("/") ? selectedModel.slice(selectedModel.indexOf("/") + 1) : selectedModel;
-        const modelArgs = model ? ["--model", model] : [];
-        fail(spawnSync(executable, [...commandArgs, ...modelArgs, prompt], {
-          stdio: "inherit",
-          env: process.env,
-        }), "Cursor Agent execution");
-      } catch (error) {
+      main().catch(error => {
         log(error instanceof Error ? error.message : String(error));
         process.exitCode = 1;
-      } finally {
-        rmSync(installDir, { recursive: true, force: true });
-      }
+      });
     log-parser: |
       function parseLog(logContent) {
         const lines = logContent.split("\n");
@@ -231,6 +265,18 @@ imports:
 ```
 
 Configure the `CURSOR_API_KEY` GitHub Actions secret with an API key from the
-Cursor dashboard. Cursor serves the selected model through its own API, so this
-engine does not use universal provider routing.
+Cursor dashboard. The definition configures Cursor's upstream API as the AWF
+OpenAI route's custom target via `engine.env.OPENAI_BASE_URL`. The real key is
+bound to the runner's `OPENAI_API_KEY` for sidecar authentication and excluded
+from the agent; Cursor receives only the non-secret `awf-proxy` placeholder.
+
+The harness resolves the provider's live gateway URL using `awf_reflect.cjs`,
+binds both `--endpoint` and `--agent-endpoint`, and uses an ephemeral HTTP/1.1
+configuration. It does not hard-code a gateway port, fall back to another
+provider, or permit direct Cursor inference as a fallback. Disabling AWF is not
+supported. The OpenAI route forwards Cursor's native HTTP requests to the
+custom upstream; this is not an OpenAI protocol conversion. Cursor-specific
+model validation and token accounting are not supplied by this endpoint
+configuration, so do not assume those gateway controls cover Cursor's native
+protocol.
 -->

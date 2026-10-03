@@ -80,7 +80,7 @@ func TestParseEngineDefinitionFromJSON_CacheHitReturnsDeepCopy(t *testing.T) {
 	resetEngineDefinitionCacheForTest()
 	defer resetEngineDefinitionCacheForTest()
 
-	const engineJSON = `{"id":"test-engine","options":{"key":"value"}}`
+	const engineJSON = `{"id":"test-engine","options":{"key":"value"},"env":{"OPENAI_BASE_URL":"https://gateway.example"}}`
 
 	registerBuiltinEngineDefinitionJSON(engineJSON)
 
@@ -91,12 +91,14 @@ func TestParseEngineDefinitionFromJSON_CacheHitReturnsDeepCopy(t *testing.T) {
 
 	// Mutate the Options map on the returned definition.
 	first.Options["injected"] = "evil"
+	first.Env["OPENAI_BASE_URL"] = "https://mutated.example"
 
 	second, err := parseEngineDefinitionFromJSON(engineJSON)
 	require.NoError(t, err)
 	require.NotNil(t, second)
 	_, poisoned := second.Options["injected"]
 	assert.False(t, poisoned, "Options mutation leaked into cached state via shallow map copy")
+	assert.Equal(t, "https://gateway.example", second.Env["OPENAI_BASE_URL"], "Env mutation leaked into cached state")
 }
 
 func TestParseEngineDefinitionFromJSON_NonBuiltinNotCached(t *testing.T) {

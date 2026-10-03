@@ -519,6 +519,7 @@ func (e *BehaviorDefinedEngine) GetExecutionSteps(workflowData *WorkflowData, lo
 		return nil
 	}
 
+	workflowData = e.withDefinitionEnv(workflowData)
 	exec := behavior.Execution
 	firewallEnabled := e.behaviorDefinedFirewallEnabled(workflowData)
 	engineCommand := e.buildBehaviorDefinedEngineCommand(exec, workflowData)
@@ -527,6 +528,22 @@ func (e *BehaviorDefinedEngine) GetExecutionSteps(workflowData *WorkflowData, lo
 	steps := e.buildBehaviorDefinedSetupSteps()
 	steps = append(steps, e.buildBehaviorDefinedExecutionStep(exec, workflowData, command, env))
 	return steps
+}
+
+func (e *BehaviorDefinedEngine) withDefinitionEnv(workflowData *WorkflowData) *WorkflowData {
+	if workflowData == nil || len(e.definition.Env) == 0 {
+		return workflowData
+	}
+	data := *workflowData
+	config := EngineConfig{ID: e.GetID()}
+	if workflowData.EngineConfig != nil {
+		config = *workflowData.EngineConfig
+	}
+	env := maps.Clone(e.definition.Env)
+	maps.Copy(env, config.Env)
+	config.Env = env
+	data.EngineConfig = &config
+	return &data
 }
 
 func (e *BehaviorDefinedEngine) buildBehaviorDefinedSetupSteps() []GitHubActionStep {
@@ -909,6 +926,7 @@ func deepCopyAny(v any) any {
 // nor the cache can corrupt the other's state through shared references.
 func deepCopyEngineDefinition(src EngineDefinition) EngineDefinition {
 	dst := src // value copy covers all scalar fields
+	dst.Env = maps.Clone(src.Env)
 
 	// Models.Supported
 	if src.Models.Supported != nil {

@@ -43,12 +43,45 @@ Read the closest examples before making changes:
   without native MCP
 - `.github/workflows/shared/crush.md`: native MCP configuration adapter and
   harness
-- `.github/workflows/shared/cursor.md`: plugin support
+- `.github/workflows/shared/cursor.md`: custom upstream gateway routing and plugins
 - `.github/workflows/shared/deepseek-harness.md`: provider endpoint discovery
   and a headless profile
 
 Use the examples to identify a pattern, not as a reason to copy optional
 behaviors.
+
+## Require gateway-only inference
+
+Agentic engines must send all LLM inference through the AWF LLM gateway.
+Running inside AWF, allowing a provider domain in Squid, starting the MCP
+gateway, or setting `AWF_REFLECT_ENABLED=1` does not route inference.
+
+Resolve the live provider endpoint with the shared `awf_reflect.cjs` helpers
+before launching the CLI or driver, and pass that URL through its actual
+endpoint flag, environment variable, or configuration. Require a configured
+matching provider (`requireProviderMatch: true`); never select an unrelated
+provider, hard-code a gateway port, or fall back to a direct upstream URL.
+Use the reflected `base_url` and retain any protocol-required path prefix.
+Bind separate control/API and inference endpoints when the engine has both.
+
+Fail explicitly when AWF, reflection, or a compatible provider is unavailable.
+Disabling AWF must not enable direct inference for an imported engine.
+Do not add direct inference domains to engine network defaults as a workaround.
+Configure custom upstreams on the gateway, not on the CLI: use
+`engine.env.OPENAI_BASE_URL` (or `ANTHROPIC_BASE_URL`) to select the AWF target,
+bind the provider key as a runner environment variable, and let AWF exclude it
+from the agent and inject authentication in the sidecar. Give the CLI only a
+non-secret placeholder. Review the pinned firewall's `awf-config-spec.md` and
+`api-proxy-sidecar.md` for target, base-path, and auth-header semantics.
+Native-protocol pass-through, such as Cursor on a custom OpenAI target, is not
+protocol conversion or proof of model-policy/token-accounting support. Verify
+the request contract and document missing controls; extend the upstream AWF
+adapter when those controls or the protocol itself are unsupported.
+
+Reuse the existing harness runtime and helpers before adding schema fields.
+Precompute reflection and pass it to a driver only when its runtime cannot
+consume the shared helpers; precomputation must happen inside the active AWF
+network and preserve the same matching-provider and fail-closed checks.
 
 ## Add a shared engine definition
 
@@ -85,6 +118,9 @@ Keep the definition declarative and minimal:
   verification command under `behaviors.installation`.
 - Put invocation arguments and non-secret environment variables under
   `behaviors.execution`.
+- Put gateway upstream URLs and runner-side credential bindings in the
+  definition's `engine.env` defaults, which are applied before AWF configuration
+  is built. Workflow `engine.env` overrides take precedence.
 - Use an existing secret strategy and provider environment mode where
   possible.
 - Declare native MCP support only when the CLI can consume the generated
@@ -179,6 +215,8 @@ Do not trigger a smoke workflow from a Copilot cloud agent run.
 - The declarative path was preferred unless its limitations are documented.
 - The engine definition uses a pinned, verified installation.
 - Authentication, provider/model handling, MCP, and network access are covered.
+- All inference endpoints are gateway-bound; unavailable reflection, a missing
+  or incompatible provider, and disabled AWF fail without direct fallback.
 - Harnesses and adapters do not expose secrets or interpolate untrusted input.
 - `.github/aw/engines.json`, smoke workflow, generated lock file,
   documentation, and changeset are updated when applicable.

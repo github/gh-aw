@@ -37,6 +37,12 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI inte
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
 
+The Cursor sample uses the AWF OpenAI route with Cursor's API as its custom
+upstream. Both Cursor API and agent endpoints are bound to the gateway URL
+discovered through `/reflect`; missing reflection or disabled AWF fails before
+Cursor launches. This forwards Cursor's native HTTP protocol without converting
+it to OpenAI, and does not supply Cursor-specific model or token accounting.
+
 ## Which engine should I choose?
 
 Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers, native MCP, codemode, and SDK/RPC execution.

@@ -347,6 +347,7 @@ type EngineDefinition struct {
 	Provider  ProviderSelection         `yaml:"provider,omitempty"`
 	Models    ModelSelection            `yaml:"models,omitempty"`
 	Auth      []AuthBinding             `yaml:"auth,omitempty"`
+	Env       map[string]string         `yaml:"env,omitempty"`
 	Options   map[string]any            `yaml:"options,omitempty"`
 	Behaviors *EngineBehaviorDefinition `yaml:"behaviors,omitempty"`
 }
