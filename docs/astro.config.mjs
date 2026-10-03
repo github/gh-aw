@@ -253,12 +253,14 @@ export default defineConfig({
     "/reference/repository-package-manifest/": "/gh-aw/reference/aw-yml-package-manifest/",
   },
   integrations: [
-    // Dev-only page for the social preview image (see scripts/capture-og.mjs).
+    // Dev-only pages for the social preview images (see scripts/capture-og.mjs).
     {
       name: "og-preview",
       hooks: {
         "astro:config:setup": ({ command, injectRoute }) => {
-          if (command === "dev") injectRoute({ pattern: "/og/home", entrypoint: "./src/og/OgHome.astro" });
+          if (command !== "dev") return;
+          injectRoute({ pattern: "/og-preview/home", entrypoint: "./src/og/OgHome.astro" });
+          injectRoute({ pattern: "/og-preview/background", entrypoint: "./src/og/OgBackground.astro" });
         },
       },
     },

@@ -1,5 +1,6 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
+import { getCollection } from 'astro:content';
 
 type BlogAuthor = {
   name?: string;
@@ -14,9 +15,6 @@ const pathname = Astro.url.pathname;
 // Detect blog posts by URL path - more reliable than entry.id   
 const isBlogPath = pathname.includes('/blog/');
 
-// Social image, generated from src/og/OgHome.astro with `npm run og`.
-const socialImage = 'https://github.github.com/gh-aw/og-home-1200x630.png';
-const socialImageAlt = 'GitHub Agentic Workflows: intelligent GitHub repository automation, with your own agents.';
 
 // Build enhanced OG title: "Page Title | Site Name" (target: 50-60 chars)
 const siteTitle = 'GitHub Agentic Workflows';
@@ -29,6 +27,21 @@ const ogTitle = isHomePage ? siteTitle : `${rawPageTitle} | ${siteTitle}`;
 // Default description (110-160 chars optimal for OG)
 const defaultDescription = 'Intelligent GitHub repository automation with Copilot, Claude Code, Codex or Gemini. Agents triage, investigate and open pull requests safely in GitHub Actions.';
 const pageDescription = entry?.data?.description || defaultDescription;
+
+// Social image: the site card (src/og/OgHome.astro, `npm run og`) for the home
+// page and pages outside the docs collection; otherwise the page's own card
+// from src/pages/og/[...slug].png.ts.
+// Blog index and tag pages carry entries outside the collection (or another
+// page's entry), so require a real collection entry whose id matches the URL.
+const docIds = new Set((await getCollection('docs')).map(({ id }) => id));
+const hasPageImage =
+  !isHomePage && Boolean(entry) && docIds.has(entry!.id) && pathname.replace(/\/$/, '') === `/gh-aw/${entry!.id}`;
+const socialImage = hasPageImage
+  ? `https://github.github.com/gh-aw/og/${entry!.id}.png`
+  : 'https://github.github.com/gh-aw/og-home-1200x630.png';
+const socialImageAlt = hasPageImage
+  ? `${rawPageTitle}, from the GitHub Agentic Workflows docs.`
+  : 'GitHub Agentic Workflows: intelligent GitHub repository automation, with your own agents.';
 const configuredSite = Astro.site ?? new URL('https://github.github.com');
 const siteOrigin = configuredSite.origin;
 const siteUrl = new URL(import.meta.env.BASE_URL, configuredSite).toString();

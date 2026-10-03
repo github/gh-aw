@@ -30,3 +30,21 @@ test("serves the social image", async ({ request }) => {
   expect(response.ok()).toBe(true);
   expect(response.headers()["content-type"]).toBe("image/png");
 });
+
+test("gives documentation pages their own social image", async ({ page, request }) => {
+  await page.goto("/gh-aw/setup/creating-workflows/");
+
+  const image = "https://github.github.com/gh-aw/og/setup/creating-workflows.png";
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", image);
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", image);
+
+  const response = await request.get("/gh-aw/og/setup/creating-workflows.png");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toBe("image/png");
+});
+
+test("falls back to the site image for pages outside the docs collection", async ({ page }) => {
+  await page.goto("/gh-aw/blog/");
+
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://github.github.com/gh-aw/og-home-1200x630.png");
+});
