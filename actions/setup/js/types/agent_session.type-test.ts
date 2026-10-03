@@ -10,8 +10,7 @@ const messages: CoreSessionEvent[] = [
   { type: "tool.execution_complete", data: { toolCallId: "call", success: false, output: null } },
   { type: "session.result", data: { numTurns: 0, usage: { input_tokens: 0 }, errors: [{ code: "failed" }] } },
   { type: "session.format", data: { version: 1 } },
-  { type: "session.runtime", data: { engine: "copilot", engineVersion: "1.0.90" } },
-  { type: "session.sandbox", data: { firewallEnabled: false, allowedDomains: [] } },
+  { type: "session.sandbox", data: { engine: "copilot", engineVersion: "1.0.90", firewallEnabled: false, allowedDomains: [] } },
   { type: "workflow.aw_info", data: { nested: { futureField: true } } },
 ];
 void messages;
@@ -48,12 +47,10 @@ createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.
 createSessionEvent({}, "session.format", {});
 
-createSessionEvent({}, "session.runtime", { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "docker" });
-createSessionEvent({}, "session.runtime", { engine: "custom" });
 // @ts-expect-error Engine versions are strings, not numbers.
-createSessionEvent({}, "session.runtime", { engineVersion: 1 });
+createSessionEvent({}, "session.sandbox", { engineVersion: 1 });
 // @ts-expect-error Sandbox runtime names are strings, not flags.
-createSessionEvent({}, "session.runtime", { sandboxRuntime: false });
+createSessionEvent({}, "session.sandbox", { runtime: false });
 
 createSessionEvent({}, "session.sandbox", { runtime: "docker", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com"] });
 createSessionEvent({}, "session.sandbox", { firewallEnabled: false, allowedDomains: [] });

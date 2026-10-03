@@ -39,17 +39,18 @@ describe("Unified conclusion session", () => {
     const createdAt = "2026-10-02T00:00:00Z";
     write(metadataPath, { engine_id: "copilot", agent_version: "1.0.90", version: "configured", cli_version: "0.90.0", agent_runtime: "cloud-hypervisor", created_at: createdAt });
     const events = writeUnifiedSession({ rootDir: root });
-    const runtime = events.filter(event => event.type === "session.runtime");
-    expect(runtime).toEqual([
+    const sandbox = events.filter(event => event.type === "session.sandbox");
+    expect(sandbox).toEqual([
       {
-        type: "session.runtime",
+        type: "session.sandbox",
         timestamp: createdAt,
-        data: { engine: "copilot", engineVersion: "1.0.90", sandboxRuntime: "cloud-hypervisor" },
+        data: { engine: "copilot", engineVersion: "1.0.90", runtime: "cloud-hypervisor" },
         provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 1, timestampMs: Date.parse(createdAt) },
       },
     ]);
     const published = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
-    expect(published.filter(event => event.type === "session.runtime")).toEqual(runtime);
+    expect(published.filter(event => event.type === "session.sandbox")).toEqual(sandbox);
+    expect(events.some(event => event.type === "session.runtime")).toBe(false);
     expect(published[0].type).toBe("session.format");
     expect(events.some(event => event.type === "session.init")).toBe(false);
     expect(events.find(event => event.type === "workflow.aw_info")).toMatchObject({
@@ -121,11 +122,12 @@ describe("Unified conclusion session", () => {
       {
         type: "session.sandbox",
         timestamp: createdAt,
-        data: { runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com", "api.github.com"] },
-        provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 3, timestampMs: Date.parse(createdAt) },
+        data: { engine: "copilot", runtime: "cloud-hypervisor", firewallEnabled: true, firewallType: "squid", firewallVersion: "v0.30.1", mcpGatewayVersion: "v1.0.0", allowedDomains: ["example.com", "api.github.com"] },
+        provenance: { component: "workflow", phase: "activation", path: metadataPath, index: 1, timestampMs: Date.parse(createdAt) },
       },
     ]);
-    expect(events.find(event => event.type === "session.sandbox").data.runtime).toBe(events.find(event => event.type === "session.runtime").data.sandboxRuntime);
+    expect(events.filter(event => event.type === "session.sandbox")).toHaveLength(1);
+    expect(events.some(event => event.type === "session.runtime")).toBe(false);
     writeUnifiedSession({ rootDir: root });
     expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse)).toEqual(published);
   });
@@ -153,7 +155,7 @@ describe("Unified conclusion session", () => {
     expect(sandbox[0].provenance).not.toHaveProperty("timestampMs");
   });
 
-  it.each([{}, { engine_id: "custom" }, { firewall_enabled: false, allowed_domains: [] }, { agent_runtime: "", firewall_enabled: null, awf_version: "", awmg_version: "", steps: [], allowed_domains: null }])(
+  it.each([{}, { firewall_enabled: false, allowed_domains: [] }, { agent_runtime: "", firewall_enabled: null, awf_version: "", awmg_version: "", steps: [], allowed_domains: null }])(
     "does not fabricate a sandbox event without sandbox evidence (%j)",
     metadata => {
       write("aw_info.json", metadata);
@@ -182,34 +184,34 @@ describe("Unified conclusion session", () => {
   it.each([
     [
       { engine_id: "claude", agent_version: "", version: "2.1.160", cli_version: "0.90.0", agent_runtime: "", firewall_enabled: true },
-      { engine: "claude", engineVersion: "2.1.160", sandboxRuntime: "docker" },
+      { engine: "claude", engineVersion: "2.1.160", runtime: "docker", firewallEnabled: true },
     ],
     [
       { engine_id: "codex", agent_version: "0.118.0", agent_runtime: "docker-sudo-iptables", firewall_enabled: true },
-      { engine: "codex", engineVersion: "0.118.0", sandboxRuntime: "docker-sudo-iptables" },
+      { engine: "codex", engineVersion: "0.118.0", runtime: "docker-sudo-iptables", firewallEnabled: true },
     ],
     [
       { engine_id: "custom", agent_runtime: "", firewall_enabled: false, sandbox_configuration_observed: true },
-      { engine: "custom", sandboxRuntime: "none" },
+      { engine: "custom", runtime: "none", firewallEnabled: false },
     ],
     [{ engine_id: "custom", agent_version: "", version: "", cli_version: "0.90.0", agent_runtime: "" }, { engine: "custom" }],
     [{ engine_id: "pi", agent_version: null, version: 1, agent_runtime: null }, { engine: "pi" }],
-    [{ agent_runtime: "cloud-hypervisor" }, { sandboxRuntime: "cloud-hypervisor" }],
-  ])("records partial identity and known runtime defaults without inventing unavailable values (%j)", (metadata, expected) => {
+    [{ agent_runtime: "cloud-hypervisor" }, { runtime: "cloud-hypervisor" }],
+  ])("records partial engine and sandbox metadata without inventing unavailable values (%j)", (metadata, expected) => {
     write("aw_info.json", metadata);
-    const runtime = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "session.runtime");
-    expect(runtime).toHaveLength(1);
-    expect(runtime[0].data).toEqual(expected);
-    expect(runtime[0]).not.toHaveProperty("timestamp");
-    expect(runtime[0].provenance).not.toHaveProperty("timestampMs");
+    const sandbox = collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "session.sandbox");
+    expect(sandbox).toHaveLength(1);
+    expect(sandbox[0].data).toEqual(expected);
+    expect(sandbox[0]).not.toHaveProperty("timestamp");
+    expect(sandbox[0].provenance).not.toHaveProperty("timestampMs");
   });
 
   it.each([{}, { engine_id: "", agent_version: "", version: "", cli_version: "0.90.0", agent_runtime: "" }])("does not invent runtime identity from empty metadata (%j)", metadata => {
     write("aw_info.json", metadata);
-    expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.runtime")).toBe(false);
+    expect(collectUnifiedSession({ rootDir: root }).events.some(event => event.type === "session.sandbox")).toBe(false);
   });
 
-  it("prefers original run metadata over a usage mirror and redacts runtime identity", () => {
+  it("prefers original run metadata over a usage mirror and redacts combined engine and sandbox identity", () => {
     write("aw_info.json", { engine_id: "custom", agent_version: "opaque-mask", agent_runtime: "docker" });
     write("usage/aw_info.json", { engine_id: "copilot", agent_version: "duplicate", agent_runtime: "cloud-hypervisor" });
     write("agent-stdio.log", "::add-mask::opaque-mask\n");
@@ -233,8 +235,9 @@ describe("Unified conclusion session", () => {
         .trimEnd()
         .split("\n")
         .map(JSON.parse)
-        .filter(event => event.type === "session.runtime")
-    ).toEqual([expect.objectContaining({ data: { engine: "custom", engineVersion: "***", sandboxRuntime: "docker" }, provenance: expect.objectContaining({ path: "aw_info.json" }) })]);
+        .filter(event => event.type === "session.sandbox")
+    ).toEqual([expect.objectContaining({ data: { engine: "custom", engineVersion: "***", runtime: "docker" }, provenance: expect.objectContaining({ path: "aw_info.json" }) })]);
+    expect(content).not.toContain('"type":"session.runtime"');
   });
 
   it("merges every required component with essential payloads and timestamp ordering", () => {
@@ -435,7 +438,6 @@ describe("Unified conclusion session", () => {
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ type: "session.format", data: { version: 1 } });
     expect(events[0].provenance).not.toHaveProperty("timestampMs");
-    expect(events.some(event => event.type === "session.runtime")).toBe(false);
     expect(events.some(event => event.type === "session.sandbox")).toBe(false);
     expect(events[1]).toMatchObject({ type: "session.collection", data: { absentComponents: ["agent", "mcp", "firewall", "safe_output", "experiment", "grader", "eval"], warnings: 0, untimedEvents: 0 } });
   });

@@ -72,7 +72,7 @@ function eventDetail(event) {
     case "session.runtime":
       return fields(data, ["engine", "engineVersion", "sandboxRuntime"]);
     case "session.sandbox":
-      return fields(data, ["runtime", "firewallEnabled", "firewallType", "firewallVersion", "mcpGatewayVersion", "allowedDomains"]);
+      return fields(data, ["engine", "engineVersion", "runtime", "firewallEnabled", "firewallType", "firewallVersion", "mcpGatewayVersion", "allowedDomains"]);
     case "session.init":
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);

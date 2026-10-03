@@ -126,29 +126,6 @@ function observedSandboxRuntime(info) {
 }
 
 /**
- * Installation metadata identifies the engine CLI, not the gh-aw compiler.
- * An empty runtime selector uses Docker only when sandboxing is known enabled.
- * @param {SessionEvent} record
- * @returns {import("./types/agent_session").SessionRuntimeEvent | undefined}
- */
-function runtimeSessionEvent(record) {
-  const info = record.data;
-  const engine = observedString(info.engine_id);
-  const engineVersion = observedString(info.agent_version) ?? observedString(info.version);
-  const sandboxRuntime = observedSandboxRuntime(info);
-  if (engine === undefined && engineVersion === undefined && sandboxRuntime === undefined) return undefined;
-  return {
-    ...record,
-    type: "session.runtime",
-    data: {
-      ...(engine !== undefined ? { engine } : {}),
-      ...(engineVersion !== undefined ? { engineVersion } : {}),
-      ...(sandboxRuntime !== undefined ? { sandboxRuntime } : {}),
-    },
-  };
-}
-
-/**
  * @param {SessionEvent} record
  * @returns {import("./types/agent_session").SessionSandboxEvent | undefined}
  */
@@ -159,8 +136,12 @@ function sandboxSessionEvent(record) {
   const mcpGatewayVersion = observedString(info.awmg_version);
   const steps = info.steps;
   const firewallType = observedString(steps && typeof steps === "object" && !Array.isArray(steps) && "firewall" in steps ? steps.firewall : undefined);
+  const engine = observedString(info.engine_id);
+  const engineVersion = observedString(info.agent_version) ?? observedString(info.version);
   /** @type {import("./types/agent_session").SessionSandboxData} */
   const data = {
+    ...(engine !== undefined ? { engine } : {}),
+    ...(engineVersion !== undefined ? { engineVersion } : {}),
     ...(runtime !== undefined ? { runtime } : {}),
     ...(typeof info.firewall_enabled === "boolean" && (info.firewall_enabled || info.sandbox_configuration_observed === true) ? { firewallEnabled: info.firewall_enabled } : {}),
     ...(firewallType !== undefined ? { firewallType } : {}),
@@ -298,15 +279,11 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     if (engine === undefined && typeof observedEngine === "string") engine = observedEngine;
     if (source) {
       const runtimeEvents = source.events.flatMap(event => {
-        const runtime = runtimeSessionEvent(event);
-        return runtime ? [runtime] : [];
-      });
-      const infoEvents = source.events.map(event => createSessionEvent(event, "workflow.aw_info", {}));
-      const sandboxEvents = source.events.flatMap(event => {
         const sandbox = sandboxSessionEvent(event);
         return sandbox ? [sandbox] : [];
       });
-      source.events.push(...runtimeEvents, ...infoEvents, ...sandboxEvents);
+      const infoEvents = source.events.map(event => createSessionEvent(event, "workflow.aw_info", {}));
+      source.events.push(...runtimeEvents, ...infoEvents);
     }
   }
   const stdio = path.join(rootDir, "agent-stdio.log");

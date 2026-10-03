@@ -124,19 +124,9 @@ export interface SessionFileFormatEvent extends EventMetadata {
   data: SessionFileFormatData;
 }
 
-export interface SessionRuntimeData {
+export interface SessionSandboxData {
   engine?: string;
   engineVersion?: string;
-  sandboxRuntime?: string;
-  [key: string]: unknown;
-}
-
-export interface SessionRuntimeEvent extends EventMetadata {
-  type: "session.runtime";
-  data: SessionRuntimeData;
-}
-
-export interface SessionSandboxData {
   runtime?: string;
   firewallEnabled?: boolean;
   firewallType?: string;
@@ -161,21 +151,10 @@ export interface WorkflowAwInfoEvent extends EventMetadata {
 }
 
 export type CoreSessionEvent =
-  | SessionInitEvent
-  | UserMessageEvent
-  | AssistantMessageEvent
-  | AssistantReasoningEvent
-  | ToolExecutionStartEvent
-  | ToolExecutionCompleteEvent
-  | SessionResultEvent
-  | SessionFileFormatEvent
-  | SessionRuntimeEvent
-  | SessionSandboxEvent
-  | WorkflowAwInfoEvent;
+  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | SessionSandboxEvent | WorkflowAwInfoEvent;
 
 export interface SessionEventDataMap {
   "session.format": SessionFileFormatData;
-  "session.runtime": SessionRuntimeData;
   "session.sandbox": SessionSandboxData;
   "workflow.aw_info": WorkflowAwInfoData;
   "session.init": SessionInitData;
