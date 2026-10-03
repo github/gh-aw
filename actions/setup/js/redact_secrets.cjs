@@ -24,7 +24,16 @@ function findFiles(dir, extensions) {
     if (!fs.existsSync(dir)) {
       return results;
     }
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+        core.warning(`Skipping inaccessible directory during secret redaction: ${dir}`);
+        return results;
+      }
+      throw error;
+    }
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isSymbolicLink()) {

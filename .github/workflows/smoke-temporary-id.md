@@ -22,7 +22,7 @@ permissions:
   issues: read
   pull-requests: read
 engine: pi
-model: copilot/auto
+model: copilot/gpt-5.4-mini
 strict: true
 network:
   allowed:

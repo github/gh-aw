@@ -25,6 +25,7 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
+  copilot-requests: write
 
 strict: true
 
@@ -34,10 +35,10 @@ runtimes:
 
 # AI engine configuration
 max-turns: 90  # Reduce from avg 115 turns
-model: openai/gpt-5.4
+model: copilot/claude-sonnet-5.5
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 # Shared instructions
 imports:
   - uses: shared/daily-pr-base.md

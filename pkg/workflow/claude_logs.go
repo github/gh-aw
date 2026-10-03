@@ -15,19 +15,12 @@ var claudeLogsLog = logger.New("workflow:claude_logs")
 // ParseLogMetrics implements engine-specific log parsing for Claude
 func (e *ClaudeEngine) ParseLogMetrics(logContent string, verbose bool) LogMetrics {
 	claudeLogsLog.Printf("Parsing Claude log metrics: %d bytes", len(logContent))
-	var metrics LogMetrics
-	var maxTokenUsage int
-
-	// First try to parse as JSON array (Claude logs are structured as JSON arrays)
-	if strings.TrimSpace(logContent) != "" {
-		if resultMetrics := e.parseClaudeJSONLog(logContent, verbose); resultMetrics.TokenUsage > 0 || resultMetrics.EstimatedCost > 0 || resultMetrics.Turns > 0 || len(resultMetrics.ToolCalls) > 0 || len(resultMetrics.ToolSequences) > 0 {
-			metrics.TokenUsage = resultMetrics.TokenUsage
-			metrics.EstimatedCost = resultMetrics.EstimatedCost
-			metrics.Turns = resultMetrics.Turns
-			metrics.ToolCalls = resultMetrics.ToolCalls         // Copy tool calls
-			metrics.ToolSequences = resultMetrics.ToolSequences // Copy tool sequences
-		}
+	entries := e.parseClaudeLogEntries(logContent, verbose)
+	if hasClaudeResultEntry(entries) {
+		return e.extractClaudeMetricsFromEntries(entries, verbose)
 	}
+	metrics := e.extractClaudeMetricsFromEntries(entries, verbose)
+	var maxTokenUsage int
 
 	// Process line by line for error counting and fallback parsing
 	lines := strings.SplitSeq(logContent, "\n")
@@ -141,16 +134,6 @@ func (e *ClaudeEngine) extractClaudeResultMetrics(line string) LogMetrics {
 	return metrics
 }
 
-// parseClaudeJSONLog parses Claude logs as a JSON array or mixed format (debug logs + JSONL)
-func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMetrics {
-	claudeLogsLog.Print("Attempting to parse Claude JSON log")
-	logEntries := e.parseClaudeLogEntries(logContent, verbose)
-	if len(logEntries) == 0 {
-		return LogMetrics{}
-	}
-	return e.extractClaudeMetricsFromEntries(logEntries, verbose)
-}
-
 func (e *ClaudeEngine) parseClaudeLogEntries(logContent string, verbose bool) []map[string]any {
 	var logEntries []map[string]any
 	if err := json.Unmarshal([]byte(logContent), &logEntries); err == nil {
@@ -178,6 +161,9 @@ func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose boo
 	var logEntries []map[string]any
 	lines := strings.Split(logContent, "\n")
 	for i := 0; i < len(lines); i++ {
+		if i < 0 || i >= len(lines) {
+			break
+		}
 		trimmedLine := strings.TrimSpace(lines[i])
 		if trimmedLine == "" {
 			continue
@@ -198,14 +184,18 @@ func (e *ClaudeEngine) parseClaudeMixedLogEntries(logContent string, verbose boo
 }
 
 func extractClaudeJSONArrayEntries(lines []string, start int) ([]map[string]any, int) {
+	if start < 0 || start >= len(lines) {
+		return nil, start
+	}
 	buf := strings.TrimSpace(lines[start])
 	end := start
 	if !strings.Contains(buf, "]") {
 		var sb strings.Builder
-		for j := start + 1; j < len(lines); j++ {
-			sb.WriteString("\n" + lines[j])
+		for offset, line := range lines[start+1:] {
+			j := start + 1 + offset
+			sb.WriteString("\n" + line)
 			end = j
-			if strings.Contains(lines[j], "]") {
+			if strings.Contains(line, "]") {
 				break
 			}
 		}
@@ -248,22 +238,33 @@ func parseClaudeJSONEntry(trimmedLine string, verbose bool) (map[string]any, boo
 func (e *ClaudeEngine) extractClaudeMetricsFromEntries(logEntries []map[string]any, verbose bool) LogMetrics {
 	var metrics LogMetrics
 	toolCallMap := make(map[string]*ToolCallInfo) // Track tool calls across entries
-	var currentSequence []string                  // Track tool sequence within current context
+	toolIDs := make(map[string]string)
+	sessions := make(map[string]*LogMetrics)
+	var currentSequence []string // Track tool sequence within current context
 
-	var done bool
 	for _, entry := range logEntries {
+		sessionID, _ := typeutil.LookupString(entry, "session_id")
+		parentID, _ := typeutil.LookupString(entry, "parent_tool_use_id")
+		context := sessionID + "\x00" + parentID + "\x00"
 		switch e.claudeEntryType(entry) {
 		case "result":
-			e.applyClaudeResultEntry(&metrics, entry, verbose)
-			done = true
+			if parentID != "" {
+				continue
+			}
+			if sessions[sessionID] == nil {
+				sessions[sessionID] = &LogMetrics{}
+			}
+			e.applyClaudeResultEntry(sessions[sessionID], entry, verbose)
 		case "assistant":
-			currentSequence = append(currentSequence, e.claudeAssistantSequence(entry, toolCallMap)...)
+			currentSequence = append(currentSequence, e.claudeAssistantSequence(entry, toolCallMap, toolIDs, context)...)
 		case "user":
-			e.claudeUserToolResults(entry, toolCallMap)
+			e.claudeUserToolResults(entry, toolCallMap, toolIDs, context)
 		}
-		if done {
-			break
-		}
+	}
+	for _, snapshot := range sessions {
+		metrics.TokenUsage += snapshot.TokenUsage
+		metrics.EstimatedCost += snapshot.EstimatedCost
+		metrics.Turns += snapshot.Turns
 	}
 
 	FinalizeToolCallsAndSequence(&metrics, toolCallMap, currentSequence)
@@ -281,8 +282,17 @@ func (e *ClaudeEngine) extractClaudeMetricsFromEntries(logEntries []map[string]a
 }
 
 func (e *ClaudeEngine) claudeEntryType(entry map[string]any) string {
-	typeStr, _ := entry["type"].(string)
+	typeStr, _ := typeutil.LookupString(entry, "type")
 	return typeStr
+}
+
+func hasClaudeResultEntry(entries []map[string]any) bool {
+	for _, entry := range entries {
+		if entry["type"] == "result" {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *ClaudeEngine) applyClaudeResultEntry(metrics *LogMetrics, entry map[string]any, verbose bool) {
@@ -313,7 +323,7 @@ func (e *ClaudeEngine) applyClaudeResultEntry(metrics *LogMetrics, entry map[str
 	}
 }
 
-func (e *ClaudeEngine) claudeAssistantSequence(entry map[string]any, toolCallMap map[string]*ToolCallInfo) []string {
+func (e *ClaudeEngine) claudeAssistantSequence(entry map[string]any, toolCallMap map[string]*ToolCallInfo, toolIDs map[string]string, context string) []string {
 	messageMap, ok := entry["message"].(map[string]any)
 	if !ok {
 		return nil
@@ -322,10 +332,10 @@ func (e *ClaudeEngine) claudeAssistantSequence(entry map[string]any, toolCallMap
 	if !ok {
 		return nil
 	}
-	return e.parseToolCallsWithSequence(contentArray, toolCallMap)
+	return e.parseToolCallsWithSequence(contentArray, toolCallMap, toolIDs, context)
 }
 
-func (e *ClaudeEngine) claudeUserToolResults(entry map[string]any, toolCallMap map[string]*ToolCallInfo) {
+func (e *ClaudeEngine) claudeUserToolResults(entry map[string]any, toolCallMap map[string]*ToolCallInfo, toolIDs map[string]string, context string) {
 	messageMap, ok := entry["message"].(map[string]any)
 	if !ok {
 		return
@@ -334,11 +344,11 @@ func (e *ClaudeEngine) claudeUserToolResults(entry map[string]any, toolCallMap m
 	if !ok {
 		return
 	}
-	e.parseToolCallsWithSequence(contentArray, toolCallMap)
+	e.parseToolCallsWithSequence(contentArray, toolCallMap, toolIDs, context)
 }
 
 // parseToolCallsWithSequence extracts tool call information from Claude log content array and returns sequence
-func (e *ClaudeEngine) parseToolCallsWithSequence(contentArray []any, toolCallMap map[string]*ToolCallInfo) []string {
+func (e *ClaudeEngine) parseToolCallsWithSequence(contentArray []any, toolCallMap map[string]*ToolCallInfo, toolIDs map[string]string, context string) []string {
 	var sequence []string
 
 	for _, contentItem := range contentArray {
@@ -354,11 +364,18 @@ func (e *ClaudeEngine) parseToolCallsWithSequence(contentArray []any, toolCallMa
 
 		switch typeStr {
 		case "tool_use":
+			id, _ := typeutil.LookupString(contentMap, "id")
+			if id != "" && toolIDs[context+id] != "" {
+				continue
+			}
 			if prettifiedName, ok := e.recordClaudeToolUse(contentMap, toolCallMap); ok {
 				sequence = append(sequence, prettifiedName)
+				if id != "" {
+					toolIDs[context+id] = prettifiedName
+				}
 			}
 		case "tool_result":
-			e.recordClaudeToolResult(contentMap, toolCallMap)
+			e.recordClaudeToolResult(contentMap, toolCallMap, toolIDs, context)
 		}
 	}
 
@@ -397,19 +414,21 @@ func (e *ClaudeEngine) recordClaudeToolUse(contentMap map[string]any, toolCallMa
 	return prettifiedName, true
 }
 
-func (e *ClaudeEngine) recordClaudeToolResult(contentMap map[string]any, toolCallMap map[string]*ToolCallInfo) {
-	contentStr, ok := typeutil.LookupString(contentMap, "content")
+func (e *ClaudeEngine) recordClaudeToolResult(contentMap map[string]any, toolCallMap map[string]*ToolCallInfo, toolIDs map[string]string, context string) {
+	id, ok := typeutil.LookupString(contentMap, "tool_use_id")
 	if !ok {
 		return
 	}
-	if _, ok := typeutil.LookupString(contentMap, "tool_use_id"); !ok {
+	toolInfo := toolCallMap[toolIDs[context+id]]
+	if toolInfo == nil {
 		return
 	}
-	outputSize := len(contentStr) / 4
-	for _, toolInfo := range toolCallMap {
-		if outputSize > toolInfo.MaxOutputSize {
-			toolInfo.MaxOutputSize = outputSize
-		}
+	outputSize := e.estimateInputSize(contentMap["content"])
+	if contentStr, ok := typeutil.LookupString(contentMap, "content"); ok {
+		outputSize = len(contentStr) / 4
+	}
+	if outputSize > toolInfo.MaxOutputSize {
+		toolInfo.MaxOutputSize = outputSize
 	}
 }
 

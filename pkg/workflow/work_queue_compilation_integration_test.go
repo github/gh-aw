@@ -4,12 +4,14 @@ package workflow
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,4 +94,64 @@ Compile each work-queue workflow phase.
 	require.Contains(t, conclusion, "Summarize work queue activity\n        if: always()")
 	require.Contains(t, conclusion, "work_queue_summary.cjs")
 	require.Contains(t, conclusion, "await main({ core, githubClient: github, context });")
+}
+
+func TestWorkQueueSmokeVerification(t *testing.T) {
+	source, err := os.ReadFile("../../.github/workflows/smoke-work-queue.md")
+	require.NoError(t, err)
+	dir := testutil.TempDir(t, "work-queue-smoke-")
+	workflowPath := filepath.Join(dir, "smoke-work-queue.md")
+	require.NoError(t, os.WriteFile(workflowPath, source, 0o600))
+	require.NoError(t, NewCompiler(WithVersion("integration")).CompileWorkflow(workflowPath))
+
+	lock, err := os.ReadFile(filepath.Join(dir, "smoke-work-queue.lock.yml"))
+	require.NoError(t, err)
+	var compiled struct {
+		Jobs map[string]struct {
+			Needs any
+			Steps []struct {
+				Name string
+				Run  string
+			}
+		}
+	}
+	require.NoError(t, yaml.Unmarshal(lock, &compiled))
+	job, ok := compiled.Jobs["verify_smoke_result"]
+	require.True(t, ok)
+	require.Contains(t, job.Needs, "safe_outputs", "failure issues must be processed before failing the smoke run")
+	var script string
+	for _, step := range job.Steps {
+		if step.Name == "Verify smoke result" {
+			script = step.Run
+		}
+	}
+	require.NotEmpty(t, script)
+
+	for _, tc := range []struct {
+		name    string
+		outputs string
+		intent  string
+		success bool
+	}{
+		{"completed", "{\"type\":\"noop\"}\n", "{\"outcome\":\"completed\"}\n", true},
+		{"reported failure", "{\"type\":\"create_issue\"}\n", "", false},
+		{"failure with success artifacts", "{\"type\":\"noop\"}\n{\"type\":\"create_issue\"}\n", "{\"outcome\":\"completed\"}\n", false},
+		{"missing finish intent", "{\"type\":\"noop\"}\n", "", false},
+		{"cancelled", "{\"type\":\"noop\"}\n", "{\"outcome\":\"cancelled\"}\n", false},
+		{"missing noop", "", "{\"outcome\":\"completed\"}\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			evidence := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(evidence, "safeoutputs.jsonl"), []byte(tc.outputs), 0o600))
+			if tc.intent != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(evidence, "work-queue.finish.jsonl"), []byte(tc.intent), 0o600))
+			}
+			output, err := exec.Command("bash", "-e", "-c", strings.ReplaceAll(script, "/tmp/gh-aw/", evidence+"/")).CombinedOutput()
+			if tc.success {
+				require.NoError(t, err, "%s", output)
+			} else {
+				require.Error(t, err, "%s", output)
+			}
+		})
+	}
 }

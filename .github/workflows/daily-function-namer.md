@@ -12,13 +12,14 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 
 tracker-id: daily-function-namer
 
-model: openai/gpt-5.4
+model: copilot/claude-sonnet-5
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 imports:
   - uses: shared/daily-audit-base.md
     with:

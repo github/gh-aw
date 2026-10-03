@@ -96,7 +96,7 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 				if !isPlaywrightCLIMode(data.Tools) {
 					servers = append(servers, toolName)
 				}
-			case "qmd":
+			case "qmd", "work-queue":
 				servers = append(servers, toolName)
 			case "agentic-workflows":
 				// The gateway and manifest use "agenticworkflows" (no hyphen) as the server ID.
@@ -147,6 +147,9 @@ func getMCPCLIServerNames(data *WorkflowData) []string { //nolint:largefunc // E
 	if isCLIMountActive && data.EngineConfig != nil && data.EngineConfig.ID == string(constants.CopilotEngine) {
 		if hasGitHubTool(data.ParsedTools) && !isGitHubCLIModeEnabled(data) && !slices.Contains(servers, constants.GitHubMCPServerID.String()) {
 			servers = append(servers, constants.GitHubMCPServerID.String())
+		}
+		if isWorkQueueEnabled(data) && !slices.Contains(servers, "work-queue") {
+			servers = append(servers, "work-queue")
 		}
 
 		for toolName, toolValue := range data.Tools {

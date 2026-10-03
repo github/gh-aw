@@ -101,6 +101,75 @@ describe("no-unsafe-catch-error-property", () => {
     });
   });
 
+  it("valid: catch aliases guarded by instanceof or prior safe extraction are accepted", () => {
+    cjsRuleTester.run("no-unsafe-catch-error-property", noUnsafeCatchErrorPropertyRule, {
+      valid: [
+        `try { f(); } catch (error) { const err = error; if (err instanceof Error) { console.log(err.message); } }`,
+        `try { f(); } catch (error) { const err = error; if (!(err instanceof Error)) return; console.log(err.stack); }`,
+        `try { f(); } catch (error) { const err = error; if (error instanceof Error) { console.log(err.message); } }`,
+        `try { f(); } catch (error) { const err = error; getErrorMessage(err); console.log(err.message); }`,
+        `try { f(); } catch (error) { const err = new Error(); console.log(err.message); }`,
+      ],
+      invalid: [],
+    });
+  });
+
+  it("invalid: unguarded const aliases of catch parameters are flagged by alias name", () => {
+    cjsRuleTester.run("no-unsafe-catch-error-property", noUnsafeCatchErrorPropertyRule, {
+      valid: [],
+      invalid: [
+        {
+          code: `try { f(); } catch (error) { const err = error; console.log(err.message); }`,
+          errors: [
+            {
+              messageId: "unsafeProperty",
+              data: { prop: "message", errorVar: "err" },
+              suggestions: [
+                {
+                  messageId: "useGetErrorMessage",
+                  data: { errorVar: "err" },
+                  output: `try { f(); } catch (error) { const err = error; console.log(getErrorMessage(err)); }`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: `try { f(); } catch (err) { const e = /** @type {Error} */ err; console.log(e["stack"]); }`,
+          errors: [
+            {
+              messageId: "unsafeProperty",
+              data: { prop: "stack", errorVar: "e" },
+              suggestions: [
+                {
+                  messageId: "wrapWithInstanceof",
+                  data: { errorVar: "e", prop: "stack" },
+                  output: `try { f(); } catch (err) { const e = /** @type {Error} */ err; console.log((e instanceof Error ? e.stack : undefined)); }`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: `try { f(); } catch (error) { const alias = error; error = new Error(); if (error instanceof Error) console.log(alias.message); }`,
+          errors: [
+            {
+              messageId: "unsafeProperty",
+              data: { prop: "message", errorVar: "alias" },
+              suggestions: [
+                {
+                  messageId: "useGetErrorMessage",
+                  data: { errorVar: "alias" },
+                  output: `try { f(); } catch (error) { const alias = error; error = new Error(); if (error instanceof Error) console.log(getErrorMessage(alias)); }`,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("valid: dynamic computed property access on catch variable is not flagged", () => {
     cjsRuleTester.run("no-unsafe-catch-error-property", noUnsafeCatchErrorPropertyRule, {
       valid: [`try { f(); } catch (err) { const prop = "message"; console.log(err[prop]); }`],

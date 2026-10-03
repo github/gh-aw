@@ -28,7 +28,7 @@ concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"
   cancel-in-progress: false
 engine: pi
-model: copilot/auto
+model: copilot/claude-haiku-4.5
 network:
   allowed:
     - defaults
@@ -53,6 +53,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 safe-outputs:
   add-labels:
     allowed: [spam, ai-generated, link-spam, ai-inspected]

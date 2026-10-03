@@ -69,6 +69,16 @@ records a `WorkQueueFinishIntent` containing only `outcome: "completed"` or
 `outcome: "cancelled"`. Artifacts use `work-queue.snapshot.json` and
 `work-queue.finish.jsonl`; the durable transaction file is `work-queue.jsonl`.
 
+When the runtime prompt advertises `work-queue` under `<mcp-clis>`, invoke these
+tools as `work-queue work_queue_read '{"work":"example"}'` and
+`work-queue work_queue_claim_finish '{"outcome":"completed"}'`. The tool names
+are subcommands of the server's CLI wrapper, not standalone executables.
+Copilot advertises this wrapper when CLI mounting is active; other engines
+advertise it with `tools.cli-proxy: true`.
+Both tools return JSON serialized in MCP text content. The finish-intent file
+contains only the outcome and is readable by the runner artifact collector even
+when the MCP container runs as a different user.
+
 Pre-rename `aw_context.work_claim` assignments are schema-checked and normalized
 to `work_queue`, not treated as unassigned. Existing runtime storage on
 `dispatch-coordinator` / `dispatch-work-coordinator.jsonl` is read and updated in

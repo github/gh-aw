@@ -136,6 +136,13 @@ func TestIsStringLiteral(t *testing.T) {
 	if IsStringLiteral(&ast.BasicLit{Kind: token.INT, Value: "1"}) {
 		t.Fatal("did not expect int literal to be detected as string")
 	}
+	parenthesized := &ast.ParenExpr{X: &ast.ParenExpr{X: &ast.BasicLit{Kind: token.STRING, Value: `"alice"`}}}
+	if !IsStringLiteral(parenthesized) {
+		t.Fatal("expected parenthesized string literal to be detected")
+	}
+	if value, ok := StringLitValue(parenthesized); !ok || value != "alice" {
+		t.Fatalf("StringLitValue(parenthesized) = %q, %v", value, ok)
+	}
 }
 
 func TestNodeText(t *testing.T) {

@@ -27,7 +27,7 @@ var rawLogFuncs = map[string]bool{
 
 func run(pass *analysis.Pass) (any, error) {
 	pkgPath := pass.Pkg.Path()
-	if strings.HasSuffix(pkgPath, "/main") || strings.Contains(pkgPath, "/cmd/") {
+	if pass.Pkg.Name() == "main" || strings.HasSuffix(pkgPath, "/main") || strings.Contains(pkgPath, "/cmd/") {
 		pkgLog.Printf("skipping cmd/main package %s", pkgPath)
 		return nil, nil
 	}

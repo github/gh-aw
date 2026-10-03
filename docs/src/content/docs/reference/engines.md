@@ -21,6 +21,38 @@ Set `engine:` in workflow frontmatter and configure the corresponding authentica
 
 Copilot CLI is the default, so `engine:` can be omitted when using Copilot. Copilot SDK mode is an execution mode of the Copilot engine, not a separate engine; enable it with `engine: copilot` and `copilot-sdk: true`. See [Copilot SDK support](#copilot-sdk-support).
 
+## Configuration conformance workflows
+
+This repository provides manual-only `engine-conformance-<engine-id>.md`
+workflows for all five built-in engines and the eight runnable imported engines:
+Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, OpenCode, and Pydantic AI.
+Each imports `shared/engine-conformance.md` and uses its normal engine installer,
+configuration renderer, and execution harness. No additional CLI command is
+required.
+
+The shared JavaScript setup creates a fresh file nonce and arithmetic fixture.
+The agent reads the fixture, runs a shell probe that checks `engine.env`, obtains
+a second nonce through the mounted `mcpscripts` CLI, and writes a typed JSON
+result. A JavaScript post-step compares that result with host-side expectations
+and the tool's recorded receipt. Missing or malformed results, mismatched
+values, and unsuccessful agent execution fail the job even if the agent claims
+success. Aider's single-turn profile implements the probes in a JavaScript file
+before executing them.
+
+Results appear in the Actions step summary and the two-day
+`engine-conformance-<engine-id>` artifact as `report.json`. The workflows have
+a ten-minute agent timeout and a five-credit budget; engines that advertise
+`max-turns` additionally cap inference at 30 turns. Safe outputs are staged,
+so the suite does not publish GitHub issues or comments. Copilot-backed profiles
+use `copilot-requests: write` with `${{ github.token }}` and require no PAT.
+Claude, Codex, Gemini, Cursor, and Kiro use their normal engine credentials.
+Missing credentials fail activation rather than passing or skipping the suite.
+
+This is a configuration smoke test, not a security or model-quality evaluation.
+The tool probe checks the production MCP gateway/CLI path, not native MCP client
+support. It does not test SDK/driver profiles, plugins, permission-denial
+enforcement, or prove that a provider honored the requested model.
+
 ## Unsupported engine samples
 
 The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI integrations in this repository are **samples only**. They are not officially supported by gh-aw and have no compatibility or maintenance commitment.
@@ -36,6 +68,15 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI inte
 | [Pydantic AI](https://ai.pydantic.dev/) | `pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md@main` |
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
+
+The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
+through the selected AWF endpoint, retains configured MCP tools, and uses native
+JSONL session events for summaries and unified session artifacts. Copilot routing
+requires AWF; direct Anthropic/OpenAI BYOK is available with the sandbox disabled.
+Runtime configuration overlays preserve repository JSON/JSONC settings; OpenCode
+may add a missing `$schema` field. Runtime overrides disable
+automatic updates, sharing, default plugins, and LSP downloads; native npm plugins
+are not gh-aw Agent Plugins. The shared definition documents these limitations.
 
 ## Which engine should I choose?
 
@@ -346,7 +387,7 @@ engine:
 
 ### Custom Harness Script (`harness`)
 
-The `harness` field lets you replace the built-in Node.js harness wrapper used by Copilot, Claude, or Codex. Use this when you need to customize startup behavior, inject pre/post hooks, or test an alternative harness implementation.
+The `harness` field lets you replace the built-in Node.js harness wrapper used by Copilot, Claude, or Codex. Use this to customize startup behavior, inject pre/post hooks, or test an alternative harness implementation. Custom harnesses are responsible for their own retry, timeout, prompt-delivery, and tool-policy behavior.
 
 ```yaml wrap
 engine:
@@ -358,7 +399,7 @@ engine:
 The `use` value must be a bare filename — no directory separators, no `..`, and no shell metacharacters. It must end with `.js`, `.cjs`, or `.mjs`. When `harness.use` is set, AWF automatically ensures Node 24 is available in the runner environment.
 
 > [!NOTE]
-> Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
+> Custom harness scripts are supported by Copilot, Claude, and Codex. Provision the replacement script in `${RUNNER_TEMP}/gh-aw/actions/` before execution, for example through `pre-agent-steps`. Selecting a filename does not copy a script from the repository.
 
 **Validation rules for `harness.use`:**
 
@@ -397,6 +438,8 @@ When an expression is used, it must already be in milliseconds (GitHub Actions e
 | `watchdog-timeout` | `120` | Post-result idle watchdog timeout in seconds before terminating a quiet process |
 
 The post-result watchdog is dormant until the harness observes a terminal safe output. `noop` and ordinary task outputs such as comments, labels, pushes, and pull request creation are terminal; diagnostics such as `missing_tool`, `missing_data`, and `report_incomplete` are not. Once armed, any stdout or stderr activity resets the inactivity clock. A quiet child process can still be terminated while it is doing useful work, and the harness may treat that termination as successful when a terminal safe output already exists.
+
+Claude arms the watchdog only for terminal outputs added during the current attempt. Its soft deadline also stops an active attempt before the Actions hard timeout. Resumable retries use the captured session ID and a short continuation prompt, not the original task. Empty-input resume requires a deferred tool marker and cannot recover ordinary API-error terminations. Fresh restarts after partial work are refused unless `engine.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART: "true"` explicitly declares the workflow replay-safe.
 
 You can also set the underlying `GH_AW_HARNESS_*` env vars directly via `engine.env` when you need expression-level control, including `GH_AW_HARNESS_WATCHDOG_TIMEOUT_MS` for the post-result watchdog and `GH_AW_HARNESS_STARTUP_RETRIES` for fresh startup retries. Explicit `engine.env` values take precedence over `engine.harness` sub-key values. See [Harness Settings and Runtime Tuning Variables](/gh-aw/reference/environment-variables/#harness-settings-and-runtime-tuning-variables) for supported env vars, units, and clamping behavior.
 
@@ -526,7 +569,7 @@ The underlying mechanism is engine-specific:
 | Engine | Effect |
 |--------|--------|
 | Copilot | Passes `--no-custom-instructions` — suppresses `.github/AGENTS.md` and user-level custom instructions |
-| Claude | Passes `--bare` — suppresses CLAUDE.md memory files |
+| Claude | Passes `--bare` — skips ambient discovery; explicit workflow skills/pinned plugins load, but automatic Skill-tool invocation and subagent delegation are unavailable in the minimal tool set |
 | Pi | Disables automatic context, skill, prompt-template, extension, and theme discovery; explicit infrastructure extensions remain loaded |
 
 Defaults to `false`.
@@ -598,28 +641,28 @@ When `max-turns` is set in frontmatter, gh-aw passes it to Claude automatically 
 
 ## Claude Tool Enforcement Security Model
 
-Claude Code accepts a `--permission-mode` flag that determines whether the declared `tools:` allowlist is enforced. Set `engine.permission-mode` to one of `auto`, `acceptEdits`, `plan`, or `bypassPermissions`:
+Claude's `--allowed-tools` flag pre-approves actions; it does not remove every other tool. The default `engine.permission-mode: dontAsk` denies actions that would require approval. Supported overrides are `default`, `dontAsk`, `auto`, `acceptEdits`, `plan`, and `bypassPermissions`:
 
 ```yaml wrap
 engine:
   id: claude
-  permission-mode: auto
+  permission-mode: dontAsk
 ```
 
-`engine.permission-mode` takes precedence over any `--permission-mode` flag supplied through `engine.args`. When unset, the default is `acceptEdits` (or `auto` when `tools.edit: false`). gh-aw **does not** derive `bypassPermissions` implicitly from unrestricted bash — set it explicitly.
+`engine.permission-mode` takes precedence over any `--permission-mode` flag supplied through `engine.args`. When unset, the default is `dontAsk`. Disabled Bash/web tools are removed, and `tools.edit: false` denies repository edits. Safe outputs grant MCP access, not unrestricted file writes. Memory and sandbox paths use absolute recursive `Read`/`Edit` grants. gh-aw does not derive `bypassPermissions` from unrestricted bash.
 
-| `engine.permission-mode` | Effective mode | `--allowed-tools` enforced? | Gateway `allowed:` enforced? |
+| `engine.permission-mode` | Effective mode | Actions beyond pre-approved rules | Gateway `allowed:` enforced? |
 |---|---|:---:|:---:|
-| unset (default) | `acceptEdits` | ✅ Yes | ✅ Yes |
-| unset, with `tools.edit: false` | `auto` | ✅ Yes | ✅ Yes |
-| `auto` | `auto` | ✅ Yes | ✅ Yes |
-| `acceptEdits` | `acceptEdits` | ✅ Yes | ✅ Yes |
-| `plan` | `plan` | ✅ Yes | ✅ Yes |
-| `bypassPermissions` | `bypassPermissions` | ❌ No | ✅ Yes |
+| unset / `dontAsk` | `dontAsk` | Actions requiring approval are denied; built-in read-only actions remain | ✅ Yes |
+| `default` | `default` | Uses Claude's normal approval policy | ✅ Yes |
+| `auto` | `auto` | Classifier may approve additional actions | ✅ Yes |
+| `acceptEdits` | `acceptEdits` | Automatically approves edits and some filesystem commands | ✅ Yes |
+| `plan` | `plan` | Uses Claude's plan-mode policy | ✅ Yes |
+| `bypassPermissions` | `bypassPermissions` | Skips approval checks except explicit deny rules | ✅ Yes |
 
 ### Gateway-side enforcement
 
-The MCP gateway's `allowed:` filter is the sole effective tool boundary in `bypassPermissions` mode (and a second layer of enforcement otherwise). Always specify `allowed:` on each `mcp-servers:` entry to restrict which MCP tools are reachable:
+The MCP gateway's `allowed:` filter constrains MCP access independently of Claude's permission mode. Always specify `allowed:` on each `mcp-servers:` entry to restrict which MCP tools are reachable:
 
 ```yaml wrap
 mcp-servers:
@@ -629,7 +672,7 @@ mcp-servers:
 ```
 
 > [!WARNING]
-> Do not rely on `tools:` or `mcp-servers: allowed:` for security guarantees in `bypassPermissions` mode. The agent can already run arbitrary shell commands when unrestricted bash is granted, so `--allowed-tools` provides no meaningful additional boundary.
+> Pre-approval rules are not OS-level isolation. Use the sandbox for filesystem/network boundaries and the gateway for MCP access. Explicit `auto`, `acceptEdits`, or `bypassPermissions` can approve more than the pre-approved actions.
 
 ## Learn More
 

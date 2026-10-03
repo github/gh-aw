@@ -152,3 +152,13 @@ func badSelectCase(scanner *bufio.Scanner, ch <-chan struct{}) {
 	default:
 	}
 }
+
+func badErrAfterUnreachableReturn(scanner *bufio.Scanner, enabled bool) {
+	if enabled {
+		for scanner.Scan() { // want "Scanner loop does not check Err\\(\\) after completion; read errors may be silently dropped"
+			println(scanner.Text())
+		}
+		return
+	}
+	_ = scanner.Err()
+}

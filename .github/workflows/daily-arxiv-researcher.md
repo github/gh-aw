@@ -10,13 +10,15 @@ permissions:
   contents: read
   copilot-requests: write
 
-engine: copilot
-model: large
+engine: codex
+model: openai/gpt-5.6-sol
 
 timeout-minutes: 20
 max-ai-credits: 300
 
 tools:
+  web-search:
+  web-fetch:
   cache-memory:
     key: arxiv-paper-dedup
     retention-days: 90
@@ -26,18 +28,17 @@ tools:
     allowed-extensions: [".json", ".md"]
     format-json: true
   bash:
-    - "cat *"
-    - "ls *"
-    - "curl *"
-    - "base64 *"
-    - "jq *"
-    - "python3 -c *"
+    - "*"
 
 network:
   allowed:
     - defaults
     - arxiv.org
     - export.arxiv.org
+  hosted-web:
+    allowed:
+      - arxiv.org
+      - export.arxiv.org
 
 imports:
   - shared/mcp/kreuzberg.md
@@ -258,7 +259,7 @@ Do not end with a plain-text summary only. The final action in the run must be o
 ## agent: `preliminary-investigator`
 ---
 description: Extracts a concise evidence-based note from an arXiv paper PDF
-model: small
+model: openai/gpt-5.4-mini
 ---
 
 Investigate an arXiv paper beyond its abstract before relevance screening.
@@ -275,7 +276,7 @@ Output exactly one line of valid JSON — no other text:
 ## agent: `paper-screener`
 ---
 description: Fast relevance screening of arXiv paper abstracts for GitHub Agentic Workflows
-model: small
+model: openai/gpt-5.4-mini
 ---
 
 Screen an arXiv paper abstract for relevance to GitHub Agentic Workflows (gh-aw).
@@ -304,7 +305,7 @@ Output: exactly one line of valid JSON — no other text:
 ## agent: `relevance-ranker`
 ---
 description: Scores a relevant arXiv paper by actionability for GitHub Agentic Workflows
-model: small
+model: openai/gpt-5.4-mini
 ---
 
 Score a relevant arXiv paper by how actionable it is for GitHub Agentic Workflows (gh-aw).
@@ -326,7 +327,7 @@ Output: exactly one line of valid JSON — no other text:
 ## agent: `opportunity-extractor`
 ---
 description: Extracts a specific actionable improvement for gh-aw from a relevant arXiv paper
-model: large
+model: openai/gpt-5.6-sol
 ---
 
 Extract one specific actionable improvement for GitHub Agentic Workflows (gh-aw) from an arXiv paper.

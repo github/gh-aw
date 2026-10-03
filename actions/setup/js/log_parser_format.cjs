@@ -1,7 +1,7 @@
 // @ts-check
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
+const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
 const { escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
 
@@ -626,7 +626,7 @@ function createLogParserFormatters(deps) {
       }
     }
     if (lastEntry?.usage) {
-      const usage = lastEntry.usage;
+      const usage = normalizeSessionUsage(lastEntry.usage) ?? lastEntry.usage;
       const totalTokens = sessionTokenTotal(usage);
       if (totalTokens !== undefined) {
         const inputTokens = usage.input_tokens === undefined ? "unknown" : usage.input_tokens.toLocaleString();

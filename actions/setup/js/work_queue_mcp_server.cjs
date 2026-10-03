@@ -77,7 +77,7 @@ function createWorkQueueStateTool(snapshot) {
     },
     handler: args => {
       console.error("[work-queue] Reading queue snapshot");
-      return readWorkQueueState(snapshot, args);
+      return { content: [{ type: "text", text: JSON.stringify(readWorkQueueState(snapshot, args)) }] };
     },
   };
 }
@@ -103,10 +103,16 @@ function createWorkQueueFinishTool(options = {}) {
       if (!["completed", "cancelled"].includes(outcome)) {
         throw new TypeError("outcome must be completed or cancelled");
       }
-      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-      fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8", mode: 0o600 });
+      try {
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8" });
+        // The MCP container and runner artifact collector can run as different users.
+        fs.chmodSync(outputPath, 0o644);
+      } catch (error) {
+        throw new Error("Failed to record work queue finish intent", { cause: error });
+      }
       console.error(`[work-queue] Recorded ${outcome} finish intent`);
-      return { recorded: true, outcome };
+      return { content: [{ type: "text", text: JSON.stringify({ recorded: true, outcome }) }] };
     },
   };
 }

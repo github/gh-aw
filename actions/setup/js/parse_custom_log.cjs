@@ -17,6 +17,11 @@ const main = createEngineLogParser({
  */
 function parseCustomLog(logContent) {
   const entries = parseLogEntries(logContent) ?? [];
+  const { isOpenCodeEvent, parseOpenCodeLog } = require("./parse_opencode_log.cjs");
+  if (entries.some(isOpenCodeEvent)) {
+    const result = parseOpenCodeLog(logContent);
+    return { ...result, markdown: `### Custom Engine Log (OpenCode format)\n\n${result.markdown}` };
+  }
   const claudeSignature = entries.some(
     entry =>
       entry &&
@@ -64,7 +69,7 @@ function parseCustomLog(logContent) {
   return {
     markdown: buildStepSummaryDetailsSection(
       "Custom Engine Log",
-      `Log format not recognized as Claude or Codex format.
+      `      Log format not recognized as Claude, Codex, or OpenCode format.
 
 **Basic Statistics:**
 - Lines: ${lineCount}

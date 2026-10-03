@@ -51,6 +51,7 @@ tools:
   edit: null
   bash:
     - "find specs -type f -name \"*.md\" | sort"
+    - "cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json"
     - "cat specs/*.md"
     - "find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20"
     - "cat pkg/workflow/*.go | head -200"
@@ -93,7 +94,7 @@ Schema:
 ```
 
 - On first run (file missing): initialize `{ "last_index": 0, "processed": [], "last_run": "" }`.
-- Run `find specs -type f -name '*.md' | sort` to get the full list.
+- Run exactly `find specs -type f -name "*.md" | sort` to get the full list. Run it separately from the cache read; do not add `head`, `wc`, `cd`, or other shell commands to it.
 - Select the spec at `(last_index + 1) % len(specs)` that is **not** in `processed` from the last 14 days.
 - If all specs were processed within the last 14 days, reset `processed` to `[]` and start from `last_index 0`.
 
@@ -124,12 +125,13 @@ Before analyzing the selected spec, check for existing notes from previous runs:
 ```
 
 If a note file exists for the selected spec, read it and use the prior predicate list as a starting point, extending or refining it rather than starting from scratch. If no prior notes exist, proceed fresh.
+Use built-in file inspection tools for note files; do not combine note and cache reads with shell commands.
 
 ---
 
 ## Step 2 — Read and Parse the Specification
 
-Read the selected spec file in full with `bash`.
+Read the selected spec file in full with built-in file inspection tools (or an allowed standalone `cat specs/*.md` command for a top-level spec). Do not combine reads or pipe them through `head`.
 
 Use built-in file inspection tools only for read-only analysis when bash output is insufficient. Do not modify repository files.
 

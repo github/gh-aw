@@ -17,10 +17,6 @@
       "import": "github/gh-aw/.github/workflows/shared/deepseek-harness.md"
     },
     {
-      "id": "custom",
-      "import": "github/gh-aw/.github/workflows/shared/genaiscript.md"
-    },
-    {
       "id": "goose",
       "import": "github/gh-aw/.github/workflows/shared/goose.md"
     },

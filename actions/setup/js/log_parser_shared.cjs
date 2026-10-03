@@ -6,7 +6,7 @@ const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const createLogParserFormatters = require("./log_parser_format.cjs");
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
-const { isSessionEvent, normalizeAgentSession, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
+const { isSessionEvent, normalizeAgentSession, normalizeSessionUsage, projectSessionResult, projectSessionInitialization, sessionOutputText, sessionToolSuccess, sessionTokenTotal, isMetric } = require("./agent_session.cjs");
 const { escapeSummaryText, toolInventoryName, displayArgument } = require("./agent_session_render.cjs");
 
 /**
@@ -313,7 +313,7 @@ function generateInformationSection(lastEntry, options = {}) {
   }
 
   if (lastEntry.usage) {
-    const usage = lastEntry.usage;
+    const usage = normalizeSessionUsage(lastEntry.usage) ?? lastEntry.usage;
     const totalTokens = sessionTokenTotal(usage);
     if (totalTokens !== undefined || usage.cache_creation_input_tokens !== undefined || usage.cache_read_input_tokens !== undefined) {
       markdown += `**Token Usage:**\n`;

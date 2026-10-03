@@ -11,14 +11,15 @@ permissions:
   issues: read
   pull-requests: read
   discussions: read
+  copilot-requests: write
 
 sandbox:
   agent:
     id: awf
 engine:
   id: pi
-  model-provider: openai
-model: openai/gpt-5.4
+  model-provider: github
+model: copilot/gpt-6-luna
 strict: true
 tracker-id: daily-performance-summary
 tools:

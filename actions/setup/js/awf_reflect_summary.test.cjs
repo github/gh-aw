@@ -13,7 +13,8 @@ const mockCore = {
 
 global.core = mockCore;
 
-const REFLECT_PATH = path.join(process.env.RUNNER_TEMP || os.tmpdir(), "awf-reflect.json");
+const REFLECT_PATH = "/tmp/gh-aw/agent/awf-reflect.json";
+const LEGACY_REFLECT_PATH = path.join(process.env.RUNNER_TEMP || os.tmpdir(), "awf-reflect.json");
 const REFLECT_ARTIFACT_PATH = "/tmp/gh-aw/sandbox/firewall/awf-reflect.json";
 const CONFIG_PATH = "/tmp/gh-aw/awf-config.json";
 const MODELS_PATH = "/tmp/gh-aw/sandbox/firewall/models.json";
@@ -111,6 +112,9 @@ describe("awf_reflect_summary.cjs", () => {
     if (fs.existsSync(REFLECT_PATH)) {
       fs.unlinkSync(REFLECT_PATH);
     }
+    if (fs.existsSync(LEGACY_REFLECT_PATH)) {
+      fs.unlinkSync(LEGACY_REFLECT_PATH);
+    }
     if (fs.existsSync(REFLECT_ARTIFACT_PATH)) {
       fs.unlinkSync(REFLECT_ARTIFACT_PATH);
     }
@@ -135,6 +139,15 @@ describe("awf_reflect_summary.cjs", () => {
       expect(result).not.toBeNull();
       expect(result.endpoints).toHaveLength(5);
       expect(result.models_fetch_complete).toBe(true);
+    });
+    it("reads legacy runner-temp data when no sandbox payload exists", () => {
+      fs.writeFileSync(LEGACY_REFLECT_PATH, JSON.stringify(SAMPLE_REFLECT), "utf8");
+      expect(module.readReflectData()).toEqual(SAMPLE_REFLECT);
+    });
+    it("prefers fresh sandbox data over legacy payloads", () => {
+      fs.writeFileSync(LEGACY_REFLECT_PATH, '{"endpoints":[]}', "utf8");
+      fs.writeFileSync(REFLECT_PATH, JSON.stringify(SAMPLE_REFLECT), "utf8");
+      expect(module.readReflectData()).toEqual(SAMPLE_REFLECT);
     });
   });
 

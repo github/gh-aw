@@ -117,6 +117,28 @@ describe("process_runner.cjs", () => {
       }
     });
 
+    it("observes every stderr line independently of the bounded classifier tail", async () => {
+      const observed = [];
+      const original = process.stderr.write;
+      process.stderr.write = () => true;
+      try {
+        const result = await runProcess({
+          command: process.execPath,
+          args: ["-e", `process.stderr.write('startup failure\\r\\n'+'x'.repeat(2000)+'\\n');process.stdout.write('stdout\\n');setTimeout(()=>process.stderr.write('unterminated tail'),20);`],
+          attempt: 0,
+          log: () => {},
+          maxCollectedOutputBytes: 1024,
+          onStderrLine: line => observed.push(line),
+        });
+        expect(result.exitCode).toBe(0);
+        expect(observed).toEqual(["startup failure", "x".repeat(2000), "unterminated tail"]);
+        expect(result.stderr).not.toContain("startup failure");
+        expect(result.stdout).toBe("stdout\n");
+      } finally {
+        process.stderr.write = original;
+      }
+    });
+
     it("kills descendants holding inherited stdio when the runtime guard fires", async () => {
       const result = await runProcess({
         command: process.execPath,

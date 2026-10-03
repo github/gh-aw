@@ -52,7 +52,7 @@ func (e *ClaudeEngine) expandNeutralToolsToClaudeTools(tools map[string]any) map
 	claudeAllowed := getOrCreateToolMap(claudeSection, "allowed")
 
 	// Convert neutral tools to Claude tools
-	if bashTool, hasBash := tools["bash"]; hasBash {
+	if bashTool, hasBash := tools["bash"]; hasBash && !isExplicitlyDisabledTool(bashTool) {
 		// bash -> Bash, KillBash, BashOutput
 		if bashCommands, ok := bashTool.([]any); ok {
 			claudeAllowed["Bash"] = bashCommands
@@ -61,12 +61,12 @@ func (e *ClaudeEngine) expandNeutralToolsToClaudeTools(tools map[string]any) map
 		}
 	}
 
-	if _, hasWebFetch := tools["web-fetch"]; hasWebFetch {
+	if webFetch, hasWebFetch := tools["web-fetch"]; hasWebFetch && !isExplicitlyDisabledTool(webFetch) {
 		// web-fetch -> WebFetch
 		claudeAllowed["WebFetch"] = nil
 	}
 
-	if _, hasWebSearch := tools["web-search"]; hasWebSearch {
+	if webSearch, hasWebSearch := tools["web-search"]; hasWebSearch && !isExplicitlyDisabledTool(webSearch) {
 		// web-search -> WebSearch
 		claudeAllowed["WebSearch"] = nil
 	}
@@ -264,12 +264,10 @@ func appendDriveMemoryTools(allowedTools []string, config *DriveMemoryConfig) []
 	}
 	for _, drive := range config.Drives {
 		memoryDir := driveMemoryDirFor(drive.ID)
-		pattern := memoryDir + "/*" //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
+		pattern, _ := normalizeSandboxWritablePattern(memoryDir)
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Read(%s)", pattern))
 		if !drive.RestoreOnly {
-			allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Write(%s)", pattern))
 			allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Edit(%s)", pattern))
-			allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("MultiEdit(%s)", pattern))
 		}
 		allowedTools = appendCacheMemoryBashTools(allowedTools, memoryDir)
 	}
@@ -282,11 +280,9 @@ func appendCacheMemoryTools(allowedTools []string, cacheMemoryConfig *CacheMemor
 	}
 	for _, cache := range cacheMemoryConfig.Caches {
 		cacheDir := cacheMemoryDirFor(cache.ID)
-		cacheDirPattern := cacheDir + "/*" //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
+		cacheDirPattern, _ := normalizeSandboxWritablePattern(cacheDir)
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Read(%s)", cacheDirPattern))
-		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Write(%s)", cacheDirPattern))
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Edit(%s)", cacheDirPattern))
-		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("MultiEdit(%s)", cacheDirPattern))
 		allowedTools = appendCacheMemoryBashTools(allowedTools, cacheDir)
 	}
 	return allowedTools
@@ -400,9 +396,7 @@ func appendSandboxWritableTools(allowedTools []string, sandboxConfig *SandboxCon
 		}
 		seenPatterns[pattern] = struct{}{}
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Read(%s)", pattern))
-		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Write(%s)", pattern))
 		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("Edit(%s)", pattern))
-		allowedTools = sliceutil.MergeUnique(allowedTools, fmt.Sprintf("MultiEdit(%s)", pattern))
 	}
 	return allowedTools
 }
@@ -413,9 +407,12 @@ func normalizeSandboxWritablePattern(writablePath string) (string, bool) {
 		return "", false
 	}
 	if strings.ContainsAny(path, "*?[]{}") {
-		return path, true
+		return "//" + strings.TrimLeft(path, "/"), true
 	}
-	return strings.TrimRight(path, "/") + "/*", true //nolint:manualpathconcat // Claude permission patterns require slash-separated globs.
+	if strings.Trim(path, "/") == "" {
+		return "//**", true
+	}
+	return "//" + strings.Trim(path, "/") + "/**", true //nolint:manualpathconcat // Claude absolute permission patterns start with two slashes.
 }
 
 func appendSafeOutputsTools(allowedTools []string, safeOutputs *SafeOutputsConfig) []string {
@@ -423,12 +420,6 @@ func appendSafeOutputsTools(allowedTools []string, safeOutputs *SafeOutputsConfi
 		return allowedTools
 	}
 	allowedTools = append(allowedTools, "mcp__"+string(constants.SafeOutputsMCPServerID))
-	if !slices.Contains(allowedTools, "Write") {
-		// Ideally we would grant Write only for the exact safe outputs file, but Claude
-		// doesn't currently honor that scoped grant reliably.
-		// See: https://github.com/github/gh-aw/issues/244#issuecomment-3240319103
-		allowedTools = append(allowedTools, "Write")
-	}
 	return allowedTools
 }
 

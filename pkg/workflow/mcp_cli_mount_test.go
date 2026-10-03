@@ -368,3 +368,46 @@ func TestBuildMCPCLIPromptSection_OmittedWhenBashDisabled(t *testing.T) {
 	require.NotEmpty(t, getMCPCLIServerNames(data), "safeoutputs is still CLI-mounted")
 	assert.Nil(t, buildMCPCLIPromptSection(data), "CLI-only instructions must be omitted when the agent has no shell")
 }
+
+func TestWorkQueueCLIMountSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		engine   string
+		enabled  any
+		cliProxy bool
+		expected []string
+	}{
+		{"copilot enabled", "copilot", true, false, []string{"safeoutputs", "work-queue"}},
+		{"copilot implicit", "copilot", nil, false, []string{"safeoutputs", "work-queue"}},
+		{"copilot disabled", "copilot", false, false, []string{"safeoutputs"}},
+		{"claude MCP", "claude", true, false, []string{"safeoutputs"}},
+		{"claude CLI", "claude", true, true, []string{"safeoutputs", "work-queue"}},
+		{"copilot CLI deduplicated", "copilot", true, true, []string{"safeoutputs", "work-queue"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tools := map[string]any{
+				"work-queue": tc.enabled,
+				"cli-proxy":  tc.cliProxy,
+				"bash":       []any{"echo"},
+			}
+			data := &WorkflowData{
+				Tools:        tools,
+				ParsedTools:  NewTools(tools),
+				EngineConfig: &EngineConfig{ID: tc.engine},
+				SafeOutputs:  &SafeOutputsConfig{NoOp: &NoOpConfig{}},
+			}
+			require.Equal(t, tc.expected, getMCPCLIServerNames(data))
+
+			section := buildMCPCLIPromptSection(data)
+			require.NotNil(t, section)
+			commands := withMountedCLIShellCommandsInRestrictedBash(data)["bash"]
+			if len(tc.expected) == 2 {
+				require.Contains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "`work-queue --help`")
+				require.Contains(t, commands, "work-queue:*")
+			} else {
+				require.NotContains(t, section.EnvVars["GH_AW_MCP_CLI_SERVERS_LIST"], "work-queue")
+				require.NotContains(t, commands, "work-queue:*")
+			}
+		})
+	}
+}

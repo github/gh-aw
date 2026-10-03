@@ -161,7 +161,7 @@ func TestEngineBashDisableCapability(t *testing.T) {
 		engineID  string
 		supported bool
 	}{
-		{"claude", false},
+		{"claude", true},
 		{"copilot", false},
 		{"gemini", false},
 		{"codex", true},

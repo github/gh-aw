@@ -98,7 +98,7 @@ function eventDetail(event) {
       return fields(data, ["event", "message", "reason"]);
     case "firewall.token_usage":
     case "usage.report":
-      return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]);
+      return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]);
     case "mcp.event":
     case "firewall.event":
       return fields(data, ["event", "level", "status"]);
@@ -125,7 +125,7 @@ function eventDetail(event) {
     case "detection.result":
       return fields(data, ["jobResult", "conclusion", "reason", "promptInjection", "secretLeak", "maliciousPatch"]);
     case "workflow.info":
-      return fields(data, ["engine", "model", "workflow", "repository", "runId"]);
+      return fields(data, ["engineId", "requestedModel", "triggerType", "cliVersion", "awfVersion", "mcpgVersion", "agentVersion", "workflow", "repository", "runId"]);
     case "session.collection_warning":
       return fields(data, ["path", "line", "code"]);
     case "session.collection":

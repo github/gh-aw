@@ -15,16 +15,17 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 
 sandbox:
   agent:
     id: awf
 tracker-id: daily-multi-device-docs-tester
 max-turns: 80  # 10 devices × ~5 turns each + setup/report overhead
-model: openai/gpt-5.4
+model: copilot/gemini-3.8-flash
 engine:
   id: pi
-  model-provider: openai
+  model-provider: github
 strict: true
 timeout-minutes: 30
 runtimes:

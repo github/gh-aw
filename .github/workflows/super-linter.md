@@ -18,7 +18,7 @@ safe-outputs:
     title-prefix: "[linter] "
     labels: [automation, code-quality, cookie]
 engine: pi
-model: copilot/auto
+model: copilot/mai-code-1.1-flash
 name: Super Linter Report
 timeout-minutes: 15
 imports:

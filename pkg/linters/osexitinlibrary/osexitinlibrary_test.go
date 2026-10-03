@@ -13,5 +13,5 @@ import (
 func TestOsExitInLibrary(t *testing.T) {
 	t.Parallel()
 	testdata := analysistest.TestData()
-	analysistest.Run(t, testdata, osexitinlibrary.Analyzer, "osexitinlibrary")
+	analysistest.Run(t, testdata, osexitinlibrary.Analyzer, "osexitinlibrary", "entrypoint")
 }

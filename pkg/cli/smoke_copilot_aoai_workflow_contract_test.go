@@ -40,3 +40,21 @@ func TestSmokeCopilotAOAIWorkflowDispatchContract(t *testing.T) {
 		})
 	}
 }
+
+func TestSmokeCopilotAOAIEntraSetIssueTypeTarget(t *testing.T) {
+	t.Parallel()
+	repoRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		t.Skipf("Skipping test: not in a git repository: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "smoke-copilot-aoai-entra.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "    set-issue-type:\n      target: \"*\"",
+		"Set issue type must honor the temporary issue ID supplied by the smoke test")
+
+	compiled, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "smoke-copilot-aoai-entra.lock.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(compiled), `\"set_issue_type\":{\"target\":\"*\"}`,
+		"Compiled safe-output handler must use the explicit issue target")
+}

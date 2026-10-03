@@ -41,7 +41,7 @@ function mergeSessionSources(sources) {
   const events = sources.flatMap(source =>
     source.events.map((event, index) => {
       const timestampMs = sessionTimestamp(event, source.timestampUnit);
-      const normalized = normalizeUnifiedSessionEvent(event);
+      const normalized = normalizeUnifiedSessionEvent(event, source.phase);
       if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
         delete normalized.data.reason;
       }
@@ -111,6 +111,7 @@ function parseEngineSession(content, engine) {
     codex: ["parse_codex_log.cjs", "parseCodexLog"],
     gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
     pi: ["parse_pi_log.cjs", "parsePiLog"],
+    opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
     custom: ["parse_custom_log.cjs", "parseCustomLog"],
   };
   const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;

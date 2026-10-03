@@ -249,3 +249,53 @@ func goodNestedEarlyReturnGuard(arr []int, idx int) int {
 	}
 	return -1
 }
+
+type sliceHolder struct {
+	Field []int
+}
+
+func goodFieldChecked(h sliceHolder, i int) int {
+	if i >= 0 && len(h.Field) > i {
+		return h.Field[i]
+	}
+	return 0
+}
+
+func goodFieldBoundedFor(h sliceHolder) {
+	for i := 0; i < len(h.Field); i++ {
+		_ = h.Field[i]
+	}
+}
+
+func goodFieldRange(h sliceHolder) {
+	for i := range h.Field {
+		_ = h.Field[i]
+	}
+}
+
+func goodFieldEarlyReturn(h sliceHolder, i int) int {
+	if i < 0 || i >= len(h.Field) {
+		return 0
+	}
+	return h.Field[i]
+}
+
+func badDifferentField(h struct{ Field, Other []int }, i int) {
+	if i >= 0 && i < len(h.Field) {
+		_ = h.Other[i] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badFieldChangedAfterCheck(h sliceHolder, i int) {
+	if i >= 0 && i < len(h.Field) {
+		h.Field = nil
+		_ = h.Field[i] // want "direct slice indexing without bounds checking"
+	}
+}
+
+func badFieldChangedInLoop(h sliceHolder) {
+	for i := 0; i < len(h.Field); i++ {
+		h.Field = nil
+		_ = h.Field[i] // want "direct slice indexing without bounds checking"
+	}
+}

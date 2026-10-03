@@ -29,6 +29,9 @@ var _ = 4
 
 //nolint:tolowerequalfold
 var _ = 5
+
+// nolint:tolowerequalfold
+var _ = 6
 `
 
 	fset := token.NewFileSet()
@@ -50,5 +53,8 @@ var _ = 5
 	}
 	if HasDirectiveForLinter(token.Position{Filename: filename, Line: 10}, shared, "tolowerequalfold") {
 		t.Fatalf("unexpected shared directive match for prefix-only directive")
+	}
+	if !HasDirectiveForLinter(token.Position{Filename: filename, Line: 16}, shared, "tolowerequalfold") {
+		t.Fatalf("expected spaced previous-line directive match")
 	}
 }

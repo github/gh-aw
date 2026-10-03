@@ -56,34 +56,19 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		return []string{"      # Engine not found, skipping execution\n"}
 	}
 
-	// Build a detection engine config inheriting ID, Version, Env, Config, Args, APITarget.
-	// MaxTurns, Concurrency, UserAgent, Firewall, Agent, and MaxAICredits are intentionally
-	// omitted — MaxAICredits is set independently below from safe-outputs.threat-detection
-	// so the detection budget is always resolved from its own default expression rather than
-	// silently reusing the main agent budget.
+	// Preserve execution policy and authentication while resetting task-specific settings.
+	// Detection resolves its own budgets independently of the main agent.
 	detectionEngineConfig := engineConfig
 	if detectionEngineConfig == nil {
 		detectionEngineConfig = &EngineConfig{ID: engineSetting}
 	} else {
-		detectionEngineConfig = &EngineConfig{
-			ID:                       detectionEngineConfig.ID,
-			Version:                  detectionEngineConfig.Version,
-			Env:                      detectionEngineConfig.Env,
-			Config:                   detectionEngineConfig.Config,
-			Args:                     detectionEngineConfig.Args,
-			APITarget:                detectionEngineConfig.APITarget,
-			HarnessScript:            detectionEngineConfig.HarnessScript,
-			Driver:                   detectionEngineConfig.Driver,
-			HarnessMaxRetries:        detectionEngineConfig.HarnessMaxRetries,
-			HarnessInitialDelayMs:    detectionEngineConfig.HarnessInitialDelayMs,
-			HarnessBackoffMultiplier: detectionEngineConfig.HarnessBackoffMultiplier,
-			HarnessMaxDelayMs:        detectionEngineConfig.HarnessMaxDelayMs,
-			HarnessWatchdogTimeoutMs: detectionEngineConfig.HarnessWatchdogTimeoutMs,
-		}
+		detectionEngineConfig = cloneThreatDetectionEngineConfig(engineSetting, detectionEngineConfig)
+		resetDetectionEngineTaskSettings(detectionEngineConfig)
 	}
 	if detectionEngineConfig.ID == "" {
 		detectionEngineConfig.ID = engineSetting
 	}
+	detectionEngineConfig.Env = mergeThreatDetectionEngineEnv(data, detectionEngineConfig.Env)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}
