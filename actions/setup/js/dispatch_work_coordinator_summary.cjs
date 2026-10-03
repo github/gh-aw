@@ -3,7 +3,7 @@
 
 const { loadDispatchCoordinatorSnapshot } = require("./dispatch_work_coordinator_mcp_server.cjs");
 const { replayTransactions } = require("./dispatch_work_coordinator_replay.cjs");
-const { readCoordinatorLog } = require("./dispatch_work_coordinator_store.cjs");
+const { readCoordinatorLog: defaultReadCoordinatorLog } = require("./dispatch_work_coordinator_store.cjs");
 
 /**
  * @param {Record<string, string>} states
@@ -67,11 +67,13 @@ function renderSummary(snapshot, current) {
 async function main(options = {}) {
   const coreApi = options.core || core;
   let summary;
+  let phase = "activation snapshot loading";
   try {
     const snapshot = loadDispatchCoordinatorSnapshot(options.snapshotPath);
+    phase = "durable queue reading";
     const githubClient = options.githubClient || github;
     const repositoryContext = options.context || context;
-    const readLog = options.readCoordinatorLog || readCoordinatorLog;
+    const readLog = options.readCoordinatorLog || defaultReadCoordinatorLog;
     const latest = await readLog({
       githubClient,
       owner: repositoryContext.repo.owner,
@@ -79,9 +81,10 @@ async function main(options = {}) {
       publishUpgrades: false,
       core: coreApi,
     });
+    phase = "transaction replay";
     summary = renderSummary(snapshot, replayTransactions(latest.transactions));
   } catch (error) {
-    coreApi.warning("Work queue activity summary is unavailable; the activation snapshot or current queue could not be read.");
+    coreApi.warning(`Work queue activity summary is unavailable; failed during ${phase}.`);
     await coreApi.summary.addRaw("### Work queue activity\n\n<details>\n<summary>Show work queue activity</summary>\n\nActivity is unavailable because the activation snapshot or current queue could not be read.\n\n</details>\n").write();
     throw new Error("Failed to summarize work queue activity", { cause: error });
   }

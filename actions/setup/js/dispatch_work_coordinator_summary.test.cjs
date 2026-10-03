@@ -166,15 +166,24 @@ describe("dispatch coordinator conclusion summary", () => {
     expect(options.core.summary.addRaw).toHaveBeenCalledOnce();
   });
 
-  it.each(["missing snapshot", "malformed snapshot", "failed refresh", "invalid queue"])("reports %s as unavailable rather than an empty queue", async failure => {
+  it.each([
+    ["missing snapshot", "activation snapshot loading"],
+    ["malformed snapshot", "activation snapshot loading"],
+    ["malformed JSON", "activation snapshot loading"],
+    ["failed refresh", "durable queue reading"],
+    ["invalid queue", "transaction replay"],
+  ])("reports %s as unavailable rather than an empty queue", async (failure, phase) => {
     const options = setup();
     const readCoordinatorLog = vi.fn().mockResolvedValue({ sha: null, transactions: [] });
     if (failure === "missing snapshot") fs.unlinkSync(options.snapshotPath);
     if (failure === "malformed snapshot") fs.writeFileSync(options.snapshotPath, '{"version":0}');
+    if (failure === "malformed JSON") fs.writeFileSync(options.snapshotPath, "invalid sensitive JSON");
     if (failure === "failed refresh") readCoordinatorLog.mockRejectedValue(new Error("sensitive API error"));
     if (failure === "invalid queue") readCoordinatorLog.mockResolvedValue({ transactions: [{ kind: "unknown", work: "sensitive" }] });
     await expect(main({ ...options, readCoordinatorLog })).rejects.toThrow("Failed to summarize work queue activity");
-    expect(options.core.warning).toHaveBeenCalledOnce();
+    expect(options.core.warning).toHaveBeenCalledExactlyOnceWith(`Work queue activity summary is unavailable; failed during ${phase}.`);
+    expect(options.core.warning.mock.calls.flat().join(" ")).not.toContain("sensitive");
+    expect(options.core.warning.mock.calls.flat().join(" ")).not.toContain(options.snapshotPath);
     const summary = options.core.summary.addRaw.mock.calls[0][0];
     expect(summary).toContain("<details>");
     expect(summary).toContain("Activity is unavailable");

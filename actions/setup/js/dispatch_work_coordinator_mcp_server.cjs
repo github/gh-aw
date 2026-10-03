@@ -9,6 +9,12 @@ const { replayTransactions, parseTransactionLog } = require("./dispatch_work_coo
 const DEFAULT_SNAPSHOT_PATH = "/tmp/gh-aw/dispatch-work-coordinator.snapshot.json";
 const DEFAULT_FINISH_INTENT_PATH = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "dispatch-coordinator", "dispatch-work-coordinator.finish.jsonl");
 
+/**
+ * Load the version-2 activation envelope containing sha, transactionLog, and
+ * worker (null or {work_id, claim_id}). Return sha and worker with the validated
+ * log replayed into a deterministic projection; no Git access is performed.
+ * @param {string} [snapshotPath]
+ */
 function loadDispatchCoordinatorSnapshot(snapshotPath = process.env.GH_AW_DISPATCH_COORDINATOR_SNAPSHOT || DEFAULT_SNAPSHOT_PATH) {
   let snapshot;
   try {
