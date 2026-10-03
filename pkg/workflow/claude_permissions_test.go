@@ -32,6 +32,7 @@ func TestClaudeScopedMemoryPermissions(t *testing.T) {
 	assert.Contains(t, allowed, "Edit(//tmp/gh-aw/cache-memory/**)")
 	assert.NotContains(t, allowed, "Write(")
 	assert.NotContains(t, allowed, "MultiEdit(")
+	assert.Equal(t, []string{"AskUserQuestion", "WebFetch", "WebSearch", "Write", "MultiEdit", "NotebookEdit"}, claudeDisabledTools(data, allowed))
 	assert.NotContains(t, claudeDisabledTools(data, allowed), "Edit")
 	for _, tool := range []string{"Write", "MultiEdit", "NotebookEdit"} {
 		assert.Contains(t, claudeDisabledTools(data, allowed), tool)

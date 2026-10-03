@@ -757,7 +757,7 @@ engine:
 
 ### Engine Permission Mode (`engine.permission-mode`)
 
-A first-class Claude engine setting that controls approval behavior. Accepts `default`, `dontAsk`, `acceptEdits`, `auto`, `plan`, or `bypassPermissions`. The default is `dontAsk`: actions requiring approval are denied unless pre-approved by `--allowed-tools`; built-in read-only actions remain available. `acceptEdits` automatically approves edits and some filesystem commands, `auto` uses a classifier to approve additional actions, and `bypassPermissions` skips approval checks except explicit deny rules. These modes are not OS-level isolation.
+A first-class Claude engine setting that controls approval behavior. Accepts `default`, `dontAsk`, `acceptEdits`, `auto`, `plan`, or `bypassPermissions`. The default is `dontAsk`: actions requiring approval are denied unless pre-approved by `--allowed-tools`; built-in read-only actions remain available. `acceptEdits` automatically approves edits and some filesystem commands, `auto` uses a classifier to approve additional actions, `plan` uses Claude's plan-mode policy, and `bypassPermissions` skips approval checks except explicit deny rules. These modes are not OS-level isolation.
 
 `engine.permission-mode` takes precedence over legacy `--permission-mode` arguments. Unrestricted bash does not implicitly enable `bypassPermissions`. Disabled native tools are removed, and `tools.edit: false` denies repository editing while retaining separately scoped memory edits. The sandbox provides filesystem/network isolation, and the MCP gateway enforces its `allowed:` filter independently of permission mode. See [AI Engines Reference](/gh-aw/reference/engines/#claude-tool-enforcement-security-model).
 
