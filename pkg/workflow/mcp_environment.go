@@ -63,6 +63,14 @@ var mcpEnvironmentLog = logger.New("workflow:mcp_environment")
 // from the workflow configuration to be passed to both Start MCP gateway and MCP Gateway steps
 func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, workflowData *WorkflowData, hasAgenticWorkflows bool) map[string]string { //nolint:largefunc // Existing MCP environment collection remains centralized.
 	envVars := make(map[string]string)
+	if workflowData != nil {
+		if workflowData.ToolsStartupTimeout != "" {
+			envVars["GH_AW_STARTUP_TIMEOUT"] = workflowData.ToolsStartupTimeout
+		}
+		if workflowData.ToolsTimeout != "" {
+			envVars["GH_AW_TOOL_TIMEOUT"] = workflowData.ToolsTimeout
+		}
+	}
 
 	// Check for GitHub MCP server token
 	hasGitHub := slices.Contains(mcpTools, "github")

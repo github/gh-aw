@@ -40,6 +40,7 @@ const { withRetry } = require("./error_recovery.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
+const { applyGatewayRuntimeTimeouts } = require("./tool_timeouts.cjs");
 
 /** @type {number | null} */
 let activeGatewayPid = null;
@@ -834,6 +835,8 @@ async function main() {
     core.setFailed("ERROR: Configuration is missing required 'gateway' section");
     return;
   }
+  applyGatewayRuntimeTimeouts(configObj, process.env);
+  mcpConfig = JSON.stringify(configObj);
   if (!("port" in gw) || gw.port == null) {
     core.setFailed("ERROR: Gateway configuration is missing required 'port' field");
     return;

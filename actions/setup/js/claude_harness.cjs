@@ -5,31 +5,30 @@
  *
  * Wraps the Claude Code CLI command with retry logic for failures that occur after the session
  * has been partially executed.  Passes all arguments to the claude subprocess, forwarding
- * stdout/stderr; stdin is closed since the prompt is delivered via CLI argument, not stdin.
+ * stdout/stderr; the initial prompt is delivered through stdin.
  *
  * Retry policy:
  *   - If the process produced any output (hasOutput) and exits with a non-zero code, the
- *     session is considered partially executed.  The driver retries with --continue so the
- *     Claude Code CLI can continue from where it left off.
+ *     driver resumes the captured session ID after genuine assistant progress.
  *   - Overloaded API errors (HTTP 529 / "overloaded_error") and rate-limit errors (HTTP 429 /
  *     "rate_limit_error") are well-known transient failure modes and are logged explicitly, but
  *     any partial-execution failure is retried — not just those specific errors.
  *   - "The request body is not valid JSON" (HTTP 400) is a transport-level serialization bug,
  *     observed immediately after a `permission_denied` tool-result on a compound Bash command.
- *     It is retried as a fresh run (not `--continue`, which is permanently disabled for the rest
- *     of the driver invocation) since resuming would resend the same corrupted session state.
+ *     Fresh restarts after partial work require GH_AW_CLAUDE_ALLOW_FRESH_RESTART=true;
+ *     otherwise the harness fails explicitly instead of replaying side effects.
  *   - Connection-refused failures before the first assistant response are retried as fresh
  *     runs because there is no session state to resume.
  *   - Other failures that produce no output use a separate bounded startup retry budget.
- *   - On a `--continue` retry the initial prompt is omitted: Claude Code resumes the session
+ *   - On a `--resume <id>` retry the initial prompt is omitted: Claude Code resumes the session
  *     from its on-disk state rather than re-processing the original instructions.
  *   - Retries use exponential backoff: 5s → 10s → 20s (capped at 60s) by default.
  *   - Maximum 3 retry attempts after the initial run by default.
  *
  * Prompt handling:
  *   - The harness expects a `--prompt-file <path>` argument in the args list.
- *   - For the initial run it reads the file and appends the content as the last positional arg.
- *   - For `--continue` retries the prompt is omitted (Claude resumes from session state).
+ *   - For the initial run it reads the file and sends the content through stdin.
+ *   - For resume retries stdin is empty.
  *
  * Usage: node claude_harness.cjs <command> [args...]
  * Example: node claude_harness.cjs claude --print --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt
@@ -39,7 +38,9 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
-const { runProcess, formatDuration, sleep } = require("./process_runner.cjs");
+const { runProcess, formatDuration, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
+const { applyClaudeRuntimeTimeouts } = require("./tool_timeouts.cjs");
+const { claudeFailureEvidence, hasClaudeSessionProgress, claudeSessionId, claudePermissionDenials, claudeBareCapabilities, claudeRepositoryEditPolicy, claudeSafeOutputsOffset, removeClaudePlugin } = require("./claude_runtime.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const {
@@ -55,7 +56,7 @@ const {
   normalizeReflectProviderName,
   resolveProviderEndpointFromReflect,
 } = require("./awf_reflect.cjs");
-const { emitMissingToolPermissionIssue, hasExpectedSafeOutputs, hasNoopInSafeOutputs } = require("./safeoutputs_cli.cjs");
+const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
 const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractDeniedCommands, buildMissingToolPermissionIssuePayload } = require("./permission_denied_helpers.cjs");
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
@@ -177,17 +178,7 @@ function isRateLimitError(output) {
  * @returns {string}
  */
 function classifiableOutput(output) {
-  return output
-    .split("\n")
-    .filter(line => {
-      if (!line.startsWith("{")) return true;
-      try {
-        return JSON.parse(line).type !== "user";
-      } catch {
-        return true;
-      }
-    })
-    .join("\n");
+  return claudeFailureEvidence(output);
 }
 
 /**
@@ -231,10 +222,6 @@ function isConnectionRefusedError(output) {
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
-function hasClaudeSessionProgress(output) {
-  return output.split(/\r?\n/).some(line => /"type"\s*:\s*"assistant"/.test(line));
-}
-
 /**
  * Determines if the collected output contains a "no deferred tool marker" error.
  * This occurs when Claude Code is invoked with --continue but the session was never
@@ -294,20 +281,11 @@ function shouldRetryWithContinue({ attempt, maxRetries, exitCode, hasOutput, isN
 
 /**
  * Resolve --prompt-file arguments for the initial Claude run.
- * Strips the --prompt-file <path> pair from args and appends -- followed by
- * the file content as the last positional argument.
- *
- * The end-of-options marker (--) is essential: Claude Code 2.x treats any
- * non-flag argument that follows --mcp-config as an additional config file
- * path (variadic flag).  Without --, a long prompt appended after
- * --mcp-config <path> would be used as a file path, producing an
- * ENAMETOOLONG error when the prompt exceeds PATH_MAX (~4096 bytes).
- *
- * For --continue retries the prompt should be omitted entirely (Claude resumes
- * from its on-disk session state).  Call this function only for the initial run.
+ * Separate --prompt-file content from argv for stdin delivery. This avoids
+ * argument-size limits and Claude's variadic --mcp-config parsing.
  *
  * @param {string[]} args
- * @returns {string[]} Args with --prompt-file resolved to ["--", <content>]
+ * @returns {{args: string[], prompt: string | null}}
  */
 function resolveClaudePromptFileArgs(args) {
   /** @type {string[]} */
@@ -322,9 +300,7 @@ function resolveClaudePromptFileArgs(args) {
     }
 
     if (i + 1 >= args.length) {
-      log("warning: --prompt-file provided without a path; leaving arguments unchanged");
-      filteredArgs.push(args[i]);
-      continue;
+      throw new Error("--prompt-file requires a readable file path");
     }
 
     const promptFile = args[i + 1];
@@ -342,17 +318,7 @@ function resolveClaudePromptFileArgs(args) {
     i++; // Skip the prompt-file path argument
   }
 
-  // Append an end-of-options marker followed by the prompt content.
-  // The '--' prevents Claude Code from treating the prompt text as an additional
-  // --mcp-config value (Claude Code 2.x accepts that flag variadically, so any
-  // non-flag positional argument that follows --mcp-config <path> would otherwise
-  // be tried as a second config file path, causing ENAMETOOLONG for long prompts).
-  if (promptContent !== null) {
-    filteredArgs.push("--");
-    filteredArgs.push(promptContent);
-  }
-
-  return filteredArgs;
+  return { args: filteredArgs, prompt: promptContent };
 }
 
 /**
@@ -393,6 +359,7 @@ function stripContinueArgs(args) {
  */
 async function buildClaudeChildEnv() {
   const childEnv = { ...process.env };
+  applyClaudeRuntimeTimeouts(childEnv);
   applyModelFallback(childEnv, "ANTHROPIC_MODEL", log);
   const provider = normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic");
   try {
@@ -429,8 +396,14 @@ async function main() {
   // Resolve the prompt for the initial run (reads --prompt-file content).
   // A missing or unreadable prompt file is treated as a fatal startup error.
   let initialArgs;
+  let prompt;
+  let pluginDir;
   try {
-    initialArgs = resolveClaudePromptFileArgs(args);
+    const resolved = resolveClaudePromptFileArgs(args);
+    prompt = resolved.prompt;
+    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(resolved.args), process.env));
+    initialArgs = capabilities.args;
+    pluginDir = capabilities.pluginDir;
   } catch (err) {
     const e = /** @type {Error} */ err;
     log(`fatal: ${e.message}`);
@@ -438,18 +411,10 @@ async function main() {
   }
   const freshRetryArgs = stripContinueArgs(initialArgs);
   // Args without --prompt-file, used as the base for --continue retries.
-  const continueBaseArgs = stripContinueArgs(stripPromptFileArgs(args));
+  const continueBaseArgs = freshRetryArgs;
 
-  // Detect whether the original args included --prompt-file so we know whether
-  // initialArgs carries prompt text as its last positional arg.
-  const hadPromptFile = args.includes("--prompt-file");
-
-  // Safe arg list for logging: when --prompt-file was present, the last two elements of
-  // initialArgs are the -- end-of-options marker and the resolved prompt content.
-  // Strip both and replace with a placeholder so task instructions are never written
-  // to stderr or captured in agent logs.
-  const safeInitialArgs = hadPromptFile && initialArgs.length > 0 ? [...initialArgs.slice(0, -2), "<prompt omitted>"] : initialArgs;
-  const safeFreshRetryArgs = hadPromptFile && freshRetryArgs.length > 0 ? [...freshRetryArgs.slice(0, -2), "<prompt omitted>"] : freshRetryArgs;
+  const safeInitialArgs = initialArgs;
+  const safeFreshRetryArgs = freshRetryArgs;
 
   // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
   // This is best-effort: failures are logged but do not affect the agent run.
@@ -461,6 +426,7 @@ async function main() {
   // would be wasteful and potentially harmful.
   const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
   if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
+    removeClaudePlugin(pluginDir);
     process.exit(0);
   }
 
@@ -474,11 +440,9 @@ async function main() {
   // emits anything) even though earlier attempts in the same session already made progress.
   // Reset only when a genuinely fresh run begins (see below), never on a --continue attempt.
   let sessionHasProgress = false;
+  let sessionId;
   const driverStartTime = Date.now();
-  // Soft-timeout guard: polled at the top of the retry loop and after each backoff sleep.
-  // It does not preempt a running attempt — if a single invocation runs past the soft
-  // deadline the guard fires on the next iteration. Individual attempts are expected to
-  // complete within the SOFT_TIMEOUT_BUFFER_MS window.
+  // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
 
   const retryRun = await runHarnessRetryLoop({
@@ -492,40 +456,72 @@ async function main() {
     softTimeoutGuard,
     getRetryMode: () => (useContinueOnRetry ? "--continue" : "fresh run"),
     runAttempt: async attempt => {
-      // For --continue retries: omit the original prompt and add --continue.
+      // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
       let currentArgs;
       if (attempt > 0 && useContinueOnRetry) {
-        currentArgs = [...continueBaseArgs, "--continue"];
+        currentArgs = [...continueBaseArgs, "--resume", sessionId];
       } else {
         currentArgs = attempt === 0 ? initialArgs : freshRetryArgs;
         // This attempt starts a brand-new session (either attempt 0, or a fresh
         // retry that discards prior on-disk state) — no assistant progress can carry
         // forward from any earlier attempt, so reset the tracker.
         sessionHasProgress = false;
+        sessionId = undefined;
       }
 
       // Use redacted args for logging when the run carries the prompt text.
       const logArgs = attempt === 0 ? safeInitialArgs : useContinueOnRetry ? currentArgs : safeFreshRetryArgs;
-      return runProcess({ command, args: currentArgs, attempt, log, logArgs, env: childEnv });
+      const safeOutputsByteOffset = claudeSafeOutputsOffset(safeOutputsPath);
+      const result = await runProcess({
+        command,
+        args: currentArgs,
+        attempt,
+        log,
+        logArgs,
+        env: childEnv,
+        stdin: attempt > 0 && useContinueOnRetry ? undefined : (prompt ?? undefined),
+        postResultWatchdog: safeOutputsPath
+          ? {
+              shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),
+              inactivityTimeoutMs: resolvePostResultWatchdogIdleTimeoutMs(),
+            }
+          : undefined,
+        runtimeGuard: softTimeoutGuard
+          ? {
+              shouldTerminate: () => (Date.now() >= softTimeoutGuard.softDeadlineMs ? { terminate: true, reason: "Claude execution reached its soft deadline" } : false),
+            }
+          : undefined,
+      });
+      sessionId = claudeSessionId(result.output) || sessionId;
+      return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset };
     },
     handleFailure: ({ attempt, result }) => {
-      const classifierOutput = classifiableOutput(result.output);
+      if (result.runtimeGuardFired && softTimeoutGuard) {
+        emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
+        return { action: "stop" };
+      }
+      if (result.watchdogFired && hasTerminalSafeOutput(safeOutputsPath, { byteOffset: result.safeOutputsByteOffset, logger: log })) {
+        log("post-result watchdog stopped an idle process after terminal safe-output — treating as success");
+        return { action: "stop", exitCode: 0 };
+      }
+      const classifierOutput = claudeFailureEvidence(result.output);
       const isOverloaded = isOverloadedError(classifierOutput);
       const isRateLimit = isRateLimitError(classifierOutput);
       const isAuthenticationFailed = isAuthenticationFailedError(classifierOutput);
-      const isMaxTurns = isMaxTurnsExit(result.output);
-      const isNoDeferredMarker = isNoDeferredMarkerError(result.output);
-      const isInvalidModel = isInvalidModelError(result.output);
-      const isInvalidJsonBody = isInvalidJsonBodyError(result.output);
-      const isConnectionRefused = isConnectionRefusedError(result.output);
+      const isMaxTurns = isMaxTurnsExit(classifierOutput);
+      const isNoDeferredMarker = isNoDeferredMarkerError(classifierOutput);
+      const isInvalidModel = isInvalidModelError(classifierOutput);
+      const isInvalidJsonBody = isInvalidJsonBodyError(classifierOutput);
+      const isConnectionRefused = isConnectionRefusedError(classifierOutput);
       // Accumulate across attempts of the same session: once an assistant response has been
       // observed, it stays true for the remainder of this session's --continue attempts, even
       // if a later attempt's own output contains nothing but startup/transport errors.
       sessionHasProgress = sessionHasProgress || hasClaudeSessionProgress(result.output);
-      const permissionDeniedCount = countPermissionDeniedIssues(classifierOutput);
-      const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(classifierOutput);
+      const denials = claudePermissionDenials(result.output);
+      const permissionDeniedCount = denials.count;
+      const hasNumerousPermissionDenied = permissionDeniedCount >= 3;
       const crashSignalName = crashSignalNameForExitCode(result.exitCode);
       log(
         `attempt ${attempt + 1} failed:` +
@@ -551,6 +547,12 @@ async function main() {
       }
 
       const nonRetryableGuard = detectNonRetryableHarnessGuard(classifierOutput);
+      if (nonRetryableGuard.apiProxyGuardRejection) {
+        const reason = `AWF API proxy guardrail rejected the request: ${nonRetryableGuard.apiProxyGuardRejection.guard}`;
+        log(`${reason} — not retrying`);
+        emitInfrastructureIncomplete(reason, { logger: log });
+        return { action: "stop" };
+      }
       const proxyAICreditsRejection = parseAICreditsExceededProxyRejection(result.output);
       if (proxyAICreditsRejection) {
         log(`attempt ${attempt + 1}: AWF API proxy rejected the request with HTTP 403 max-AI-credits (${proxyAICreditsRejection.aiCredits}/${proxyAICreditsRejection.maxAICredits}) — trusted budget-abort evidence`);
@@ -582,6 +584,12 @@ async function main() {
 
       const isSignalTermination = isSignalTerminationExitCode(result.exitCode);
       const isCrashSignal = isCrashSignalExitCode(result.exitCode);
+      if (sessionHasProgress && (isSignalTermination || isCrashSignal || isNoDeferredMarker || isInvalidJsonBody) && process.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART !== "true") {
+        const reason = "Claude cannot safely resume completed work; refusing to replay the original task. Set GH_AW_CLAUDE_ALLOW_FRESH_RESTART=true only for replay-safe workflows.";
+        emitInfrastructureIncomplete(reason, { logger: log });
+        log(reason);
+        return { action: "stop" };
+      }
       if (attempt < maxRetries && result.hasOutput && (isSignalTermination || isCrashSignal)) {
         continueDisabledPermanently = true;
         useContinueOnRetry = false;
@@ -607,7 +615,7 @@ async function main() {
           log(`attempt ${attempt + 1}: detected numerous permission-denied issues but safe-outputs already contain expected output — suppressing terminal verdict (false-red: core work succeeded)`);
           return { action: "stop", exitCode: 0 };
         }
-        const deniedCommands = extractDeniedCommands(result.output);
+        const deniedCommands = denials.commands;
         emitMissingToolPermissionIssue({ deniedCommands, logger: log });
         log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
         return { action: "stop" };
@@ -620,6 +628,10 @@ async function main() {
 
       if (isNoDeferredMarker) {
         if (attempt < maxRetries && result.hasOutput) {
+          if (!continueDisabledPermanently && !sessionId) {
+            log("partial execution produced no session ID — not retrying to avoid resuming an unrelated conversation");
+            return { action: "stop" };
+          }
           useContinueOnRetry = false;
           continueDisabledPermanently = true;
           log(`attempt ${attempt + 1}: no deferred tool marker on --continue — retrying as fresh run (failure_reason=harness_retry_path_invalid, --continue disabled permanently, attempt ${attempt + 2}/${maxRetries + 1})`);
@@ -701,6 +713,7 @@ async function main() {
   await fetchAWFReflect({ logger: log });
 
   log(`done: exitCode=${lastExitCode} totalDuration=${formatDuration(Date.now() - driverStartTime)}`);
+  removeClaudePlugin(pluginDir);
   process.exit(lastExitCode);
 }
 

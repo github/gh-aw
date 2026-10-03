@@ -52,7 +52,11 @@ Analyze the repository and create a concise daily status report covering:
 
 ## Capabilities and limitations
 
-Claude Code supports native web search, bare mode, top-level `max-turns`, and per-command bash allowlisting. It does not support Copilot-specific `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+Claude Code supports native web search, bare mode, top-level `max-turns`, per-command bash pre-approval, and custom `engine.harness` scripts. It does not support Copilot-specific `max-continuations` or native `engine.agent` selection. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+
+The default permission mode is `dontAsk`: actions requiring approval run only when pre-approved. Disabled Bash/web tools are removed, and `tools.edit: false` denies repository edits even with an explicit permission-mode override. Safe outputs do not independently grant file-write access. Sandbox and MCP gateway policies provide the isolation boundaries.
+
+Bare mode skips ambient hooks, instructions, skills, and subagents. Workflow-declared skills and inline subagents are explicitly loaded through the `gh-aw-workflow` plugin; their names are plugin-qualified, such as `gh-aw-workflow:reviewer`. Top-level pinned plugins continue to load explicitly.
 
 ## Guided workflow authoring with Claude Code
 

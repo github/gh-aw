@@ -14547,8 +14547,8 @@
             },
             "permission-mode": {
               "type": "string",
-              "enum": ["auto", "acceptEdits", "plan", "bypassPermissions"],
-              "description": "Claude permission mode override. Defaults to acceptEdits (or auto when tools.edit is false)."
+              "enum": ["default", "dontAsk", "auto", "acceptEdits", "plan", "bypassPermissions"],
+              "description": "Claude permission mode override. Defaults to dontAsk for unattended runs. Other modes may approve actions beyond tools pre-approved by the workflow."
             },
             "max-turns": {
               "$ref": "#/$defs/templatable_integer",

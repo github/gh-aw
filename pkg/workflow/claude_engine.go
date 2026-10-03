@@ -40,6 +40,7 @@ func NewClaudeEngine() *ClaudeEngine {
 				NativeAgentFile:      false, // Claude does not support agent file natively; the compiler prepends the agent file content to prompt.txt
 				BareMode:             true,  // Claude CLI supports --bare
 				BashCommandAllowlist: true,  // Claude enforces tools.bash allowlist via --allowed-tools Bash(cmd)
+				BashDisable:          true,  // Explicit Bash deny rules remove shell execution.
 				Plugins:              true,  // Claude Code loads Agent Plugins via --plugin-dir
 			},
 			dedicatedLLMGatewayPort: constants.ClaudeLLMGatewayPort,
@@ -251,6 +252,9 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)
 	}
+	if deniedTools := claudeDisabledTools(workflowData, allowedTools); len(deniedTools) > 0 {
+		claudeArgs = append(claudeArgs, "--disallowed-tools", strings.Join(deniedTools, ","))
+	}
 
 	// Keep debug output separate from the stream-json transcript captured by tee.
 	claudeArgs = append(claudeArgs, "--debug-file", claudeDebugLogFile, "--verbose")
@@ -285,13 +289,9 @@ func appendClaudePluginArgs(claudeArgs []string, workflowData *WorkflowData) []s
 }
 
 // resolveClaudePermissionMode returns the --permission-mode value to use, applying any
-// engine-level overrides. The default is "acceptEdits" unless tools.edit=false ("auto").
+// engine-level overrides. dontAsk permits only pre-approved actions in unattended runs.
 func resolveClaudePermissionMode(workflowData *WorkflowData) string {
-	permissionMode := "acceptEdits"
-	if isEditToolExplicitlyDisabled(workflowData.Tools) {
-		claudeLog.Print("tools.edit=false detected: using auto permission mode")
-		permissionMode = "auto"
-	}
+	permissionMode := "dontAsk"
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.PermissionMode != "" {
 		permissionMode = workflowData.EngineConfig.PermissionMode
 		claudeLog.Printf("Using engine.permission-mode override: %s", permissionMode)
@@ -308,6 +308,9 @@ func appendClaudeCustomEngineArgs(claudeArgs []string, permissionModeValueIndex 
 	// stripClaudePermissionModeArgs returns an empty string when no override flag is present.
 	engineArgs, permissionModeFromArgs := stripClaudePermissionModeArgs(workflowData.EngineConfig.Args)
 	if permissionModeFromArgs != "" && workflowData.EngineConfig.PermissionMode == "" {
+		if permissionModeValueIndex < 0 || permissionModeValueIndex >= len(claudeArgs) {
+			panic("BUG: Claude permission-mode argument index is out of bounds")
+		}
 		claudeLog.Printf("Using legacy engine.args permission mode override: %s", permissionModeFromArgs)
 		claudeArgs[permissionModeValueIndex] = permissionModeFromArgs
 	}
@@ -338,8 +341,8 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 	// prepends the agent file content to prompt.txt so no special shell variable juggling is needed.
 	var claudeCommand string
 	if harnessScriptName != "" {
-		// Harness-wrapped execution: the harness reads --prompt-file and passes its content
-		// as the last positional arg on the initial run. On --continue retries it omits the
+		// Harness-wrapped execution: the harness reads --prompt-file and sends its content
+		// through stdin on the initial run. On exact-session retries it omits the
 		// prompt so Claude Code resumes from its on-disk session state.
 		// The harness sets cwd=GITHUB_WORKSPACE when spawning the claude process, so no
 		// shell-level cd prefix is needed.
@@ -480,6 +483,9 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	applyClaudeModelEnvVars(env, workflowData)
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, claudeLog)
+	if isEditToolExplicitlyDisabled(workflowData.Tools) {
+		env["GH_AW_CLAUDE_DISABLE_REPO_EDITS"] = "true"
+	}
 	applyMCPScriptsSecretEnv(env, workflowData)
 	return env
 }
@@ -599,13 +605,18 @@ func stripClaudePermissionModeArgs(args []string) ([]string, string) {
 	filtered := make([]string, 0, len(args))
 	permissionMode := ""
 
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
+	skipValue := false
+	for i, arg := range args {
+		if skipValue {
+			skipValue = false
+			continue
+		}
 		switch {
 		case arg == "--permission-mode":
-			if i+1 < len(args) {
-				permissionMode = args[i+1]
-				i++
+			next := i + 1
+			if next >= 0 && next < len(args) {
+				permissionMode = args[next]
+				skipValue = true
 			}
 		case strings.HasPrefix(arg, "--permission-mode="):
 			permissionMode = strings.TrimPrefix(arg, "--permission-mode=")
