@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const { parsePiConfig, preparePiRuntime, nativePiProvider, resolvePiPackageFile } = await import("./pi_runtime.cjs");
+const { parsePiConfig, preparePiRuntime, nativePiProvider, resolvePiPackageFile, verifyPiVersion } = await import("./pi_runtime.cjs");
 let dir;
 
 beforeEach(() => {
@@ -17,6 +17,13 @@ afterEach(() => {
 });
 
 describe("Pi runtime configuration", () => {
+  it.each(["0.99.2", "1.0.0-beta.1", "unexpected"])("rejects an incompatible actual CLI version: %s", version => {
+    expect(() => verifyPiVersion("pi", () => version)).toThrow("v1.0.0 or newer");
+  });
+  it.each(["1.0.0", "1.1.0", "2.0.0", "Pi 1.0.0"])("accepts an actual compatible version: %s", version => {
+    expect(() => verifyPiVersion("pi", () => version)).not.toThrow();
+  });
+
   it("uses the install-time package root even when sandbox npm paths differ", () => {
     const root = path.join(dir, "host-toolcache/pi");
     fs.mkdirSync(path.join(root, "dist"), { recursive: true });

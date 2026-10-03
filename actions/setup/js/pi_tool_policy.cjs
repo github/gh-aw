@@ -11,7 +11,7 @@ function isPiBashAllowed(command, allowed) {
   if (typeof command !== "string" || !command.trim()) return false;
   // Dynamic expansions, redirections, grouping, and background execution are
   // deliberately refused rather than attempting to infer their executable scope.
-  if (/[$`\\()<>{}]/.test(command) || /(^|[^&])&([^&]|$)/.test(command)) return false;
+  if (/[$`\\()<>{}#]/.test(command) || /(^|[^&])&([^&]|$)/.test(command)) return false;
   const segments = splitOnPipelineOperators(command);
   return (
     segments.length > 0 &&
@@ -20,8 +20,11 @@ function isPiBashAllowed(command, allowed) {
       if (!executable) return false;
       return allowed.some(pattern => {
         if (typeof pattern !== "string") return false;
-        const prefix = pattern.replace(/:\*$/, "").trim();
-        return segment === prefix || (segment.startsWith(prefix + " ") && extractCommandName(prefix) === executable);
+        const wildcard = /(?::\*| \*)$/.test(pattern);
+        const prefix = pattern.replace(/(?::\*| \*)$/, "").trim();
+        if (segment === prefix) return true;
+        if (!prefix.includes(" ") && !wildcard) return executable === prefix;
+        return wildcard && segment.startsWith(prefix + " ") && extractCommandName(prefix) === executable;
       });
     })
   );

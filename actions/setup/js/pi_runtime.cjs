@@ -4,11 +4,26 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { execFileSync } = require("node:child_process");
 const { writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const DEFAULT_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const DEFAULT_SESSION_DIR = "/tmp/gh-aw/agent/pi-sessions";
+
+/** @param {string} [command] @param {typeof execFileSync} [execute] */
+function verifyPiVersion(command = process.env.GH_AW_PI_COMMAND || "pi", execute = execFileSync) {
+  let version;
+  try {
+    version = execute(command, ["--version"], { encoding: "utf8", timeout: 10000, maxBuffer: 4096 }).trim();
+  } catch (error) {
+    throw new Error(`Cannot verify installed Pi version: ${getErrorMessage(error)}`, { cause: error });
+  }
+  const match = /^(?:pi\s+)?v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/i.exec(version);
+  if (!match || Number(match[1]) < 1 || (match[1] === "1" && match[2] === "0" && match[3] === "0" && match[4])) {
+    throw new Error(`Pi v1.0.0 or newer is required; installed version is ${version}`);
+  }
+}
 
 /** @param {string} [raw] @returns {Record<string, any>} */
 function parsePiConfig(raw = process.env.GH_AW_PI_CONFIG || "{}") {
@@ -111,6 +126,7 @@ function preparePiRuntime(config = parsePiConfig()) {
 }
 
 async function main() {
+  verifyPiVersion();
   preparePiRuntime();
 }
 
@@ -121,4 +137,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parsePiConfig, loadPiSDK, resolvePiPackageFile, nativePiProvider, preparePiRuntime, DEFAULT_AGENT_DIR, DEFAULT_SESSION_DIR };
+module.exports = { parsePiConfig, loadPiSDK, resolvePiPackageFile, nativePiProvider, preparePiRuntime, verifyPiVersion, DEFAULT_AGENT_DIR, DEFAULT_SESSION_DIR };

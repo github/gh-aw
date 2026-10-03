@@ -35,7 +35,7 @@ async function main(options = {}) {
   const modelRuntime = await sdk.ModelRuntime.create({ authPath: path.join(agentDir, "auth.json"), modelsPath: path.join(agentDir, "models.json") });
   const modelString = process.env.GH_AW_PI_MODEL || process.env.PI_MODEL || "";
   const slash = modelString.indexOf("/");
-  const provider = nativePiProvider(slash >= 0 ? modelString.slice(0, slash) : "copilot");
+  const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? modelString.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? modelString.slice(slash + 1) : modelString;
   const model = modelString ? modelRuntime.getModel(fs.existsSync(path.join(agentDir, "models.json")) ? "aw-gateway" : provider, modelId) : undefined;
   if (modelString && !model) settingsManager.applyOverrides({ defaultProvider: provider, defaultModel: modelId });

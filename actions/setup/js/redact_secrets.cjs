@@ -11,6 +11,7 @@ const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAddMaskedValues, redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
+const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
 /**
  * Recursively finds all files matching the specified extensions
  * @param {string} dir - Directory to search
@@ -263,12 +264,20 @@ function redactStepSummaryContent(content) {
 function processFile(filePath, secretValues, maskedValues = []) {
   try {
     const content = fs.readFileSync(filePath, "utf8");
-
-    const runtimeRedacted = redactArtifactMaskedValues(content, maskedValues);
+    const encodedResult =
+      path.extname(filePath).toLowerCase() === ".html"
+        ? redactPiSessionHTML(content, text => {
+            const masked = redactArtifactMaskedValues(text, maskedValues);
+            const builtIn = redactBuiltInPatterns(masked);
+            const custom = redactSecrets(builtIn.content, secretValues);
+            return { content: custom.content, redactionCount: builtIn.redactionCount + custom.redactionCount + (masked !== text ? 1 : 0) };
+          })
+        : { content, redactionCount: 0 };
+    const runtimeRedacted = redactArtifactMaskedValues(encodedResult.content, maskedValues);
     // First, redact built-in patterns
     const builtInResult = redactBuiltInPatterns(runtimeRedacted);
     let redacted = builtInResult.content;
-    let totalRedactions = builtInResult.redactionCount + (runtimeRedacted !== content ? 1 : 0);
+    let totalRedactions = encodedResult.redactionCount + builtInResult.redactionCount + (runtimeRedacted !== encodedResult.content ? 1 : 0);
 
     // Then, redact custom secrets
     const customResult = redactSecrets(redacted, secretValues);
@@ -281,7 +290,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
     }
     return totalRedactions;
   } catch (error) {
-    if (maskedValues.length) {
+    if (maskedValues.length || path.extname(filePath).toLowerCase() === ".html") {
       // Uploads can run with always(); do not leave an unsanitized source behind.
       try {
         fs.unlinkSync(filePath);
@@ -412,4 +421,4 @@ async function redactFilesInDir(dir) {
   }
 }
 
-module.exports = { main, redactFilesInDir, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };
+module.exports = { main, redactFilesInDir, processFile, redactSecrets, redactBuiltInPatterns, redactStepSummaryContent, extractMCPGatewayTokens, BUILT_IN_PATTERNS, MCP_GATEWAY_CONFIG_PATHS };

@@ -30,7 +30,7 @@ async function main(options = {}) {
   if (!promptPath) throw new Error("GH_AW_PROMPT is required");
   const configuredModel = process.env.GH_AW_PI_MODEL || "";
   const slash = configuredModel.indexOf("/");
-  const provider = nativePiProvider(slash >= 0 ? configuredModel.slice(0, slash) : "copilot");
+  const provider = process.env.GH_AW_PI_NATIVE_PROVIDER || nativePiProvider(slash >= 0 ? configuredModel.slice(0, slash) : "copilot");
   const modelId = slash >= 0 ? configuredModel.slice(slash + 1) : configuredModel;
   const model = fs.existsSync(path.join(agentDir, "models.json")) ? `aw-gateway/${modelId}` : `${provider}/${modelId}`;
   const args = rpcArgs(JSON.parse(process.env.GH_AW_PI_ARGS || '["--no-session","--no-approve"]'));

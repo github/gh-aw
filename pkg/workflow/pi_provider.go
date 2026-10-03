@@ -51,6 +51,28 @@ func piConfiguredProvider(data *WorkflowData) string {
 	return "github-copilot"
 }
 
+func piExecutionProvider(data *WorkflowData) string {
+	provider := piConfiguredProvider(data)
+	if data == nil || data.EngineConfig == nil || data.EngineConfig.LLMProvider == "" {
+		return provider
+	}
+	switch provider {
+	case "github-copilot", "anthropic", "openai", "google":
+		switch resolvePiBackend(data) {
+		case UniversalLLMBackendAnthropic:
+			return "anthropic"
+		case UniversalLLMBackendCodex:
+			return "openai"
+		case piBackendGoogle:
+			return "google"
+		default:
+			return "github-copilot"
+		}
+	default:
+		return provider
+	}
+}
+
 func piProviderProfile(data *WorkflowData) universalLLMBackendProfile {
 	profile := piStaticProviderProfile(data)
 	if data != nil && data.EngineConfig != nil && data.EngineConfig.Auth != nil &&
@@ -65,7 +87,8 @@ func piProviderProfile(data *WorkflowData) universalLLMBackendProfile {
 
 func piStaticProviderProfile(data *WorkflowData) universalLLMBackendProfile {
 	provider := piConfiguredProvider(data)
-	if provider == "google" {
+	backend := resolvePiBackend(data)
+	if backend == piBackendGoogle {
 		return universalLLMBackendProfile{
 			coreSecretNames: []string{"GEMINI_API_KEY"},
 			env:             map[string]string{"GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}"},
@@ -73,7 +96,8 @@ func piStaticProviderProfile(data *WorkflowData) universalLLMBackendProfile {
 			gatewayPort:     constants.GeminiLLMGatewayPort,
 		}
 	}
-	if !isFirewallEnabled(data) && provider != "github-copilot" && provider != "openai" && provider != "anthropic" {
+	if !isFirewallEnabled(data) && data != nil && data.EngineConfig != nil && data.EngineConfig.LLMProvider == "" &&
+		provider != "github-copilot" && provider != "openai" && provider != "anthropic" {
 		keys := piNativeProviderKeys[provider]
 		env := make(map[string]string, len(keys))
 		for _, key := range keys {
@@ -81,5 +105,5 @@ func piStaticProviderProfile(data *WorkflowData) universalLLMBackendProfile {
 		}
 		return universalLLMBackendProfile{coreSecretNames: keys, env: env}
 	}
-	return getUniversalLLMBackendProfile(resolvePiBackend(data), hasCopilotRequestsWritePermission(data))
+	return getUniversalLLMBackendProfile(backend, hasCopilotRequestsWritePermission(data))
 }

@@ -76,12 +76,13 @@ func (e *PiEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider {
 // "github-copilot/" is accepted as an alias for "copilot/" since that is the
 // provider name used by Pi CLI's built-in model registry.
 func resolvePiBackend(workflowData *WorkflowData) UniversalLLMBackend {
-	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.Model == "" {
+	if workflowData == nil || workflowData.EngineConfig == nil {
 		return UniversalLLMBackendCopilot
 	}
-	model := workflowData.Model
 	if workflowData.EngineConfig.LLMProvider != "" {
 		switch normalizeLLMProvider(string(workflowData.EngineConfig.LLMProvider)) {
+		case LLMProviderGitHub:
+			return UniversalLLMBackendCopilot
 		case LLMProviderAnthropic:
 			return UniversalLLMBackendAnthropic
 		case LLMProviderOpenAI:
@@ -90,6 +91,7 @@ func resolvePiBackend(workflowData *WorkflowData) UniversalLLMBackend {
 			return piBackendGoogle
 		}
 	}
+	model := workflowData.Model
 	if !strings.Contains(model, "/") {
 		// No provider prefix — default to Copilot (backward compatibility).
 		return UniversalLLMBackendCopilot
@@ -404,7 +406,7 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 		return setup, piArgs
 	}
 	if !driverConfigured {
-		nativeProvider := piConfiguredProvider(workflowData)
+		nativeProvider := piExecutionProvider(workflowData)
 		piArgs = append(piArgs, "--model", path.Join(nativeProvider, modelID))
 		piLog.Printf("Pi: using native provider %q for model %q (no firewall)", nativeProvider, modelID)
 	}
@@ -499,7 +501,7 @@ func (e *PiEngine) buildPiExecutionEnv(workflowData *WorkflowData, profile unive
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	if modelConfigured {
 		env["GH_AW_PI_MODEL"] = workflowData.Model
-		env["GH_AW_PI_NATIVE_PROVIDER"] = piConfiguredProvider(workflowData)
+		env["GH_AW_PI_NATIVE_PROVIDER"] = piExecutionProvider(workflowData)
 	}
 	maps.Copy(env, profile.env)
 	if backend == UniversalLLMBackendCopilot {

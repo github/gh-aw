@@ -102,7 +102,7 @@ Codemode batches tool calls and reduces results before they enter model context.
 | `max-turns`, `max-ai-credits` | Enforced by the AWF inference proxy. |
 | `max-tool-calls` | Pre-dispatch limit covering local, MCP, and nested codemode calls. |
 | `max-tool-denials` | Stops inference after repeated policy denials. |
-| `tools.bash` | Supports disabling bash and command-prefix allowlists. Restricted commands reject dynamic shell expansions, redirections, grouping, and background execution. |
+| `tools.bash` | Supports disabling bash, executable-name rules, exact multiword commands, and explicit argument wildcards (`:*` or ` *`). Restricted commands reject shell comments, dynamic expansions, redirections, grouping, and background execution. |
 | `tools.edit: false` | Disables native `edit` and `write` tools. |
 | `engine.bare: true` | Disables automatic context, skill, prompt-template, extension, and theme discovery; retains explicit workflow infrastructure extensions. |
 | `engine.extensions` | Installs npm, pinned git, or local Pi packages into the managed runtime directory. |
