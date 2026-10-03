@@ -21,6 +21,40 @@ Set `engine:` in workflow frontmatter and configure the corresponding authentica
 
 Copilot CLI is the default, so `engine:` can be omitted when using Copilot. Copilot SDK mode is an execution mode of the Copilot engine, not a separate engine; enable it with `engine: copilot` and `copilot-sdk: true`. See [Copilot SDK support](#copilot-sdk-support).
 
+## Configuration conformance workflows
+
+This repository provides manual-only `engine-conformance-<engine-id>.md`
+workflows for all five built-in engines and the eight runnable imported engines:
+Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, OpenCode, and Pydantic AI.
+Each imports `shared/engine-conformance.md` and uses its normal engine installer,
+configuration renderer, and execution harness. No additional CLI command is
+required.
+
+The shared JavaScript setup creates a fresh file nonce and arithmetic fixture.
+The agent reads the fixture, runs a shell probe that checks `engine.env`, obtains
+a second nonce through the mounted `mcpscripts` CLI, and writes a typed JSON
+result. A JavaScript post-step compares that result with host-side expectations
+and the tool's recorded receipt. Missing or malformed results, mismatched
+values, and unsuccessful agent execution fail the job even if the agent claims
+success. Aider's single-turn profile implements the probes in a JavaScript file
+before executing them.
+
+Results appear in the Actions step summary and the two-day
+`engine-conformance-<engine-id>` artifact as `report.json`. The workflows have
+a ten-minute agent timeout and a five-credit budget; engines that advertise
+`max-turns` additionally cap inference at 30 turns. Safe outputs are staged,
+so the suite does not publish GitHub issues or comments. Copilot-backed profiles
+use `copilot-requests: write` with `${{ github.token }}` and require no PAT.
+Claude, Codex, Gemini, Cursor, and Kiro use their normal engine credentials.
+Missing credentials fail activation rather than passing or skipping the suite.
+
+This is a configuration smoke test, not a security or model-quality evaluation.
+The tool probe checks the production MCP gateway/CLI path, not native MCP client
+support. It does not test SDK/driver profiles, plugins, permission-denial
+enforcement, or prove that a provider honored the requested model. The legacy
+GenAIScript `custom` catalog entry has no registered runtime or `behaviors`
+definition and is excluded until migrated to an executable engine definition.
+
 ## Unsupported engine samples
 
 The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI integrations in this repository are **samples only**. They are not officially supported by gh-aw and have no compatibility or maintenance commitment.
