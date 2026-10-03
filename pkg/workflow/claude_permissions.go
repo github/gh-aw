@@ -2,7 +2,8 @@ package workflow
 
 import "strings"
 
-// Bare deny rules remove tools even when a user explicitly selects auto or acceptEdits.
+// Bare deny rules remove tools from Claude's context before permission-mode approval,
+// so auto, acceptEdits, and bypassPermissions cannot re-enable disabled native tools.
 func claudeDisabledTools(data *WorkflowData, allowed string) []string {
 	granted := make(map[string]struct{})
 	for tool := range strings.SplitSeq(allowed, ",") {

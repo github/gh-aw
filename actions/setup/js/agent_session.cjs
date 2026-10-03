@@ -204,6 +204,13 @@ function selectSessionResult(events) {
         if (Array.isArray(snapshot[key])) aggregate[key] = [...(aggregate[key] ?? []), ...snapshot[key]];
       }
     }
+    for (const event of normalized) {
+      if (event.type !== "session.result" || event.data.sourceEngine !== "claude" || event.parent_tool_use_id || typeof event.session_id === "string") continue;
+      // Unassigned diagnostics are valid evidence, but their usage may overlap a named session.
+      for (const key of ["errors", "permissionDenials"]) {
+        if (Array.isArray(event.data[key])) aggregate[key] = [...(aggregate[key] ?? []), ...structuredClone(event.data[key])];
+      }
+    }
     aggregate.usage.input_tokens_include_cache = false;
     return aggregate;
   }

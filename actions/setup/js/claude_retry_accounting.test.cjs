@@ -23,4 +23,37 @@ describe("Claude retry accounting", () => {
   it("preserves existing snapshot semantics when session identifiers are unavailable", () => {
     expect(projectSessionResult(normalizeClaudeSession([result(undefined, 0.1, 1000, 3), result(undefined, 0.2, 2000, 4)]))).toMatchObject({ total_cost_usd: 0.2, num_turns: 4, usage: { input_tokens: 2000 } });
   });
+  it("preserves unassigned provider and stream errors after fresh-session retries", () => {
+    const records = [
+      result("a", 0.125, 1000, 3),
+      { type: "assistant", error: "server_error", is_api_error_message: true, message: { content: [{ type: "text", text: "Provider failed before initialization" }] } },
+      result("b", 0.25, 2000, 4),
+      { type: "stream_event", event: { type: "error", error: { type: "overloaded_error", message: "Stream failed" } } },
+    ];
+    const projected = projectSessionResult(normalizeClaudeSession(records));
+    expect(projected).toMatchObject({ total_cost_usd: 0.375, num_turns: 7, usage: { input_tokens: 3000 } });
+    expect(projected.errors).toEqual([
+      { error: "server_error", message: { content: [{ type: "text", text: "Provider failed before initialization" }] } },
+      { type: "overloaded_error", message: "Stream failed" },
+    ]);
+  });
+  it.each([undefined, null, 42])("retains unassigned diagnostics for session ID %j without counting ambiguous metrics", session_id => {
+    const denial = { tool_name: "Bash", tool_use_id: "blocked", tool_input: { command: "blocked-command" } };
+    const records = [
+      result("a", 0.125, 1000, 3),
+      result("b", 0.25, 2000, 4),
+      result(session_id, 100, 1000000, 1000, { errors: ["unassigned error"], permission_denials: [denial] }),
+      result("child", 200, 2000000, 2000, { parent_tool_use_id: "task", errors: ["child diagnostic"], permission_denials: [{ tool_name: "Write" }] }),
+    ];
+    const events = normalizeClaudeSession(records);
+    const original = structuredClone(events);
+    expect(projectSessionResult(events)).toMatchObject({
+      total_cost_usd: 0.375,
+      num_turns: 7,
+      usage: { input_tokens: 3000 },
+      errors: ["unassigned error"],
+      permission_denials: [denial],
+    });
+    expect(events).toEqual(original);
+  });
 });
