@@ -24,7 +24,7 @@ A PR is merge-ready when **all three** are satisfied. Work them **concurrently**
 | Condition | Definition | Agent's signal |
 |---|---|---|
 | **Reviews** | Every unresolved in-scope review thread is addressed on its merits, replied to, and resolved, including GitHub Actions bot threads/comments (`github-actions[bot]`). Code changes alone do not satisfy this. Threads where Copilot has already replied with a substantive answer must be resolved before delegating to `copilot-review`. | `copilot-review` skill + GraphQL `reviewThreads` |
-| **Checks** | Local `make fmt` / `make lint` / `make test-unit` / `make test` pass. Last-known CI runs reviewed at log level. | `make` targets locally; `gh pr checks` / `gh run view --log-failed` for prior runs |
+| **Checks** | Local formatting, lint, and impacted unit tests pass; broader tests run when required by affected code or prior CI failures. Last-known CI failures reviewed at log level. | `make` targets locally; `gh pr checks` / `gh run view --log-failed` for prior runs |
 | **Mergeable** | PR is OPEN, not draft, `mergeable: MERGEABLE`, not `BEHIND` if the repo requires up-to-date branches. | `gh pr view --json mergeable,mergeStateStatus,state,isDraft` |
 
 Because the agent cannot re-trigger CI, "Checks" is satisfied at the agent's level when **local validation passes and prior CI failures have been root-caused and fixed in the pushed commits**. Final green CI requires a human to re-trigger after the agent stops.
@@ -71,9 +71,21 @@ The agent runs this once. There is no monitoring loop.
 ```bash
 mkdir -p /tmp/gh-aw/pr-finisher
 PR_SNAPSHOT=/tmp/gh-aw/pr-finisher/pr-state.json
-GH_PAGER="" gh pr view <number> --json author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,reviews,reviewThreads,comments > "$PR_SNAPSHOT"
+GH_PAGER="" gh pr view <number> --json author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,reviews,comments > "$PR_SNAPSHOT"
+GH_PAGER="" gh api graphql --paginate --slurp \
+  -f query='query($owner:String!,$repo:String!,$pr:Int!,$endCursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:100){pageInfo{hasNextPage} nodes{author{login} authorAssociation body createdAt url}}}}}}}' \
+  -f owner=github -f repo=gh-aw -F pr=<number> \
+  > /tmp/gh-aw/pr-finisher/review-threads.json
+jq -s '.[0] + {reviewThreads: [.[1][] | .data.repository.pullRequest.reviewThreads.nodes[] | . + {comments: .comments.nodes, commentsPageInfo: .comments.pageInfo}]}' \
+  "$PR_SNAPSHOT" /tmp/gh-aw/pr-finisher/review-threads.json \
+  > "$PR_SNAPSHOT.tmp" && mv "$PR_SNAPSHOT.tmp" "$PR_SNAPSHOT"
 GH_PAGER="" gh pr checks <number>
 ```
+
+`reviewThreads` is not a supported `gh pr view --json` field. The GraphQL data
+above is flattened into the snapshot shape used by `copilot-review`. If a thread's
+`commentsPageInfo.hasNextPage` is true, fetch its remaining comments before judging
+whether it is addressed. Do not treat truncated or failed reads as resolved feedback.
 
 If merged/closed, report and stop. Also stop if the author is a platform-managed dependency bot or another unrecognized bot, unless the user explicitly requested handling that bot-authored PR. This author gate is independent of reviewer eligibility. Otherwise classify each condition as ✅ / ❌ / ⏳ / ❓ using the snapshot file plus `gh pr checks`. The CI snapshot here is your **only** view of CI for this run — capture which checks failed and why before changing anything, because after you push it will be stale.
 
@@ -118,15 +130,24 @@ jq '{state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefOid}' "$PR_S
 
 ### 4. Address Checks (local + prior CI)
 
-**Local validation** — the agent's only correctness signal. Run in order; fix at each step before moving on:
+**Local validation** — the agent's only correctness signal. Batch related review,
+mergeability, and CI fixes before the final gate. Use focused tests while editing;
+do not repeat the full gate for each thread or run both standalone `test-unit` and
+the progress gate on the same unchanged files. Run in order; fix failures before
+moving on:
 
 ```bash
 make fmt
 make lint
-make test-unit
-make test
-make recompile
+make agent-report-progress
 ```
+
+The progress gate includes impacted `test-unit` coverage and workflow drift checks.
+Run `make test` when the affected code or a prior failing CI job requires its
+broader coverage, not on every no-change finisher pass. Run `make recompile` after
+workflow markdown changes. If nothing changed and all blockers are already
+addressed, reuse prior validation only when its recorded SHA matches the current
+`headRefOid`, and stop instead of repeating validation or producing an empty commit.
 
 If a `make test` fix changes wasm compiler output, or wasm golden tests fail:
 
