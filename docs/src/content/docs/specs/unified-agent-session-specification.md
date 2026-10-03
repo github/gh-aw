@@ -474,6 +474,11 @@ source for opaque fields.
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. |
+
+Detection and evals token-usage ledgers contribute their observed per-request AIC
+through detection- and evals-phase accounting events. The staged detection ledger
+is a fallback when the original detection firewall accounting is unavailable;
+the two copies MUST NOT be emitted as separate consumption observations.
 | `session.collection_warning`, `session.collection` | Explicit collection diagnostics and coverage. |
 | `session.format` | Leading collector-owned file-format metadata, distinct from source-native events with the same type. |
 

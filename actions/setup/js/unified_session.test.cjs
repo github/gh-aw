@@ -213,6 +213,37 @@ describe("Unified conclusion session", () => {
     expect(fallback[0].provenance.path).toBe(mirror);
   });
 
+  it("retains detection and evals AIC from their token-usage ledgers without duplicating detection accounting", () => {
+    const detectionLedger = "threat-detection/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+    const detectionMirror = "usage/detection/token_usage.jsonl";
+    const evalsLedger = "evals/evals_token_usage.jsonl";
+    const evalsMirror = "usage/evals/token_usage.jsonl";
+    const detectionRecord = { event: "token_usage", ai_credits_this_response: 0.5, ai_credits_total: 0.5, input_tokens: 10 };
+    const evalsRecord = { ai_credits_this_response: 1.25, ai_credits_total: 1.25, output_tokens: 20 };
+    write(detectionLedger, [detectionRecord]);
+    write(detectionMirror, [detectionRecord]);
+    write(evalsLedger, [evalsRecord]);
+    write(evalsMirror, [evalsRecord]);
+
+    const accounting = () => collectUnifiedSession({ rootDir: root }).events.filter(event => ["detection", "evals"].includes(event.provenance.phase) && event.data.aic !== undefined);
+    expect(accounting()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "firewall.token_usage", data: expect.objectContaining({ aic: 0.5, totalAic: 0.5, usage: { input_tokens: 10 } }), provenance: expect.objectContaining({ phase: "detection", path: detectionLedger }) }),
+        expect.objectContaining({ type: "usage.report", data: expect.objectContaining({ aic: 1.25, totalAic: 1.25, usage: { output_tokens: 20 } }), provenance: expect.objectContaining({ phase: "evals", path: evalsLedger }) }),
+      ])
+    );
+
+    fs.unlinkSync(path.join(root, detectionLedger));
+    fs.unlinkSync(path.join(root, evalsLedger));
+    expect(accounting()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "usage.report", data: expect.objectContaining({ aic: 0.5 }), provenance: expect.objectContaining({ phase: "detection", path: detectionMirror }) }),
+        expect.objectContaining({ type: "usage.report", data: expect.objectContaining({ aic: 1.25 }), provenance: expect.objectContaining({ phase: "evals", path: evalsMirror }) }),
+      ])
+    );
+    expect(accounting()).toHaveLength(2);
+  });
+
   it.each(["structured", "inline"])("collects the sanitized %s detection verdict with its job outcome and categorical reason", source => {
     const verdict = { prompt_injection: true, secret_leak: false, malicious_patch: true, reasons: ["PRIVATE_DETECTOR_REASON"] };
     if (source === "structured") write("threat-detection/detection_result.json", verdict);

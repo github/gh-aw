@@ -298,6 +298,12 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const file = choose(candidates);
     if (file) add(file, component, phase, type);
   }
+  // The staged detection ledger mirrors the raw firewall log; use it only when
+  // the original per-request observations are unavailable.
+  if (!sources.some(source => source.phase === "detection" && source.events.some(event => event.type === "firewall.token_usage"))) {
+    const file = choose(["usage/detection/token_usage.jsonl"]);
+    if (file) add(file, "usage", "detection", "usage.report");
+  }
   /** @type {SessionEvent} */
   const summary = {
     type: "session.collection",
