@@ -43,6 +43,38 @@ engine:
         - --output-format
         - text
       step-name: Execute Cursor Agent CLI
+      api-target-env-var: OPENAI_BASE_URL
+      prepare-env-var: OPENAI_API_KEY
+      prepare-script: |
+        const main = async () => {
+          const rawEndpoint = process.env.OPENAI_BASE_URL;
+          const apiKey = process.env.OPENAI_API_KEY;
+          if (!rawEndpoint || !apiKey) throw new Error("Cursor gateway authentication requires its upstream and CURSOR_API_KEY secret");
+          const endpoint = new URL(rawEndpoint.includes("://") ? rawEndpoint : `https://${rawEndpoint}`);
+          if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+            throw new Error("Cursor authentication requires an HTTPS upstream without userinfo, query, or fragment");
+          }
+          const exchangeURL = new URL(`${endpoint.pathname.replace(/\/+$/, "")}/auth/exchange_user_api_key`, endpoint.origin);
+          const response = await fetch(exchangeURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+            body: "{}",
+            redirect: "error",
+            signal: AbortSignal.timeout(30000),
+          });
+          if (!response.ok) throw new Error(`Cursor API-key exchange failed with HTTP ${response.status}`);
+          const data = await response.json();
+          if (typeof data.accessToken !== "string" || !data.accessToken || /[\r\n]/.test(data.accessToken)) {
+            throw new Error("Cursor API-key exchange returned no valid access token");
+          }
+          const masked = data.accessToken.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+          process.stderr.write(`::add-mask::${masked}\n`);
+          process.stdout.write(data.accessToken);
+        };
+        main().catch(() => {
+          process.stderr.write("Cursor gateway authentication failed; verify CURSOR_API_KEY and engine.api-target\n");
+          process.exitCode = 1;
+        });
       model-env-var: CURSOR_MODEL
       mcp-config-env-var: GH_AW_MCP_CONFIG
       write-timestamp: true
@@ -124,7 +156,7 @@ engine:
           if (process.env.AWF_REFLECT_ENABLED !== "1") {
             throw new Error("Cursor requires the AWF LLM gateway; enable sandbox.agent: awf");
           }
-          const result = await fetchAWFReflect({ logger: log });
+          const result = await fetchAWFReflect({ logger: log, outputPath: "/tmp/gh-aw/awf-reflect.json" });
           if (!result.ok || !result.reflectData) {
             throw new Error(`Unable to discover the Cursor LLM endpoint from /reflect: ${result.reason || "empty response"}`);
           }
@@ -166,7 +198,7 @@ engine:
             permissions: { allow: [], deny: [] },
             network: { useHttp1ForAgent: true },
           }), { mode: 0o600 });
-          const gatewayArgs = ["--endpoint", endpoint.baseUrl, "--agent-endpoint", endpoint.baseUrl, "--http-version", "1.1"];
+          const gatewayArgs = ["--auth-token", "awf-proxy", "--endpoint", endpoint.baseUrl, "--agent-endpoint", endpoint.baseUrl, "--http-version", "1.1"];
           fail(spawnSync(executable, [...commandArgs, ...modelArgs, ...gatewayArgs, prompt], {
             stdio: "inherit",
             env: {
@@ -259,6 +291,7 @@ Import this file and set `engine: id: cursor` to use it:
 ```yaml
 engine:
   id: cursor
+  api-target: api2.cursor.sh
 model: cursor/auto
 imports:
   - shared/cursor.md
@@ -267,8 +300,16 @@ imports:
 Configure the `CURSOR_API_KEY` GitHub Actions secret with an API key from the
 Cursor dashboard. The definition configures Cursor's upstream API as the AWF
 OpenAI route's custom target via `engine.env.OPENAI_BASE_URL`. The real key is
-bound to the runner's `OPENAI_API_KEY` for sidecar authentication and excluded
-from the agent; Cursor receives only the non-secret `awf-proxy` placeholder.
+exchanged on the runner for a session token before AWF starts. The token is
+masked, bound to the runner's `OPENAI_API_KEY` for sidecar authentication, and
+excluded from the agent. Cursor receives only the non-secret `awf-proxy`
+session-token placeholder, so the CLI does not perform its own API-key exchange.
+
+`api-target` is optional: omitting it binds the gateway to `api2.cursor.sh`.
+To use an organization-managed Cursor endpoint, change just
+`engine.api-target` to that hostname. This changes AWF's upstream destination,
+not the CLI's local gateway URL; no OpenAI-specific environment variables or
+gateway ports are required in the consuming workflow.
 
 The harness resolves the provider's live gateway URL using `awf_reflect.cjs`,
 binds both `--endpoint` and `--agent-endpoint`, and uses an ephemeral HTTP/1.1

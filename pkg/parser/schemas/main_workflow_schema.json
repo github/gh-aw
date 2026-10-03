@@ -15339,6 +15339,20 @@
                     "provider-env-mode": {
                       "type": "string"
                     },
+                    "api-target-env-var": {
+                      "type": "string",
+                      "enum": ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "GEMINI_API_BASE_URL"],
+                      "description": "Gateway upstream base-URL variable to configure from a workflow's engine.api-target. The explicit API target overrides definition defaults and engine.env for this variable; the CLI still uses its reflected gateway endpoint."
+                    },
+                    "prepare-script": {
+                      "type": "string",
+                      "description": "Trusted runner-side JavaScript executed immediately before AWF starts. Prints one prepared provider credential to stdout for prepare-env-var; must mask credentials, avoid inference calls, and fail explicitly on authentication errors."
+                    },
+                    "prepare-env-var": {
+                      "type": "string",
+                      "enum": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
+                      "description": "Runner-side gateway credential variable populated from prepare-script stdout. Must be paired with prepare-script. AWF isolates this credential in the API-proxy sidecar."
+                    },
                     "env": {
                       "type": "object",
                       "description": "Additional static environment variables injected into the execution step. Values are rendered verbatim and must not contain secrets.",

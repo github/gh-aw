@@ -40,6 +40,26 @@ func NewBehaviorDefinedEngine(def *EngineDefinition) (*BehaviorDefinedEngine, er
 	if def.Behaviors == nil {
 		return nil, fmt.Errorf("engine definition %q is missing behaviors", def.ID)
 	}
+	if execution := def.Behaviors.Execution; execution != nil {
+		switch execution.APITargetEnvVar {
+		case "", "OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "GEMINI_API_BASE_URL":
+		default:
+			return nil, fmt.Errorf("engine definition %q has unsupported behaviors.execution.api-target-env-var %q; use OPENAI_BASE_URL, ANTHROPIC_BASE_URL, or GEMINI_API_BASE_URL", def.ID, execution.APITargetEnvVar)
+		}
+		if execution.PrepareScript != "" || execution.PrepareEnvVar != "" {
+			if execution.PrepareScript == "" || execution.PrepareEnvVar == "" {
+				return nil, fmt.Errorf("engine definition %q must pair prepare-script with prepare-env-var", def.ID)
+			}
+			switch execution.PrepareEnvVar {
+			case "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY":
+			default:
+				return nil, fmt.Errorf("engine definition %q has unsupported prepare-env-var %q; use a gateway provider credential variable", def.ID, execution.PrepareEnvVar)
+			}
+			if strings.Contains(execution.PrepareScript, "\n"+prepareScriptHeredocDelimiter) || strings.HasPrefix(execution.PrepareScript, prepareScriptHeredocDelimiter) {
+				return nil, fmt.Errorf("engine definition %q prepare-script contains its reserved heredoc delimiter", def.ID)
+			}
+		}
+	}
 	capabilities := def.Behaviors.Capabilities.ToRuntimeCapabilities()
 	capabilities.MCP = true
 	// Declaring a plugins behavior block is what enables Agent Plugins for the engine:
@@ -519,19 +539,38 @@ func (e *BehaviorDefinedEngine) GetExecutionSteps(workflowData *WorkflowData, lo
 		return nil
 	}
 
-	workflowData = e.withDefinitionEnv(workflowData)
+	workflowData = e.withDefinitionExecutionConfig(workflowData)
 	exec := behavior.Execution
 	firewallEnabled := e.behaviorDefinedFirewallEnabled(workflowData)
 	engineCommand := e.buildBehaviorDefinedEngineCommand(exec, workflowData)
 	command := e.buildBehaviorDefinedExecutionCommand(exec, workflowData, logFile, engineCommand, firewallEnabled)
 	env := e.buildBehaviorDefinedExecutionEnv(exec, workflowData, firewallEnabled)
 	steps := e.buildBehaviorDefinedSetupSteps()
+	if exec.PrepareScript != "" {
+		steps = append(steps, e.buildScriptWriteStep(
+			"Write "+e.GetDisplayName()+" gateway authentication script",
+			e.GetID()+"_prepare.cjs", exec.PrepareScript, prepareScriptHeredocDelimiter,
+		))
+		preparePath := path.Join(SetupActionDestinationShell, e.GetID()+"_prepare.cjs")
+		command = fmt.Sprintf("GH_AW_PREPARED_CREDENTIAL=\"$(%s \"%s\")\" || exit $?\nexport %s=\"$GH_AW_PREPARED_CREDENTIAL\"\nunset GH_AW_PREPARED_CREDENTIAL\n%s",
+			nodeRuntimeResolutionCommand, preparePath, exec.PrepareEnvVar, command)
+	}
 	steps = append(steps, e.buildBehaviorDefinedExecutionStep(exec, workflowData, command, env))
 	return steps
 }
 
-func (e *BehaviorDefinedEngine) withDefinitionEnv(workflowData *WorkflowData) *WorkflowData {
-	if workflowData == nil || len(e.definition.Env) == 0 {
+const prepareScriptHeredocDelimiter = "GHAW_PREPARE_SCRIPT_4f93a182_EOF"
+
+func (e *BehaviorDefinedEngine) withDefinitionExecutionConfig(workflowData *WorkflowData) *WorkflowData {
+	if workflowData == nil {
+		return workflowData
+	}
+	targetEnvVar := ""
+	if execution := e.behavior().Execution; execution != nil {
+		targetEnvVar = execution.APITargetEnvVar
+	}
+	hasAPITarget := targetEnvVar != "" && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != ""
+	if len(e.definition.Env) == 0 && !hasAPITarget {
 		return workflowData
 	}
 	data := *workflowData
@@ -539,8 +578,14 @@ func (e *BehaviorDefinedEngine) withDefinitionEnv(workflowData *WorkflowData) *W
 	if workflowData.EngineConfig != nil {
 		config = *workflowData.EngineConfig
 	}
-	env := maps.Clone(e.definition.Env)
+	env := make(map[string]string, len(e.definition.Env)+len(config.Env)+1)
+	maps.Copy(env, e.definition.Env)
 	maps.Copy(env, config.Env)
+	if hasAPITarget {
+		env[targetEnvVar] = config.APITarget
+		// The target now belongs to this engine's declared gateway route, not Copilot's legacy route.
+		config.APITarget = ""
+	}
 	config.Env = env
 	data.EngineConfig = &config
 	return &data

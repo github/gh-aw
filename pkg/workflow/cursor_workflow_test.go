@@ -46,6 +46,9 @@ func TestCursorSharedEngineGatewayRouting(t *testing.T) {
 	assert.Contains(t, execution, "CURSOR_API_KEY: awf-proxy")
 	assert.NotContains(t, execution, "CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}")
 	assert.Contains(t, execution, "AWF_REFLECT_ENABLED: 1")
+	assert.Contains(t, execution, `export OPENAI_API_KEY="$GH_AW_PREPARED_CREDENTIAL"`)
+	assert.Contains(t, execution, "cursor_prepare.cjs")
+	assert.Less(t, strings.Index(execution, "cursor_prepare.cjs"), strings.Index(execution, "awf --config"))
 	assert.NotContains(t, engine.allowedDomains(data), "api2.cursor.sh")
 	assert.NotContains(t, engine.allowedDomains(data), "agentn.global.api5.cursor.sh")
 	assert.Nil(t, data.EngineConfig.Env, "definition defaults must not mutate the caller")
@@ -60,5 +63,32 @@ func TestCursorSharedEngineGatewayRouting(t *testing.T) {
 		assert.Contains(t, execution, "--exclude-env OPENAI_API_KEY")
 		assert.Contains(t, execution, "CURSOR_API_KEY: awf-proxy")
 		assert.Equal(t, map[string]string{"OPENAI_BASE_URL": "https://cursor-proxy.example"}, data.EngineConfig.Env)
+	})
+
+	t.Run("api-target binds the Cursor upstream without gateway-specific environment settings", func(t *testing.T) {
+		data.EngineConfig = &EngineConfig{
+			ID:        "cursor",
+			APITarget: "cursor-proxy.example",
+		}
+		steps := engine.GetExecutionSteps(data, "/tmp/cursor.log")
+		execution := strings.Join(steps[len(steps)-1], "\n")
+		assert.Contains(t, execution, `\"targets\":{\"openai\":{\"host\":\"cursor-proxy.example\"}}`)
+		assert.Contains(t, execution, "--exclude-env OPENAI_API_KEY")
+		assert.Contains(t, execution, "CURSOR_API_KEY: awf-proxy")
+		assert.Equal(t, "cursor-proxy.example", data.EngineConfig.APITarget)
+		assert.Nil(t, data.EngineConfig.Env)
+	})
+
+	t.Run("api-target overrides conflicting environment configuration", func(t *testing.T) {
+		data.EngineConfig = &EngineConfig{
+			ID:        "cursor",
+			APITarget: "api2.cursor.sh",
+			Env:       map[string]string{"OPENAI_BASE_URL": "https://wrong.example"},
+		}
+		steps := engine.GetExecutionSteps(data, "/tmp/cursor.log")
+		execution := strings.Join(steps[len(steps)-1], "\n")
+		assert.Contains(t, execution, `\"targets\":{\"openai\":{\"host\":\"api2.cursor.sh\"}}`)
+		assert.NotContains(t, execution, "wrong.example")
+		assert.Equal(t, "https://wrong.example", data.EngineConfig.Env["OPENAI_BASE_URL"])
 	})
 }

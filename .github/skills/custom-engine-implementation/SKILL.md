@@ -78,6 +78,21 @@ protocol conversion or proof of model-policy/token-accounting support. Verify
 the request contract and document missing controls; extend the upstream AWF
 adapter when those controls or the protocol itself are unsupported.
 
+For a user-facing upstream override, declare
+`behaviors.execution.api-target-env-var` with the gateway route's base-URL
+variable. Users can then set `engine.api-target` without knowing adapter
+environment names. It overrides that variable's definition and workflow
+environment values while the driver still binds only to the reflected gateway.
+
+When the gateway needs a session token rather than the user API key, pair
+`execution.prepare-script` with `execution.prepare-env-var`. The trusted
+runner script may perform authentication only, must mask the resulting token,
+and writes exactly that token to stdout for capture before AWF starts.
+The destination must be a supported provider credential variable; AWF keeps it
+in the sidecar. Give the CLI a session-token placeholder and prevent its own
+exchange from conflicting with sidecar authentication. Never use this hook for
+direct inference.
+
 Reuse the existing harness runtime and helpers before adding schema fields.
 Precompute reflection and pass it to a driver only when its runtime cannot
 consume the shared helpers; precomputation must happen inside the active AWF

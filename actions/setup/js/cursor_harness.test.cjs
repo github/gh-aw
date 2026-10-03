@@ -59,9 +59,10 @@ describe("Cursor shared engine harness", () => {
     const result = await runHarness({
       env: { CURSOR_API_ENDPOINT: "https://direct.example", CURSOR_API_BASE_URL: "https://direct.example" },
     });
+
     const execution = result.spawnSync.mock.calls.find(([command, args]) => command.endsWith("/cursor-agent") && args[0] !== "--version");
     expect(execution).toBeDefined();
-    expect(execution[1]).toEqual(["-p", "--force", "--model", "auto", "--endpoint", "http://api-proxy:12005", "--agent-endpoint", "http://api-proxy:12005", "--http-version", "1.1", "Test prompt"]);
+    expect(execution[1]).toEqual(["-p", "--force", "--model", "auto", "--auth-token", "awf-proxy", "--endpoint", "http://api-proxy:12005", "--agent-endpoint", "http://api-proxy:12005", "--http-version", "1.1", "Test prompt"]);
     expect(execution[2].env).toMatchObject({
       CURSOR_API_KEY: "awf-proxy",
       CURSOR_API_ENDPOINT: "http://api-proxy:12005",
@@ -95,5 +96,55 @@ describe("Cursor shared engine harness", () => {
     const result = await runHarness({ exitStatus: 7 });
     expect(result.processMock.exitCode).toBe(1);
     expect(result.logs.join("")).toContain("Cursor Agent execution failed with exit code 7");
+  });
+});
+
+describe("Cursor runner-side gateway authentication", () => {
+  const prepareMatch = definition.match(/^      prepare-script: \|\n([\s\S]*?)(?=^      model-env-var:)/m);
+  if (!prepareMatch) throw new Error("Cursor definition has no prepare-script");
+  const prepareSource = prepareMatch[1].replace(/^        /gm, "");
+
+  async function runPreparation(options = {}) {
+    const stdout = [];
+    const stderr = [];
+    const processMock = {
+      env: { OPENAI_BASE_URL: "cursor-proxy.example", OPENAI_API_KEY: "test-api-key", ...options.env },
+      stdout: { write: message => stdout.push(message) },
+      stderr: { write: message => stderr.push(message) },
+      exitCode: undefined,
+    };
+    const fetchMock = vi.fn(async () => ({
+      ok: options.ok ?? true,
+      status: options.status ?? 200,
+      json: async () => options.data ?? { accessToken: "test-session-token" },
+    }));
+    await vm.runInNewContext(prepareSource, { process: processMock, fetch: fetchMock, URL, AbortSignal });
+    return { stdout, stderr, fetchMock, processMock };
+  }
+
+  it("exchanges the API key on the selected upstream and masks the captured session token", async () => {
+    const result = await runPreparation();
+    const [url, options] = result.fetchMock.mock.calls[0];
+    expect(url.href).toBe("https://cursor-proxy.example/auth/exchange_user_api_key");
+    expect(options).toMatchObject({ method: "POST", redirect: "error", body: "{}", headers: { Authorization: "Bearer test-api-key" } });
+    expect(result.stdout).toEqual(["test-session-token"]);
+    expect(result.stderr).toEqual(["::add-mask::test-session-token\n"]);
+    expect(result.processMock.exitCode).toBeUndefined();
+  });
+
+  it.each([
+    { env: { OPENAI_BASE_URL: "" } },
+    { env: { OPENAI_API_KEY: "" } },
+    { env: { OPENAI_BASE_URL: "http://cursor-proxy.example" } },
+    { env: { OPENAI_BASE_URL: "https://user:pass@cursor-proxy.example" } },
+    { ok: false, status: 401 },
+    { data: {} },
+    { data: { accessToken: "token\ninjection" } },
+  ])("fails closed without emitting any credential for invalid authentication %j", async options => {
+    const result = await runPreparation(options);
+    expect(result.stdout).toEqual([]);
+    expect(result.processMock.exitCode).toBe(1);
+    expect(result.stderr.join("")).toContain("Cursor gateway authentication failed");
+    expect(result.stderr.join("")).not.toContain("test-api-key");
   });
 });

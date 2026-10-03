@@ -197,6 +197,66 @@ func TestBehaviorDefinedEngineHarnessPassesAuthSecretToAWF(t *testing.T) {
 	assert.NotContains(t, executionStep, "--exclude-env TESTHARNESS_API_KEY")
 }
 
+func TestBehaviorDefinedEngineAPITargetBinding(t *testing.T) {
+	for _, envVar := range []string{"OPENAI_BASE_URL", "ANTHROPIC_BASE_URL", "GEMINI_API_BASE_URL"} {
+		t.Run(envVar, func(t *testing.T) {
+			def := newHarnessEngineDefinition()
+			def.Behaviors.Execution.APITargetEnvVar = envVar
+			engine, err := NewBehaviorDefinedEngine(def)
+			require.NoError(t, err)
+			data := &WorkflowData{EngineConfig: &EngineConfig{
+				ID:        def.ID,
+				APITarget: "provider.example",
+				Env:       map[string]string{envVar: "https://other.example"},
+			}}
+			resolved := engine.withDefinitionExecutionConfig(data)
+			require.NotSame(t, data, resolved)
+			assert.Equal(t, "provider.example", resolved.EngineConfig.Env[envVar])
+			assert.Empty(t, resolved.EngineConfig.APITarget)
+			assert.Equal(t, "provider.example", data.EngineConfig.APITarget)
+			assert.Equal(t, "https://other.example", data.EngineConfig.Env[envVar])
+		})
+	}
+	t.Run("rejects a credential variable as a target binding", func(t *testing.T) {
+		def := newHarnessEngineDefinition()
+		def.Behaviors.Execution.APITargetEnvVar = "OPENAI_API_KEY"
+		_, err := NewBehaviorDefinedEngine(def)
+		require.ErrorContains(t, err, "unsupported behaviors.execution.api-target-env-var")
+	})
+}
+
+func TestBehaviorDefinedEnginePrepareCredential(t *testing.T) {
+	def := newHarnessEngineDefinition()
+	def.Behaviors.Execution.PrepareScript = `process.stdout.write("prepared-token");`
+	def.Behaviors.Execution.PrepareEnvVar = "OPENAI_API_KEY"
+	engine, err := NewBehaviorDefinedEngine(def)
+	require.NoError(t, err)
+	steps := engine.GetExecutionSteps(&WorkflowData{Name: "test"}, "/tmp/test.log")
+	require.Len(t, steps, 3)
+	assert.Contains(t, strings.Join(steps[1], "\n"), def.Behaviors.Execution.PrepareScript)
+	execution := strings.Join(steps[2], "\n")
+	assert.Contains(t, execution, `"${RUNNER_TEMP}/gh-aw/actions/testharness_prepare.cjs")" || exit $?`)
+	assert.Contains(t, execution, `export OPENAI_API_KEY="$GH_AW_PREPARED_CREDENTIAL"`)
+	assert.Less(t, strings.Index(execution, "testharness_prepare.cjs"), strings.Index(execution, "awf --config"))
+
+	t.Run("requires paired fields", func(t *testing.T) {
+		def.Behaviors.Execution.PrepareEnvVar = ""
+		_, err := NewBehaviorDefinedEngine(def)
+		require.ErrorContains(t, err, "must pair prepare-script with prepare-env-var")
+	})
+	t.Run("rejects arbitrary environment targets", func(t *testing.T) {
+		def.Behaviors.Execution.PrepareEnvVar = "PATH"
+		_, err := NewBehaviorDefinedEngine(def)
+		require.ErrorContains(t, err, "unsupported prepare-env-var")
+	})
+	t.Run("rejects heredoc injection", func(t *testing.T) {
+		def.Behaviors.Execution.PrepareEnvVar = "OPENAI_API_KEY"
+		def.Behaviors.Execution.PrepareScript += "\n" + prepareScriptHeredocDelimiter
+		_, err := NewBehaviorDefinedEngine(def)
+		require.ErrorContains(t, err, "reserved heredoc delimiter")
+	})
+}
+
 // TestBehaviorDefinedEngineNoHarnessScript verifies that engines without harness-script
 // continue to use the direct command execution path (inline prompt substitution).
 func TestBehaviorDefinedEngineNoHarnessScript(t *testing.T) {

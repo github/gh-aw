@@ -22,6 +22,7 @@ name: Smoke Cursor
 model: cursor/auto
 engine:
   id: cursor
+  api-target: api2.cursor.sh
 strict: true
 imports:
   - shared/cursor.md

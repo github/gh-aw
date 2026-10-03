@@ -3313,6 +3313,25 @@ engine:
       # (optional)
       provider-env-mode: "example-value"
 
+      # Gateway upstream base-URL variable to configure from a workflow's
+      # engine.api-target. The explicit API target overrides definition defaults and
+      # engine.env for this variable; the CLI still uses its reflected gateway endpoint.
+      # (optional)
+      api-target-env-var: "OPENAI_BASE_URL"
+
+      # Trusted runner-side JavaScript executed immediately before AWF starts. Prints
+      # one prepared provider credential to stdout for prepare-env-var; must mask
+      # credentials, avoid inference calls, and fail explicitly on authentication
+      # errors.
+      # (optional)
+      prepare-script: "example-value"
+
+      # Runner-side gateway credential variable populated from prepare-script stdout.
+      # Must be paired with prepare-script. AWF isolates this credential in the
+      # API-proxy sidecar.
+      # (optional)
+      prepare-env-var: "OPENAI_API_KEY"
+
       # Additional static environment variables injected into the execution step. Values
       # are rendered verbatim and must not contain secrets.
       # (optional)
@@ -21761,6 +21780,25 @@ safe-outputs:
 
           # (optional)
           provider-env-mode: "example-value"
+
+          # Gateway upstream base-URL variable to configure from a workflow's
+          # engine.api-target. The explicit API target overrides definition defaults and
+          # engine.env for this variable; the CLI still uses its reflected gateway endpoint.
+          # (optional)
+          api-target-env-var: "OPENAI_BASE_URL"
+
+          # Trusted runner-side JavaScript executed immediately before AWF starts. Prints
+          # one prepared provider credential to stdout for prepare-env-var; must mask
+          # credentials, avoid inference calls, and fail explicitly on authentication
+          # errors.
+          # (optional)
+          prepare-script: "example-value"
+
+          # Runner-side gateway credential variable populated from prepare-script stdout.
+          # Must be paired with prepare-script. AWF isolates this credential in the
+          # API-proxy sidecar.
+          # (optional)
+          prepare-env-var: "OPENAI_API_KEY"
 
           # Additional static environment variables injected into the execution step. Values
           # are rendered verbatim and must not contain secrets.

@@ -231,6 +231,9 @@ type EngineExecutionDefinition struct {
 	MCPConfigFlag          string   `yaml:"mcp-config-flag,omitempty"`
 	WriteTimestamp         bool     `yaml:"write-timestamp,omitempty"`
 	ProviderEnvMode        string   `yaml:"provider-env-mode,omitempty"`
+	APITargetEnvVar        string   `yaml:"api-target-env-var,omitempty"`
+	PrepareScript          string   `yaml:"prepare-script,omitempty"`
+	PrepareEnvVar          string   `yaml:"prepare-env-var,omitempty"`
 	// Env holds additional static environment variables to inject into the
 	// execution step.  Values are rendered verbatim and are not filtered
 	// through the secrets allowlist, so they must not contain secret values.

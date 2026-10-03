@@ -52,6 +52,8 @@ Do not implement the engine until each contract is known. If the available GitHu
 | Requirement | Mechanism |
 |---|---|
 | Shared provider credentials and environment | `secret-strategy: universal-llm-consumer` and `execution.provider-env-mode: universal-llm-consumer` |
+| User-facing custom gateway upstream | `execution.api-target-env-var`, binding workflow `engine.api-target` to `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, or `GEMINI_API_BASE_URL` |
+| Runner-side session credential exchange | Pair `execution.prepare-script` with `execution.prepare-env-var`; mask and emit exactly the prepared credential to stdout for AWF sidecar isolation, never perform inference in this hook |
 | Model passed through an environment variable | `execution.model-env-var` |
 | `provider/model` must be rewritten for the CLI | `execution.model-env-provider-prefix`, or a harness for more complex transformations |
 | Static engine configuration | `behaviors.config-file` with the correct path, content, and merge strategy |

@@ -43,6 +43,22 @@ discovered through `/reflect`; missing reflection or disabled AWF fails before
 Cursor launches. This forwards Cursor's native HTTP protocol without converting
 it to OpenAI, and does not supply Cursor-specific model or token accounting.
 
+Bind the Cursor upstream with the normal `api-target` field; it defaults to
+`api2.cursor.sh` when omitted:
+
+```yaml
+engine:
+  id: cursor
+  api-target: api2.cursor.sh
+model: cursor/auto
+imports:
+  - shared/cursor.md
+```
+
+Set the `CURSOR_API_KEY` repository secret. For an organization-managed Cursor
+endpoint, substitute its hostname in `api-target`; no gateway port or
+OpenAI-specific environment configuration is required.
+
 ## Which engine should I choose?
 
 Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers, native MCP, codemode, and SDK/RPC execution.
