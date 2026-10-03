@@ -19,6 +19,7 @@ func TestUnifiedSessionAgentArtifactPaths(t *testing.T) {
 			data := &WorkflowData{AI: id}
 			paths := compiler.collectArtifactPaths(data, engine, constants.AgentStdioLogPath, nil)
 			assert.Contains(t, paths, "/tmp/gh-aw/agent-session.jsonl")
+			assert.Contains(t, paths, agentExecutionExitCodePath)
 		})
 	}
 }

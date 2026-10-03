@@ -2699,6 +2699,28 @@ describe("handle_agent_failure", () => {
       expect(buildEngineFailureContext()).toBe("");
     });
 
+    it("reports a nonzero driver exit even when the stdio log is missing", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "127");
+      const result = buildEngineFailureContext();
+      expect(result).toContain("Driver exit code:** 127");
+      expect(result).toContain("terminated before producing output");
+    });
+
+    it("reports the driver exit alongside stderr captured in the stdio log", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1");
+      fs.writeFileSync(stdioLogPath, "Error: Refusing to use symlink as bind mountpoint: /usr/local/bin/npm\n");
+      const result = buildEngineFailureContext();
+      expect(result).toContain("Driver exit code:** 1");
+      expect(result).toContain("Refusing to use symlink as bind mountpoint");
+    });
+
+    it("ignores invalid or successful driver exit codes", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1\nsecret");
+      expect(buildEngineFailureContext()).toBe("");
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "0");
+      expect(buildEngineFailureContext()).toBe("");
+    });
+
     it("returns empty string when log file is empty", () => {
       fs.writeFileSync(stdioLogPath, "");
       expect(buildEngineFailureContext()).toBe("");
