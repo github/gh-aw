@@ -66,6 +66,75 @@ describe("handle_agent_failure", () => {
     delete process.env.GH_AW_GROUP_REPORTS;
   });
 
+  describe("invalidated PR merge-ref checkout", () => {
+    const closedAt = "2026-10-03T12:00:00Z";
+    const checkoutCompletedAt = "2026-10-03T12:00:01Z";
+    let getPR;
+    let listJobs;
+
+    beforeEach(() => {
+      global.context = {
+        repo: { owner: "owner", repo: "repo" },
+        eventName: "pull_request",
+        ref: "refs/pull/42/merge",
+        runId: 123,
+        payload: { pull_request: { number: 42, state: "open" } },
+      };
+      getPR = vi.fn().mockResolvedValue({ data: { state: "closed", closed_at: closedAt } });
+      listJobs = vi.fn().mockResolvedValue({
+        data: {
+          jobs: [
+            {
+              name: "agent",
+              conclusion: "failure",
+              steps: [{ name: "Checkout repository", conclusion: "failure", completed_at: checkoutCompletedAt }],
+            },
+          ],
+        },
+      });
+      global.github = { rest: { pulls: { get: getPR }, actions: { listJobsForWorkflowRun: listJobs }, issues: { create: vi.fn() } } };
+    });
+
+    it("skips failure reporting when a PR closes before its merge-ref checkout fails", async () => {
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      try {
+        await main();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("PR merge ref was invalidated"));
+      } finally {
+        delete process.env.GH_AW_AGENT_CONCLUSION;
+      }
+    });
+
+    it("does not classify a checkout that failed before the PR closed as invalidated", async () => {
+      getPR.mockResolvedValue({ data: { state: "closed", closed_at: "2026-10-03T12:00:02Z" } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not suppress a real agent failure after closure", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("recognizes an invalidated actions-folder checkout", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout actions folder", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(true);
+    });
+
+    it("does not classify open PRs or unrelated refs as invalidated", async () => {
+      getPR.mockResolvedValue({ data: { state: "open", closed_at: null } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(listJobs).not.toHaveBeenCalled();
+      global.context.ref = "refs/heads/main";
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("keeps reporting when PR state cannot be checked", async () => {
+      getPR.mockRejectedValue(new Error("API unavailable"));
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+  });
+
   describe("getActionFailureIssueExpiresHours", () => {
     it("returns default when env var is missing", () => {
       expect(getActionFailureIssueExpiresHours()).toBe(168);
