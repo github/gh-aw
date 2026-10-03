@@ -471,7 +471,7 @@ Run node --version to check the Node.js version.
 	// 1. First step should be "Checkout actions folder" (checkout local actions)
 	// 2. Second step should be "Setup Scripts" (use the checked out action)
 	// 3. Third step should be "Set runtime paths" (safe-outputs port, always injected)
-	// 4. Fourth step should be "Checkout repository" (automatic full checkout - no separate .github checkout needed)
+	// 4. Fourth step should be the generated default repository checkout (no separate .github checkout needed)
 	// NOTE: The .github sparse checkout is skipped when full repository checkout is performed
 
 	if stepNames[0] != "Checkout actions folder" {
@@ -486,8 +486,8 @@ Run node --version to check the Node.js version.
 		t.Errorf("Third step should be 'Set runtime paths', got '%s'", stepNames[2])
 	}
 
-	if stepNames[3] != "Checkout repository" {
-		t.Errorf("Fourth step should be 'Checkout repository', got '%s'", stepNames[3])
+	if stepNames[3] != "Checkout repository (gh-aw default)" {
+		t.Errorf("Fourth step should be the generated default repository checkout, got '%s'", stepNames[3])
 	}
 
 	// Verify that .github checkout is NOT present (redundant with full checkout)
