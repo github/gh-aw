@@ -128,6 +128,16 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 			conclusionPerms.Set(PermissionActions, PermissionRead)
 		}
 	}
+	// The agent-failure handler checks the PR state and agent job steps before
+	// reporting a failed PR merge-ref checkout.
+	if conclusionReportFailureAsIssueEnabled(data) {
+		if level, ok := conclusionPerms.Get(PermissionActions); !ok || level == PermissionNone {
+			conclusionPerms.Set(PermissionActions, PermissionRead)
+		}
+		if level, ok := conclusionPerms.Get(PermissionPullRequests); !ok || level == PermissionNone {
+			conclusionPerms.Set(PermissionPullRequests, PermissionRead)
+		}
+	}
 	// Only request issues: write when at least one conclusion-job mechanism can actually
 	// create/update an issue and that path is not already covered by
 	// ComputePermissionsForSafeOutputs (report-failed-jobs, agent-failure reporting,

@@ -3697,7 +3697,7 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
  */
 async function isInvalidatedPRMergeCheckout() {
   const prNumber = context.payload?.pull_request?.number;
-  if (context.eventName !== "pull_request" || !Number.isSafeInteger(prNumber) || context.ref !== `refs/pull/${prNumber}/merge`) {
+  if (process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF !== "true" || context.eventName !== "pull_request" || !Number.isSafeInteger(prNumber) || context.ref !== `refs/pull/${prNumber}/merge`) {
     return false;
   }
 
@@ -3711,13 +3711,13 @@ async function isInvalidatedPRMergeCheckout() {
     if (!Number.isFinite(closedAt)) {
       return false;
     }
-    const { data } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: context.runId, per_page: 100 });
-    return data.jobs.some(
+    const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { owner, repo, run_id: context.runId, per_page: 100 });
+    return jobs.some(
       job =>
         job.name === "agent" &&
         job.conclusion === "failure" &&
         job.steps?.some(step => {
-          if ((step.name !== "Checkout repository" && step.name !== "Checkout actions folder") || step.conclusion !== "failure" || !step.completed_at) {
+          if (step.name !== "Checkout repository (gh-aw default)" || step.conclusion !== "failure" || !step.completed_at) {
             return false;
           }
           const completedAt = Date.parse(step.completed_at);
@@ -3725,7 +3725,12 @@ async function isInvalidatedPRMergeCheckout() {
         })
     );
   } catch (error) {
-    core.warning(`Could not check PR merge-ref invalidation: ${getErrorMessage(error)}`);
+    const message = getErrorMessage(error);
+    if (error?.status === 403 || /Resource not accessible/i.test(message)) {
+      core.warning(`Could not check PR merge-ref invalidation; ensure the conclusion job grants actions: read and pull-requests: read: ${message}`);
+    } else {
+      core.warning(`Could not check PR merge-ref invalidation: ${message}`);
+    }
     return false;
   }
 }

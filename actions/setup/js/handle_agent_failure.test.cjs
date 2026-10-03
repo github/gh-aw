@@ -62,6 +62,7 @@ describe("handle_agent_failure", () => {
     delete global.github;
     delete global.context;
     delete process.env.GITHUB_SHA;
+    delete process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_GROUP_REPORTS;
   });
@@ -80,6 +81,7 @@ describe("handle_agent_failure", () => {
         runId: 123,
         payload: { pull_request: { number: 42, state: "open" } },
       };
+      process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "true";
       getPR = vi.fn().mockResolvedValue({ data: { state: "closed", closed_at: closedAt } });
       listJobs = vi.fn().mockResolvedValue({
         data: {
@@ -87,12 +89,15 @@ describe("handle_agent_failure", () => {
             {
               name: "agent",
               conclusion: "failure",
-              steps: [{ name: "Checkout repository", conclusion: "failure", completed_at: checkoutCompletedAt }],
+              steps: [{ name: "Checkout repository (gh-aw default)", conclusion: "failure", completed_at: checkoutCompletedAt }],
             },
           ],
         },
       });
-      global.github = { rest: { pulls: { get: getPR }, actions: { listJobsForWorkflowRun: listJobs }, issues: { create: vi.fn() } } };
+      global.github = {
+        paginate: vi.fn(async (request, params) => (await request(params)).data.jobs),
+        rest: { pulls: { get: getPR }, actions: { listJobsForWorkflowRun: listJobs }, issues: { create: vi.fn() } },
+      };
     });
 
     it("skips failure reporting when a PR closes before its merge-ref checkout fails", async () => {
@@ -116,9 +121,20 @@ describe("handle_agent_failure", () => {
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
     });
 
-    it("recognizes an invalidated actions-folder checkout", async () => {
+    it("does not classify the actions-folder checkout as the default merge-ref checkout", async () => {
       listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout actions folder", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
-      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(true);
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not classify unrelated checkout steps with matching common names", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout repository", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not classify when compiler metadata says the default checkout was overridden", async () => {
+      process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "false";
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(getPR).not.toHaveBeenCalled();
     });
 
     it("does not classify open PRs or unrelated refs as invalidated", async () => {
@@ -132,6 +148,12 @@ describe("handle_agent_failure", () => {
     it("keeps reporting when PR state cannot be checked", async () => {
       getPR.mockRejectedValue(new Error("API unavailable"));
       expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("warns when permission errors prevent checking PR merge-ref invalidation", async () => {
+      getPR.mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("actions: read and pull-requests: read"));
     });
   });
 

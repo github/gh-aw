@@ -463,6 +463,7 @@ func (c *Compiler) buildAgentFailureStep(data *WorkflowData, mainJobName, messag
 	if err != nil {
 		return nil, err
 	}
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: %q\n", strconv.FormatBool(c.defaultCheckoutUsesTriggerRef(data))))
 	envVars = append(envVars, buildAgentFailureEngineDetectionVars(engine, data, mainJobName)...)
 	envVars = append(envVars, buildAgentFailureActivationStatusVars(data)...)
 	if messagesJSON != "" {
@@ -481,6 +482,15 @@ func (c *Compiler) buildAgentFailureStep(data *WorkflowData, mainJobName, messag
 		CustomToken:   steeringToken,
 		StepCondition: "always()",
 	}), nil
+}
+
+func (c *Compiler) defaultCheckoutUsesTriggerRef(data *WorkflowData) bool {
+	if c.trialMode || !c.shouldAddCheckoutStep(data) {
+		return false
+	}
+	checkoutMgr := NewCheckoutManager(data.CheckoutConfigs)
+	override := checkoutMgr.GetDefaultCheckoutOverride()
+	return override == nil || (!override.key.wiki && override.key.repository == "" && override.ref == "")
 }
 
 // buildConclusionScriptEnvVars builds environment variables for the completion status script.
