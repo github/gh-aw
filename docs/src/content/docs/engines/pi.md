@@ -5,7 +5,7 @@ description: Select and authenticate Pi as the AI engine for GitHub Agentic Work
 
 [Pi](https://pi.dev/) is a provider-agnostic coding agent for repository analysis and code changes. GitHub Agentic Workflows runs Pi through GitHub Actions from a Markdown workflow and adds GitHub triggers, sandbox controls, and safe outputs for event-driven, reviewable automation.
 
-Pi requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. The compiler rejects Pi workflows that omit either requirement.
+Pi v1.0.0 supports native MCP through the gh-aw policy gateway. GitHub CLI proxy mode and `tools.cli-proxy: true` remain optional transport choices. The default model is `copilot/gpt-5.4` when no model is configured.
 
 ## Selecting Pi + GitHub as the AI engine
 
@@ -72,7 +72,6 @@ engine:
   model: copilot/gpt-5.4
 
 tools:
-  cli-proxy: true
   github:
     mode: gh-proxy
     toolsets: [default]
@@ -94,7 +93,69 @@ Analyze the repository and create a concise daily status report covering:
 
 ## Capabilities and limitations
 
-Pi supports top-level `max-turns`, provider-prefixed models, and `engine.extensions`. Pi already runs in bare mode, so `engine.bare: true` is accepted but has no effect. The built-in `tools.playwright` integration works through `playwright-cli`; omit its `mode` field because CLI is the only built-in mode. Pi does not provide native MCP server integration, native `tools.web-search`, per-command bash allowlisting, `max-continuations`, native `engine.agent` selection, or custom `engine.harness` scripts. MCP-backed tools must be exposed through the required CLI proxy.
+Pi supports native MCP tools and resources, codemode, tool search, provider-prefixed models, and workflow-installed Pi packages. Native MCP connects only to the compiler-managed gateway; provider and GitHub credentials remain outside the sandbox.
+
+Codemode batches tool calls and reduces results before they enter model context. Its classifier and image-generation APIs are available when the configured provider route supports those model types. Custom providers still need a compatible API-proxy target and credentials; enabling codemode does not grant additional credentials or network access.
+
+| Option | Pi behavior |
+|---|---|
+| `max-turns`, `max-ai-credits` | Enforced by the AWF inference proxy. |
+| `max-tool-calls` | Pre-dispatch limit covering local, MCP, and nested codemode calls. |
+| `max-tool-denials` | Stops inference after repeated policy denials. |
+| `tools.bash` | Supports disabling bash and command-prefix allowlists. Restricted commands reject dynamic shell expansions, redirections, grouping, and background execution. |
+| `tools.edit: false` | Disables native `edit` and `write` tools. |
+| `engine.bare: true` | Disables automatic context, skill, prompt-template, extension, and theme discovery; retains explicit workflow infrastructure extensions. |
+| `engine.extensions` | Installs npm, pinned git, or local Pi packages into the managed runtime directory. |
+| `engine.driver: pi_agent_core_driver.cjs` | Uses the full coding-agent SDK session layer, including tools, resources, compaction, and retries. |
+| `engine.driver: pi_rpc_driver.cjs` | Runs a headless RPC subprocess through Pi's RPC client. |
+
+Project-local executable resources remain untrusted by default. Workflow-installed packages and activation-installed skills use the managed agent directory. Model catalog metadata preserves thinking, vision, token limits, pricing, and cache lifetimes through gateway routing. Workflow system instructions remain separate from user instructions so compaction does not summarize them away.
+
+Custom executables without the npm SDK must supply complete model metadata (`reasoning`, `input`, `contextWindow`, and `maxTokens`) in `engine.config.model`.
+
+The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mode` field. Native `tools.web-search`, `max-continuations`, native `engine.agent` selection, and custom `engine.harness` scripts remain unsupported. Custom drivers must implement their own policies and cannot opt into the built-in aggregate tool budgets.
+
+## Additional providers
+
+`google/` models use the Gemini gateway and `GEMINI_API_KEY`. Other API-compatible providers can use an explicit inference family and endpoint:
+
+```yaml wrap
+engine:
+  id: pi
+  model: openrouter/anthropic/claude-sonnet-4
+  model-provider: openai
+  env:
+    OPENAI_BASE_URL: https://openrouter.ai/api/v1
+    OPENAI_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+network:
+  allowed: [defaults, openrouter.ai]
+```
+
+Compatible provider catalogs, including classifier and image models, retain their native identities but route through the same credential-isolated gateway. Requests must be supported by that gateway and upstream endpoint. Providers requiring different protocols or ambient cloud authentication can run natively only when the agent sandbox is explicitly disabled; this removes credential isolation and is not the recommended deployment mode. Unsupported sandboxed provider routes fail compilation instead of silently switching to Copilot.
+
+## Pi runtime configuration
+
+`engine.config` accepts JSON with four optional objects:
+
+| Object | Purpose |
+|---|---|
+| `settings` | Pi settings, including `defaultThinkingLevel`, `codemode`, compaction, retries, and cache warming. Project trust remains disabled. |
+| `model` | Model metadata overrides: API protocol, reasoning, input types, context/output limits, pricing, compatibility, and prompt-cache lifetimes. |
+| `mcp` | Default `exposure` (`deferred`, `direct`, `codemode`, or `hidden`) and per-server `toolExposure` patterns. Does not add servers or credentials. |
+| `session` | `enabled`, optional `id`, `resume` or `fork`, and `export`. |
+
+```yaml wrap
+engine:
+  id: pi
+  config: |
+    {
+      "settings": {"defaultThinkingLevel": "high", "codemode": {"mode": "on"}},
+      "session": {"enabled": true, "export": true}
+    }
+max-tool-calls: 100
+```
+
+Sessions are ephemeral by default. Persistent JSONL sessions are written under `/tmp/gh-aw/agent/pi-sessions`; restore a previous session artifact there before using `resume` or `fork`. HTML exports are stored at `/tmp/gh-aw/pi-agent-dir/session.html`. Both are secret-redacted before artifact upload.
 
 See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison) and [Pi extensions reference](/gh-aw/reference/engines/#pi-extensions-extensions).
 

@@ -253,7 +253,7 @@ function registerConfiguredProviders(pi, logger) {
       ["anthropic"],
       {
         apiKey: process.env.ANTHROPIC_API_KEY,
-        api: "anthropic",
+        api: "anthropic-messages",
         ...(process.env.ANTHROPIC_BASE_URL ? { baseUrl: process.env.ANTHROPIC_BASE_URL } : {}),
       },
       logger
@@ -291,12 +291,12 @@ function registerConfiguredProviders(pi, logger) {
 /**
  * Pi provider extension for gh-aw.
  *
- * Registers providers immediately, then subscribes to the `agent_start` and `agent_end`
+ * Registers providers immediately, then subscribes to the `agent_start` and `agent_settled`
  * Pi SDK events and calls the AWF /reflect endpoint to discover and log the open LLM
  * inference paths before the agent begins its first turn and again after it finishes.
  * The post-run fetch is the authoritative snapshot used by the step summary; the pre-run
  * fetch captures the initial proxy state for diagnostics in case the session exits
- * unexpectedly before reaching `agent_end`.
+ * unexpectedly before reaching `agent_settled`.
  * Both calls are best-effort: any network or parse error is logged but does not abort the
  * agent session.
  *
@@ -385,7 +385,7 @@ function piProviderExtension(pi) {
     }
   });
 
-  pi.on("agent_end", async () => {
+  pi.on("agent_settled", async () => {
     // Fetch AWF API proxy reflection data after the agent finishes for the post-run step summary.
     // This is best-effort: failures are logged but do not affect the agent exit code.
     // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. sandbox.agent: false — no api-proxy running).
@@ -399,7 +399,7 @@ function piProviderExtension(pi) {
         modelsTimeoutMs: AWF_MODELS_URL_TIMEOUT_MS,
         logger: log,
       });
-      logReflectFailure({ phase: "agent_end", provider, model, result, logger: log });
+      logReflectFailure({ phase: "agent_settled", provider, model, result, logger: log });
     }
 
     if (providerRequestCount > 0 && successfulProviderResponseCount === 0) {

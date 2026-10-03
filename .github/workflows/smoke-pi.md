@@ -23,6 +23,7 @@ model: openai/gpt-5.4
 engine:
   id: pi
   model-provider: openai
+max-tool-calls: 80
 strict: true
 sandbox:
   agent:
@@ -31,6 +32,7 @@ sandbox:
         allow-write:
           - ${{ github.workspace }}
           - /tmp/gh-aw/agent
+          - /tmp/gh-aw/pi-agent-dir
 runtimes:
   node: {}
 imports:
@@ -42,6 +44,7 @@ network:
   allowed:
     - defaults
     - github
+    - go
 tools:
   cache-memory: true
   github:
@@ -51,7 +54,6 @@ tools:
   bash:
     - "*"
   web-fetch:
-  cli-proxy: true
 safe-outputs:
     allowed-domains: [default-safe-outputs]
     add-comment:
@@ -85,6 +87,7 @@ Execute the following tests sequentially in a single turn:
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-pi-${{ github.run_id }}.txt` with content "Smoke test passed for Pi at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.
+6. **Codemode Testing**: Use the native `codemode` tool to read the test file and run `echo pi-codemode-ok` in parallel, returning only the file contents and command output. Verify both results.
 
 ## Output
 

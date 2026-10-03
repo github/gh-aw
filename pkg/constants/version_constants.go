@@ -55,7 +55,7 @@ const DefaultCodexVersion Version = "0.159.3"
 const DefaultGeminiVersion Version = "0.62.0"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "0.99.2"
+const DefaultPiVersion Version = "1.0.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v1.12.2"

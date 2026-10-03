@@ -96,6 +96,7 @@ const MCP_GATEWAY_CONFIG_PATHS = [
       path.join("/tmp", "gh-aw/mcp-config/gateway-output.json"),
       path.join("/tmp", "gh-aw/mcp-config/mcp-servers.json"),
       path.join("/tmp", "gh-aw/mcp-config/config.toml"),
+      path.join("/tmp", "gh-aw/pi-agent-dir/mcp.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/gateway-output.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/mcp-servers.json"),
       path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml"),
@@ -338,7 +339,7 @@ async function main() {
     core.info("Scanning for built-in credential patterns and custom secrets");
 
     // Find all target files in /tmp/gh-aw and ${RUNNER_TEMP}/gh-aw directories
-    const targetExtensions = [".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch"];
+    const targetExtensions = [".txt", ".json", ".log", ".md", ".mdx", ".yml", ".jsonl", ".patch", ".html"];
     const tmpFiles = findFiles("/tmp/gh-aw", targetExtensions);
     const optFiles = findFiles(`${process.env.RUNNER_TEMP}/gh-aw`, targetExtensions);
     const files = [...new Set([...tmpFiles, ...optFiles])];

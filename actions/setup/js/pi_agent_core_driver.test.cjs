@@ -1,48 +1,63 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-const { buildModel } = await import("./pi_agent_core_driver.cjs");
+const { main, jsonEvent } = await import("./pi_agent_core_driver.cjs");
+let dir;
 
-describe("pi_agent_core_driver.cjs", () => {
-  let originalEnv;
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-sdk-"));
+  vi.stubEnv("PI_CODING_AGENT_DIR", path.join(dir, "agent"));
+  vi.stubEnv("RUNNER_TEMP", dir);
+  vi.stubEnv("GH_AW_PROMPT", path.join(dir, "prompt.txt"));
+  vi.stubEnv("GH_AW_PI_MODEL", "openai/gpt-5.4");
+  vi.stubEnv("GH_AW_PI_CONFIG", "{}");
+  fs.writeFileSync(path.join(dir, "prompt.txt"), "Complete the task");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
-  beforeEach(() => {
-    originalEnv = { ...process.env };
+describe("Pi coding-agent SDK driver", () => {
+  it("runs the full session layer with MCP, codemode, and policy extensions", async () => {
+    const model = { id: "gpt-5.4", reasoning: true, input: ["text", "image"] };
+    const session = { sessionId: "session-id", subscribe: vi.fn(), bindExtensions: vi.fn(), prompt: vi.fn(), dispose: vi.fn() };
+    const resourceLoader = { reload: vi.fn() };
+    const sdk = {
+      ModelRuntime: { create: vi.fn(async () => ({ getModel: () => model })) },
+      SettingsManager: { create: () => ({ applyOverrides: vi.fn() }) },
+      DefaultResourceLoader: vi.fn(function () {
+        return resourceLoader;
+      }),
+      createCodemodeExtension: vi.fn(() => "codemode"),
+      createToolSearchExtension: vi.fn(() => "search"),
+      createMcpExtension: vi.fn(() => "mcp"),
+      SessionManager: { inMemory: vi.fn(() => "in-memory") },
+      createAgentSession: vi.fn(async () => ({ session })),
+    };
+    const emit = vi.fn();
+    await main({ sdk, emit });
+    expect(sdk.DefaultResourceLoader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extensionFactories: ["codemode", "search", "mcp"],
+        additionalExtensionPaths: expect.arrayContaining([path.join(dir, "gh-aw/actions/pi_tool_policy.cjs")]),
+      })
+    );
+    expect(sdk.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ model, resourceLoader, sessionManager: "in-memory" }));
+    expect(session.bindExtensions).toHaveBeenCalledOnce();
+    expect(session.prompt).toHaveBeenCalledWith("Complete the task");
+    expect(session.dispose).toHaveBeenCalledOnce();
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ type: "session", version: 3 }));
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  describe("buildModel", () => {
-    it("routes the openai provider through openai-responses in native (no-gateway) mode", () => {
-      process.env.OPENAI_API_KEY = "test-key";
-      const model = buildModel(null, "openai/gpt-5.4");
-      expect(model.api).toBe("openai-responses");
-      expect(model.provider).toBe("openai");
+  it("removes cumulative streaming snapshots while preserving usage and tool identity", () => {
+    const event = jsonEvent({
+      type: "message_update",
+      message: { usage: { input: 1 } },
+      assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: { content: [{ type: "toolCall", id: "call-id", name: "bash" }] } },
     });
-
-    it("routes the codex provider through openai-responses in native mode", () => {
-      const model = buildModel(null, "codex/gpt-5.4");
-      expect(model.api).toBe("openai-responses");
-      expect(model.provider).toBe("openai");
-    });
-
-    it("keeps the anthropic provider on anthropic-messages in native mode", () => {
-      const model = buildModel(null, "anthropic/claude-opus-4");
-      expect(model.api).toBe("anthropic-messages");
-      expect(model.provider).toBe("anthropic");
-    });
-
-    it("keeps the github-copilot provider on openai-completions in native mode", () => {
-      const model = buildModel(null, "copilot/claude-sonnet-4");
-      expect(model.api).toBe("openai-completions");
-      expect(model.provider).toBe("github-copilot");
-    });
-
-    it("defaults to github-copilot when no provider prefix is present", () => {
-      const model = buildModel(null, "claude-sonnet-4");
-      expect(model.api).toBe("openai-completions");
-      expect(model.provider).toBe("github-copilot");
-    });
+    expect(event).toEqual({ type: "message_update", usage: { input: 1 }, assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, id: "call-id", toolName: "bash" } });
   });
 });

@@ -20,7 +20,9 @@ func TestNewPiEngine(t *testing.T) {
 	assert.False(t, engine.IsExperimental(), "Pi engine should not be experimental")
 	capabilities := engine.GetCapabilities()
 	assert.True(t, capabilities.ToolsAllowlist, "Pi should support tools allowlist (needed for gh-proxy/cli-proxy settings)")
-	assert.False(t, capabilities.MCP, "Pi should not support MCP directly")
+	assert.True(t, capabilities.MCP, "Pi supports native MCP through the policy gateway")
+	assert.True(t, capabilities.BashCommandAllowlist, "Pi enforces bash allowlists in its pre-tool hook")
+	assert.True(t, capabilities.BashDisable, "Pi can disable bash")
 	assert.True(t, capabilities.MaxTurns, "Pi should support max turns")
 	assert.True(t, capabilities.ContextWindow, "Pi should support context-window")
 }
@@ -217,6 +219,9 @@ func TestPiEngine_GetExecutionSteps_Basic(t *testing.T) {
 	assert.Contains(t, stepText, "agentic_execution", "Step should have agentic_execution id")
 	assert.Contains(t, stepText, "pi_provider.cjs", "Step should load the provider extension")
 	assert.Contains(t, stepText, "pi_steering_extension.cjs", "Step should automatically load the steering extension")
+	assert.Contains(t, stepText, "pi_tool_policy.cjs", "Step must enforce tool policy")
+	assert.Contains(t, stepText, "builtin:mcp", "Step loads native MCP")
+	assert.Contains(t, stepText, "--no-approve", "Untrusted project resources must not load implicitly")
 	assert.Contains(t, stepText, "shell_harness.cjs", "Step should run Pi through the shared shell harness")
 	assert.Contains(t, stepText, "GH_AW_TIMEOUT_MINUTES: 20", "Step should expose the timeout to the shared harness")
 }

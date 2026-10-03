@@ -2604,6 +2604,19 @@ engine:
   # (optional)
   model: "example-value"
 
+  # Ask AWF to select a Copilot model for this task using its rendered prompt.
+  # (optional)
+  model-routing:
+    # Routing objective.
+    goal: "cost"
+
+    # Routing quality/cost profile.
+    mode: "economy"
+
+    # Copilot model candidates; provider qualification is added by the compiler.
+    allowed-models: []
+      # Array of strings
+
   # Optional model context window metadata for engines that need to register
   # explicit model catalog entries. Supported by the Pi engine when generating its
   # AWF gateway models.json; other engines ignore it and emit a warning.
@@ -2813,8 +2826,9 @@ engine:
     # (optional)
     location: "example-value"
 
-  # Additional TOML configuration text that will be appended to the generated
-  # config.toml in the action (codex engine only)
+  # Additional engine configuration text. Codex accepts TOML appended to
+  # config.toml. Pi accepts a JSON object with settings, model metadata overrides,
+  # MCP exposure settings, and session persistence options.
   # (optional)
   config: "example-value"
 
@@ -2837,12 +2851,9 @@ engine:
     # Array of strings
 
   # When true, disables automatic loading of context and custom instructions by the
-  # AI engine. The engine-specific flag depends on the engine: copilot uses
-  # --no-custom-instructions (suppresses .github/AGENTS.md and user-level custom
-  # instructions), claude uses --bare (suppresses CLAUDE.md memory files), codex
-  # uses --no-system-prompt (suppresses the default system prompt), gemini sets
-  # GEMINI_SYSTEM_MD=/dev/null (overrides the built-in system prompt with an empty
-  # one). Defaults to false.
+  # AI engine. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi
+  # disables context-file, skill, prompt-template, extension, and theme discovery
+  # while retaining explicit workflow infrastructure extensions. Defaults to false.
   # (optional)
   bare: true
 
@@ -3377,10 +3388,10 @@ max-turns: 1
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
 max-turns: "example-value"
 
-# Copilot SDK safeguard threshold for repeated tool denials before stopping
-# inference. Defaults to 5 when omitted. Supports GitHub Actions expressions (for
-# example, '${{ inputs.max-tool-denials }}'). Supported only with engine 'copilot'
-# and engine.copilot-sdk: true.
+# Safeguard threshold for repeated tool denials before stopping inference.
+# Supports the built-in Copilot SDK driver and Pi CLI, SDK, and RPC drivers.
+# Defaults to 5 for Copilot SDK when omitted. Supports GitHub Actions expressions
+# (for example, '${{ inputs.max-tool-denials }}').
 # (optional)
 # Accepted formats:
 
@@ -3391,17 +3402,17 @@ max-tool-denials: 1
 max-tool-denials: "example-value"
 
 # Maximum aggregate number of tool dispatches for the workflow run, including
-# subagents. Enforced before execution only by the built-in Copilot SDK driver.
-# Supports GitHub Actions expressions. Not supported by other engines or custom
-# Copilot SDK drivers/harnesses.
+# nested calls. Enforced before execution by the built-in Copilot SDK driver and
+# Pi CLI, SDK, and RPC drivers. Supports GitHub Actions expressions. Custom
+# drivers cannot enforce this contract.
 # (optional)
 # Accepted formats:
 
-# Format 1: positive integer
+# Format 1: integer
 max-tool-calls: 1
 
 # Format 2: GitHub Actions expression that resolves to an integer at runtime
-max-tool-calls: "${{ inputs.max-tool-calls }}"
+max-tool-calls: "example-value"
 
 # Per-run AI Credits budget control for firewall cost enforcement. Enabled by
 # default at 1000 (1k) when omitted. Set to -1 to disable both budget enforcement
@@ -4285,6 +4296,18 @@ tools:
   # Format 2: Enable agentic-workflows tool with default settings (same as true)
   agentic-workflows: null
 
+  # Read dispatch work and claim state from the immutable activation snapshot. The
+  # MCP server does not read Git; the snapshot can become stale while the agent
+  # runs.
+  # (optional)
+  # Accepted formats:
+
+  # Format 1: Enable or disable the work-queue MCP server.
+  work-queue: true
+
+  # Format 2: Enable the work-queue MCP server.
+  work-queue: null
+
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
   # Accepted formats:
@@ -4519,6 +4542,36 @@ tools:
   # (optional)
   cli-proxy: true
 
+  # Standalone Git-backed ledger configuration. Declare type: log, set, map, table,
+  # counter, or notes for trusted built-in replay. Custom replay and compaction
+  # scripts are not supported. Tables require key (the string primary-key field).
+  # Built-ins accept typed operations via the configured ledger safe-output tools.
+  # Each ledger may set compaction; compaction is lossless and preserves all source
+  # transactions.
+  # (optional)
+  ledger:
+    # Built-in ledger reducer type, or a named object-valued ledger.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    type: "log"
+
+    # Format 2: object
+    type:
+      {}
+
+    # Table primary-key field, or a named object-valued ledger.
+    # (optional)
+    # Accepted formats:
+
+    # Format 1: string
+    key: "example-value"
+
+    # Format 2: object
+    key:
+      {}
+
   # Repo memory configuration for git-based persistent storage
   # (optional)
   # Accepted formats:
@@ -4596,6 +4649,12 @@ tools:
     # committed, making them human-readable in the repository (default: false)
     # (optional)
     format-json: true
+
+    # Experimental. Enable the repo-memory ledger projection, optionally validated
+    # against a repository-relative JSON schema. Ledger workflows require AWF Cloud
+    # Hypervisor filesystem isolation. Using this field emits a compile-time warning.
+    # (optional)
+    ledger: null
 
     # Custom domain validation hook for this repo-memory entry
     # (optional)
@@ -20985,6 +21044,19 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
+      # Ask AWF to select a Copilot model for this task using its rendered prompt.
+      # (optional)
+      model-routing:
+        # Routing objective.
+        goal: "cost"
+
+        # Routing quality/cost profile.
+        mode: "economy"
+
+        # Copilot model candidates; provider qualification is added by the compiler.
+        allowed-models: []
+          # Array of strings
+
       # Optional model context window metadata for engines that need to register
       # explicit model catalog entries. Supported by the Pi engine when generating its
       # AWF gateway models.json; other engines ignore it and emit a warning.
@@ -21194,8 +21266,9 @@ safe-outputs:
         # (optional)
         location: "example-value"
 
-      # Additional TOML configuration text that will be appended to the generated
-      # config.toml in the action (codex engine only)
+      # Additional engine configuration text. Codex accepts TOML appended to
+      # config.toml. Pi accepts a JSON object with settings, model metadata overrides,
+      # MCP exposure settings, and session persistence options.
       # (optional)
       config: "example-value"
 
@@ -21218,12 +21291,9 @@ safe-outputs:
         # Array of strings
 
       # When true, disables automatic loading of context and custom instructions by the
-      # AI engine. The engine-specific flag depends on the engine: copilot uses
-      # --no-custom-instructions (suppresses .github/AGENTS.md and user-level custom
-      # instructions), claude uses --bare (suppresses CLAUDE.md memory files), codex
-      # uses --no-system-prompt (suppresses the default system prompt), gemini sets
-      # GEMINI_SYSTEM_MD=/dev/null (overrides the built-in system prompt with an empty
-      # one). Defaults to false.
+      # AI engine. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi
+      # disables context-file, skill, prompt-template, extension, and theme discovery
+      # while retaining explicit workflow infrastructure extensions. Defaults to false.
       # (optional)
       bare: true
 

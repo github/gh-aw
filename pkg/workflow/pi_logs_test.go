@@ -109,6 +109,7 @@ func TestPiEngine_ParseLogMetrics_FullConversation(t *testing.T) {
 			},
 		}),
 	}
+
 	logContent := strings.Join(lines, "\n")
 
 	metrics := engine.ParseLogMetrics(logContent, false)

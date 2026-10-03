@@ -1177,6 +1177,7 @@ async function main() {
     codex: "convert_gateway_config_codex.cjs",
     claude: "convert_gateway_config_claude.cjs",
     gemini: "convert_gateway_config_gemini.cjs",
+    pi: "convert_gateway_config_pi.cjs",
   };
 
   // Engines can declare a "mcp.config-adapter" script in their behaviors definition
