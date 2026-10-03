@@ -105,7 +105,7 @@ function createWorkQueueFinishTool(options = {}) {
       }
       try {
         fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-        fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8", mode: 0o644 });
+        fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8" });
         // The MCP container and runner artifact collector can run as different users.
         fs.chmodSync(outputPath, 0o644);
       } catch (error) {
