@@ -51,7 +51,24 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 		return nil
 	}
 
-	output, err := runSessionParser(context.Background(), "agent-markdown", agentLogPath, engine.GetID())
+	var output []byte
+	var err error
+	if behaviorEngine, ok := engine.(*workflow.BehaviorDefinedEngine); ok {
+		if parserSource := behaviorEngine.GetLogParserScriptSource(); parserSource != "" {
+			output, err = runSessionParserWithSources(
+				context.Background(),
+				map[string][]byte{"behavior_log_parser.cjs": []byte(parserSource)},
+				"agent-markdown",
+				agentLogPath,
+				engine.GetID(),
+				"behavior_log_parser.cjs",
+			)
+		} else {
+			output, err = runSessionParser(context.Background(), "agent-markdown", agentLogPath, engine.GetID())
+		}
+	} else {
+		output, err = runSessionParser(context.Background(), "agent-markdown", agentLogPath, engine.GetID())
+	}
 	if err != nil {
 		return err
 	}

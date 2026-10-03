@@ -23,7 +23,7 @@ function readSessionInput(inputPath) {
  * @returns {string}
  */
 function sessionCLI(args) {
-  const [mode, inputPath, engine] = args;
+  const [mode, inputPath, engine, customParser] = args;
   if (!inputPath) throw new Error("A session input path is required");
   if (mode === "reconstruct") {
     const { events, maskedValues } = collectUnifiedSession({
@@ -53,6 +53,20 @@ function sessionCLI(args) {
   }
   if (mode === "agent-markdown") {
     if (!engine) throw new Error("An engine is required to parse an agent log");
+    if (customParser) {
+      if (customParser !== "behavior_log_parser.cjs") throw new Error("Invalid custom log parser");
+      const parsed = require("./" + customParser).parseLog(readSessionInput(inputPath));
+      if (typeof parsed === "string") return parsed + "\n";
+      if (Array.isArray(parsed?.mcpFailures) && parsed.mcpFailures.length > 0) {
+        throw new Error(`MCP server(s) failed to launch: ${parsed.mcpFailures.join(", ")}`);
+      }
+      if (parsed?.maxTurnsHit) throw new Error("Agent execution stopped: max-turns limit reached");
+      if (Array.isArray(parsed?.logEntries) && parsed.logEntries.length > 0) {
+        return generateCopilotCliStyleSummary(parsed.logEntries) + "\n";
+      }
+      if (typeof parsed?.markdown === "string") return parsed.markdown + "\n";
+      return generateCopilotCliStyleSummary(parsed?.logEntries ?? []) + "\n";
+    }
     return generateCopilotCliStyleSummary(parseEngineSession(readSessionInput(inputPath), engine)) + "\n";
   }
   throw new Error(`Unsupported session CLI mode: ${mode}`);

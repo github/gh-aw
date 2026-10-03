@@ -14,6 +14,10 @@ import (
 )
 
 func runSessionParser(ctx context.Context, args ...string) ([]byte, error) {
+	return runSessionParserWithSources(ctx, nil, args...)
+}
+
+func runSessionParserWithSources(ctx context.Context, additionalSources map[string][]byte, args ...string) ([]byte, error) {
 	tempDir, err := os.MkdirTemp("", "gh-aw-session-parser-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session parser directory: %w", err)
@@ -34,6 +38,14 @@ func runSessionParser(ctx context.Context, args ...string) ([]byte, error) {
 		return os.WriteFile(filepath.Join(tempDir, entry.Name()), content, constants.FilePermSensitive)
 	}); err != nil {
 		return nil, fmt.Errorf("failed to prepare session parser sources: %w", err)
+	}
+	for name, content := range additionalSources {
+		if filepath.Base(name) != name || name == "." || name == ".." {
+			return nil, fmt.Errorf("invalid additional session parser source name %q", name)
+		}
+		if err := os.WriteFile(filepath.Join(tempDir, name), content, constants.FilePermSensitive); err != nil {
+			return nil, fmt.Errorf("failed to prepare additional session parser source %s: %w", name, err)
+		}
 	}
 
 	cmd := exec.CommandContext(ctx, "node", append([]string{filepath.Join(tempDir, "session_cli.cjs")}, args...)...)

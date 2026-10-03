@@ -125,6 +125,9 @@ func sessionArtifactName(names []string, base, legacy string) (string, error) {
 	}
 	var matches []string
 	for _, name := range names {
+		if base == "info" && (strings.HasSuffix(name, "-aw-info") || strings.HasSuffix(name, "-aw_info")) {
+			continue
+		}
 		if strings.HasSuffix(name, "-"+base) || (legacy != "" && strings.HasSuffix(name, "-"+legacy)) {
 			matches = append(matches, name)
 		}

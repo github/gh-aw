@@ -60,3 +60,62 @@ func TestParseAgentLogUsesSharedSessionParser(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(markdown), "Audit parser works")
 }
+
+func TestParseAgentLogUsesBehaviorDefinedParser(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	for _, test := range []struct {
+		name       string
+		parser     string
+		wantOutput string
+		wantError  string
+	}{
+		{
+			name: "structured parser",
+			parser: `function parseLog(logContent) {
+  return { markdown: "### Parser markdown", logEntries: [{ type: "assistant.message", data: { content: "Custom structured finding" } }], mcpFailures: [], maxTurnsHit: false };
+}`,
+			wantOutput: "Custom structured finding",
+		},
+		{
+			name: "MCP failure",
+			parser: `function parseLog(logContent) {
+  return { markdown: "### Parser markdown", logEntries: [], mcpFailures: ["custom server"], maxTurnsHit: false };
+}`,
+			wantError: "MCP server(s) failed to launch: custom server",
+		},
+		{
+			name: "max turns",
+			parser: `function parseLog(logContent) {
+  return { markdown: "### Parser markdown", logEntries: [], mcpFailures: [], maxTurnsHit: true };
+}`,
+			wantError: "max-turns limit reached",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeSessionTestFile(t, root, "agent-stdio.log", "unrecognized custom log format\n")
+			engine, err := workflow.NewBehaviorDefinedEngine(&workflow.EngineDefinition{
+				ID:          "testparser",
+				DisplayName: "TestParser",
+				Behaviors: &workflow.EngineBehaviorDefinition{
+					Execution: &workflow.EngineExecutionDefinition{
+						CommandName: "testparser-cli",
+						StepName:    "Execute TestParser",
+					},
+					LogParser: test.parser,
+				},
+			})
+			require.NoError(t, err)
+			err = parseAgentLog(root, engine, false)
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				return
+			}
+			require.NoError(t, err)
+			markdown, err := os.ReadFile(filepath.Join(root, "log.md"))
+			require.NoError(t, err)
+			require.Contains(t, string(markdown), test.wantOutput)
+		})
+	}
+}

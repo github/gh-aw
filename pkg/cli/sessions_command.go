@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/parser"
@@ -59,6 +61,7 @@ func runSessionsDownloadCommand(cmd *cobra.Command, args []string) error {
 	}
 	repoFlag, _ := cmd.Flags().GetString("repo")
 	if repoFlag != "" && components.Owner == "" {
+		// Session downloads also accept host-prefixed slugs for GHES and Proxima.
 		ownerRepo, host := repoutil.NormalizeRepoForAPI(repoFlag)
 		owner, repo, err := repoutil.SplitRepoSlug(ownerRepo)
 		if err != nil {
@@ -73,11 +76,36 @@ func runSessionsDownloadCommand(cmd *cobra.Command, args []string) error {
 	}
 	output, _ := cmd.Flags().GetString("output")
 	if output != "" {
-		if err := writeFileAtomically(output, content); err != nil {
+		if err := writeSessionFileAtomically(output, content); err != nil {
 			return fmt.Errorf("failed to write session to %s: %w", output, err)
 		}
 		return nil
 	}
 	_, err = cmd.OutOrStdout().Write(content)
 	return err
+}
+
+func writeSessionFileAtomically(path string, content []byte) error {
+	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
+	if err != nil {
+		return err
+	}
+	tempPath := file.Name()
+	defer func() { _ = os.Remove(tempPath) }()
+	if _, err := file.Write(content); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	mode := constants.FilePermSensitive
+	if info, err := os.Stat(path); err == nil {
+		mode &= info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Chmod(mode); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -109,7 +110,7 @@ func TestSessionsDownloadUsageFirst(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(commands), "repos/owner/repo/actions/runs/123/artifacts")
 	require.Contains(t, string(commands), "--name usage")
-	require.Contains(t, string(commands), "-R owner/repo")
+	require.Regexp(t, `-R ([^ ]*/)?owner/repo`, string(commands))
 	require.NotContains(t, string(commands), "--name agent")
 }
 
@@ -174,6 +175,21 @@ func TestSessionsDownloadLegacyAgentUsesInfo(t *testing.T) {
 	require.Contains(t, string(commands), "--name info")
 }
 
+func TestSessionsDownloadWithoutEngineMetadata(t *testing.T) {
+	requireSessionTestNode(t)
+	output, err := func() (string, error) {
+		installSessionTestGH(t, map[string]map[string]string{
+			"agent": {
+				"pi-streaming.jsonl": `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Metadata-free Pi session"}]}}` + "\n",
+			},
+		})
+		return executeSessionTestCommand(t, "123", "--repo", "owner/repo")
+	}()
+	require.NoError(t, err)
+	require.NoError(t, validateSessionJSONL([]byte(output)))
+	require.Contains(t, output, "Metadata-free Pi session")
+}
+
 func TestSessionsDownloadPreviousVersions(t *testing.T) {
 	requireSessionTestNode(t)
 	for _, test := range []struct {
@@ -233,6 +249,37 @@ func TestSessionsDownloadMarkdownAndOutput(t *testing.T) {
 				require.Contains(t, string(written), "Session download works.")
 				require.NotContains(t, string(written), "private prompt")
 			}
+		})
+	}
+}
+
+func TestSessionsDownloadOutputFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission bits are only enforced on Unix")
+	}
+	content := sessionTestHeader + sessionTestAgentEvent
+	tests := []struct {
+		name         string
+		existingMode os.FileMode
+		create       bool
+		wantMode     os.FileMode
+	}{
+		{name: "new file", wantMode: constants.FilePermSensitive},
+		{name: "restrict public file", existingMode: constants.FilePermPublic, create: true, wantMode: constants.FilePermSensitive},
+		{name: "preserve restrictive file", existingMode: 0o400, create: true, wantMode: 0o400},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			installSessionTestGH(t, map[string]map[string]string{"usage": {"aw_session.jsonl": content}})
+			file := filepath.Join(t.TempDir(), "session.jsonl")
+			if test.create {
+				require.NoError(t, os.WriteFile(file, []byte("old"), test.existingMode))
+			}
+			_, err := executeSessionTestCommand(t, "123", "--repo", "owner/repo", "-o", file)
+			require.NoError(t, err)
+			info, err := os.Stat(file)
+			require.NoError(t, err)
+			require.Equal(t, test.wantMode, info.Mode().Perm())
 		})
 	}
 }
@@ -324,6 +371,13 @@ func TestSessionArtifactName(t *testing.T) {
 	}
 	_, err := sessionArtifactName([]string{"one-usage", "two-usage"}, "usage", "")
 	require.ErrorContains(t, err, "multiple usage artifacts")
+
+	name, err := sessionArtifactName([]string{"caller-info", "caller-aw-info"}, "info", "")
+	require.NoError(t, err)
+	require.Equal(t, "caller-info", name)
+	name, err = sessionArtifactName([]string{"caller-info", "caller-aw-info"}, "aw-info", "aw_info")
+	require.NoError(t, err)
+	require.Equal(t, "caller-aw-info", name)
 }
 
 func TestValidateSessionJSONL(t *testing.T) {
