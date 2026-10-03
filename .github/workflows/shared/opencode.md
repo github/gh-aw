@@ -83,6 +83,8 @@ engine:
       command-name: opencode
       args:
         - run
+        - --format
+        - json
         - --print-logs
         - --log-level
         - DEBUG
@@ -98,73 +100,7 @@ engine:
       config-path: opencode.jsonc
     log-parser: |
       function parseLog(logContent) {
-        const lines = logContent.split("\n");
-        const logEntries = [];
-        const mcpFailures = [];
-        let maxTurnsHit = false;
-        const AWF_INFRA_RE = /^\[(INFO|WARN|SUCCESS|ERROR|entrypoint|health-check)\]|^ (?:Container|Network|Volume) |^Process exiting with code:/;
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let toolCallIndex = 0;
-        let turnCount = 0;
-        let pendingText = [];
-
-        function flushText() {
-          if (pendingText.length === 0) return;
-          const text = pendingText.join("\n").trim();
-          if (text) {
-            logEntries.push({ type: "assistant", message: { content: [{ type: "text", text }] } });
-            turnCount++;
-          }
-          pendingText = [];
-        }
-
-        logEntries.push({ type: "system", subtype: "init", model: null, session_id: null });
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          if (AWF_INFRA_RE.test(line)) continue;
-          if (/max.?turns|maximum.*turns.*reached|turn limit/i.test(line)) maxTurnsHit = true;
-          if (/MCP server .* failed|MCP.*connection.*error|Failed to connect to MCP/i.test(line)) {
-            const serverMatch = line.match(/MCP server ['"]?([^\s'"]+)['"]?/i);
-            mcpFailures.push(serverMatch ? serverMatch[1] : line.trim());
-          }
-
-          let parsed = null;
-          try {
-            if (line.trim().startsWith("{")) parsed = JSON.parse(line.trim());
-          } catch (e) { /* not JSON */ }
-
-          if (parsed) {
-            const entryType = parsed.type != null ? String(parsed.type) : "log";
-            const msg = parsed.msg || parsed.message || "";
-            if (parsed.input_tokens) inputTokens += parsed.input_tokens;
-            if (parsed.output_tokens) outputTokens += parsed.output_tokens;
-
-            if (/tool[._]call|tool[._]use/i.test(entryType)) {
-              flushText();
-              const toolId = `opencode_tool_${toolCallIndex++}`;
-              const toolName = parsed.tool || parsed.name || entryType;
-              logEntries.push({ type: "assistant", message: { content: [{ type: "tool_use", id: toolId, name: toolName, input: {} }] } });
-              logEntries.push({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: toolId, content: msg }] } });
-            } else if (msg) {
-              pendingText.push(msg);
-            }
-          } else {
-            pendingText.push(line.trim());
-          }
-        }
-        flushText();
-
-        const usage = {};
-        if (inputTokens) usage.input_tokens = inputTokens;
-        if (outputTokens) usage.output_tokens = outputTokens;
-        logEntries.push({ type: "result", num_turns: turnCount, usage });
-        const parts = [`**Turns:** ${turnCount}`, `**Tool calls:** ${toolCallIndex}`];
-        if (inputTokens || outputTokens) parts.push(`**Tokens:** ${((inputTokens ?? 0) + (outputTokens ?? 0)).toLocaleString()}`);
-        if (mcpFailures.length) parts.push(`**MCP failures:** ${mcpFailures.length}`);
-        if (maxTurnsHit) parts.push("**Max turns reached**");
-        return { markdown: parts.join(" · "), logEntries, mcpFailures, maxTurnsHit };
+        return require("./parse_opencode_log.cjs").parseOpenCodeLog(logContent);
       }
 ---
 
@@ -184,4 +120,10 @@ imports:
 
 `model` must use `provider/model` format. Supported providers are `copilot`,
 `anthropic`, `openai`, and `codex`.
+
+Execution uses `run --format json`. The shared OpenCode adapter maps emitted
+text, reasoning, tool parts, step accounting, and provider errors to canonical
+agent-session events. Debug/startup lines are not assistant messages. The CLI
+does not emit session initialization or a session turn count; those values
+remain unavailable rather than being inferred from text or tool counts.
 -->

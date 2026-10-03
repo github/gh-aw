@@ -656,6 +656,47 @@ Delegation is deterministic. Native event recognition and per-record mixed conve
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
 
+#### 7.6.1 OpenCode declarative adapter
+
+The experimental OpenCode shared definition uses the focused
+`parseOpenCodeLog` adapter, not generic custom-format guessing. Execution
+selects `run --format json`; the mapping is based on the pinned OpenCode
+v1.2.14 CLI and native SDK schemas.
+
+| Source signature | Canonical mapping |
+| --- | --- |
+| CLI `text` / `reasoning` with the corresponding `part.type` | Exact assistant text/reasoning, retaining the part and envelope metadata. |
+| CLI `tool_use` with `part.type: "tool"` and `part.state` | Observed invocation and terminal completion; `callID` is the correlation ID, distinct from the part or envelope ID. `running` and `pending` do not imply completion. |
+| CLI `step_start` / `step_finish` with corresponding parts | Native `opencode.step_start` / `opencode.step_finish` observations; distinct step-finish usage and cost contribute to canonical accounting. |
+| CLI `error` with `sessionID` and `error`, or native `session.error.properties.error` | Structured provider/session errors, not assistant answers or tool completions. |
+| Native `session.created.properties.info` | Initialization only when actually observed, including native ID and directory. |
+| Native `message.updated.properties.info` | Native message metadata/snapshots; message cost is cumulative, but message tokens describe only the last model step. Neither duplicates observed step accounting. |
+| Native `message.part.updated` / `message.part.delta` | Role-aware user/assistant/reasoning observations, exact ordered deltas, and retained transport snapshots without duplicating already observed text. Unknown channels and revised snapshots remain native extensions. |
+
+OpenCode `tokens.input` excludes cache reads/writes after its native `getUsage`
+normalization. Cache read/write, output, reasoning, and supplied total tokens
+remain distinct fields. Step IDs scope duplicate accounting observations.
+Observed step token reports take precedence over overlapping message token
+snapshots; snapshot tokens are a fallback when step evidence is absent.
+Message cost snapshots cover earlier step costs for that message. Text parts, tool calls,
+and model steps do not establish a session turn count. One derived accounting
+result per observed session follows the native observations; raw step and
+message reports remain available separately. CLI JSON output does
+not expose session initialization, user prompts, or a measured session
+duration; absent evidence remains unavailable.
+
+The retained agent artifacts for runs
+[37082362756](https://github.com/github/gh-aw/actions/runs/37082362756),
+[36797163342](https://github.com/github/gh-aw/actions/runs/36797163342),
+[36503599029](https://github.com/github/gh-aw/actions/runs/36503599029), and
+[36282968227](https://github.com/github/gh-aw/actions/runs/36282968227) contain
+startup/database-migration diagnostics and bootstrap-generated legacy
+accounting, not native assistant/tool lifecycle events. Sanitized startup
+excerpts exercise rejection of that false evidence. CLI lifecycle and native
+streaming regression fixtures are explicitly synthetic; they verify protocol
+mapping, not a successful real-CI OpenCode session. Plain/default CLI output
+and diagnostic lines are not claimed as supported conversation formats.
+
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 
 ### 8.1 Reader and presentation compatibility
