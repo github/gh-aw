@@ -804,7 +804,7 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
       expect(createIssueMock).toHaveBeenCalledOnce();
       const createCall = createIssueMock.mock.calls[0][0];
-      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2022-11-28" });
+      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2026-03-10" });
       expect(searchMock).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining('"gh-aw-agentic-workflow:"') }));
       expect(searchMock).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining('"workflow_id: test-workflow" in:body') }));
     });
@@ -845,7 +845,7 @@ describe("handle_agent_failure", () => {
 
       const parentCreateCall = createIssueMock.mock.calls.map(([call]) => call).find(call => call.title === "[aw] Failed runs");
       expect(parentCreateCall).toBeDefined();
-      expect(parentCreateCall.headers).toEqual({ "X-GitHub-Api-Version": "2022-11-28" });
+      expect(parentCreateCall.headers).toEqual({ "X-GitHub-Api-Version": "2026-03-10" });
       expect(createCommentMock).not.toHaveBeenCalled();
       expect(searchMock).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining('"[aw] Failed runs"') }));
     });
@@ -1460,7 +1460,7 @@ describe("handle_agent_failure", () => {
       expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Summarize-and-stop"));
       const createCall = createIssueMock.mock.calls[0][0];
       expect(createCall.title).toBe("[aw] Daily failure issue cap exceeded");
-      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2022-11-28" });
+      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2026-03-10" });
       expect(createCommentMock).toHaveBeenCalledOnce();
       expect(createCommentMock).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 999 }));
       expect(global.github.rest.search.issuesAndPullRequests).toHaveBeenCalledWith(expect.objectContaining({ q: expect.stringContaining("is:open") }));
@@ -5681,7 +5681,7 @@ describe("handle_agent_failure", () => {
       expect(createCall.title).toBe(CASCADE_ROLLUP_TITLE);
       expect(createCall.labels).toContain(CASCADE_ROLLUP_LABEL);
       expect(createCall.labels).toContain("agentic-workflows");
-      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2022-11-28" });
+      expect(createCall.headers).toEqual({ "X-GitHub-Api-Version": "2026-03-10" });
 
       // All 10 issues labeled
       expect(addLabelsMock).toHaveBeenCalledTimes(10);
@@ -5763,6 +5763,7 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).not.toHaveBeenCalled();
       expect(updateIssueMock).toHaveBeenCalledOnce();
       expect(updateIssueMock.mock.calls[0][0].issue_number).toBe(50);
+      expect(updateIssueMock.mock.calls[0][0].headers).toEqual({ "X-GitHub-Api-Version": "2026-03-10" });
     });
 
     it("creates cascade-suspected label when it does not exist (404)", async () => {

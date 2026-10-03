@@ -21,6 +21,12 @@ const AGENT_OUTPUT_FILENAME = "agent_output.json";
  */
 const TMP_GH_AW_PATH = "/tmp/gh-aw";
 
+/**
+ * Default GitHub REST API version for Actions clients.
+ * @type {string}
+ */
+const GITHUB_API_VERSION = "2026-03-10";
+
 // ---------------------------------------------------------------------------
 // GitHub reviewer bot
 // ---------------------------------------------------------------------------
@@ -153,6 +159,7 @@ const DETECTION_RESULT_FILENAME = "detection_result.json";
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
+  GITHUB_API_VERSION,
   COPILOT_REVIEWER_BOT,
   COPILOT_REVIEWER_BOT_ID,
   FAQ_CREATE_PR_PERMISSIONS_URL,
