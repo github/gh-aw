@@ -1291,6 +1291,7 @@ func TestCollectSafeJobArtifactPaths(t *testing.T) {
 		"/tmp/gh-aw/agent/alpha/**/*.yml",
 		"/tmp/gh-aw/agent/alpha/**/*.jsonl",
 		"/tmp/gh-aw/agent/alpha/**/*.patch",
+		"/tmp/gh-aw/agent/alpha/**/*.html",
 		"/tmp/gh-aw/agent/alpha/extra.json",
 		"/tmp/gh-aw/agent/zeta/**/*.txt",
 		"/tmp/gh-aw/agent/zeta/**/*.json",
@@ -1300,6 +1301,7 @@ func TestCollectSafeJobArtifactPaths(t *testing.T) {
 		"/tmp/gh-aw/agent/zeta/**/*.yml",
 		"/tmp/gh-aw/agent/zeta/**/*.jsonl",
 		"/tmp/gh-aw/agent/zeta/**/*.patch",
+		"/tmp/gh-aw/agent/zeta/**/*.html",
 	}, paths)
 }
 

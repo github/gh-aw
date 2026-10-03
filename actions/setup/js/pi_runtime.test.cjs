@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const { parsePiConfig, preparePiRuntime, nativePiProvider } = await import("./pi_runtime.cjs");
+const { parsePiConfig, preparePiRuntime, nativePiProvider, resolvePiPackageFile } = await import("./pi_runtime.cjs");
 let dir;
 
 beforeEach(() => {
@@ -17,6 +17,29 @@ afterEach(() => {
 });
 
 describe("Pi runtime configuration", () => {
+  it("uses the install-time package root even when sandbox npm paths differ", () => {
+    const root = path.join(dir, "host-toolcache/pi");
+    fs.mkdirSync(path.join(root, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(root, "dist/index.js"), "export {};");
+    vi.stubEnv("GH_AW_PI_PACKAGE_ROOT", root);
+    expect(fs.realpathSync(resolvePiPackageFile("dist/index.js"))).toBe(fs.realpathSync(path.join(root, "dist/index.js")));
+  });
+
+  it("finds the package from the real CLI symlink without depending on NODE_PATH", () => {
+    const root = path.join(dir, "alternate-node/lib/node_modules/@earendil-works/pi-coding-agent");
+    const bin = path.join(dir, "alternate-node/bin");
+    fs.mkdirSync(path.join(root, "dist/bundle"), { recursive: true });
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(root, "package.json"), '{"name":"@earendil-works/pi-coding-agent"}');
+    fs.writeFileSync(path.join(root, "dist/index.js"), "export {};");
+    fs.writeFileSync(path.join(root, "dist/bundle/cli.js"), "");
+    fs.symlinkSync(path.join(root, "dist/bundle/cli.js"), path.join(bin, "pi"));
+    vi.stubEnv("PATH", bin);
+    vi.stubEnv("NODE_PATH", "");
+    vi.stubEnv("GH_AW_PI_PACKAGE_ROOT", "");
+    expect(fs.realpathSync(resolvePiPackageFile("dist/index.js"))).toBe(fs.realpathSync(path.join(root, "dist/index.js")));
+  });
+
   it("retains installed package declarations in the same runtime directory", () => {
     fs.mkdirSync(path.join(dir, "agent"));
     fs.writeFileSync(path.join(dir, "agent/settings.json"), '{"packages":["npm:example@1.0.0"]}');

@@ -168,14 +168,14 @@ func TestCompiledLockFiles_SmokePiOmitsYoloArg(t *testing.T) {
 		"smoke-pi should not pass a redundant --yolo arg because Pi runs in yolo mode by default")
 }
 
-func TestCompiledLockFiles_SmokePiKeepsCLIProxySafeoutputsWiring(t *testing.T) {
+func TestCompiledLockFiles_SmokePiUsesNativeMCPSafeoutputsWiring(t *testing.T) {
 	sourcePath := filepath.Join(workflowsDir, "smoke-pi.md")
 	sourceBytes, err := os.ReadFile(sourcePath)
 	require.NoError(t, err, "should read smoke-pi source workflow")
 
 	source := string(sourceBytes)
-	assert.Contains(t, source, "cli-proxy: true",
-		"smoke-pi source workflow should keep cli-proxy enabled so safeoutputs CLI wrappers are generated")
+	assert.NotContains(t, source, "cli-proxy: true",
+		"smoke-pi exercises native MCP rather than hiding MCP servers behind CLI wrappers")
 
 	lockPath := filepath.Join(workflowsDir, "smoke-pi.lock.yml")
 	lockBytes, err := os.ReadFile(lockPath)
@@ -183,11 +183,15 @@ func TestCompiledLockFiles_SmokePiKeepsCLIProxySafeoutputsWiring(t *testing.T) {
 
 	lockContent := string(lockBytes)
 	assert.Contains(t, lockContent, "Mount MCP servers as CLIs",
-		"smoke-pi lock file should mount MCP servers as CLI wrappers")
-	assert.Contains(t, lockContent, `GH_AW_MCP_CLI_SERVERS='["safeoutputs"]'`,
-		"smoke-pi lock file should request the safeoutputs CLI wrapper")
-	assert.Contains(t, lockContent, `export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH"`,
-		"smoke-pi lock file should add mounted MCP CLI wrappers to PATH before executing Pi")
+		"the infrastructure CLI fallback remains available alongside native MCP")
+	assert.Contains(t, lockContent, "export GH_AW_PI_NATIVE_MCP=1",
+		"native Pi must retain infrastructure servers even when CLI fallbacks are mounted")
+	assert.Contains(t, lockContent, "pi_runtime.cjs",
+		"Pi must prepare the scoped gateway MCP configuration")
+	assert.Contains(t, lockContent, "--extension builtin:mcp",
+		"Pi must load the native MCP extension")
+	assert.Contains(t, lockContent, safeOutputsMCPTransportPromptFile,
+		"native MCP safe-output guidance must be included")
 }
 
 func TestCompiledLockFiles_CLIEngineInstallStepNamesIncludeCLISuffix(t *testing.T) {

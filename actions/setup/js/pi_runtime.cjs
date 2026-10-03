@@ -36,8 +36,27 @@ function resolvePiPackageFile(relativePath) {
     ...(require.resolve.paths("@earendil-works/pi-coding-agent") || []),
     ...(process.env.NODE_PATH || "").split(path.delimiter).filter(Boolean),
   ];
-  for (const root of new Set(roots)) {
-    const entry = path.join(root, "@earendil-works/pi-coding-agent", relativePath);
+  const packageRoots = roots.map(root => path.join(root, "@earendil-works/pi-coding-agent"));
+  if (process.env.GH_AW_PI_PACKAGE_ROOT) packageRoots.unshift(process.env.GH_AW_PI_PACKAGE_ROOT);
+  for (const bin of (process.env.PATH || "").split(path.delimiter)) {
+    if (!bin) continue;
+    const executable = path.join(bin, "pi");
+    if (!fs.existsSync(executable)) continue;
+    let root = path.dirname(fs.realpathSync(executable));
+    for (let depth = 0; depth < 4; depth++) {
+      const manifest = path.join(root, "package.json");
+      if (fs.existsSync(manifest)) {
+        const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        if (pkg.name === "@earendil-works/pi-coding-agent") {
+          packageRoots.push(root);
+          break;
+        }
+      }
+      root = path.dirname(root);
+    }
+  }
+  for (const root of new Set(packageRoots)) {
+    const entry = path.join(root, relativePath);
     if (fs.existsSync(entry)) return entry;
   }
   throw new Error("Pi coding-agent SDK is missing; install @earendil-works/pi-coding-agent@1.0.0 or newer");

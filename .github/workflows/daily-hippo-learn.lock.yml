@@ -562,6 +562,10 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.31 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.0.0
+      - name: Record Pi package location
+        run: |
+          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
+          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
@@ -2038,6 +2042,10 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.31 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.0.0
+      - name: Record Pi package location
+        run: |
+          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
+          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
       - name: Execute Pi CLI
         if: always()
         continue-on-error: true

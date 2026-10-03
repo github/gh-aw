@@ -243,6 +243,12 @@ func (e *PiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActi
 		}
 
 		steps = BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)
+		steps = append(steps, GitHubActionStep{
+			"      - name: Record Pi package location",
+			"        run: |",
+			`          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"`,
+			`          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"`,
+		})
 	}
 
 	return append(steps, e.extensionInstallationSteps(workflowData)...)

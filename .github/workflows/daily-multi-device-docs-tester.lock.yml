@@ -541,6 +541,10 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.31 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.0.0
+      - name: Record Pi package location
+        run: |
+          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
+          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
       - name: Install Playwright CLI
         run: npm install -g @playwright/cli@0.1.21
         env:
@@ -1951,6 +1955,10 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.31 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.0.0
+      - name: Record Pi package location
+        run: |
+          GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
+          printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
       - name: Execute Pi CLI
         if: always()
         continue-on-error: true

@@ -15,5 +15,8 @@ func (e *PiEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, 
 
 	// The gateway converter emits scoped HTTP clients, which pi_runtime.cjs
 	// installs as mcp.json in the same agent directory as models and packages.
+	if !NewTools(tools).CLIProxy {
+		yaml.WriteString("          export GH_AW_PI_NATIVE_MCP=1\n")
+	}
 	return renderDefaultJSONMCPConfig(yaml, tools, mcpTools, workflowData, constants.ShellMcpServersJsonPath)
 }

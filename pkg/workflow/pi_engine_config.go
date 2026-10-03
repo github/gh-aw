@@ -90,6 +90,9 @@ func validatePiJSONConfig(raw string) error {
 			return fmt.Errorf("engine.config.%s for Pi must be a JSON object", key)
 		}
 	}
+	if err := validatePiNestedConfig(raw); err != nil {
+		return err
+	}
 	if session, ok := parsed["session"]; ok {
 		return validatePiSessionConfig(session)
 	}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api": { "enum": ["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"] },
+        "name": { "type": "string", "minLength": 1 },
+        "reasoning": { "type": "boolean" },
+        "thinkingLevelMap": { "type": "object" },
+        "input": { "type": "array", "items": { "enum": ["text", "image"] } },
+        "inputLimits": { "type": "object" },
+        "cost": { "type": "object" },
+        "promptCache": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "short": { "type": "number", "minimum": 0 },
+            "long": { "type": "number", "minimum": 0 }
+          }
+        },
+        "contextWindow": { "type": "integer", "minimum": 1 },
+        "maxTokens": { "type": "integer", "minimum": 1 },
+        "samplingParams": { "type": "object" },
+        "compat": { "type": "object" }
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exposure": { "$ref": "#/$defs/exposure" },
+        "toolExposure": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/$defs/exposure" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "exposure": { "enum": ["direct", "deferred", "codemode", "hidden"] }
+  }
+}
