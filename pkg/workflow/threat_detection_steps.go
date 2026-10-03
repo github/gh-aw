@@ -291,6 +291,7 @@ func (c *Compiler) buildDetectionConclusionStep(data *WorkflowData) []string {
 	// When ContinueOnErrorExpr is set the value is resolved at runtime; compile-time we use
 	// true as a safe default so the step-level continue-on-error is included (permissive).
 	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
+	threatLog.Printf("Building detection conclusion step: continueOnError=%t, hasExpr=%t", continueOnError, continueOnErrorExpr != nil)
 
 	steps := []string{
 		"      - name: Parse and conclude threat detection\n",
@@ -526,6 +527,7 @@ func (c *Compiler) buildCustomThreatDetectionSteps(steps []any) []string {
 // The prefix comes from the agent job output since the detection job depends on the agent job.
 func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 	detectionArtifactName := artifactPrefixExprForAgentDownstreamJob(data) + constants.DetectionArtifactName.String()
+	threatLog.Printf("Building detection log upload step with artifact name %s", detectionArtifactName)
 	steps := []string{
 		"      - name: Upload threat detection log\n",
 		"        if: always()\n",
