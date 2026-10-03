@@ -102,6 +102,17 @@ describe("standard agent trace rendering", () => {
     }
   });
 
+  it("renders camelCase usage totals and cache semantics in summary statistics", () => {
+    const output = generatePlainTextSummary([
+      {
+        type: "result",
+        usage: { totalTokens: 15, inputTokens: 10, outputTokens: 2, cacheReadInputTokens: 3, inputTokensIncludeCache: false },
+      },
+    ]);
+    expect(output).toContain("Tokens: 15 total (10 in / 2 out)");
+    expect(output).toContain("Cache Read Tokens: 3");
+  });
+
   it.each([undefined, []])("renders permission denials without accompanying errors %j in both views", errors => {
     const events = [{ type: "session.result", data: { errors, permissionDenials: [{ toolName: "Read", permission: "read" }] } }];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {

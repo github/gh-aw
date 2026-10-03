@@ -191,6 +191,7 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     const usage = normalizeSessionUsage({ input_tokens: 0, inputTokens: 42, outputTokens: 2, cacheReadInputTokens: 3, extra: { kept: true }, cache_creation_input_tokens: -1 });
     expect(usage).toMatchObject({ input_tokens: 0, inputTokens: 42, output_tokens: 2, cache_read_input_tokens: 3, extra: { kept: true } });
     expect(usage.cache_creation_input_tokens).toBeUndefined();
+    expect(usage.cacheCreationInputTokens).toBeUndefined();
     const result = projectSessionResult([{ type: "session.result", data: { numTurns: NaN, durationMs: -2, totalCostUsd: Infinity, usage: { input_tokens: -1 } } }]);
     expect(result.num_turns).toBeUndefined();
     expect(result.duration_ms).toBeUndefined();
@@ -203,6 +204,19 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     expect(sessionTokenTotal({ input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 7, input_tokens_include_cache: false })).toBe(19);
     expect(sessionTokenTotal({ total_tokens: 30, input_tokens: 10, output_tokens: 2 })).toBe(30);
     expect(sessionTokenTotal({ cache_read_input_tokens: 7 })).toBeUndefined();
+  });
+
+  it("T-UAS-030: canonical usage fields win over camelCase aliases by presence", () => {
+    expect(sessionTokenTotal({ total_tokens: 7, totalTokens: 99 })).toBe(7);
+    expect(sessionTokenTotal({ total_tokens: -1, totalTokens: 99, input_tokens: 2, output_tokens: 3 })).toBe(5);
+    expect(sessionTokenTotal({ input_tokens: 7, inputTokens: 99, output_tokens: 2 })).toBe(9);
+    expect(sessionTokenTotal({ input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 7, cacheReadInputTokens: 99, input_tokens_include_cache: true, inputTokensIncludeCache: false })).toBe(12);
+    expect(sessionTokenTotal({ input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 7, input_tokens_include_cache: false, inputTokensIncludeCache: true })).toBe(19);
+  });
+
+  it("prefers the canonical overflow marker by property presence", () => {
+    expect(normalizeSessionUsage({ input_tokens: 10, overflowed_tokens: [], overflowedTokens: ["inputTokens"] })).toMatchObject({ input_tokens: 10, overflowed_tokens: [] });
+    expect(normalizeSessionUsage({ input_tokens: 10, overflowed_tokens: ["input_tokens"], overflowedTokens: [] })).toMatchObject({ overflowed_tokens: ["input_tokens"] });
   });
 
   it("T-UAS-032/033: sum contributions but select snapshots field by field", () => {

@@ -207,6 +207,23 @@ describe("essential unified session payloads", () => {
     }
   });
 
+  it("preserves camelCase AIC checkpoints and resolves only valid priced token usage", () => {
+    const checkpoint = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "openai", model: "gpt-4o-mini", aiCreditsTotal: 2.5, input_tokens: 100 } }, "evals");
+    expect(checkpoint.data).toMatchObject({ totalAic: 2.5 });
+    expect(checkpoint.data).not.toHaveProperty("aic");
+
+    const cacheOnly = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "openai", model: "gpt-4o-mini", cache_read_input_tokens: 500 } }, "evals");
+    expect(cacheOnly.data.aic).toBeGreaterThan(0);
+
+    for (const inputTokens of [-5, Infinity, NaN]) {
+      const invalid = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "openai", model: "gpt-4o-mini", input_tokens: inputTokens } }, "detection");
+      expect(invalid.data).not.toHaveProperty("aic");
+    }
+
+    const otherPhase = normalizeUnifiedSessionEvent({ type: "usage.report", data: { provider: "openai", model: "gpt-4o-mini", input_tokens: 100 } }, "conclusion");
+    expect(otherPhase.data).not.toHaveProperty("aic");
+  });
+
   it("normalizes actual safe-output failure reports without dropping operation error codes", () => {
     const compact = normalizeUnifiedSessionEvent({
       type: "safe_output.error",

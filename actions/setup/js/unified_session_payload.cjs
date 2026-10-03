@@ -15,6 +15,7 @@ const USAGE_FIELDS = {
   inputTokensIncludeCache: ["inputTokensIncludeCache", "input_tokens_include_cache"],
   overflowedTokens: ["overflowedTokens", "overflowed_tokens"],
 };
+const AIC_RESOLVABLE_PHASES = new Set(["detection", "evals"]);
 
 /** @type {Fields} */
 const TOOL_FIELDS = {
@@ -123,7 +124,7 @@ const EVENT_FIELDS = {
     requestId: ["requestId", "request_id"],
     status: ["status"],
     aic: ["aic", "ai_credits_this_response", "aiCreditsThisResponse"],
-    totalAic: ["totalAic", "ai_credits_total", "ai_credits", "aiCredits"],
+    totalAic: ["totalAic", "aiCreditsTotal", "ai_credits_total", "ai_credits", "aiCredits"],
     premiumRequests: ["premiumRequests", "premium_requests"],
     durationMs: ["durationMs", "duration_ms"],
   },
@@ -228,7 +229,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
         if (data[key] === undefined && nested[key] !== undefined) data[key] = nested[key];
       }
     }
-    if (event.type === "usage.report" && (phase === "detection" || phase === "evals")) resolveUsageAic(source, data, usage);
+    if (event.type === "usage.report" && phase !== undefined && AIC_RESOLVABLE_PHASES.has(phase)) resolveUsageAic(source, data, usage);
   }
   if (event.type === "tool.execution_complete" && (source.is_error === true || source.result?.isError === true || source.result?.is_error === true)) data.isError = true;
   if (event.type === "experiment.assignment") {
