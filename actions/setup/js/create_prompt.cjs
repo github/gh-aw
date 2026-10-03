@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
+const { readInboundAwContext } = require("./aw_context.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -156,6 +157,25 @@ function renderPrompt(config, env, promptsDir, replayPromptPath = LEDGER_REPLAY_
 }
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function renderWorkClaim(payload) {
+  const assignment = readInboundAwContext(payload)?.work_claim;
+  if (!isRecord(assignment) || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work)) {
+    return "";
+  }
+
+  const work = JSON.stringify({ id: assignment.work_id, payload: assignment.work }).replace(/</g, "\\u003c");
+  const claim = JSON.stringify({ id: assignment.claim_id, work_id: assignment.work_id }).replace(/</g, "\\u003c");
+  return `<work-claim>\n${work}\n${claim}\nWhen the work is complete, call dispatch_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled". The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</work-claim>\n`;
+}
+
+/**
  * @param {typeof import('@actions/core')} core - GitHub Actions core library
  * @returns {Promise<void>}
  */
@@ -179,7 +199,7 @@ async function main(core) {
     const promptOutputDir = path.join(runnerTemp, "gh-aw", "aw-prompts");
     const systemItemCount = config.system_item_count ?? 0;
     const systemContent = renderPrompt({ items: config.items.slice(0, systemItemCount) }, process.env, promptsDir);
-    const userContent = renderPrompt({ items: config.items.slice(systemItemCount) }, process.env, promptsDir);
+    const userContent = renderWorkClaim(typeof context === "undefined" ? null : context.payload) + renderPrompt({ items: config.items.slice(systemItemCount) }, process.env, promptsDir);
     const content = systemContent + userContent;
 
     fs.mkdirSync(promptOutputDir, { recursive: true, mode: 0o700 });

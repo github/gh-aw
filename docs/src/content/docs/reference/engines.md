@@ -39,7 +39,7 @@ Engine owners should publish and maintain their own Markdown integration definit
 
 ## Which engine should I choose?
 
-Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports the broadest engine-specific feature set, including native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers but requires proxy-specific tool configuration.
+Choose the engine that matches the required capabilities, identity mechanism, and existing provider access. Copilot supports native agent selection, custom harnesses, and continuation mode. Claude Code and Codex provide native web search when enabled. Gemini supports Google WIF and per-command bash restrictions. Pi supports multiple providers, native MCP, codemode, and SDK/RPC execution.
 
 Changing engines requires updating `engine:` and may also require different authentication, tools, model names, or network access. Review the setup guide and comparison before switching.
 
@@ -56,10 +56,10 @@ Not all features are available across all engines. The table below summarizes pe
 | `tools.web-search` | ✅ (native, opt-in) | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
 | `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ (no-op; already bare) |
+| `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `engine.harness` (custom harness script) | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Per-command `tools.bash` allowlist | ✅ | ✅ | ❌ (disable only) | ✅ | ❌ |
-| Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Per-command `tools.bash` allowlist | ✅ | ✅ | ❌ (disable only) | ✅ | ✅ (restricted shell syntax) |
+| Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
 
 `max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support; Codex and Copilot require explicit `tools: web-search:` configuration. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
@@ -108,7 +108,7 @@ By default, workflows install the latest available version of each engine CLI. T
 | Claude Code | `claude` | `"2.1.70"` |
 | Codex | `codex` | `"0.111.0"` |
 | Gemini CLI | `gemini` | `"0.31.0"` |
-| Pi | `pi` | `"0.72.1"` |
+| Pi | `pi` | `"1.0.0"` |
 
 ```yaml wrap
 engine:
@@ -515,7 +515,7 @@ engine:
 
 ### Bare Mode (`bare`)
 
-Set `engine.bare: true` with Copilot or Claude to disable automatic loading of context and custom instructions by the engine. Use this when the workflow prompt is fully self-contained and you want to prevent the engine from reading memory files, `AGENTS.md`, or built-in system prompts that would otherwise be loaded automatically. Pi also accepts `engine.bare: true`, but the setting is a no-op because Pi already runs in bare mode. Codex and Gemini do not support this field.
+Set `engine.bare: true` with Copilot, Claude, or Pi to disable automatic loading of context and custom instructions by the engine. Use this when the workflow prompt is fully self-contained and you want to prevent automatic instruction or resource discovery. Codex and Gemini do not support this field.
 
 ```yaml wrap
 engine:
@@ -529,23 +529,24 @@ The underlying mechanism is engine-specific:
 |--------|--------|
 | Copilot | Passes `--no-custom-instructions` — suppresses `.github/AGENTS.md` and user-level custom instructions |
 | Claude | Passes `--bare` — skips ambient instructions, hooks, skills, subagents, plugins, and MCP discovery; workflow-declared skills/subagents and pinned plugins load explicitly |
-| Pi | No effect — Pi already runs in bare mode |
+| Pi | Disables automatic context, skill, prompt-template, extension, and theme discovery; explicit infrastructure extensions remain loaded |
 
 Defaults to `false`.
 
 ### Pi Extensions (`extensions`)
 
-The Pi engine supports loading additional plugins via `engine.extensions`. Each entry is an npm package name installed with `pi install <extension>` before the agent runs. Only the Pi engine reads this field; other engines ignore it. Pi extensions are distinct from the top-level Agent Plugins `plugins` field.
+The Pi engine supports packages via `engine.extensions`. Each npm, pinned git, or local package source is installed with `pi install <source>` into the same managed agent directory used at execution. Packages can contain extensions, skills, and prompt templates. Only Pi reads this field; other engines ignore it. Pi packages are distinct from the top-level Agent Plugins `plugins` field.
 
 ```yaml wrap
 engine:
   id: pi
   extensions:
-    - "@pi/web-search"
-    - "@pi/file-browser"
+    - "npm:@example/pi-tools@1.0.0"
 ```
 
 Each listed extension produces one additional install step in the compiled workflow. If `engine.command` is set, the same executable is used to install the extensions.
+
+Pi v1 also enables codemode and tool search, supports native MCP tools and resources through the policy gateway, and provides built-in coding-agent SDK and RPC drivers. Use JSON in `engine.config` to configure settings, model metadata, MCP exposure, and persistent sessions. See [Pi runtime configuration](/gh-aw/engines/pi/#pi-runtime-configuration).
 
 ## Timeout Configuration
 

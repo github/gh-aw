@@ -34,6 +34,7 @@ const fs = require("fs");
 const path = require("path");
 const { fetchAWFReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { loadPiSDK, nativePiProvider, parsePiConfig } = require("./pi_runtime.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
 const COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW = 1000000;
@@ -81,11 +82,11 @@ function resolveGatewayBaseUrl(options) {
  * "COPILOT_GITHUB_TOKEN") causes Pi to automatically use the value that is
  * already present in the container environment.
  *
- * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, contextWindow?: number|string, logger?: (msg: string) => void }} options
+ * @param {{ baseUrl: string, apiKeyEnvVar: string, modelId: string, api?: string, provider?: string, nativeProvider?: string, contextWindow?: number|string, metadata?: Record<string, any>, logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function buildModelsJSON(options) {
-  const { baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow: configuredContextWindow, logger = () => {} } = options;
+  const { baseUrl, modelId, api, provider, nativeProvider, metadata = {}, contextWindow: configuredContextWindow, logger = () => {} } = options;
   // Pi's built-in github-copilot catalog lists claude-sonnet-5 with a 1M context window.
   const fallbackContextWindow = provider === "github" && modelId === "claude-sonnet-5" ? COPILOT_CLAUDE_SONNET_5_CONTEXT_WINDOW : undefined;
   const resolvedContextWindow = resolveContextWindow(configuredContextWindow, logger);
@@ -95,9 +96,11 @@ function buildModelsJSON(options) {
       "aw-gateway": {
         baseUrl,
         api: api || "openai-completions",
-        apiKey: apiKeyEnvVar,
-        models: [{ id: modelId, ...(contextWindow ? { contextWindow } : {}) }],
+        // AWF owns the upstream credential; Pi only needs a non-secret placeholder.
+        apiKey: "awf-proxy",
+        models: [{ ...metadata, id: modelId, ...(contextWindow ? { contextWindow } : {}) }],
       },
+      ...(nativeProvider && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider) ? { [nativeProvider]: { baseUrl, apiKey: "awf-proxy" } } : {}),
     },
   });
 }
@@ -144,10 +147,12 @@ function resolvePiApiForProvider(provider) {
   if (provider === "openai" || provider === "codex") {
     return "openai-responses";
   }
+  if (provider === "google" || provider === "gemini") return "google-generative-ai";
   return provider === "anthropic" ? "anthropic-messages" : "openai-completions";
 }
 
-async function main() {
+/** @param {{ loadSDK?: typeof loadPiSDK }} [options] */
+async function main(options = {}) {
   const logger = DEFAULT_LOGGER;
   const modelId = process.env.GH_AW_PI_MODEL_ID || "";
   const apiKeyEnvVar = process.env.GH_AW_PI_GATEWAY_SECRET_ENV || "";
@@ -179,12 +184,41 @@ async function main() {
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
-  const api = resolvePiApiForProvider(provider);
+  let api = resolvePiApiForProvider(provider);
   logger(`resolved gateway api=${api} (provider=${provider})`);
 
-  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, contextWindow, logger });
+  const overrides = parsePiConfig().model || {};
+  const nativeProvider = nativePiProvider(process.env.GH_AW_PI_NATIVE_PROVIDER || provider);
+  let catalogModel;
+  if (["reasoning", "input", "contextWindow", "maxTokens"].every(key => Object.hasOwn(overrides, key))) {
+    logger(`using explicit model metadata for ${nativeProvider}/${modelId}`);
+  } else {
+    const sdk = await (options.loadSDK || loadPiSDK)();
+    const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
+    catalogModel = runtime.getModel(nativeProvider, modelId.split("?")[0]);
+  }
+  if (catalogModel && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider)) api = catalogModel.api;
+  const metadata = {};
+  if (catalogModel) {
+    for (const key of ["name", "reasoning", "thinkingLevelMap", "input", "inputLimits", "cost", "promptCache", "contextWindow", "maxTokens", "samplingParams", "compat"]) {
+      if (catalogModel[key] !== undefined) metadata[key] = catalogModel[key];
+    }
+  } else {
+    logger(`warning: Pi has no catalog metadata for ${nativeProvider}/${modelId}; configure engine.config.model for a custom model`);
+  }
+  for (const key of Object.keys(overrides)) {
+    if (!["api", "name", "reasoning", "thinkingLevelMap", "input", "inputLimits", "cost", "promptCache", "contextWindow", "maxTokens", "samplingParams", "compat"].includes(key)) {
+      throw new Error(`Unsupported Pi model metadata field: ${key}`);
+    }
+  }
+  if (overrides.api !== undefined) {
+    if (!["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"].includes(overrides.api)) throw new Error("Pi model API must match a supported AWF protocol");
+    api = overrides.api;
+  }
+  Object.assign(metadata, overrides);
+  const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, nativeProvider, contextWindow, metadata, logger });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, modelsJSON, "utf8");
+  fs.writeFileSync(outputPath, modelsJSON, { encoding: "utf8", mode: 0o600 });
   logger(`wrote ${outputPath}`);
 }
 

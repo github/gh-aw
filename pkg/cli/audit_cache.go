@@ -13,7 +13,7 @@ import (
 
 type auditCacheSource string
 
-const auditSchemaVersion = 2
+const auditSchemaVersion = 5
 
 const (
 	auditCacheSourceFull auditCacheSource = "full"
@@ -99,6 +99,9 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 		auditData, _ = buildLocalAuditData(processedRun, metrics, processedRun.MCPToolUsage)
 		auditData.CacheSource = auditCacheSourceLogs
 	}
+	if processedRun.DispatchCoordinator != nil {
+		auditData.DispatchCoordinator = processedRun.DispatchCoordinator
+	}
 	hydratedProcessedRuns := hydrateProcessedRunsWithCachedAudit(processedRuns)
 	auditData.Comparison = buildAuditComparisonForProcessedRuns(hydrateProcessedRunWithCachedAudit(processedRun), hydratedProcessedRuns)
 	if err := writeAuditData(runOutputDir, auditData); err != nil {
@@ -140,6 +143,9 @@ func hydrateProcessedRunWithCachedAudit(processedRun ProcessedRun) ProcessedRun 
 	}
 	if len(processedRun.GatewaySteeringEvents) == 0 {
 		processedRun.GatewaySteeringEvents = audit.GatewaySteeringEvents
+	}
+	if processedRun.DispatchCoordinator == nil {
+		processedRun.DispatchCoordinator = audit.DispatchCoordinator
 	}
 	return processedRun
 }

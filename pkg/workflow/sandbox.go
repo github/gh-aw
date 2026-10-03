@@ -318,6 +318,9 @@ func ensureDefaultAgentWritePath(sandboxConfig *SandboxConfig, engineConfig *Eng
 		// Codex writes runtime state under CODEX_HOME.
 		addAllowWritePathIfMissing(sandboxConfig.Agent.Config.Filesystem, constants.TmpMcpConfigDir)
 	}
+	if engineConfig != nil && engineConfig.ID == string(constants.PiEngine) {
+		addAllowWritePathIfMissing(sandboxConfig.Agent.Config.Filesystem, constants.TmpPiAgentDir)
+	}
 	addAllowWritePathIfMissing(sandboxConfig.Agent.Config.Filesystem, cloudHypervisorWorkspaceWritePath)
 	addAllowWritePathIfMissing(sandboxConfig.Agent.Config.Filesystem, cloudHypervisorAwfHomeWritePath)
 }

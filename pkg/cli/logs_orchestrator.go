@@ -337,6 +337,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		continuation:      result.continuation,
 		verbose:           opts.Verbose,
 		artifactFilter:    result.artifactFilter,
+		includeWorkQueue:  workQueueEvidenceRequested(opts.ArtifactSets),
 		startDate:         opts.StartDate,
 		endDate:           opts.EndDate,
 		checkStaleness:    true,

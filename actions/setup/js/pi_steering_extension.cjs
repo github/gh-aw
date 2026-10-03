@@ -56,7 +56,7 @@ function piSteeringExtension(pi) {
   let criticalInjected = false;
 
   pi.on("agent_start", async () => {
-    startTime = Date.now();
+    startTime ??= Date.now();
     process.stderr.write(`[gh-aw/steering] Session started. timeout=${config.timeoutMinutes}min, warn<${config.timeWarningMinutes}min, critical<${config.timeCriticalMinutes}min\n`);
   });
 
@@ -73,19 +73,11 @@ function piSteeringExtension(pi) {
       warningInjected = true;
       criticalInjected = true;
       process.stderr.write(`[gh-aw/steering] CRITICAL: ${remainingMinutes.toFixed(1)}min remaining — injecting critical message\n`);
-      ctx.agent.steer({
-        role: "user",
-        content: `⚠️ CRITICAL: Only ${remainingMinutes.toFixed(0)} minute(s) remaining before the workflow times out. Stop all new research and produce your final output immediately.`,
-        timestamp: Date.now(),
-      });
+      pi.sendUserMessage(`⚠️ CRITICAL: Only ${remainingMinutes.toFixed(0)} minute(s) remaining before the workflow times out. Stop all new research and produce your final output immediately.`, { deliverAs: "steer" });
     } else if (remainingMinutes <= config.timeWarningMinutes && !warningInjected) {
       warningInjected = true;
       process.stderr.write(`[gh-aw/steering] WARNING: ${remainingMinutes.toFixed(1)}min remaining — injecting warning message\n`);
-      ctx.agent.steer({
-        role: "user",
-        content: `⚠️ ${remainingMinutes.toFixed(0)} minute(s) remaining. Please wrap up your current task and start writing your final output.`,
-        timestamp: Date.now(),
-      });
+      pi.sendUserMessage(`⚠️ ${remainingMinutes.toFixed(0)} minute(s) remaining. Please wrap up your current task and start writing your final output.`, { deliverAs: "steer" });
     }
   });
 }
