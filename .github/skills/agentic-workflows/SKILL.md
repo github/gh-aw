@@ -87,10 +87,10 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/update-agentic-workflow.md`
 - `.github/aw/upgrade-agentic-workflows.md`
 - `.github/aw/visual-regression.md`
+- `.github/aw/work-queue.md`
 - `.github/aw/workflow-constraints.md`
 - `.github/aw/workflow-editing.md`
 - `.github/aw/workflow-patterns.md`
-- `.github/aw/work-queue.md`
 
 After loading the matching workflow prompt or skill, follow it directly:
 - Design workflows from scratch via interview: `.github/aw/designer.md`
@@ -106,7 +106,6 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Render compact markdown charts: `.github/aw/asciicharts.md`
 - Map CLI commands to MCP usage: `.github/aw/cli-commands.md`
 - Choose workflow architecture and patterns: `.github/aw/patterns.md`
-- Orchestrate durable work with a work queue (dispatcher/worker roles or queue inspection): `.github/aw/work-queue.md`
 - Optimize token usage and cost: `.github/aw/token-optimization.md`
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
