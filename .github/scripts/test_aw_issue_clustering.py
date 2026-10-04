@@ -352,6 +352,52 @@ class PublishingTests(unittest.TestCase):
         self.assertEqual("owned", api.call_args.kwargs["id"])
         self.assertTrue(api.call_args.kwargs["body"].startswith("Operator note."))
 
+    @patch.object(publish, "graphql")
+    def test_dashboard_comments_when_existing_discussion_cannot_be_edited(self, api):
+        old_body = collect.START + "\nOld table\n" + collect.END + collect.OWNER_MARKER
+        api.side_effect = [
+            {"search": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"id": "owned", "title": "AW Essential 10", "body": old_body,
+                 "author": {"__typename": "Bot"}, "closed": False},
+            ]}},
+            collect.GitHubAPIError("GitHub API request failed: Resource not accessible by integration", []),
+            {"addDiscussionComment": {"comment": {"id": "new"}}},
+        ]
+        body = collect.START + "\nUpdated ranked queue\n" + collect.END + collect.OWNER_MARKER
+        publish.publish_dashboard(REPO, body)
+        self.assertEqual(3, api.call_count)
+        self.assertIn("Updated ranked queue", api.call_args.kwargs["body"])
+        self.assertEqual("owned", api.call_args.kwargs["id"])
+        self.assertIn("addDiscussionComment", api.call_args.args[0])
+
+    @patch.object(publish, "graphql")
+    def test_dashboard_does_not_hide_other_update_errors(self, api):
+        api.side_effect = [
+            {"search": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"id": "owned", "title": "AW Essential 10",
+                 "body": collect.START + "\nOld table\n" + collect.END + collect.OWNER_MARKER,
+                 "author": {"__typename": "Bot"}, "closed": False},
+            ]}},
+            collect.GitHubAPIError("GitHub API request failed: rate limit exceeded", []),
+        ]
+        with self.assertRaisesRegex(collect.GitHubAPIError, "rate limit exceeded"):
+            publish.publish_dashboard(REPO, collect.START + "\nNew table\n" + collect.END)
+        self.assertEqual(2, api.call_count)
+
+    @patch.object(publish, "graphql")
+    def test_dashboard_comment_failure_is_not_hidden(self, api):
+        api.side_effect = [
+            {"search": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"id": "owned", "title": "AW Essential 10",
+                 "body": collect.START + "\nOld table\n" + collect.END + collect.OWNER_MARKER,
+                 "author": {"__typename": "Bot"}, "closed": False},
+            ]}},
+            collect.GitHubAPIError("Resource not accessible by integration", []),
+            collect.GitHubAPIError("comment failed", []),
+        ]
+        with self.assertRaisesRegex(collect.GitHubAPIError, "comment failed"):
+            publish.publish_dashboard(REPO, collect.START + "\nNew table\n" + collect.END)
+
     @patch.object(publish, "run_cutoff", return_value="2026-10-03T00:00:00Z")
     @patch.object(publish, "collect_discussions", return_value=[])
     @patch.object(publish, "collect_issues")
