@@ -32,6 +32,7 @@ const { attachExecutionState, fetchIssueState, normalizeLabelNames } = require("
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
 
 const POLICY_REJECTION_ERROR_NAME = "ReplaceLabelPolicyRejectionError";
 const SET_LABELS_RETRY_CONFIG = {
@@ -121,18 +122,31 @@ const main = createCountGatedHandler({
       const { repo: itemRepo, repoParts } = repoResult;
       core.info(`Target repository: ${itemRepo}`);
 
-      const effectiveContext = resolveInvocationContext(context);
-      const triggeringItemNumber = effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
       let itemNumber;
+      let contextType;
 
       if (target === "*") {
+        const effectiveContext = resolveInvocationContext(context);
+        const triggeringItemNumber = effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
         const targetResult = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE });
         if (!targetResult.success) return targetResult;
         itemNumber = targetResult.number ?? triggeringItemNumber;
+        contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       } else if (target === "triggering") {
-        itemNumber = triggeringItemNumber;
+        const targetResult = resolveTarget({ targetConfig: target, item: message, context, itemType: HANDLER_TYPE, supportsPR: true });
+        if (!targetResult.success) {
+          if (targetResult.shouldFail === false) {
+            core.warning(targetResult.error);
+            return { success: false, skipped: true, reason: targetResult.error, error: targetResult.error };
+          }
+          return targetResult;
+        }
+        itemNumber = targetResult.number;
+        contextType = targetResult.contextType;
       } else {
+        const effectiveContext = resolveInvocationContext(context);
         itemNumber = Number(target);
+        contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       }
 
       itemNumber = Number(itemNumber);
@@ -142,7 +156,6 @@ const main = createCountGatedHandler({
         return { success: false, error };
       }
 
-      const contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       const labelToRemove = String(message.label_to_remove ?? "").trim();
       const labelToAdd = String(message.label_to_add ?? "").trim();
 

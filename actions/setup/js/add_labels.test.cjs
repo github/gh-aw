@@ -140,6 +140,28 @@ describe("add_labels", () => {
         expect(addLabelsCalls[0].issue_number).toBe(123);
       });
 
+      it("rejects an unauthorized triggering number from workflow_dispatch", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.payload = {
+          inputs: {
+            event_name: "issues",
+            event_payload: JSON.stringify({ issue: { number: "123" } }),
+          },
+        };
+        const handler = await main({ max: 10, target: "triggering" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
+        expect(addLabelsCalls).toHaveLength(0);
+      });
+
       it("AL-001 defaults to the triggering item when target is omitted", async () => {
         const handler = await main({ max: 10 });
         const addLabelsCalls = [];
@@ -1668,7 +1690,7 @@ describe("add_labels", () => {
       expect(result.labelsAdded[0].length).toBe(64);
     });
 
-    it("should handle numeric string from context payload correctly", async () => {
+    it("should reject a string issue number from context", async () => {
       const handler = await main({ max: 10 });
       const addLabelsCalls = [];
 
@@ -1690,8 +1712,9 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(true);
-      expect(addLabelsCalls).toHaveLength(1);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
+      expect(addLabelsCalls).toHaveLength(0);
     });
 
     it("should reject invalid non-numeric value from context", async () => {
@@ -1711,7 +1734,7 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("No issue/PR number available");
+      expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
     });
 
     it("should skip when item does not have all required_labels", async () => {

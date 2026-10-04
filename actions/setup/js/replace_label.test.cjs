@@ -53,6 +53,7 @@ describe("replace_label", () => {
     };
 
     mockContext = {
+      eventName: "issues",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -160,6 +161,24 @@ describe("replace_label", () => {
       expect(result.success).toBe(true);
       expect(result.number).toBe(99);
       expect(setLabelsCalls[0].issue_number).toBe(99);
+    });
+
+    it("skips when the triggering context has no issue or pull request", async () => {
+      mockContext.eventName = "workflow_dispatch";
+      mockContext.payload = {};
+      const setLabelsCalls = [];
+      mockGithub.rest.issues.setLabels = async params => {
+        setLabelsCalls.push(params);
+        return { data: [] };
+      };
+      const handler = await main({});
+
+      const result = await handler({ label_to_remove: "in-progress", label_to_add: "done" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      expect(result.error).toContain('Target is "triggering" but not running in issue or pull request context');
+      expect(setLabelsCalls).toHaveLength(0);
     });
   });
 
