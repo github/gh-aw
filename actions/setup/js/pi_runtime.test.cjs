@@ -52,6 +52,7 @@ describe("Pi runtime configuration", () => {
     fs.writeFileSync(path.join(dir, "agent/settings.json"), '{"packages":["npm:example@1.0.0"]}');
     const result = preparePiRuntime({ settings: { defaultThinkingLevel: "high", defaultProjectTrust: "always" } });
     expect(result.settings.packages).toEqual(["npm:example@1.0.0"]);
+    expect(result.settings.retry).toEqual({ enabled: true, maxRetries: 2, baseDelayMs: 1000, maxAgentDelayMs: 30000 });
     expect(result.settings.defaultTools).toEqual(["+codemode", "+tool_search"]);
     expect(result.settings.defaultProjectTrust).toBe("never");
     expect(result.settings.defaultThinkingLevel).toBe("high");

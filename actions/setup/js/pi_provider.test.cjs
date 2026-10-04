@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import childProcess from "node:child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -117,6 +118,51 @@ describe("pi_provider.cjs", () => {
 
     expect(stderrOutput.some(line => line.includes("provider_request provider=copilot model=claude-sonnet-4 api=openai-completions method=POST url=http://api-proxy:10002/v1/chat/completions"))).toBe(true);
     expect(stderrOutput.some(line => line.includes("provider_response provider=copilot model=claude-sonnet-4 status=503 method=POST url=http://api-proxy:10002/v1/chat/completions response_headers=content-type,x-request-id"))).toBe(true);
+  });
+
+  it("includes the provider status and redacted response message in the incomplete report", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-provider-"));
+    process.env.GH_AW_SAFE_OUTPUTS = path.join(tempDir, "outputs.jsonl");
+    process.env.GH_AW_SAFEOUTPUTS_CLI = "safeoutputs";
+    process.env.OPENAI_API_KEY = "provider-secret-value";
+    const execFileSync = vi.spyOn(childProcess, "execFileSync").mockReturnValue("");
+
+    const handlers = {};
+    const pi = {
+      registerProvider: vi.fn(),
+      on: vi.fn((event, handler) => {
+        handlers[event] = handler;
+      }),
+    };
+    const ctx = {
+      model: {
+        provider: "openai",
+        id: "gpt-5.4",
+        api: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
+      },
+    };
+
+    module.default(pi);
+    await handlers.before_provider_request({}, ctx);
+    await handlers.after_provider_response({ status: 429, headers: {} }, ctx);
+    await handlers.message_end({
+      message: {
+        role: "assistant",
+        provider: "openai",
+        model: "gpt-5.4",
+        stopReason: "error",
+        errorMessage: '429: {"message":"rate limited","api_key":"provider-secret-value"}',
+      },
+    });
+    await handlers.agent_settled();
+
+    const reportArgs = execFileSync.mock.calls.find(([, args]) => args[0] === "report_incomplete")?.[1];
+    expect(reportArgs.join(" ")).toContain("HTTP 429");
+    expect(reportArgs.join(" ")).toContain("rate limited");
+    expect(reportArgs.join(" ")).not.toContain("provider-secret-value");
+    expect(stderrOutput.some(line => line.includes("provider_error provider=openai model=gpt-5.4 api=openai-responses status=429") && line.includes("rate limited"))).toBe(true);
+    expect(stderrOutput.some(line => line.includes("provider-secret-value"))).toBe(false);
   });
 
   it("resolves native Anthropic requests to the Messages API", () => {

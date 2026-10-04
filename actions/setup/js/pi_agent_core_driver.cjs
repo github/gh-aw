@@ -5,17 +5,26 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { loadPiSDK, nativePiProvider, preparePiRuntime, DEFAULT_SESSION_DIR } = require("./pi_runtime.cjs");
+const { sanitizeProviderErrorMessage } = require("./pi_provider.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /** @param {any} event @returns {Record<string, any>} */
 function jsonEvent(event) {
-  if (event.type !== "message_update") return event;
+  if (event.type !== "message_update") {
+    const sanitized = { ...event };
+    if (typeof event.errorMessage === "string") sanitized.errorMessage = sanitizeProviderErrorMessage(event.errorMessage);
+    if (typeof event.message?.errorMessage === "string") {
+      sanitized.message = { ...event.message, errorMessage: sanitizeProviderErrorMessage(event.message.errorMessage) };
+    }
+    return sanitized;
+  }
   const { partial, ...update } = event.assistantMessageEvent;
   if (update.type === "toolcall_start") {
     const call = partial?.content?.[update.contentIndex];
     update.id = call?.id;
     update.toolName = call?.name;
   }
+  if (typeof update.errorMessage === "string") update.errorMessage = sanitizeProviderErrorMessage(update.errorMessage);
   return { type: event.type, usage: event.usage ?? event.message?.usage, assistantMessageEvent: update };
 }
 

@@ -98,6 +98,7 @@ function preparePiRuntime(config = parsePiConfig()) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
   }
   const settings = {
+    retry: { enabled: true, maxRetries: 2, baseDelayMs: 1000, maxAgentDelayMs: 30000 },
     ...installedSettings,
     defaultTools: ["+codemode", "+tool_search"],
     sessionDir: DEFAULT_SESSION_DIR,
