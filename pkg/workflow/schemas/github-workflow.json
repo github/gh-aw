@@ -42,15 +42,8 @@
         "queue": {
           "$comment": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-queueing-multiple-pending-runs",
           "description": "Controls how pending jobs or workflow runs are queued within a concurrency group. With the default `single`, at most one run can be pending — additional pending runs cancel the previous one. With `max`, up to 100 runs can be pending and are processed in FIFO order. The combination of `queue: max` and `cancel-in-progress: true` is not allowed.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["single", "max"]
-            },
-            {
-              "$ref": "#/definitions/expressionSyntax"
-            }
-          ],
+          "type": "string",
+          "enum": ["single", "max"],
           "default": "single"
         }
       },
