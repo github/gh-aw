@@ -236,6 +236,37 @@ describe("handle_agent_failure", () => {
       await expect(getFailedAgentStep()).resolves.toBe("Post Run agent");
     });
 
+    it("returns an empty string when no failed agent job is found", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ name: "other", conclusion: "failure", steps: [] }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.debug).toHaveBeenCalledWith("No failed agent job found when looking up the failed agent step");
+    });
+
+    it("returns an empty string when the agent job has no failed steps", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "success" }] }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.debug).toHaveBeenCalledWith("No failed step found in the agent job");
+    });
+
+    it("warns when the workflow run jobs API is inaccessible", async () => {
+      const error = Object.assign(new Error("Resource not accessible by integration"), { status: 403 });
+      global.github = {
+        paginate: vi.fn().mockRejectedValue(error),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("ensure the conclusion job grants actions: read"));
+    });
+
     it("renders a captured cause for generic agent failures", () => {
       const result = buildFailureDiagnosticsContext({
         failureCategories: ["agent_failure"],

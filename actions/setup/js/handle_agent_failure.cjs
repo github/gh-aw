@@ -1723,13 +1723,26 @@ async function getFailedAgentStep() {
       per_page: 100,
     });
     const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
+    if (!agentJob) {
+      core.debug("No failed agent job found when looking up the failed agent step");
+      return "";
+    }
     const failedStep = agentJob?.steps
       ?.slice()
       .reverse()
       .find(step => step.conclusion === "failure" && typeof step.name === "string");
-    return failedStep ? sanitizeContent(failedStep.name, 200) : "";
-  } catch {
-    core.debug("Could not identify the failed agent step");
+    if (!failedStep) {
+      core.debug("No failed step found in the agent job");
+      return "";
+    }
+    return sanitizeContent(failedStep.name, 200);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    if (error?.status === 403 || /Resource not accessible/i.test(message)) {
+      core.warning(`Could not identify the failed agent step; ensure the conclusion job grants actions: read: ${message}`);
+    } else {
+      core.warning(`Could not identify the failed agent step: ${message}`);
+    }
     return "";
   }
 }
