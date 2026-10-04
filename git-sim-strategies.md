@@ -1253,3 +1253,18 @@ conclusion each run is low value.
 - Recommendation stands unchanged: needs a human maintainer decision (retarget to a
   disposable sandbox repo + fix sub-agent reference + explicit re-authorization)
   before any future run resumes firing real safe-output calls.
+
+## Run 2026-10-04: HALTED (44th consecutive run, no cells advanced)
+
+- Re-confirmed the 2026-08-16 policy finding independently against this session's
+  own system prompt: real create_pull_request/push_to_pull_request_branch/create_issue
+  calls stuffed with synthetic filler solely to probe safe-output enforcement against
+  the real github/gh-aw repo matches the outer safe-outputs policy's forbidden
+  "probing / placeholder-content / let me see if this works" pattern verbatim.
+- config-simulator sub-agent type still not registered this session (only
+  claude/Explore/general-purpose/Plan/statusline-setup available).
+- No steering issue number given this run (blank field). No real safe-output calls
+  made. No cells tested/advanced (next_index stays 216).
+- Recommendation stands unchanged: needs a human maintainer decision (retarget to a
+  disposable sandbox repo + fix sub-agent reference + explicit re-authorization)
+  before any future run resumes firing real safe-output calls.
