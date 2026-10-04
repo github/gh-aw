@@ -5,6 +5,10 @@ import path from "path";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = _require("./constants.cjs");
+const incompleteOutput = JSON.stringify({
+  items: [{ type: "report_incomplete", reason: "Agent finished without emitting any valid safe outputs; task completion could not be confirmed." }],
+  errors: [],
+});
 describe("collect_ndjson_output.cjs", () => {
   let mockCore, collectScript;
   (beforeEach(() => {
@@ -164,8 +168,8 @@ describe("collect_ndjson_output.cjs", () => {
     it("should handle missing GH_AW_SAFE_OUTPUTS environment variable", async () => {
       (delete process.env.GH_AW_SAFE_OUTPUTS,
         await eval(`(async () => { ${collectScript}; await main(); })()`),
-        expect(mockCore.setOutput).toHaveBeenCalledWith("output", ""),
-        expect(mockCore.setOutput).toHaveBeenCalledWith("output_types", ""),
+        expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
+        expect(mockCore.setOutput).toHaveBeenCalledWith("output_types", "report_incomplete"),
         expect(mockCore.setOutput).toHaveBeenCalledWith("has_patch", "false"),
         expect(mockCore.info).toHaveBeenCalledWith("GH_AW_SAFE_OUTPUTS not set, no output to collect"));
     }),
@@ -173,10 +177,10 @@ describe("collect_ndjson_output.cjs", () => {
       const missingFile = `${TMP_GH_AW_PATH}/nonexistent-file.txt`;
       ((process.env.GH_AW_SAFE_OUTPUTS = missingFile),
         await eval(`(async () => { ${collectScript}; await main(); })()`),
-        expect(mockCore.setOutput).toHaveBeenCalledWith("output", '{"items":[],"errors":[]}'),
-        expect(mockCore.setOutput).toHaveBeenCalledWith("output_types", ""),
+        expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
+        expect(mockCore.setOutput).toHaveBeenCalledWith("output_types", "report_incomplete"),
         expect(mockCore.setOutput).toHaveBeenCalledWith("has_patch", "false"),
-        expect(mockCore.info).toHaveBeenCalledWith(`Output file does not exist: ${missingFile} — no safe-output items were emitted; treating as empty collection (graceful no-op)`),
+        expect(mockCore.info).toHaveBeenCalledWith(`Output file does not exist: ${missingFile}`),
         expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_AGENT_OUTPUT", path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME)));
     }),
     it("should fail with infra error when safeoutputs gateway-empty flag exists and outputs file is missing", async () => {
@@ -195,7 +199,10 @@ describe("collect_ndjson_output.cjs", () => {
         const failedMessage = failedCalls[0][0];
         expect(failedMessage).toContain("safeoutputs MCP gateway registered 0 tools");
         expect(failedMessage).toContain("gateway infrastructure failure");
-        expect(mockCore.setOutput).not.toHaveBeenCalledWith("output", expect.anything());
+        const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+        expect(output.items[0].type).toBe("report_incomplete");
+        expect(output.items[0].details).toContain("safeoutputs MCP gateway registered 0 tools");
+        expect(fs.existsSync(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME))).toBe(true);
       } finally {
         if (originalRunnerTemp === undefined) {
           delete process.env.RUNNER_TEMP;
@@ -214,8 +221,8 @@ describe("collect_ndjson_output.cjs", () => {
         ((process.env.GH_AW_SAFE_OUTPUTS = `${TMP_GH_AW_PATH}/nonexistent-file.txt`),
           await eval(`(async () => { ${collectScript}; await main(); })()`),
           expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("disk full")),
-          expect(spy).toHaveBeenCalledWith(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME), '{"items":[],"errors":[]}', "utf8"),
-          expect(mockCore.setOutput).toHaveBeenCalledWith("output", '{"items":[],"errors":[]}'),
+          expect(spy).toHaveBeenCalledWith(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME), incompleteOutput, "utf8"),
+          expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
           expect(mockCore.exportVariable).not.toHaveBeenCalled());
       } finally {
         spy.mockRestore();
@@ -226,7 +233,7 @@ describe("collect_ndjson_output.cjs", () => {
       (fs.writeFileSync(testFile, ""),
         (process.env.GH_AW_SAFE_OUTPUTS = testFile),
         await eval(`(async () => { ${collectScript}; await main(); })()`),
-        expect(mockCore.setOutput).toHaveBeenCalledWith("output", '{"items":[],"errors":[]}'),
+        expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
         expect(mockCore.info).toHaveBeenCalledWith("Output file is empty"));
     }),
     it("should validate and parse valid JSONL content", async () => {
@@ -345,7 +352,7 @@ describe("collect_ndjson_output.cjs", () => {
         outputCall = setOutputCalls.find(call => "output" === call[0]);
       expect(outputCall).toBeDefined();
       const parsedOutput = JSON.parse(outputCall[1]);
-      (expect(parsedOutput.items).toHaveLength(0),
+      (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
         expect(parsedOutput.errors.length).toBeGreaterThan(0),
         expect(parsedOutput.errors.some(e => e.includes("requires a 'body' field (string)"))).toBe(!0),
         expect(parsedOutput.errors.some(e => e.includes("requires a 'title' field (string)"))).toBe(!0));
@@ -700,7 +707,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
         }),
         it("should preserve valid JSON without modification", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -752,7 +761,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          parsedOutput.items.length > 0
+          parsedOutput.errors.length === 0
             ? (expect(parsedOutput.items[0].type).toBe("add_labels"), expect(parsedOutput.items[0].labels).toEqual(["bug", "feature"]), expect(parsedOutput.errors).toHaveLength(0))
             : (expect(mockCore.setFailed).not.toHaveBeenCalled(), expect(mockCore.warning).toHaveBeenCalled(), expect(parsedOutput.errors.length).toBeGreaterThan(0));
         }),
@@ -949,7 +958,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
         }),
         it("should repair very long strings with multiple issues", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -989,9 +1000,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          1 === parsedOutput.items.length
+          parsedOutput.errors.length === 0
             ? (expect(parsedOutput.items[0].type).toBe("create_issue"), expect(parsedOutput.items[0].title).toContain("quotes"), expect(parsedOutput.errors).toHaveLength(0))
-            : (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors).toHaveLength(1), expect(parsedOutput.errors[0]).toContain("JSON parsing failed"));
+            : (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]), expect(parsedOutput.errors).toHaveLength(1), expect(parsedOutput.errors[0]).toContain("JSON parsing failed"));
         }),
         it("should repair JSON with carriage returns and form feeds", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1021,7 +1032,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
         }),
         it("should handle repair of JSON with missing property separators", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1038,7 +1051,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("JSON parsing failed"))).toBe(!0));
         }),
         it("should repair arrays with mixed bracket types in complex structures", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1064,7 +1079,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          parsedOutput.items.length > 0
+          parsedOutput.errors.length === 0
             ? (expect(parsedOutput.items[0].type).toBe("create_issue"), expect(parsedOutput.items[0].title).toBe("Test"), expect(parsedOutput.errors).toHaveLength(0))
             : (expect(mockCore.setFailed).not.toHaveBeenCalled(), expect(mockCore.warning).toHaveBeenCalled(), expect(parsedOutput.errors.length).toBeGreaterThan(0));
         }),
@@ -1175,7 +1190,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0),
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
             expect(parsedOutput.errors.length).toBeGreaterThan(0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert requires a 'file' field (string)"))).toBe(!0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'line' is required"))).toBe(!0),
@@ -1198,7 +1213,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0),
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
             expect(parsedOutput.errors.length).toBeGreaterThan(0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert requires a 'file' field (string)"))).toBe(!0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'line' is required"))).toBe(!0),
@@ -1221,7 +1236,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0),
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
             expect(parsedOutput.errors.length).toBeGreaterThan(0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'severity' must be one of: error, warning, info, note"))).toBe(!0));
         }),
@@ -1241,7 +1256,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0),
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
             expect(parsedOutput.errors.length).toBeGreaterThan(0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'column' must be a valid positive integer (got: invalid)"))).toBe(!0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'ruleIdSuffix' must be a string"))).toBe(!0),
@@ -1281,7 +1296,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0),
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
             expect(parsedOutput.errors.length).toBeGreaterThan(0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'line' must be a valid positive integer (got: invalid)"))).toBe(!0),
             expect(parsedOutput.errors.some(e => e.includes("create_code_scanning_alert 'line' must be a valid positive integer (got: 0)"))).toBe(!0),
@@ -1652,7 +1667,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors).toHaveLength(1), expect(parsedOutput.errors[0]).toContain("Too few items of type 'create_issue'. Minimum required: 1, found: 0."));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors).toHaveLength(1),
+            expect(parsedOutput.errors[0]).toContain("Too few items of type 'create_issue'. Minimum required: 1, found: 0."));
         }),
         it("should work with different safe output types", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1697,7 +1714,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("noop requires a 'message' field (string)"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("noop requires a 'message' field (string)"))).toBe(!0));
         }),
         it("should reject noop with non-string message", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1714,7 +1733,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("noop requires a 'message' field (string)"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("noop requires a 'message' field (string)"))).toBe(!0));
         }),
         it("should sanitize noop message content", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1826,7 +1847,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("assign_to_agent requires at least one of"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("assign_to_agent requires at least one of"))).toBe(!0));
         }));
     }),
     describe("link_sub_issue temporary ID validation", () => {
@@ -1894,7 +1917,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("must be a positive integer or temporary ID"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("must be a positive integer or temporary ID"))).toBe(!0));
         }),
         it("should reject same temporary ID for parent and sub", async () => {
           const sameId = "aw_abc123",
@@ -1909,7 +1934,9 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("must be different"))).toBe(!0));
+          (expect(parsedOutput.items).toEqual([expect.objectContaining({ type: "report_incomplete" })]),
+            expect(parsedOutput.errors.length).toBeGreaterThan(0),
+            expect(parsedOutput.errors.some(e => e.includes("must be different"))).toBe(!0));
         }));
     }));
 });
