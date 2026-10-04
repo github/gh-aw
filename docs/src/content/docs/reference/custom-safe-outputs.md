@@ -229,7 +229,7 @@ Custom jobs receive the same `GH_AW_WORKFLOW_*`, engine, tracker, message, and d
 
 ### Issue Creation API
 
-`actions/setup/js/stable.cjs` is a supported public entry point for custom jobs. Run the setup action to install the runtime helpers and prompt templates, then load `${RUNNER_TEMP}/gh-aw/actions/stable.cjs` from `actions/github-script`.
+`actions/setup/js/create-issue.cjs` is a supported public entry point for custom jobs. Run the setup action to install the runtime helpers and prompt templates, then load `${RUNNER_TEMP}/gh-aw/actions/create-issue.cjs` from `actions/github-script`.
 
 ```aw wrap
 safe-outputs:
@@ -251,15 +251,15 @@ safe-outputs:
             script: |
               const fs = require("node:fs");
               const actionsDir = `${process.env.RUNNER_TEMP}/gh-aw/actions`;
-              const stable = require(`${actionsDir}/stable.cjs`);
-              stable.setupGlobals(core, github, context, exec, io, getOctokit);
+              const { setupGlobals, createIssue } = require(`${actionsDir}/create-issue.cjs`);
+              setupGlobals(core, github, context, exec, io, getOctokit);
               const { sanitizeContent } = require(`${actionsDir}/sanitize_content.cjs`);
               const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8"));
               const items = output.items.filter(item => item.type === "publish_finding");
               if (items.length !== 1 || typeof items[0].body !== "string") {
                 throw new Error("Exactly one finding with a string body is required");
               }
-              const result = await stable.createIssue({
+              const result = await createIssue({
                 title: "Validated workflow finding",
                 body: sanitizeContent(items[0].body),
               });

@@ -21,7 +21,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
  */
 async function createIssue(parameters) {
   if (typeof github === "undefined" || typeof context === "undefined" || typeof core === "undefined") {
-    throw new Error(`${ERR_VALIDATION}: Call stable.setupGlobals(core, github, context, exec, io, getOctokit) before creating an issue`);
+    throw new Error(`${ERR_VALIDATION}: Call setupGlobals(core, github, context, exec, io, getOctokit) from create-issue.cjs before creating an issue`);
   }
   if (!process.env.GH_AW_WORKFLOW_ID || !process.env.GH_AW_WORKFLOW_NAME) {
     throw new Error(`${ERR_VALIDATION}: GH_AW_WORKFLOW_ID and GH_AW_WORKFLOW_NAME are required for custom issue attribution; recompile the workflow`);
