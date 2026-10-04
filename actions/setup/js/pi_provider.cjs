@@ -31,66 +31,11 @@ const { fetchAWFReflect, AWF_API_PROXY_REFLECT_URL, AWF_REFLECT_OUTPUT_PATH, AWF
 const { emitInfrastructureIncomplete } = require("./safeoutputs_cli.cjs");
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-
-const MAX_PROVIDER_ERROR_LENGTH = 1000;
+const { getProviderErrorDetails } = require("./pi_provider_error.cjs");
 
 // Default logger: prefixed with "[gh-aw/pi-provider]" for easy grepping.
 // prettier-ignore
 const DEFAULT_LOGGER = /** @type {(msg: string) => void} */ (msg => process.stderr.write(`[gh-aw/pi-provider] ${new Date().toISOString()} ${msg}\n`));
-
-/**
- * Reduce provider errors to bounded, single-line diagnostics without exposing credentials.
- *
- * @param {unknown} value
- * @returns {string}
- */
-function sanitizeProviderErrorMessage(value) {
-  let message;
-  if (value === undefined || value === null) {
-    message = "";
-  } else if (typeof value === "string") {
-    message = value;
-  } else {
-    try {
-      message = JSON.stringify(value);
-    } catch {
-      message = String(value);
-    }
-  }
-
-  for (const [name, secret] of Object.entries(process.env)) {
-    if (/(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)/i.test(name) && secret && secret.length >= 6) {
-      message = message.split(secret).join("[REDACTED]");
-    }
-  }
-
-  message = message
-    .replace(/\bBearer\s+[^\s,;"}]+/gi, "******")
-    .replace(/\b(?:gh[pousr]_|ghs_|github_pat_)[A-Za-z0-9._-]+\b/g, "[REDACTED]")
-    .replace(/\bsk-(?:proj-|ant-api03-)?[A-Za-z0-9_-]{20,}\b/g, "[REDACTED]")
-    .replace(/[\u0000-\u001f\u007f-\u009f]+/g, " ");
-  if (message.length > MAX_PROVIDER_ERROR_LENGTH) {
-    message = `${message.slice(0, MAX_PROVIDER_ERROR_LENGTH)}…`;
-  }
-  return message;
-}
-
-/**
- * Extract the HTTP status and response message from a Pi provider error.
- *
- * @param {unknown} value
- * @param {number|undefined} responseStatus
- * @returns {{ status?: number, message: string }}
- */
-function getProviderErrorDetails(value, responseStatus) {
-  const rawMessage = sanitizeProviderErrorMessage(value);
-  const match = /^\s*(?:HTTP\s*)?(\d{3})(?::\s*|\s+)([\s\S]*)$/i.exec(rawMessage);
-  const parsedStatus = match ? Number(match[1]) : undefined;
-  return {
-    ...(typeof responseStatus === "number" ? { status: responseStatus } : parsedStatus ? { status: parsedStatus } : {}),
-    message: match ? match[2] : rawMessage,
-  };
-}
 
 /**
  * Return the workflow-configured model string exposed to Pi extensions.
@@ -486,5 +431,3 @@ _piExports.resolveProviderRequestTarget = resolveProviderRequestTarget;
 _piExports.formatResponseHeaderNames = formatResponseHeaderNames;
 _piExports.emitInfrastructureIncompleteIfNoSafeOutputs = emitInfrastructureIncompleteIfNoSafeOutputs;
 _piExports.logReflectFailure = logReflectFailure;
-_piExports.sanitizeProviderErrorMessage = sanitizeProviderErrorMessage;
-_piExports.getProviderErrorDetails = getProviderErrorDetails;

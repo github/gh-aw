@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { loadPiSDK, nativePiProvider, preparePiRuntime, DEFAULT_SESSION_DIR } = require("./pi_runtime.cjs");
-const { sanitizeProviderErrorMessage } = require("./pi_provider.cjs");
+const { sanitizeProviderErrorMessage } = require("./pi_provider_error.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /** @param {any} event @returns {Record<string, any>} */
