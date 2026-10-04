@@ -206,6 +206,7 @@ type RunData struct {
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
 	Graders                    *GradersData           `json:"graders,omitempty" console:"-"`                                                        // Deterministic grader results for this run
 	SafeOutputs                []CreatedItemReport    `json:"safe_outputs,omitempty" console:"-"`                                                   // Entities affected by safe-output handlers
+	SafeOutputErrors           json.RawMessage        `json:"safe_output_errors,omitempty" console:"-"`
 	// DownloadDurationMS is the wall-clock time (milliseconds) spent by `gh aw logs`
 	// downloading this run's artifacts from GitHub. Zero means no download duration
 	// was recorded for this invocation (for example, an on-disk cache hit); when the
@@ -482,7 +483,7 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo string, agg *logsAggregate) RunData {
 	if pr.cachedData != nil {
 		agg.accumulateCachedRunTotals(*pr.cachedData)
-		return *pr.cachedData
+		return attachSafeOutputErrorsToCachedRun(*pr.cachedData)
 	}
 	run := pr.Run
 
@@ -509,6 +510,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	comparison := buildAuditComparisonForProcessedRuns(pr, processedRuns)
 
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
+	runData.SafeOutputErrors = readSafeOutputErrors(run.LogsPath)
 	runData.Ledger = pr.Ledger
 	runData.awInfo = engineInfo.awInfo
 	if engineInfo.awInfo != nil {
@@ -604,6 +606,33 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 	}
 	applyGitHubMetadataToRunData(&runData, run)
 	return runData
+}
+
+func attachSafeOutputErrorsToCachedRun(runData RunData) RunData {
+	if len(runData.SafeOutputErrors) == 0 {
+		runData.SafeOutputErrors = readSafeOutputErrors(runData.LogsPath)
+	}
+	return runData
+}
+
+func readSafeOutputErrors(logsPath string) json.RawMessage {
+	if logsPath == "" {
+		return nil
+	}
+
+	content, err := os.ReadFile(filepath.Join(logsPath, constants.SafeOutputErrorsFilename))
+	if err != nil || len(content) == 0 {
+		return nil
+	}
+	if json.Valid(content) {
+		return json.RawMessage(content)
+	}
+
+	encoded, err := json.Marshal(string(content))
+	if err != nil {
+		return nil
+	}
+	return encoded
 }
 
 // buildLogsData creates structured logs data from processed runs

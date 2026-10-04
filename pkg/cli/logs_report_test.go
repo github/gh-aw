@@ -12,11 +12,61 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildLogsDataIncludesSafeOutputErrors(t *testing.T) {
+	t.Parallel()
+
+	logsPath := t.TempDir()
+	want := `{"error_code":"handler_failed","message":"permission denied"}`
+	require.NoError(t, os.WriteFile(filepath.Join(logsPath, constants.SafeOutputErrorsFilename), []byte(want), 0600))
+
+	processedRun := ProcessedRun{
+		Run: WorkflowRun{
+			DatabaseID:   42,
+			Conclusion:   "failure",
+			LogsPath:     logsPath,
+			WorkflowName: "test-workflow",
+		},
+		JobDetails: []JobInfoWithDuration{
+			{JobInfo: JobInfo{Name: "agent", Conclusion: "success"}},
+			{JobInfo: JobInfo{Name: "safe_outputs", Conclusion: "failure"}},
+		},
+	}
+
+	data := buildLogsData([]ProcessedRun{processedRun}, logsPath, nil)
+	require.Len(t, data.Runs, 1)
+	assert.Equal(t, "agent_logic", data.Runs[0].FailureKind)
+	assert.JSONEq(t, want, string(data.Runs[0].SafeOutputErrors))
+
+	encoded, err := json.Marshal(compactLogsData(data))
+	require.NoError(t, err)
+	var output map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &output))
+	runs, ok := output["runs"].([]any)
+	require.True(t, ok)
+	run, ok := runs[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, map[string]any{
+		"error_code": "handler_failed",
+		"message":    "permission denied",
+	}, run["safe_output_errors"])
+
+	cachedRun := RunData{
+		RunID:       42,
+		Conclusion:  "failure",
+		FailureKind: "agent_logic",
+		LogsPath:    logsPath,
+	}
+	cachedData := buildLogsData([]ProcessedRun{{Run: processedRun.Run, cachedData: &cachedRun}}, logsPath, nil)
+	require.Len(t, cachedData.Runs, 1)
+	assert.JSONEq(t, want, string(cachedData.Runs[0].SafeOutputErrors))
+}
 
 func TestNormalizeJobNamePreservesPeriods(t *testing.T) {
 	t.Parallel()

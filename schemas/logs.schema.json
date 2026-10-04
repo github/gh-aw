@@ -1780,6 +1780,17 @@
                   "additionalProperties": false
                 }
               },
+              "safe_output_errors": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
               "download_duration_ms": {
                 "type": "integer"
               },
