@@ -41,25 +41,10 @@ function validateSort(sort) {
     throw new TypeError("sort must contain between one and four sort operators");
   }
   for (const term of sort) {
-    if (!term || typeof term !== "object" || Array.isArray(term) || Object.keys(term).some(key => !["expression", "direction"].includes(key)) || !["asc", "desc"].includes(term.direction)) {
-      throw new TypeError("each sort operator must have an expression and an asc or desc direction");
-    }
-    const expression = term.expression;
-    if (
-      !expression ||
-      typeof expression !== "object" ||
-      Array.isArray(expression) ||
-      Object.keys(expression).some(key => !["op", "field"].includes(key)) ||
-      !((expression.op === "field" && ["id", "enqueued"].includes(expression.field)) || (expression.op === "length" && expression.field === "id"))
-    ) {
-      throw new TypeError("sort expression must be a field (id or enqueued) or the length of id");
+    if (!term || typeof term !== "object" || Array.isArray(term) || Object.keys(term).some(key => !["key", "direction"].includes(key)) || !["id", "enqueued", "id_length"].includes(term.key) || !["asc", "desc"].includes(term.direction)) {
+      throw new TypeError("each sort operator must have a supported key and an asc or desc direction");
     }
   }
-}
-
-function evaluateSortExpression(work, expression) {
-  const value = work[expression.field];
-  return expression.op === "length" ? [...value].length : value;
 }
 
 function readWorkQueueState(snapshot, args = {}) {
@@ -68,16 +53,19 @@ function readWorkQueueState(snapshot, args = {}) {
   }
   validateSort(args.sort);
 
+  const enqueuedByWork = new Map();
+  for (const transaction of snapshot.projection.transactions) {
+    if (transaction.kind === "Work" && !enqueuedByWork.has(transaction.work)) {
+      enqueuedByWork.set(transaction.work, transaction.enqueued ?? 0);
+    }
+  }
   const available = [...snapshot.projection.available];
   if (args.sort) {
-    const metadata = new Map(snapshot.projection.transactions.filter(transaction => transaction.kind === "Work").map(transaction => [transaction.work, transaction.enqueued ?? 0]));
     const defaultOrder = new Map(available.map((id, index) => [id, index]));
     available.sort((left, right) => {
-      const leftWork = { id: left, enqueued: metadata.get(left) ?? 0 };
-      const rightWork = { id: right, enqueued: metadata.get(right) ?? 0 };
-      for (const { expression, direction } of args.sort) {
-        const a = evaluateSortExpression(leftWork, expression);
-        const b = evaluateSortExpression(rightWork, expression);
+      for (const { key, direction } of args.sort) {
+        const a = key === "id" ? left : key === "enqueued" ? (enqueuedByWork.get(left) ?? 0) : [...left].length;
+        const b = key === "id" ? right : key === "enqueued" ? (enqueuedByWork.get(right) ?? 0) : [...right].length;
         const comparison = typeof a === "string" ? Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8")) : a < b ? -1 : a > b ? 1 : 0;
         if (comparison) return direction === "asc" ? comparison : -comparison;
       }
@@ -98,7 +86,7 @@ function readWorkQueueState(snapshot, args = {}) {
     return {
       id: work,
       state: snapshot.projection.work[work],
-      enqueued: snapshot.projection.transactions.find(transaction => transaction.kind === "Work" && transaction.work === work)?.enqueued ?? 0,
+      enqueued: enqueuedByWork.get(work) ?? 0,
       winner: snapshot.projection.winner[work],
       claims,
     };
@@ -118,14 +106,16 @@ function createWorkQueueStateTool(snapshot) {
         work: { type: "string", minLength: 1, description: "Optional Work identifier to read." },
         sort: {
           type: "array",
-          description: 'Optional ordered sort operators (1–4), e.g. [{"expression":{"op":"field","field":"enqueued"},"direction":"desc"}]. Each expression reads id or enqueued, or computes the length of id. Ties retain oldest-first order.',
+          minItems: 1,
+          maxItems: 4,
+          description: 'Optional ordered sort keys (1–4), e.g. [{"key":"enqueued","direction":"desc"}]. Keys are id, enqueued, and id_length. Ties retain oldest-first order.',
           items: {
             type: "object",
             properties: {
-              expression: { type: "object", properties: { op: { type: "string", enum: ["field", "length"] }, field: { type: "string", enum: ["id", "enqueued"] } }, required: ["op", "field"], additionalProperties: false },
+              key: { type: "string", enum: ["id", "enqueued", "id_length"] },
               direction: { type: "string", enum: ["asc", "desc"] },
             },
-            required: ["expression", "direction"],
+            required: ["key", "direction"],
             additionalProperties: false,
           },
         },

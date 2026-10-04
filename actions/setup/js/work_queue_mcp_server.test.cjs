@@ -87,35 +87,44 @@ describe("work queue MCP snapshot", () => {
         worker: null,
       })
     );
-    const newestFirst = [{ expression: { op: "field", field: "enqueued" }, direction: "desc" }];
+    const newestFirst = [{ key: "enqueued", direction: "desc" }];
     expect(readWorkQueueState(snapshot, { sort: newestFirst }).works.map(item => item.id)).toEqual(["aaa", "bb", "z", "claimed"]);
     expect(readWorkQueueState(snapshot, { sort: newestFirst }).next_work).toBe("aaa");
     expect(readWorkQueueState(snapshot, { work: "z", sort: newestFirst }).next_work).toBe("aaa");
 
     const byLength = [
-      { expression: { op: "length", field: "id" }, direction: "asc" },
-      { expression: { op: "field", field: "id" }, direction: "desc" },
+      { key: "id_length", direction: "asc" },
+      { key: "id", direction: "desc" },
     ];
     expect(readWorkQueueState(snapshot, { sort: byLength }).works.map(item => item.id)).toEqual(["z", "bb", "aaa", "claimed"]);
-    expect(readWorkQueueState(snapshot, { sort: [{ expression: { op: "field", field: "id" }, direction: "desc" }] }).next_work).toBe("z");
+    expect(readWorkQueueState(snapshot, { sort: [{ key: "id", direction: "desc" }] }).next_work).toBe("z");
     expect(readWorkQueueState(snapshot).next_work).toBe("z");
+  });
+
+  it("sorts IDs by Unicode code point length", () => {
+    const snapshot = loadWorkQueueSnapshot(
+      writeSnapshot({
+        version: 2,
+        sha: "head",
+        transactionLog: serializeTransactionLog([createWorkTransaction("😀", 10), createWorkTransaction("ab", 10)]),
+        worker: null,
+      })
+    );
+
+    expect(readWorkQueueState(snapshot, { sort: [{ key: "id_length", direction: "asc" }] }).works.map(item => item.id)).toEqual(["😀", "ab"]);
   });
 
   it("rejects unsupported and unbounded sort operators", () => {
     const snapshot = loadWorkQueueSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null }));
-    const term = { expression: { op: "field", field: "id" }, direction: "asc" };
-    for (const sort of [
-      [],
-      [term, term, term, term, term],
-      "id",
-      [{ ...term, direction: "random" }],
-      [{ ...term, extra: true }],
-      [{ ...term, expression: { op: "length", field: "enqueued" } }],
-      [{ ...term, expression: { op: "field", field: "state" } }],
-    ]) {
+    const term = { key: "id", direction: "asc" };
+    for (const sort of [[], [term, term, term, term, term], "id", [{ ...term, direction: "random" }], [{ ...term, extra: true }], [{ ...term, key: "state" }]]) {
       expect(() => readWorkQueueState(snapshot, { sort })).toThrow(TypeError);
     }
-    expect(createWorkQueueStateTool(snapshot).inputSchema.properties.sort.items.required).toEqual(["expression", "direction"]);
+    const sortSchema = createWorkQueueStateTool(snapshot).inputSchema.properties.sort;
+    expect(sortSchema.minItems).toBe(1);
+    expect(sortSchema.maxItems).toBe(4);
+    expect(sortSchema.items.required).toEqual(["key", "direction"]);
+    expect(sortSchema.items.properties.key.enum).toEqual(["id", "enqueued", "id_length"]);
   });
 
   it("loads v1 Work at age zero without changing the snapshot envelope", () => {
