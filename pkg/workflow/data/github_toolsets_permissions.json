@@ -1,12 +1,18 @@
 {
   "version": "2.5",
-  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added)",
+  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added; governance added; automations provisional pending upstream confirmation)",
   "toolsets": {
     "actions": {
       "description": "GitHub Actions workflows",
       "read_permissions": ["actions"],
       "write_permissions": ["actions"],
       "tools": ["actions_get", "actions_list", "actions_run_trigger", "get_job_logs"]
+    },
+    "automations": {
+      "description": "Copilot automations (provisional; observed remotely but not found in upstream main)",
+      "read_permissions": [],
+      "write_permissions": [],
+      "tools": ["get_automation", "get_automation_revision", "list_automation_revisions", "list_automations", "list_available_automation_tools", "list_available_automation_triggers"]
     },
     "code_quality": {
       "description": "Code quality findings",
@@ -61,6 +67,12 @@
       "read_permissions": [],
       "write_permissions": [],
       "tools": ["create_gist", "get_gist", "list_gists", "update_gist"]
+    },
+    "governance": {
+      "description": "Repository governance (rulesets and custom properties)",
+      "read_permissions": ["administration"],
+      "write_permissions": ["administration"],
+      "tools": ["create_repository_ruleset", "custom_properties_read", "custom_properties_write", "repository_ruleset_read"]
     },
     "git": {
       "description": "Git API operations (tree, refs)",

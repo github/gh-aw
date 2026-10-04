@@ -133,6 +133,8 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `semantic_issues_search` | Search issues using natural language queries | `query`, `owner`, `repo` |
 | `sub_issue_write` | Create or manage sub-issues | `owner`, `repo`, `issue_number` |
 
+> **Tool availability note**: `semantic_issues_search` is listed in the mapping but was not observed during remote MCP self-inspection. Its natural-language search description overlaps with `search_issues`; whether it has been consolidated upstream is unconfirmed.
+
 ---
 
 ### pull_requests
@@ -162,6 +164,22 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 | `actions_list` | List GitHub Actions workflows and runs | `owner`, `repo`, `method`, `resource_id`, `per_page`, `page` |
 | `actions_run_trigger` | Trigger a workflow run | `owner`, `repo`, `workflow_id`, `ref`, `inputs` |
 | `get_job_logs` | Download logs for a specific workflow job | `owner`, `repo`, `job_id` |
+
+---
+
+### automations
+**Description**: Copilot automation tools (provisional)
+
+> **Note**: These tools were observed through remote MCP self-inspection but are not present in the upstream `github/github-mcp-server` main-branch tool registry. The toolset name and empty permission requirements are provisional pending confirmation.
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `get_automation` | Get a Copilot automation | `owner`, `repo`, `automation_id` |
+| `get_automation_revision` | Get a revision of a Copilot automation | `owner`, `repo`, `automation_id`, `revision_id` |
+| `list_automation_revisions` | List Copilot automation revisions | `owner`, `repo`, `automation_id` |
+| `list_automations` | List Copilot automations | `owner`, `repo` |
+| `list_available_automation_tools` | List tools available to Copilot automations | — |
+| `list_available_automation_triggers` | List triggers available to Copilot automations | — |
 
 ---
 
@@ -208,6 +226,20 @@ When calling `list_code_scanning_alerts` in workflow prompts/templates, always b
 | `get_gist` | Get a specific gist by ID | `gist_id` |
 | `list_gists` | List gists for a user | `username`, `page`, `per_page` |
 | `update_gist` | Update an existing gist | `gist_id`, `description`, `files` |
+
+---
+
+### governance
+**Description**: Rulesets and custom properties at repository, organization, and enterprise levels
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `create_repository_ruleset` | Create a ruleset | `level`, `owner`, `repo`, `name`, `enforcement`, ruleset definition |
+| `custom_properties_read` | Read custom properties | `level`, `owner`, `repo`, `org`, `enterprise` |
+| `custom_properties_write` | Set custom properties | `level`, `owner`, `repo`, `org`, `enterprise`, `properties` |
+| `repository_ruleset_read` | Read rulesets and rule suites | `level`, `method`, `owner`, `repo`, `ruleset_id` |
+
+Repository-level ruleset operations require the `administration` permission; write operations require `administration: write`. Organization- and enterprise-level operations require the corresponding elevated access.
 
 ---
 

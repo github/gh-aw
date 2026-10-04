@@ -25,6 +25,49 @@ func TestValidateMainWorkflowFrontmatter_IssueFieldActivityTypes(t *testing.T) {
 
 }
 
+func TestValidateMainWorkflowFrontmatter_GitHubToolsets(t *testing.T) {
+	for _, toolset := range []string{
+		"automations",
+		"code_quality",
+		"copilot",
+		"copilot_issue_intents",
+		"copilot_spaces",
+		"git",
+		"github_support_docs_search",
+		"governance",
+	} {
+		t.Run(toolset, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "workflow_dispatch",
+				"tools": map[string]any{
+					"github": map[string]any{
+						"toolsets": []any{toolset},
+					},
+				},
+			}
+			if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"); err != nil {
+				t.Fatalf("expected toolset %q to validate: %v", toolset, err)
+			}
+		})
+	}
+
+	for _, toolset := range []string{"experiments", "search"} {
+		t.Run("rejects_"+toolset, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "workflow_dispatch",
+				"tools": map[string]any{
+					"github": map[string]any{
+						"toolsets": []any{toolset},
+					},
+				},
+			}
+			if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"); err == nil {
+				t.Fatalf("expected removed toolset %q to fail schema validation", toolset)
+			}
+		})
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
 	for _, test := range []struct {
 		name    string

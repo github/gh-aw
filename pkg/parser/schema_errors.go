@@ -139,7 +139,7 @@ var typeConflictGotWantPattern = regexp.MustCompile(`(?:^|: )got (\w+), want (\w
 // Update this list when built-in engines change.
 var knownOneOfFieldHints = map[string]string{
 	"/engine":                "Valid engine names: claude, codex, copilot, gemini, pi.\n\nExample:\nengine: copilot\n# or with options:\nengine:\n  id: copilot\nmax-turns: 15  # top-level field, not nested under engine",
-	"/tools/github/toolsets": "Valid toolsets: all, default, action-friendly, context, repos, issues, pull_requests, actions, code_security, dependabot, discussions, experiments, gists, labels, notifications, orgs, projects, search, secret_protection, security_advisories, stargazers, users.\n\nExample:\ntools:\n  github:\n    toolsets: default\n    # or as an array:\n    toolsets: [default, repos]",
+	"/tools/github/toolsets": "Valid toolsets: all, default, action-friendly, context, repos, issues, pull_requests, actions, automations, code_quality, code_security, copilot, copilot_issue_intents, copilot_spaces, dependabot, discussions, gists, git, github_support_docs_search, governance, labels, notifications, orgs, projects, secret_protection, security_advisories, stargazers, users.\n\nExample:\ntools:\n  github:\n    toolsets: default\n    # or as an array:\n    toolsets: [default, repos]",
 	"/tools/linear/toolsets": "Valid toolsets: all, attachments, comments, customers, cycles, diffs, documentation, documents, initiatives, issues, milestones, projects, status_updates, teams, users.\n\nExample:\ntools:\n  linear:\n    toolsets: [issues, projects]",
 }
 

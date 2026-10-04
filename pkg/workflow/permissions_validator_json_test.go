@@ -15,7 +15,7 @@ func TestToolsetPermissionsLoadedFromJSON(t *testing.T) {
 	}
 
 	// Test a few known toolsets
-	expectedToolsets := []string{"context", "repos", "issues", "pull_requests", "actions"}
+	expectedToolsets := []string{"context", "repos", "issues", "pull_requests", "actions", "governance", "automations"}
 	for _, toolset := range expectedToolsets {
 		if _, exists := toolsetPermissionsMap[toolset]; !exists {
 			t.Errorf("Expected toolset %s not found in toolsetPermissionsMap", toolset)
@@ -49,5 +49,24 @@ func TestToolsetPermissionsLoadedFromJSON(t *testing.T) {
 	}
 	if len(contextPerms.Tools) == 0 {
 		t.Error("context toolset should have tools listed")
+	}
+
+	governancePerms := toolsetPermissionsMap["governance"]
+	if len(governancePerms.ReadPermissions) != 1 || governancePerms.ReadPermissions[0] != PermissionAdministration {
+		t.Errorf("governance toolset should require administration read permission, got %v", governancePerms.ReadPermissions)
+	}
+	if len(governancePerms.WritePermissions) != 1 || governancePerms.WritePermissions[0] != PermissionAdministration {
+		t.Errorf("governance toolset should require administration write permission, got %v", governancePerms.WritePermissions)
+	}
+	if len(governancePerms.Tools) != 4 {
+		t.Errorf("governance toolset should list four tools, got %v", governancePerms.Tools)
+	}
+
+	automationsPerms := toolsetPermissionsMap["automations"]
+	if len(automationsPerms.ReadPermissions) != 0 || len(automationsPerms.WritePermissions) != 0 {
+		t.Errorf("provisional automations toolset should have no permission requirements, got read=%v write=%v", automationsPerms.ReadPermissions, automationsPerms.WritePermissions)
+	}
+	if len(automationsPerms.Tools) != 6 {
+		t.Errorf("automations toolset should list six tools, got %v", automationsPerms.Tools)
 	}
 }

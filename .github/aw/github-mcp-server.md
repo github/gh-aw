@@ -6,7 +6,7 @@ description: Overview and practical guidance for configuring and using GitHub MC
 
 **Source**: [github/github-mcp-server](https://github.com/github/github-mcp-server/tree/main/pkg/github)
 **Mapping File**: [pkg/workflow/data/github_toolsets_permissions.json](https://github.com/github/gh-aw/blob/main/pkg/workflow/data/github_toolsets_permissions.json)
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-10-04
 
 ## Overview
 
@@ -72,6 +72,7 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 | Toolset | When to Enable |
 |---------|---------------|
 | `actions` | Workflow introspection, triggering runs |
+| `automations` | Copilot automation tools (provisional; remote-only until confirmed upstream) |
 | `code_quality` | Code quality finding lookups |
 | `code_security` | Code scanning alert management |
 | `copilot` | Copilot assignment, PR creation, and review requests |
@@ -82,6 +83,7 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 | `gists` | Gist creation and management |
 | `git` | Git API operations (tree, refs) |
 | `github_support_docs_search` | GitHub support documentation search (remote mode only) |
+| `governance` | Repository rulesets and custom properties |
 | `labels` | Label management automation |
 | `notifications` | Notification processing agents |
 | `orgs` | Organization search operations |
@@ -94,6 +96,10 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 ## Tools by Toolset
 
 See [github-mcp-server-tools.md](github-mcp-server-tools.md) for the full per-toolset tool reference (parameters, known quirks like the `search_repositories` `repo:` limitation).
+
+> **Provisional toolset**: `automations` was observed through remote MCP self-inspection but is not present in the upstream `github/github-mcp-server` main-branch tool registry. Its toolset name and empty permission mapping are provisional pending upstream confirmation.
+
+> **Schema sync**: The workflow frontmatter schema now mirrors the toolset mapping, including toolsets previously omitted and excluding the removed `experiments` and `search` names.
 
 ---
 
