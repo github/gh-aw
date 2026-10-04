@@ -1710,6 +1710,53 @@ function buildReportIncompleteContext(items) {
 }
 
 /**
+ * Find the failed step in the agent job for generic failure reports.
+ * @returns {Promise<string>} The failed step name, or an empty string when unavailable
+ */
+async function getFailedAgentStep() {
+  try {
+    const { owner, repo } = context.repo;
+    const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+      owner,
+      repo,
+      run_id: context.runId,
+      per_page: 100,
+    });
+    const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
+    const failedStep = agentJob?.steps?.findLast(step => step.conclusion === "failure" && typeof step.name === "string");
+    return failedStep ? sanitizeContent(failedStep.name, 200) : "";
+  } catch {
+    core.debug("Could not identify the failed agent step");
+    return "";
+  }
+}
+
+/**
+ * Add step-level context to generic agent and infrastructure failures.
+ * @param {{failureCategories: string[], failingStep: string, engineFailureContext: string, items?: Array<any>}} options
+ * @returns {string}
+ */
+function buildFailureDiagnosticsContext({ failureCategories, failingStep, engineFailureContext, items = [] }) {
+  const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
+  const isGenericFailure = failureCategories.includes("agent_failure") || infrastructureMessages.length > 0;
+  if (!isGenericFailure) {
+    return "";
+  }
+
+  let context = "\n### Failure Diagnostics\n\n";
+  if (failingStep) {
+    context += `**Failing step:** ${failingStep}\n\n`;
+  }
+
+  const hasInfrastructureDetails = infrastructureMessages.some(item => typeof item.details === "string" && item.details.trim());
+  if (!engineFailureContext.trim() && !hasInfrastructureDetails) {
+    context += "No cause was captured from the agent report or engine logs.\n\n";
+  }
+
+  return context;
+}
+
+/**
  * Build a context string with a frontmatter hint when the agent timed out.
  * @param {boolean} isTimedOut - Whether the agent job timed out
  * @param {string} timeoutMinutes - Current timeout value in minutes (e.g. "20")
@@ -4324,6 +4371,10 @@ async function main() {
       }
     }
 
+    const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
+    const needsFailureDiagnostics = failureCategories.includes("agent_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
+    const failingStep = needsFailureDiagnostics ? await getFailedAgentStep() : "";
+
     // Check if parent issue creation is enabled (defaults to false)
     const groupReports = process.env.GH_AW_GROUP_REPORTS === "true";
 
@@ -4438,6 +4489,12 @@ async function main() {
               maxCacheMissesExceeded,
             })
           : "";
+        const failureDiagnosticsContext = buildFailureDiagnosticsContext({
+          failureCategories,
+          failingStep,
+          engineFailureContext,
+          items: agentOutputItems,
+        });
         // Build timeout context
         const timeoutContext = buildTimeoutContext(isTimedOut, timeoutMinutes);
 
@@ -4502,6 +4559,7 @@ async function main() {
           permission_denied_context: permissionDeniedContext,
           tool_denials_exceeded_context: toolDenialsExceededContext,
           report_incomplete_context: reportIncompleteContext,
+          failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
           engine_failure_context: engineFailureContext,
           timeout_context: timeoutContext,
@@ -4672,6 +4730,12 @@ async function main() {
         const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected)
           ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded })
           : "";
+        const failureDiagnosticsContext = buildFailureDiagnosticsContext({
+          failureCategories,
+          failingStep,
+          engineFailureContext,
+          items: agentOutputItems,
+        });
 
         // Build timeout context
         const timeoutContext = buildTimeoutContext(isTimedOut, timeoutMinutes);
@@ -4741,6 +4805,7 @@ async function main() {
           permission_denied_context: permissionDeniedContext,
           tool_denials_exceeded_context: toolDenialsExceededContext,
           report_incomplete_context: reportIncompleteContext,
+          failure_diagnostics_context: failureDiagnosticsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
           engine_failure_context: engineFailureContext,
           timeout_context: timeoutContext,
@@ -4874,6 +4939,8 @@ module.exports = {
   isDroppedPipeSafeOutputsCommand,
   detectAWFFirewallStartupFailureFromLog,
   buildReportIncompleteContext,
+  getFailedAgentStep,
+  buildFailureDiagnosticsContext,
   buildMCPPolicyErrorContext,
   buildCopilotOrgBillingErrorContext,
   detectCopilotOrgBillingErrorFromLog,

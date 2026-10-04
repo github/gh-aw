@@ -12,6 +12,8 @@ describe("handle_agent_failure", () => {
   let buildCodePushFailureContext;
   let buildPushRepoMemoryFailureContext;
   let buildReportIncompleteContext;
+  let buildFailureDiagnosticsContext;
+  let getFailedAgentStep;
   let buildFailureIssueTitle;
   let buildModelPricingFrontmatterSnippet;
   let fetchModelPricingFromModelsDev;
@@ -45,6 +47,8 @@ describe("handle_agent_failure", () => {
       buildCodePushFailureContext,
       buildPushRepoMemoryFailureContext,
       buildReportIncompleteContext,
+      buildFailureDiagnosticsContext,
+      getFailedAgentStep,
       buildFailureIssueTitle,
       buildModelPricingFrontmatterSnippet,
       fetchModelPricingFromModelsDev,
@@ -209,6 +213,48 @@ describe("handle_agent_failure", () => {
 
       expect(global.core.setOutput).toHaveBeenCalledWith("failure_issue_number", "99");
       expect(global.core.setOutput).toHaveBeenCalledWith("failure_issue_url", "https://github.com/owner/repo/issues/99");
+    });
+  });
+
+  describe("failure diagnostics", () => {
+    it("includes the last failed agent step when available", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run agent", conclusion: "failure" },
+              { name: "Post Run agent", conclusion: "failure" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+      global.context.runId = 123;
+
+      await expect(getFailedAgentStep()).resolves.toBe("Post Run agent");
+    });
+
+    it("renders a captured cause for generic agent failures", () => {
+      const result = buildFailureDiagnosticsContext({
+        failureCategories: ["agent_failure"],
+        failingStep: "Run agent",
+        engineFailureContext: "Driver exit code: 1\nLast error: engine failed",
+      });
+
+      expect(result).toContain("Failing step:** Run agent");
+      expect(result).not.toContain("No cause was captured");
+    });
+
+    it("states when no cause was captured", () => {
+      const result = buildFailureDiagnosticsContext({
+        failureCategories: ["agent_failure"],
+        failingStep: "",
+        engineFailureContext: "",
+      });
+
+      expect(result).toContain("No cause was captured from the agent report or engine logs.");
     });
   });
 
@@ -1763,10 +1809,17 @@ describe("handle_agent_failure", () => {
     const fs = require("fs");
     const path = require("path");
     const { renderTemplate } = require("./messages_core.cjs");
-    const reportIncompleteMarker = "MARKER: cannot continue";
+    const reportIncompleteMarker = "MARKER: infrastructure failed";
 
     it("renders report_incomplete context in both comment and issue templates", () => {
-      const reportIncompleteContext = buildReportIncompleteContext([{ type: "report_incomplete", reason: reportIncompleteMarker }]);
+      const reportIncompleteItems = [{ type: "report_incomplete", reason: "infrastructure_error", details: reportIncompleteMarker }];
+      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems);
+      const failureDiagnosticsContext = buildFailureDiagnosticsContext({
+        failureCategories: ["report_incomplete"],
+        failingStep: "Run agent",
+        engineFailureContext: "",
+        items: reportIncompleteItems,
+      });
       const templateContext = {
         run_id: "123456",
         run_url: "https://github.com/owner/repo/actions/runs/123456",
@@ -1795,6 +1848,7 @@ describe("handle_agent_failure", () => {
         permission_denied_context: "",
         tool_denials_exceeded_context: "",
         report_incomplete_context: reportIncompleteContext,
+        failure_diagnostics_context: failureDiagnosticsContext,
         missing_safe_outputs_context: "",
         engine_failure_context: "",
         timeout_context: "",
@@ -1806,6 +1860,9 @@ describe("handle_agent_failure", () => {
 
       expect(renderTemplate(commentTemplate, templateContext)).toContain(reportIncompleteMarker);
       expect(renderTemplate(issueTemplate, templateContext)).toContain(reportIncompleteMarker);
+      expect(reportIncompleteContext).toContain("infrastructure_error");
+      expect(reportIncompleteContext).toContain(reportIncompleteMarker);
+      expect(failureDiagnosticsContext).toContain("Failing step:** Run agent");
     });
   });
 
