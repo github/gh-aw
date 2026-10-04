@@ -89,6 +89,7 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		constants.TmpGhAwDirSlash + constants.AgentOutputFilename.String(),
 		constants.TmpGhAwDirSlash + constants.SafeOutputsFilename.String(),
 		agentExecutionEvidencePath,
+		agentExecutionExitCodePath,
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",

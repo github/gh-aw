@@ -180,8 +180,12 @@ func TestCredentialsCleanerStepsHelper(t *testing.T) {
 
 		expectedContents := []string{
 			"Clean credentials",
-			"continue-on-error: true",
-			"run: bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"",
+			"run: |",
+			"bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"",
+			"bash \"${RUNNER_TEMP}/gh-aw/actions/verify_git_credentials.sh\"",
+		}
+		if strings.Contains(fullContent, "continue-on-error: true") {
+			t.Error("Credential cleanup must fail closed")
 		}
 		for _, expected := range expectedContents {
 			if !strings.Contains(fullContent, expected) {
@@ -260,12 +264,9 @@ This workflow uses API tools only and does not need the repository to be checked
 		t.Error("'Configure Git credentials' step must NOT be present when checkout: false (no .git directory)")
 	}
 
-	// The "Clean credentials" step should still be present (resilient, continue-on-error).
-	// Assert that the cleaner step block itself contains both the name and continue-on-error
-	// to avoid false positives from other steps that also use continue-on-error.
-	const cleanerStepBlock = "- name: Clean credentials\n        continue-on-error: true\n        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\""
+	const cleanerStepBlock = "- name: Clean credentials\n        run: |\n          bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"\n          bash \"${RUNNER_TEMP}/gh-aw/actions/verify_git_credentials.sh\""
 	if !strings.Contains(lockContent, cleanerStepBlock) {
-		t.Error("Expected 'Clean credentials' step with 'continue-on-error: true' to be present when checkout: false")
+		t.Error("Expected fail-closed cleanup and verification even when checkout is disabled")
 	}
 }
 

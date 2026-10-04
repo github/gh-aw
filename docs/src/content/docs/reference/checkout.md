@@ -199,6 +199,13 @@ By default, generated checkout steps set `persist-credentials: false`, which cau
 
 Set `force-clean-git-credentials: true` on a checkout target to opt into an explicit cleanup step instead. The compiler emits the checkout with `persist-credentials: true`, then injects a `Clean git credentials after checkout` step immediately after it. The cleanup removes the credential helper and `http.*.extraheader` entries from both `.git/config` and any `.git/modules/*/config`, including nested submodules.
 
+Cleanup is fail-closed: a failed helper, invalid git configuration, or residual
+credential helper, authentication header, or authenticated URL stops the job
+before agent execution. A separate read-only verification checks the effective
+configuration, including included config files, without logging token values.
+The final pre-agent credential cleanup has the same verification requirement.
+With no checkout or git config files, cleanup and verification are no-ops.
+
 ```yaml wrap
 checkout:
   - repository: org/monorepo-with-submodules

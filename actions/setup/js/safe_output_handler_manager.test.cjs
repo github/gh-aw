@@ -57,6 +57,31 @@ describe("Safe Output Handler Manager", () => {
     fs.rmSync("/tmp/gh-aw/actions", { recursive: true, force: true });
   });
 
+  describe("main with no safe-output messages", () => {
+    it("writes an empty ledger transaction artifact when ledger appends are enabled", async () => {
+      const runnerTemp = fs.mkdtempSync(path.join("/tmp", "gh-aw-empty-ledger-"));
+      process.env.RUNNER_TEMP = runnerTemp;
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
+        ledger_append: { ledgers: [{ name: "findings" }] },
+      });
+      const outputFile = path.join(runnerTemp, "agent-output.json");
+      fs.writeFileSync(outputFile, JSON.stringify({ items: [] }));
+      process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+      try {
+        await main();
+
+        const artifactPath = path.join(runnerTemp, "gh-aw", "ledger-transactions.json");
+        const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+        expect(artifact.version).toBe(1);
+        expect(artifact.transaction_id).toMatch(/^.+:\d+$/);
+        expect(artifact.ledgers).toEqual({});
+      } finally {
+        fs.rmSync(runnerTemp, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("loadConfig", () => {
     it("should load config from environment variable and normalize keys", () => {
       const config = {

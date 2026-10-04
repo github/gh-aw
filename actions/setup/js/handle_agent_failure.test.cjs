@@ -62,8 +62,119 @@ describe("handle_agent_failure", () => {
     delete global.github;
     delete global.context;
     delete process.env.GITHUB_SHA;
+    delete process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF;
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_GROUP_REPORTS;
+  });
+
+  describe("invalidated PR merge-ref checkout", () => {
+    const closedAt = "2026-10-03T12:00:00Z";
+    const checkoutCompletedAt = "2026-10-03T12:00:01Z";
+    let getPR;
+    let listJobs;
+
+    beforeEach(() => {
+      global.context = {
+        repo: { owner: "owner", repo: "repo" },
+        eventName: "pull_request",
+        ref: "refs/pull/42/merge",
+        runId: 123,
+        payload: { pull_request: { number: 42, state: "open" } },
+      };
+      process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "true";
+      getPR = vi.fn().mockResolvedValue({ data: { state: "closed", closed_at: closedAt } });
+      listJobs = vi.fn().mockResolvedValue({
+        data: {
+          jobs: [
+            {
+              name: "agent",
+              conclusion: "failure",
+              steps: [{ name: "Checkout repository (gh-aw default)", conclusion: "failure", completed_at: checkoutCompletedAt }],
+            },
+          ],
+        },
+      });
+      global.github = {
+        paginate: vi.fn(async (request, params) => (await request(params)).data.jobs),
+        rest: { pulls: { get: getPR }, actions: { listJobsForWorkflowRun: listJobs }, issues: { create: vi.fn() } },
+      };
+    });
+
+    it("skips failure reporting when a PR closes before its merge-ref checkout fails", async () => {
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      try {
+        await main();
+        expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+        expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("PR merge ref was invalidated"));
+        expect(global.core.debug).toHaveBeenCalledWith("Checking PR #42 for merge-ref checkout invalidation");
+        expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref checkout timing: closed_at=2026-10-03T12:00:00.000Z, checkout_completed_at=2026-10-03T12:00:01.000Z");
+        expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation confirmed: closure preceded failed default checkout completion");
+      } finally {
+        delete process.env.GH_AW_AGENT_CONCLUSION;
+      }
+    });
+
+    it("does not classify a checkout that failed before the PR closed as invalidated", async () => {
+      getPR.mockResolvedValue({ data: { state: "closed", closed_at: "2026-10-03T12:00:02Z" } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: no failed default checkout completed at or after PR closure");
+    });
+
+    it("does not suppress a real agent failure after closure", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not classify the actions-folder checkout as the default merge-ref checkout", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout actions folder", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not classify unrelated checkout steps with matching common names", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout repository", conclusion: "failure", completed_at: checkoutCompletedAt }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("does not classify when compiler metadata says the default checkout was overridden", async () => {
+      process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "false";
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(getPR).not.toHaveBeenCalled();
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation check skipped: requires a pull_request merge ref and compiler-confirmed default checkout");
+    });
+
+    it("does not classify open PRs or unrelated refs as invalidated", async () => {
+      getPR.mockResolvedValue({ data: { state: "open", closed_at: null } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(listJobs).not.toHaveBeenCalled();
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: PR is not closed with a closure timestamp");
+      global.context.ref = "refs/heads/main";
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("logs invalid closure timestamps without logging API payloads", async () => {
+      getPR.mockResolvedValue({ data: { state: "closed", closed_at: "invalid", body: "private PR content" } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: invalid PR closure timestamp");
+      expect(listJobs).not.toHaveBeenCalled();
+      expect(JSON.stringify(global.core.debug.mock.calls)).not.toContain("private PR content");
+    });
+
+    it("logs invalid checkout completion timestamps and keeps failures reportable", async () => {
+      listJobs.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", steps: [{ name: "Checkout repository (gh-aw default)", conclusion: "failure", completed_at: "invalid" }] }] } });
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.debug).toHaveBeenCalledWith("PR merge-ref invalidation not confirmed: invalid checkout completion timestamp");
+    });
+
+    it("keeps reporting when PR state cannot be checked", async () => {
+      getPR.mockRejectedValue(new Error("API unavailable"));
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+    });
+
+    it("warns when permission errors prevent checking PR merge-ref invalidation", async () => {
+      getPR.mockRejectedValue(Object.assign(new Error("Resource not accessible by integration"), { status: 403 }));
+      expect(await require("./handle_agent_failure.cjs").isInvalidatedPRMergeCheckout()).toBe(false);
+      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("actions: read and pull-requests: read"));
+    });
   });
 
   describe("getActionFailureIssueExpiresHours", () => {
@@ -2696,6 +2807,28 @@ describe("handle_agent_failure", () => {
 
     it("returns empty string when log file does not exist", () => {
       // stdioLogPath not written — file does not exist
+      expect(buildEngineFailureContext()).toBe("");
+    });
+
+    it("reports a nonzero driver exit even when the stdio log is missing", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "127");
+      const result = buildEngineFailureContext();
+      expect(result).toContain("Driver exit code:** 127");
+      expect(result).toContain("terminated before producing output");
+    });
+
+    it("reports the driver exit alongside stderr captured in the stdio log", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1");
+      fs.writeFileSync(stdioLogPath, "Error: Refusing to use symlink as bind mountpoint: /usr/local/bin/npm\n");
+      const result = buildEngineFailureContext();
+      expect(result).toContain("Driver exit code:** 1");
+      expect(result).toContain("Refusing to use symlink as bind mountpoint");
+    });
+
+    it("ignores invalid or successful driver exit codes", () => {
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1\nsecret");
+      expect(buildEngineFailureContext()).toBe("");
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "0");
       expect(buildEngineFailureContext()).toBe("");
     });
 

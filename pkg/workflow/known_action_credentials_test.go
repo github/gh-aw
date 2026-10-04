@@ -222,7 +222,8 @@ func TestGenerateCredentialsCleanerStep(t *testing.T) {
 
 		content := strings.Join(steps, "")
 		assert.Contains(t, content, "Clean credentials", "expected step name")
-		assert.Contains(t, content, "continue-on-error: true", "expected continue-on-error")
+		assert.NotContains(t, content, "continue-on-error: true", "cleanup must fail closed")
+		assert.Contains(t, content, "verify_git_credentials.sh", "cleanup must verify its postcondition")
 		assert.Contains(t, content, "clean_git_credentials.sh", "expected git cleaner script")
 		assert.NotContains(t, content, "clean_known_action_credentials.sh", "known-action script must not appear")
 		assert.NotContains(t, content, "env:", "env block must not appear when no known actions detected")
@@ -245,7 +246,8 @@ func TestGenerateCredentialsCleanerStep(t *testing.T) {
 
 		content := strings.Join(steps, "")
 		assert.Contains(t, content, "Clean credentials", "expected step name")
-		assert.Contains(t, content, "continue-on-error: true", "expected continue-on-error")
+		assert.NotContains(t, content, "continue-on-error: true", "cleanup must fail closed")
+		assert.Contains(t, content, "verify_git_credentials.sh", "cleanup must verify its postcondition")
 		assert.Contains(t, content, `GH_AW_CLEAN_AWS: "true"`, "expected AWS env var")
 		assert.Contains(t, content, "clean_git_credentials.sh", "expected git cleaner script")
 		assert.Contains(t, content, "clean_known_action_credentials.sh", "expected known-action script")

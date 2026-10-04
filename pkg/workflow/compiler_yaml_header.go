@@ -13,6 +13,18 @@ import (
 
 var compilerYamlHeaderLog = logger.New("workflow:compiler_yaml:header")
 
+func collectDetectionPolicyForManifest(data *WorkflowData) *GHAWManifestDetectionPolicy {
+	policy := &GHAWManifestDetectionPolicy{Mode: "disabled"}
+	if IsDetectionJobEnabled(data.SafeOutputs) {
+		policy.Mode = "enabled"
+	}
+	if IsConditionalDetection(data.SafeOutputs) {
+		policy.Mode = "conditional"
+		policy.Condition = *data.SafeOutputs.ThreatDetection.EnabledExpr
+	}
+	return policy
+}
+
 // generateWorkflowHeader generates the YAML header section including comments
 // for description, source, imports/includes, frontmatter-hash, stop-time, and manual-approval.
 // All ANSI escape codes are stripped from the output.
@@ -22,7 +34,18 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 	if c.skipHeader {
 		return nil
 	}
+	c.generateLockMetadataHeader(yaml, data, frontmatterHash, bodyHash)
+	if err := c.generateManifestHeader(yaml, data, secrets, actions); err != nil {
+		return err
+	}
+	generateDescriptiveHeader(yaml, data)
+	generateSourceHeader(yaml, data)
+	generateConfigHeader(yaml, data, secrets, actions)
+	generateApprovalHeader(yaml, data)
+	return nil
+}
 
+func (c *Compiler) generateLockMetadataHeader(yaml *strings.Builder, data *WorkflowData, frontmatterHash, bodyHash string) {
 	// Add lock metadata as the very first line for easy machine parsing.
 	// Single-line JSON format to minimize merge conflicts.
 	if frontmatterHash != "" {
@@ -60,7 +83,9 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 			fmt.Fprintf(yaml, "# gh-aw-metadata: %s\n", metadataJSON)
 		}
 	}
+}
 
+func (c *Compiler) generateManifestHeader(yaml *strings.Builder, data *WorkflowData, secrets, actions []string) error {
 	// Embed the gh-aw-manifest immediately after gh-aw-metadata for easy machine parsing.
 	// The manifest records all secrets, external actions, container images, and frontmatter
 	// skills detected at compile time so that subsequent compilations can perform safe update
@@ -77,12 +102,16 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 	}
 	manifest.MemoryValidationScripts = collectMemoryValidationScripts(data)
 	manifest.MCPServers = collectMCPServersForManifest(data)
+	manifest.ThreatDetection = collectDetectionPolicyForManifest(data)
 	if manifestJSON, err := manifest.ToJSON(); err == nil {
 		fmt.Fprintf(yaml, "# gh-aw-manifest: %s\n", manifestJSON)
 	} else {
 		compilerYamlHeaderLog.Printf("Failed to serialize gh-aw-manifest: %v. Safe update mode will not be available for future compilations of this workflow.", err)
 	}
+	return nil
+}
 
+func generateDescriptiveHeader(yaml *strings.Builder, data *WorkflowData) {
 	// Add workflow header with logo and instructions
 	sourceFile := "the corresponding .md file"
 	if data.Source != "" {
@@ -119,7 +148,9 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 			fmt.Fprintf(yaml, "#         %s\n", strings.TrimSpace(line))
 		}
 	}
+}
 
+func generateSourceHeader(yaml *strings.Builder, data *WorkflowData) {
 	// Add source comment if provided
 	if data.Source != "" {
 		yaml.WriteString("#\n")
@@ -169,6 +200,9 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 		yaml.WriteString("#\n")
 		yaml.WriteString("# inlined-imports: true\n")
 	}
+}
+
+func generateConfigHeader(yaml *strings.Builder, data *WorkflowData, secrets, actions []string) {
 	// Add frontmatter-declared env vars with source attribution.
 	// Note: programmatically injected env vars (e.g. OTEL_* from OTLP config) are not listed here.
 	if len(data.EnvSources) > 0 {
@@ -207,7 +241,9 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 			fmt.Fprintf(yaml, "#   - %s\n", img)
 		}
 	}
+}
 
+func generateApprovalHeader(yaml *strings.Builder, data *WorkflowData) {
 	// Add stop-time comment if configured
 	if data.StopTime != "" {
 		yaml.WriteString("#\n")
@@ -223,5 +259,4 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 	}
 
 	yaml.WriteString("\n")
-	return nil
 }

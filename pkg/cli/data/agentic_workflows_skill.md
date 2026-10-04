@@ -30,6 +30,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Render compact markdown charts: `.github/aw/asciicharts.md`
 - Map CLI commands to MCP usage: `.github/aw/cli-commands.md`
 - Choose workflow architecture and patterns: `.github/aw/patterns.md`
+- Orchestrate durable work with a work queue (dispatcher/worker roles or queue inspection): `.github/aw/work-queue.md`
 - Optimize token usage and cost: `.github/aw/token-optimization.md`
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
