@@ -129,7 +129,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `execcommandwithoutcontext` | Custom `go/analysis` analyzer that flags `exec.Command(...)` calls that should use `exec.CommandContext(...)` in context-receiving functions |
 | `fileclosenotdeferred` | Custom `go/analysis` analyzer that flags file `Close()` calls that are not deferred immediately |
 | `fmterrorfnoverbs` | Custom `go/analysis` analyzer that flags `fmt.Errorf` calls with no format verbs, recommending `errors.New` |
-| `fprintferrorunchecked` | Custom `go/analysis` analyzer that flags `fmt.Fprintf`/`Fprint`/`Fprintln` assignments that explicitly discard all return values |
+| `fprintferrorunchecked` | Custom `go/analysis` analyzer that warns about unchecked `fmt.Fprintf`/`Fprint`/`Fprintln` writes other than direct console output |
 | `fprintlnsprintf` | Custom `go/analysis` analyzer that flags `fmt.Fprintln(..., fmt.Sprintf(...))` patterns |
 | `generatedyamlheredoc` | Custom `go/analysis` analyzer that flags shell heredocs embedded in generated workflow YAML |
 | `globwalkignorederror` | Custom `go/analysis` analyzer that flags `filepath.Glob` and `os.ReadDir` calls where the error return is discarded with `_` |
