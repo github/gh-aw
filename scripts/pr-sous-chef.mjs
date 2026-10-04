@@ -204,13 +204,8 @@ function inspect(repo, pr, runs) {
 const prFields = "number,title,url,state,isDraft,headRefOid,headRefName,createdAt,updatedAt,changedFiles,author,mergeStateStatus,statusCheckRollup";
 
 export function fetchCandidate(repo, number, api = gh) {
-  const pull = api(["api", `repos/${repo}/pulls/${number}`]);
-  const owner = pull.head?.user?.login;
-  const branch = pull.head?.ref;
-  if (!owner || !branch) throw new Error(`PR #${number}: missing head branch`);
-  const candidates = api(["pr", "list", "--repo", repo, "--state", "all", "--head", `${owner}:${branch}`, "--limit", "100", "--json", prFields]);
-  const candidate = candidates.find(pr => pr.number === Number(number));
-  if (!candidate || !candidate.updatedAt || !candidate.headRefOid) throw new Error(`PR #${number}: could not refresh PR metadata`);
+  const candidate = api(["pr", "view", String(number), "--repo", repo, "--json", prFields]);
+  if (candidate?.number !== Number(number) || !candidate.updatedAt || !candidate.headRefOid) throw new Error(`PR #${number}: could not refresh PR metadata`);
   return candidate;
 }
 

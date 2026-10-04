@@ -277,25 +277,20 @@ test("active-run lookup can be narrowed to one PR branch", () => {
   assert.ok(calls.every(args => args[1].includes("&branch=copilot%2Ffix%20a%20bug")));
 });
 
-test("targeted refresh uses the working list query and matches the exact PR number", () => {
+test("targeted refresh reads the exact PR without filtering by head owner", () => {
   const calls = [];
   const candidate = fetchCandidate("github/gh-aw", "42", args => {
     calls.push(args);
-    if (args[0] === "api") return { head: { user: { login: "contributor" }, ref: "fix-branch" } };
-    return [{ ...pr, number: 43 }, pr];
+    return pr;
   });
   assert.equal(candidate.number, 42);
-  assert.deepEqual(calls[0], ["api", "repos/github/gh-aw/pulls/42"]);
-  assert.ok(calls[1].includes("contributor:fix-branch"));
-  assert.ok(calls[1].includes("all"));
+  assert.deepEqual(calls, [["pr", "view", "42", "--repo", "github/gh-aw", "--json", "number,title,url,state,isDraft,headRefOid,headRefName,createdAt,updatedAt,changedFiles,author,mergeStateStatus,statusCheckRollup"]]);
 });
 
 test("targeted refresh fails closed when metadata is incomplete or the PR is absent", () => {
-  const head = { head: { user: { login: "contributor" }, ref: "fix-branch" } };
-  for (const results of [[], [{ ...pr, number: 0, updatedAt: null }], [{ ...pr, updatedAt: null }]]) {
-    assert.throws(() => fetchCandidate("github/gh-aw", "42", args => (args[0] === "api" ? head : results)), /could not refresh PR metadata/);
+  for (const result of [null, { ...pr, number: 43 }, { ...pr, updatedAt: null }, { ...pr, headRefOid: null }]) {
+    assert.throws(() => fetchCandidate("github/gh-aw", "42", () => result), /could not refresh PR metadata/);
   }
-  assert.throws(() => fetchCandidate("github/gh-aw", "42", () => ({ head: {} })), /missing head branch/);
 });
 
 test("deduplication finds a nudge beyond the first hundred comments", () => {
