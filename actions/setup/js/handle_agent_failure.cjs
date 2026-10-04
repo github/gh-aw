@@ -1737,11 +1737,11 @@ async function getFailedAgentStep() {
     }
     return sanitizeContent(failedStep.name, 200);
   } catch (error) {
-    const message = getErrorMessage(error);
-    if (error?.status === 403 || /Resource not accessible/i.test(message)) {
-      core.warning(`Could not identify the failed agent step; ensure the conclusion job grants actions: read: ${message}`);
+    const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+    if (status === 403) {
+      core.warning("Could not identify the failed agent step; ensure the conclusion job grants actions: read.");
     } else {
-      core.warning(`Could not identify the failed agent step: ${message}`);
+      core.warning("Could not identify the failed agent step because the workflow run jobs API request failed.");
     }
     return "";
   }

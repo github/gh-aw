@@ -257,14 +257,26 @@ describe("handle_agent_failure", () => {
     });
 
     it("warns when the workflow run jobs API is inaccessible", async () => {
-      const error = Object.assign(new Error("Resource not accessible by integration"), { status: 403 });
+      const error = Object.assign(new Error("Resource not accessible by integration: user-generated response"), { status: 403 });
       global.github = {
         paginate: vi.fn().mockRejectedValue(error),
         rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
       };
 
       await expect(getFailedAgentStep()).resolves.toBe("");
-      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("ensure the conclusion job grants actions: read"));
+      expect(global.core.warning).toHaveBeenCalledWith("Could not identify the failed agent step; ensure the conclusion job grants actions: read.");
+      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("user-generated response");
+    });
+
+    it("warns without exposing unexpected API error text", async () => {
+      global.github = {
+        paginate: vi.fn().mockRejectedValue(new Error("user-generated response")),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.warning).toHaveBeenCalledWith("Could not identify the failed agent step because the workflow run jobs API request failed.");
+      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("user-generated response");
     });
 
     it("renders a captured cause for generic agent failures", () => {
