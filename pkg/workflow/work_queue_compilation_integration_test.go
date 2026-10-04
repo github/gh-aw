@@ -23,7 +23,9 @@ on: workflow_dispatch
 name: Work Queue Worker Integration
 engine: claude
 tools:
-  work-queue: true
+  work-queue:
+    storage: git
+    require-assignment: true
 safe-outputs:
   create-issue:
     max: 1
@@ -57,6 +59,7 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, "contents: write")
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
 	require.Contains(t, safeOutputs, "Reconcile work queue claim")
+	require.Contains(t, safeOutputs, "requireAssignment: true")
 	gate := "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
 	require.Contains(t, safeOutputs, gate)
 	require.Less(t,

@@ -18,6 +18,7 @@ Use the Git-backed work queue when independently running dispatchers and workers
 ## Worker workflows
 
 - Enable `tools.work-queue: true`. A queue worker receives exactly one trusted `aw_context.work_queue` assignment containing `work_id`, `claim_id`, and a `work` payload. Do not construct or override that assignment from a prompt, event input, or MCP tool argument.
+- Set `tools.work-queue: {storage: git, require-assignment: true}` for workflows that must never process safe outputs without a trusted inbound assignment. With this option, safe-output reconciliation fails closed when the activation snapshot has no worker claim.
 - Read the assigned work, perform the bounded task, and stage any external writes through safe outputs. Call `work_queue_claim_finish` once with `outcome: "completed"` when done, or `"cancelled"` if unable to finish. The tool accepts only `outcome`; it records intent, not authority.
 - Trusted safe-output reconciliation refreshes the durable queue, checks the effective Claim, persists Completion, and authorizes ordinary outputs only for the winning worker. Activation-time admission and the MCP snapshot are not final authorization. If there is no trusted inbound assignment, a finish intent does not claim work or authorize writes.
 - Make worker effects idempotent. Retries and competing Claims can repeat agent execution; missing or losing finish intent must not produce external effects.

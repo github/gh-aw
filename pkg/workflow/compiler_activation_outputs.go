@@ -243,6 +243,18 @@ func isWorkQueueEnabled(data *WorkflowData) bool {
 	return configured && value != false
 }
 
+func workQueueRequiresAssignment(data *WorkflowData) bool {
+	if data == nil || data.Tools == nil {
+		return false
+	}
+	config, ok := data.Tools["work-queue"].(map[string]any)
+	if !ok {
+		return false
+	}
+	required, ok := config["require-assignment"].(bool)
+	return ok && required
+}
+
 // addActivationInfoArtifactUploadStep appends an archived upload of aw_info.json.
 func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildContext) {
 	compilerActivationJobLog.Print("Adding info artifact upload step")
