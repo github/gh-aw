@@ -3348,10 +3348,7 @@ describe("safe_outputs_handlers", () => {
       expect(data.error).toContain("3 files");
     });
 
-    it("should ignore ineligible files (disallowed extension) instead of hard-failing on file count", () => {
-      // Regression: the preflight must apply the same allowed-extensions/file-glob
-      // filtering as the agent-side filter step and the push job, so an ineligible
-      // file left in the memory directory does not cause a hard preflight failure.
+    it("should preserve ineligible files (disallowed extension) while excluding them from validation", () => {
       const h = makeHandlersWithMemory({ max_file_count: 1, allowed_extensions: [".json"] });
       fs.mkdirSync(memoryDir, { recursive: true });
       initGitRepo(memoryDir);
@@ -3361,11 +3358,12 @@ describe("safe_outputs_handlers", () => {
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0].text);
       expect(data.result).toBe("success");
-      expect(fs.existsSync(path.join(memoryDir, "notes.json.new"))).toBe(false);
+      expect(data.storage_validation.files).toBe(1);
+      expect(fs.existsSync(path.join(memoryDir, "notes.json.new"))).toBe(true);
       expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
     });
 
-    it("should ignore files not matching file_glob before counting/staging", () => {
+    it("should preserve files not matching file_glob while excluding them from validation", () => {
       const h = makeHandlersWithMemory({ max_file_count: 1, file_glob: "*.json" });
       fs.mkdirSync(memoryDir, { recursive: true });
       initGitRepo(memoryDir);
@@ -3375,8 +3373,110 @@ describe("safe_outputs_handlers", () => {
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0].text);
       expect(data.result).toBe("success");
-      expect(fs.existsSync(path.join(memoryDir, "notes.md"))).toBe(false);
+      expect(data.storage_validation.files).toBe(1);
+      expect(fs.existsSync(path.join(memoryDir, "notes.md"))).toBe(true);
       expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
+    });
+
+    it("should preserve all files in the memory directory during validation", () => {
+      const h = makeHandlersWithMemory({ allowed_extensions: [".md"], file_glob: "deep-report/*.md", max_file_count: 10 });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+
+      const paths = [...Array.from({ length: 6 }, (_, index) => `deep-report/file-${index}.md`), "memory/deep-report/legacy.md", "memory/default/legacy.md"];
+      for (const relativePath of paths) {
+        const fullPath = path.join(memoryDir, relativePath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, `${relativePath}\n`);
+      }
+
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      const data = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBeUndefined();
+      expect(data.result).toBe("success");
+      expect(data.storage_validation.files).toBe(6);
+      for (const relativePath of paths) {
+        expect(fs.readFileSync(path.join(memoryDir, relativePath), "utf8")).toBe(`${relativePath}\n`);
+      }
+    });
+
+    it("should format and custom-validate only eligible JSON files", () => {
+      const legacyJson = JSON.stringify(Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`k${index}`, "x"])));
+      const maxFileSize = Buffer.byteLength(legacyJson, "utf8") + 1;
+      expect(Buffer.byteLength(`${JSON.stringify(JSON.parse(legacyJson), null, 2)}\n`, "utf8")).toBeGreaterThan(maxFileSize);
+      const malformedJson = "{invalid";
+      const h = makeHandlersWithMemory({
+        file_glob: "state.json",
+        format_json: true,
+        max_file_size: maxFileSize,
+        max_file_count: 1,
+        validation: {
+          script: `
+            const jsonFiles = fs.readdirSync(memoryRoot).filter(file => file.endsWith(".json"));
+            if (jsonFiles.length !== 1 || jsonFiles[0] !== "state.json") throw new Error("unexpected JSON files in validation view");
+            if (memoryRoot !== process.cwd()) throw new Error("validation working directory does not match memory root");
+            JSON.parse(fs.readFileSync("state.json", "utf8"));
+          `,
+          timeout: 5,
+        },
+      });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+      fs.writeFileSync(path.join(memoryDir, "state.json"), '{"ok":true}');
+      fs.writeFileSync(path.join(memoryDir, "legacy.json"), legacyJson);
+      fs.writeFileSync(path.join(memoryDir, "malformed.json"), malformedJson);
+
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      const data = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBeUndefined();
+      expect(data.result).toBe("success");
+      expect(data.storage_validation.files).toBe(1);
+      expect(data.custom_validation.result).toBe("success");
+      expect(fs.readFileSync(path.join(memoryDir, "state.json"), "utf8")).toBe('{\n  "ok": true\n}\n');
+      expect(fs.readFileSync(path.join(memoryDir, "legacy.json"), "utf8")).toBe(legacyJson);
+      expect(fs.readFileSync(path.join(memoryDir, "malformed.json"), "utf8")).toBe(malformedJson);
+    });
+
+    it("should keep custom validation read-only when using the filtered view", () => {
+      const originalState = '{"ok":true}';
+      const h = makeHandlersWithMemory({
+        file_glob: "state.json",
+        validation: {
+          script: `fs.writeFileSync(path.join(memoryRoot, "state.json"), '{"ok":false}');`,
+          timeout: 5,
+        },
+      });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+      fs.writeFileSync(path.join(memoryDir, "state.json"), originalState);
+
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      const data = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBe(true);
+      expect(data.custom_validation.stderr).toContain("must not modify memory files");
+      expect(fs.readFileSync(path.join(memoryDir, "state.json"), "utf8")).toBe(originalState);
+    });
+
+    it("should measure only eligible staged files without changing excluded index entries", () => {
+      const h = makeHandlersWithMemory({ file_glob: "state.json", max_file_size: 1024, max_file_count: 1, max_patch_size: 10 });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+      fs.writeFileSync(path.join(memoryDir, "state.json"), "{}");
+      fs.writeFileSync(path.join(memoryDir, "legacy.json"), "x".repeat(1000));
+      execSync("git add legacy.json", { cwd: memoryDir, stdio: "pipe" });
+      const stagedLegacyBefore = execSync("git show :legacy.json", { cwd: memoryDir, encoding: "utf8" });
+
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      const data = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBeUndefined();
+      expect(data.result).toBe("success");
+      expect(data.storage_validation.patch_size_bytes).toBeLessThanOrEqual(12);
+      expect(execSync("git show :legacy.json", { cwd: memoryDir, encoding: "utf8" })).toBe(stagedLegacyBefore);
+      expect(execSync("git diff --cached --name-only", { cwd: memoryDir, encoding: "utf8" }).trim().split("\n")).toEqual(["legacy.json", "state.json"]);
     });
 
     it("should pass when total folder size is large but staged diff is tiny", () => {

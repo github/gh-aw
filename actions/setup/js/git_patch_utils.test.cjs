@@ -358,7 +358,7 @@ describe("getStagedPatchDiffSizeBytes", () => {
     const diffOutput = ["diff --git a/data.json b/data.json", "index abc..def 100644", "--- a/data.json", "+++ b/data.json", "@@ -1 +1,2 @@", '-{"old":1}', '+{"new":1}', '+{"extra":2}'].join("\n");
 
     const execGitSyncFn = (/** @type {string[]} */ args, /** @type {any} */ _opts) => {
-      if (args[0] === "diff" && args[1] === "--cached") return diffOutput;
+      if (args[0] === "diff" && args[1] === "--cached" && !args.includes("--")) return diffOutput;
       return "";
     };
 
@@ -377,8 +377,27 @@ describe("getStagedPatchDiffSizeBytes", () => {
 
     getStagedPatchDiffSizeBytes({ execGitSyncFn, cwd: "/memory/dir" });
     expect(calls).toHaveLength(1);
-    expect(calls[0].args).toEqual(["diff", "--cached"]);
+    expect(calls[0].args).toEqual(["diff", "--cached", "--no-renames"]);
     expect(calls[0].opts.cwd).toBe("/memory/dir");
+  });
+
+  it("limits patch size to the supplied pathspecs", () => {
+    const calls = /** @type {string[][]} */ [];
+    const execGitSyncFn = (/** @type {string[]} */ args, /** @type {any} */ _opts) => {
+      calls.push(args);
+      return "";
+    };
+
+    getStagedPatchDiffSizeBytes({ execGitSyncFn, cwd: "/memory/dir", pathspecs: [":(literal)state.json"] });
+
+    expect(calls).toEqual([["diff", "--cached", "--no-renames", "--", ":(literal)state.json"]]);
+  });
+
+  it("returns zero without running git when the pathspec list is empty", () => {
+    const execGitSyncFn = vi.fn();
+
+    expect(getStagedPatchDiffSizeBytes({ execGitSyncFn, cwd: "/memory/dir", pathspecs: [] })).toBe(0);
+    expect(execGitSyncFn).not.toHaveBeenCalled();
   });
 });
 

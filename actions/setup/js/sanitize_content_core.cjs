@@ -301,7 +301,6 @@ function stripUrlUserinfo(s) {
   // rewrite only happens when the cleaned authority contains "@" — so an
   // ordinary host that merely happens to be followed by a newline and more
   // prose is left untouched.
-  // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- URL_START_DELIMITERS/URL_AUTHORITY_CHAR are intentional regex character-class fragments, not user input
   const schemeUserinfoRegex = new RegExp(`([a-z][a-z0-9+.-]{0,30}://)((?:${URL_AUTHORITY_CHAR}|[\\t\\r\\n])*)`, "gi");
   return s.replace(schemeUserinfoRegex, (match, scheme, authority) => {
     const cleaned = stripUrlIgnorableWhitespace(authority);
@@ -334,7 +333,6 @@ function stripUrlUserinfo(s) {
  * @returns {string} The string with userinfo removed from protocol-relative URLs
  */
 function stripProtocolRelativeUserinfo(s) {
-  // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- URL_START_DELIMITERS/URL_AUTHORITY_CHAR are intentional regex character-class fragments, not user input
   const protoRelativeUserinfoRegex = new RegExp(`(^|${URL_START_DELIMITERS})([/\\\\]{2})((?:${URL_AUTHORITY_CHAR}|[\\t\\r\\n])*)`, "g");
   return s.replace(protoRelativeUserinfoRegex, (match, prefix, _slashes, authority) => {
     const cleaned = stripUrlIgnorableWhitespace(authority);
@@ -537,7 +535,6 @@ function sanitizeUrlDomains(s, allowed) {
   //   2: separator (// or a backslash variant)
   //   3: hostname (and optional port)
   //   4: optional path
-  // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- URL_START_DELIMITERS/URL_AUTHORITY_CHAR are intentional regex character-class fragments, not user input
   const protoRelativeUrlRegex = new RegExp(`(^|${URL_START_DELIMITERS})([/\\\\]{2})([\\w.-]+(?::\\d+)?)((?:/(?:(?![/\\\\]{2})[^\\s,])*)?)`, "gi");
 
   s = s.replace(protoRelativeUrlRegex, (match, prefix, _separator, hostnameWithPort, path = "") => {

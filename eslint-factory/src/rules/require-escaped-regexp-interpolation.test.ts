@@ -52,6 +52,19 @@ describe("require-escaped-regexp-interpolation", () => {
     });
   });
 
+  it("valid: const strings with explicit regex-fragment name suffixes are accepted", () => {
+    cjsRuleTester.run("require-escaped-regexp-interpolation", requireEscapedRegexpInterpolationRule, {
+      valid: [
+        'const PATH_CHAR = "[^/]"; new RegExp(`^${PATH_CHAR}$`);',
+        'const ALTERNATIVES_RE = "(?:a|b)"; new RegExp(`${ALTERNATIVES_RE}`);',
+        'const HOST_RE_SOURCE = "(?:localhost|example\\\\.com)"; new RegExp(`^${HOST_RE_SOURCE}$`);',
+        'const URL_DELIMITERS = "(?:^|[\\\\s,])"; new RegExp(`${URL_DELIMITERS}`);',
+        'const TOKEN_PATTERN = "(?:a|b)"; new RegExp(`${TOKEN_PATTERN}`);',
+      ],
+      invalid: [],
+    });
+  });
+
   it("valid: const numeric literal is accepted when interpolated", () => {
     cjsRuleTester.run("require-escaped-regexp-interpolation", requireEscapedRegexpInterpolationRule, {
       valid: ["const MAX_LENGTH = 128; new RegExp(`([^\\\\n]{1,${MAX_LENGTH}})`);", "const COUNT = 3; new RegExp(`a{${COUNT}}`);"],
@@ -98,6 +111,18 @@ describe("require-escaped-regexp-interpolation", () => {
       invalid: [
         {
           code: "function hasQualifier(name, qualifier) { return new RegExp(`(^|[-_\\\\s])${qualifier}($|[-_\\\\s])`).test(name); }",
+          errors: [{ messageId: "unescapedInterpolation" }],
+        },
+      ],
+    });
+  });
+
+  it("invalid: raw user-controlled strings with regex metacharacters are flagged", () => {
+    cjsRuleTester.run("require-escaped-regexp-interpolation", requireEscapedRegexpInterpolationRule, {
+      valid: [],
+      invalid: [
+        {
+          code: "function search(userInput) { return new RegExp(`^${userInput}$`); }",
           errors: [{ messageId: "unescapedInterpolation" }],
         },
       ],

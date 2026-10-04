@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,22 +111,22 @@ func TestExtractZipFileZipSlipPrevention(t *testing.T) {
 	require.ErrorContains(t, err, "invalid file path", "Error should mention invalid path")
 }
 
-// TestExtractZipFilePreservesMode tests that file permissions are preserved
-func TestExtractZipFilePreservesMode(t *testing.T) {
+// TestExtractZipFileUsesSensitivePermissions tests that ZIP permissions do not override the local permission policy
+func TestExtractZipFileUsesSensitivePermissions(t *testing.T) {
 	t.Parallel()
 	// Create a temporary directory for extraction
 	tempDir := t.TempDir()
 
-	// Create an in-memory zip with specific file mode
+	// Create an in-memory zip with restrictive file mode
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 
-	// Create a file with specific mode (executable)
+	// Create a file with owner-only permissions
 	header := &zip.FileHeader{
 		Name:   "executable.sh",
 		Method: zip.Deflate,
 	}
-	header.SetMode(0755) // Executable mode
+	header.SetMode(0600)
 
 	writer, err := zipWriter.CreateHeader(header)
 	require.NoError(t, err, "Failed to create file with header in zip")
@@ -145,14 +146,12 @@ func TestExtractZipFilePreservesMode(t *testing.T) {
 	err = extractZipFile(zipReader.File[0], tempDir, false)
 	require.NoError(t, err, "extractZipFile should succeed")
 
-	// Verify the extracted file has the correct mode
+	// Verify the extracted file uses sensitive permissions despite the restrictive zip mode
 	extractedPath := filepath.Join(tempDir, "executable.sh")
 	info, err := os.Stat(extractedPath)
 	require.NoError(t, err, "Failed to stat extracted file")
 
-	// Check that file is executable (at least one execute bit set)
-	mode := info.Mode()
-	assert.NotEqual(t, os.FileMode(0), mode&0111, "File should have execute permission")
+	assert.Equal(t, constants.FilePermSensitive, info.Mode().Perm(), "File should have sensitive permissions")
 }
 
 // TestExtractZipFileWithNestedDirectories tests extraction with nested paths

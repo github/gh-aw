@@ -32,7 +32,59 @@ const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
-const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
+const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
+
+function createEligibleMemoryValidationView(memoryDir, isEligibleFile) {
+  let validationDir;
+  try {
+    validationDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-repo-memory-validation-"));
+  } catch (error) {
+    throw new Error(`${ERR_SYSTEM}: Failed to create repo-memory validation directory: ${getErrorMessage(error)}`, { cause: error });
+  }
+
+  /**
+   * @param {string} targetPath
+   */
+  function removeValidationDirectory(targetPath) {
+    try {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    } catch (error) {
+      throw new Error(`${ERR_SYSTEM}: Failed to remove repo-memory validation directory: ${getErrorMessage(error)}`, { cause: error });
+    }
+  }
+
+  try {
+    /**
+     * @param {string} sourceDir
+     * @param {string} relativePath
+     */
+    function copyEligibleFiles(sourceDir, relativePath) {
+      for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const relativeFilePath = relativePath ? path.join(relativePath, entry.name) : entry.name;
+        if (entry.isDirectory()) {
+          if (entry.name !== ".git") {
+            copyEligibleFiles(sourcePath, relativeFilePath);
+          }
+        } else if (entry.isFile() && isEligibleFile(relativeFilePath)) {
+          const targetPath = path.join(validationDir, relativeFilePath);
+          fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+          fs.copyFileSync(sourcePath, targetPath);
+        }
+      }
+    }
+
+    copyEligibleFiles(memoryDir, "");
+    return validationDir;
+  } catch (error) {
+    try {
+      removeValidationDirectory(validationDir);
+    } catch (cleanupError) {
+      throw new Error(`${ERR_SYSTEM}: Failed to create repo-memory validation view: ${getErrorMessage(error)}; cleanup also failed: ${getErrorMessage(cleanupError)}`, { cause: error });
+    }
+    throw error;
+  }
+}
 
 /** PR event names used for target:triggering context validation across all safe-output handlers. */
 const PR_EVENT_NAMES = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
@@ -1840,22 +1892,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       };
     }
 
-    // Allowed-extensions and file-glob are persistence filters: ineligible files must be
-    // removed here too, before formatting/scanning/staging/custom-validation, so this
-    // preflight sees the same effective file set as the later filter/upload/push steps
-    // and never hard-fails on a file that would have been silently dropped downstream.
-    if (allowedExtensions.length > 0 || fileGlobFilter) {
-      const { removed } = filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilter, core);
-      if (removed.length > 0) {
-        core.info(`push_repo_memory: ignored ${removed.length} ineligible file(s) before validation`);
-      }
-    }
+    // Persistence filters apply to validation and staging, but validation must
+    // not delete files from the agent's working directory.
+    const { compiledPatterns } = compileFileGlobPatterns(fileGlobFilter);
+    const isEligibleFile = relativePath => isMemoryFileEligible(relativePath, allowedExtensions, compiledPatterns).eligible;
 
     clearValidationMarker("repo", memoryId);
 
     if (memoryConf.format_json === true) {
       try {
-        const formattedFiles = formatJSONFiles(memoryDir, maxFileSize);
+        const formattedFiles = formatJSONFiles(memoryDir, maxFileSize, isEligibleFile);
         if (formattedFiles.length > 0) {
           core.info(`Formatted ${formattedFiles.length} repo-memory JSON file(s) before validation: ${formattedFiles.join(", ")}`);
         }
@@ -1902,6 +1948,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         if (entry.isDirectory()) {
           scanDir(fullPath, relPath);
         } else if (entry.isFile()) {
+          if (!isEligibleFile(relPath)) {
+            continue;
+          }
           let stats;
           try {
             stats = fs.statSync(fullPath);
@@ -1974,8 +2023,14 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     let patchSizeBytes;
     try {
       ensureSafeDirectoryTrust(memoryDir, server);
-      execGitSync(["add", "--sparse", "."], { cwd: memoryDir, stdio: "pipe" });
-      patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: memoryDir });
+      const stagedFiles = execGitSync(["diff", "--cached", "--no-renames", "--name-only", "-z"], { cwd: memoryDir, stdio: "pipe" }).split("\0").filter(Boolean).filter(isEligibleFile);
+      const trackedFiles = execGitSync(["ls-files", "-z"], { cwd: memoryDir, stdio: "pipe" }).split("\0").filter(Boolean).filter(isEligibleFile);
+      const filesToStage = [...new Set([...files.map(file => file.relativePath), ...trackedFiles])];
+      if (filesToStage.length > 0) {
+        execGitSync(["add", "--sparse", "--all", "--", ...filesToStage.map(file => `:(literal)${file}`)], { cwd: memoryDir, stdio: "pipe" });
+      }
+      const filesToMeasure = [...new Set([...stagedFiles, ...filesToStage])].map(file => `:(literal)${file}`);
+      patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: memoryDir, pathspecs: filesToMeasure });
     } catch (/** @type {any} */ error) {
       return {
         content: [
@@ -2016,13 +2071,22 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     /** @type {ReturnType<typeof runCustomMemoryValidation> | null} */
     let customValidation = null;
     if (validationConfig) {
-      customValidation = runCustomMemoryValidation({
-        script: validationScript,
-        memoryDir,
-        memoryId,
-        kind: "repo",
-        timeoutSeconds: validationTimeoutSeconds,
-      });
+      const validationDir = createEligibleMemoryValidationView(memoryDir, isEligibleFile);
+      try {
+        customValidation = runCustomMemoryValidation({
+          script: validationScript,
+          memoryDir: validationDir,
+          memoryId,
+          kind: "repo",
+          timeoutSeconds: validationTimeoutSeconds,
+        });
+      } finally {
+        try {
+          fs.rmSync(validationDir, { recursive: true, force: true });
+        } catch (error) {
+          throw new Error(`${ERR_SYSTEM}: Failed to clean up repo-memory validation directory: ${getErrorMessage(error)}`, { cause: error });
+        }
+      }
       if (!customValidation.ok) {
         const reason = customValidation.timedOut ? `timed out after ${validationTimeoutSeconds || 30} second(s)` : `exited with code ${customValidation.exitCode}`;
         return {

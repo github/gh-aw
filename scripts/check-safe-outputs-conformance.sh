@@ -466,6 +466,7 @@ compiler_populated_fields = {
     "safe-outputs.call-workflow.workflow_files",
     "safe-outputs.dispatch-workflow.workflow_files",
     "safe-outputs.dispatch-workflow.aw_context_workflows",
+    "safe-outputs.dispatch-workflow.work_queue_workflows",
 }
 
 tool_configured_outputs = {"comment-memory"}

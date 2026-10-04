@@ -165,10 +165,18 @@ function getPatchDiffSizeBytes(patchContent) {
  * @param {Object} options
  * @param {(args: string[], opts?: Record<string, any>) => string} options.execGitSyncFn
  * @param {string} [options.cwd]
+ * @param {string[]} [options.pathspecs] - Optional pathspecs to limit the staged diff
  * @returns {number}
  */
-function getStagedPatchDiffSizeBytes({ execGitSyncFn, cwd }) {
-  const patchContent = execGitSyncFn(["diff", "--cached"], { stdio: "pipe", cwd });
+function getStagedPatchDiffSizeBytes({ execGitSyncFn, cwd, pathspecs }) {
+  if (Array.isArray(pathspecs) && pathspecs.length === 0) {
+    return 0;
+  }
+  const args = ["diff", "--cached", "--no-renames"];
+  if (Array.isArray(pathspecs)) {
+    args.push("--", ...pathspecs);
+  }
+  const patchContent = execGitSyncFn(args, { stdio: "pipe", cwd });
   return getPatchDiffSizeBytes(patchContent);
 }
 
