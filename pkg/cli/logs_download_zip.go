@@ -91,7 +91,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 	defer srcFile.Close()
 
 	// Create the destination file
-	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, constants.FilePermPublic)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
