@@ -223,12 +223,27 @@ func TestGenerateConcurrencyConfig(t *testing.T) {
   pull_request:
     types: [opened, synchronize]
   workflow_dispatch:`,
+				CommandOtherEvents: map[string]any{"pull_request": nil},
 			},
 			isAliasTrigger: true,
 			expected: `concurrency:
-  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}"
-  cancel-in-progress: true`,
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}-${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}"
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}`,
 			description: "Mixed slash_command and pull_request workflows should cancel stale PR runs",
+		},
+		{
+			name: "Mixed command and PR workflow can disable queue max",
+			workflowData: &WorkflowData{
+				On:                 "on:\n  pull_request:\n  workflow_dispatch:",
+				CommandOtherEvents: map[string]any{"pull_request": nil},
+				Features:           map[string]any{"group-concurrency-queue": false},
+			},
+			isAliasTrigger: true,
+			expected: `concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}-${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}"
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}`,
+			description: "Mixed workflows respect the queue feature flag",
 		},
 		{
 			name: "Push workflow should have dynamic concurrency with ref",
@@ -1165,6 +1180,7 @@ func TestShouldEnableCancelInProgress(t *testing.T) {
 				On: `on:
   pull_request:
     types: [opened, synchronize]`,
+				CommandOtherEvents: map[string]any{"pull_request": nil},
 			},
 			isAliasTrigger: true,
 			expected:       true,
@@ -1180,6 +1196,29 @@ func TestShouldEnableCancelInProgress(t *testing.T) {
 			isAliasTrigger: true,
 			expected:       false,
 			description:    "Command-only workflows should remain queued",
+		},
+		{
+			name: "Command-only workflow with PR-like expanded On should not enable cancellation",
+			workflowData: &WorkflowData{
+				On: `on:
+  pull_request_review_comment:
+  pull_request_target:
+  workflow_dispatch:`,
+				CommandOtherEvents: map[string]any{"pull_request_review_comment": nil, "pull_request_target": nil},
+			},
+			isAliasTrigger: true,
+			expected:       false,
+			description:    "Only an explicit pull_request event in the preserved event map enables command cancellation",
+		},
+		{
+			name: "Label command with explicit PR trigger should enable cancellation",
+			workflowData: &WorkflowData{
+				On:                      "on:\n  pull_request:",
+				LabelCommandOtherEvents: map[string]any{"pull_request": nil},
+			},
+			isAliasTrigger: true,
+			expected:       true,
+			description:    "Label commands use their own preserved event map",
 		},
 		{
 			name: "PR workflow should enable cancellation",
