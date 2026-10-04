@@ -13,6 +13,7 @@ const dependencyPattern = /^(?:app\/)?(?:dependabot|renovate)(?:\[bot\])?$/i;
 const failureStates = new Set(["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
 const idleMs = 10 * 60 * 1000;
 const staleMs = 14 * 24 * 60 * 60 * 1000;
+const approvalWorkflows = new Set([".github/workflows/cjs.yml", ".github/workflows/cgo.yml", ".github/workflows/CWI.yml"]);
 
 function epoch(value) {
   if (!value) return 0;
@@ -74,10 +75,18 @@ export function activeAgent(pr, runs) {
   );
 }
 
-export function classify(pr, detail, comments, runs, now = Date.now()) {
-  if (dependencyPattern.test(pr.author?.login ?? "")) return { skip_reason: "dependency_bot" };
-  if (pr.isDraft || (pr.state && pr.state !== "OPEN")) return { skip_reason: "closed_or_draft" };
-  if (activeAgent(pr, runs)) return { skip_reason: "agent_active" };
+function metadataSkip(pr, now) {
+  if (dependencyPattern.test(pr.author?.login ?? "")) return "dependency_bot";
+  if (pr.isDraft || (pr.state && pr.state !== "OPEN")) return "closed_or_draft";
+  if (pr.labels?.some(label => label.name === "broccoli")) return "opted_out";
+  const updated = epoch(pr.updatedAt);
+  if (now - updated > staleMs) return "stale";
+  if (now - updated < idleMs) return "not_idle";
+  return null;
+}
+
+function checkSkip(pr, now) {
+  if (activeAgent(pr, [])) return "agent_active";
   const checks = pr.statusCheckRollup ?? [];
   if (
     checks.some(check => {
@@ -87,8 +96,36 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
       return !started || now - started < 60 * 60 * 1000;
     })
   ) {
-    return { skip_reason: "checks_pending" };
+    return "checks_pending";
   }
+  return null;
+}
+
+export function approvableRuns(pr, runs) {
+  const candidates = runs
+    .filter(
+      run =>
+        Number.isSafeInteger(run.id) &&
+        run.id > 0 &&
+        Number.isSafeInteger(run.workflow_id) &&
+        run.workflow_id > 0 &&
+        run.event === "pull_request" &&
+        (["waiting", "action_required"].includes(run.status) || run.conclusion === "action_required") &&
+        run.head_branch === pr.headRefName &&
+        run.head_sha === pr.headRefOid &&
+        approvalWorkflows.has((run.path ?? "").split("@")[0]) &&
+        run.pull_requests?.length > 0 &&
+        run.pull_requests.every(item => item.number === pr.number)
+    )
+    .map(run => [run.id, { run_id: run.id, workflow_id: run.workflow_id, path: run.path }]);
+  return [...new Map(candidates).values()].sort((a, b) => a.run_id - b.run_id);
+}
+
+export function classify(pr, detail, comments, runs, now = Date.now()) {
+  const skip = metadataSkip(pr, now) || checkSkip(pr, now);
+  if (skip) return { skip_reason: skip };
+  if (activeAgent(pr, runs)) return { skip_reason: "agent_active" };
+  const checks = pr.statusCheckRollup ?? [];
   if (detail.reviewThreads.pageInfo.hasNextPage || detail.reviews.pageInfo.hasPreviousPage) {
     return { skip_reason: "incomplete_reviews" };
   }
@@ -100,7 +137,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     .filter(thread => trustedReviewer(thread.comments.nodes[0] ?? {}))
     .flatMap(thread => {
       const replyAt = Math.max(0, ...thread.comments.nodes.filter(comment => authorReply(comment, pr) && comment.body?.trim()).map(commentTime));
-      const reviewerComments = thread.comments.nodes.filter(comment => trustedReviewer(comment) && !authorReply(comment, pr) && commentTime(comment) > replyAt);
+      const reviewerComments = thread.comments.nodes.filter(comment => comment.body?.trim() && trustedReviewer(comment) && !authorReply(comment, pr) && commentTime(comment) > replyAt);
       if (!reviewerComments.length) return [];
       const original = reviewerComments[0];
       const last = [...reviewerComments].sort((a, b) => commentTime(b) - commentTime(a))[0];
@@ -141,6 +178,7 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   const zeroDiff = pr.changedFiles === 0 && now - epoch(pr.createdAt) >= 24 * 60 * 60 * 1000;
   const branchAction = ["CONFLICTING", "BEHIND"].includes(pr.mergeStateStatus) ? pr.mergeStateStatus : null;
   const dismissReviews = unresolved.length === 0 ? detail.reviews.nodes.filter(review => normalizedLogin(review) === "github-actions" && review.state === "CHANGES_REQUESTED").map(review => review.databaseId) : [];
+  const approveRuns = approvableRuns(pr, runs);
   const state = createHash("sha256")
     .update(
       JSON.stringify({
@@ -179,14 +217,12 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
         return recorded?.split(" ") ?? [];
       })
   );
-  if (!branchAction && (alreadyNudged || (work.length && work.every(token => coveredWork.has(token))))) {
-    return { skip_reason: "unchanged" };
-  }
-  if (!branchAction && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) {
-    return { skip_reason: "unchanged_legacy" };
-  }
-  if (!branchAction && !zeroDiff && !failedChecks.length && !feedback.length && !dismissReviews.length) {
-    return { skip_reason: "nothing_actionable" };
+  let nudgeSkip;
+  if (!branchAction && (alreadyNudged || (work.length && work.every(token => coveredWork.has(token))))) nudgeSkip = "unchanged";
+  else if (!branchAction && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) nudgeSkip = "unchanged_legacy";
+  else if (!branchAction && !work.length) nudgeSkip = failedChecks.length ? "approval_required" : "nothing_actionable";
+  if (nudgeSkip && !dismissReviews.length && !approveRuns.length) {
+    return { skip_reason: nudgeSkip };
   }
   return {
     number: pr.number,
@@ -205,8 +241,10 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     failed_checks: failedChecks,
     unresolved_reviews: feedback,
     dismiss_reviews: dismissReviews,
+    approve_runs: approveRuns,
+    nudge_needed: !nudgeSkip,
     zero_diff_stalled: zeroDiff,
-    priority: branchAction === "CONFLICTING" ? 0 : failedChecks.length ? 1 : feedback.length ? 2 : zeroDiff ? 3 : 4,
+    priority: branchAction === "CONFLICTING" ? 0 : !nudgeSkip && failedChecks.some(check => check.conclusion !== "ACTION_REQUIRED") ? 1 : !nudgeSkip && feedback.length ? 2 : !nudgeSkip && zeroDiff ? 3 : 4,
   };
 }
 
@@ -252,15 +290,13 @@ function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   return classify(pr, response.data.repository.pullRequest, comments, runs, now);
 }
 
-const prFields = "number,updatedAt,author";
+const prFields = "number,updatedAt,author,isDraft,state,labels";
 
-export function fetchCandidate(repo, number, api = gh) {
+export function fetchCandidate(repo, number, api = gh, now) {
   // gh pr view's union fragments are rewritten incorrectly by the GitHub CLI proxy.
   const candidate = api(["api", `repos/${repo}/pulls/${number}`]);
   if (candidate?.number !== Number(number) || !candidate.updated_at || !candidate.head?.sha || !candidate.head.ref || !candidate.base?.ref) throw new Error(`PR #${number}: could not refresh PR metadata`);
-  const checkRuns = api(["api", `repos/${repo}/commits/${candidate.head.sha}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"]).flatMap(page => page.check_runs);
-  const statuses = api(["api", `repos/${repo}/commits/${candidate.head.sha}/status?per_page=100`, "--paginate", "--slurp"]).flatMap(page => page.statuses);
-  return {
+  const metadata = {
     number: candidate.number,
     title: candidate.title,
     url: candidate.html_url,
@@ -273,7 +309,14 @@ export function fetchCandidate(repo, number, api = gh) {
     updatedAt: candidate.updated_at,
     changedFiles: candidate.changed_files,
     author: candidate.user ? { login: candidate.user.login } : null,
+    labels: candidate.labels ?? [],
     mergeStateStatus: candidate.mergeable_state === "dirty" ? "CONFLICTING" : (candidate.mergeable_state ?? "unknown").toUpperCase(),
+  };
+  if (now !== undefined && metadataSkip(metadata, now)) return metadata;
+  const checkRuns = api(["api", `repos/${repo}/commits/${candidate.head.sha}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"]).flatMap(page => page.check_runs);
+  const statuses = api(["api", `repos/${repo}/commits/${candidate.head.sha}/status?per_page=100`, "--paginate", "--slurp"]).flatMap(page => page.statuses);
+  return {
+    ...metadata,
     statusCheckRollup: [
       ...checkRuns.map(check => ({
         name: check.name,
@@ -298,8 +341,8 @@ export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
   const eligible = [];
   for (const pr of candidates) {
     let result;
-    if (dependencyPattern.test(pr.author?.login ?? "")) result = { skip_reason: "dependency_bot" };
-    else if (now - epoch(pr.updatedAt) > staleMs) result = { skip_reason: "stale" };
+    const skip = metadataSkip(pr, now);
+    if (skip) result = { skip_reason: skip };
     else result = inspectCandidate(pr);
     if (result.skip_reason) skipped.push({ pr_number: pr.number, ...result });
     else eligible.push(result);
@@ -315,6 +358,7 @@ export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
 }
 
 export function formatNudge(pr) {
+  if (pr.nudge_needed === false) return null;
   const checks = pr.failed_checks.filter(check => check.conclusion !== "ACTION_REQUIRED");
   if (!pr.unresolved_reviews.length && !checks.length && !pr.zero_diff_stalled && !["CONFLICTING", "BEHIND"].includes(pr.mergeStateStatus)) return null;
   const tasks = [`Update this branch with the latest \`${pr.baseRefName ?? "main"}\` using \`make merge-main\`, resolving any conflicts and preserving the intended changes.`];
@@ -370,7 +414,7 @@ export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
   });
   if (rateLimit.low) return limitedQueue();
   const candidates = checkNumber
-    ? [fetchCandidate(repo, checkNumber, api)]
+    ? [fetchCandidate(repo, checkNumber, api, now)]
     : api(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
   if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
   let runs;
@@ -379,9 +423,15 @@ export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
     pr => {
       if (!rateLimit.low) rateLimit = checkRateLimit(api);
       if (rateLimit.low) return { skip_reason: "rate_limit" };
-      const current = checkNumber ? pr : fetchCandidate(repo, pr.number, api);
+      const current = checkNumber ? pr : fetchCandidate(repo, pr.number, api, now);
+      const skip = metadataSkip(current, now) || checkSkip(current, now);
+      if (skip) return { skip_reason: skip };
       runs ??= fetchActiveRuns(repo, api, checkNumber ? current.headRefName : undefined);
-      return activeAgent(current, runs) ? { skip_reason: "agent_active" } : inspect(repo, current, runs, api, now);
+      if (activeAgent(current, runs)) return { skip_reason: "agent_active" };
+      const approvals = current.statusCheckRollup.some(check => (check.conclusion ?? check.state) === "ACTION_REQUIRED" || check.status === "WAITING")
+        ? api(["api", `repos/${repo}/actions/runs?status=action_required&per_page=100&branch=${encodeURIComponent(current.headRefName)}`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs)
+        : [];
+      return inspect(repo, current, [...runs, ...approvals], api, now);
     },
     now
   );
@@ -424,7 +474,8 @@ export function formatSummary(output) {
   const budget = output.rate_limit
     ? `\n\n| API budget | Remaining / limit | No-op at or below | Resets |\n|---|---|---|---|\n${output.rate_limit.resources.map(item => `| ${item.resource} | ${item.remaining} / ${item.limit} | ${item.threshold} | ${item.reset_at} |`).join("\n")}\n`
     : "";
-  return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n${budget}`;
+  const decision = output.rate_limit?.low ? "Agent skipped: GitHub API budget is low." : output.prs.length ? "Agent needed: executable progress actions remain." : "Agent skipped: no executable progress actions remain.";
+  return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n${decision}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n${budget}`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

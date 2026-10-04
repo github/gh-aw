@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { activeAgent, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatNudge, formatSummary } from "./pr-sous-chef.mjs";
+import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatNudge, formatSummary } from "./pr-sous-chef.mjs";
 
 const now = Date.parse("2026-10-03T18:00:00Z");
 const recent = "2026-10-03T16:00:00Z";
@@ -23,6 +24,17 @@ const failingPr = {
   ...pr,
   mergeStateStatus: "BLOCKED",
   statusCheckRollup: [{ name: "CGO", status: "COMPLETED", conclusion: "FAILURE" }],
+};
+const waitingRun = {
+  id: 7,
+  workflow_id: 12,
+  name: "CGO",
+  path: ".github/workflows/cgo.yml",
+  event: "pull_request",
+  status: "waiting",
+  head_branch: pr.headRefName,
+  head_sha: pr.headRefOid,
+  pull_requests: [{ number: pr.number }],
 };
 
 function detail(threads = []) {
@@ -274,6 +286,12 @@ test("out-of-scope unresolved feedback does not wake an implementation agent or 
   assert.equal(classify({ ...pr, mergeStateStatus: "BLOCKED" }, data, [], [], now).skip_reason, "nothing_actionable");
 });
 
+test("empty reviewer comments do not constitute implementation work", () => {
+  const empty = thread();
+  empty.comments.nodes[0].body = "  ";
+  assert.equal(classify({ ...pr, mergeStateStatus: "CLEAN" }, detail([empty]), [], [], now).skip_reason, "nothing_actionable");
+});
+
 test("active-run lookup paginates every nonterminal status", () => {
   const calls = [];
   const runs = fetchActiveRuns("github/gh-aw", args => {
@@ -518,8 +536,73 @@ test("approval or review cleanup alone generates no implementation nudge", () =>
   data.reviews.nodes = [{ author: { login: "github-actions" }, state: "CHANGES_REQUESTED", databaseId: 8 }];
   const cleanup = classify({ ...pr, mergeStateStatus: "BLOCKED" }, data, [], [], now);
   assert.equal(formatNudge(cleanup), null);
-  const approval = classify({ ...pr, mergeStateStatus: "BLOCKED", statusCheckRollup: [{ name: "CGO", status: "WAITING" }] }, detail(), [], [], now);
+  const approval = classify({ ...pr, mergeStateStatus: "BLOCKED", statusCheckRollup: [{ name: "CGO", status: "WAITING" }] }, detail(), [], [waitingRun], now);
   assert.equal(formatNudge(approval), null);
+  assert.equal(approval.nudge_needed, false);
+  assert.equal(approval.priority, 4);
+  assert.deepEqual(approval.approve_runs, [{ run_id: 7, workflow_id: 12, path: ".github/workflows/cgo.yml" }]);
+});
+
+test("approval-only checks do not start an agent without a safely approvable run", () => {
+  const candidate = { ...pr, mergeStateStatus: "BLOCKED", statusCheckRollup: [{ name: "Other CI", status: "COMPLETED", conclusion: "ACTION_REQUIRED" }] };
+  assert.equal(classify(candidate, detail(), [], [], now).skip_reason, "approval_required");
+  assert.equal(classify(candidate, detail(), [], [{ ...waitingRun, path: ".github/workflows/untrusted.yml" }], now).skip_reason, "approval_required");
+  assert.equal(classify({ ...candidate, statusCheckRollup: [{ name: "Other CI", status: "WAITING" }] }, detail(), [], [], now).skip_reason, "approval_required");
+});
+
+test("approval candidates require exact workflow, PR, current head, and approval state", () => {
+  for (const changes of [
+    { id: 0 },
+    { workflow_id: undefined },
+    { event: "pull_request_target" },
+    { status: "in_progress" },
+    { status: "completed", conclusion: "success" },
+    { head_branch: "other" },
+    { head_sha: "old" },
+    { path: ".github/workflows/cgo.yml.lock.yml" },
+    { path: ".github/workflows/nested/cgo.yml" },
+    { pull_requests: [] },
+    { pull_requests: [{ number: 43 }] },
+    { pull_requests: [{ number: 42 }, { number: 43 }] },
+  ]) {
+    assert.deepEqual(approvableRuns(pr, [{ ...waitingRun, ...changes }]), [], JSON.stringify(changes));
+  }
+  for (const path of [".github/workflows/cjs.yml", ".github/workflows/cgo.yml", ".github/workflows/CWI.yml", ".github/workflows/cgo.yml@refs/heads/main"]) {
+    assert.equal(approvableRuns(pr, [{ ...waitingRun, path }]).length, 1);
+  }
+  assert.equal(approvableRuns(pr, [{ ...waitingRun, status: "action_required" }]).length, 1);
+  assert.equal(approvableRuns(pr, [{ ...waitingRun, status: "completed", conclusion: "action_required" }]).length, 1);
+  assert.equal(approvableRuns(pr, [waitingRun, waitingRun]).length, 1);
+});
+
+test("new approvals and review cleanup can proceed without repeating covered implementation work", () => {
+  const original = classify(failingPr, detail(), [], [], now);
+  const comments = [{ ...nudge(original.state_fingerprint), body: formatNudge(original) }];
+  const approved = classify(failingPr, detail(), comments, [waitingRun], now);
+  assert.deepEqual(
+    approved.approve_runs.map(run => run.run_id),
+    [7]
+  );
+  assert.equal(approved.nudge_needed, false);
+  assert.equal(approved.priority, 4);
+  assert.equal(formatNudge(approved), null);
+  const resolved = detail();
+  resolved.reviews.nodes = [{ author: { login: "github-actions" }, state: "CHANGES_REQUESTED", databaseId: 8 }];
+  const cleanup = classify(failingPr, resolved, comments, [], now);
+  assert.deepEqual(cleanup.dismiss_reviews, [8]);
+  assert.equal(cleanup.nudge_needed, false);
+  assert.equal(formatNudge(cleanup), null);
+  const legacy = { ...comments[0], body: "<!-- gh-aw-pr-sous-chef-nudge --> @copilot fix" };
+  assert.equal(formatNudge(classify(failingPr, resolved, [legacy], [], now)), null);
+});
+
+test("human-only approval blockers do not suppress genuine new implementation work", () => {
+  const candidate = { ...failingPr, statusCheckRollup: [...failingPr.statusCheckRollup, { name: "Other CI", status: "COMPLETED", conclusion: "ACTION_REQUIRED" }] };
+  const result = classify(candidate, detail([thread()]), [], [], now);
+  assert.equal(result.nudge_needed, true);
+  assert.deepEqual(result.approve_runs, []);
+  assert.match(formatNudge(result), /Fix the regression/);
+  assert.doesNotMatch(formatNudge(result), /Other CI/);
 });
 
 test("deployed fingerprints survive the migration and later human chatter", () => {
@@ -572,6 +655,134 @@ const budgets = {
     search: { limit: 30, remaining: 30, reset: 1791057600 },
   },
 };
+const idleMsForTest = 10 * 60 * 1000;
+
+function queueAPI({ listed = [pr], candidate = restPr, checks = [], statuses = [], data = detail(), comments = [], runs = [], approvals = [] } = {}) {
+  const calls = [];
+  return {
+    calls,
+    api(args) {
+      calls.push(args);
+      if (args[1] === "rate_limit") return budgets;
+      if (args[0] === "pr") return listed;
+      if (args[1].includes("/pulls/")) return candidate;
+      if (args[1].includes("/check-runs?")) return [{ check_runs: checks }];
+      if (args[1].includes("/status?")) return [{ statuses }];
+      if (args[1].includes("/actions/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
+      if (args[1] === "graphql") return { data: { repository: { pullRequest: data } } };
+      if (args[1].includes("/comments?")) return [comments];
+      assert.fail(`Unexpected API call: ${args.join(" ")}`);
+    },
+  };
+}
+
+test("cheap metadata exclusions avoid all detail and active-run reads", () => {
+  for (const [changes, reason] of [
+    [{ isDraft: true }, "closed_or_draft"],
+    [{ state: "CLOSED" }, "closed_or_draft"],
+    [{ labels: [{ name: "broccoli" }] }, "opted_out"],
+    [{ updatedAt: "2026-10-03T17:55:00Z" }, "not_idle"],
+    [{ updatedAt: "2026-09-01T00:00:00Z" }, "stale"],
+    [{ author: { login: "dependabot[bot]" } }, "dependency_bot"],
+  ]) {
+    const { api, calls } = queueAPI({ listed: [{ ...pr, ...changes }] });
+    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: reason }]);
+    assert.equal(calls.length, 2);
+  }
+  for (const elapsed of [idleMsForTest - 1, idleMsForTest]) {
+    const { api, calls } = queueAPI({ listed: [{ ...pr, updatedAt: new Date(now - elapsed).toISOString() }] });
+    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    assert.equal(calls.length === 2, elapsed < idleMsForTest);
+    assert.equal(queue.prs.length, elapsed < idleMsForTest ? 0 : 1);
+  }
+});
+
+test("targeted refresh preserves metadata gates before fetching checks", () => {
+  for (const [changes, reason] of [
+    [{ draft: true }, "closed_or_draft"],
+    [{ state: "closed" }, "closed_or_draft"],
+    [{ labels: [{ name: "broccoli" }] }, "opted_out"],
+    [{ updated_at: "2026-10-03T17:55:00Z" }, "not_idle"],
+    [{ user: { login: "renovate[bot]" } }, "dependency_bot"],
+  ]) {
+    const { api, calls } = queueAPI({ candidate: { ...restPr, ...changes } });
+    const queue = fetchQueue("github/gh-aw", "42", api, now);
+    assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: reason }]);
+    assert.equal(calls.length, 2);
+  }
+});
+
+test("metadata is rechecked when the PR changed after list enumeration", () => {
+  const { api, calls } = queueAPI({ candidate: { ...restPr, updated_at: "2026-10-03T17:55:00Z" } });
+  assert.equal(fetchQueue("github/gh-aw", undefined, api, now).skipped[0].skip_reason, "not_idle");
+  assert.equal(calls.length, 4);
+});
+
+test("pending checks and active agent checks avoid review and run lookups", () => {
+  for (const [check, reason] of [
+    [{ name: "build", status: "queued", created_at: "2026-10-03T17:55:00Z" }, "checks_pending"],
+    [{ name: "Copilot coding agent", status: "in_progress", started_at: recent }, "agent_active"],
+  ]) {
+    const { api, calls } = queueAPI({ checks: [check] });
+    assert.equal(fetchQueue("github/gh-aw", undefined, api, now).skipped[0].skip_reason, reason);
+    assert.ok(!calls.some(args => args[1] === "graphql" || args[1].includes("/actions/runs?")));
+  }
+});
+
+test("approval-required runs are discovered by conclusion, scoped to the PR branch", () => {
+  for (const check of [
+    { name: "CGO", status: "completed", conclusion: "action_required" },
+    { name: "CGO", status: "waiting" },
+  ]) {
+    const { api, calls } = queueAPI({
+      candidate: { ...restPr, mergeable_state: "blocked" },
+      checks: [check],
+      approvals: [{ ...waitingRun, status: "completed", conclusion: "action_required" }],
+    });
+    const queue = fetchQueue("github/gh-aw", "42", api, now);
+    assert.equal(queue.prs[0].nudge_needed, false);
+    assert.equal(queue.prs[0].approve_runs[0].run_id, 7);
+    const lookup = calls.find(args => args[1].includes("status=action_required"));
+    assert.match(lookup[1], /branch=copilot%2Ffix/);
+    assert.ok(lookup.includes("--paginate") && lookup.includes("--slurp"));
+  }
+});
+
+test("healthy idle PRs and human-only approvals produce empty queues", () => {
+  for (const checks of [[], [{ name: "Other CI", status: "completed", conclusion: "action_required" }]]) {
+    const { api } = queueAPI({ candidate: { ...restPr, mergeable_state: "clean" }, checks });
+    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    assert.deepEqual(queue.prs, []);
+    assert.equal(queue.skipped[0].skip_reason, checks.length ? "approval_required" : "nothing_actionable");
+    assert.match(formatSummary(queue), /Agent skipped: no executable progress actions remain/);
+  }
+});
+
+test("approval lookup errors remain failed reads, not a successful no-op", () => {
+  const { api } = queueAPI({ checks: [{ name: "CGO", status: "completed", conclusion: "action_required" }] });
+  assert.throws(
+    () =>
+      fetchQueue(
+        "github/gh-aw",
+        "42",
+        args => {
+          if (args[1].includes("status=action_required")) throw new Error("HTTP 403");
+          return api(args);
+        },
+        now
+      ),
+    /HTTP 403/
+  );
+});
+
+test("workflow polls every five minutes but never starts an agent for low budgets or empty automatic queues", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/pr-sous-chef.md", import.meta.url), "utf8");
+  assert.match(workflow, /^  schedule: every 5m$/m);
+  assert.match(workflow, /^max-daily-ai-credits: -1$/m);
+  assert.match(workflow, /^  skip-if-no-match: .* -label:broccoli"$/m);
+  assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
+});
 
 test("each API budget no-ops at exactly ten percent remaining", () => {
   assert.equal(checkRateLimit(() => budgets).low, false);
@@ -604,6 +815,7 @@ test("low rate limits stop before any PR lookup, including targeted refreshes", 
     assert.deepEqual(queue.prs, []);
     assert.deepEqual(queue.skipped, [{ skip_reason: "rate_limit" }]);
     assert.match(formatSummary(queue), /\| graphql \| 200 \/ 5000 \| 500 \|/);
+    assert.match(formatSummary(queue), /Agent skipped: GitHub API budget is low/);
   }
 });
 
