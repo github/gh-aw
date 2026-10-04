@@ -16,6 +16,9 @@ function jsonEvent(event) {
     if (typeof event.message?.errorMessage === "string") {
       sanitized.message = { ...event.message, errorMessage: sanitizeProviderErrorMessage(event.message.errorMessage) };
     }
+    if (Array.isArray(event.messages)) {
+      sanitized.messages = event.messages.map(message => (typeof message?.errorMessage === "string" ? { ...message, errorMessage: sanitizeProviderErrorMessage(message.errorMessage) } : message));
+    }
     return sanitized;
   }
   const { partial, ...update } = event.assistantMessageEvent;

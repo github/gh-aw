@@ -58,6 +58,13 @@ describe("Pi runtime configuration", () => {
     expect(result.settings.defaultThinkingLevel).toBe("high");
   });
 
+  it("merges retry defaults with partial installed and workflow settings", () => {
+    fs.mkdirSync(path.join(dir, "agent"));
+    fs.writeFileSync(path.join(dir, "agent/settings.json"), JSON.stringify({ retry: { maxRetries: 4 } }));
+    const result = preparePiRuntime({ settings: { retry: { baseDelayMs: 500 } } });
+    expect(result.settings.retry).toEqual({ enabled: true, maxRetries: 4, baseDelayMs: 500, maxAgentDelayMs: 30000 });
+  });
+
   it("uses only gateway-authorized MCP servers and preserves scoped headers", () => {
     fs.mkdirSync(path.join(dir, "gh-aw/mcp-config"), { recursive: true });
     fs.writeFileSync(path.join(dir, "gh-aw/mcp-config/mcp-servers.json"), JSON.stringify({ mcpServers: { safeoutputs: { url: "http://gateway/mcp/safeoutputs", headers: { Authorization: "gateway-session-token" } } } }));

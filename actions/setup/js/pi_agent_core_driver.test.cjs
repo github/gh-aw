@@ -70,4 +70,18 @@ describe("Pi coding-agent SDK driver", () => {
     expect(event.message.errorMessage).toContain("[REDACTED]");
     expect(event.message.errorMessage).not.toContain("provider-secret-value");
   });
+
+  it("redacts secrets from assistant errors in agent_end message snapshots", () => {
+    vi.stubEnv("OPENAI_API_KEY", "provider-secret-value");
+    const event = jsonEvent({
+      type: "agent_end",
+      messages: [
+        { role: "assistant", errorMessage: "429: provider-secret-value" },
+        { role: "user", content: "Complete the task" },
+      ],
+    });
+    expect(event.messages[0].errorMessage).toContain("[REDACTED]");
+    expect(event.messages[0].errorMessage).not.toContain("provider-secret-value");
+    expect(event.messages[1]).toEqual({ role: "user", content: "Complete the task" });
+  });
 });
