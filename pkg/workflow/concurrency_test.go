@@ -216,6 +216,21 @@ func TestGenerateConcurrencyConfig(t *testing.T) {
 			description: "Alias workflows should use dynamic concurrency with ref but without cancellation",
 		},
 		{
+			name: "Mixed slash_command and PR workflow should cancel stale runs",
+			workflowData: &WorkflowData{
+				On: `on:
+  slash_command: test-bot
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:`,
+			},
+			isAliasTrigger: true,
+			expected: `concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}"
+  cancel-in-progress: true`,
+			description: "Mixed slash_command and pull_request workflows should cancel stale PR runs",
+		},
+		{
 			name: "Push workflow should have dynamic concurrency with ref",
 			workflowData: &WorkflowData{
 				On: `on:
@@ -1145,15 +1160,26 @@ func TestShouldEnableCancelInProgress(t *testing.T) {
 		description    string
 	}{
 		{
-			name: "Alias workflow should not enable cancellation",
+			name: "Alias workflow with pull request trigger should enable cancellation",
 			workflowData: &WorkflowData{
 				On: `on:
   pull_request:
     types: [opened, synchronize]`,
 			},
 			isAliasTrigger: true,
+			expected:       true,
+			description:    "Alias workflows with pull_request triggers should enable cancellation",
+		},
+		{
+			name: "Command-only workflow should not enable cancellation",
+			workflowData: &WorkflowData{
+				On: `on:
+  issues:
+    types: [opened, edited]`,
+			},
+			isAliasTrigger: true,
 			expected:       false,
-			description:    "Alias workflows should never enable cancellation",
+			description:    "Command-only workflows should remain queued",
 		},
 		{
 			name: "PR workflow should enable cancellation",

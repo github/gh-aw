@@ -356,8 +356,9 @@ func buildConcurrencyGroupKeys(workflowData *WorkflowData, isCommandTrigger bool
 
 // shouldEnableCancelInProgress determines if cancel-in-progress should be enabled
 func shouldEnableCancelInProgress(workflowData *WorkflowData, isCommandTrigger bool) bool {
-	// Never enable cancellation for command workflows
-	if isCommandTrigger {
+	// Keep command-only workflows queued, but allow pull request events in mixed
+	// workflows to cancel stale runs.
+	if isCommandTrigger && !isPullRequestWorkflow(workflowData.On) {
 		concurrencyLog.Print("cancel-in-progress disabled: command trigger workflow")
 		return false
 	}
