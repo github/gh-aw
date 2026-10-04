@@ -74,6 +74,7 @@ describe("add_labels", () => {
     };
 
     mockContext = {
+      eventName: "issues",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -702,6 +703,7 @@ describe("add_labels", () => {
     });
 
     it("should add labels to a pull request from context", async () => {
+      mockContext.eventName = "pull_request";
       mockContext.payload = {
         pull_request: {
           number: 789,
@@ -743,7 +745,8 @@ describe("add_labels", () => {
       expect(result.error.includes("Invalid item number")).toBe(true);
     });
 
-    it("should handle missing item_number and no context", async () => {
+    it("should skip when the triggering context has no issue or pull request", async () => {
+      mockContext.eventName = "workflow_dispatch";
       mockContext.payload = {};
 
       const handler = await main({ max: 10 });
@@ -756,7 +759,8 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("No issue/PR number available")).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.error).toContain('Target is "triggering" but not running in issue or pull request context');
     });
 
     it("should respect max count limit", async () => {

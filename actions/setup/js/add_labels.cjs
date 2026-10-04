@@ -24,6 +24,7 @@ const HANDLER_TYPE = "add_labels";
 const { validateLabels } = require("./safe_output_validator.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -293,6 +294,11 @@ const main = createCountGatedHandler({
         if (!targetResult.success) return targetResult;
         itemNumber = targetResult.number ?? triggeringItemNumber;
       } else if (target === "triggering") {
+        const targetResult = resolveTarget({ targetConfig: target, item: message, context, itemType: HANDLER_TYPE, supportsPR: true });
+        if (!targetResult.success && targetResult.shouldFail === false) {
+          core.warning(targetResult.error);
+          return { success: false, skipped: true, reason: targetResult.error, error: targetResult.error };
+        }
         itemNumber = triggeringItemNumber;
       } else {
         itemNumber = Number(target);
