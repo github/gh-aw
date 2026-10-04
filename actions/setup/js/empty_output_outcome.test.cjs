@@ -44,6 +44,20 @@ describe("empty output outcome", () => {
     expect(outcome.details).toContain("safeoutputs.create_issue");
   });
 
+  it("includes canonical tool failures even when success is absent", () => {
+    writeEvents([
+      { type: "tool.execution_start", data: { toolCallId: "shell", toolName: "bash", input: { command: "cat secret" } } },
+      { type: "tool.execution_complete", data: { toolCallId: "shell", isError: true, error: "Permission denied" } },
+      { type: "tool.execution_complete", data: { toolName: "read", status: "failed", error: "Read unavailable" } },
+      { type: "tool.execution_complete", data: { toolName: "write", exitCode: 1, error: "Write failed" } },
+    ]);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.details).toContain("bash: cat secret");
+    expect(outcome.details).toContain("Permission denied");
+    expect(outcome.details).toContain("Read unavailable");
+    expect(outcome.details).toContain("Write failed");
+  });
+
   it("includes runtime guard reasons but ignores quoted assistant error narratives", () => {
     writeEvents([
       { type: "assistant.message", data: { content: "Permission denied: private quoted command" } },
@@ -91,6 +105,6 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("sensitive");
     expect(outcome.details).not.toContain("runtime-private-value");
     expect(outcome.details).toContain("Permission denied");
-    expect(outcome.details.length).toBeLessThanOrEqual(8000);
+    expect(outcome.details.length).toBeLessThanOrEqual(8000 + "\n[Content truncated due to length]".length);
   });
 });

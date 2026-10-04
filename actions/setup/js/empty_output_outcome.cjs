@@ -45,7 +45,18 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
     const key = `${event.provenance.path}:${event.session_id || ""}:${data.toolCallId}`;
     if (event.type === "tool.execution_start") {
       starts.set(key, data);
-    } else if (event.type === "tool.execution_complete" && data.success === false) {
+    } else if (
+      event.type === "tool.execution_complete" &&
+      (data.success === false ||
+        data.is_error === true ||
+        data.isError === true ||
+        data.result?.isError === true ||
+        data.result?.is_error === true ||
+        data.status === "failed" ||
+        data.status === "error" ||
+        data.error != null ||
+        (typeof data.exitCode === "number" && data.exitCode !== 0))
+    ) {
       const start = starts.get(key);
       const toolName = data.toolName || start?.toolName || "unknown tool";
       const tool = [data.mcpServerName || start?.mcpServerName, toolName].filter(Boolean).join(".");
@@ -76,7 +87,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
   if (attributedDiagnostics) diagnostics.add(attributedDiagnostics);
   const details = [...diagnostics].slice(0, 20).join("\n");
-  const sanitized = sanitizeContent(redact(details)).slice(0, 8000);
+  const sanitized = sanitizeContent(redact(details), { maxLength: 8000 });
   return {
     type: "report_incomplete",
     reason: "Agent finished without emitting any valid safe outputs; task completion could not be confirmed.",
