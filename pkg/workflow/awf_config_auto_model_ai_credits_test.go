@@ -29,12 +29,36 @@ func TestZeroConfigCopilotAutoModelWithMaxAiCredits(t *testing.T) {
 			constants.DefaultFirewallVersion, awfDynamicModelAiCreditsMinVersion)
 	})
 
+	t.Run("unknown static models receive default fallback pricing", func(t *testing.T) {
+		config := AWFCommandConfig{
+			EngineName:     "copilot",
+			AllowedDomains: "github.com",
+			WorkflowData: &WorkflowData{
+				Model: "gpt-6.1-sol",
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true},
+				},
+			},
+		}
+
+		jsonStr, err := BuildAWFConfigJSON(config)
+		require.NoError(t, err)
+
+		var parsed struct {
+			APIProxy struct {
+				DefaultAiCreditsPricing AiCreditsPricingConfig `json:"defaultAiCreditsPricing"`
+			} `json:"apiProxy"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+		assert.Equal(t, AiCreditsPricingConfig{Input: 3, Output: 15}, parsed.APIProxy.DefaultAiCreditsPricing)
+	})
+
 	t.Run("no synthetic auto pricing overlay is emitted with maxAiCredits", func(t *testing.T) {
 		config := AWFCommandConfig{
 			EngineName:     "copilot",
 			AllowedDomains: "github.com",
 			WorkflowData: &WorkflowData{
-				Model: "auto",
+				Model: "copilot/auto",
 				EngineConfig: &EngineConfig{
 					ID:           "copilot",
 					MaxAICredits: 1000,

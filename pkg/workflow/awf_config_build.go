@@ -19,6 +19,9 @@ import (
 
 var awfConfigLog = logger.New("workflow:awf_config")
 
+const defaultAiCreditsPricingInput = 3.0
+const defaultAiCreditsPricingOutput = 15.0
+
 // BuildAWFConfigJSON generates a compact JSON config file for AWF from the provided
 // command configuration. The JSON is single-line (no indentation) for safe embedding
 // in a shell printf command.
@@ -179,9 +182,18 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfigLog.Print("API proxy: modelFallback disabled by default: custom LLM API target configured")
 	}
 
-	if pricing := extractDefaultAiCreditsPricing(config.WorkflowData); pricing != nil {
+	pricing := extractDefaultAiCreditsPricing(config.WorkflowData)
+	if pricing == nil && config.WorkflowData != nil &&
+		strings.TrimSpace(config.WorkflowData.Model) != "" &&
+		!isDynamicAWFConfigModel(config.WorkflowData.Model) &&
+		awfSupportsDefaultAiCreditsPricing(firewallConfig) {
+		pricing = &AiCreditsPricingConfig{Input: defaultAiCreditsPricingInput, Output: defaultAiCreditsPricingOutput}
+	}
+	if pricing != nil && awfSupportsDefaultAiCreditsPricing(firewallConfig) {
 		apiProxy.DefaultAiCreditsPricing = pricing
 		awfConfigLog.Printf("API proxy: defaultAiCreditsPricing configured: input=%g, output=%g", pricing.Input, pricing.Output)
+	} else if pricing != nil {
+		awfConfigLog.Printf("Skipping apiProxy.defaultAiCreditsPricing: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFDefaultAiCreditsPricingMinVersion)
 	}
 
 	targets := map[string]*AWFAPITargetConfig{}
@@ -514,6 +526,13 @@ func extractModelFallback(workflowData *WorkflowData) *AWFModelFallbackConfig {
 	return &AWFModelFallbackConfig{
 		Enabled: mf,
 	}
+}
+
+func isDynamicAWFConfigModel(model string) bool {
+	if _, suffix, ok := strings.Cut(strings.TrimSpace(model), "/"); ok {
+		model = suffix
+	}
+	return isDynamicModelAliasForPricing(model)
 }
 
 // hasCustomLLMAPITarget reports whether the workflow routes the agentic engine to a

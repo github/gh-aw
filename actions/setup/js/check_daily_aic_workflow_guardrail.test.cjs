@@ -26,7 +26,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     exports = mod.default || mod;
   });
 
-  it("fails closed for the repo-memory backend unless explicitly enabled", async () => {
+  it("fails closed when an untrusted repo-memory ledger has no token for verified accounting", async () => {
     const outputs = {};
     const setFailed = vi.fn();
     global.core = {
@@ -50,7 +50,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     try {
       await exports.main({ repoMemoryDir: scanCacheDirectory });
       expect(outputs.daily_ai_credits_guardrail_status).toBe("structural_error");
-      expect(outputs.daily_ai_credits_guardrail_error).toContain("untrusted");
+      expect(outputs.daily_ai_credits_guardrail_error).toContain("no artifact lookup token");
       expect(setFailed).toHaveBeenCalledOnce();
     } finally {
       delete global.core;
@@ -58,6 +58,86 @@ describe("check_daily_aic_workflow_guardrail", () => {
       delete global.context;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND;
+      delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
+      delete process.env.GITHUB_EVENT_NAME;
+    }
+  });
+
+  it("uses verified workflow-run accounting instead of an untrusted repo-memory ledger", async () => {
+    const outputs = {};
+    const warnings = [];
+    const setFailed = vi.fn();
+    const getRunAIC = vi.fn(async () => 25);
+    const mockCore = {
+      setOutput: (key, value) => {
+        outputs[key] = value;
+      },
+      setFailed,
+      info: vi.fn(),
+      warning: message => warnings.push(message),
+      summary: {
+        addDetails: function () {
+          return this;
+        },
+        write: async () => {},
+      },
+    };
+    const now = new Date().toISOString();
+    const mockGithub = {
+      rest: {
+        actions: {
+          getWorkflowRun: async () => ({
+            data: { workflow_id: 777, actor: { login: "octocat" } },
+            headers: {},
+          }),
+          listWorkflowRuns: async () => ({
+            data: {
+              workflow_runs: [
+                {
+                  id: 41,
+                  workflow_id: 777,
+                  run_attempt: 1,
+                  status: "completed",
+                  conclusion: "success",
+                  created_at: now,
+                  updated_at: now,
+                  html_url: "https://github.com/test-owner/test-repo/actions/runs/41",
+                },
+              ],
+            },
+            headers: {},
+          }),
+        },
+      },
+    };
+
+    global.core = mockCore;
+    global.github = mockGithub;
+    global.context = { repo: { owner: "test-owner", repo: "test-repo" }, runId: 99 };
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS = "100";
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND = "repo-memory";
+    process.env.GH_AW_GITHUB_TOKEN = "fake-token";
+    process.env.GH_AW_WORKFLOW_ID = "workflow-777";
+    process.env.GITHUB_EVENT_NAME = "schedule";
+    delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
+    exports.getRunAIC = getRunAIC;
+
+    try {
+      await exports.main({ repoMemoryDir: scanCacheDirectory, cachePath: path.join(scanCacheDirectory, "scan.jsonl") });
+      expect(warnings.join("\n")).toContain("falling back to verified workflow-run artifact accounting");
+      expect(getRunAIC).toHaveBeenCalledOnce();
+      expect(outputs.daily_ai_credits_total).toBe("25");
+      expect(outputs.daily_ai_credits_guardrail_status).toBe("under_budget");
+      expect(setFailed).not.toHaveBeenCalled();
+    } finally {
+      delete global.core;
+      delete global.github;
+      delete global.context;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND;
+      delete process.env.GH_AW_GITHUB_TOKEN;
+      delete process.env.GH_AW_WORKFLOW_ID;
+      delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
       delete process.env.GITHUB_EVENT_NAME;
     }
   });
