@@ -30,3 +30,4 @@
 ./pkg/workflow/reactions_test.go|2026-04-15
 ./pkg/workflow/resolve_test.go|2026-05-24
 ./pkg/workflow/time_delta_test.go|2026-05-10
+./pkg/workflow/unquote_uses_test.go|2026-10-04
