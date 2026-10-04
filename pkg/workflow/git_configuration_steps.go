@@ -122,12 +122,10 @@ func getGitIdentityEnvVars() map[string]string {
 // When envVars is empty the step runs only clean_git_credentials.sh.
 // When envVars is non-empty the env block is included and both scripts are run in sequence.
 //
-// The step always uses continue-on-error to remain resilient when no .git directory
-// exists (e.g. checkout: false) or when git is not installed.
+// Cleanup and its postcondition fail closed. With no checkout, both scripts are no-ops.
 func (c *Compiler) generateCredentialsCleanerStep(envVars map[string]struct{}) []string {
 	lines := []string{
 		"      - name: Clean credentials\n",
-		"        continue-on-error: true\n",
 	}
 
 	if len(envVars) > 0 {
@@ -138,16 +136,14 @@ func (c *Compiler) generateCredentialsCleanerStep(envVars map[string]struct{}) [
 				lines = append(lines, fmt.Sprintf("          %s: \"true\"\n", known.envVar))
 			}
 		}
-		lines = append(lines,
-			"        run: |\n",
-			"          bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"\n",
-			"          bash \"${RUNNER_TEMP}/gh-aw/actions/clean_known_action_credentials.sh\"\n",
-		)
-	} else {
-		lines = append(lines,
-			"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"\n",
-		)
 	}
-
+	lines = append(lines,
+		"        run: |\n",
+		"          bash \"${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh\"\n",
+	)
+	if len(envVars) > 0 {
+		lines = append(lines, "          bash \"${RUNNER_TEMP}/gh-aw/actions/clean_known_action_credentials.sh\"\n")
+	}
+	lines = append(lines, "          bash \"${RUNNER_TEMP}/gh-aw/actions/verify_git_credentials.sh\"\n")
 	return lines
 }

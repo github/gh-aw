@@ -2,21 +2,20 @@
 jobs:
   check_token_telemetry:
     runs-on: ubuntu-latest
-    needs: [agent]
+    needs: [agent, activation]
     if: needs.agent.result == 'success'
     permissions:
       contents: read
     steps:
       - name: Download agent artifact
         id: download-agent
-        continue-on-error: true
         uses: actions/download-artifact@v8.0.1
         with:
           name: agent
           path: /tmp/gh-aw/
 
       - name: Assert token_usage.jsonl is non-empty
-        if: steps.download-agent.outcome == 'success'
+        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
         run: |
           # The AWF firewall proxy writes token_usage.jsonl for every LLM API call.
           # If all token_usage.jsonl files are missing or empty, the emitter is broken.
@@ -44,7 +43,7 @@ jobs:
           fi
 
       - name: Assert agent_usage.json has non-zero token counts
-        if: steps.download-agent.outcome == 'success'
+        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
         run: |
           USAGE_FILE="/tmp/gh-aw/agent_usage.json"
           if [ ! -f "${USAGE_FILE}" ]; then
@@ -58,12 +57,19 @@ jobs:
             exit 1
           fi
           echo "OK: agent_usage.json reports ${INPUT_TOKENS} input tokens"
+
+      - name: Report engines without proxy token telemetry
+        if: steps.download-agent.outcome == 'success' && contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
+        run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 ---
 <!--
 # Token Telemetry Check
 
 This shared workflow adds a `check_token_telemetry` job that runs after the `agent` job
-and asserts that AWF firewall proxy token telemetry is functioning correctly.
+and asserts that AWF firewall proxy token telemetry is functioning correctly
+for engines that provide proxy token counts. Kiro, Goose, and Cursor do not
+currently provide these counts, so the job reports that the assertions are
+not applicable instead of treating missing proxy records as a regression.
 
 It guards against silent regressions in the `token_usage.jsonl` emitter, which feeds
 downstream token-cost and API-consumption audits.

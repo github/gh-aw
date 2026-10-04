@@ -2984,6 +2984,7 @@ function buildEngineFailureContext(options = {}) {
   // Derive agent-stdio.log path from the agent output file path (same directory)
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
   const stdioLogPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+  const exitCodePath = path.join(path.dirname(stdioLogPath), "agent_execution_exit_code.txt");
 
   // Include engine ID in failure messages when available (e.g. "copilot", "claude", "codex")
   const engineId = process.env.GH_AW_ENGINE_ID || "";
@@ -2991,6 +2992,8 @@ function buildEngineFailureContext(options = {}) {
   const hasStructuredMaxCacheMissesSignal = maxCacheMissesExceededFromDetection || parseMaxCacheMissesExceededFromEventLog();
 
   try {
+    const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
+    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? `**Driver exit code:** ${exitCodeText}\n\n` : "";
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
         core.info("agent-stdio.log not found, but shell expansion guard rejection was detected — using dedicated context message");
@@ -3000,8 +3003,8 @@ function buildEngineFailureContext(options = {}) {
         core.info("agent-stdio.log not found, but structured max cache misses signal was detected — using dedicated context message");
         return buildEngineMaxCacheMissesExceededContext(engineLabel);
       }
-      core.info(`agent-stdio.log not found at ${stdioLogPath}, skipping engine failure context`);
-      return "";
+      core.info(`agent-stdio.log not found at ${stdioLogPath}`);
+      return exitDetails ? buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails : "";
     }
 
     const logContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -3014,7 +3017,7 @@ function buildEngineFailureContext(options = {}) {
         core.info("agent-stdio.log is empty, but structured max cache misses signal was detected — using dedicated context message");
         return buildEngineMaxCacheMissesExceededContext(engineLabel);
       }
-      return "";
+      return exitDetails ? buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails : "";
     }
 
     const lines = logContent.split("\n");
@@ -3191,7 +3194,7 @@ function buildEngineFailureContext(options = {}) {
         return context;
       }
 
-      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n**Error details:**\n";
+      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails + "**Error details:**\n";
       for (const message of errorMessages) {
         context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
       }
@@ -3271,7 +3274,7 @@ function buildEngineFailureContext(options = {}) {
         process.env.GH_AW_ENGINE_ID === "copilot"
           ? "If this failure recurs, check the GitHub Copilot status page and review the firewall audit logs.\n\n"
           : "If this failure recurs, check the provider status page (if available) and review the firewall audit logs.\n\n";
-      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n";
+      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails;
       context += "The engine exited immediately without producing any output. This often indicates a transient infrastructure issue (e.g., service unavailable, API rate limiting). " + recurringFailureGuidance;
       return context;
     }
@@ -3279,7 +3282,7 @@ function buildEngineFailureContext(options = {}) {
     const tailLines = agentLines.slice(-TAIL_LINES);
     core.info(`No specific error patterns found; including last ${tailLines.length} line(s) of agent-stdio.log as fallback`);
 
-    let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n**Last agent output:**\n\`\`\`\n";
+    let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "**Last agent output:**\n\`\`\`\n";
     context += applyAddMaskRedaction(tailLines.join("\n"), maskedValues);
     context += "\n```\n\n";
     return context;
