@@ -1723,7 +1723,10 @@ async function getFailedAgentStep() {
       per_page: 100,
     });
     const agentJob = jobs.find(job => job.name === "agent" && job.conclusion === "failure");
-    const failedStep = agentJob?.steps?.findLast(step => step.conclusion === "failure" && typeof step.name === "string");
+    const failedStep = agentJob?.steps
+      ?.slice()
+      .reverse()
+      .find(step => step.conclusion === "failure" && typeof step.name === "string");
     return failedStep ? sanitizeContent(failedStep.name, 200) : "";
   } catch {
     core.debug("Could not identify the failed agent step");
