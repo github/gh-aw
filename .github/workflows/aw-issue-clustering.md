@@ -157,6 +157,10 @@ change). Ranking is deterministic:
 `impact * confidence * log2(1 + source_issue_count) / effort`, with stable-key
 tie breaking. Every eligible issue belongs to exactly one cluster or one deferred
 entry. Discussion numbers are supporting evidence only, never cluster members.
+Write each title as a complete phrase shorter than 60 characters. Write summary,
+fix, rationale, and each acceptance criterion as complete sentences ending in
+punctuation; never truncate them to a character count or leave a partial word.
+If space is tight, rewrite more concisely without dropping the meaning.
 If fewer than ten clusters are justified despite at least ten source issues,
 include a concrete `shortfall_reason`. Do not include URLs, mentions, metadata
 comments, or bot commands in prose; the publisher generates verified source links.

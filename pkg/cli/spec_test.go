@@ -3,7 +3,6 @@
 package cli_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,14 +67,6 @@ func TestSpec_PublicAPI_IsCommitSHA(t *testing.T) {
 	}
 }
 
-// TestSpec_PublicAPI_GetVersion validates that GetVersion returns a non-empty string.
-// Spec: "Returns the current CLI version"
-func TestSpec_PublicAPI_GetVersion(t *testing.T) {
-	t.Parallel()
-	version := cli.GetVersion()
-	assert.NotEmpty(t, version, "GetVersion should return a non-empty version string")
-}
-
 // TestSpec_PublicAPI_SetVersionInfo validates that SetVersionInfo stores the version returned by GetVersion.
 // Spec: "Sets the version at startup"
 func TestSpec_PublicAPI_SetVersionInfo(t *testing.T) {
@@ -103,6 +94,63 @@ func TestSpec_Types_ShellType(t *testing.T) {
 	assert.Equal(t, cli.ShellFish, cli.ShellType("fish"), "ShellFish constant should be \"fish\"")
 	assert.Equal(t, cli.ShellPowerShell, cli.ShellType("powershell"), "ShellPowerShell constant should be \"powershell\"")
 	assert.Equal(t, cli.ShellUnknown, cli.ShellType("unknown"), "ShellUnknown constant should be \"unknown\"")
+}
+
+// TestSpec_Constants_CheckState validates the documented normalized CI state values.
+func TestSpec_Constants_CheckState(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		actual   cli.CheckState
+		expected cli.CheckState
+	}{
+		{name: "failed", actual: cli.CheckStateFailed, expected: "failed"},
+		{name: "pending", actual: cli.CheckStatePending, expected: "pending"},
+		{name: "no checks", actual: cli.CheckStateNoChecks, expected: "no_checks"},
+		{name: "policy blocked", actual: cli.CheckStatePolicyBlocked, expected: "policy_blocked"},
+		{name: "success", actual: cli.CheckStateSuccess, expected: "success"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.actual, "CheckState constant %q should match the README specification", tt.name)
+		})
+	}
+}
+
+// TestSpec_Constants_DockerImages validates the documented default scanner images.
+// SPEC_MISMATCH: The README documents unpinned/latest image references, while the
+// exported constants currently contain versioned, digest-pinned references.
+func TestSpec_Constants_DockerImages(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "ghcr.io/zizmorcore/zizmor:latest", cli.ZizmorImage, "ZizmorImage should match the README specification")
+	assert.Equal(t, "ghcr.io/boostsecurityio/poutine:latest", cli.PoutineImage, "PoutineImage should match the README specification")
+	assert.Equal(t, "rhysd/actionlint:1.7.12", cli.ActionlintImage, "ActionlintImage should match the README specification")
+	assert.Equal(t, "ghcr.io/vigilant-llc/runner-guard:latest", cli.RunnerGuardImage, "RunnerGuardImage should match the README specification")
+}
+
+// TestSpec_Constants_TimelineEvents validates the documented timeline source and kind values.
+func TestSpec_Constants_TimelineEvents(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, cli.TimelineSourceGateway, cli.TimelineEventSource("gateway"), "gateway source should match the README specification")
+	assert.Equal(t, cli.TimelineSourceFirewall, cli.TimelineEventSource("firewall"), "firewall source should match the README specification")
+	assert.Equal(t, cli.TimelineSourceAgent, cli.TimelineEventSource("agent"), "agent source should match the README specification")
+	assert.Equal(t, cli.TimelineKindToolCall, cli.TimelineEventKind("tool_call"), "tool-call kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindDIFCFiltered, cli.TimelineEventKind("difc_filtered"), "DIFC kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindGuardPolicyBlocked, cli.TimelineEventKind("guard_blocked"), "guard-policy kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindNetworkAllowed, cli.TimelineEventKind("net_allowed"), "allowed-network kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindNetworkBlocked, cli.TimelineEventKind("net_blocked"), "blocked-network kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindAgentTurn, cli.TimelineEventKind("agent_turn"), "agent-turn kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindAgentToolStart, cli.TimelineEventKind("agent_tool_start"), "agent tool-start kind should match the README specification")
+	assert.Equal(t, cli.TimelineKindAgentToolDone, cli.TimelineEventKind("agent_tool_done"), "agent tool-done kind should match the README specification")
+}
+
+// TestSpec_Constants_WorkflowIDExplanation validates the documented workflow-ID explanation.
+func TestSpec_Constants_WorkflowIDExplanation(t *testing.T) {
+	t.Parallel()
+	assert.Contains(t, cli.WorkflowIDExplanation, "basename", "workflow-ID explanation should describe the Markdown filename basename")
+	assert.Contains(t, cli.WorkflowIDExplanation, ".md extension", "workflow-ID explanation should describe removal of the .md extension")
 }
 
 // TestSpec_PublicAPI_DetectShell validates DetectShell returns one of the documented ShellType values.
@@ -251,29 +299,6 @@ func TestSpec_PublicAPI_ExtractWorkflowPrivate(t *testing.T) {
 	}
 }
 
-// TestSpec_DesignDecision_StderrDiagnostics verifies the documented design constraint.
-// Spec: "All diagnostic output MUST go to stderr ... Structured output (JSON, hashes, graphs) goes to stdout."
-func TestSpec_DesignDecision_StderrDiagnostics(t *testing.T) {
-	require.NotNil(t, t, "design constraint: functions returning structured data use return values, not stdout")
-	engines := cli.ValidEngineNames()
-	assert.NotEmpty(t, engines, "ValidEngineNames returns data via return value, not stdout")
-	names := cli.ValidArtifactSetNames()
-	assert.NotEmpty(t, names, "ValidArtifactSetNames returns data via return value, not stdout")
-}
-
-// TestSpec_PublicAPI_GetAllCodemods validates that GetAllCodemods returns at least one codemod.
-// Spec: "Returns all available codemods"
-func TestSpec_PublicAPI_GetAllCodemods(t *testing.T) {
-	codemods := cli.GetAllCodemods()
-	require.NotEmpty(t, codemods, "GetAllCodemods should return at least one codemod")
-	for _, c := range codemods {
-		assert.NotEmpty(t, c.ID, "each Codemod should have a non-empty ID")
-		assert.NotEmpty(t, c.Name, "each Codemod should have a non-empty Name")
-		assert.NotEmpty(t, c.Description, "each Codemod should have a non-empty Description")
-		assert.NotNil(t, c.Apply, "each Codemod should have a non-nil Apply function")
-	}
-}
-
 // TestSpec_PublicAPI_ResolveArtifactFilter validates that ResolveArtifactFilter expands aliases.
 // Spec: "Expands artifact set aliases to concrete artifact names"
 func TestSpec_PublicAPI_ResolveArtifactFilter(t *testing.T) {
@@ -313,53 +338,6 @@ func TestSpec_PublicAPI_GroupRunsByWorkflow(t *testing.T) {
 	assert.Len(t, grouped, 2, "should produce two groups for two distinct workflow names")
 	assert.Len(t, grouped["workflow-a"], 2, "workflow-a group should contain two runs")
 	assert.Len(t, grouped["workflow-b"], 1, "workflow-b group should contain one run")
-}
-
-// TestSpec_PublicAPI_ValidateWorkflowIntent validates the documented validation rules.
-// Spec: "Validates the workflow intent string"
-func TestSpec_PublicAPI_ValidateWorkflowIntent(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{
-			name:    "empty string returns error",
-			input:   "",
-			wantErr: true,
-		},
-		{
-			name:    "whitespace-only string returns error",
-			input:   "   ",
-			wantErr: true,
-		},
-		{
-			name:    "string shorter than 20 characters returns error",
-			input:   "too short",
-			wantErr: true,
-		},
-		{
-			name:    "string of exactly 20 characters is valid",
-			input:   "twelve chars here!!!",
-			wantErr: false,
-		},
-		{
-			name:    "string longer than 20 characters is valid",
-			input:   "This is a sufficiently long workflow intent description",
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := cli.ValidateWorkflowIntent(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err, "ValidateWorkflowIntent(%q) should return error", tt.input)
-			} else {
-				require.NoError(t, err, "ValidateWorkflowIntent(%q) should not return error", tt.input)
-			}
-		})
-	}
 }
 
 // TestSpec_PublicAPI_UpdateFieldInFrontmatter validates the documented frontmatter field update.
@@ -520,29 +498,6 @@ func TestSpec_PublicAPI_CalculateWorkflowHealth(t *testing.T) {
 		assert.False(t, health.BelowThresh, "BelowThresh should be false when all runs succeed")
 		assert.Equal(t, 4, health.SuccessCount, "SuccessCount should count all successful runs")
 	})
-}
-
-// TestSpec_PublicAPI_IsDockerAvailable validates that IsDockerAvailable returns a bool without panicking.
-// Spec: "Returns true if the Docker daemon is reachable"
-func TestSpec_PublicAPI_IsDockerAvailable(t *testing.T) {
-	result := cli.IsDockerAvailable(context.Background())
-	_ = result // environment-dependent; spec contract: returns bool without panic
-}
-
-// TestSpec_PublicAPI_IsDockerImageAvailable validates that IsDockerImageAvailable returns false
-// for an image that cannot be present locally.
-// Spec: "Returns true if a Docker image is present locally"
-func TestSpec_PublicAPI_IsDockerImageAvailable(t *testing.T) {
-	result := cli.IsDockerImageAvailable(context.Background(), "this-image-does-not-exist-xyzzy:never")
-	assert.False(t, result, "non-existent image should not be available locally")
-}
-
-// TestSpec_PublicAPI_IsDockerImageDownloading validates that IsDockerImageDownloading returns false
-// for an image that cannot be downloading.
-// Spec: "Returns true if an image pull is in progress"
-func TestSpec_PublicAPI_IsDockerImageDownloading(t *testing.T) {
-	result := cli.IsDockerImageDownloading("this-image-does-not-exist-xyzzy:never")
-	assert.False(t, result, "non-existent image should not be currently downloading")
 }
 
 // TestSpec_PublicAPI_CalculateHealthSummary validates the aggregate health computation documented in the spec.

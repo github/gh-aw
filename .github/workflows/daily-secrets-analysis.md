@@ -59,7 +59,7 @@ Generate a daily report analyzing secret usage in all `.lock.yml` files in the r
 3. Track changes in secret usage patterns
 4. Identify security issues or anomalies
 5. Post results as a discussion
-6. Close older daily secrets discussions
+6. Let the configured safe output automatically close older daily secrets discussions
 
 ## Current Context
 
@@ -300,7 +300,7 @@ For detailed information about secret usage patterns, see:
    - Be posted in "audits" category
    - Expire after 3 days
    - Replace any existing daily secrets discussion (max: 1)
-3. **Close older discussions** older than 3 days using `close_discussion` safe output
+3. Older daily secrets discussions are closed automatically by `close-older-discussions: true` via `shared/daily-audit-discussion.md`; no manual closing is needed.
 
 ## Success Criteria
 

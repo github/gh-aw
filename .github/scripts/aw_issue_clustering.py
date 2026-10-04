@@ -174,7 +174,7 @@ def collect_discussions(repo, issues, days=14, now=None):
                 entry.get("type") == "NOT_FOUND" and entry.get("path") == ["repository", "discussion"]
                 for entry in error.errors
             ):
-                print(f"Warning: linked discussion #{number} does not exist; excluded from evidence", file=sys.stderr)
+                print(f"Linked discussion #{number} does not exist; excluded from evidence", file=sys.stderr)
                 continue
             raise
         if item is not None and aw_authored(item, repo):
