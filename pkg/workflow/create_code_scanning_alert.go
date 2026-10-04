@@ -7,6 +7,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var createCodeScanningAlertLog = logger.New("workflow:create_code_scanning_alert")
@@ -107,7 +108,7 @@ func (c *Compiler) buildCodeScanningUploadJob(data *WorkflowData) (*Job, error) 
 	}
 
 	uploadSteps := c.buildCodeScanningUploadSteps(data, restoreToken)
-	steps := make([]string, 0, len(tokenMintSteps)+len(uploadSteps))
+	steps := make([]string, 0, typeutil.SafeAllocationCapacity(len(tokenMintSteps), len(uploadSteps)))
 	steps = append(steps, tokenMintSteps...)
 	steps = append(steps, uploadSteps...)
 

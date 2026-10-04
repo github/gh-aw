@@ -381,7 +381,7 @@ func computeExperimentAnalysesWithObservationBundle(
 	if observationSets == nil {
 		observationSets = &experimentMetricObservationSets{}
 	}
-	analyses := make([]ExperimentAnalysis, 0, len(experiments))
+	analyses := make([]ExperimentAnalysis, 0)
 	for _, exp := range experiments {
 		var cfg *workflow.ExperimentConfig
 		if configs != nil {
