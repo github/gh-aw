@@ -265,6 +265,25 @@ class ClusteringTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Assigned clusters"):
             publish.validate_plan({"clusters": [], "deferred": [{"number": 1, "reason": "Deferred pending evidence."}]}, data)
 
+    def test_clipped_text_marked_with_ascii_ellipses_is_preserved(self):
+        candidate = cluster([1, 2])
+        candidate.update({
+            "title": "Make AI credits accounting resilient to unknown models...",
+            "summary": "The accounting guardrail rejects unknown models...",
+            "fix": "Provide a pricing fallback and validate the ledger...",
+            "rationale": "Related workflows report the same accounting failure...",
+            "acceptance": ["Unknown-model runs use a fallback price with a warning..."],
+        })
+        value = {
+            "clusters": [candidate], "deferred": [],
+            "shortfall_reason": "Only one coherent assignment is supported.",
+        }
+        self.assertLess(len(candidate["title"]), 60)
+        self.assertEqual([candidate], publish.validate_plan(value, corpus()))
+        body = publish.island(candidate, 1, REPO)
+        for text in (candidate["summary"], candidate["fix"], candidate["rationale"], *candidate["acceptance"]):
+            self.assertIn(text, body)
+
     def test_identity_cannot_be_repurposed(self):
         data = corpus(3)
         data["managed"] = [owned(20, cluster([1, 2]))]

@@ -78,6 +78,24 @@ test("clipped issue titles and prose are rejected, but assigned scopes remain fr
   }
 });
 
+test("clipped text marked with ASCII ellipses passes validation and is preserved", () => {
+  const candidate = {
+    ...cluster(),
+    title: "Make AI credits accounting resilient to unknown models...",
+    summary: "The accounting guardrail rejects unknown models...",
+    fix: "Provide a pricing fallback and validate the ledger...",
+    rationale: "Related workflows report the same accounting failure...",
+    acceptance: ["Unknown-model runs use a fallback price with a warning..."],
+  };
+  const value = { ...plan(candidate), shortfall_reason: "Only one coherent assignment is supported." };
+  assert.ok(candidate.title.length < 60);
+  assert.deepEqual(validatePlan(value, corpus()), [candidate]);
+  const body = island(candidate, 1, repo);
+  for (const text of [candidate.summary, candidate.fix, candidate.rationale, ...candidate.acceptance]) {
+    assert.ok(body.includes(text));
+  }
+});
+
 test("only verified mid-run closures are removed before validating remaining members", () => {
   const data = buildCorpus(
     repo,

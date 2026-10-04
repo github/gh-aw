@@ -26,6 +26,10 @@ authentication, rate-limit, or other collection errors fail the run.
 Semantic synthesis may split or merge seeds, but every eligible issue must appear
 once in an actionable cluster or an explained deferral.
 
+Prefer concise, complete prose. When clipping is unavoidable, cut at a
+whole-word boundary and append literal `...` within the field's length limit.
+Titles, including any ellipsis, must remain shorter than 60 characters.
+
 Impact, confidence, and effort use 1-5 scales. Priority is
 `impact * confidence * log2(1 + source_count) / effort`; key order breaks ties.
 Repeated reports are corroboration, not additional affected issues. A shortfall
