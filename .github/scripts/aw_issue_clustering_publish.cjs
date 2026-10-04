@@ -308,7 +308,7 @@ async function ensureLabel(github, owner, repo, staged, core) {
   else await github.rest.issues.createLabel({ owner, repo, name: label, color: "1D76DB", description: "Essential AW-generated issue clusters: assign one to resolve related findings" });
 }
 
-async function reconcile(github, owner, repo, clusters, corpus, staged, core) {
+async function reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue) {
   const existing = new Map(corpus.managed.map(item => [metadata(item).key, item]));
   const wanted = new Set(clusters.map(cluster => cluster.key));
   const retiring = [...existing].filter(([key]) => !wanted.has(key)).map(([, item]) => item);
@@ -360,8 +360,10 @@ async function reconcile(github, owner, repo, clusters, corpus, staged, core) {
     } else if (!staged) {
       const live = await collectIssues(github, owner, repo);
       requireValid(live.filter(issue => issue.state === "open" && managed(issue)).length < 10, "Active queue is full; refusing an eleventh issue");
-      const created = await github.rest.issues.create({ owner, repo, title, body: `${content}\n\n${ownerMarker}\n`, labels: [label, "automation", "agentic-workflows", "cookie"] });
-      url = created.data.html_url;
+      requireValid(typeof createIssue === "function", "Attributed issue-creation API is required");
+      const created = await createIssue({ owner, repo, title, body: content, labels: [label, "automation", "agentic-workflows", "cookie"] });
+      requireValid(!created.staged, "Issue creation was unexpectedly staged during live reconciliation");
+      url = created.issue.html_url;
     }
     result.push([rank, cluster, url]);
     core.info(`${staged ? "Preview: " : ""}${title}: ${url || ""}`);
@@ -464,7 +466,7 @@ async function publishDashboard(github, owner, repo, body, staged, core) {
   }
 }
 
-async function publish({ github, context, core }) {
+async function publish({ github, context, core, createIssue }) {
   const { owner, repo } = context.repo;
   const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8"));
   const items = (output.items || []).filter(item => item.type === "publish_essential_issues");
@@ -485,7 +487,7 @@ async function publish({ github, context, core }) {
   const preview = clusters.map((cluster, index) => [index + 1, cluster, `https://github.com/${corpus.repo}/issues/999999999`]);
   requireValid(dashboardBody(preview, refreshed, corpus, context.runId).length < 60000, "Dashboard body too large");
   await ensureLabel(github, owner, repo, staged, core);
-  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core);
+  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue);
   const body = dashboardBody(result, refreshed, corpus, context.runId);
   await publishDashboard(github, owner, repo, body, staged, core);
   await core.summary.addRaw(body).write();

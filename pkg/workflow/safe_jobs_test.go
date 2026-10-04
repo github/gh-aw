@@ -173,6 +173,47 @@ func TestBuildSafeJobsDefaultsEmptyRunsOn(t *testing.T) {
 	}
 }
 
+func TestBuildSafeJobsAttributionMetadata(t *testing.T) {
+	c := NewCompiler()
+	c.markdownPath = ".github/workflows/custom-finding.md"
+	data := &WorkflowData{
+		Name:      "Custom Finding",
+		TrackerID: "tracking-123",
+		Model:     "test-model",
+		EngineConfig: &EngineConfig{
+			ID:      "copilot",
+			Version: "1.0.0",
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			Jobs: map[string]*SafeJobConfig{
+				"publish-finding": {
+					Env: map[string]string{"CUSTOM_VALUE": "preserved"},
+					Steps: []any{map[string]any{
+						"run": "echo finding",
+						"env": map[string]any{"GH_AW_WORKFLOW_NAME": "Step override"},
+					}},
+				},
+			},
+			Staged: templatableBoolPtr("true"),
+		},
+	}
+
+	_, err := c.buildSafeJobs(data, false)
+	require.NoError(t, err)
+	job, exists := c.jobManager.GetJob("publish_finding")
+	require.True(t, exists)
+	require.Equal(t, `"custom-finding"`, job.Env["GH_AW_WORKFLOW_ID"])
+	require.Equal(t, `"Custom Finding"`, job.Env["GH_AW_WORKFLOW_NAME"])
+	require.Equal(t, `"${{ github.repository }}/custom-finding"`, job.Env["GH_AW_CALLER_WORKFLOW_ID"])
+	require.Equal(t, `"tracking-123"`, job.Env["GH_AW_TRACKER_ID"])
+	require.Equal(t, `"copilot"`, job.Env["GH_AW_ENGINE_ID"])
+	require.Equal(t, `"test-model"`, job.Env["GH_AW_ENGINE_MODEL"])
+	require.Equal(t, `"true"`, job.Env["GH_AW_SAFE_OUTPUTS_STAGED"])
+	steps := strings.Join(job.Steps, "")
+	require.Contains(t, steps, "CUSTOM_VALUE: preserved")
+	require.Contains(t, steps, "GH_AW_WORKFLOW_NAME: Step override")
+}
+
 func TestParseSafeJobsConfigMax(t *testing.T) {
 	c := NewCompiler()
 

@@ -4,11 +4,8 @@
 const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
-const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
-const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
-const { generateHistoryUrl } = require("./generate_history_link.cjs");
-const { getTrackerID } = require("./get_tracker_id.cjs");
+const { normalizeCloseOlderKey } = require("./generate_footer.cjs");
+const { formatIssueBody } = require("./issue_body.cjs");
 const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, getOrGenerateTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -762,9 +759,6 @@ async function main(config = {}) {
   const parentIssueCache = new Map();
 
   // Extract triggering context for footer generation
-  const triggeringIssueNumber = context.payload?.issue?.number && !context.payload?.issue?.pull_request ? context.payload.issue.number : undefined;
-  const triggeringPRNumber = context.payload?.pull_request?.number || (context.payload?.issue?.pull_request ? context.payload.issue.number : undefined);
-  const triggeringDiscussionNumber = context.payload?.discussion?.number;
   const parentIssueNumber = context.payload?.issue?.number;
 
   /**
@@ -1027,82 +1021,17 @@ async function main(config = {}) {
     }
 
     const workflowName = process.env.GH_AW_WORKFLOW_NAME ?? "Workflow";
-    const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE ?? "";
     const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL ?? "";
     const workflowId = process.env.GH_AW_WORKFLOW_ID ?? "";
-    // GH_AW_CALLER_WORKFLOW_ID is set at compile time to `github.repository/<workflow-id>`.
-    // When multiple workflows call the same reusable workflow via workflow_call they all
-    // share the same GH_AW_WORKFLOW_ID. We embed a separate gh-aw-workflow-call-id marker
-    // with the caller's identity so close-older-issues can distinguish callers precisely.
     const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID ?? "";
     const runUrl = buildWorkflowRunUrl(context, context.repo);
-
-    // Inject body header before user content (unshifted first, so caution will appear before it)
-    const bodyHeader = getBodyHeader({ workflowName, runUrl });
-    if (bodyHeader) {
-      bodyLines.unshift(...bodyHeader.split("\n"), "");
-    }
-
-    // Inject disclosure header (this runs after body-header, but appears before it because unshift prepends)
-    const disclosureHeader = getDisclosureHeader({ workflowName, runUrl });
-    if (disclosureHeader) {
-      bodyLines.unshift(...disclosureHeader.split("\n"), "");
-    }
-
-    // Inject CAUTION at top of body if threat detection warning was raised
-    // (unshifted after header so it appears first in the final output)
-    const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-    if (detectionCaution) {
-      bodyLines.unshift(...detectionCaution.split("\n"), "");
-    }
-
-    // Add tracker-id comment if present
-    const trackerIDComment = getTrackerID("markdown");
-    if (trackerIDComment) {
-      bodyLines.push(trackerIDComment);
-    }
-
-    // Generate footer and add expiration using helper
-    // When footer is disabled, only add XML markers (no visible footer content)
-    if (includeFooter) {
-      const historyUrl = generateHistoryUrl({
-        owner: repoParts.owner,
-        repo: repoParts.repo,
-        itemType: "issue",
-        workflowCallId: callerWorkflowId,
-        workflowId,
-        serverUrl: context.serverUrl,
-      });
-      const footer = addExpirationToFooter(
-        generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber, historyUrl, { skipDetectionCaution: true }).trimEnd(),
-        expiresHours,
-        "Issue"
-      );
-      bodyLines.push(``, footer);
-    }
-
-    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
-    if (bodyFooter) {
-      bodyLines.push(``, bodyFooter.trimEnd());
-    }
-
-    // Add standalone workflow-id marker for searchability (consistent with comments)
-    // Always add XML markers even when footer is disabled
-    if (workflowId) {
-      bodyLines.push(``, generateWorkflowIdMarker(workflowId));
-    }
-    // Add workflow-call-id marker when available to allow close-older-issues to
-    // distinguish callers that share the same reusable workflow (and GH_AW_WORKFLOW_ID)
-    if (callerWorkflowId) {
-      bodyLines.push(generateWorkflowCallIdMarker(callerWorkflowId));
-    }
-    // Add explicit close-key marker when a custom deduplication key is provided
-    if (closeOlderKey) {
-      bodyLines.push(generateCloseKeyMarker(closeOlderKey));
-    }
-
-    bodyLines.push("");
-    const body = bodyLines.join("\n").trim();
+    const body = formatIssueBody(bodyLines.join("\n"), {
+      repo: repoParts,
+      footer: includeFooter,
+      bodyFooter: config.body_footer,
+      expiresHours,
+      closeOlderKey,
+    });
 
     // Reserve a max-count slot synchronously before any async pre-creation work.
     // There is no await between check and increment, so concurrent invocations

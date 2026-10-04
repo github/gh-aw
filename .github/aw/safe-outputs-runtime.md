@@ -40,6 +40,8 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
 
   Post-processing GitHub Actions jobs registered as MCP tools. Agents call the tool by its normalized name (dashes → underscores, e.g., `send_notification`). The job runs after the agent completes with access to `$GH_AW_AGENT_OUTPUT` (agent output JSON path). Use to integrate Slack, Discord, external APIs, databases, or any service requiring secrets. Import from shared files via `imports:`.
 
+  Custom implementations should add a generated-by footer and workflow provenance annotations to published content; direct API calls omit them and lose provenance-based tracking. For GitHub issues, run the setup action, initialize `actions/setup/js/stable.cjs` with `setupGlobals`, and call `createIssue`. See the [public issue-creation API](https://github.github.com/gh-aw/reference/custom-safe-outputs/#issue-creation-api).
+
   Two extra per-job properties:
   - `needs:` (string or array) - sequence this job relative to other compiled jobs; valid targets are `agent`, `safe_outputs`, `detection`, `upload_assets`, `unlock`, or another job name (dashes normalized to underscores). Persists across recompiles, unlike hand-patching the lock file.
   - `artifacts:` (array of strings) - filesystem paths/globs under `/tmp/gh-aw/` that this job's `inputs` reference so the compiler includes them in the unified agent artifact upload (paths the agent wrote at runtime are otherwise dropped). Directory entries must end with `/`; only secret-redaction-covered extensions (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, `.patch`) are persisted, and `..` or hidden-file segments are rejected at compile time.
