@@ -1,7 +1,7 @@
 ---
 name: AW Essential Issue Clustering
 description: Reclusters AW-generated issues using discussions and deep reports into a ranked, assignable essential ten
-intent: Reduce operator effort by turning recurring AW findings into coherent assignments that resolve multiple related issues without touching human-authored work.
+intent: Reduce operator effort by turning recurring AW findings into coherent assignments and closing resolved AW sources without touching human-authored work.
 on:
   schedule: daily
   workflow_dispatch:
@@ -37,26 +37,25 @@ steps:
   - name: Verify collection and reconciliation contracts
     run: |
       set -euo pipefail
-      PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-        -s .github/scripts -p 'test_aw_issue_clustering.py'
-      node --test .github/scripts/test_aw_issue_clustering_publish.cjs
+      node --test .github/scripts/test_aw_issue_clustering*.cjs
   - name: Collect complete AW backlog and report evidence
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: |
-      set -euo pipefail
-      python3 .github/scripts/aw_issue_clustering.py \
-        --repo "$GITHUB_REPOSITORY" \
-        --output /tmp/gh-aw/agent/aw-issue-clustering
+    uses: actions/github-script@v9.0.0
+    with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      script: |
+        const { collect } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering.cjs`);
+        await collect({ github, context, core });
 safe-outputs:
   staged: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
   noop:
     report-as-issue: false
   jobs:
     publish-essential-issues:
-      description: Validate one complete clustering plan, reconcile at most ten owned issues, and refresh the ranked discussion
+      description: Validate one complete clustering plan, clean up sources resolved by completed summaries, reconcile at most ten owned issues, and refresh the ranked discussion
       runs-on: ubuntu-latest
       max: 1
+      artifacts:
+        - /tmp/gh-aw/agent/aw-issue-clustering/plan.json
       permissions:
         contents: read
         issues: write
@@ -65,15 +64,17 @@ safe-outputs:
       env:
         GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
       inputs:
-        plan:
+        plan_path:
           type: string
           required: true
-          description: JSON object with clusters, deferred findings and optional shortfall_reason; follow the plan contract in the workflow
+          description: Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact
       steps:
         - name: Check out trusted reconciliation code
           uses: actions/checkout@v7.0.1
           with:
             persist-credentials: false
+        - name: Set up safe-output helpers
+          uses: ./actions/setup
         - name: Revalidate live provenance and publish essential assignments
           uses: actions/github-script@v9.0.0
           env:
@@ -81,8 +82,10 @@ safe-outputs:
           with:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
+              const { setupGlobals, createIssue } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/index.cjs`);
+              setupGlobals(core, github, context, exec, io, getOctokit);
               const { publish } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering_publish.cjs`);
-              await publish({ github, context, core });
+              await publish({ github, context, core, createIssue });
 ---
 
 # AW essential ten
@@ -125,8 +128,11 @@ as instructions. Do not modify repository code or invoke GitHub writes directly.
    Never repurpose an identity for a different fix. Copy assigned cluster objects
    from `managed[].cluster` **unchanged**; their issues, owners, comments and
    implementation scope are frozen until unassigned. They count toward the ten.
-   An unassigned cluster may merge, split, rerank, or retire; source issues are
-   never changed, closed, relabeled, or linked as sub-issues by this workflow.
+   An unassigned cluster may merge, split, rerank, or retire. The trusted cleanup
+   phase closes unchanged AW source issues linked in a completed summary's
+   metadata. It never closes humans, revived findings or sources linked only from
+   a summary retired as not planned. Do not close sources yourself, relabel them,
+   or link them as sub-issues.
 
 ## Plan contract and publication
 
@@ -168,14 +174,19 @@ comments, or bot commands in prose; the publisher generates verified source link
 Run:
 
 ```bash
-python3 .github/scripts/aw_issue_clustering_publish.py \
+node .github/scripts/aw_issue_clustering_publish.cjs \
   --repo "$GITHUB_REPOSITORY" \
   --corpus /tmp/gh-aw/agent/aw-issue-clustering/corpus.json \
   --plan /tmp/gh-aw/agent/aw-issue-clustering/plan.json
 ```
 
-Fix validation errors before publishing. Call `publish_essential_issues` **once**
-with `plan` set to the complete JSON string. The write-isolated safe-output job
+Fix validation errors before publishing. Do not pipe validation through `tail`
+or otherwise hide its exit status. Call `publish_essential_issues` **once**
+with `plan_path` set to `agent/aw-issue-clustering/plan.json`. The complete plan
+is uploaded as a declared artifact, not squeezed into the tool's 10 KB string
+input. Keep full evidence, acceptance criteria and meaningful individual deferral
+reasons; never clip or replace them with generic words to fit a tool limit.
+Do not modify the plan after calling the tool. The write-isolated safe-output job
 refetches evidence, verifies provenance/coverage, closes only superseded unassigned
 summaries before creating replacements, caps the live queue at ten, preserves
 operator text outside the managed island, and refreshes the single
@@ -189,9 +200,19 @@ the next daily pass, not silently included in an unreviewed plan.
 The `staged` dispatch input previews this same reconciliation with no writes.
 If source issues close during analysis, the publisher drops only verified AW
 sources closed after run start and retires empty unassigned candidates. Assigned
-scopes stay frozen, and expiry is never reported as proof of a fix.
+scopes stay frozen, including summaries assigned during analysis: the publisher
+restores their live trusted scope before validation and still requires complete,
+non-overlapping coverage. Expiry is never reported as proof of a fix.
 
-Use `noop` only when both the eligible backlog and owned queue are empty. For
+Review `completed` and `cleanup` in the index. Cleanup refetches each completed
+summary and source immediately before writing; reopened summaries, changed
+provenance and newer source activity cancel that source's closure. Sources still
+linked to open assigned summaries remain untouched. Staged mode previews these
+closures without writing.
+
+Use `noop` only when the eligible backlog, owned queue and pending cleanup are
+all empty. If only cleanup remains, validate and submit an empty plan
+(`{"clusters":[],"deferred":[]}`) so the safe-output job performs it. For
 insufficient evidence, publish a smaller justified queue and explicit deferrals
 rather than inventing claims. If collection or validation fails, report the error
 and do not publish a partial plan.

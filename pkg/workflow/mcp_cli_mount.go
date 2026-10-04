@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var mcpCLIMountLog = logger.New("workflow:mcp_cli_mount")
@@ -378,7 +379,7 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	// would reference a step from the agent job in the activation job's env block, which
 	// is out of scope and triggers actionlint errors.
 	budgetLines := staticEnclaveInformationBudgetPromptLines(data)
-	lines := make([]string, 0, len(servers)+len(budgetLines))
+	lines := make([]string, 0, typeutil.SafeAllocationCapacity(len(servers), len(budgetLines)))
 	for _, server := range servers {
 		lines = append(lines, fmt.Sprintf("- `%s` — run `%s --help` to see available tools", server, server))
 	}

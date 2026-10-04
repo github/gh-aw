@@ -324,6 +324,7 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 		job := &Job{
 			Name:        normalizedJobName,
 			Environment: c.indentYAMLLines(resolveSafeOutputsEnvironment(data), "    "),
+			Env:         c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath)),
 		}
 
 		// Set custom job name if specified

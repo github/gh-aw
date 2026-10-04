@@ -82,7 +82,7 @@ func dynamicEnclaveGitHubGuardRepos(workflowData *WorkflowData) []string {
 		return nil
 	}
 	seen := make(map[string]struct{})
-	repos := make([]string, 0, len(enclave.Dynamic.AllowedRepositories)+len(enclave.Dynamic.AllowedOwners))
+	repos := make([]string, 0, typeutil.SafeAllocationCapacity(len(enclave.Dynamic.AllowedRepositories), len(enclave.Dynamic.AllowedOwners)))
 	add := func(repo string) {
 		repo = strings.TrimSpace(repo)
 		if repo == "" {
@@ -208,7 +208,7 @@ func staticEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]an
 }
 
 func writeSinkAcceptLabelsForRepos(repos []string) []string {
-	accept := make([]string, 0, len(repos))
+	accept := make([]string, 0, typeutil.SafeAllocationCapacity(len(repos)))
 	for _, repo := range repos {
 		accept = append(accept, transformRepoPattern(repo))
 	}
@@ -423,7 +423,7 @@ func parseGitHubAllowedToolsAndLimits(allowedSetting any) ([]string, map[string]
 		return parseStringSliceAny(allowedSetting, nil), nil
 	}
 
-	allowedTools := make([]string, 0, len(allowedItems))
+	allowedTools := make([]string, 0)
 	toolCallLimits := make(map[string]int)
 
 	for _, item := range allowedItems {
@@ -639,7 +639,7 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 		}
 	case []any:
 		// Array of patterns
-		acceptList = make([]string, 0, len(r))
+		acceptList = make([]string, 0)
 		for _, item := range r {
 			if pattern, ok := item.(string); ok {
 				acceptList = append(acceptList, transformRepoPattern(pattern))
@@ -647,7 +647,7 @@ func deriveSafeOutputsGuardPolicyFromGitHub(githubTool map[string]any) map[strin
 		}
 	case []string:
 		// Array of patterns (already strings)
-		acceptList = make([]string, 0, len(r))
+		acceptList = make([]string, 0)
 		for _, pattern := range r {
 			acceptList = append(acceptList, transformRepoPattern(pattern))
 		}

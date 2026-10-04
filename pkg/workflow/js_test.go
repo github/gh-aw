@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-func TestGetLogParserBootstrap(t *testing.T) {
-	if got := GetLogParserBootstrap(); got != "" {
-		t.Errorf("GetLogParserBootstrap() = %q, want empty string", got)
-	}
-}
-
 func TestFormatJavaScriptForYAML(t *testing.T) {
 	tests := []struct {
 		name     string

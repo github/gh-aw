@@ -98,6 +98,46 @@ process.stdout.write(serializeConfig(buildConfig({github: {headers: {Authorizati
 	assert.Equal(t, "Bearer \"quoted\"\\token", headers["Authorization"])
 }
 
+func TestCodexGitHubInferenceDisablesUnsupportedExecTool(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		model        string
+		disableShell bool
+	}{
+		{name: "Copilot provider", model: "copilot/gpt-5.3-codex", disableShell: true},
+		{name: "OpenAI provider", model: "gpt-5.3-codex"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := &WorkflowData{
+				Name:         "provider-tool-config",
+				Model:        test.model,
+				EngineConfig: &EngineConfig{ID: "codex"},
+			}
+			var output strings.Builder
+			require.NoError(t, renderCodexMCPConfigForTest(t, NewCodexEngine(), &output, map[string]any{}, nil, data))
+
+			config := decodeCodexBootstrap(t, output.String())
+			features := config["features"].(map[string]any)
+			if test.disableShell {
+				assert.Equal(t, false, features["shell_tool"])
+			} else {
+				assert.NotContains(t, features, "shell_tool")
+			}
+		})
+	}
+}
+
+func TestCodexGitHubInferenceRejectsExecToolOverride(t *testing.T) {
+	_, err := NewCodexEngine().buildNativeConfig(&WorkflowData{
+		Model: "copilot/gpt-5.3-codex",
+		EngineConfig: &EngineConfig{
+			ID:     "codex",
+			Config: "[features]\nshell_tool = true",
+		},
+	}, nil)
+	require.ErrorContains(t, err, "does not support the Codex exec custom tool")
+}
+
 func TestCodexNativeConfigShellEnvironment(t *testing.T) {
 	data := &WorkflowData{
 		EngineConfig: &EngineConfig{Env: map[string]string{

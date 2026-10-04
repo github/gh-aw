@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 const (
@@ -98,7 +99,7 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 	}
 
 	startedLines := componentExecutionEvidenceShellLines(component, "started", filePath)
-	injected := make(GitHubActionStep, 0, len(step)+len(startedLines))
+	injected := make(GitHubActionStep, 0, typeutil.SafeAllocationCapacity(len(step), len(startedLines)))
 	injected = append(injected, step[:insertIndex]...)
 	for _, line := range startedLines {
 		injected = append(injected, "          "+line)

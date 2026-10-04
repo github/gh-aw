@@ -16,6 +16,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
+const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { normalizeIssueIntentLabelNames } = require("./issue_intents.cjs");
 
 /**
@@ -68,19 +69,32 @@ const main = createCountGatedHandler({
       const { repo: itemRepo, repoParts } = repoResult;
       core.info(`Target repository: ${itemRepo}`);
 
-      const effectiveContext = resolveInvocationContext(context);
-      const triggeringItemNumber = effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
       let itemNumber;
+      let contextType;
 
       if (target === "*") {
+        const effectiveContext = resolveInvocationContext(context);
+        const triggeringItemNumber = effectiveContext.eventPayload?.issue?.number ?? effectiveContext.eventPayload?.pull_request?.number;
         // Accept common aliases: issue_number, pr_number, and pull_number are normalised to item_number
         const targetResult = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE });
         if (!targetResult.success) return targetResult;
         itemNumber = targetResult.number ?? triggeringItemNumber;
+        contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       } else if (target === "triggering") {
-        itemNumber = triggeringItemNumber;
+        const targetResult = resolveTarget({ targetConfig: target, item: message, context, itemType: HANDLER_TYPE, supportsPR: true });
+        if (!targetResult.success) {
+          if (targetResult.shouldFail === false) {
+            core.warning(targetResult.error);
+            return { success: false, skipped: true, reason: targetResult.error, error: targetResult.error };
+          }
+          return targetResult;
+        }
+        itemNumber = targetResult.number;
+        contextType = targetResult.contextType;
       } else {
+        const effectiveContext = resolveInvocationContext(context);
         itemNumber = Number(target);
+        contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       }
 
       itemNumber = Number(itemNumber);
@@ -90,7 +104,6 @@ const main = createCountGatedHandler({
         return { success: false, error };
       }
 
-      const contextType = effectiveContext.eventPayload?.pull_request ? "pull request" : "issue";
       const requestedLabels = message.labels ?? [];
       core.info(`Requested labels to remove: ${JSON.stringify(requestedLabels)}`);
       let requestedLabelNames;

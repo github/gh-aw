@@ -12,6 +12,8 @@ describe("handle_agent_failure", () => {
   let buildCodePushFailureContext;
   let buildPushRepoMemoryFailureContext;
   let buildReportIncompleteContext;
+  let buildFailureDiagnosticsContext;
+  let getFailedAgentStep;
   let buildFailureIssueTitle;
   let buildModelPricingFrontmatterSnippet;
   let fetchModelPricingFromModelsDev;
@@ -45,6 +47,8 @@ describe("handle_agent_failure", () => {
       buildCodePushFailureContext,
       buildPushRepoMemoryFailureContext,
       buildReportIncompleteContext,
+      buildFailureDiagnosticsContext,
+      getFailedAgentStep,
       buildFailureIssueTitle,
       buildModelPricingFrontmatterSnippet,
       fetchModelPricingFromModelsDev,
@@ -209,6 +213,91 @@ describe("handle_agent_failure", () => {
 
       expect(global.core.setOutput).toHaveBeenCalledWith("failure_issue_number", "99");
       expect(global.core.setOutput).toHaveBeenCalledWith("failure_issue_url", "https://github.com/owner/repo/issues/99");
+    });
+  });
+
+  describe("failure diagnostics", () => {
+    it("includes the last failed agent step when available", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Run agent", conclusion: "failure" },
+              { name: "Post Run agent", conclusion: "failure" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+      global.context.runId = 123;
+
+      await expect(getFailedAgentStep()).resolves.toBe("Post Run agent");
+    });
+
+    it("returns an empty string when no failed agent job is found", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ name: "other", conclusion: "failure", steps: [] }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.debug).toHaveBeenCalledWith("No failed agent job found when looking up the failed agent step");
+    });
+
+    it("returns an empty string when the agent job has no failed steps", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([{ name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "success" }] }]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.debug).toHaveBeenCalledWith("No failed step found in the agent job");
+    });
+
+    it("warns when the workflow run jobs API is inaccessible", async () => {
+      const error = Object.assign(new Error("Resource not accessible by integration: user-generated response"), { status: 403 });
+      global.github = {
+        paginate: vi.fn().mockRejectedValue(error),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.warning).toHaveBeenCalledWith("Could not identify the failed agent step; ensure the conclusion job grants actions: read.");
+      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("user-generated response");
+    });
+
+    it("warns without exposing unexpected API error text", async () => {
+      global.github = {
+        paginate: vi.fn().mockRejectedValue(new Error("user-generated response")),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentStep()).resolves.toBe("");
+      expect(global.core.warning).toHaveBeenCalledWith("Could not identify the failed agent step because the workflow run jobs API request failed.");
+      expect(JSON.stringify(global.core.warning.mock.calls)).not.toContain("user-generated response");
+    });
+
+    it("renders a captured cause for generic agent failures", () => {
+      const result = buildFailureDiagnosticsContext({
+        failureCategories: ["agent_failure"],
+        failingStep: "Run agent",
+        engineFailureContext: "Driver exit code: 1\nLast error: engine failed",
+      });
+
+      expect(result).toContain("Failing step:** Run agent");
+      expect(result).not.toContain("No cause was captured");
+    });
+
+    it("states when no cause was captured", () => {
+      const result = buildFailureDiagnosticsContext({
+        failureCategories: ["agent_failure"],
+        failingStep: "",
+        engineFailureContext: "",
+      });
+
+      expect(result).toContain("No cause was captured from the agent report or engine logs.");
     });
   });
 
@@ -1763,10 +1852,17 @@ describe("handle_agent_failure", () => {
     const fs = require("fs");
     const path = require("path");
     const { renderTemplate } = require("./messages_core.cjs");
-    const reportIncompleteMarker = "MARKER: cannot continue";
+    const reportIncompleteMarker = "MARKER: infrastructure failed";
 
     it("renders report_incomplete context in both comment and issue templates", () => {
-      const reportIncompleteContext = buildReportIncompleteContext([{ type: "report_incomplete", reason: reportIncompleteMarker }]);
+      const reportIncompleteItems = [{ type: "report_incomplete", reason: "infrastructure_error", details: reportIncompleteMarker }];
+      const reportIncompleteContext = buildReportIncompleteContext(reportIncompleteItems);
+      const failureDiagnosticsContext = buildFailureDiagnosticsContext({
+        failureCategories: ["report_incomplete"],
+        failingStep: "Run agent",
+        engineFailureContext: "",
+        items: reportIncompleteItems,
+      });
       const templateContext = {
         run_id: "123456",
         run_url: "https://github.com/owner/repo/actions/runs/123456",
@@ -1795,6 +1891,7 @@ describe("handle_agent_failure", () => {
         permission_denied_context: "",
         tool_denials_exceeded_context: "",
         report_incomplete_context: reportIncompleteContext,
+        failure_diagnostics_context: failureDiagnosticsContext,
         missing_safe_outputs_context: "",
         engine_failure_context: "",
         timeout_context: "",
@@ -1806,6 +1903,34 @@ describe("handle_agent_failure", () => {
 
       expect(renderTemplate(commentTemplate, templateContext)).toContain(reportIncompleteMarker);
       expect(renderTemplate(issueTemplate, templateContext)).toContain(reportIncompleteMarker);
+      expect(reportIncompleteContext).toContain("infrastructure_error");
+      expect(reportIncompleteContext).toContain(reportIncompleteMarker);
+      expect(failureDiagnosticsContext).toContain("Failing step:** Run agent");
+    });
+
+    it("renders denied commands and missing capability names from an empty-output outcome", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const os = require("os");
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "failure-empty-output-"));
+      try {
+        fs.writeFileSync(
+          path.join(rootDir, "agent-session.jsonl"),
+          [
+            { type: "tool.execution_start", data: { toolCallId: "denied", toolName: "bash", input: { command: "cat restricted-file" } } },
+            { type: "tool.execution_complete", data: { toolCallId: "denied", success: false, error: "Permission denied" } },
+            { type: "tool.execution_complete", data: { toolName: "github.get_file_contents", success: false, error: "Missing read access" } },
+          ]
+            .map(JSON.stringify)
+            .join("\n")
+        );
+        const report = buildReportIncompleteContext([buildEmptyOutputOutcome([], rootDir)]);
+        expect(report).toContain("cat restricted-file");
+        expect(report).toContain("Permission denied");
+        expect(report).toContain("github.get_file_contents");
+        expect(report).toContain("Missing read access");
+      } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
     });
   });
 

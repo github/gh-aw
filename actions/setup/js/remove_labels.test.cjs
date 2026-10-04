@@ -42,6 +42,7 @@ describe("remove_labels", () => {
     };
 
     mockContext = {
+      eventName: "issues",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -345,6 +346,7 @@ describe("remove_labels", () => {
     });
 
     it("should remove labels from a pull request from context", async () => {
+      mockContext.eventName = "pull_request";
       mockContext.payload = {
         pull_request: {
           number: 789,
@@ -387,9 +389,15 @@ describe("remove_labels", () => {
     });
 
     it("should handle missing item_number and no context", async () => {
+      mockContext.eventName = "workflow_dispatch";
       mockContext.payload = {};
 
       const handler = await main({ max: 10 });
+      const removeLabelCalls = [];
+      mockGithub.rest.issues.removeLabel = async params => {
+        removeLabelCalls.push(params);
+        return {};
+      };
 
       const result = await handler(
         {
@@ -399,7 +407,9 @@ describe("remove_labels", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("No issue/PR number available")).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.error).toContain('Target is "triggering" but not running in issue or pull request context');
+      expect(removeLabelCalls).toHaveLength(0);
     });
 
     it("should respect max count limit", async () => {

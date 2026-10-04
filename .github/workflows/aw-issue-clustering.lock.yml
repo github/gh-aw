@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"a7cb566328197a106a5f8f5999a880caff484b9f9ae33ae0b6dc23e94508c60e","body_hash":"aaff390af142555e7fbf6a4e8e5c8ba02e418b83fcf04b5b08e137c70c35032d","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.90"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/setup-python","sha":"5fda3b95a4ea91299a34e894583c3862153e4b97","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31","digest":"sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31@sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31","digest":"sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31@sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.31","digest":"sha256:505df66052e6688cf419ad248a511d17093475bd66a958618078d3c9cdf95083","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.31@sha256:505df66052e6688cf419ad248a511d17093475bd66a958618078d3c9cdf95083"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31","digest":"sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31@sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"mcp_servers":[{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_essential_issues"]}],"threat_detection":{"mode":"enabled"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"33151a72a813661ee3e437a52ed5704892239e03db929981909e7499df3151fd","body_hash":"9b180ea8d6bb4ef7a85c2e0ac7a940edaf8b2d66af15ca9209d7d6ef795ab807","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.90"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31","digest":"sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.31@sha256:c4ab1d48d533cc7daaa5f2e1193d1a644888242fb8813d49c6de46d129224b76"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31","digest":"sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.31@sha256:a5a37489635109334a5e2b5cb2eaba32e8c8f1a89d8dea6009baa962a8904c4a"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.31","digest":"sha256:505df66052e6688cf419ad248a511d17093475bd66a958618078d3c9cdf95083","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.31@sha256:505df66052e6688cf419ad248a511d17093475bd66a958618078d3c9cdf95083"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31","digest":"sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.31@sha256:90a46d2e6e910ace2c09c2dcf6b56dc374ed513d9da642a4e9fcfcd6e9248a9d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.12.2","digest":"sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6","pinned_image":"ghcr.io/github/github-mcp-server:v1.12.2@sha256:508a0857ec762b1ab1cece29193345b501fab1dd9d1228a7b617062954cecac6"}],"mcp_servers":[{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_essential_issues"]}],"threat_detection":{"mode":"enabled"}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -25,7 +25,7 @@
 #
 # Reclusters AW-generated issues using discussions and deep reports into a ranked, assignable essential ten
 #
-# Intent: Reduce operator effort by turning recurring AW findings into coherent assignments that resolve multiple related issues without touching human-authored work.
+# Intent: Reduce operator effort by turning recurring AW findings into coherent assignments and closing resolved AW sources without touching human-authored work.
 #
 # Secrets used:
 #   - GH_AW_DEFAULT_OTLP_ENDPOINT
@@ -40,7 +40,6 @@
 #   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
 #   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
 #   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-#   - actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
 #   - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
 #
 # Container images used:
@@ -476,10 +475,6 @@ jobs:
           evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"
           printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
       - name: Create gh-aw temp directory
         run: bash "${RUNNER_TEMP}/gh-aw/actions/create_gh_aw_tmp_dir.sh"
       - name: Configure gh CLI for GitHub Enterprise
@@ -492,11 +487,16 @@ jobs:
           name: activation
           path: /tmp/gh-aw
       - name: Verify collection and reconciliation contracts
-        run: "set -euo pipefail\nPYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \\\n  -s .github/scripts -p 'test_aw_issue_clustering.py'\nnode --test .github/scripts/test_aw_issue_clustering_publish.cjs\n"
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Collect complete AW backlog and report evidence
-        run: "set -euo pipefail\npython3 .github/scripts/aw_issue_clustering.py \\\n  --repo \"$GITHUB_REPOSITORY\" \\\n  --output /tmp/gh-aw/agent/aw-issue-clustering"
+        run: |
+          set -euo pipefail
+          node --test .github/scripts/test_aw_issue_clustering*.cjs
+      - name: Collect complete AW backlog and report evidence
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |-
+            const { collect } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering.cjs`);
+            await collect({ github, context, core });
 
       - name: Configure Git credentials
         env:
@@ -566,7 +566,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"publish-essential-issues\":{\"description\":\"Validate one complete clustering plan, reconcile at most ten owned issues, and refresh the ranked discussion\",\"inputs\":{\"plan\":{\"default\":null,\"description\":\"JSON object with clusters, deferred findings and optional shortfall_reason; follow the plan contract in the workflow\",\"required\":true,\"type\":\"string\"}},\"max\":1},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"publish-essential-issues\":{\"description\":\"Validate one complete clustering plan, clean up sources resolved by completed summaries, reconcile at most ten owned issues, and refresh the ranked discussion\",\"inputs\":{\"plan_path\":{\"default\":null,\"description\":\"Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact\",\"required\":true,\"type\":\"string\"}},\"max\":1},\"report_incomplete\":{}}"
         with:
           script: |
             const path = require('path');
@@ -583,17 +583,17 @@ jobs:
               "repo_params": {},
               "dynamic_tools": [
                 {
-                  "description": "Validate one complete clustering plan, reconcile at most ten owned issues, and refresh the ranked discussion",
+                  "description": "Validate one complete clustering plan, clean up sources resolved by completed summaries, reconcile at most ten owned issues, and refresh the ranked discussion",
                   "inputSchema": {
                     "additionalProperties": false,
                     "properties": {
-                      "plan": {
-                        "description": "JSON object with clusters, deferred findings and optional shortfall_reason; follow the plan contract in the workflow",
+                      "plan_path": {
+                        "description": "Set to agent/aw-issue-clustering/plan.json after writing and validating the complete plan artifact",
                         "type": "string"
                       }
                     },
                     "required": [
-                      "plan"
+                      "plan_path"
                     ],
                     "type": "object"
                   },
@@ -970,6 +970,7 @@ jobs:
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/stop_mcp_gateway.sh" "$GATEWAY_PID"
       - name: Redact secrets in logs
+        id: redact_secrets
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -1106,7 +1107,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
       - name: Upload agent artifacts
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1129,6 +1130,7 @@ jobs:
             /tmp/gh-aw/otlp-export-errors.jsonl
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json
+            /tmp/gh-aw/agent/aw-issue-clustering/plan.json
             /tmp/gh-aw/aw-*.patch
             /tmp/gh-aw/aw-*.bundle
             /tmp/gh-aw/awf-config.json
@@ -1753,6 +1755,21 @@ jobs:
       contents: read
       discussions: write
       issues: write
+    env:
+      GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
+      GH_AW_CALLER_WORKFLOW_ID: "${{ github.repository }}/aw-issue-clustering"
+      GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
+      GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+      GH_AW_ENGINE_ID: "copilot"
+      GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+      GH_AW_PROJECT_UTC: "-08:00"
+      GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
+      GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
+      GH_AW_WORKFLOW_ID: "aw-issue-clustering"
+      GH_AW_WORKFLOW_NAME: "AW Essential Issue Clustering"
+      GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/aw-issue-clustering.md"
     steps:
       - name: Download agent output artifact
         continue-on-error: true
@@ -1768,6 +1785,11 @@ jobs:
           GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
         with:
           persist-credentials: false
+      - name: Set up safe-output helpers
+        uses: ./actions/setup
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
+          GH_AW_SAFE_OUTPUTS_STAGED: ${{ github.event_name == 'workflow_dispatch' && inputs.staged }}
       - name: Revalidate live provenance and publish essential assignments
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1776,8 +1798,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const { setupGlobals, createIssue } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/index.cjs`);
+            setupGlobals(core, github, context, exec, io, getOctokit);
             const { publish } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering_publish.cjs`);
-            await publish({ github, context, core });
+            await publish({ github, context, core, createIssue });
 
   safe_outputs:
     needs:

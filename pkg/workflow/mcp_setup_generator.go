@@ -70,6 +70,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/typeutil"
 )
 
 var mcpSetupGeneratorLog = logger.New("workflow:mcp_setup_generator")
@@ -153,7 +154,7 @@ func toolsWithEnclaveGitHubIssues(tools map[string]any, workflowData *WorkflowDa
 	if !enclaveGitHubDelegationEnabled(workflowData) {
 		return tools
 	}
-	updated := make(map[string]any, len(tools)+1)
+	updated := make(map[string]any, typeutil.SafeAllocationCapacity(len(tools), 1))
 	maps.Copy(updated, tools)
 	if githubToolRaw, hasGitHub := tools["github"]; hasGitHub && githubToolRaw == false {
 		return updated

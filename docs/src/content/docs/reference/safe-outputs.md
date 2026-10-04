@@ -155,6 +155,8 @@ safe-outputs:
 
 Create custom post-processing jobs registered as Model Context Protocol (MCP) tools. Support standard GitHub Actions properties and auto-access agent output via `$GH_AW_AGENT_OUTPUT`. See [Custom Safe Output Jobs](/gh-aw/reference/custom-safe-outputs/).
 
+Custom implementations should include a generated-by footer and workflow metadata on published content. Direct API calls do not add these automatically; without them, provenance searches and workflow-output tracking cannot identify the content. Use the [stable issue-creation API](/gh-aw/reference/custom-safe-outputs/#issue-creation-api) for GitHub issues.
+
 ### GitHub Action Wrappers (`actions:`)
 
 Mount any public GitHub Action as a once-callable MCP tool. The compiler pins the action reference to a SHA at compile time and derives the tool's input schema from the action's `action.yml`. See [GitHub Action Wrappers](/gh-aw/reference/custom-safe-outputs/#github-action-wrappers-safe-outputsactions).

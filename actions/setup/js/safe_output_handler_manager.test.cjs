@@ -411,6 +411,18 @@ describe("Safe Output Handler Manager", () => {
       expect(fatalFailures).toEqual([{ type: "create_issue", success: false, error: "Validation failed" }]);
     });
 
+    it("does not fail the job when a successful write has an unrelated add_labels skip", () => {
+      const results = [
+        { type: "add_labels", success: false, skipped: true, error: 'Target is "triggering" but not running in issue or pull request context' },
+        { type: "create_discussion", success: true },
+      ];
+      const { fatalFailures, reportOnlyFailures } = partitionFailureResults(results);
+
+      expect(fatalFailures).toEqual([]);
+      expect(reportOnlyFailures).toEqual([]);
+      expect(computeSafeOutputsStatus(results).status).toBe("completed_with_skips");
+    });
+
     it("computes partial success item status from mixed successful and failed results", () => {
       const status = computeSafeOutputsStatus([
         { type: "create_issue", success: true },

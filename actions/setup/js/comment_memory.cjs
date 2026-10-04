@@ -36,15 +36,23 @@ function sanitizeMemoryID(memoryID) {
   return normalized;
 }
 
+function buildCollapsedMemorySection(rawBody, memoryID) {
+  return `<details>
+<summary>Peek at saved memory (${memoryID})</summary>
+
+${buildCodeFenceOpener(memoryID)}
+${sanitizeContent(rawBody)}
+${COMMENT_MEMORY_CODE_FENCE}
+
+</details>`;
+}
+
 function buildManagedMemoryBody(rawBody, memoryID, options) {
   const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
   core.info(`comment_memory: building managed body for memory_id='${memoryID}'`);
-  // Use code-fence-as-container so the memory content is visible in GitHub's rendered Markdown.
-  // The language specifier encodes the memory ID: ``````gh-aw-comment-memory:<id>
-  const codeFenceOpener = buildCodeFenceOpener(memoryID);
 
   const markdownParts = assembleMarkdownBodyParts({
     includeFooter,
@@ -62,7 +70,8 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
   const detectionCaution = markdownParts.detectionCaution;
   const cautionPrefix = detectionCaution ? detectionCaution + "\n\n" : "";
 
-  let body = `${cautionPrefix}${MANAGED_COMMENT_HEADER}\n\n${codeFenceOpener}\n${sanitizeContent(rawBody)}\n${COMMENT_MEMORY_CODE_FENCE}`;
+  // Keep the tagged code fence intact for memory extraction inside the collapsed section.
+  let body = `${cautionPrefix}${MANAGED_COMMENT_HEADER}\n\n${buildCollapsedMemorySection(rawBody, memoryID)}`;
 
   const tracker = getTrackerID("markdown");
   if (tracker) {

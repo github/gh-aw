@@ -4,11 +4,11 @@ package jsonmarshalignoredeerror
 
 import (
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -46,21 +46,26 @@ func run(pass *analysis.Pass) (any, error) {
 
 func checkDiscardedJSONAssign(pass *analysis.Pass, assign *ast.AssignStmt, noLintIndex nolint.DirectiveIndex) {
 	// Pattern: val, _ := json.Marshal(x)  — 2 lhs, 1 rhs, Lhs[1] is blank
-	if len(assign.Lhs) == 2 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[1].(*ast.Ident)
-		if ok && blank.Name == "_" {
-			call, ok := assign.Rhs[0].(*ast.CallExpr)
-			if ok && isJSONFunc(pass, call, "Marshal") {
-				reportDiscardedJSONCall(pass, call, noLintIndex, "error return from json.Marshal is discarded; marshal failures produce nil bytes silently")
-			}
-		}
+	if call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, assign); ok &&
+		pkgPath == "encoding/json" && funcName == "Marshal" {
+		reportDiscardedJSONCall(pass, call, noLintIndex, "error return from json.Marshal is discarded; marshal failures produce nil bytes silently")
 	}
 
 	// Pattern: _ = json.Unmarshal(data, &v)  — 1 lhs, 1 rhs, Lhs[0] is blank
 	if len(assign.Lhs) == 1 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[0].(*ast.Ident)
+		var lhs ast.Expr
+		for _, expr := range assign.Lhs {
+			lhs = expr
+			break
+		}
+		blank, ok := lhs.(*ast.Ident)
 		if ok && blank.Name == "_" {
-			call, ok := assign.Rhs[0].(*ast.CallExpr)
+			var rhs ast.Expr
+			for _, expr := range assign.Rhs {
+				rhs = expr
+				break
+			}
+			call, ok := rhs.(*ast.CallExpr)
 			if ok && isJSONFunc(pass, call, "Unmarshal") {
 				reportDiscardedJSONCall(pass, call, noLintIndex, "error return from json.Unmarshal is discarded; unmarshal failures leave the target value in a partial state")
 			}
@@ -92,21 +97,6 @@ func reportDiscardedJSONCall(pass *analysis.Pass, call *ast.CallExpr, noLintInde
 }
 
 func isJSONFunc(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return false
-	}
-	if sel.Sel.Name != name {
-		return false
-	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	obj := pass.TypesInfo.Uses[ident]
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return false
-	}
-	return pkgName.Imported().Path() == "encoding/json"
+	pkgPath, funcName, ok := astutil.PackageCall(pass, call)
+	return ok && pkgPath == "encoding/json" && funcName == name
 }

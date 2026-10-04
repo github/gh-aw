@@ -92,7 +92,6 @@ permissions: {}
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}-${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}"
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}
 
 run-name: "Smoke Copilot ARM64"
 
@@ -3279,6 +3278,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
+      GH_AW_CALLER_WORKFLOW_ID: "${{ github.repository }}/smoke-copilot-arm"
+      GH_AW_COMMANDS: "[\"smoke-copilot-arm\"]"
+      GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
+      GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+      GH_AW_ENGINE_ID: "copilot"
+      GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+      GH_AW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      GH_AW_PROJECT_UTC: "-08:00"
+      GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*{ai_credits_suffix}{history_link}\",\"appendOnlyComments\":true,\"runStarted\":\"[{workflow_name}]({run_url}) ARM64 smoke test started for this {event_type}.\",\"runSuccess\":\"[{workflow_name}]({run_url}) ARM64 smoke test completed successfully.\",\"runFailure\":\"[{workflow_name}]({run_url}) ARM64 smoke test {status}. Check the logs for details.\"}"
+      GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
+      GH_AW_WORKFLOW_EMOJI: "🧪"
+      GH_AW_WORKFLOW_ID: "smoke-copilot-arm"
+      GH_AW_WORKFLOW_NAME: "Smoke Copilot ARM64"
+      GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/smoke-copilot-arm.md"
     steps:
       - name: Download agent output artifact
         continue-on-error: true

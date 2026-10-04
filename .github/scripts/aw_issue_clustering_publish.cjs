@@ -1,4 +1,6 @@
 const fs = require("node:fs");
+const path = require("node:path");
+const { parseArgs } = require("node:util");
 
 const repoId = "aw-issue-clustering";
 const prefix = "[AW Top 10] ";
@@ -54,19 +56,26 @@ function buildCorpus(repo, issues, discussions, cutoff) {
   const resolved = new Map();
   for (const item of completed) {
     for (const number of metadata(item).members) {
-      if ((resolved.get(number) || "") < item.closed_at) resolved.set(number, item.closed_at);
+      if ((resolved.get(number)?.closed_at || "") < item.closed_at) resolved.set(number, item);
     }
   }
-  const corpus = { repo, issues: [], reports: [], managed: [], excluded: [], recently_closed: [] };
+  const activeAssigned = new Set(issues.filter(item => managed(item) && item.state === "open" && item.assignees?.length).flatMap(item => metadata(item).members));
+  const corpus = { repo, cutoff, completed, cleanup: [], issues: [], reports: [], managed: [], excluded: [], recently_closed: [] };
   for (const item of [...issues].sort((a, b) => a.number - b.number)) {
     const body = item.body || "";
     if (item.state !== "open") continue;
     requireValid(!owns(item) || managed(item), `Owned summary #${item.number} has malformed metadata; refusing queue changes`);
     if (managed(item)) corpus.managed.push(item);
-    else if (cutoff && item.created_at > cutoff) corpus.excluded.push(item.number);
-    else if (!authored(item, repo) || body.includes(ownerMarker)) corpus.excluded.push(item.number);
-    else if (resolved.has(item.number) && item.updated_at <= resolved.get(item.number)) corpus.excluded.push(item.number);
-    else if (item.title.startsWith("[WIP] ") || body.includes("<!-- gh-aw-group:")) corpus.excluded.push(item.number);
+    else if (cutoff && item.created_at > cutoff) corpus.excluded.push({ number: item.number, reason: "Arrived after run start; next daily pass" });
+    else if (!authored(item, repo)) corpus.excluded.push({ number: item.number, reason: "No bot + AW provenance" });
+    else if (body.includes(ownerMarker)) corpus.excluded.push({ number: item.number, reason: "Clustering workflow output" });
+    else if (resolved.has(item.number) && item.updated_at <= resolved.get(item.number).closed_at) {
+      corpus.excluded.push({ number: item.number, reason: "Operator completed its cluster; no newer evidence" });
+      if (!activeAssigned.has(item.number) && !item.title.startsWith("[WIP] ") && !body.includes("<!-- gh-aw-group:")) {
+        const summary = resolved.get(item.number);
+        corpus.cleanup.push({ number: item.number, summary_number: summary.number, summary_closed_at: summary.closed_at, source_updated_at: item.updated_at });
+      }
+    } else if (item.title.startsWith("[WIP] ") || body.includes("<!-- gh-aw-group:")) corpus.excluded.push({ number: item.number, reason: "WIP or grouping container" });
     else corpus.issues.push(item);
   }
   corpus.reports = discussions.filter(item => authored(item, repo) && !(item.body || "").includes(ownerMarker));
@@ -94,8 +103,8 @@ async function collectIssues(github, owner, repo, cutoff) {
 
 const discussionFields = "number title body url createdAt updatedAt closed author { login __typename } category { id name }";
 
-async function collectDiscussions(github, owner, repo, issues, core) {
-  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
+async function collectDiscussions(github, owner, repo, issues, core, now = Date.now()) {
+  const cutoff = new Date(now - 14 * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
   const found = new Map();
   let cursor = null;
   for (let page = 0; page < 100; page++) {
@@ -148,8 +157,17 @@ function refreshClosed(plan, corpus, core = { info() {} }) {
   requireValid(plan && typeof plan === "object" && Array.isArray(plan.clusters), "Invalid clustering plan");
   requireValid(Array.isArray(plan.deferred), "Missing deferred coverage");
   const result = structuredClone(plan);
-  const closed = new Set(corpus.recently_closed);
+  const closed = new Set([...corpus.recently_closed, ...corpus.cleanup.map(item => item.number)]);
   const assigned = new Set(corpus.managed.filter(item => item.assignees?.length).map(item => metadata(item).key));
+  for (const item of corpus.managed) {
+    if (!item.assignees?.length || !corpus.cutoff || item.updated_at < corpus.cutoff) continue;
+    const frozen = metadata(item);
+    result.clusters = result.clusters.map(cluster => {
+      if (cluster?.key !== frozen.key || JSON.stringify(canonical(cluster)) === JSON.stringify(canonical(frozen))) return cluster;
+      core.info(`Reconciliation: summary #${item.number} was assigned or edited after run start; preserved its live frozen scope`);
+      return structuredClone(frozen);
+    });
+  }
   const dropped = [];
   let removed = 0;
   result.clusters = result.clusters.filter(cluster => {
@@ -170,8 +188,9 @@ function refreshClosed(plan, corpus, core = { info() {} }) {
     "Invalid deferred entries"
   );
   result.deferred = result.deferred.filter(item => !closed.has(item.number));
-  if (dropped.length) result.shortfall_reason = `${dropped.length} planned assignments lost all open sources during analysis. Their source closures are not proof of a fix; the next daily pass reassesses the remaining backlog.`;
-  if (removed) core.info(`Reconciliation: removed ${removed} verified AW sources closed after run start; retired ${dropped.length} empty candidate assignments`);
+  if (dropped.length)
+    result.shortfall_reason = `${dropped.length} planned assignments lost all eligible sources during analysis. Sources were closed or resolved by completed summaries; expiry alone is not proof of a fix. The next daily pass reassesses the remaining backlog.`;
+  if (removed) core.info(`Reconciliation: removed ${removed} verified AW sources closed or resolved by completed summaries; retired ${dropped.length} empty candidate assignments`);
   return result;
 }
 
@@ -290,7 +309,7 @@ ${reports}
 
 </details>
 
-Source issues remain untouched. Closing this summary does not close its sources. Assigned summaries are frozen; unassign to allow reclustering.
+Unchanged AW sources close only after this summary is completed. Newer source activity and not-planned retirement do not trigger source closure. Assigned summaries are frozen; unassign to allow reclustering.
 
 <!-- aw-essential-meta: ${JSON.stringify(canonical(cluster))} -->
 ${end}`;
@@ -308,7 +327,7 @@ async function ensureLabel(github, owner, repo, staged, core) {
   else await github.rest.issues.createLabel({ owner, repo, name: label, color: "1D76DB", description: "Essential AW-generated issue clusters: assign one to resolve related findings" });
 }
 
-async function reconcile(github, owner, repo, clusters, corpus, staged, core) {
+async function reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue) {
   const existing = new Map(corpus.managed.map(item => [metadata(item).key, item]));
   const wanted = new Set(clusters.map(cluster => cluster.key));
   const retiring = [...existing].filter(([key]) => !wanted.has(key)).map(([, item]) => item);
@@ -360,8 +379,10 @@ async function reconcile(github, owner, repo, clusters, corpus, staged, core) {
     } else if (!staged) {
       const live = await collectIssues(github, owner, repo);
       requireValid(live.filter(issue => issue.state === "open" && managed(issue)).length < 10, "Active queue is full; refusing an eleventh issue");
-      const created = await github.rest.issues.create({ owner, repo, title, body: `${content}\n\n${ownerMarker}\n`, labels: [label, "automation", "agentic-workflows", "cookie"] });
-      url = created.data.html_url;
+      requireValid(typeof createIssue === "function", "Attributed issue-creation API is required");
+      const created = await createIssue({ owner, repo, title, body: content, labels: [label, "automation", "agentic-workflows", "cookie"] });
+      requireValid(!created.staged, "Issue creation was unexpectedly staged during live reconciliation");
+      url = created.issue.html_url;
     }
     result.push([rank, cluster, url]);
     core.info(`${staged ? "Preview: " : ""}${title}: ${url || ""}`);
@@ -369,7 +390,44 @@ async function reconcile(github, owner, repo, clusters, corpus, staged, core) {
   return result;
 }
 
-function dashboardBody(result, plan, corpus, runId) {
+async function cleanupCompleted(github, owner, repo, corpus, staged, core) {
+  const summaries = new Map(corpus.completed.map(item => [item.number, item]));
+  const cleaned = [];
+  for (const candidate of corpus.cleanup) {
+    const summary = (await github.rest.issues.get({ owner, repo, issue_number: candidate.summary_number })).data;
+    const previous = summaries.get(candidate.summary_number);
+    if (
+      !managed(summary) ||
+      summary.state !== "closed" ||
+      summary.state_reason !== "completed" ||
+      summary.closed_at !== candidate.summary_closed_at ||
+      JSON.stringify(canonical(metadata(summary))) !== JSON.stringify(canonical(metadata(previous)))
+    ) {
+      core.info(`Cleanup: summary #${candidate.summary_number} was reopened or changed; kept source #${candidate.number} open`);
+      continue;
+    }
+    const source = (await github.rest.issues.get({ owner, repo, issue_number: candidate.number })).data;
+    if (source.state === "closed") continue;
+    if (
+      source.pull_request ||
+      !authored(source, `${owner}/${repo}`) ||
+      (source.body || "").includes(ownerMarker) ||
+      source.title.startsWith("[WIP] ") ||
+      (source.body || "").includes("<!-- gh-aw-group:") ||
+      source.updated_at !== candidate.source_updated_at ||
+      source.updated_at > summary.closed_at
+    ) {
+      core.info(`Cleanup: source #${candidate.number} has newer activity or changed provenance; kept it open`);
+      continue;
+    }
+    if (!staged) await github.rest.issues.update({ owner, repo, issue_number: candidate.number, state: "closed", state_reason: "completed" });
+    core.info(`${staged ? "Preview: " : ""}close AW source #${candidate.number}: summary #${summary.number} completed`);
+    cleaned.push(candidate);
+  }
+  return cleaned;
+}
+
+function dashboardBody(result, plan, corpus, runId, cleanup = [], staged = false) {
   const rows = [
     start,
     "### Essential AW fixes",
@@ -396,6 +454,10 @@ function dashboardBody(result, plan, corpus, runId) {
     rows.push(`- [#${item.number}](https://github.com/${corpus.repo}/issues/${item.number}): ${safeText(item.reason)}`);
   }
   if (plan.shortfall_reason) rows.push("", safeText(plan.shortfall_reason));
+  if (cleanup.length) {
+    rows.push("", `Cleanup: ${staged ? "would close" : "closed"} ${cleanup.length} unchanged AW sources linked to completed summaries.`);
+    for (const item of cleanup) rows.push(`- [#${item.number}](https://github.com/${corpus.repo}/issues/${item.number}) resolved by [summary #${item.summary_number}](https://github.com/${corpus.repo}/issues/${item.summary_number}).`);
+  }
   if (runId) rows.push("", `[Workflow run](https://github.com/${corpus.repo}/actions/runs/${runId})`);
   rows.push("", "</details>", "", end, "", ownerMarker);
   return rows.join("\n");
@@ -464,12 +526,16 @@ async function publishDashboard(github, owner, repo, body, staged, core) {
   }
 }
 
-async function publish({ github, context, core }) {
+async function publish({ github, context, core, createIssue }) {
   const { owner, repo } = context.repo;
   const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8"));
   const items = (output.items || []).filter(item => item.type === "publish_essential_issues");
   requireValid(items.length === 1, "Exactly one publish_essential_issues plan required");
-  const plan = JSON.parse(items[0].plan);
+  requireValid(items[0].plan_path === "agent/aw-issue-clustering/plan.json", "Invalid clustering plan artifact path");
+  const planFile = path.join(path.dirname(process.env.GH_AW_AGENT_OUTPUT), items[0].plan_path);
+  const stat = fs.lstatSync(planFile);
+  requireValid(stat.isFile() && stat.size <= 1048576, "Plan artifact must be a regular JSON file no larger than 1 MiB");
+  const plan = JSON.parse(fs.readFileSync(planFile, "utf8"));
   const cutoff = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId })).data.created_at;
   const issues = await collectIssues(github, owner, repo, cutoff);
   const sources = buildCorpus(`${owner}/${repo}`, issues, [], cutoff).issues;
@@ -483,12 +549,32 @@ async function publish({ github, context, core }) {
     "Issue body too large"
   );
   const preview = clusters.map((cluster, index) => [index + 1, cluster, `https://github.com/${corpus.repo}/issues/999999999`]);
-  requireValid(dashboardBody(preview, refreshed, corpus, context.runId).length < 60000, "Dashboard body too large");
+  requireValid(dashboardBody(preview, refreshed, corpus, context.runId, corpus.cleanup, staged).length < 60000, "Dashboard body too large");
+  const cleanup = await cleanupCompleted(github, owner, repo, corpus, staged, core);
   await ensureLabel(github, owner, repo, staged, core);
-  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core);
-  const body = dashboardBody(result, refreshed, corpus, context.runId);
+  const result = await reconcile(github, owner, repo, clusters, corpus, staged, core, createIssue);
+  const body = dashboardBody(result, refreshed, corpus, context.runId, cleanup, staged);
   await publishDashboard(github, owner, repo, body, staged, core);
   await core.summary.addRaw(body).write();
 }
 
-module.exports = { publish, buildCorpus, refreshClosed, validatePlan, island, reconcile, dashboardBody, publishDashboard, collectDiscussions, collectIssues };
+function validateFile(args = process.argv.slice(2)) {
+  const { values } = parseArgs({ args, options: { repo: { type: "string" }, corpus: { type: "string" }, plan: { type: "string" } } });
+  requireValid(values.repo && values.corpus && values.plan, "--repo, --corpus and --plan are required");
+  const corpus = JSON.parse(fs.readFileSync(values.corpus, "utf8"));
+  const plan = JSON.parse(fs.readFileSync(values.plan, "utf8"));
+  requireValid(corpus.repo === values.repo, "Corpus repository mismatch");
+  const clusters = validatePlan(plan, corpus);
+  return `Validated ${clusters.length} clusters; complete coverage of ${corpus.issues.length} AW issues`;
+}
+
+if (require.main === module) {
+  try {
+    process.stdout.write(validateFile() + "\n");
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  }
+}
+
+module.exports = { publish, buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, dashboardBody, publishDashboard, collectDiscussions, collectIssues, metadata };

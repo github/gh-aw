@@ -381,7 +381,7 @@ func computeExperimentAnalysesWithObservationBundle(
 	if observationSets == nil {
 		observationSets = &experimentMetricObservationSets{}
 	}
-	analyses := make([]ExperimentAnalysis, 0, len(experiments))
+	analyses := make([]ExperimentAnalysis, 0)
 	for _, exp := range experiments {
 		var cfg *workflow.ExperimentConfig
 		if configs != nil {
@@ -415,7 +415,7 @@ func observationRunReferences(
 	primary map[string]string,
 	guardrails map[string]map[string]string,
 ) map[string]struct{} {
-	experimentNames := make(map[string]struct{}, len(primary)+len(guardrails))
+	experimentNames := make(map[string]struct{}, max(len(primary), len(guardrails)))
 	for experimentName := range primary {
 		experimentNames[experimentName] = struct{}{}
 	}

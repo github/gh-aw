@@ -74,6 +74,7 @@ describe("add_labels", () => {
     };
 
     mockContext = {
+      eventName: "issues",
       repo: {
         owner: "test-owner",
         repo: "test-repo",
@@ -137,6 +138,28 @@ describe("add_labels", () => {
         expect(result.success).toBe(true);
         expect(result.number).toBe(123);
         expect(addLabelsCalls[0].issue_number).toBe(123);
+      });
+
+      it("rejects an unauthorized triggering number from workflow_dispatch", async () => {
+        mockContext.eventName = "workflow_dispatch";
+        mockContext.payload = {
+          inputs: {
+            event_name: "issues",
+            event_payload: JSON.stringify({ issue: { number: "123" } }),
+          },
+        };
+        const handler = await main({ max: 10, target: "triggering" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
+        expect(addLabelsCalls).toHaveLength(0);
       });
 
       it("AL-001 defaults to the triggering item when target is omitted", async () => {
@@ -702,6 +725,7 @@ describe("add_labels", () => {
     });
 
     it("should add labels to a pull request from context", async () => {
+      mockContext.eventName = "pull_request";
       mockContext.payload = {
         pull_request: {
           number: 789,
@@ -743,7 +767,8 @@ describe("add_labels", () => {
       expect(result.error.includes("Invalid item number")).toBe(true);
     });
 
-    it("should handle missing item_number and no context", async () => {
+    it("should skip when the triggering context has no issue or pull request", async () => {
+      mockContext.eventName = "workflow_dispatch";
       mockContext.payload = {};
 
       const handler = await main({ max: 10 });
@@ -756,7 +781,8 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("No issue/PR number available")).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.error).toContain('Target is "triggering" but not running in issue or pull request context');
     });
 
     it("should respect max count limit", async () => {
@@ -1664,7 +1690,7 @@ describe("add_labels", () => {
       expect(result.labelsAdded[0].length).toBe(64);
     });
 
-    it("should handle numeric string from context payload correctly", async () => {
+    it("should reject a string issue number from context", async () => {
       const handler = await main({ max: 10 });
       const addLabelsCalls = [];
 
@@ -1686,8 +1712,9 @@ describe("add_labels", () => {
         {}
       );
 
-      expect(result.success).toBe(true);
-      expect(addLabelsCalls).toHaveLength(1);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
+      expect(addLabelsCalls).toHaveLength(0);
     });
 
     it("should reject invalid non-numeric value from context", async () => {
@@ -1707,7 +1734,7 @@ describe("add_labels", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("No issue/PR number available");
+      expect(result.error).toContain("ERR_TARGET_AUTHORIZATION");
     });
 
     it("should skip when item does not have all required_labels", async () => {

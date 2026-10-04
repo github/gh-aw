@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
 )
 
 func TestCommandConcurrencyCompilation(t *testing.T) {
@@ -49,7 +49,7 @@ func TestCommandConcurrencyCompilation(t *testing.T) {
 			if tt.mixedPR {
 				require.Equal(t, "${{ github.event_name == 'pull_request' }}", workflow.Concurrency.Cancel)
 				require.Contains(t, workflow.Concurrency.Group, "${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}")
-				require.Equal(t, "${{ github.event_name == 'pull_request' && 'single' || 'max' }}", workflow.Concurrency.Queue)
+				require.Empty(t, workflow.Concurrency.Queue)
 			} else {
 				require.Nil(t, workflow.Concurrency.Cancel)
 				require.Equal(t, "max", workflow.Concurrency.Queue)

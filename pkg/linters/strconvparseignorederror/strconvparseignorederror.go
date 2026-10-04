@@ -5,11 +5,11 @@ package strconvparseignorederror
 
 import (
 	"go/ast"
-	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 )
@@ -45,31 +45,11 @@ func analyzeStrconvAssign(pass *analysis.Pass, n ast.Node, generatedFiles filech
 	if !ok {
 		return
 	}
-	if len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
-		return
-	}
-	blank, ok := assign.Lhs[1].(*ast.Ident)
-	if !ok || blank.Name != "_" {
-		return
-	}
-	call, ok := assign.Rhs[0].(*ast.CallExpr)
+	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, assign)
 	if !ok {
 		return
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return
-	}
-	if !strconvParseFuncs[sel.Sel.Name] {
-		return
-	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return
-	}
-	obj := pass.TypesInfo.Uses[ident]
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok || pkgName.Imported().Path() != "strconv" {
+	if pkgPath != "strconv" || !strconvParseFuncs[funcName] {
 		return
 	}
 	position := pass.Fset.PositionFor(call.Pos(), false)
@@ -79,5 +59,5 @@ func analyzeStrconvAssign(pass *analysis.Pass, n ast.Node, generatedFiles filech
 	if nolint.HasDirectiveForLinter(position, nolintIndex, "strconvparseignorederror") {
 		return
 	}
-	pass.ReportRangef(call, "error return from strconv.%s is discarded; parse failures produce zero values silently", sel.Sel.Name)
+	pass.ReportRangef(call, "error return from strconv.%s is discarded; parse failures produce zero values silently", funcName)
 }
