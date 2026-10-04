@@ -62,7 +62,7 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
   const detectionCaution = markdownParts.detectionCaution;
   const cautionPrefix = detectionCaution ? detectionCaution + "\n\n" : "";
 
-  let body = `${cautionPrefix}${MANAGED_COMMENT_HEADER}\n\n<details>\n<summary>🧠 Peek at saved memory (${memoryID})</summary>\n\n${codeFenceOpener}\n${sanitizeContent(rawBody)}\n${COMMENT_MEMORY_CODE_FENCE}\n\n</details>`;
+  let body = `${cautionPrefix}${MANAGED_COMMENT_HEADER}\n\n<details>\n<summary>Peek at saved memory (${memoryID})</summary>\n\n${codeFenceOpener}\n${sanitizeContent(rawBody)}\n${COMMENT_MEMORY_CODE_FENCE}\n\n</details>`;
 
   const tracker = getTrackerID("markdown");
   if (tracker) {

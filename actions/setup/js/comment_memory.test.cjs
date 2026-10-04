@@ -49,7 +49,7 @@ describe("comment_memory", () => {
       triggeringPRNumber: undefined,
     });
     expect(body).toContain("### Comment Memory");
-    expect(body).toContain("<details>\n<summary>🧠 Peek at saved memory (default)</summary>\n\n``````gh-aw-comment-memory:default");
+    expect(body).toContain("<details>\n<summary>Peek at saved memory (default)</summary>\n\n``````gh-aw-comment-memory:default");
     expect(body).toContain("``````gh-aw-comment-memory:default");
     expect(body).toContain("Hello world");
     expect(body).toContain("Hello world\n``````\n\n</details>");
