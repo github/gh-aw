@@ -22,7 +22,8 @@ def require(condition, message):
 
 
 def text(value, field, limit=4000, minimum=10):
-    require(isinstance(value, str) and minimum <= len(value.strip()) <= limit, f"Invalid {field}")
+    require(isinstance(value, str) and len(value.strip()) >= minimum and len(value) <= limit,
+            f"Invalid {field}")
     require(
         "<!--" not in value and not re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", value),
         f"Control characters or metadata injection in {field}",

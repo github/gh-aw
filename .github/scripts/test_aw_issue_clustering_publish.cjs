@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildCorpus, refreshClosed, validatePlan, island, reconcile, publish } = require("./aw_issue_clustering_publish.cjs");
+const { buildCorpus, refreshClosed, validatePlan, island, reconcile, publish, collectDiscussions } = require("./aw_issue_clustering_publish.cjs");
 
 const repo = "github/gh-aw";
 const cutoff = "2026-10-03T00:00:00Z";
@@ -77,6 +77,19 @@ test("only verified mid-run closures are removed before validating remaining mem
   assert.deepEqual(refreshClosed(plan(), data).clusters[0].members, [1]);
   assert.deepEqual(validatePlan(refreshClosed(plan(), data), data)[0].members, [1]);
   assert.throws(() => validatePlan(plan(cluster([1, 3])), data), /unverified/);
+});
+
+test("linked discussion URLs match the exact repository name", async () => {
+  let queries = 0;
+  const github = {
+    graphql: async () => {
+      queries++;
+      return { repository: { discussions: { nodes: [], pageInfo: { hasNextPage: false } } } };
+    },
+  };
+  const sources = [issue(1, { body: "https://github.com/github/ghXaw/discussions/12" })];
+  assert.deepEqual(await collectDiscussions(github, "github", "gh.aw", sources, { warning() {} }), []);
+  assert.equal(queries, 1);
 });
 
 test("staged reconciliation never writes, and preserves operator text and safe prose", async () => {
