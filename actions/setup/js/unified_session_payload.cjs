@@ -78,6 +78,7 @@ const SAFE_OUTPUT_FIELDS = {
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
+  "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
   "user.message": { content: ["content"] },
   "assistant.message": { content: ["content"] },

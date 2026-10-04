@@ -70,7 +70,9 @@ func downloadSession(ctx context.Context, run *parser.GitHubURLComponents, forma
 func reconstructSession(ctx context.Context, run *parser.GitHubURLComponents, hostname string, names []string, root string, verbose bool) ([]byte, error) {
 	sessionsDownloadLog.Printf("No published unified session for run %d; reconstructing from agent", run.Number)
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No aw_session.jsonl in usage; reconstructing from the agent artifact"))
+		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No aw_session.jsonl in usage; reconstructing from the agent artifact")); err != nil {
+			return nil, fmt.Errorf("failed to write session reconstruction diagnostic: %w", err)
+		}
 	}
 	agent, err := sessionArtifactName(names, constants.AgentArtifactName.String(), "agent-artifacts")
 	if err != nil {
@@ -151,7 +153,9 @@ func downloadSessionArtifact(ctx context.Context, run *parser.GitHubURLComponent
 	}
 	sessionsDownloadLog.Printf("Downloading session artifact: gh %s", strings.Join(args, " "))
 	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Downloading artifact: "+name))
+		if _, err := fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Downloading artifact: "+name)); err != nil {
+			return fmt.Errorf("failed to write session artifact diagnostic: %w", err)
+		}
 	}
 	output, err := workflow.ExecGHContext(ctx, args...).CombinedOutput()
 	if err != nil {
@@ -213,6 +217,7 @@ func formatSession(ctx context.Context, content []byte, sessionPath, format stri
 
 func validateSessionJSONL(content []byte) error {
 	records := 0
+	hasAgentExecution := false
 	for index, line := range bytes.Split(content, []byte("\n")) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
@@ -247,6 +252,15 @@ func validateSessionJSONL(content []byte) error {
 			}
 		} else if isHeader {
 			return errors.New("unified session contains multiple collector format headers")
+		}
+		if event.Type == "agent.execution" {
+			if hasAgentExecution {
+				return errors.New("unified session contains multiple agent.execution records")
+			}
+			if _, err := parseAgentExecution(data); err != nil {
+				return fmt.Errorf("invalid session event at line %d: %w", index+1, err)
+			}
+			hasAgentExecution = true
 		}
 		records++
 	}

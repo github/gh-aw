@@ -4,13 +4,84 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParseAgentExecution(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name string
+		data string
+		fail bool
+	}{
+		{"zero exit", `{"categories":[],"errorCodes":[0,"0"],"errorTypes":[],"exitCode":0}`, false},
+		{"unknown exit", `{"categories":["agentic_engine_timeout"],"errorCodes":[502],"errorTypes":["server_error"]}`, false},
+		{"missing arrays", `{}`, true},
+		{"null array", `{"categories":null,"errorCodes":[],"errorTypes":[]}`, true},
+		{"duplicate categories", `{"categories":["timeout","timeout"],"errorCodes":[],"errorTypes":[]}`, true},
+		{"duplicate codes", `{"categories":[],"errorCodes":[400,400],"errorTypes":[]}`, true},
+		{"invalid type", `{"categories":[],"errorCodes":[],"errorTypes":[1]}`, true},
+		{"invalid code", `{"categories":[],"errorCodes":[false],"errorTypes":[]}`, true},
+		{"unsafe code", `{"categories":[],"errorCodes":[9007199254740992],"errorTypes":[]}`, true},
+		{"null exit", `{"categories":[],"errorCodes":[],"errorTypes":[],"exitCode":null}`, true},
+		{"negative exit", `{"categories":[],"errorCodes":[],"errorTypes":[],"exitCode":-1}`, true},
+		{"invalid exit", `{"categories":[],"errorCodes":[],"errorTypes":[],"exitCode":256}`, true},
+		{"string exit", `{"categories":[],"errorCodes":[],"errorTypes":[],"exitCode":"0"}`, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			execution, err := parseAgentExecution(json.RawMessage(test.data))
+			if test.fail {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if test.name == "zero exit" {
+				require.NotNil(t, execution.ExitCode)
+				require.Zero(t, *execution.ExitCode)
+			} else {
+				require.Nil(t, execution.ExitCode)
+			}
+			entry := `{"type":"agent.execution","data":` + test.data + `}` + "\n"
+			require.NoError(t, validateSessionJSONL([]byte(sessionTestHeader+entry)))
+			require.ErrorContains(t, validateSessionJSONL([]byte(sessionTestHeader+entry+entry)), "multiple agent.execution")
+		})
+	}
+}
+
+func TestSessionParserExecutionErrors(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	root := t.TempDir()
+	writeSessionTestFile(t, root, "agent-stdio.log", `{"type":"turn.failed","error":{"code":502,"type":"server_error","message":"Provider unavailable"}}`+"\n[codex-harness] done: exitCode=1\n")
+	writeSessionTestFile(t, root, "agent_execution_exit_code.txt", "0\n")
+	session, err := runSessionParser(context.Background(), "reconstruct", root, "codex")
+	require.NoError(t, err)
+	require.NoError(t, validateSessionJSONL(session))
+	var execution *agentExecutionData
+	for line := range strings.SplitSeq(string(session), "\n") {
+		var event struct {
+			Type string          `json:"type"`
+			Data json.RawMessage `json:"data"`
+		}
+		if json.Unmarshal([]byte(line), &event) == nil && event.Type == "agent.execution" {
+			execution, err = parseAgentExecution(event.Data)
+			require.NoError(t, err)
+		}
+	}
+	require.NotNil(t, execution)
+	require.Equal(t, []string{"server_error"}, execution.ErrorTypes)
+	require.Equal(t, []json.RawMessage{json.RawMessage("502")}, execution.ErrorCodes)
+	require.NotNil(t, execution.ExitCode)
+	require.Zero(t, *execution.ExitCode)
+}
 
 func TestSessionParserEngines(t *testing.T) {
 	t.Parallel()
