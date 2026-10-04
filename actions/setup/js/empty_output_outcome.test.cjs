@@ -68,12 +68,16 @@ describe("empty output outcome", () => {
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(
       path.join(sessionDir, "events.jsonl"),
-      JSON.stringify({
-        type: "tool.execution_complete",
-        data: { toolName: "create_issue", mcpServerName: "safeoutputs", success: false, result: { content: "Tool not available" } },
-      })
+      [
+        { type: "tool.execution_start", data: { toolName: "bash", toolCallId: "native-shell", arguments: { command: "cat restricted-file" } } },
+        { type: "tool.execution_complete", data: { toolCallId: "native-shell", success: false, result: { content: "Permission denied" } } },
+        { type: "tool.execution_complete", data: { toolName: "create_issue", mcpServerName: "safeoutputs", success: false, result: { content: "Tool not available" } } },
+      ]
+        .map(JSON.stringify)
+        .join("\n")
     );
     const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.details).toContain("bash: cat restricted-file");
     expect(outcome.details).toContain("safeoutputs.create_issue");
     expect(outcome.details).toContain("Tool not available");
   });
