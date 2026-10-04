@@ -45,6 +45,60 @@ func RhsExprForIndex(rhs []ast.Expr, idx int) (ast.Expr, bool) {
 	}
 }
 
+// MatchDiscardedErrorCall reports whether assign has the form value, _ = pkg.Func(...)
+// and resolves the selected function to its imported package.
+func MatchDiscardedErrorCall(pass *analysis.Pass, assign *ast.AssignStmt) (call *ast.CallExpr, pkgPath, funcName string, ok bool) {
+	if pass == nil || pass.TypesInfo == nil || assign == nil || len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
+		return nil, "", "", false
+	}
+	var secondLHS ast.Expr
+	for index, lhs := range assign.Lhs {
+		if index == 1 {
+			secondLHS = lhs
+			break
+		}
+	}
+	blank, ok := secondLHS.(*ast.Ident)
+	if !ok || blank.Name != "_" {
+		return nil, "", "", false
+	}
+	var rhs ast.Expr
+	for _, expr := range assign.Rhs {
+		rhs = expr
+		break
+	}
+	call, ok = rhs.(*ast.CallExpr)
+	if !ok {
+		return nil, "", "", false
+	}
+	pkgPath, funcName, ok = PackageCall(pass, call)
+	if !ok {
+		return nil, "", "", false
+	}
+	return call, pkgPath, funcName, true
+}
+
+// PackageCall resolves a package-qualified call and returns its import path and
+// selected function name.
+func PackageCall(pass *analysis.Pass, call *ast.CallExpr) (pkgPath, funcName string, ok bool) {
+	if pass == nil || pass.TypesInfo == nil || call == nil {
+		return "", "", false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return "", "", false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return "", "", false
+	}
+	pkgName, ok := pass.TypesInfo.Uses[ident].(*types.PkgName)
+	if !ok || pkgName.Imported() == nil {
+		return "", "", false
+	}
+	return pkgName.Imported().Path(), sel.Sel.Name, true
+}
+
 // IsStringLiteral reports whether expr is a string literal.
 func IsStringLiteral(expr ast.Expr) bool {
 	lit, ok := UnwrapParenExpr(expr).(*ast.BasicLit)

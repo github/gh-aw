@@ -5,11 +5,12 @@ package globwalkignorederror
 
 import (
 	"go/ast"
-	"go/types"
+	"path"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 )
@@ -43,35 +44,15 @@ func analyzeGlobWalkAssign(pass *analysis.Pass, n ast.Node, generatedFiles filec
 	if !ok {
 		return
 	}
-	if len(assign.Lhs) != 2 || len(assign.Rhs) != 1 {
-		return
-	}
-	blank, ok := assign.Lhs[1].(*ast.Ident)
-	if !ok || blank.Name != "_" {
-		return
-	}
-	call, ok := assign.Rhs[0].(*ast.CallExpr)
+	call, pkgPath, funcName, ok := astutil.MatchDiscardedErrorCall(pass, assign)
 	if !ok {
 		return
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	funcs, ok := checkedFuncs[pkgPath]
 	if !ok {
 		return
 	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok {
-		return
-	}
-	obj := pass.TypesInfo.Uses[ident]
-	pkgName, ok := obj.(*types.PkgName)
-	if !ok {
-		return
-	}
-	funcs, ok := checkedFuncs[pkgName.Imported().Path()]
-	if !ok {
-		return
-	}
-	if _, checked := funcs[sel.Sel.Name]; !checked {
+	if _, checked := funcs[funcName]; !checked {
 		return
 	}
 	position := pass.Fset.PositionFor(call.Pos(), false)
@@ -81,5 +62,5 @@ func analyzeGlobWalkAssign(pass *analysis.Pass, n ast.Node, generatedFiles filec
 	if nolint.HasDirectiveForLinter(position, nolintIndex, "globwalkignorederror") {
 		return
 	}
-	pass.ReportRangef(call, "error return from %s.%s is discarded; malformed patterns or unreadable directories silently produce an empty result", pkgName.Imported().Name(), sel.Sel.Name)
+	pass.ReportRangef(call, "error return from %s.%s is discarded; malformed patterns or unreadable directories silently produce an empty result", path.Base(pkgPath), funcName)
 }
