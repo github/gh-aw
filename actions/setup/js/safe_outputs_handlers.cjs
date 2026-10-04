@@ -32,7 +32,7 @@ const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
-const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
+const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 
 /** PR event names used for target:triggering context validation across all safe-output handlers. */
 const PR_EVENT_NAMES = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
@@ -1840,16 +1840,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       };
     }
 
-    // Allowed-extensions and file-glob are persistence filters: ineligible files must be
-    // removed here too, before formatting/scanning/staging/custom-validation, so this
-    // preflight sees the same effective file set as the later filter/upload/push steps
-    // and never hard-fails on a file that would have been silently dropped downstream.
-    if (allowedExtensions.length > 0 || fileGlobFilter) {
-      const { removed } = filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilter, core);
-      if (removed.length > 0) {
-        core.info(`push_repo_memory: ignored ${removed.length} ineligible file(s) before validation`);
-      }
-    }
+    // Persistence filters apply to validation and staging, but validation must
+    // not delete files from the agent's working directory.
+    const { compiledPatterns } = compileFileGlobPatterns(fileGlobFilter);
+    const isEligibleFile = relativePath => isMemoryFileEligible(relativePath, allowedExtensions, compiledPatterns).eligible;
 
     clearValidationMarker("repo", memoryId);
 
@@ -1902,6 +1896,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         if (entry.isDirectory()) {
           scanDir(fullPath, relPath);
         } else if (entry.isFile()) {
+          if (!isEligibleFile(relPath)) {
+            continue;
+          }
           let stats;
           try {
             stats = fs.statSync(fullPath);
@@ -1974,7 +1971,11 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     let patchSizeBytes;
     try {
       ensureSafeDirectoryTrust(memoryDir, server);
-      execGitSync(["add", "--sparse", "."], { cwd: memoryDir, stdio: "pipe" });
+      const trackedFiles = execGitSync(["ls-files", "-z"], { cwd: memoryDir, stdio: "pipe" }).split("\0").filter(Boolean).filter(isEligibleFile);
+      const filesToStage = [...new Set([...files.map(file => file.relativePath), ...trackedFiles])];
+      if (filesToStage.length > 0) {
+        execGitSync(["add", "--sparse", "--all", "--", ...filesToStage.map(file => `:(literal)${file}`)], { cwd: memoryDir, stdio: "pipe" });
+      }
       patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: memoryDir });
     } catch (/** @type {any} */ error) {
       return {
