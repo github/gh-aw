@@ -39,6 +39,7 @@ steps:
       set -euo pipefail
       PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
         -s .github/scripts -p 'test_aw_issue_clustering.py'
+      node --test .github/scripts/test_aw_issue_clustering_publish.cjs
   - name: Collect complete AW backlog and report evidence
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,13 +75,14 @@ safe-outputs:
           with:
             persist-credentials: false
         - name: Revalidate live provenance and publish essential assignments
+          uses: actions/github-script@v9.0.0
           env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            set -euo pipefail
-            python3 .github/scripts/aw_issue_clustering_publish.py \
-              --repo "$GITHUB_REPOSITORY" \
-              --agent-output "$GH_AW_AGENT_OUTPUT"
+            GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
+          with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            script: |
+              const { publish } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering_publish.cjs`);
+              await publish({ github, context, core });
 ---
 
 # AW essential ten

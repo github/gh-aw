@@ -62,6 +62,7 @@ and the next successful pass reconciles the queue without creating an eleventh.
 
 ```bash
 python3 -m unittest discover -s .github/scripts -p 'test_aw_issue_clustering.py'
+node --test .github/scripts/test_aw_issue_clustering_publish.cjs
 python3 .github/scripts/aw_issue_clustering.py \
   --repo github/gh-aw --output /tmp/gh-aw/agent/aw-issue-clustering
 python3 .github/scripts/aw_issue_clustering_publish.py \
@@ -70,7 +71,8 @@ python3 .github/scripts/aw_issue_clustering_publish.py \
   --plan /tmp/gh-aw/agent/aw-issue-clustering/plan.json
 ```
 
-The last command validates only; writes require the safe-output job's
-`--agent-output` mode. Collection requires an authenticated `gh` CLI with issues,
-discussions, and (in Actions) workflow-run read access. No Python dependencies,
-embedding API, or separate cache database are required.
+The last command validates only; writes run in the `actions/github-script`
+safe-output job using `.github/scripts/aw_issue_clustering_publish.cjs`.
+Collection requires an authenticated `gh` CLI with issues, discussions, and
+(in Actions) workflow-run read access. No Python dependencies, embedding API,
+or separate cache database are required.

@@ -216,6 +216,11 @@ class ClusteringTests(unittest.TestCase):
             publish.validate_plan(value, corpus(1))
         value["shortfall_reason"] = "No current finding supports an actionable assignment."
         self.assertEqual([], publish.validate_plan(value, corpus(1)))
+        value["deferred"][0]["reason"] = "Duplicate"
+        self.assertEqual([], publish.validate_plan(value, corpus(1)))
+        value["deferred"][0]["reason"] = " "
+        with self.assertRaisesRegex(ValueError, "deferral reason"):
+            publish.validate_plan(value, corpus(1))
 
     def test_report_provenance_and_metadata_injection_fail(self):
         value = plan()
