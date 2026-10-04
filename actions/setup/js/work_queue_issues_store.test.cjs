@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { applyAndPublishIssues, readIssues, QUEUE_LABEL } from "./work_queue_issues_store.cjs";
 import { applyAndPublishWorkQueueTransactions, readWorkQueueLog } from "./work_queue_store.cjs";
@@ -166,5 +166,21 @@ describe("issue-backed work queue", () => {
   it("requires the work queue HMAC secret", async () => {
     const fake = fakeClient();
     await expect(readIssues({ ...options(fake), secret: "" })).rejects.toThrow("Work queue HMAC secret is not configured");
+  });
+
+  it("logs issue-backed queue reads when work queue debugging is enabled", async () => {
+    const fake = fakeClient();
+    const previousDebug = process.env.DEBUG;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    process.env.DEBUG = "work_queue";
+    try {
+      await readIssues(options(fake));
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("[work_queue_issues] reading issue-backed queue"));
+      expect(log.mock.calls.flat().join("\n")).not.toContain(secret);
+    } finally {
+      if (previousDebug === undefined) delete process.env.DEBUG;
+      else process.env.DEBUG = previousDebug;
+      log.mockRestore();
+    }
   });
 });
