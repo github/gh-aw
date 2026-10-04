@@ -89,7 +89,7 @@ The `tools:` field configures which tools the coding agent may use.
 - `toolsets:` - Enable specific GitHub toolset groups (single name string or array; a string is shorthand for a one-element array)
   - **Default toolsets** (when unspecified): `context`, `repos`, `issues`, `pull_requests` (excludes `users` as GitHub Actions tokens don't support user operations)
   - **Group aliases**: `default` (recommended action-friendly set), `action-friendly` (action-safe toolsets, excludes `users`), `all` (everything)
-  - **Individual toolsets**: `context`, `repos`, `issues`, `pull_requests`, `actions`, `code_quality`, `code_security`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `dependabot`, `discussions`, `gists`, `git`, `github_support_docs_search`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`
+  - **Individual toolsets**: `context`, `repos`, `issues`, `pull_requests`, `actions`, `automations`, `code_quality`, `code_security`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `dependabot`, `discussions`, `gists`, `git`, `github_support_docs_search`, `governance`, `labels`, `notifications`, `orgs`, `projects`, `secret_protection`, `security_advisories`, `stargazers`, `users`
     Search tools are distributed across `repos`, `orgs`, `users`, and `issues`; there is no standalone `search` toolset.
   - Examples: `toolsets: [default]`, `toolsets: [default, discussions]`, `toolsets: [repos, issues]`
   - **Recommended**: Prefer `toolsets:` over `allowed:` for better organization and reduced configuration verbosity

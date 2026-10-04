@@ -58,6 +58,22 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 
 ---
 
+### automations
+**Description**: Copilot Automation configuration discovery (list/get automations, revisions, available tools and triggers)
+
+> **Note**: Discovered via live remote-server self-inspection on 2026-10-04; not found in the `github/github-mcp-server` main branch source (`pkg/github/tools.go` `AllTools()`) as of the commit audited. The remote server's reported build SHA differs from the fetched main-branch HEAD SHA, suggesting this toolset ships from a newer or separately-staged build. Toolset naming and permissions are provisional pending maintainer confirmation.
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `get_automation` | Get a Copilot Automation in a repository | `owner`, `repo`, `automation_id` |
+| `get_automation_revision` | Get a revision of a Copilot Automation | `owner`, `repo`, `automation_id`, `revision_id` |
+| `list_automation_revisions` | List revisions for a Copilot Automation | `owner`, `repo`, `automation_id`, `cursor`, `perPage` |
+| `list_automations` | List Copilot Automations for a repository | `owner`, `repo`, `ownership`, `page`, `perPage` |
+| `list_available_automation_tools` | List available tools for Copilot Automations | *(none)* |
+| `list_available_automation_triggers` | List available triggers for Copilot Automations | *(none)* |
+
+---
+
 ### repos
 **Description**: Repository operations
 
@@ -111,10 +127,26 @@ Full tool reference for each toolset. See [github-mcp-server.md](github-mcp-serv
 
 ---
 
+### governance
+**Description**: Repository governance tools for managing rulesets and custom properties at the repository, organization, and enterprise levels (write operations require PAT — not supported by GITHUB_TOKEN)
+
+> **Source confirmed**: `pkg/github/tools.go` (`RepositoryRulesetRead`, `CreateRepositoryRuleset`, `CustomPropertiesRead`, `CustomPropertiesWrite`), toolset ID `governance`. `create_repository_ruleset` and `custom_properties_write` are write tools not available under this session's read-only self-inspection; their purposes are inferred from upstream source and should be verified before relying on exact parameters.
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `repository_ruleset_read` | Read rulesets (and rule suites) at the repository, organization, or enterprise level | `level`, `method`, `owner`, `repo`, `ruleset_id`, `branch` |
+| `custom_properties_read` | Read custom properties at the repository, organization, or enterprise level | `level`, `owner`, `repo`, `org`, `enterprise` |
+| `create_repository_ruleset` *(write, not self-inspected)* | Create a repository, organization, or enterprise ruleset | `owner`, `repo`, `name`, `target`, `rules` |
+| `custom_properties_write` *(write, not self-inspected)* | Set custom property values on a repository | `owner`, `repo`, `properties` |
+
+---
+
 ### issues
 **Description**: Issue management
 
 > **Note**: `find_duplicate`, `issue_dependency_read`, and `issue_dependency_write` require their upstream feature flags to be enabled, independently of toolset selection.
+>
+> **Naming ambiguity**: Only `search_issues` and `semantic_issue_similarity_search` were observed via self-inspection this run; `semantic_issues_search` (listed below per the JSON mapping) was not. `search_issues`'s own description already covers natural-language/semantic matching, so `semantic_issues_search` may have been superseded/consolidated into it rather than genuinely missing. Verify upstream before treating it as a confirmed separate tool.
 
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|

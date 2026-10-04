@@ -1,12 +1,18 @@
 {
-  "version": "2.5",
-  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added)",
+  "version": "2.6",
+  "description": "GitHub MCP server toolsets and their required permissions (synced to github/github-mcp-server main: restored semantic search, advisory, and secret scanning tools; search tools remain redistributed to repos/orgs/users/issues; experiments toolset removed; list_org_repository_security_advisories moved orgs->security_advisories; get_label dual-registered in issues; create_pull_request_with_copilot added; find_duplicate added to issues; copilot_issue_intents added; added governance toolset (repository_ruleset_read, create_repository_ruleset, custom_properties_read, custom_properties_write) per upstream pkg/github/tools.go; added automations toolset (Copilot Automation discovery tools) observed via live remote-server self-inspection, not yet present in upstream main source at time of audit - flagged for maintainer verification)",
   "toolsets": {
     "actions": {
       "description": "GitHub Actions workflows",
       "read_permissions": ["actions"],
       "write_permissions": ["actions"],
       "tools": ["actions_get", "actions_list", "actions_run_trigger", "get_job_logs"]
+    },
+    "automations": {
+      "description": "Copilot Automation configuration discovery (list/get automations, revisions, available tools and triggers). Not found in github-mcp-server main branch source as of this audit; observed only via live remote-server self-inspection - permissions and toolset naming pending maintainer verification.",
+      "read_permissions": [],
+      "write_permissions": [],
+      "tools": ["get_automation", "get_automation_revision", "list_automation_revisions", "list_automations", "list_available_automation_tools", "list_available_automation_triggers"]
     },
     "code_quality": {
       "description": "Code quality findings",
@@ -73,6 +79,12 @@
       "read_permissions": [],
       "write_permissions": [],
       "tools": ["github_support_docs_search"]
+    },
+    "governance": {
+      "description": "Repository governance tools for managing rulesets and custom properties at the repository, organization, and enterprise levels (write operations require PAT - not supported by GITHUB_TOKEN)",
+      "read_permissions": [],
+      "write_permissions": [],
+      "tools": ["create_repository_ruleset", "custom_properties_read", "custom_properties_write", "repository_ruleset_read"]
     },
     "issues": {
       "description": "Issue management (get_label is also registered here alongside labels)",

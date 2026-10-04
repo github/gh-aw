@@ -6,7 +6,7 @@ description: Overview and practical guidance for configuring and using GitHub MC
 
 **Source**: [github/github-mcp-server](https://github.com/github/github-mcp-server/tree/main/pkg/github)
 **Mapping File**: [pkg/workflow/data/github_toolsets_permissions.json](https://github.com/github/gh-aw/blob/main/pkg/workflow/data/github_toolsets_permissions.json)
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-10-04
 
 ## Overview
 
@@ -72,6 +72,7 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 | Toolset | When to Enable |
 |---------|---------------|
 | `actions` | Workflow introspection, triggering runs |
+| `automations` | Copilot Automation configuration discovery (provisional — see [github-mcp-server-tools.md](github-mcp-server-tools.md#automations)) |
 | `code_quality` | Code quality finding lookups |
 | `code_security` | Code scanning alert management |
 | `copilot` | Copilot assignment, PR creation, and review requests |
@@ -82,6 +83,7 @@ When the GitHub tool is configured, gh-aw injects a separate `<github-context>` 
 | `gists` | Gist creation and management |
 | `git` | Git API operations (tree, refs) |
 | `github_support_docs_search` | GitHub support documentation search (remote mode only) |
+| `governance` | Repository rulesets and custom properties (requires PAT for write operations) |
 | `labels` | Label management automation |
 | `notifications` | Notification processing agents |
 | `orgs` | Organization search operations |
@@ -112,6 +114,10 @@ MCP tool responses have a **25,000 token limit**; always pass an explicit `perPa
 3. **Security toolsets** (`code_security`, `dependabot`, `secret_protection`, `security_advisories`) require `security-events` permission
 4. **Write operations** require appropriate GitHub token permissions (see `write_permissions` in the JSON mapping)
 5. **Projects toolset** requires a PAT (Personal Access Token) — `GITHUB_TOKEN` lacks the required `project` scope
+
+### Schema Validation Note (fixed 2026-10-04)
+
+The `toolsets:` frontmatter enum in `pkg/parser/schemas/main_workflow_schema.json` had drifted from the permissions JSON mapping: it was missing `code_quality`, `copilot`, `copilot_issue_intents`, `copilot_spaces`, `git`, and `github_support_docs_search` (so workflows could not actually select them despite the Go-side permissions map already supporting them), and it still listed two stale/removed toolset names, `experiments` and `search`. This audit synchronized the enum with the permissions mapping and added `automations` and `governance`.
 
 ### Permission Requirements
 
