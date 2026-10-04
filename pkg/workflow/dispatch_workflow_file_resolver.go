@@ -143,7 +143,8 @@ func mdHasWorkQueueTools(mdPath string) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	return tools["work-queue"] == true, nil
+	value, configured := tools["work-queue"]
+	return configured && value != false, nil
 }
 
 // lockHasWorkQueueProtocol reports whether a compiled workflow includes both queue admission and reconciliation.

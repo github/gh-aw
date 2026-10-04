@@ -184,7 +184,8 @@ func TestPopulateDispatchWorkflowFilesRequiresQueueEnabledWorker(t *testing.T) {
 
 	for name, frontmatter := range map[string]string{
 		"worker": `tools:
-  work-queue: true
+  work-queue:
+    storage: issues
 `,
 		"ordinary-worker": "",
 		"stale-worker": `tools:

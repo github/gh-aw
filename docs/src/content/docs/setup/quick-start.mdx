@@ -148,7 +148,7 @@ If organization billing is enabled in your organization, you can choose **Use co
 1. Create an API key in [Anthropic Console](https://console.anthropic.com/settings/keys).
 2. Add it as a repository secret from your repository root with `gh secret set ANTHROPIC_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#anthropic_api_key) for more detail.
 
-To avoid a long-lived key, configure [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif).
+For keyless authentication, configure [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif) with a federation rule in your Anthropic workspace and grant the workflow `id-token: write`. GitHub Actions exchanges a short-lived OIDC token for Anthropic credentials, so you don't need a repository secret.
 
 A Claude subscription token from `claude login` (`CLAUDE_CODE_OAUTH_TOKEN`) is not supported. It is silently ignored, and the run fails with a Claude CLI authentication error that does not mention the token.
 
@@ -168,7 +168,7 @@ Follow [Using Claude Code with GitHub Agentic Workflows](/gh-aw/engines/claude/)
 1. Create an API key in [Google AI Studio](https://aistudio.google.com/api-keys).
 2. Add it as a repository secret from your repository root with `gh secret set GEMINI_API_KEY < /path/to/key.txt`, or use the GitHub UI. See [Authentication](/gh-aw/reference/auth/#gemini_api_key) for more detail.
 
-To avoid a long-lived key, configure [Google Workload Identity Federation](/gh-aw/reference/auth/#google-workload-identity-federation-wif).
+For keyless authentication, configure [Google Workload Identity Federation](/gh-aw/reference/auth/#google-workload-identity-federation-wif) with a Google Cloud Workload Identity Pool and Provider for GitHub Actions, and grant the service account Vertex AI User permissions. GitHub Actions exchanges a short-lived OIDC token for Google Cloud credentials, so you don't need a repository secret.
 
 **Pi**
 

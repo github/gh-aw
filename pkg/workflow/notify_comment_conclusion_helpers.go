@@ -68,11 +68,16 @@ func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []str
 		StepName:     "Download activation artifact for work queue summary",
 		IfCondition:  "always()",
 	}, c.getActionPin)
-	return append(steps,
+	steps = append(steps,
 		"      - name: Summarize work queue activity\n",
 		"        if: always()\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+	)
+	if workQueueStorage(data) == "issues" {
+		steps = append(steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n", "          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n")
+	}
+	return append(steps,
 		"        with:\n",
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_summary.cjs');\n",

@@ -134,7 +134,7 @@ async function collectDiscussions(github, owner, repo, issues, core) {
       item = data.repository.discussion;
     } catch (error) {
       if (error.errors?.length && error.errors.every(entry => entry.type === "NOT_FOUND" && JSON.stringify(entry.path) === '["repository","discussion"]')) {
-        core.warning(`Linked discussion #${number} does not exist; excluded from evidence`);
+        core.info(`Linked discussion #${number} does not exist; excluded from evidence`);
         continue;
       }
       throw error;
@@ -193,16 +193,23 @@ function validatePlan(plan, corpus) {
     requireValid(typeof key === "string" && /^[a-z][a-z0-9-]{2,63}$/.test(key), "Invalid cluster key");
     requireValid(!keys.has(key), "Duplicate cluster key");
     keys.add(key);
+    const previous = existing.get(key);
     for (const field of ["title", "summary", "fix", "rationale"]) {
       text(cluster[field], field, field === "title" ? 120 : 4000);
+      if (!previous?.assignees?.length) {
+        if (field === "title") requireValid(cluster.title.trim().length < 60, "Title must be a complete phrase under 60 characters");
+        else requireValid(/[.!?]$/.test(cluster[field].trim()), `${field} must end with sentence punctuation; do not clip prose`);
+      }
     }
     requireValid(Array.isArray(cluster.acceptance) && cluster.acceptance.length >= 1 && cluster.acceptance.length <= 6, "Missing acceptance criteria");
-    for (const criterion of cluster.acceptance) text(criterion, "acceptance criterion", 1000);
+    for (const criterion of cluster.acceptance) {
+      text(criterion, "acceptance criterion", 1000);
+      if (!previous?.assignees?.length) requireValid(/[.!?]$/.test(criterion.trim()), "Acceptance criterion must end with sentence punctuation; do not clip prose");
+    }
     for (const field of ["impact", "confidence", "effort"]) {
       requireValid(Number.isInteger(cluster[field]) && cluster[field] >= 1 && cluster[field] <= 5, `Invalid ${field}`);
     }
     requireValid(Array.isArray(cluster.members) && cluster.members.length && cluster.members.every(Number.isInteger) && new Set(cluster.members).size === cluster.members.length, "Members must be unique issue numbers");
-    const previous = existing.get(key);
     let liveMembers;
     if (previous?.assignees?.length) {
       requireValid(JSON.stringify(canonical(cluster)) === JSON.stringify(canonical(metadata(previous))), `Assigned cluster ${key} must remain unchanged`);
@@ -401,13 +408,13 @@ async function publishDashboard(github, owner, repo, body, staged, core) {
     return;
   }
   const data = await github.graphql(
-    `query($query:String!) {
-    search(query:$query, type:DISCUSSION, first:100) {
+    `query($searchTerm:String!) {
+    search(query:$searchTerm, type:DISCUSSION, first:100) {
       pageInfo { hasNextPage }
       nodes { ... on Discussion { id title body closed author { __typename } } }
     }
   }`,
-    { query: `repo:${owner}/${repo} in:title "AW Essential 10"` }
+    { searchTerm: `repo:${owner}/${repo} in:title "AW Essential 10"` }
   );
   requireValid(!data.search.pageInfo.hasNextPage, "Dashboard search truncated");
   const dashboards = data.search.nodes.filter(item => item?.title === "AW Essential 10" && item.author?.__typename === "Bot" && item.body.includes(ownerMarker));
@@ -484,4 +491,4 @@ async function publish({ github, context, core }) {
   await core.summary.addRaw(body).write();
 }
 
-module.exports = { publish, buildCorpus, refreshClosed, validatePlan, island, reconcile, dashboardBody, collectDiscussions, collectIssues };
+module.exports = { publish, buildCorpus, refreshClosed, validatePlan, island, reconcile, dashboardBody, publishDashboard, collectDiscussions, collectIssues };
