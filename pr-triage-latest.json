@@ -1,74 +1,32 @@
 {
-  "run_date": "2026-10-04T01:31:12Z",
-  "run_id": "37168157408",
+  "run_date": "2026-10-04T14:07:10Z",
+  "run_id": "37207964175",
   "source": "github-mcp-triage",
   "summary": {
-    "eligible_total": 2,
-    "cooldown_skipped": 3,
-    "category_counts": {
-      "bug": 1,
-      "feature": 1
-    },
-    "risk_counts": {
-      "high": 1,
-      "medium": 1
-    },
-    "priority_counts": {
-      "high": 1,
-      "medium": 1
-    },
-    "action_counts": {
-      "batch_review": 1,
-      "defer": 1
-    }
+    "eligible_total": 0,
+    "cooldown_skipped": 13,
+    "category_counts": {},
+    "risk_counts": {},
+    "priority_counts": {},
+    "action_counts": {}
   },
-  "prs": [
-    {
-      "number": 65444,
-      "category": "feature",
-      "risk": "medium",
-      "score": 51,
-      "action": "defer",
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:defer",
-        "pr-agent:copilot"
-      ],
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 12,
-        "quality": 11
-      },
-      "batch": null
-    },
-    {
-      "number": 56568,
-      "category": "bug",
-      "risk": "high",
-      "score": 71,
-      "action": "batch_review",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
-      ],
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 21,
-        "quality": 12
-      },
-      "batch": null
-    }
-  ],
+  "prs": [],
   "cooldown_skipped": [
-    {"number": 65448, "reason": "updated within 1 hour"},
-    {"number": 65443, "reason": "updated within 1 hour"},
-    {"number": 65423, "reason": "updated within 1 hour"}
+    {"number": 65592, "title": "Restore /matt in centralized slash-command routing", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:03:01Z", "draft": true},
+    {"number": 65591, "title": "Migrate ESLint factory workflows to work-queue dispatch", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:01:09Z", "draft": true},
+    {"number": 65590, "title": "Collapse comment memory in managed issue and PR comments", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:05:21Z", "draft": false},
+    {"number": 65577, "title": "Include root-cause details in generic failure issues", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:58:31Z", "draft": false},
+    {"number": 65570, "title": "Add inline WIF setup summaries to the quick-start", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:43:51Z", "draft": false},
+    {"number": 65569, "title": "Review and reconcile seasonal workflow references", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:43:16Z", "draft": false},
+    {"number": 65568, "title": "Upgrade the issue triage workflow to annotate PRs and runbooks", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:42:34Z", "draft": false},
+    {"number": 65564, "title": "Add report formatting guidance for workflow issue body generation", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:35:54Z", "draft": false},
+    {"number": 65563, "title": "Add xlate workflow for release notes packaging", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:31:31Z", "draft": false},
+    {"number": 65562, "title": "Add a dedicated workflow for GitHub issue reports", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:28:00Z", "draft": false},
+    {"number": 65548, "title": "Document repo memory branch state in the issue templates", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:54:00Z", "draft": false},
+    {"number": 65547, "title": "Prefer reporting metadata over issue body templates", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:53:29Z", "draft": false},
+    {"number": 65526, "title": "Add follow-up issue guidance for generic startup failures", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:44:43Z", "draft": false}
   ],
   "batches": [],
-  "report_issue": "created"
+  "selected_candidates": [],
+  "report_issue": "pending"
 }
