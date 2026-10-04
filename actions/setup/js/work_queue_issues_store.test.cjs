@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyAndPublishIssues, readIssues, QUEUE_LABEL } from "./work_queue_issues_store.cjs";
+import { applyAndPublishWorkQueueTransactions, readWorkQueueLog } from "./work_queue_store.cjs";
 import { CURRENT_VERSION } from "./work_queue_codemods.cjs";
 
 const work = id => ({ version: CURRENT_VERSION, kind: "Work", work: id, claim: null, attempt: null });
@@ -88,5 +89,18 @@ describe("issue-backed work queue", () => {
     const fake = fakeClient(true);
     await applyAndPublishIssues({ ...options(fake), intents: [work("one"), claim("claim-1"), completion("claim-1")] });
     expect((await readIssues(options(fake))).transactions).toHaveLength(3);
+  });
+
+  it("routes the existing runtime store API to issues without changing the MCP protocol", async () => {
+    const fake = fakeClient();
+    const previous = process.env.GH_AW_WORK_QUEUE_STORAGE;
+    process.env.GH_AW_WORK_QUEUE_STORAGE = "issues";
+    try {
+      await applyAndPublishWorkQueueTransactions({ ...options(fake), intents: [work("one")] });
+      expect((await readWorkQueueLog(options(fake))).transactions).toEqual([work("one")]);
+    } finally {
+      if (previous === undefined) delete process.env.GH_AW_WORK_QUEUE_STORAGE;
+      else process.env.GH_AW_WORK_QUEUE_STORAGE = previous;
+    }
   });
 });
