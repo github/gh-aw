@@ -128,10 +128,11 @@ func RunOutcomesHistory(config OutcomesHistoryConfig) error {
 		config.Limit = 200
 	}
 
-	source := strings.ToLower(strings.TrimSpace(config.Source))
+	source := strings.TrimSpace(config.Source)
 	if source == "" {
 		source = historySourceAll
 	}
+	source = strings.ToLower(source)
 	if source != historySourceAll && source != historySourceIssues && source != historySourcePRs {
 		return fmt.Errorf("invalid --source %q: expected issues, prs, or all", config.Source)
 	}

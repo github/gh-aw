@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -20,15 +21,15 @@ var safeOutputsDispatchWorkflowLog = logger.New("workflow:safe_outputs_dispatch"
 // populateDispatchWorkflowFiles resolves the file extension for each dispatch
 // workflow listed in SafeOutputsConfig.DispatchWorkflow.Workflows. The resolved
 // extension is stored in WorkflowFiles for later use by the runtime handler.
-// It also detects which workflows declare aw_context in their workflow_dispatch.inputs
-// and stores those names in AwContextWorkflows, so the runtime handler only injects
-// aw_context metadata for workflows that explicitly support it.
+// It also detects which workflows declare aw_context and which additionally enable
+// the work-queue protocol, so runtime dispatch can enforce each worker's contract.
 //
 // Priority order: .lock.yml > .yml > .md (same-batch compilation target)
 func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 	if data.SafeOutputs == nil || data.SafeOutputs.DispatchWorkflow == nil {
 		return
 	}
+	data.SafeOutputs.WorkQueueEnabled = isWorkQueueEnabled(data)
 
 	if len(data.SafeOutputs.DispatchWorkflow.Workflows) == 0 {
 		return
@@ -67,8 +68,34 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 				data.SafeOutputs.DispatchWorkflow.AwContextWorkflows, workflowName,
 			)
 			safeOutputsConfigLog.Printf("Workflow %s declares aw_context input", workflowName)
+			if data.SafeOutputs.WorkQueueEnabled && workflowHasWorkQueueTools(fileResult, workflowName) {
+				data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows = append(
+					data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows, workflowName,
+				)
+				safeOutputsConfigLog.Printf("Workflow %s enables the work-queue protocol", workflowName)
+			}
 		}
 	}
+}
+
+// workflowHasWorkQueueTools reports whether an agentic workflow source enables the queue protocol.
+func workflowHasWorkQueueTools(fileResult *findWorkflowFileResult, workflowName string) bool {
+	if !fileResult.mdExists {
+		return false
+	}
+	enabled, err := mdHasWorkQueueTools(fileResult.mdPath)
+	if err != nil {
+		safeOutputsConfigLog.Printf("Warning: error checking work-queue tools for %s: %v", workflowName, err)
+		return false
+	}
+	if enabled && fileResult.lockExists {
+		enabled, err = lockHasWorkQueueProtocol(fileResult.lockPath)
+		if err != nil {
+			safeOutputsConfigLog.Printf("Warning: error checking compiled work-queue support for %s: %v", workflowName, err)
+			return false
+		}
+	}
+	return enabled
 }
 
 // workflowHasAwContextInput reports whether the workflow identified by fileResult
@@ -99,7 +126,7 @@ func workflowHasAwContextInput(fileResult *findWorkflowFileResult, workflowName 
 // the workflow's defined workflow_dispatch inputs as parameters.
 // When allowedRefs is non-empty, a 'ref' parameter is added to let the agent
 // specify which branch/tag/SHA to dispatch to, validated against the configured globs.
-func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string]any, allowedRefs []string) map[string]any {
+func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string]any, allowedRefs []string, workQueueEnabled bool) map[string]any {
 	safeOutputsDispatchWorkflowLog.Printf("Generating dispatch-workflow tool: workflow=%s, inputs=%d, allowedRefs=%d", workflowName, len(workflowInputs), len(allowedRefs))
 
 	descriptionFormat := "Dispatch the '%s' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository."
@@ -110,13 +137,36 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 		descriptionFormat: descriptionFormat,
 		metadataKey:       "_workflow_name",
 	})
+	inputSchema, ok := tool["inputSchema"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	properties, ok := inputSchema["properties"].(map[string]any)
+	if !ok {
+		return tool
+	}
+	_, acceptsContext := workflowInputs["aw_context"]
+	if workQueueEnabled && acceptsContext {
+		// The handler supplies aw_context in both ordinary and queue dispatches.
+		delete(properties, "aw_context")
+		if required, ok := inputSchema["required"].([]string); ok {
+			inputSchema["required"] = slices.DeleteFunc(required, func(name string) bool { return name == "aw_context" })
+		}
+		properties["work_queue"] = map[string]any{
+			"type":        "object",
+			"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
+			"properties": map[string]any{
+				"work_id": map[string]any{"type": "string", "minLength": 1},
+			},
+			"required":             []string{"work_id"},
+			"additionalProperties": false,
+		}
+	}
 
 	// When allowed-refs is configured, inject a 'ref' property so the agent can
 	// specify the target branch/tag/SHA. The runtime handler validates the value
 	// against the configured glob patterns before dispatching.
 	if len(allowedRefs) > 0 {
-		inputSchema, _ := tool["inputSchema"].(map[string]any)
-		properties, _ := inputSchema["properties"].(map[string]any)
 		allowedRefsDesc := strings.Join(allowedRefs, ", ")
 
 		refDesc := fmt.Sprintf("The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: %s. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.", allowedRefsDesc)
@@ -125,12 +175,11 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 			"description": refDesc,
 		}
 
-		desc, _ := tool["description"].(string)
-		tool["description"] = desc + fmt.Sprintf(" Use the 'ref' parameter to target a specific branch or tag (allowed patterns: %s).", allowedRefsDesc)
+		if desc, ok := tool["description"].(string); ok {
+			tool["description"] = desc + fmt.Sprintf(" Use the 'ref' parameter to target a specific branch or tag (allowed patterns: %s).", allowedRefsDesc)
+		}
 	}
 
-	inputSchema, _ := tool["inputSchema"].(map[string]any)
-	properties, _ := inputSchema["properties"].(map[string]any)
 	requiredCount := 0
 	if required, ok := inputSchema["required"].([]string); ok {
 		requiredCount = len(required)

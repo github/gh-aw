@@ -86,6 +86,7 @@ Compile each work-queue workflow phase.
 	} else {
 		handlerEnd += len("      - name:")
 	}
+
 	require.Contains(t, safeOutputs[handlerStart:handlerStart+handlerEnd], gate)
 
 	conclusion := extractJobSection(compiled, "conclusion")
@@ -126,6 +127,42 @@ Read and finish assigned work.
 	require.Contains(t, conclusion, "GH_AW_WORK_QUEUE_STORAGE: issues")
 	require.Regexp(t, `issues: (read|write)`, conclusion)
 	require.Contains(t, extractJobSection(compiled, string(constants.AgentJobName)), `"work-queue"`)
+}
+
+func TestWorkQueueDispatchCompilerConfiguration(t *testing.T) {
+	dir := testutil.TempDir(t, "work-queue-dispatch-")
+	workflowsDir := filepath.Join(dir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
+	workerPath := filepath.Join(workflowsDir, "worker.md")
+	require.NoError(t, os.WriteFile(workerPath, []byte(`---
+on:
+  workflow_dispatch:
+    inputs:
+      aw_context:
+        type: string
+tools:
+  work-queue: true
+---
+Process the assigned work.
+`), 0o600))
+	dispatcherPath := filepath.Join(workflowsDir, "dispatcher.md")
+	require.NoError(t, os.WriteFile(dispatcherPath, []byte(`---
+on: workflow_dispatch
+tools:
+  work-queue: true
+safe-outputs:
+  dispatch-workflow:
+    workflows: [worker]
+---
+Read the queue and dispatch an available Work identity.
+`), 0o600))
+	compiler := NewCompiler(WithVersion("integration"))
+	require.NoError(t, compiler.CompileWorkflow(dispatcherPath))
+	compiled, err := os.ReadFile(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(compiled), `work_queue_enabled`)
+	require.Contains(t, string(compiled), `work_queue_workflows`)
+	require.Contains(t, string(compiled), `work_queue`)
 }
 
 func TestWorkQueueSmokeVerification(t *testing.T) {

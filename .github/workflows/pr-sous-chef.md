@@ -26,7 +26,9 @@ env:
 features:
   gh-aw-detection: true
 checkout:
-  sparse-checkout: scripts
+  sparse-checkout: |
+    scripts
+    actions
 network:
   allowed: ["defaults"]
 model: copilot/claude-haiku-4.5

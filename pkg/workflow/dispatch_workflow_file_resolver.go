@@ -9,6 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/goccy/go-yaml"
 )
 
 // getCurrentWorkflowName extracts the workflow name from the file path
@@ -126,6 +127,56 @@ func mdHasWorkflowDispatch(mdPath string) (bool, error) {
 		return false, nil
 	}
 	return containsWorkflowDispatch(onSection), nil
+}
+
+// mdHasWorkQueueTools reports whether a workflow source enables the work-queue tool.
+func mdHasWorkQueueTools(mdPath string) (bool, error) {
+	content, err := os.ReadFile(mdPath) // #nosec G304 -- mdPath is validated via isPathWithinDir in findWorkflowFile
+	if err != nil {
+		return false, err
+	}
+	result, err := parser.ExtractFrontmatterFromContent(string(content))
+	if err != nil || result == nil {
+		return false, err
+	}
+	tools, ok := result.Frontmatter["tools"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	return tools["work-queue"] == true, nil
+}
+
+// lockHasWorkQueueProtocol reports whether a compiled workflow includes both queue admission and reconciliation.
+func lockHasWorkQueueProtocol(lockPath string) (bool, error) {
+	content, err := os.ReadFile(lockPath) // #nosec G304 -- lockPath is validated via isPathWithinDir in findWorkflowFile
+	if err != nil {
+		return false, err
+	}
+	var compiled struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string `yaml:"name"`
+				ID   string `yaml:"id"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(content, &compiled); err != nil {
+		return false, err
+	}
+	hasStep := func(jobName, stepName, stepID string) bool {
+		job, ok := compiled.Jobs[jobName]
+		if !ok {
+			return false
+		}
+		for _, step := range job.Steps {
+			if step.Name == stepName && (stepID == "" || step.ID == stepID) {
+				return true
+			}
+		}
+		return false
+	}
+	return hasStep(string(constants.ActivationJobName), "Snapshot work queue state", "") &&
+		hasStep(string(constants.SafeOutputsJobName), "Reconcile work queue claim", "work_queue_claim_reconciliation"), nil
 }
 
 // extractMDWorkflowDispatchInputs reads a .md workflow file's frontmatter and extracts

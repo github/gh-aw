@@ -78,6 +78,19 @@ provenance, which the workflow fact format does not contain.
 Trusted workflow assignments use `aw_context.work_queue`, containing `work_id`,
 `claim_id`, and the `work` payload object (`WorkQueueAssignment`). Activation
 checks that the Claim is currently effective before capturing the assignment.
+When `tools.work-queue: true` and `safe-outputs.dispatch-workflow` are both
+configured, a dispatcher can read an available identity with `work_queue_read`
+and pass `work_queue: {work_id: "..."}` to an allowed same-repository worker's
+dispatch tool. The worker must declare a `workflow_dispatch` `aw_context` input
+and enable `tools.work-queue: true` so its activation admission and completion
+reconciliation are compiled.
+Trusted safe-output processing refreshes the queue, publishes a new Claim for
+that identity, verifies it is effective, and injects the assignment with
+`work: {id: work_id}`. The selection is not forwarded as a workflow input.
+Dispatch errors attempt to cancel the Claim. An ordinary dispatch without a
+selection and a staged preview create no Claim; `call-workflow` does not create
+one either. Concurrent Claims may supersede an assignment before worker
+activation, so admission and completion still recheck the durable queue.
 The MCP tools are `work_queue_read` and `work_queue_claim_finish`; the latter
 records a `WorkQueueFinishIntent` containing only `outcome: "completed"` or
 `outcome: "cancelled"`. Artifacts use `work-queue.snapshot.json` and
