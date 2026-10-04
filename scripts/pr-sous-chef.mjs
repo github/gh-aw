@@ -203,6 +203,17 @@ function inspect(repo, pr, runs) {
 
 const prFields = "number,title,url,state,isDraft,headRefOid,headRefName,createdAt,updatedAt,changedFiles,author,mergeStateStatus,statusCheckRollup";
 
+export function fetchCandidate(repo, number, api = gh) {
+  const pull = api(["api", `repos/${repo}/pulls/${number}`]);
+  const owner = pull.head?.user?.login;
+  const branch = pull.head?.ref;
+  if (!owner || !branch) throw new Error(`PR #${number}: missing head branch`);
+  const candidates = api(["pr", "list", "--repo", repo, "--state", "all", "--head", `${owner}:${branch}`, "--limit", "100", "--json", prFields]);
+  const candidate = candidates.find(pr => pr.number === Number(number));
+  if (!candidate || !candidate.updatedAt || !candidate.headRefOid) throw new Error(`PR #${number}: could not refresh PR metadata`);
+  return candidate;
+}
+
 export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
   const skipped = [];
   const eligible = [];
@@ -230,7 +241,7 @@ function main() {
   const checkNumber = process.argv[2];
   if (checkNumber && !/^[1-9]\d*$/.test(checkNumber)) throw new Error("Expected a numeric PR number");
   const candidates = checkNumber
-    ? [gh(["pr", "view", checkNumber, "--repo", repo, "--json", prFields])]
+    ? [fetchCandidate(repo, checkNumber)]
     : gh(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
   if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
   let runs;
