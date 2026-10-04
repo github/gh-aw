@@ -32,11 +32,14 @@ selects issue storage instead of the default Git branch. Each Work is an issue w
 the `aw:work-queue` label; its Work transaction is in the issue body and later
 transactions are comments. `aw:work-queue:available`, `:claimed`, `:completed`,
 and `:cancelled` labels display the projected state. Comments are replayed in
-publication order, and labels are not used to authorize a worker. The same
+publication order; only issues and comments authored by the authenticated
+publisher participate. All queue writers and readers must use the same
+publisher identity. Labels are not used to authorize a worker. The same
 snapshot and MCP tools are used with either storage choice. Both backends must
 not be used on the same logical queue without an explicit migration. Issue
 storage needs issues read access at activation and conclusion, and issues write
-access at trusted safe-output publication.
+access at trusted safe-output publication. Each refresh lists the issues and
+comments in full, so the Git backend is preferable for large queues.
 
 | Command | Arguments |
 |---|---|

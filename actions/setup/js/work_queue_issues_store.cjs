@@ -30,17 +30,29 @@ async function pages(githubClient, method, params) {
 }
 
 async function readIssues({ githubClient, owner, repo }) {
-  const issues = (await pages(githubClient, githubClient.rest.issues.listForRepo, { owner, repo, state: "all", labels: QUEUE_LABEL })).filter(issue => !issue.pull_request);
+  const authenticated = await githubClient.rest.users.getAuthenticated();
+  const publisher = authenticated.data.login;
+  if (typeof publisher !== "string" || !publisher) throw new TypeError("Work queue publisher identity is unavailable");
+  const issues = (await pages(githubClient, githubClient.rest.issues.listForRepo, { owner, repo, state: "all", labels: QUEUE_LABEL })).filter(issue => !issue.pull_request).sort((a, b) => a.number - b.number);
   const entries = [];
   const byWork = new Map();
   for (const issue of issues) {
+    if (issue.user?.login !== publisher) continue;
     const work = record(issue.body);
     if (!work || work.kind !== "Work") throw new TypeError("Labeled work queue issue has no valid Work record");
-    if (byWork.has(work.work)) throw new Error("Multiple work queue issues have the same Work identity");
+    applyTransactions([], [work]);
+    if (byWork.has(work.work)) {
+      const original = entries.find(entry => entry.transaction.kind === "Work" && entry.transaction.work === work.work);
+      if (!original || original.transaction.version !== work.version || original.transaction.enqueued !== work.enqueued) throw new Error("Multiple work queue issues have conflicting Work records");
+      const duplicateComments = await pages(githubClient, githubClient.rest.issues.listComments, { owner, repo, issue_number: issue.number });
+      if (duplicateComments.some(comment => comment.user?.login === publisher && record(comment.body))) throw new Error("Duplicate work queue issue has transactions");
+      continue;
+    }
     byWork.set(work.work, issue.number);
     entries.push({ transaction: work, timestamp: issue.created_at, order: issue.id, issue: issue.number, comment: 0 });
     const comments = await pages(githubClient, githubClient.rest.issues.listComments, { owner, repo, issue_number: issue.number });
     for (const comment of comments) {
+      if (comment.user?.login !== publisher) continue;
       const transaction = record(comment.body);
       if (transaction) {
         if (transaction.kind === "Work" || transaction.work !== work.work) throw new TypeError("Work queue comment targets the wrong Work");
@@ -123,7 +135,11 @@ async function applyAndPublishIssues({ githubClient, owner, repo, intents, core:
     const latest = await readIssues({ githubClient, owner, repo });
     const accepted = applyTransactions(latest.transactions, [intent]).idempotent === 1;
     if (!accepted) throw new Error("Work queue transaction lost concurrent arbitration");
-    await syncStateLabel(githubClient, owner, repo, issueNumber, replayTransactions(latest.transactions).work[intent.work]);
+    if (intent.kind === "Work" && issueNumber !== latest.byWork.get(intent.work)) {
+      await githubClient.rest.issues.removeLabel({ owner, repo, issue_number: issueNumber, name: QUEUE_LABEL });
+      await githubClient.rest.issues.removeLabel({ owner, repo, issue_number: issueNumber, name: STATE_LABELS[0] });
+    }
+    await syncStateLabel(githubClient, owner, repo, latest.byWork.get(intent.work), replayTransactions(latest.transactions).work[intent.work]);
     coreApi?.info("Work queue: issue transaction published");
   }
   const latest = await readIssues({ githubClient, owner, repo });

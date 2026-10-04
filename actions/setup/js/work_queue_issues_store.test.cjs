@@ -13,18 +13,19 @@ function fakeClient(sameTimestamp = false) {
   let id = 0;
   const issue = number => issues.find(value => value.number === number);
   const rest = {
+    users: { getAuthenticated: async () => ({ data: { login: "github-actions[bot]" } }) },
     issues: {
       listForRepo: async ({ labels: filter, state, page, per_page }) => ({
         data: issues.filter(value => value.labels.some(label => label.name === filter) && (state === "all" || value.state === state)).slice((page - 1) * per_page, page * per_page),
       }),
       listComments: async ({ issue_number, page, per_page }) => ({ data: issue(issue_number).comments.slice((page - 1) * per_page, page * per_page) }),
       create: async ({ title, body, labels: names }) => {
-        const created = { id: ++id, number: id, created_at: new Date((sameTimestamp ? 1 : id) * 1000).toISOString(), title, body, labels: names.map(name => ({ name })), comments: [], state: "open" };
+        const created = { id: ++id, number: id, created_at: new Date((sameTimestamp ? 1 : id) * 1000).toISOString(), title, body, user: { login: "github-actions[bot]" }, labels: names.map(name => ({ name })), comments: [], state: "open" };
         issues.push(created);
         return { data: created };
       },
       createComment: async ({ issue_number, body }) => {
-        const comment = { id: ++id, created_at: new Date((sameTimestamp ? 1 : id) * 1000).toISOString(), body };
+        const comment = { id: ++id, created_at: new Date((sameTimestamp ? 1 : id) * 1000).toISOString(), body, user: { login: "github-actions[bot]" } };
         issue(issue_number).comments.push(comment);
         return { data: comment };
       },
@@ -74,7 +75,7 @@ describe("issue-backed work queue", () => {
     expect((await readIssues(options(fake))).transactions).toHaveLength(4);
   });
 
-  it("fails closed when two issues share one Work identity", async () => {
+  it("deduplicates simultaneous identical submissions and rejects conflicting records", async () => {
     const fake = fakeClient();
     await applyAndPublishIssues({ ...options(fake), intents: [work("one")] });
     await fake.githubClient.rest.issues.create({
@@ -82,7 +83,28 @@ describe("issue-backed work queue", () => {
       body: fake.issues[0].body,
       labels: [QUEUE_LABEL],
     });
-    await expect(readIssues(options(fake))).rejects.toThrow("Multiple work queue issues");
+
+    expect((await readIssues(options(fake))).transactions).toHaveLength(1);
+    fake.issues[1].body = fake.issues[0].body.replace('"attempt":null}', '"attempt":null,"enqueued":42}');
+    await expect(readIssues(options(fake))).rejects.toThrow("conflicting Work records");
+  });
+
+  it("cleans up the losing issue when two writers submit the same Work concurrently", async () => {
+    const fake = fakeClient();
+    const create = fake.githubClient.rest.issues.create;
+    let competing = true;
+    fake.githubClient.rest.issues.create = async args => {
+      if (competing) {
+        competing = false;
+        await create(args);
+      }
+      return create(args);
+    };
+    await applyAndPublishIssues({ ...options(fake), intents: [work("one")] });
+    expect(fake.issues).toHaveLength(2);
+    expect(fake.issues[0].labels.some(label => label.name === QUEUE_LABEL)).toBe(true);
+    expect(fake.issues[1].labels).toEqual([]);
+    expect((await readIssues(options(fake))).transactions).toHaveLength(1);
   });
 
   it("replays Work before comments created within the same timestamp", async () => {
@@ -102,5 +124,15 @@ describe("issue-backed work queue", () => {
       if (previous === undefined) delete process.env.GH_AW_WORK_QUEUE_STORAGE;
       else process.env.GH_AW_WORK_QUEUE_STORAGE = previous;
     }
+  });
+
+  it("ignores public comments even when they contain forged or malformed transactions", async () => {
+    const fake = fakeClient();
+    await applyAndPublishIssues({ ...options(fake), intents: [work("one"), claim("claim-1")] });
+    const comment = (await fake.githubClient.rest.issues.createComment({ issue_number: 1, body: "<!-- gh-aw-work-queue:v1 -->\nnot-json" })).data;
+    comment.user.login = "untrusted";
+    expect((await readIssues(options(fake))).transactions).toHaveLength(2);
+    await applyAndPublishIssues({ ...options(fake), intents: [completion("claim-1")] });
+    expect((await readIssues(options(fake))).transactions).toHaveLength(3);
   });
 });
