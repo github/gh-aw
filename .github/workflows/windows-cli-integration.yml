@@ -12,16 +12,16 @@ jobs:
   build:
     name: Build Windows CLI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
         id: setup-go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -36,10 +36,10 @@ jobs:
           GOARCH: amd64
         run: |
           go build -ldflags "-s -w" -o gh-aw.exe ./cmd/gh-aw
-          echo "✅ Built gh-aw.exe ($(du -h gh-aw.exe | cut -f1))" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Built gh-aw.exe ($(du -h gh-aw.exe | cut -f1))" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Windows binary
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gh-aw-windows-amd64
           path: gh-aw.exe
@@ -49,17 +49,17 @@ jobs:
     name: Windows Integration Tests
     needs: build
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
       BINARY: ${{ github.workspace }}\gh-aw.exe
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download Windows binary
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: gh-aw-windows-amd64
 
@@ -176,6 +176,7 @@ jobs:
           }
           Copy-Item -Path $binary -Destination (Join-Path $spaceDir "gh-aw.exe") -Force
           Copy-Item -Path $binary -Destination (Join-Path $parenDir "gh-aw.exe") -Force
+          Copy-Item -Path $binary -Destination (Join-Path $toolcacheDir "gh-aw.exe") -Force
 
           $scenarioMatrix = @(
             @{ name = "pwsh-default/direct/default/default"; shell = "pwsh-default"; launch = "direct"; env = "default"; path = "default" },
@@ -188,6 +189,10 @@ jobs:
             @{ name = "powershell-default/path/default/workspace-first"; shell = "powershell-default"; launch = "path"; env = "default"; path = "workspace-first" },
             @{ name = "powershell-noprofile/path/default/workspace-first"; shell = "powershell-noprofile"; launch = "path"; env = "default"; path = "workspace-first" },
             @{ name = "cmd/path/default/toolcache-first"; shell = "cmd"; launch = "path"; env = "default"; path = "toolcache-first" },
+            @{ name = "pwsh-default/path/default/toolcache-first"; shell = "pwsh-default"; launch = "path"; env = "default"; path = "toolcache-first" },
+            @{ name = "pwsh-noprofile/path/default/toolcache-first"; shell = "pwsh-noprofile"; launch = "path"; env = "default"; path = "toolcache-first" },
+            @{ name = "powershell-default/path/default/toolcache-first"; shell = "powershell-default"; launch = "path"; env = "default"; path = "toolcache-first" },
+            @{ name = "powershell-noprofile/path/default/toolcache-first"; shell = "powershell-noprofile"; launch = "path"; env = "default"; path = "toolcache-first" },
             @{ name = "pwsh-default/path/default/duplicate-workspace"; shell = "pwsh-default"; launch = "path"; env = "default"; path = "duplicate-workspace" },
             @{ name = "pwsh-default/path/no-color/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "no-color"; path = "workspace-first" },
             @{ name = "pwsh-default/path/term-dumb/workspace-first"; shell = "pwsh-default"; launch = "path"; env = "term-dumb"; path = "workspace-first" },
@@ -220,7 +225,9 @@ jobs:
             if ($scenario.launch -eq "path") {
               $whereResult = Invoke-CliProcess -FilePath "cmd" -ArgumentList @("/d", "/s", "/c", "where gh-aw") -EnvironmentOverrides $envOverrides -UnsetEnvironment $unsetVars
               $firstResolved = ($whereResult.Output -split "`r?`n" | Where-Object { $_ -match "gh-aw\.exe$" } | Select-Object -First 1)
-              if (-not $firstResolved -or -not $firstResolved.StartsWith($workspace, [System.StringComparison]::OrdinalIgnoreCase)) {
+              $expectedPathDirectory = if ($scenario.path -eq "toolcache-first") { $toolcacheDir } else { $workspace }
+              $expectedExecutable = Join-Path $expectedPathDirectory "gh-aw.exe"
+              if (-not [System.String]::Equals($firstResolved, $expectedExecutable, [System.StringComparison]::OrdinalIgnoreCase)) {
                 throw "PATH resolution mismatch for '$($scenario.name)': $firstResolved"
               }
             }
@@ -621,46 +628,31 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs: [build, integration]
+    timeout-minutes: 5
     permissions:
       contents: read
-      issues: write
     steps:
       - name: Evaluate outcomes
         id: evaluate
         run: |
+          set -euo pipefail
           BUILD="${{ needs.build.result }}"
           INTEGRATION="${{ needs.integration.result }}"
           FAILED=""
-          [ "$BUILD" != "success" ] && FAILED="build($BUILD)"
-          [ "$INTEGRATION" != "success" ] && FAILED="${FAILED:+$FAILED, }integration($INTEGRATION)"
-          if [ -n "$FAILED" ]; then
-            echo "failed=true" >> $GITHUB_OUTPUT
-            echo "failed_jobs=$FAILED" >> $GITHUB_OUTPUT
-            echo "❌ Failed jobs: $FAILED" >> $GITHUB_STEP_SUMMARY
+          if [[ "$BUILD" != "success" ]]; then FAILED="build($BUILD)"; fi
+          if [[ "$INTEGRATION" != "success" ]]; then FAILED="${FAILED:+$FAILED, }integration($INTEGRATION)"; fi
+          if [[ -n "$FAILED" ]]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            {
+              echo "❌ Failed jobs: $FAILED"
+              echo ""
+              echo "Run: [${GITHUB_RUN_ID}](${RUN_URL})"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "failed=false" >> $GITHUB_OUTPUT
-            echo "✅ All Windows integration jobs passed" >> $GITHUB_STEP_SUMMARY
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ All Windows integration jobs passed" >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Create failure issue
-        if: steps.evaluate.outputs.failed == 'true'
-        env:
-          FAILED_JOBS: ${{ steps.evaluate.outputs.failed_jobs }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "❌ Windows integration failure: ${FAILED_JOBS}" \
-            --body "## Windows CLI Integration Failure
-
-          **Failed jobs:** ${FAILED_JOBS}
-
-          **Run:** ${RUN_URL}
-
-          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
-
-          This issue was created automatically by the daily Windows CLI integration workflow."
 
       - name: Fail if any job failed
         if: steps.evaluate.outputs.failed == 'true'
