@@ -62,11 +62,38 @@ async function createIssue(parameters) {
   if (typeof owner !== "string" || !owner.trim() || typeof repo !== "string" || !repo.trim()) {
     throw new Error(`${ERR_VALIDATION}: createIssue requires a repository owner and name`);
   }
+  if ((parameters.labels !== undefined && !Array.isArray(parameters.labels)) || (parameters.assignees !== undefined && !Array.isArray(parameters.assignees))) {
+    throw new Error(`${ERR_VALIDATION}: createIssue labels and assignees must be arrays`);
+  }
+  const labels = Array.isArray(parameters.labels)
+    ? parameters.labels
+        .filter(Boolean)
+        .map(label => String(label).trim())
+        .filter(Boolean)
+        .map(sanitizeLabelContent)
+        .filter(Boolean)
+        .map(label => (label.length > 64 ? label.substring(0, 64) : label))
+        .filter((label, index, array) => array.indexOf(label) === index)
+    : undefined;
+  const assignees = Array.isArray(parameters.assignees)
+    ? parameters.assignees
+        .filter(Boolean)
+        .map(assignee => String(assignee).trim())
+        .filter(Boolean)
+        .filter((assignee, index, array) => array.indexOf(assignee) === index)
+    : undefined;
+  const issueArrayLimitError = getIssueArrayLimitError(labels, assignees);
+  if (issueArrayLimitError) {
+    throw new Error(`${ERR_VALIDATION}: ${issueArrayLimitError}`);
+  }
   const body = formatIssueBody(parameters.body, { repo: { owner, repo } });
   if (body.length > MAX_GITHUB_BODY_LENGTH) {
     throw new Error(`${ERR_VALIDATION}: Issue body exceeds GitHub's maximum length of ${MAX_GITHUB_BODY_LENGTH} characters including attribution`);
   }
+  /** @type {IssueParameters} */
   const request = { ...parameters, owner, repo, body };
+  if (labels) request.labels = labels;
+  if (assignees) request.assignees = assignees;
   if (isStagedMode()) {
     core.info(`Staged: would create issue in ${owner}/${repo} with title: ${parameters.title}`);
     return { staged: true, preview: request };
@@ -74,6 +101,25 @@ async function createIssue(parameters) {
   const { data: issue } = await withRetry(() => github.rest.issues.create(request), RATE_LIMIT_RETRY_CONFIG, `create_issue in ${owner}/${repo}`);
   core.info(`Created issue ${owner}/${repo}#${issue.number}: ${issue.html_url}`);
   return { staged: false, issue };
+}
+
+/**
+ * @param {string[]|undefined} labels
+ * @param {string[]|undefined} assignees
+ * @returns {string|undefined}
+ */
+function getIssueArrayLimitError(labels, assignees) {
+  const labelsLimitResult = tryEnforceArrayLimit(labels, MAX_LABELS, "labels");
+  if (!labelsLimitResult.success) {
+    return labelsLimitResult.error;
+  }
+
+  const assigneesLimitResult = tryEnforceArrayLimit(assignees, MAX_ASSIGNEES, "assignees");
+  if (!assigneesLimitResult.success) {
+    return assigneesLimitResult.error;
+  }
+
+  return undefined;
 }
 
 /**
@@ -932,16 +978,10 @@ async function main(config = {}) {
     assignees = assignees.filter(assignee => assignee !== "copilot");
 
     // Enforce max limits on labels and assignees before API calls
-    const labelsLimitResult = tryEnforceArrayLimit(labels, MAX_LABELS, "labels");
-    if (!labelsLimitResult.success) {
-      core.warning(`Issue limit exceeded: ${labelsLimitResult.error}`);
-      return { success: false, error: labelsLimitResult.error };
-    }
-
-    const assigneesLimitResult = tryEnforceArrayLimit(assignees, MAX_ASSIGNEES, "assignees");
-    if (!assigneesLimitResult.success) {
-      core.warning(`Issue limit exceeded: ${assigneesLimitResult.error}`);
-      return { success: false, error: assigneesLimitResult.error };
+    const issueArrayLimitError = getIssueArrayLimitError(labels, assignees);
+    if (issueArrayLimitError) {
+      core.warning(`Issue limit exceeded: ${issueArrayLimitError}`);
+      return { success: false, error: issueArrayLimitError };
     }
 
     let title = message.title?.trim() ?? "";

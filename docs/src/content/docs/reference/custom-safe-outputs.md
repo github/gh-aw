@@ -271,12 +271,12 @@ Use a release containing this API, and pin the setup action to a trusted commit 
 | API | Contract |
 |-----|----------|
 | `setupGlobals(core, github, context, exec, io, getOctokit)` | Initializes the GitHub Actions runtime once before calling `createIssue`. |
-| `createIssue(parameters)` | Accepts Octokit issue-creation parameters, with a required string `body`; `owner` and `repo` default to the workflow repository. Returns `{ staged: false, issue }` with the created Octokit issue, or `{ staged: true, preview }` with the fully decorated request when `GH_AW_SAFE_OUTPUTS_STAGED` is `"true"`. Throws on invalid input or API failure. |
+| `createIssue(parameters)` | Accepts Octokit issue-creation parameters, with a required string `body`; `owner` and `repo` default to the workflow repository. Labels are sanitized and deduplicated; labels and assignees use the built-in handler's limits. Returns `{ staged: false, issue }` with the created Octokit issue, or `{ staged: true, preview }` with the fully decorated request when `GH_AW_SAFE_OUTPUTS_STAGED` is `"true"`. Throws on invalid input or API failure. |
 | `logSpan(toolName, attributes?, options?)` | Re-exports the [OpenTelemetry span helper](/gh-aw/reference/open-telemetry/#custom-spans-from-shared-imports). Returns `Promise<void>`, uses the configured trace context, and preserves its non-fatal export behavior. |
 
 The helper adds the standard generated-by footer, workflow-run and history links, configured headers and disclosure, detection warnings, and workflow, caller, engine, and tracker annotations. Cross-repository issues still link to the original workflow run. Missing attribution metadata or a body exceeding GitHub's 65,536-character limit **including attribution** fails before creation; content is not silently truncated.
 
-This is a posting helper, not the built-in `create-issue` policy handler. The custom job remains responsible for validating and sanitizing agent-controlled content, enforcing output counts and allowed repositories, and supplying a token with appropriate permissions. Trusted custom metadata comments are preserved. The helper does not perform grouping, deduplication, expiration, assignment to agents, or manifest artifact upload.
+This is a posting helper, not the built-in `create-issue` policy handler. The custom job remains responsible for validating and sanitizing agent-controlled content, enforcing job-level output counts and allowed repositories, and supplying a token with appropriate permissions. Trusted custom metadata comments are preserved. The helper does not perform grouping, deduplication, expiration, assignment to agents, or manifest artifact upload.
 
 ### Job Properties
 

@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const publicApi = require("./index.cjs");
 const { setupGlobals, createIssue } = publicApi;
 const { main } = require("./create_issue.cjs");
+const { MAX_LABELS, MAX_ASSIGNEES } = require("./constants.cjs");
 
 describe("custom safe-output issue API", () => {
   let originalEnv;
@@ -77,6 +78,23 @@ describe("custom safe-output issue API", () => {
     expect(request.body).toContain(
       "<!-- gh-aw-agentic-workflow: Custom Finding, gh-aw-tracker-id: tracking-123, engine: copilot, version: 1.0.0, model: test-model, id: 123, workflow_id: custom-finding, run: https://github.com/owner/repo/actions/runs/123 -->"
     );
+  });
+
+  it("sanitizes labels and normalizes assignees before creating an issue", async () => {
+    await createIssue({ title: "Finding", body: "Details", labels: ["  @team ", "duplicate", "duplicate"], assignees: [" maintainer ", "maintainer"] });
+    expect(github.rest.issues.create.mock.calls[0][0]).toMatchObject({
+      labels: ["`@team`", "duplicate"],
+      assignees: ["maintainer"],
+    });
+  });
+
+  it.each([
+    ["labels", MAX_LABELS],
+    ["assignees", MAX_ASSIGNEES],
+  ])("rejects more than the built-in limit of %s without an API write", async (field, limit) => {
+    const values = Array.from({ length: limit + 1 }, (_, index) => `${field}-${index}`);
+    await expect(createIssue({ title: "Finding", body: "Details", [field]: values })).rejects.toThrow(field);
+    expect(github.rest.issues.create).not.toHaveBeenCalled();
   });
 
   it("uses exactly the built-in issue body formatting", async () => {
