@@ -301,7 +301,7 @@ func validateNoDuplicateMemoryIDs(memories []RepoMemoryEntry) error {
 //
 // Patterns are evaluated against the full relative path from the artifact root.
 // Slashless patterns such as "*.json" match only files at the artifact root (depth 0),
-// since a single "*" does not cross "/"; use "**/*.json" to also match nested files.
+// since a single "*" does not cross "/"; use "**/*.json" to match nested files as well.
 // Patterns containing "/" match against the full relative path from the artifact root.
 //
 // Rejected patterns:
