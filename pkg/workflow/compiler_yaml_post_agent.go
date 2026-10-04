@@ -13,7 +13,7 @@ import (
 // patch/bundle paths, and firewall audit paths.
 func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEngine, logFileFull string, initialPaths []string) []string { //nolint:largefunc // Existing artifact policy remains explicit and ordered.
 	paths := initialPaths
-	paths = append(paths, agentExecutionEvidencePath, constants.TmpGhAwDirSlash+"agent-session.jsonl")
+	paths = append(paths, agentExecutionEvidencePath, agentExecutionExitCodePath, constants.TmpGhAwDirSlash+"agent-session.jsonl")
 
 	// Merge engine-declared output files into the unified artifact instead of creating a
 	// separate agent_outputs artifact.

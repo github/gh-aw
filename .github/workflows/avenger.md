@@ -39,7 +39,6 @@ sandbox:
     mounts:
       - "/usr/bin/make:/usr/bin/make:ro"
       - "/usr/local/bin/node:/usr/local/bin/node:ro"
-      - "/usr/local/bin/npm:/usr/local/bin/npm:ro"
       - "/usr/local/lib/node_modules:/usr/local/lib/node_modules:ro"
       - "/opt/hostedtoolcache/go:/opt/hostedtoolcache/go:ro"
 if: needs.check_ci_status.outputs.ci_needs_fix == 'true'

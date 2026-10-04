@@ -759,6 +759,7 @@ safe-outputs:
 	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Initialize agent execution evidence"), `"state":"not_started"`)
 	assert.NotContains(t, lockYAML, "Mark agent execution started")
 	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact"), agentExecutionEvidencePath)
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact"), agentExecutionExitCodePath)
 	assert.Contains(t, lockYAML, `pattern: "{agent,agent-output-fallback}"`)
 	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload usage artifact"), "/tmp/gh-aw/usage/agent/execution.json")
 }

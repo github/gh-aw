@@ -1301,6 +1301,7 @@ jobs:
           path: |
             /tmp/gh-aw/aw-prompts/prompt.txt
             /tmp/gh-aw/agent_execution.json
+            /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent-session.jsonl
             /tmp/gh-aw/mcp-logs/
             /tmp/gh-aw/mcp-scripts/logs/
