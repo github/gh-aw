@@ -3,6 +3,7 @@ private: true
 emoji: "👨‍🍳"
 name: PR Sous Chef
 description: Nudges PRs idle for ten minutes with unanswered reviews and a branch update, without duplicate agent work
+max-daily-ai-credits: -1
 on:
   schedule: every 15m
   workflow_dispatch:
