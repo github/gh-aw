@@ -54,9 +54,11 @@ function renderSummary(snapshot, current) {
   }
   lines.push("", `Unique transactions: ${before.transactions.length} at activation; ${current.transactions.length} at conclusion.`);
   if (snapshot.worker) {
-    const work = Object.hasOwn(current.work, snapshot.worker.work_id) ? current.work[snapshot.worker.work_id] : "absent";
-    const claim = Object.hasOwn(current.claim, snapshot.worker.claim_id) ? current.claim[snapshot.worker.claim_id] : "absent";
-    lines.push("", `Assigned worker: work **${work}**; claim **${claim}**.`);
+    for (const worker of Array.isArray(snapshot.worker) ? snapshot.worker : [snapshot.worker]) {
+      const work = Object.hasOwn(current.work, worker.work_id) ? current.work[worker.work_id] : "absent";
+      const claim = Object.hasOwn(current.claim, worker.claim_id) ? current.claim[worker.claim_id] : "absent";
+      lines.push("", `Assigned worker: work **${work}**; claim **${claim}**.`);
+    }
   } else {
     lines.push("", "No worker claim was assigned to this run.");
   }

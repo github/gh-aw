@@ -162,9 +162,17 @@ function renderWorkClaim(payload) {
     return "";
   }
 
-  const work = JSON.stringify({ id: assignment.work_id, payload: assignment.work }).replace(/</g, "\\u003c");
-  const claim = JSON.stringify({ id: assignment.claim_id, work_id: assignment.work_id }).replace(/</g, "\\u003c");
-  return `<work-claim>\n${work}\n${claim}\nWhen the work is complete, call work_queue_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled". The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</work-claim>\n`;
+  const assignments = Array.isArray(assignment) ? assignment : [assignment];
+  const claims = assignments.map(item => {
+    const work = JSON.stringify({ id: item.work_id, payload: item.work }).replace(/</g, "\\u003c");
+    const claim = JSON.stringify({ id: item.claim_id, work_id: item.work_id }).replace(/</g, "\\u003c");
+    return `${work}\n${claim}`;
+  });
+  const instructions =
+    assignments.length === 1
+      ? 'When the work is complete, call work_queue_claim_finish with outcome "completed" to record the finish intent. If you cannot complete the work, call it with outcome "cancelled".'
+      : 'Call work_queue_claim_finish with claim_id and outcome "completed" or "cancelled" for every claim. Tag each safe output with claim_id to apply it only when that claim completes. Untagged outputs require every claim to complete.';
+  return `<work-claim>\n${claims.join("\n")}\n${instructions} The claim is only complete after trusted reconciliation verifies it; recording intent alone does not authorize safe outputs.\n</work-claim>\n`;
 }
 
 /**

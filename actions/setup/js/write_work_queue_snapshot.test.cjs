@@ -102,4 +102,23 @@ describe("write work queue activation snapshot", () => {
     }
     expect(() => resolveWorkerAssignment({ client_payload: { aw_context: { work_queue: assignment, work_claim: assignment } } }, transactions)).toThrow(/cannot contain both/);
   });
+
+  it("admits multiple distinct effective assignments and rejects duplicate identities", () => {
+    const transactions = [
+      { version: 2, kind: "Work", work: "one", claim: null, attempt: null },
+      { version: 2, kind: "Work", work: "two", claim: null, attempt: null },
+      { version: 2, kind: "Claim", work: "one", claim: "a", attempt: null },
+      { version: 2, kind: "Claim", work: "two", claim: "b", attempt: null },
+    ];
+    const first = { work_id: "one", claim_id: "a", work: {} };
+    const second = { work_id: "two", claim_id: "b", work: {} };
+    const payload = assignments => ({ inputs: { aw_context: JSON.stringify({ work_queue: assignments }) } });
+    expect(resolveWorkerAssignment(payload([first, second]), transactions)).toEqual([
+      { work_id: "one", claim_id: "a" },
+      { work_id: "two", claim_id: "b" },
+    ]);
+    expect(() => resolveWorkerAssignment(payload([]), transactions)).toThrow(/invalid shape/);
+    expect(() => resolveWorkerAssignment(payload([first, first]), transactions)).toThrow(/duplicate/);
+    expect(() => resolveWorkerAssignment(payload([first, { ...second, claim_id: "a" }]), transactions)).toThrow(/duplicate/);
+  });
 });

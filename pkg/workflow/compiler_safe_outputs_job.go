@@ -326,7 +326,7 @@ func (c *Compiler) buildSafeOutputsUserProvidedSteps(data *WorkflowData) ([]stri
 			return nil, fmt.Errorf("failed to convert safe-outputs step at index %d to typed step: %w", i, err)
 		}
 		if isWorkQueueEnabled(data) {
-			typedStep.If = combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, typedStep.If)
+			typedStep.If = combineGitHubIfExpressions("steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true'", typedStep.If)
 		}
 		pinnedStep, err := applyActionPinToTypedStep(typedStep, data)
 		if err != nil {
@@ -382,11 +382,18 @@ func gateSafeOutputSteps(steps []string) []string {
 		if len(block) == 0 {
 			return
 		}
+		condition := workQueueClaimAuthorizedExpression
+		for _, line := range block {
+			if strings.HasPrefix(line, "        id: action_") {
+				condition = "steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true'"
+				break
+			}
+		}
 		hasCondition := false
 		for i, line := range block {
 			if existing, ok := strings.CutPrefix(line, "        if:"); ok {
 				existing = strings.TrimSpace(existing)
-				block[i] = "        if: " + combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, existing) + "\n"
+				block[i] = "        if: " + combineGitHubIfExpressions(condition, existing) + "\n"
 				hasCondition = true
 				break
 			}
@@ -394,7 +401,7 @@ func gateSafeOutputSteps(steps []string) []string {
 		if !hasCondition {
 			// block is non-empty because flush returned above when it was empty.
 			//nolint:uncheckedsliceindex // flush returned above for an empty block.
-			block = append([]string{block[0], "        if: " + combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, "") + "\n"}, block[1:]...)
+			block = append([]string{block[0], "        if: " + combineGitHubIfExpressions(condition, "") + "\n"}, block[1:]...)
 		}
 		result = append(result, block...)
 		block = nil

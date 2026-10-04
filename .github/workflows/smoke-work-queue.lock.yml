@@ -1949,7 +1949,7 @@ jobs:
           GH_HOST="${GH_HOST#http://}"
           echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
       - name: Verify queue finish intent artifact
-        if: ${{ steps.work_queue_claim_reconciliation.outputs.authorized == 'true' }}
+        if: ${{ steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true' }}
         run: |
           if grep -Eq '"type"[[:space:]]*:[[:space:]]*"create_issue"' /tmp/gh-aw/safeoutputs.jsonl; then
             echo 'Work queue smoke failure reported; processing the failure issue'

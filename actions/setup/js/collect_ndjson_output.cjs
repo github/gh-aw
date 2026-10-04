@@ -291,6 +291,10 @@ async function main() {
           errors.push(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
           continue;
         }
+        if (item.claim_id !== undefined && (typeof item.claim_id !== "string" || !item.claim_id || !fs.existsSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT || "/tmp/gh-aw/work-queue.snapshot.json"))) {
+          errors.push(`Line ${i + 1}: claim_id requires a non-empty ID and a work queue assignment`);
+          continue;
+        }
         if (itemType === "noop" && isProbingNoopMessage(item.message)) {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
@@ -346,7 +350,7 @@ async function main() {
           // Use the normalized item (with sanitized/validated fields) rather
           // than the raw input, so downstream consumers see the canonical form.
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validationResult.normalizedItem);
+          parsedItems.push(item.claim_id === undefined ? validationResult.normalizedItem : { ...validationResult.normalizedItem, claim_id: item.claim_id });
         } else {
           // Fall back to validateItemWithSafeJobConfig for unknown types
           const jobOutputType = expectedOutputTypes[itemType];
@@ -361,7 +365,7 @@ async function main() {
             continue;
           }
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validation.normalizedItem);
+          parsedItems.push(item.claim_id === undefined ? validation.normalizedItem : { ...validation.normalizedItem, claim_id: item.claim_id });
         }
       } catch (error) {
         const errorMsg = getErrorMessage(error);

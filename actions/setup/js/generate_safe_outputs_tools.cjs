@@ -495,6 +495,13 @@ async function main() {
   // Append dynamic tools (custom jobs, dispatch_workflow, call_workflow)
   const dynamicTools = Array.isArray(toolsMeta.dynamic_tools) ? toolsMeta.dynamic_tools : [];
   const allFilteredTools = [...filteredTools, ...dynamicTools];
+  if (fs.existsSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT || "/tmp/gh-aw/work-queue.snapshot.json")) {
+    for (const tool of allFilteredTools) {
+      if (tool.inputSchema?.properties) {
+        tool.inputSchema.properties.claim_id = { type: "string", minLength: 1, description: "Optional trusted work queue claim ID; apply this output only when that claim completes." };
+      }
+    }
+  }
 
   // Write the result to the output path
   try {

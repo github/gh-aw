@@ -164,6 +164,25 @@ describe("work queue MCP snapshot", () => {
     expect(fs.statSync(finishPath).mode & 0o777).toBe(0o644);
   });
 
+  it("only records per-claim intents for inbound claims in a batch", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "work-queue-batch-"));
+    tempFiles.push(directory);
+    const finishPath = path.join(directory, "finish.jsonl");
+    const tool = createWorkQueueFinishTool({
+      finishIntentPath: finishPath,
+      worker: [
+        { claim_id: "a", work_id: "one" },
+        { claim_id: "b", work_id: "two" },
+      ],
+    });
+    expect(tool.inputSchema.required).toEqual(["claim_id"]);
+    expect(() => tool.handler({ claim_id: "unknown", outcome: "completed" })).toThrow(/trusted inbound/);
+    expect(() => tool.handler({ outcome: "completed" })).toThrow(/trusted inbound/);
+    tool.handler({ claim_id: "a", outcome: "completed" });
+    tool.handler({ claim_id: "b", outcome: "cancelled" });
+    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"claim_id":"a","outcome":"completed"}\n{"claim_id":"b","outcome":"cancelled"}\n');
+  });
+
   it("returns queue state and finish confirmation through the stdio MCP transport", async () => {
     const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
     const finishPath = path.join(path.dirname(snapshotPath), "finish.jsonl");

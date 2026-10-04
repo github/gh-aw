@@ -22,9 +22,13 @@ function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPS
     snapshot.version !== 2 ||
     (snapshot.sha !== null && (typeof snapshot.sha !== "string" || snapshot.sha.length === 0)) ||
     typeof snapshot.transactionLog !== "string" ||
-    (snapshot.worker !== null && (!snapshot.worker || typeof snapshot.worker !== "object" || typeof snapshot.worker.work_id !== "string" || typeof snapshot.worker.claim_id !== "string"))
+    (snapshot.worker !== null && !(Array.isArray(snapshot.worker) ? snapshot.worker.length > 0 && snapshot.worker.every(validWorker) : validWorker(snapshot.worker)))
   ) {
     throw new TypeError("work queue snapshot has an invalid shape");
+  }
+
+  function validWorker(worker) {
+    return worker && typeof worker === "object" && typeof worker.work_id === "string" && worker.work_id.length > 0 && typeof worker.claim_id === "string" && worker.claim_id.length > 0;
   }
 
   const transactions = parseTransactionLog(snapshot.transactionLog);
@@ -131,18 +135,22 @@ function createWorkQueueStateTool(snapshot) {
 
 function createWorkQueueFinishTool(options = {}) {
   const outputPath = options.finishIntentPath || process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || DEFAULT_FINISH_INTENT_PATH;
+  const workers = options.worker == null ? [] : Array.isArray(options.worker) ? options.worker : [options.worker];
+  const multiple = workers.length > 1;
   return {
     name: "work_queue_claim_finish",
-    description: "Record the finish intent for the trusted inbound work queue claim. The claim identity is supplied by workflow context and cannot be selected or changed here.",
+    description: multiple ? "Record a finish intent for a trusted inbound claim. Call once for each claim_id." : "Record the finish intent for the trusted inbound work queue claim.",
     inputSchema: {
       type: "object",
       properties: {
+        ...(multiple && { claim_id: { type: "string", description: "Claim ID from the trusted inbound work queue assignment." } }),
         outcome: {
           type: "string",
           enum: ["completed", "cancelled"],
           description: "Complete the claim (default) or cancel it so another claim may proceed.",
         },
       },
+      ...(multiple && { required: ["claim_id"] }),
       additionalProperties: false,
     },
     handler: args => {
@@ -150,9 +158,12 @@ function createWorkQueueFinishTool(options = {}) {
       if (!["completed", "cancelled"].includes(outcome)) {
         throw new TypeError("outcome must be completed or cancelled");
       }
+      if (multiple && (!workers.some(worker => worker.claim_id === args.claim_id) || typeof args.claim_id !== "string")) {
+        throw new TypeError("claim_id must identify a trusted inbound claim");
+      }
       try {
         fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-        fs.appendFileSync(outputPath, `${JSON.stringify({ outcome })}\n`, { encoding: "utf8" });
+        fs.appendFileSync(outputPath, `${JSON.stringify(multiple ? { claim_id: args.claim_id, outcome } : { outcome })}\n`, { encoding: "utf8" });
         // The MCP container and runner artifact collector can run as different users.
         fs.chmodSync(outputPath, 0o644);
       } catch (error) {
@@ -169,7 +180,7 @@ function startWorkQueueServer(options = {}) {
   console.error(`[work-queue] Loaded queue snapshot with ${snapshot.projection.transactions.length} transactions; worker ${snapshot.worker ? "assigned" : "absent"}`);
   const server = createServer({ name: "work-queue", version: "1.0.0" }, { logDir: options.logDir || process.env.GH_AW_MCP_LOG_DIR });
   registerTool(server, createWorkQueueStateTool(snapshot));
-  registerTool(server, createWorkQueueFinishTool(options));
+  registerTool(server, createWorkQueueFinishTool({ ...options, worker: snapshot.worker }));
   start(server);
 }
 

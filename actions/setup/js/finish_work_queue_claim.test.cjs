@@ -43,6 +43,52 @@ afterEach(() => {
 });
 
 describe("work queue claim reconciliation", () => {
+  it("reconciles each explicitly finished claim and filters outputs to completed claims", async () => {
+    const second = { work_id: "w2", claim_id: "claim-b" };
+    const fake = setup([...initialTransactions, { version: CURRENT_VERSION, kind: "Work", work: "w2", claim: null, attempt: null }, { version: CURRENT_VERSION, kind: "Claim", work: "w2", claim: "claim-b", attempt: null }]);
+    const outputPath = path.join(tempDirectory, "agent_output.json");
+    fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "create_issue", claim_id: "claim-a" }, { type: "create_issue", claim_id: "claim-b" }, { type: "create_issue" }, { type: "create_issue", claim_id: "unknown" }] }));
+    fs.writeFileSync(fake.finishIntentPath, '{"claim_id":"claim-a","outcome":"completed"}\n{"claim_id":"claim-b","outcome":"cancelled"}\n');
+    const result = await reconcileWorkerClaim({
+      worker: [worker, second],
+      finishIntentPath: fake.finishIntentPath,
+      agentOutputPath: outputPath,
+      readWorkQueueLog: fake.readWorkQueueLog,
+      applyAndPublish: fake.applyAndPublish,
+      context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
+    });
+    expect(result).toEqual({ authorized: true, allAuthorized: false, status: "partial" });
+    expect(fake.transactions.filter(item => item.kind === "Completion")).toHaveLength(1);
+    expect(fake.transactions.filter(item => item.kind === "ClaimCancellation")).toHaveLength(1);
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8")).items).toEqual([{ type: "create_issue" }]);
+  });
+
+  it("cancels all claims and blocks safe outputs when any finish intent is missing", async () => {
+    const second = { work_id: "w2", claim_id: "claim-b" };
+    const fake = setup([...initialTransactions, { version: CURRENT_VERSION, kind: "Work", work: "w2", claim: null, attempt: null }, { version: CURRENT_VERSION, kind: "Claim", work: "w2", claim: "claim-b", attempt: null }]);
+    fs.writeFileSync(fake.finishIntentPath, '{"claim_id":"claim-a","outcome":"completed"}\n');
+    const result = await reconcileWorkerClaim({
+      worker: [worker, second],
+      finishIntentPath: fake.finishIntentPath,
+      readWorkQueueLog: fake.readWorkQueueLog,
+      applyAndPublish: fake.applyAndPublish,
+      context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
+    });
+
+    expect(result).toEqual({ authorized: false, allAuthorized: false, status: "cancelled" });
+    expect(fake.transactions.filter(item => item.kind === "Completion")).toHaveLength(0);
+    expect(fake.transactions.filter(item => item.kind === "ClaimCancellation")).toHaveLength(2);
+  });
+  it("rejects conflicting or unknown per-claim finish intents", () => {
+    const fake = setup();
+    const workers = [worker, { work_id: "w2", claim_id: "claim-b" }];
+    fs.writeFileSync(fake.finishIntentPath, '{"claim_id":"claim-a","outcome":"completed"}\n{"claim_id":"claim-a","outcome":"cancelled"}\n');
+    expect(() => readFinishIntent(fake.finishIntentPath, workers)).toThrow(/conflict/);
+    fs.writeFileSync(fake.finishIntentPath, '{"claim_id":"unknown","outcome":"completed"}\n');
+    expect(() => readFinishIntent(fake.finishIntentPath, workers)).toThrow(/invalid/);
+    fs.writeFileSync(fake.finishIntentPath, '{"outcome":"completed"}\n');
+    expect(() => readFinishIntent(fake.finishIntentPath, workers)).toThrow(/invalid/);
+  });
   it("keeps an in-flight legacy assignment bound through activation and reconciliation", async () => {
     const fake = setup();
     const snapshotPath = path.join(tempDirectory, "snapshot.json");

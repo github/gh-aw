@@ -14,12 +14,14 @@ function resolveWorkerAssignment(payload, transactions) {
   if (!assignment) return null;
 
   const projection = replayTransactions(transactions);
-  const claim = projection.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === assignment.claim_id);
-  if (!claim || claim.work !== assignment.work_id || !Object.hasOwn(projection.work, assignment.work_id) || projection.claim[assignment.claim_id] !== "effective" || ["completed", "cancelled"].includes(projection.work[assignment.work_id])) {
-    throw new Error("work queue assignment is not currently effective");
-  }
-
-  return { work_id: assignment.work_id, claim_id: assignment.claim_id };
+  const validate = worker => {
+    const claim = projection.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === worker.claim_id);
+    if (!claim || claim.work !== worker.work_id || !Object.hasOwn(projection.work, worker.work_id) || projection.claim[worker.claim_id] !== "effective" || ["completed", "cancelled"].includes(projection.work[worker.work_id])) {
+      throw new Error("work queue assignment is not currently effective");
+    }
+    return { work_id: worker.work_id, claim_id: worker.claim_id };
+  };
+  return Array.isArray(assignment) ? assignment.map(validate) : validate(assignment);
 }
 
 async function main(options = {}) {

@@ -98,6 +98,16 @@ describe("generate_safe_outputs_tools", () => {
     expect(result.map((/** @type {{name: string}} */ t) => t.name)).not.toContain("missing_tool");
   });
 
+  it("offers claim_id on static and dynamic safe-output tools for work-queue runs", () => {
+    fs.writeFileSync(configPath, JSON.stringify({ create_issue: { max: 5 } }));
+    fs.writeFileSync(toolsMetaPath, JSON.stringify({ dynamic_tools: [{ name: "custom_output", inputSchema: { type: "object", properties: {} } }] }));
+    const snapshotPath = path.join(testDir, "snapshot.json");
+    fs.writeFileSync(snapshotPath, JSON.stringify({ worker: [{ work_id: "w", claim_id: "a" }] }));
+    runScript({ GH_AW_WORK_QUEUE_SNAPSHOT: snapshotPath });
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result.map(tool => tool.inputSchema.properties.claim_id?.type)).toEqual(["string", "string"]);
+  });
+
   it("mounts dedicated built-in ledger tools without exposing the low-level append tool", () => {
     fs.writeFileSync(toolsSourcePath, JSON.stringify([...sampleSourceTools, { name: "ledger_append", inputSchema: { type: "object", properties: { ledger: { type: "string" } } } }]));
     const builtin = { name: "ledger_map_put", _ledger_type: "map", _ledger_operation: "put", inputSchema: { type: "object", properties: { key: { type: "string" } } } };

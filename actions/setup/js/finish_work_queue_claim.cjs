@@ -6,6 +6,7 @@ const { applyAndPublishWorkQueueTransactions, readWorkQueueLog } = require("./wo
 const { CURRENT_VERSION } = require("./work_queue_codemods.cjs");
 const { replayTransactions } = require("./work_queue_replay.cjs");
 const { buildWorkflowCallId } = require("./aw_context.cjs");
+const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 const FINISH_INTENT_PATH = "/tmp/gh-aw/work-queue.finish.jsonl";
@@ -17,17 +18,21 @@ function readWorkerSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT
     !snapshot ||
     typeof snapshot !== "object" ||
     snapshot.version !== 2 ||
-    (snapshot.worker !== null &&
-      (!snapshot.worker || typeof snapshot.worker !== "object" || typeof snapshot.worker.work_id !== "string" || snapshot.worker.work_id.length === 0 || typeof snapshot.worker.claim_id !== "string" || snapshot.worker.claim_id.length === 0))
+    (snapshot.worker !== null && !(Array.isArray(snapshot.worker) ? snapshot.worker.length > 0 && snapshot.worker.every(validWorker) : validWorker(snapshot.worker)))
   ) {
     throw new TypeError("work queue snapshot has an invalid worker assignment");
   }
   return snapshot.worker;
 }
 
-function readFinishIntent(finishIntentPath = process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || FINISH_INTENT_PATH) {
+function validWorker(worker) {
+  return worker && typeof worker === "object" && typeof worker.work_id === "string" && worker.work_id.length > 0 && typeof worker.claim_id === "string" && worker.claim_id.length > 0;
+}
+
+function readFinishIntent(finishIntentPath = process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || FINISH_INTENT_PATH, workers = null) {
   if (!fs.existsSync(finishIntentPath)) return null;
   const outcomes = new Set();
+  const perClaim = new Map();
   const contents = fs.readFileSync(finishIntentPath, "utf8");
   for (const [index, line] of contents.split("\n").entries()) {
     if (!line.trim()) continue;
@@ -37,11 +42,26 @@ function readFinishIntent(finishIntentPath = process.env.GH_AW_WORK_QUEUE_FINISH
     } catch {
       throw new TypeError(`work queue claim finish intent line ${index + 1} is malformed`);
     }
-    if (!intent || typeof intent !== "object" || Array.isArray(intent) || Object.keys(intent).length !== 1 || !Object.hasOwn(intent, "outcome") || !["completed", "cancelled"].includes(intent.outcome)) {
+    const multiple = Array.isArray(workers);
+    if (
+      !intent ||
+      typeof intent !== "object" ||
+      Array.isArray(intent) ||
+      Object.keys(intent).length !== (multiple ? 2 : 1) ||
+      !Object.hasOwn(intent, "outcome") ||
+      !["completed", "cancelled"].includes(intent.outcome) ||
+      (multiple && (typeof intent.claim_id !== "string" || !workers.some(worker => worker.claim_id === intent.claim_id)))
+    ) {
       throw new TypeError(`work queue claim finish intent line ${index + 1} is invalid`);
     }
-    outcomes.add(intent.outcome);
+    if (multiple) {
+      if (perClaim.has(intent.claim_id) && perClaim.get(intent.claim_id) !== intent.outcome) throw new TypeError("work queue claim finish intents conflict");
+      perClaim.set(intent.claim_id, intent.outcome);
+    } else {
+      outcomes.add(intent.outcome);
+    }
   }
+  if (Array.isArray(workers)) return perClaim;
   if (outcomes.size > 1) throw new TypeError("work queue claim finish intents conflict");
   return outcomes.size === 0 ? null : [...outcomes][0];
 }
@@ -59,35 +79,13 @@ function renderSummary(status) {
   return `## Work queue reconciliation\n\n<details>\n<summary>Show claim reconciliation</summary>\n\n${description}\n\n</details>\n`;
 }
 
-async function reconcileWorkerClaim(options = {}) {
-  const coreApi = options.core || (typeof core === "undefined" ? undefined : core);
-  const worker = options.worker === undefined ? readWorkerSnapshot(options.snapshotPath) : options.worker;
-  const githubClient = options.githubClient || (typeof github === "undefined" ? undefined : github);
-  const repositoryContext = options.context || (typeof context === "undefined" ? undefined : context);
-  if (!repositoryContext?.repo) throw new Error("GitHub repository context is unavailable");
-  const owner = repositoryContext.repo.owner;
-  const repo = repositoryContext.repo.repo;
-  const readLog = options.readWorkQueueLog || readWorkQueueLog;
-
-  if (!worker) {
-    coreApi?.info("Work queue: no inbound worker claim; skipping queue reconciliation");
-    return { authorized: true, status: "unassigned" };
-  }
-
-  const finishIntent = readFinishIntent(options.finishIntentPath);
-  coreApi?.info(`Work queue: worker finish intent ${finishIntent || "absent"}`);
-  const initial = await readLog({ githubClient, owner, repo, core: coreApi });
+async function reconcileSingleClaim(worker, finishIntent, options, initial, attempt, coreApi, githubClient, owner, repo, readLog) {
   const projection = replayTransactions(initial.transactions);
-  coreApi?.info(`Work queue: rechecking worker against ${initial.transactions.length} queue transactions`);
   const claim = initial.transactions.find(transaction => transaction.kind === "Claim" && transaction.claim === worker.claim_id);
   if (!claim || claim.work !== worker.work_id || !Object.hasOwn(projection.work, worker.work_id) || !Object.hasOwn(projection.claim, worker.claim_id)) {
     coreApi?.info("Work queue: worker claim is no longer present in the queue");
     return { authorized: false, status: "superseded" };
   }
-
-  const runId = String(repositoryContext.runId ?? process.env.GITHUB_RUN_ID ?? "").trim();
-  const attempt = buildWorkflowCallId(runId, process.env.GITHUB_RUN_ATTEMPT || "1", process.env.GITHUB_WORKFLOW_REF || "");
-  if (!attempt) throw new Error("current workflow attempt identity is unavailable");
 
   const existingCompletion = initial.transactions.find(transaction => transaction.kind === "Completion" && transaction.work === worker.work_id && transaction.claim === worker.claim_id && transaction.attempt === attempt);
   if (existingCompletion && projection.work[worker.work_id] === "completed" && projection.winner[worker.work_id] === worker.claim_id) {
@@ -129,11 +127,74 @@ async function reconcileWorkerClaim(options = {}) {
   return { authorized: false, status: ["completed", "cancelled"].includes(verified.work[worker.work_id]) ? "terminal" : "superseded" };
 }
 
+function filterClaimOutputs(completed, allCompleted, outputPath) {
+  if (!fs.existsSync(outputPath)) return;
+  const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+  if (!Array.isArray(output.items)) throw new TypeError("agent output has an invalid shape");
+  output.items = output.items
+    .filter(item => {
+      if (item.claim_id === undefined) return allCompleted;
+      return typeof item.claim_id === "string" && completed.has(item.claim_id);
+    })
+    .map(item => {
+      const { claim_id, ...rest } = item;
+      return rest;
+    });
+  fs.writeFileSync(outputPath, JSON.stringify(output));
+}
+
+async function reconcileWorkerClaim(options = {}) {
+  const coreApi = options.core || (typeof core === "undefined" ? undefined : core);
+  const worker = options.worker === undefined ? readWorkerSnapshot(options.snapshotPath) : options.worker;
+  const githubClient = options.githubClient || (typeof github === "undefined" ? undefined : github);
+  const repositoryContext = options.context || (typeof context === "undefined" ? undefined : context);
+  if (!repositoryContext?.repo) throw new Error("GitHub repository context is unavailable");
+  const owner = repositoryContext.repo.owner;
+  const repo = repositoryContext.repo.repo;
+  const readLog = options.readWorkQueueLog || readWorkQueueLog;
+
+  if (!worker) {
+    coreApi?.info("Work queue: no inbound worker claim; skipping queue reconciliation");
+    filterClaimOutputs(new Set(), true, options.agentOutputPath || `${TMP_GH_AW_PATH}/${AGENT_OUTPUT_FILENAME}`);
+    return { authorized: true, status: "unassigned" };
+  }
+
+  const multiple = Array.isArray(worker);
+  const workers = multiple ? worker : [worker];
+  if (!workers.length || workers.some(item => !validWorker(item)) || new Set(workers.map(item => item.claim_id)).size !== workers.length) throw new TypeError("work queue snapshot has an invalid worker assignment");
+  const finishIntent = readFinishIntent(options.finishIntentPath, multiple ? workers : null);
+  coreApi?.info(`Work queue: worker finish intent ${multiple ? "per-claim" : finishIntent || "absent"}`);
+  const initial = await readLog({ githubClient, owner, repo, core: coreApi });
+  coreApi?.info(`Work queue: rechecking worker against ${initial.transactions.length} queue transactions`);
+  const runId = String(repositoryContext.runId ?? process.env.GITHUB_RUN_ID ?? "").trim();
+  const attempt = buildWorkflowCallId(runId, process.env.GITHUB_RUN_ATTEMPT || "1", process.env.GITHUB_WORKFLOW_REF || "");
+  if (!attempt) throw new Error("current workflow attempt identity is unavailable");
+
+  if (!multiple) {
+    const result = await reconcileSingleClaim(worker, finishIntent, options, initial, attempt, coreApi, githubClient, owner, repo, readLog);
+    if (result.authorized) filterClaimOutputs(new Set([worker.claim_id]), true, options.agentOutputPath || `${TMP_GH_AW_PATH}/${AGENT_OUTPUT_FILENAME}`);
+    return result;
+  }
+  // An omitted finish cancels the entire batch, including claims that have an explicit completion intent.
+  const completeBatch = finishIntent !== null && workers.every(item => finishIntent.has(item.claim_id));
+  const results = [];
+  for (const item of workers) {
+    const outcome = completeBatch ? finishIntent.get(item.claim_id) : "cancelled";
+    results.push(await reconcileSingleClaim(item, outcome, options, await readLog({ githubClient, owner, repo, core: coreApi }), attempt, coreApi, githubClient, owner, repo, readLog));
+  }
+  const completed = new Set(workers.filter((_, index) => results[index].authorized).map(item => item.claim_id));
+  const allCompleted = completed.size === workers.length;
+  const authorized = completeBatch && completed.size > 0;
+  if (authorized) filterClaimOutputs(completed, allCompleted, options.agentOutputPath || `${TMP_GH_AW_PATH}/${AGENT_OUTPUT_FILENAME}`);
+  return { authorized, allAuthorized: completeBatch && allCompleted, status: !completeBatch ? "cancelled" : allCompleted ? "completed" : authorized ? "partial" : "cancelled" };
+}
+
 async function main(options = {}) {
   const coreApi = options.core || core;
   try {
     const result = await reconcileWorkerClaim(options);
     coreApi.setOutput("authorized", String(result.authorized));
+    coreApi.setOutput("all_authorized", String(result.allAuthorized ?? result.authorized));
     coreApi.info(`Work queue claim reconciliation: ${result.status}`);
     await coreApi.summary.addRaw(renderSummary(result.status)).write();
     return result;

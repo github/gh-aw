@@ -169,7 +169,7 @@ function readInboundAwContext(payload) {
 
 /**
  * @param {Record<string, unknown> | null} awContext
- * @returns {{work_id: string, claim_id: string, work: Record<string, unknown>} | null}
+ * @returns {{work_id: string, claim_id: string, work: Record<string, unknown>} | Array<{work_id: string, claim_id: string, work: Record<string, unknown>}> | null}
  */
 function readWorkQueueAssignment(awContext) {
   if (!awContext) return null;
@@ -180,10 +180,19 @@ function readWorkQueueAssignment(awContext) {
   }
   if (!hasCurrent && !hasLegacy) return null;
   const assignment = hasCurrent ? awContext.work_queue : awContext.work_claim;
-  if (!isRecord(assignment) || Object.keys(assignment).length !== 3 || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work)) {
-    throw new TypeError("work queue assignment has an invalid shape");
+  const validate = value => {
+    if (!isRecord(value) || Object.keys(value).length !== 3 || typeof value.work_id !== "string" || !value.work_id || typeof value.claim_id !== "string" || !value.claim_id || !isRecord(value.work)) {
+      throw new TypeError("work queue assignment has an invalid shape");
+    }
+    return { work_id: value.work_id, claim_id: value.claim_id, work: value.work };
+  };
+  if (!Array.isArray(assignment)) return validate(assignment);
+  if (!assignment.length) throw new TypeError("work queue assignment has an invalid shape");
+  const claims = assignment.map(validate);
+  if (new Set(claims.map(claim => claim.claim_id)).size !== claims.length || new Set(claims.map(claim => claim.work_id)).size !== claims.length) {
+    throw new TypeError("work queue assignment contains duplicate claims or work");
   }
-  return { work_id: assignment.work_id, claim_id: assignment.claim_id, work: assignment.work };
+  return claims;
 }
 
 /**
