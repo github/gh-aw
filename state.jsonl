@@ -1,5 +1,4 @@
-{"run_id":"26762018833","timestamp":"2026-06-01T14:43:42.566Z","assignments":{"tone_variant":"assertive"},"baseline_counts":{"tone_variant":{"clinical":1,"narrative":1}}}
-{"run_id":"26779113416","timestamp":"2026-06-01T20:10:48.759Z","assignments":{"tone_variant":"clinical"}}
+{"run_id":"26779113416","timestamp":"2026-06-01T20:10:48.759Z","assignments":{"tone_variant":"clinical"},"baseline_counts":{"tone_variant":{"clinical":1,"narrative":1,"assertive":1}}}
 {"run_id":"26792887640","timestamp":"2026-06-02T01:35:38.979Z","assignments":{"tone_variant":"clinical"}}
 {"run_id":"26807347450","timestamp":"2026-06-02T08:17:10.893Z","assignments":{"tone_variant":"narrative"}}
 {"run_id":"26825214886","timestamp":"2026-06-02T14:09:07.509Z","assignments":{"tone_variant":"clinical"}}
@@ -510,3 +509,4 @@
 {"run_id":"37189248913","timestamp":"2026-10-04T08:33:39.545Z","harness_version":"ba31ebd5cc13e3cb2c95835eb6f6da9934fb6fe1f883e68d393ba8348a6f6818:fe34211c44fe13558ede7de5418e448ac448eaf5a6b8a5ff475e1610e20ff975","assignments":{"tone_variant":"assertive"}}
 {"run_id":"37210524959","timestamp":"2026-10-04T14:47:45.791Z","harness_version":"ba31ebd5cc13e3cb2c95835eb6f6da9934fb6fe1f883e68d393ba8348a6f6818:fe34211c44fe13558ede7de5418e448ac448eaf5a6b8a5ff475e1610e20ff975","assignments":{"tone_variant":"narrative"}}
 {"run_id":"37235681815","timestamp":"2026-10-04T21:21:06.139Z","harness_version":"ba31ebd5cc13e3cb2c95835eb6f6da9934fb6fe1f883e68d393ba8348a6f6818:fe34211c44fe13558ede7de5418e448ac448eaf5a6b8a5ff475e1610e20ff975","assignments":{"tone_variant":"narrative"}}
+{"run_id":"37240508596","timestamp":"2026-10-04T22:34:56.925Z","harness_version":"ba31ebd5cc13e3cb2c95835eb6f6da9934fb6fe1f883e68d393ba8348a6f6818:fe34211c44fe13558ede7de5418e448ac448eaf5a6b8a5ff475e1610e20ff975","assignments":{"tone_variant":"clinical"}}
