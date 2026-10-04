@@ -239,7 +239,7 @@ test("live queue refuses an eleventh issue", async () => {
 });
 
 test("new summaries use attributed issue creation and preserve managed metadata", async () => {
-  const { setupGlobals, createIssue } = require("../../actions/setup/js/create-issue.cjs");
+  const { setupGlobals, createIssue } = require("../../actions/setup/js/index.cjs");
   const data = corpus();
   const calls = [];
   const github = {

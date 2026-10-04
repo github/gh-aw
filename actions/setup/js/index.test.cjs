@@ -3,7 +3,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const { setupGlobals, createIssue } = require("./create-issue.cjs");
+const publicApi = require("./index.cjs");
+const { setupGlobals, createIssue } = publicApi;
 const { main } = require("./create_issue.cjs");
 
 describe("custom safe-output issue API", () => {
@@ -47,6 +48,18 @@ describe("custom safe-output issue API", () => {
     Object.assign(process.env, originalEnv);
     Object.assign(global, originalGlobals);
     vi.restoreAllMocks();
+  });
+
+  it("re-exports only the supported public functions without wrapping them", () => {
+    expect(Object.keys(publicApi).sort()).toEqual(["createIssue", "logSpan", "setupGlobals"]);
+    expect(createIssue).toBe(require("./create_issue.cjs").createIssue);
+    expect(setupGlobals).toBe(require("./setup_globals.cjs").setupGlobals);
+    expect(publicApi.logSpan).toBe(require("./otlp.cjs").logSpan);
+  });
+
+  it("keeps OTEL disabled without a valid trace ID", async () => {
+    delete process.env.GITHUB_AW_OTEL_TRACE_ID;
+    await expect(publicApi.logSpan("custom-job", { "custom-job.items": 1 })).resolves.toBeUndefined();
   });
 
   it("creates an issue with full attribution while preserving trusted custom metadata", async () => {
@@ -114,7 +127,7 @@ describe("custom safe-output issue API", () => {
 
   it("rejects missing initialization or attribution metadata without API writes", async () => {
     delete global.core;
-    await expect(createIssue({ title: "Finding", body: "Details" })).rejects.toThrow("create-issue.cjs");
+    await expect(createIssue({ title: "Finding", body: "Details" })).rejects.toThrow("index.cjs");
     global.core = core;
     for (const key of ["GH_AW_WORKFLOW_ID", "GH_AW_WORKFLOW_NAME"]) {
       const value = process.env[key];

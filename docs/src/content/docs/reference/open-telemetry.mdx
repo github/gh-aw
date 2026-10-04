@@ -160,6 +160,8 @@ Shared agentic workflow imports can emit their own OTLP spans alongside the buil
 
 The `otlp.cjs` helper provides a minimal, stable API. Use it in any `steps:` entry of a shared import:
 
+`logSpan` is also re-exported unchanged from the public `actions/setup/js/index.cjs` entry point: `const { logSpan } = require(process.env.RUNNER_TEMP + "/gh-aw/actions/index.cjs");`. Existing direct imports from `otlp.cjs` remain supported.
+
 ```yaml wrap title=".github/workflows/shared/my-tool.md"
 ---
 # My Tool — shared import that instruments its own telemetry

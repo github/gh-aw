@@ -82,7 +82,7 @@ safe-outputs:
           with:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
-              const { setupGlobals, createIssue } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/create-issue.cjs`);
+              const { setupGlobals, createIssue } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/index.cjs`);
               setupGlobals(core, github, context, exec, io, getOctokit);
               const { publish } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/aw_issue_clustering_publish.cjs`);
               await publish({ github, context, core, createIssue });

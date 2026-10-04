@@ -229,7 +229,7 @@ Custom jobs receive the same `GH_AW_WORKFLOW_*`, engine, tracker, message, and d
 
 ### Issue Creation API
 
-`actions/setup/js/create-issue.cjs` is a supported public entry point for custom jobs. Run the setup action to install the runtime helpers and prompt templates, then load `${RUNNER_TEMP}/gh-aw/actions/create-issue.cjs` from `actions/github-script`.
+`actions/setup/js/index.cjs` re-exports the supported `setupGlobals`, `createIssue`, and `logSpan` API for custom jobs. Issue creation is implemented in the existing `create_issue.cjs` handler module; telemetry comes from `otlp.cjs`. Run the setup action to install the runtime helpers and prompt templates, then load `${RUNNER_TEMP}/gh-aw/actions/index.cjs` from `actions/github-script`.
 
 ```aw wrap
 safe-outputs:
@@ -251,7 +251,7 @@ safe-outputs:
             script: |
               const fs = require("node:fs");
               const actionsDir = `${process.env.RUNNER_TEMP}/gh-aw/actions`;
-              const { setupGlobals, createIssue } = require(`${actionsDir}/create-issue.cjs`);
+              const { setupGlobals, createIssue } = require(`${actionsDir}/index.cjs`);
               setupGlobals(core, github, context, exec, io, getOctokit);
               const { sanitizeContent } = require(`${actionsDir}/sanitize_content.cjs`);
               const output = JSON.parse(fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, "utf8"));
@@ -272,6 +272,7 @@ Use a release containing this API, and pin the setup action to a trusted commit 
 |-----|----------|
 | `setupGlobals(core, github, context, exec, io, getOctokit)` | Initializes the GitHub Actions runtime once before calling `createIssue`. |
 | `createIssue(parameters)` | Accepts Octokit issue-creation parameters, with a required string `body`; `owner` and `repo` default to the workflow repository. Returns `{ staged: false, issue }` with the created Octokit issue, or `{ staged: true, preview }` with the fully decorated request when `GH_AW_SAFE_OUTPUTS_STAGED` is `"true"`. Throws on invalid input or API failure. |
+| `logSpan(toolName, attributes?, options?)` | Re-exports the [OpenTelemetry span helper](/gh-aw/reference/open-telemetry/#custom-spans-from-shared-imports). Returns `Promise<void>`, uses the configured trace context, and preserves its non-fatal export behavior. |
 
 The helper adds the standard generated-by footer, workflow-run and history links, configured headers and disclosure, detection warnings, and workflow, caller, engine, and tracker annotations. Cross-repository issues still link to the original workflow run. Missing attribution metadata or a body exceeding GitHub's 65,536-character limit **including attribution** fails before creation; content is not silently truncated.
 
