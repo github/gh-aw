@@ -1,32 +1,22 @@
 {
-  "run_date": "2026-10-04T14:07:10Z",
-  "run_id": "37207964175",
+  "run_date": "2026-10-04T19:15:19Z",
+  "run_id": 37227449650,
   "source": "github-mcp-triage",
   "summary": {
-    "eligible_total": 0,
-    "cooldown_skipped": 13,
-    "category_counts": {},
-    "risk_counts": {},
-    "priority_counts": {},
-    "action_counts": {}
+    "eligible_total": 3,
+    "cooldown_skipped": 0,
+    "category_counts": {"bug": 2, "feature": 1},
+    "risk_counts": {"high": 2, "medium": 1},
+    "priority_counts": {"high": 1, "medium": 2},
+    "action_counts": {"auto_merge": 1, "fast_track": 2}
   },
-  "prs": [],
-  "cooldown_skipped": [
-    {"number": 65592, "title": "Restore /matt in centralized slash-command routing", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:03:01Z", "draft": true},
-    {"number": 65591, "title": "Migrate ESLint factory workflows to work-queue dispatch", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:01:09Z", "draft": true},
-    {"number": 65590, "title": "Collapse comment memory in managed issue and PR comments", "reason": "updated within 1 hour", "updated_at": "2026-10-04T14:05:21Z", "draft": false},
-    {"number": 65577, "title": "Include root-cause details in generic failure issues", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:58:31Z", "draft": false},
-    {"number": 65570, "title": "Add inline WIF setup summaries to the quick-start", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:43:51Z", "draft": false},
-    {"number": 65569, "title": "Review and reconcile seasonal workflow references", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:43:16Z", "draft": false},
-    {"number": 65568, "title": "Upgrade the issue triage workflow to annotate PRs and runbooks", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:42:34Z", "draft": false},
-    {"number": 65564, "title": "Add report formatting guidance for workflow issue body generation", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:35:54Z", "draft": false},
-    {"number": 65563, "title": "Add xlate workflow for release notes packaging", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:31:31Z", "draft": false},
-    {"number": 65562, "title": "Add a dedicated workflow for GitHub issue reports", "reason": "updated within 1 hour", "updated_at": "2026-10-04T13:28:00Z", "draft": false},
-    {"number": 65548, "title": "Document repo memory branch state in the issue templates", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:54:00Z", "draft": false},
-    {"number": 65547, "title": "Prefer reporting metadata over issue body templates", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:53:29Z", "draft": false},
-    {"number": 65526, "title": "Add follow-up issue guidance for generic startup failures", "reason": "updated within 1 hour", "updated_at": "2026-10-04T12:44:43Z", "draft": false}
+  "prs": [
+    {"number": 56568, "title": "Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`", "category": "bug", "risk": "high", "priority": 84, "score_breakdown": {"impact": 42, "urgency": 27, "quality": 15}, "action": "fast_track", "batch": "core-agent-updates"},
+    {"number": 65591, "title": "Migrate ESLint factory workflows to work-queue dispatch", "category": "feature", "risk": "high", "priority": 79, "score_breakdown": {"impact": 38, "urgency": 25, "quality": 16}, "action": "fast_track", "batch": "core-agent-updates"},
+    {"number": 65619, "title": "Skip add_labels when no triggering issue or PR exists", "category": "bug", "risk": "medium", "priority": 68, "score_breakdown": {"impact": 26, "urgency": 18, "quality": 24}, "action": "auto_merge", "batch": "core-agent-updates"}
   ],
-  "batches": [],
-  "selected_candidates": [],
-  "report_issue": "pending"
+  "batches": [{"id": "core-agent-updates", "count": 3, "prs": [56568, 65591, 65619]}],
+  "selected_candidates": [56568, 65591, 65619],
+  "report_issue": "created",
+  "notes": ["PRs updated within the 1-hour cooldown were skipped.", "Bot-authored PRs outside the app/github-copilot author filter were excluded."]
 }
