@@ -239,7 +239,7 @@ func buildBaseManifestFiles() []string {
 func getAllManifestFiles(extra ...string) []string {
 	if len(extra) == 0 {
 		allManifestFilesBaseOnce.Do(func() {
-			allManifestFilesBaseCache = sliceutil.MergeUnique(buildBaseManifestFiles())
+			allManifestFilesBaseCache = sliceutil.MergeUnique(buildBaseManifestFiles()) //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 		})
 		result := make([]string, len(allManifestFilesBaseCache))
 		copy(result, allManifestFilesBaseCache)

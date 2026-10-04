@@ -47,7 +47,7 @@ func initModelPrices() {
 			return
 		}
 
-		modelPriceRecords = make([]modelPriceRecord, 0)
+		modelPriceRecords = make([]modelPriceRecord, 0) //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 		for providerName, providerData := range data.Providers {
 			normalizedProvider := strings.ToLower(strings.TrimSpace(providerName))
 			if normalizedProvider == "" { //nolint:tolowerequalfold
@@ -70,7 +70,7 @@ func initModelPrices() {
 						record.pricing[key] = parsed
 					}
 				}
-				modelPriceRecords = append(modelPriceRecords, record)
+				modelPriceRecords = append(modelPriceRecords, record) //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 			}
 		}
 		modelCostsLog.Printf("Initialized model price catalog: providers=%d, records=%d", len(data.Providers), len(modelPriceRecords))

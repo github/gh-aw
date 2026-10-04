@@ -169,7 +169,7 @@ func rewriteSchemaRefPaths(node any) bool {
 
 func getSortedSafeOutputFieldNames() []string {
 	sortedSafeOutputFieldNamesOnce.Do(func() {
-		sortedSafeOutputFieldNames = sliceutil.SortedKeys(safeOutputFieldMapping)
+		sortedSafeOutputFieldNames = sliceutil.SortedKeys(safeOutputFieldMapping) //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 	})
 	return sortedSafeOutputFieldNames
 }

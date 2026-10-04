@@ -20,7 +20,7 @@ var (
 
 func getRepoTargetAccessors() map[string]repoTargetAccessor {
 	repoTargetAccessorsOnce.Do(func() {
-		repoTargetAccessors = buildRepoTargetAccessors()
+		repoTargetAccessors = buildRepoTargetAccessors() //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 	})
 	return repoTargetAccessors
 }

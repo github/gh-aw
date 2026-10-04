@@ -70,7 +70,7 @@ func resolveVersionLabel(ctx context.Context, sourceRepo, ref string) string {
 func clearVersionLabelCache() {
 	versionLabelMu.Lock()
 	defer versionLabelMu.Unlock()
-	versionLabelCache = make(map[string]map[string]string)
+	versionLabelCache = make(map[string]map[string]string) //nolint:packagelevelmutableslicemap // versionLabelMu guards the cache.
 }
 
 func getVersionLabelCache(sourceRepo string) (map[string]string, bool) {
@@ -83,7 +83,7 @@ func getVersionLabelCache(sourceRepo string) (map[string]string, bool) {
 func setVersionLabelCache(sourceRepo string, tagMap map[string]string) {
 	versionLabelMu.Lock()
 	defer versionLabelMu.Unlock()
-	versionLabelCache[sourceRepo] = tagMap
+	versionLabelCache[sourceRepo] = tagMap //nolint:packagelevelmutableslicemap // versionLabelMu guards the cache.
 }
 
 // loadRepoTagMap fetches tags for sourceRepo and returns a map from full commit

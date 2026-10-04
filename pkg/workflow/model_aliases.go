@@ -93,7 +93,7 @@ func getBuiltinOnlyAliasMap() map[string][]string {
 			// follow a corrupted release build, never dynamic user input.
 			panic(err)
 		}
-		builtinOnlyAliasMap = data
+		builtinOnlyAliasMap = data //nolint:packagelevelmutableslicemap // sync.Once guards initialization.
 		builtinOnlyAliasMapID = mapHeaderPointer(data)
 	})
 	return builtinOnlyAliasMap
