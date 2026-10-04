@@ -31,6 +31,7 @@ const { fetchAWFReflect, AWF_API_PROXY_REFLECT_URL, AWF_REFLECT_OUTPUT_PATH, AWF
 const { emitInfrastructureIncomplete } = require("./safeoutputs_cli.cjs");
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { getProviderErrorDetails } = require("./pi_provider_error.cjs");
 
 // Default logger: prefixed with "[gh-aw/pi-provider]" for easy grepping.
 // prettier-ignore
@@ -309,6 +310,8 @@ function piProviderExtension(pi) {
   let lastProviderRequest = null;
   /** @type {{ status: number, responseHeaders: string, succeeded: boolean }|null} */
   let lastProviderResponse = null;
+  /** @type {{ status?: number, message: string }|null} */
+  let lastProviderFailure = null;
   let providerRequestCount = 0;
   let successfulProviderResponseCount = 0;
   registerConfiguredProviders(pi, log);
@@ -333,6 +336,10 @@ function piProviderExtension(pi) {
       responseHeaders: formatResponseHeaderNames(event.headers),
       succeeded,
     };
+    if (!succeeded) {
+      const responseBody = event.body ?? event.responseBody;
+      lastProviderFailure = getProviderErrorDetails(responseBody, event.status);
+    }
     const provider = ctx?.model?.provider || "(unknown provider)";
     const model = ctx?.model?.id || getConfiguredModel() || "(unknown model)";
     log(`provider_response provider=${provider} model=${model} status=${event.status} method=${request.method} url=${request.url} response_headers=${lastProviderResponse.responseHeaders}`);
@@ -344,10 +351,11 @@ function piProviderExtension(pi) {
       return;
     }
     const request = lastProviderRequest || { api: message.api || "(unknown api)", method: "POST", url: "(request unavailable)" };
-    const status = lastProviderResponse ? String(lastProviderResponse.status) : "no-response";
+    lastProviderFailure = getProviderErrorDetails(message.errorMessage, lastProviderResponse?.status);
+    const status = typeof lastProviderFailure.status === "number" ? String(lastProviderFailure.status) : "no-response";
     const responseHeaders = lastProviderResponse ? lastProviderResponse.responseHeaders : "none";
     log(
-      `provider_error provider=${message.provider || "(unknown provider)"} model=${message.model || "(unknown model)"} api=${request.api} status=${status} method=${request.method} url=${request.url} response_headers=${responseHeaders} error=${JSON.stringify(message.errorMessage)}`
+      `provider_error provider=${message.provider || "(unknown provider)"} model=${message.model || "(unknown model)"} api=${request.api} status=${status} method=${request.method} url=${request.url} response_headers=${responseHeaders} error=${JSON.stringify(lastProviderFailure.message)}`
     );
     if (lastProviderResponse?.succeeded) {
       successfulProviderResponseCount -= 1;
@@ -403,7 +411,10 @@ function piProviderExtension(pi) {
     }
 
     if (providerRequestCount > 0 && successfulProviderResponseCount === 0) {
-      emitInfrastructureIncompleteIfNoSafeOutputs(`All ${providerRequestCount} Pi provider requests failed before safe outputs were emitted.`, log);
+      const providerFailureDetails = lastProviderFailure
+        ? ` Last provider failure: ${typeof lastProviderFailure.status === "number" ? `HTTP ${lastProviderFailure.status}; ` : ""}message=${JSON.stringify(lastProviderFailure.message)}.`
+        : "";
+      emitInfrastructureIncompleteIfNoSafeOutputs(`All ${providerRequestCount} Pi provider requests failed before safe outputs were emitted.${providerFailureDetails}`, log);
       process.exitCode = 1;
     }
   });
