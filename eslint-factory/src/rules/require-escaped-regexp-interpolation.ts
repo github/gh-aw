@@ -12,6 +12,7 @@ const REGEXP_META_CHARS = new Set(["\\", "^", "$", ".", "*", "+", "?", "(", ")",
 // regex-escaped, e.g. escapedValue, ESCAPED_NAME. Requires the name to START
 // with "escaped", so unescapedValue and escapeHelper are never whitelisted.
 const ESCAPED_IDENT_PATTERN = /^escaped/i;
+const REGEXP_FRAGMENT_IDENT_PATTERN = /_(?:PATTERN|RE(?:_SOURCE)?|CHAR|DELIMITERS)$/i;
 
 // Raw pattern (between regex delimiters) of the canonical inline metacharacter
 // escape regex: /[.*+?^${}()|[\]\\]/g  — the only search form accepted when
@@ -202,7 +203,8 @@ function findConstInitializer(sourceCode: Readonly<TSESLint.SourceCode>, node: T
  * escaped — via a named regex-escape helper call, the standard inline
  * `.replace()` form, a variable name that starts with "escaped", or a
  * `const` identifier whose initializer is itself recognized as escaped or
- * is a literal value that can never contain regex metacharacters.
+ * is a literal value that can never contain regex metacharacters. A `const`
+ * string with an explicit regex-fragment name suffix is also accepted.
  */
 function isRecognizedAsEscaped(node: TSESTree.Node, sourceCode?: Readonly<TSESLint.SourceCode>): boolean {
   if (isEscapeHelperCall(node) || isRegexEscapeReplaceCall(node) || isEscapedNameReference(node)) return true;
@@ -213,6 +215,7 @@ function isRecognizedAsEscaped(node: TSESTree.Node, sourceCode?: Readonly<TSESLi
     const init = findConstInitializer(sourceCode, node);
     if (init !== null) {
       if (isEscapeHelperCall(init) || isRegexEscapeReplaceCall(init) || isLiteralSafeForRegexp(init)) return true;
+      if (typeof getStringLiteralValue(init) === "string" && REGEXP_FRAGMENT_IDENT_PATTERN.test(node.name)) return true;
     }
   }
 
@@ -225,7 +228,7 @@ export const requireEscapedRegexpInterpolationRule = createRule({
     type: "problem",
     docs: {
       description:
-        "Require values interpolated into a `new RegExp()` template-literal pattern to be passed through a regex-escaping helper first. " +
+        "Require values interpolated into a `new RegExp()` template-literal pattern to be escaped or explicitly named regex fragments. " +
         "Unescaped interpolation of a value containing regex metacharacters (e.g. `.`, `*`, `+`, `(`, `)`) can produce unintended matches " +
         "or, with attacker-controlled input, a ReDoS-prone pattern.",
     },
