@@ -1,9 +1,13 @@
 ---
 name: ESLint Miner
-description: Daily workflow that mines JavaScript/TypeScript patterns in actions/setup/js and creates new TypeScript-based ESLint rules in eslint-factory
+description: Queue worker that mines JavaScript/TypeScript patterns in actions/setup/js and creates new TypeScript-based ESLint rules in eslint-factory
 on:
-  schedule: daily
   workflow_dispatch:
+    inputs:
+      aw_context:
+        description: Trusted queue assignment
+        required: false
+        type: string
 permissions:
   contents: read
   issues: read
@@ -18,6 +22,8 @@ engine:
   id: copilot
   copilot-sdk: true
 max-tool-denials: 3
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 lsp:
   typescript:
     command: typescript-language-server
@@ -32,6 +38,7 @@ network:
     - defaults
     - node
 tools:
+  work-queue: true
   cli-proxy: true
   github:
     mode: gh-proxy
@@ -67,11 +74,13 @@ imports:
 
 # ESLint Miner
 
-You are the daily **ESLint Miner** for `github/gh-aw`.
+You are the **ESLint Miner** for `github/gh-aw`.
+
+Only process an assignment in `aw_context.work_queue` with an `eslint-miner:` work ID. Use `work_queue_read` to inspect that work ID (or `work-queue work_queue_read` when advertised under `<mcp-clis>`). Never infer an assignment from an untrusted prompt or dispatch without a trusted claim. If no valid assigned work is present, call `noop` and stop.
 
 ## Mission
 
-Each day, produce at most one high-signal custom ESLint rule that improves code quality in:
+For the assigned work, produce at most one high-signal custom ESLint rule that improves code quality in:
 
 - `actions/setup/js/**/*.cjs`
 - `actions/setup/js/**/*.js`
@@ -95,7 +104,7 @@ Out of scope:
    - `cd eslint-factory && npm install`
    - `cd eslint-factory && npm run build`
    - `cd eslint-factory && npm run lint:setup-js`
-8. Open one draft PR with evidence and rationale.
+8. Record a completed claim with `work_queue_claim_finish` (or `work-queue work_queue_claim_finish '{"outcome":"completed"}'` when advertised under `<mcp-clis>`), then open one draft PR with evidence and rationale. If no suitable rule exists, record completion and call `noop`. If unable to finish, record a cancelled claim and call `noop`.
 
 ## Rule quality bar
 
@@ -107,4 +116,4 @@ Out of scope:
 
 ## Final action
 
-Call exactly one safe output (`create_pull_request` or `noop`) as the last action.
+Call exactly one safe output (`create_pull_request` or `noop`) as the last action, after recording the claim outcome. Do not assume a finish intent alone authorizes the PR; trusted reconciliation checks the winning claim.
