@@ -112,8 +112,9 @@ function boundedOutput(output) {
 /**
  * @param {string} dirPath
  * @param {number} maxFileSize
+ * @param {(relativePath: string) => boolean} [isEligibleFile]
  */
-function formatJSONFiles(dirPath, maxFileSize) {
+function formatJSONFiles(dirPath, maxFileSize, isEligibleFile = () => true) {
   if (!fs.existsSync(dirPath)) {
     return [];
   }
@@ -122,18 +123,20 @@ function formatJSONFiles(dirPath, maxFileSize) {
 
   /**
    * @param {string} currentDir
+   * @param {string} relativePath
    */
-  function visit(currentDir) {
+  function visit(currentDir, relativePath) {
     const entries = readDirectory(currentDir);
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
+      const relativeFilePath = relativePath ? path.join(relativePath, entry.name) : entry.name;
       if (entry.isDirectory()) {
         if (entry.name !== ".git") {
-          visit(fullPath);
+          visit(fullPath, relativeFilePath);
         }
         continue;
       }
-      if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      if (!entry.isFile() || !entry.name.endsWith(".json") || !isEligibleFile(relativeFilePath.replace(/\\/g, "/"))) {
         continue;
       }
       const raw = readFile(fullPath, "utf8");
@@ -159,7 +162,7 @@ function formatJSONFiles(dirPath, maxFileSize) {
     }
   }
 
-  visit(dirPath);
+  visit(dirPath, "");
   return formattedFiles;
 }
 
