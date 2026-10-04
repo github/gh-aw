@@ -7,6 +7,7 @@ const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifac
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
+const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -115,7 +116,10 @@ function parseEngineSession(content, engine) {
     custom: ["parse_custom_log.cjs", "parseCustomLog"],
   };
   const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;
-  return require(`./${moduleName}`)[functionName](content).logEntries ?? [];
+  const events = require(`./${moduleName}`)[functionName](content).logEntries ?? [];
+  const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
+  const execution = collectAgentExecution({ content, events, observations });
+  return [...events.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
 }
 
 /**
@@ -242,7 +246,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   }
   const stdio = path.join(rootDir, "agent-stdio.log");
   // Masks can be registered in stdio even when native session events are preferred.
-  if (exists(stdio)) read(stdio);
+  const stdioContent = exists(stdio) ? read(stdio) : "";
   const canonical = path.join(rootDir, "agent-session.jsonl");
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
@@ -298,6 +302,26 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   for (const [candidates, component, phase, type] of observations) {
     const file = choose(candidates);
     if (file) add(file, component, phase, type);
+  }
+  const executionFile = path.join(rootDir, "agent-errors.jsonl");
+  add(executionFile, "agent", "agent", undefined);
+  const agentSources = sources.filter(source => source.component === "agent");
+  const diagnosticSources = [...agentSources.filter(source => source.path === "agent-errors.jsonl"), ...agentSources.filter(source => source.path !== "agent-errors.jsonl")];
+  const executionObservations = diagnosticSources.flatMap(source => source.events.filter(isAgentExecutionEvent).map(event => event.data));
+  const exitFile = path.join(rootDir, "agent_execution_exit_code.txt");
+  const executionSource = sources.find(source => source.component === "execution" && source.phase === "agent");
+  const executionEvidence = executionSource?.events[0]?.data;
+  const observedExit = executionEvidence?.exitCode ?? executionEvidence?.exit_code;
+  const execution = collectAgentExecution({
+    content: stdioContent,
+    events: agentSources.flatMap(source => source.events),
+    observations: executionObservations,
+    ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : observedExit !== undefined ? { exitCode: validateAgentExitCode(observedExit) } : {}),
+  });
+  for (const source of agentSources) source.events = source.events.filter(event => event.type !== "agent.execution");
+  if (execution) {
+    const primary = executionObservations.length ? (agentSources.find(source => source.path === "agent-errors.jsonl")?.path ?? agentSources[0]?.path) : stdioContent ? "agent-stdio.log" : agentSources[0]?.path;
+    sources.push({ component: "execution", phase: "agent", path: primary ?? executionSource?.path ?? path.relative(rootDir, exitFile), events: [execution] });
   }
   /** @type {SessionEvent} */
   const summary = {

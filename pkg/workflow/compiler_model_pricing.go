@@ -89,10 +89,11 @@ func normalizeProviderForPricing(provider string) string {
 
 func resolveProviderAndModelForPricing(workflowData *WorkflowData) (string, string, bool) {
 	provider := resolveEngineProviderForPricing(workflowData.EngineConfig)
-	model := strings.ToLower(strings.TrimSpace(workflowData.Model))
+	model := strings.TrimSpace(workflowData.Model)
 	if model == "" {
 		return "", "", false
 	}
+	model = strings.ToLower(model)
 
 	if strings.Contains(model, "/") {
 		parts := strings.SplitN(model, "/", 2)

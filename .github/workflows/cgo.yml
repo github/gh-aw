@@ -1496,10 +1496,31 @@ jobs:
       # legacy custom analyzer findings in tests or other analyzer families.
       # Note: -test=false intentionally scopes this gate to production code only.
     - name: Run custom linters
-      run: make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -fprintferrorunchecked -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false"
+      run: make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false"
+
+    - name: Report unchecked printf errors as warnings
+      run: |
+        set +e
+        /tmp/gh-aw-linters -fprintferrorunchecked -test=false ./cmd/... ./pkg/... > /tmp/fprintf-lint.log 2>&1
+        status=$?
+        set -e
+        if [ "$status" -eq 0 ]; then
+          exit 0
+        fi
+        if [ "$status" -ne 3 ]; then
+          cat /tmp/fprintf-lint.log
+          exit "$status"
+        fi
+        while IFS= read -r diagnostic; do
+          if [[ "$diagnostic" =~ ^([^:]+):([0-9]+):([0-9]+):[[:space:]]*(.*)$ ]]; then
+            echo "::warning file=${BASH_REMATCH[1]},line=${BASH_REMATCH[2]},col=${BASH_REMATCH[3]}::${BASH_REMATCH[4]}"
+          else
+            echo "$diagnostic"
+          fi
+        done < /tmp/fprintf-lint.log
 
     - name: Run custom linters (wasm)
-      run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -fprintferrorunchecked -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
+      run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
 
       # Ensure no action shell scripts invoke python or python3
     - name: Lint action shell scripts

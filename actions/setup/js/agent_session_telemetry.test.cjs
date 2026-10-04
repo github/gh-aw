@@ -85,8 +85,9 @@ describe("Unified session bootstrap telemetry conformance", () => {
     files.set(STDIO, codexNoTools);
     await runLogParser({ parserName: "Codex", parseLog: parseCodexLog });
     const published = files.get("/tmp/gh-aw/agent-session.jsonl").trimEnd().split("\n").map(JSON.parse);
-    expect(published).toEqual(JSON.parse(JSON.stringify(parseCodexLog(codexNoTools).logEntries)));
-    expect(published).toHaveLength(6);
+    expect(published.filter(event => event.type !== "agent.execution")).toEqual(JSON.parse(JSON.stringify(parseCodexLog(codexNoTools).logEntries)));
+    expect(published.filter(event => event.type === "agent.execution")).toEqual([{ type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [] } }]);
+    expect(published).toHaveLength(7);
     expect(published.some(event => event.type.startsWith("tool."))).toBe(false);
     expect(JSON.parse(files.get(STDIO).trimEnd().split("\n").at(-1))).toEqual({
       type: "result",

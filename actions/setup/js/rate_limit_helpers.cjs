@@ -29,7 +29,7 @@ async function getRateLimitRemaining(github, operation = "rate_limit_check") {
   try {
     await fetchAndLogRateLimit(github, operation);
     const { data } = await github.rest.rateLimit.get();
-    return data.rate.remaining;
+    return (data.rate ?? data.resources?.core).remaining;
   } catch {
     return -1;
   }
@@ -66,7 +66,9 @@ async function checkRateLimitHeadroom(github, operation = "rate_limit_headroom")
     const response = await github.rest.rateLimit.get();
     const { data } = response;
     logRateLimitFromResponse(response, operation);
-    const { remaining, limit } = data.rate;
+    const quota = data.rate ?? data.resources?.core;
+    if (!quota) throw new Error("GitHub rate-limit response has no core quota");
+    const { remaining, limit } = quota;
     const percentRemaining = limit > 0 ? Math.floor((remaining / limit) * 100) : 100;
 
     if (percentRemaining < LOW_RATE_LIMIT_THRESHOLD_PERCENT) {

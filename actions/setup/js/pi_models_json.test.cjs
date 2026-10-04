@@ -135,6 +135,20 @@ describe("pi_models_json.cjs", () => {
       expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
     });
 
+    it("disables unsupported reasoning effort for GitHub Copilot Claude Haiku", () => {
+      const options = {
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "claude-haiku-4.5",
+        metadata: { reasoning: true },
+      };
+      const github = JSON.parse(piModelsJson.buildModelsJSON({ ...options, provider: "github" }));
+      expect(github.providers["aw-gateway"].models).toEqual([{ id: "claude-haiku-4.5", reasoning: false }]);
+
+      const anthropic = JSON.parse(piModelsJson.buildModelsJSON({ ...options, provider: "anthropic" }));
+      expect(anthropic.providers["aw-gateway"].models).toEqual([{ id: "claude-haiku-4.5", reasoning: true }]);
+    });
+
     it("uses a configured context window for any routed model", () => {
       const json = piModelsJson.buildModelsJSON({
         baseUrl: "http://api-proxy:10001",
