@@ -20,6 +20,8 @@ import (
 
 var logsDownloadZipLog = logger.New("cli:logs_download_zip")
 
+const maxZipEntrySize = 1 * 1024 * 1024 * 1024 // 1GB
+
 // unzipFile extracts a zip file to a destination directory
 func unzipFile(zipPath, destDir string, verbose bool) error {
 	// Open the zip file
@@ -72,8 +74,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 
 	// Decompression bomb protection - limit individual file size to 1GB
 	// #nosec G110 -- Decompression bomb is mitigated by size check below
-	const maxFileSize = 1 * 1024 * 1024 * 1024 // 1GB
-	if f.UncompressedSize64 > maxFileSize {
+	if f.UncompressedSize64 > maxZipEntrySize {
 		logsDownloadZipLog.Printf("Rejected oversized zip entry (decompression bomb guard): %s (%d bytes)", f.Name, f.UncompressedSize64)
 		return fmt.Errorf("file too large in zip (>1GB): %s (%d bytes)", f.Name, f.UncompressedSize64)
 	}
@@ -83,6 +84,10 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
+	return extractZipFileContents(f, filePath)
+}
+
+func extractZipFileContents(f *zip.File, filePath string) (extractErr error) {
 	// Open the file in the zip
 	srcFile, err := f.Open()
 	if err != nil {
@@ -91,7 +96,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 	defer srcFile.Close()
 
 	// Create the destination file
-	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, constants.FilePermPublic)
+	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, constants.FilePermSensitive)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
@@ -107,7 +112,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 	// Copy the content with size limit enforcement.
 	// Limit to maxFileSize+1 bytes: if exactly maxFileSize+1 bytes can be read
 	// the archive is over the limit and must be rejected.
-	limitedReader := io.LimitReader(srcFile, int64(maxFileSize)+1)
+	limitedReader := io.LimitReader(srcFile, int64(maxZipEntrySize)+1)
 	written, err := io.Copy(destFile, limitedReader)
 	if err != nil {
 		extractErr = fmt.Errorf("failed to extract file: %w", err)
@@ -117,7 +122,7 @@ func extractZipFile(f *zip.File, destDir string, verbose bool) (extractErr error
 	// Verify we didn't exceed the size limit.
 	// written == maxFileSize+1 means the reader was not exhausted, i.e. the
 	// actual content is larger than maxFileSize.
-	if written > int64(maxFileSize) {
+	if written > int64(maxZipEntrySize) {
 		extractErr = fmt.Errorf("file extraction exceeded size limit: %s", f.Name)
 		return extractErr
 	}

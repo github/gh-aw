@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,8 +111,8 @@ func TestExtractZipFileZipSlipPrevention(t *testing.T) {
 	require.ErrorContains(t, err, "invalid file path", "Error should mention invalid path")
 }
 
-// TestExtractZipFileUsesPublicPermissions tests that restrictive zip permissions do not prevent reading extracted files
-func TestExtractZipFileUsesPublicPermissions(t *testing.T) {
+// TestExtractZipFileUsesSensitivePermissions tests that ZIP permissions do not override the local permission policy
+func TestExtractZipFileUsesSensitivePermissions(t *testing.T) {
 	t.Parallel()
 	// Create a temporary directory for extraction
 	tempDir := t.TempDir()
@@ -145,12 +146,12 @@ func TestExtractZipFileUsesPublicPermissions(t *testing.T) {
 	err = extractZipFile(zipReader.File[0], tempDir, false)
 	require.NoError(t, err, "extractZipFile should succeed")
 
-	// Verify the extracted file is world-readable despite the restrictive zip mode
+	// Verify the extracted file uses sensitive permissions despite the restrictive zip mode
 	extractedPath := filepath.Join(tempDir, "executable.sh")
 	info, err := os.Stat(extractedPath)
 	require.NoError(t, err, "Failed to stat extracted file")
 
-	assert.NotZero(t, info.Mode().Perm()&0o004, "File should have world-read permission")
+	assert.Equal(t, constants.FilePermSensitive, info.Mode().Perm(), "File should have sensitive permissions")
 }
 
 // TestExtractZipFileWithNestedDirectories tests extraction with nested paths
