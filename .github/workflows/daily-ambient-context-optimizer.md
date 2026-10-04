@@ -190,8 +190,8 @@ Your job is to inspect the **first request sent to the DLLM** for several recent
 
 Use the `agentic-workflows` MCP server instead of shelling out to `gh aw`:
 
-- call the `logs` MCP tool with `start_date: "-1d"` and `count: 60`
-- use the JSON artifacts under `/tmp/gh-aw/aw-mcp/logs/` as your source of run metadata
+- call the `logs` MCP tool with `start_date: "-1d"`, `count: 60`, and `artifacts: ["info", "usage"]` for compact run metadata
+- read run metadata from the `file_path` returned by the MCP tool (normally under `/tmp/gh-aw/logs-cache/`); do not assume the MCP artifact-download directory is readable
 - keep GitHub reads on the configured GitHub MCP tools
 - use `tools.cli-proxy: true` only for other proxied `gh` CLI commands when they are truly needed
 - do not run `gh aw logs` or `gh aw audit` through the CLI proxy because the `agentic-workflows` MCP server already provides dedicated `logs` and `audit` tools for those operations
@@ -208,16 +208,15 @@ Eligibility rules:
 - exclude this workflow itself
 - prefer successful runs, but include up to 2 failed runs when they have usable request artifacts
 - prefer breadth: no more than 2 runs from the same workflow when alternatives exist
-- require a usable first-request source:
-  - preferred: the first DLLM request payload in the canonical `sandbox/firewall/logs/api-proxy-logs/event-logs.jsonl`, accepting the legacy `sandbox/firewall/logs/api-proxy-logs/events.jsonl` name too (including the matching `sandbox/firewall-audit-logs/...` fallback path when present)
-  - fallback: the first `user.message` event in `sandbox/agent/logs/copilot-session-state/<session-id>/events.jsonl`
-  - use `prompt.txt` only as a compilation-debug cross-check, never as the ambient-context source of truth
+- sample from run metadata first; verify first-request artifacts after the targeted downloads in Step 3 and replace runs without a usable source when more eligible runs are available
 
 Prefer higher-cost runs first by using `aic`, then `token_usage`, `turns`, or first-request size when available.
 
 ### Step 3 — Enrich a subset with audits
 
-Run the `audit` MCP tool for the **2 most expensive sampled runs** so you have richer cost context and references. Record each enriched run's `working_set` block (`measurement_state`, `rebuild_factor`, `peak_input_tokens`, `cumulative_input_tokens`) — the Working-Set Rebuild Factor (WSRF) is a direct signal of how much ambient context is being re-sent across turns and complements the first-request char/token metrics gathered in Step 1.
+For each sampled run, call the `audit` MCP tool with its run ID and `artifacts: ["agent", "firewall"]`. Read the event-log paths listed in that run's audit response; only the sampled run's first-request event files are made readable to the agent. Do not read the MCP server's internal artifact directory directly.
+
+Record the `working_set` block (`measurement_state`, `rebuild_factor`, `peak_input_tokens`, `cumulative_input_tokens`) for the **2 most expensive sampled runs** — WSRF signals how much ambient context is re-sent across turns and complements the first-request char/token metrics.
 
 ### Step 4 — Closed PR Deduplication Guard
 
@@ -477,12 +476,13 @@ Before calling `create_issue`, verify:
 
 ## Reduced-Data Behavior
 
-If fewer than 2 eligible runs exist, still create the issue.
+If fewer than 2 eligible runs have readable first-request artifacts, still create the issue.
 
 In that case:
 
 - explain the reduced sample size clearly
 - report whatever evidence is available
+- if an artifact path is inaccessible, identify the permission failure and do not repeatedly retry the same path
 - prioritize repository-wide recommendations only when supported by the sampled data
 
 Do not use `noop` merely because the sample is small or imperfect. Create exactly one issue whenever logs are available. Use `noop` only if no run logs can be downloaded at all or the repository context is unavailable.

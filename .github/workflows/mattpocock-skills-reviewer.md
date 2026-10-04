@@ -184,55 +184,12 @@ Focus areas by skill:
 
 For each issue found, create a review comment using `create-pull-request-review-comment`. Apply **progressive disclosure**: lead with a brief visible statement, then collapse verbose analysis and code examples in a `<details>` block:
 
-```json
-{
-  "path": "path/to/file.ts",
-  "line": 42,
-  "body": "**[/tdd]** Missing edge case: `value` is `null` — add a test to prevent this regression.\n\n<details>\n<summary>💡 Suggested test</summary>\n\n```ts\nit('returns default when value is null', () => {\n  expect(fn(null)).toBe(defaultValue);\n});\n```\n\nMissing edge case tests are a common source of regressions.\n\n</details>\n\n@copilot please address this."
-}
-```
-
-Guidelines:
-- Prefix each comment with the skill name in brackets: `**[/diagnosing-bugs]**`, `**[/tdd]**`, etc.
-- Keep the **immediately visible text brief** (1–2 sentences): state the issue and its impact
-- Wrap code examples, detailed explanations, and multi-step suggestions in `<details><summary>💡 …</summary>` blocks
-- Be specific: file path, line number, exact issue
-- Limit to the **10 most impactful** issues
-- End each inline comment with `@copilot please address this.` to prompt follow-up action
+- Include the changed-file path and line, prefix the comment with the relevant skill name, state the issue and impact in 1–2 visible sentences, and put any longer rationale or fix example in `<details>`.
+- Post at most 10 high-impact findings. End each with `@copilot please address this.`
 
 ### Step 6: Submit the Overall Review
 
-Submit a review using `submit_pull_request_review` with an overall summary:
-
-- **`APPROVE`** — Changes are solid; only minor suggestions
-- **`REQUEST_CHANGES`** — There are important issues that should be addressed
-- **`COMMENT`** — Observations only; no blocking issues
-- If you choose **`APPROVE`**, submit the approval review first. Only add `create_check_run` when you have a concrete success summary that helps the author or merge queue; skip it otherwise.
-
-The review body should apply progressive disclosure — keep the immediately visible portion brief and collapse details:
-
-**Example review body:**
-
-```markdown
-### Skills-Based Review 🧠
-
-Applied **`/tdd`** and **`/codebase-design`** — requesting changes on test coverage gaps.
-
-<details>
-<summary>📋 Key Themes & Highlights</summary>
-
-#### Key Themes
-
-- **Test coverage gaps**: 3 new functions lack edge case tests
-- **Naming inconsistency**: New module uses different vocabulary from existing code
-
-#### Positive Highlights
-
-- ✅ Clean separation of concerns in the new module
-- ✅ Good use of early returns throughout
-
-</details>
-```
+Submit exactly one `submit-pull-request-review`: `REQUEST_CHANGES` for important issues, `COMMENT` for non-blocking observations, or `APPROVE` when no actionable issue remains. Keep the body brief and use `<details>` for supporting themes. On approval, add a check run only when it provides a concrete useful success summary.
 
 ### Step 7: Post a Summary Comment (optional)
 
@@ -240,20 +197,9 @@ If the review is complex or the overall findings are significant, post a single 
 Use `###` or lower for any headers — never `#` or `##`.
 Include `@copilot please address the review comments above.` at the end of the comment body to prompt follow-up action.
 
-### Scope Rules
-
-- **Review changed lines only** — do not critique unchanged code
-- **Prioritise impact** — security > correctness > maintainability > style
-- **Maximum 10 inline comments** — pick the highest-value issues
-- **Skip auto-generated files** — lock files, generated code, build artifacts
-- **Be constructive** — suggest improvements, not just problems
-
 ### Tone
 
-- Professional and collegial — not grumpy, not sycophantic
-- Reference skills by name so the author can learn more
-- Celebrate good decisions as well as flagging problems
-- Keep comments concise: aim for 2–4 sentences per comment
+Be professional and collegial. Reference a skill only when it strengthens the advice; prioritize concrete changed-line findings over generic praise.
 
 Now begin your review! 🧠
 ## agent: `pr-triage`

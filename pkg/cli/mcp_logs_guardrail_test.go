@@ -5,6 +5,8 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -80,6 +82,116 @@ func TestBuildLogsFileResponse_SetsReadablePermissions(t *testing.T) {
 	}
 
 	_ = os.Remove(response.FilePath)
+}
+
+func TestMakeMCPFirstRequestArtifactsReadable(t *testing.T) {
+	baseDir := t.TempDir()
+	parentDir := filepath.Join(baseDir, "aw-mcp")
+	outputDir := filepath.Join(parentDir, "logs")
+	nestedDir := filepath.Join(outputDir, "run-1", "sandbox", "firewall", "logs", "api-proxy-logs")
+	if err := os.MkdirAll(nestedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(parentDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	filePath := filepath.Join(nestedDir, "event-logs.jsonl")
+	if err := os.WriteFile(filePath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unselectedDir := filepath.Join(outputDir, "run-2", "sandbox", "firewall", "logs", "api-proxy-logs")
+	if err := os.MkdirAll(unselectedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	unselectedFile := filepath.Join(unselectedDir, "event-logs.jsonl")
+	if err := os.WriteFile(unselectedFile, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	privatePath := filepath.Join(nestedDir, "private.txt")
+	if err := os.WriteFile(privatePath, []byte("private"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := makeMCPFirstRequestArtifactsReadable(outputDir, []string{"1"}); err != nil {
+		t.Fatalf("makeMCPFirstRequestArtifactsReadable() error = %v", err)
+	}
+
+	for path, want := range map[string]os.FileMode{
+		parentDir:      0o755,
+		outputDir:      0o755,
+		nestedDir:      0o755,
+		filePath:       0o644,
+		privatePath:    0o600,
+		unselectedFile: 0o600,
+	} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat(%q) error = %v", path, err)
+		}
+		if got := info.Mode().Perm(); got != want {
+			t.Errorf("permissions for %q = %o, want %o", path, got, want)
+		}
+	}
+}
+
+func TestMakeMCPFirstRequestArtifactsReadableRejectsSymlinks(t *testing.T) {
+	baseDir := t.TempDir()
+	outputDir := filepath.Join(baseDir, "logs")
+	linkDir := filepath.Join(outputDir, "run-1", "sandbox", "firewall", "logs", "api-proxy-logs")
+	if err := os.MkdirAll(linkDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	targetPath := filepath.Join(baseDir, "private.jsonl")
+	if err := os.WriteFile(targetPath, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(targetPath, filepath.Join(linkDir, "event-logs.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := makeMCPFirstRequestArtifactsReadable(outputDir, []string{"1"}); err == nil {
+		t.Fatal("makeMCPFirstRequestArtifactsReadable() error = nil, want symlink error")
+	}
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("target permissions = %o, want 600", got)
+	}
+}
+
+func TestMCPRunIDs(t *testing.T) {
+	got := mcpRunIDs([]string{
+		"123",
+		"https://github.com/owner/repo/actions/runs/456",
+		"https://github.com/owner/repo/actions/runs/789/job/101#step:2:1",
+		"https://github.com/owner/repo/actions/runs/456",
+		"invalid",
+	})
+	want := []string{"123", "456", "789"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mcpRunIDs() = %v, want %v", got, want)
+	}
+}
+
+func TestMCPLogsRequestFirstRequestArtifacts(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		artifacts []string
+		want      bool
+	}{
+		{name: "compact metadata", artifacts: []string{"info", "usage"}},
+		{name: "agent logs", artifacts: []string{"agent"}, want: true},
+		{name: "firewall logs", artifacts: []string{"firewall"}, want: true},
+		{name: "all artifacts", artifacts: []string{"all"}, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := mcpLogsRequestFirstRequestArtifacts(test.artifacts); got != test.want {
+				t.Errorf("mcpLogsRequestFirstRequestArtifacts(%v) = %v, want %v", test.artifacts, got, test.want)
+			}
+		})
+	}
 }
 
 func TestBuildLogsFileResponse_ContentDeduplication(t *testing.T) {

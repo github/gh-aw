@@ -27,6 +27,7 @@ tools:
   cli-proxy: true
   github:
     mode: gh-proxy
+    toolsets: [pull_requests]
   bash:
     - "git diff:*"
     - "grep:*"
@@ -357,19 +358,22 @@ Scope for this step:
 - JavaScript vitest mocks for external I/O are acceptable unless business logic is mocked without output assertions.
 - Do not score `TestMain(m *testing.M)` entries as behavioral tests; they are infrastructure.
 
-## Step 5: Count Lines in Test Files vs. Production Files
+## Steps 5–8: Score and Report
 
-Calculate the test inflation ratio for each changed test file using the pre-fetched `/tmp/gh-aw/agent/diff-numstat.txt`.
+After reviewing the changed tests, load and follow the `test-quality-analysis` skill for inflation scoring, the report, verdict, and calibration. Read the `test-report-templates` skill only when drafting the report.
 
-For each **Go and JavaScript** test file, find the corresponding production file and compare the ratio of lines added:
+## skill: `test-quality-analysis`
+---
+description: Test inflation scoring, verdict rules, and report procedure for the Test Quality Sentinel.
+---
 
-- `foo_test.go` → `foo.go`
-- `foo.test.cjs` → `foo.cjs` (primary in `actions/setup/js/`)
-- `foo.test.js` → `foo.js` (used in `scripts/`)
+### Step 5: Count Lines in Test Files vs. Production Files
 
-If the ratio of new lines added to the test file vs. the production file exceeds 2:1, flag it as potential **test inflation**. Inflation scoring does not apply to `TestMain`-only files (pure infrastructure).
+Calculate the test inflation ratio for each changed test file using `/tmp/gh-aw/agent/diff-numstat.txt`.
 
-## Step 6: Calculate Test Quality Score
+For each Go and JavaScript test file, find its production file (`foo_test.go` → `foo.go`, `foo.test.cjs` → `foo.cjs`, `foo.test.js` → `foo.js`) and compare added lines. If test additions exceed production additions by 2:1, flag potential test inflation. Do not apply inflation scoring to `TestMain`-only files.
+
+### Step 6: Calculate Test Quality Score
 
 Compute **Test Quality Score** (0–100):
 
@@ -383,38 +387,31 @@ score = max(0, min(100, score))
 
 Thresholds: `>=80 ✅ Excellent`, `60-79 ⚠️ Acceptable`, `40-59 🔶 Needs improvement`, `<40 ❌ Poor`.
 
-**Infrastructure-only PRs**: If `go-new-test-funcs.txt`, `go-modified-test-funcs.txt`, `js-new-test-funcs.txt`, and `js-changed-test-files.txt` are all empty (no behavioral tests added/modified) and `go-testmain-funcs.txt` is non-empty (only `TestMain` infrastructure changed), skip the numeric score formula and assign **Score: N/A — Infrastructure**. Do not fail the PR on implementation ratio (there are no behavioral tests to evaluate). Still flag hard violations (missing build tags, go mock library usage). If `go-goleak-entries.txt` is non-empty, report it as a quality improvement and approve.
+For infrastructure-only PRs, when all behavioral test lists are empty and `go-testmain-funcs.txt` is non-empty, assign **Score: N/A — Infrastructure** instead of applying the formula. Do not fail on implementation ratio; still flag missing build tags and Go mock-library use. Note `goleak.VerifyTestMain` as a positive signal.
 
-Fail if either condition is true:
-- `implementation_tests / total_new_tests > 0.30`
-- Any coding-guideline violation exists (Go mock library usage, or new Go test missing required build tag)
+Fail if `implementation_tests / total_new_tests > 0.30` or any coding-guideline violation exists (Go mock-library use or a new Go test without its required build tag). Guideline violations always require `REQUEST_CHANGES`.
 
-Guideline violations always force `REQUEST_CHANGES` regardless of numeric score.
+### Step 7: Post PR Comment with Results
 
-## Step 7: Post PR Comment with Results
+Read the `test-report-templates` skill and post the report using `add-comment` (not bash; omit `item_number` so the runtime infers the PR). Use the infrastructure-only template for PRs containing only `TestMain`/setup changes.
 
-Read the `test-report-templates` skill and post the report using `add-comment` (not bash; omit `item_number` — runtime infers the PR). Use the standard template, or the infrastructure-only template when the PR contains only `TestMain`/setup changes.
+### Step 8: Submit PR Review Based on Result
 
-## Step 8: Submit PR Review Based on Result
+After posting the comment, submit exactly one safe-output action:
 
-After posting the comment, submit exactly one safe-output action based on the analysis outcome:
-- When no tests required action: `{"noop": {"message": "No action needed: [brief explanation]"}}`
-- When quality passes (`implementation_tests / total <= 30%` and no violations): `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: {SCORE}/100. {IMPL_PCT}% implementation tests (threshold: 30%)."}`
-- When this is an infrastructure-only PR (only `TestMain` changes, no behavioral tests) with no violations: `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: Infrastructure only. {GOLEAK_NOTE} No violations."}`
-- When quality fails (ratio `> 30%` **or** any guideline violation): `{"event": "REQUEST_CHANGES", "body": "❌ Test Quality Sentinel: {SCORE}/100. {FAIL_REASON} Review flagged tests in the comment above."}`
+- No tests required action: `{"noop": {"message": "No action needed: [brief explanation]"}}`
+- Quality passes (implementation-test ratio ≤30%, no violations): `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: {SCORE}/100. {IMPL_PCT}% implementation tests (threshold: 30%)."}`
+- Infrastructure-only PR with no violations: `{"event": "APPROVE", "body": "✅ Test Quality Sentinel: Infrastructure only. {GOLEAK_NOTE} No violations."}`
+- Quality fails (ratio >30% or any violation): `{"event": "REQUEST_CHANGES", "body": "❌ Test Quality Sentinel: {SCORE}/100. {FAIL_REASON} Review flagged tests in the comment above."}`
 
-## Guidelines
+### Calibration and Output Limits
 
-Calibration rules:
-- **Edge-case credit is generous**: one valid error assertion is enough (`assert.Error`, `t.Fatalf` on error, `.toThrow`, `.rejects`, etc.)
-- **Table-driven tests**: count each row as a scenario; credit error/edge rows individually
-- **Behavioral credit is strict**: mark `design_test` only when assertions verify user-visible behavior
-- **Go assertion messages required**: flag assertions without descriptive failure context
-- **Duplicate detection threshold**: report duplicates only when 3+ tests share the same pattern with trivial constant changes
-- **Goroutine-leak guards**: `TestMain` with `goleak.VerifyTestMain` is a strong design invariant; in infrastructure-only PRs with no hard violations, approve and note it as a positive quality signal
-- **Infrastructure-only PRs**: PRs adding only `TestMain` and test setup infrastructure carry no behavioral test ratio and must not be failed on that basis; evaluate only hard violations (build tags, mock libraries)
-
-**Token Budget**: Analyze at most **50 test functions** per run. If more exist, prioritize newly added functions over modified ones; add a sampling note in the PR comment. Keep individual test analysis concise — 2–3 sentences per test in the flagged section. Always wrap the per-test classification table and flagged-test details in `<details>` tags.
+- One valid error assertion earns edge-case credit; count table-driven rows individually.
+- Mark `design_test` only when assertions verify user-visible behavior.
+- Flag Go assertions without descriptive failure context.
+- Report duplicates only when 3+ tests share a pattern with trivial constant changes.
+- In infrastructure-only PRs, evaluate only hard violations; do not apply a behavioral test ratio.
+- Analyze at most 50 tests, prioritizing new over modified tests. Note sampling in the report. Keep flagged-test details concise and wrap the classification table and findings in `<details>` tags.
 
 ## skill: `test-report-templates`
 ---

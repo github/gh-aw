@@ -294,16 +294,27 @@ func newLogsToolHandler(execCmd execCmdFunc, actor string, validateActor bool) f
 			return nil, nil, buildLogsCommandError(err, outputStr, cmdArgs, timeoutValue, args.WorkflowName)
 		}
 
-		// Always write output to a file and return schema + file path
-		finalOutput := buildLogsFileResponse(outputStr)
-		notifyProgress(ctx, req, 100, 100, "Workflow logs downloaded")
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: finalOutput},
-			},
-		}, nil, nil
+		return completeMCPLogsToolResponse(ctx, req, args, outputStr)
 	}
+}
+
+func completeMCPLogsToolResponse(ctx context.Context, req *mcp.CallToolRequest, args logsArgs, outputStr string) (*mcp.CallToolResult, any, error) {
+	if mcpLogsRequestFirstRequestArtifacts(args.Artifacts) {
+		runItems := mcpRunItemsFromLogsOutput(outputStr)
+		if err := makeMCPFirstRequestArtifactsReadable(constants.TmpAwMcpLogsDir, runItems); err != nil {
+			return nil, nil, newMCPError(jsonrpc.CodeInternalError, "failed to make workflow event logs readable", err.Error())
+		}
+	}
+
+	// Always write output to a file and return schema + file path
+	finalOutput := buildLogsFileResponse(outputStr)
+	notifyProgress(ctx, req, 100, 100, "Workflow logs downloaded")
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: finalOutput},
+		},
+	}, nil, nil
 }
 
 // buildLogsEmptyResult returns an empty structured result instead of an MCP
@@ -395,9 +406,9 @@ func appendLogsFilterArgs(cmdArgs []string, args logsArgs) []string {
 		cmdArgs = append(cmdArgs, "--before-run-id", strconv.FormatInt(args.BeforeRunID, 10))
 	}
 	if len(args.IgnoreWorkflowRuns) > 0 {
-		runIDs := make([]string, len(args.IgnoreWorkflowRuns))
-		for i, runID := range args.IgnoreWorkflowRuns {
-			runIDs[i] = strconv.FormatInt(runID, 10)
+		runIDs := make([]string, 0, len(args.IgnoreWorkflowRuns))
+		for _, runID := range args.IgnoreWorkflowRuns {
+			runIDs = append(runIDs, strconv.FormatInt(runID, 10))
 		}
 		cmdArgs = append(cmdArgs, "--ignore-workflow-runs", strings.Join(runIDs, ","))
 	}
@@ -601,6 +612,10 @@ func newAuditToolHandler(execCmd execCmdFunc, actor string, validateActor bool) 
 
 		if execErr != nil {
 			return buildAuditErrorResult(execErr, outputStr, runItems)
+		}
+
+		if err := makeMCPFirstRequestArtifactsReadable(constants.TmpAwMcpLogsDir, runItems); err != nil {
+			return nil, nil, newMCPError(jsonrpc.CodeInternalError, "failed to make audit event logs readable", err.Error())
 		}
 
 		notifyProgress(ctx, req, 100, 100, "Audit complete")
