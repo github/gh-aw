@@ -415,7 +415,7 @@ func observationRunReferences(
 	primary map[string]string,
 	guardrails map[string]map[string]string,
 ) map[string]struct{} {
-	experimentNames := make(map[string]struct{}, len(primary)+len(guardrails))
+	experimentNames := make(map[string]struct{}, max(len(primary), len(guardrails)))
 	for experimentName := range primary {
 		experimentNames[experimentName] = struct{}{}
 	}
