@@ -68,6 +68,24 @@ describe("memory_custom_validation", () => {
     expect(result.stderr).toContain("must not modify memory files");
   });
 
+  it("keeps the working directory intact when a validator removes its memory root", () => {
+    const statePath = path.join(tempDir, "state.json");
+    fs.writeFileSync(statePath, JSON.stringify({ ok: true }));
+
+    const result = runCustomMemoryValidation({
+      script: `fs.rmSync(memoryRoot, { recursive: true, force: true });`,
+      memoryDir: tempDir,
+      memoryId: "default",
+      kind: "repo",
+      timeoutSeconds: 5,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("Unable to snapshot memory after custom validation");
+    expect(fs.existsSync(tempDir)).toBe(true);
+    expect(fs.readFileSync(statePath, "utf8")).toBe(JSON.stringify({ ok: true }));
+  });
+
   it("times out long-running validators", () => {
     const result = runCustomMemoryValidation({
       script: "while (true) {}",

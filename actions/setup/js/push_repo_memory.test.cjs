@@ -1976,11 +1976,21 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
     it("should fail deterministic validation errors without retrying", async () => {
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-validation-"));
       const setFailed = vi.fn();
-      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_VALIDATION: merge commit detected"));
-      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed };
+      const summaryContents = [];
+      const summary = {
+        addRaw: vi.fn(content => {
+          summaryContents.push(content);
+          return { write: vi.fn().mockResolvedValue(undefined) };
+        }),
+        write: vi.fn(),
+      };
+      const previousGitHubToken = process.env.GH_TOKEN;
+      process.env.GH_TOKEN = "not-a-real-token";
+      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_VALIDATION: merge commit detected with not-a-real-token"));
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed, summary };
       try {
         execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
-        await pushRepoMemoryChangesWithRetry({
+        const pushed = await pushRepoMemoryChangesWithRetry({
           githubClient: {},
           targetOwner: "owner",
           targetRepoName: "repo",
@@ -1996,9 +2006,17 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         });
 
         expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
-        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected");
+        expect(pushed).toBe(false);
+        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected with not-a-real-token");
+        expect(summaryContents.join("\n")).toContain("ERR_VALIDATION: merge commit detected with [REDACTED]");
+        expect(summaryContents.join("\n")).not.toContain("not-a-real-token");
         expect(isDeterministicPushValidationError("ERR_VALIDATION: policy violation")).toBe(true);
       } finally {
+        if (previousGitHubToken === undefined) {
+          delete process.env.GH_TOKEN;
+        } else {
+          process.env.GH_TOKEN = previousGitHubToken;
+        }
         delete global.core;
         fs.rmSync(repoDir, { recursive: true, force: true });
       }
