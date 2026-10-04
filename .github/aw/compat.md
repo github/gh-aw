@@ -1,3 +1,7 @@
+---
+description: Lists gh-aw compiler versions blocked by .github/aw/compat.json due to known advisories, and the upgrade steps to remediate.
+---
+
 # Blocked gh-aw versions
 
 The following releases are blocked by `.github/aw/compat.json` and fail during
