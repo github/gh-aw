@@ -36,33 +36,42 @@ func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride
 		return report
 	}
 
-	state, _ := issueData["state"].(string)
-	stateReason, _ := issueData["state_reason"].(string)
+	state, hasState := issueData["state"].(string)
+	if !hasState {
+		state = ""
+	}
+	stateReason, hasStateReason := issueData["state_reason"].(string)
+	if !hasStateReason {
+		stateReason = ""
+	}
 
 	// Search for linked PRs from copilot-swe-agent via timeline events
 	events, err := ghAPIGetArray(ctx, fmt.Sprintf("issues/%d/timeline", num), repo)
 	var agentPR map[string]any
 	if err == nil {
 		for _, event := range events {
-			eventType, _ := event["event"].(string)
-			if eventType != "cross-referenced" {
+			eventType, isString := event["event"].(string)
+			if !isString || eventType != "cross-referenced" {
 				continue
 			}
-			source, _ := event["source"].(map[string]any)
-			if source == nil {
+			source, isObject := event["source"].(map[string]any)
+			if !isObject || source == nil {
 				continue
 			}
-			issue, _ := source["issue"].(map[string]any)
-			if issue == nil {
+			issue, isObject := source["issue"].(map[string]any)
+			if !isObject || issue == nil {
 				continue
 			}
 			// Check if it's a PR (has pull_request field)
 			if _, hasPR := issue["pull_request"]; !hasPR {
 				continue
 			}
-			user, _ := issue["user"].(map[string]any)
-			login, _ := user["login"].(string)
-			if strings.Contains(login, "copilot") || strings.Contains(login, "github-actions") {
+			user, isObject := issue["user"].(map[string]any)
+			if !isObject {
+				continue
+			}
+			login, isString := user["login"].(string)
+			if isString && (strings.Contains(login, "copilot") || strings.Contains(login, "github-actions")) {
 				agentPR = issue
 				break
 			}
@@ -80,10 +89,22 @@ func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride
 		if prNumber > 0 {
 			prData, perr := ghAPIGet(ctx, fmt.Sprintf("pulls/%d", prNumber), repo)
 			if perr == nil {
-				merged, _ := prData["merged"].(bool)
-				prState, _ := prData["state"].(string)
-				mergedAt, _ := prData["merged_at"].(string)
-				closedAt, _ := prData["closed_at"].(string)
+				merged, hasMerged := prData["merged"].(bool)
+				if !hasMerged {
+					merged = false
+				}
+				prState, hasPRState := prData["state"].(string)
+				if !hasPRState {
+					prState = ""
+				}
+				mergedAt, hasMergedAt := prData["merged_at"].(string)
+				if !hasMergedAt {
+					mergedAt = ""
+				}
+				closedAt, hasClosedAt := prData["closed_at"].(string)
+				if !hasClosedAt {
+					closedAt = ""
+				}
 
 				switch {
 				case merged:
@@ -114,7 +135,10 @@ func evalAssignToAgent(ctx context.Context, item CreatedItemReport, repoOverride
 	case state == "closed" && stateReason == "completed":
 		report.OutcomeStatus = OutcomeStatusAccepted
 		report.Detail = "issue resolved (no agent PR found)"
-		closedAt, _ := issueData["closed_at"].(string)
+		closedAt, hasClosedAt := issueData["closed_at"].(string)
+		if !hasClosedAt {
+			closedAt = ""
+		}
 		if closedAt != "" && item.Timestamp != "" {
 			report.TimeToOutcomeHours = timeBetween(item.Timestamp, closedAt)
 		}
