@@ -174,6 +174,23 @@ func TestExpectedProportions(t *testing.T) {
 	})
 }
 
+func TestBuildVariantAnalysesShortExpectedProportions(t *testing.T) {
+	variants := buildVariantAnalyses(10, map[string]int{"A": 5, "B": 5}, []string{"A", "B"}, []float64{0.5}, 1, nil)
+
+	require.Len(t, variants, 2)
+	assert.InDelta(t, 50.0, variants[0].ExpectedPct, 0.0001)
+	assert.Zero(t, variants[1].ExpectedPct)
+}
+
+func TestApplyExperimentBalanceShortExpectedProportions(t *testing.T) {
+	analysis := &ExperimentAnalysis{IsBalanced: true}
+
+	applyExperimentBalance(analysis, "experiment", 10, nil, map[string]int{"A": 5, "B": 5}, []string{"A", "B"}, []float64{0.5})
+
+	assert.False(t, analysis.IsBalanced)
+	assert.Zero(t, analysis.DegreesOfFreedom)
+}
+
 func TestExperimentVariantCounts(t *testing.T) {
 	t.Parallel()
 

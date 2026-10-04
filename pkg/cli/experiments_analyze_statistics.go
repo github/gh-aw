@@ -488,9 +488,13 @@ func buildVariantAnalyses(
 	variants := make([]VariantAnalysis, 0, len(names))
 	for i, name := range names {
 		count := counts[name]
+		expectedPct := 0.0
+		if i >= 0 && i < len(expected) {
+			expectedPct = expected[i] * 100
+		}
 		variant := VariantAnalysis{
 			Name: name, Count: count, ObservedPct: safePercent(count, total),
-			ExpectedPct: expected[i] * 100, MinSamples: minSamples, BelowMinSamples: count < minSamples,
+			ExpectedPct: expectedPct, MinSamples: minSamples, BelowMinSamples: count < minSamples,
 		}
 		if graderObservations != nil {
 			observations := graderObservations.ByVariant[name]
@@ -521,7 +525,15 @@ func applyExperimentBalance(
 	if cfg != nil && cfg.Continual != nil {
 		a.IsBalanced = true
 	} else if total > 0 && k >= 2 {
+		if len(expectedPcts) != k {
+			a.IsBalanced = false
+			return
+		}
 		for i, name := range names {
+			if i < 0 || i >= len(expectedPcts) {
+				a.IsBalanced = false
+				return
+			}
 			expected := float64(total) * expectedPcts[i]
 			if expected > 0 {
 				diff := float64(counts[name]) - expected
@@ -588,21 +600,24 @@ func expectedProportions(sortedVariantNames []string, cfg *workflow.ExperimentCo
 		nameToWeight := make(map[string]float64, len(cfg.Variants))
 		totalWeight := 0.0
 		for i, name := range cfg.Variants {
+			if i < 0 || i >= len(cfg.Weight) {
+				break
+			}
 			w := float64(cfg.Weight[i])
 			nameToWeight[name] = w
 			totalWeight += w
 		}
 		if totalWeight > 0 {
 			// Only use weights when every observed variant name has a declared weight.
-			result := make([]float64, k)
+			result := make([]float64, 0, k)
 			allFound := true
-			for i, name := range sortedVariantNames {
+			for _, name := range sortedVariantNames {
 				w, ok := nameToWeight[name]
 				if !ok {
 					allFound = false
 					break
 				}
-				result[i] = w / totalWeight
+				result = append(result, w/totalWeight)
 			}
 			if allFound {
 				return result
