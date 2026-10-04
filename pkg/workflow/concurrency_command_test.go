@@ -10,7 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
+	"gopkg.in/yaml.v3"
 )
 
 func TestCommandConcurrencyCompilation(t *testing.T) {
