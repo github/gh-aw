@@ -1632,6 +1632,8 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `LedgerCompactionConfig`, `LedgerConfig`, `LedgerToolConfig`, `RepoMemoryLedgerCompactionConfig`, `RepoMemoryLedgerConfig` | struct | Ledger and repo-memory ledger configuration |
 | `EnginePluginsDefinition`, `PluginReference` | struct | Engine plugin definitions |
 | `PluginInstallationProvider` | interface | Engine-specific plugin installation |
+| `PostConfigPluginInstallationProvider` | interface | Installs plugin state after runtime configuration is written |
+| `GHAWManifestDetectionPolicy` | struct | Effective threat-detection compiler policy recorded in the manifest independently of jobs |
 | `GHAWManifestMCPServer`, `GHAWManifestMemoryValidationScript` | struct | gh-aw manifest entries |
 | `MCPGatewayAgentPolicy` | struct | MCP gateway agent policy |
 | `MCPParamType`, `ReactionType`, `RunnerTopology` | alias (`string`) | String-typed enumerations |
@@ -1640,6 +1642,8 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `WorkflowFile`, `WorkflowFileJob`, `WorkflowFilePermissions` | struct | Parsed GitHub Actions workflow file model |
 
 ## Source Synchronization
+
+Reviewed against source on 2026-10-04: added `PostConfigPluginInstallationProvider` and `GHAWManifestDetectionPolicy` to the "Additional Exported Types" table.
 
 Reviewed against source on 2026-10-01: added 66 previously-undocumented exported types to the "Additional Exported Types" table above.
 
