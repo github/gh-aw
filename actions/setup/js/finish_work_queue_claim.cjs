@@ -29,6 +29,7 @@ function validWorker(worker) {
   return worker && typeof worker === "object" && typeof worker.work_id === "string" && worker.work_id.length > 0 && typeof worker.claim_id === "string" && worker.claim_id.length > 0;
 }
 
+/** @param {Array<{claim_id: string, work_id: string}> | null} [workers] */
 function readFinishIntent(finishIntentPath = process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || FINISH_INTENT_PATH, workers = null) {
   if (!fs.existsSync(finishIntentPath)) return null;
   const outcomes = new Set();
@@ -70,6 +71,7 @@ function renderSummary(status) {
   const labels = {
     unassigned: "No worker claim was assigned; safe outputs may proceed.",
     completed: "The effective worker claim was durably completed and verified; safe outputs may proceed.",
+    partial: "Some claims were completed and verified; only safe outputs tagged with those claims may proceed.",
     cancelled: "The worker claim was cancelled; ordinary safe outputs were skipped.",
     superseded: "The worker claim is no longer effective; ordinary safe outputs were skipped.",
     terminal: "The work is already terminal; ordinary safe outputs were skipped.",

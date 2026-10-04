@@ -136,7 +136,7 @@ function createWorkQueueStateTool(snapshot) {
 function createWorkQueueFinishTool(options = {}) {
   const outputPath = options.finishIntentPath || process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || DEFAULT_FINISH_INTENT_PATH;
   const workers = options.worker == null ? [] : Array.isArray(options.worker) ? options.worker : [options.worker];
-  const multiple = workers.length > 1;
+  const multiple = Array.isArray(options.worker);
   return {
     name: "work_queue_claim_finish",
     description: multiple ? "Record a finish intent for a trusted inbound claim. Call once for each claim_id." : "Record the finish intent for the trusted inbound work queue claim.",

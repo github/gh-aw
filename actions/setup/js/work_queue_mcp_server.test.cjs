@@ -181,6 +181,8 @@ describe("work queue MCP snapshot", () => {
     tool.handler({ claim_id: "a", outcome: "completed" });
     tool.handler({ claim_id: "b", outcome: "cancelled" });
     expect(fs.readFileSync(finishPath, "utf8")).toBe('{"claim_id":"a","outcome":"completed"}\n{"claim_id":"b","outcome":"cancelled"}\n');
+    const arrayOfOne = createWorkQueueFinishTool({ finishIntentPath: finishPath, worker: [{ claim_id: "a", work_id: "one" }] });
+    expect(arrayOfOne.inputSchema.required).toEqual(["claim_id"]);
   });
 
   it("returns queue state and finish confirmation through the stdio MCP transport", async () => {

@@ -1750,3 +1750,13 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
 }
+
+func TestGateSafeOutputStepsForPartialWorkQueueClaims(t *testing.T) {
+	steps := gateSafeOutputSteps([]string{
+		"      - name: Process safe outputs\n        id: process_safe_outputs\n        run: echo process\n",
+		"      - name: Custom action\n        id: action_notify\n        if: success()\n        run: echo notify\n",
+	})
+	result := strings.Join(steps, "")
+	assert.Contains(t, result, "if: "+combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, "")+"\n        id: process_safe_outputs")
+	assert.Contains(t, result, "id: action_notify\n        if: "+combineGitHubIfExpressions("steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true'", "success()"))
+}
