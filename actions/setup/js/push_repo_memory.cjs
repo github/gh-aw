@@ -27,6 +27,10 @@ function redactFailureSummary(message) {
   return safeMessage.replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
 }
 
+function getCustomValidationFailureDetail({ stdout, stderr }) {
+  return redactFailureSummary([stdout, stderr].filter(Boolean).join("\n"));
+}
+
 async function setPushRepoMemoryFailure(message) {
   const summary = core.summary;
   if (summary && typeof summary.addRaw === "function" && typeof summary.write === "function") {
@@ -816,7 +820,7 @@ async function main() {
     });
     if (!customValidation.ok) {
       const reason = customValidation.timedOut ? `timed out after ${validationTimeoutSeconds} second(s)` : `exited with code ${customValidation.exitCode}`;
-      const failureDetail = redactFailureSummary(customValidation.stderr || customValidation.stdout);
+      const failureDetail = getCustomValidationFailureDetail(customValidation);
       const errorMessage = `Custom repo-memory validation failed for '${memoryId}': ${reason}${failureDetail ? `:\n${failureDetail}` : "."}`;
       if (customValidation.stdout) {
         core.info(`Custom repo-memory validation stdout:\n${redactFailureSummary(customValidation.stdout)}`);
@@ -970,4 +974,14 @@ async function main() {
   await writeLedgerSummary();
 }
 
-module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };
+module.exports = {
+  applyTemporaryIdSubstitutions,
+  configureRepoMemoryMergePolicy,
+  getCustomValidationFailureDetail,
+  isDeterministicPushValidationError,
+  isUntrustedLedgerArtifact,
+  main,
+  pushRepoMemoryChangesWithRetry,
+  reconcileRepoMemoryRetry,
+  redactFailureSummary,
+};

@@ -4,7 +4,15 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
-import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
+import {
+  applyTemporaryIdSubstitutions,
+  configureRepoMemoryMergePolicy,
+  getCustomValidationFailureDetail,
+  isDeterministicPushValidationError,
+  isUntrustedLedgerArtifact,
+  pushRepoMemoryChangesWithRetry,
+  redactFailureSummary,
+} from "./push_repo_memory.cjs";
 
 const mockCore = { info: vi.fn() };
 global.core = mockCore;
@@ -16,6 +24,30 @@ describe("push_repo_memory.cjs - untrusted ledger artifacts", () => {
     expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000000.jsonl", trusted)).toBe(true);
     expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000001.jsonl", trusted)).toBe(false);
     expect(isUntrustedLedgerArtifact("summary.json", trusted)).toBe(false);
+  });
+});
+
+describe("push_repo_memory.cjs - validation failure details", () => {
+  it("includes stdout and stderr diagnostics", () => {
+    expect(getCustomValidationFailureDetail({ stdout: "generic-looking stdout", stderr: "domain schema failed" })).toBe("generic-looking stdout\ndomain schema failed");
+  });
+
+  it.each([
+    ["GH_TOKEN", "gh-token-secret"],
+    ["GITHUB_TOKEN", "github-token-secret"],
+    ["GITHUB_APP_TOKEN", "github-app-token-secret"],
+  ])("redacts %s from failure details", (environmentVariable, secret) => {
+    const previousSecret = process.env[environmentVariable];
+    process.env[environmentVariable] = secret;
+    try {
+      expect(redactFailureSummary(`Failure includes ${secret}`)).toBe("Failure includes [REDACTED]");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env[environmentVariable];
+      } else {
+        process.env[environmentVariable] = previousSecret;
+      }
+    }
   });
 });
 
