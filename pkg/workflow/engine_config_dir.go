@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -42,7 +43,7 @@ func engineConfigBaseDirForRegistry(registry *EngineRegistry, engineID string) s
 //	pi           → .pi/skills
 //	others       → .github/skills  (Copilot default)
 func GetEngineSkillDir(engineID string) string {
-	return engineConfigBaseDir(engineID) + "/skills"
+	return path.Join(engineConfigBaseDir(engineID), "skills")
 }
 
 // GetEngineSubAgentDir returns the relative directory (from repo root / tmp base) used
@@ -56,5 +57,5 @@ func GetEngineSkillDir(engineID string) string {
 //	pi           → .pi/agents
 //	others       → .github/agents  (Copilot default)
 func GetEngineSubAgentDir(engineID string) string {
-	return engineConfigBaseDir(engineID) + "/agents"
+	return path.Join(engineConfigBaseDir(engineID), "agents")
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -141,7 +142,7 @@ func parseActionUsesField(uses string) (*actionRef, error) {
 		return nil, fmt.Errorf("invalid action ref %q: expected owner/repo format", uses)
 	}
 
-	repo := parts[0] + "/" + parts[1]
+	repo := strings.Join(parts[:2], "/")
 	var subdir string
 	if len(parts) == 3 {
 		subdir = parts[2]
@@ -287,7 +288,7 @@ func fetchRemoteActionYAML(repo, subdir, ref string) (*actionYAMLFile, error) {
 	for _, filename := range []string{"action.yml", "action.yaml"} {
 		var contentPath string
 		if subdir != "" {
-			contentPath = subdir + "/" + filename
+			contentPath = path.Join(subdir, filename)
 		} else {
 			contentPath = filename
 		}

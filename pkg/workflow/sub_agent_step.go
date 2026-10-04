@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -24,7 +25,7 @@ func generateRestoreInlineSubAgentsStep(yaml *strings.Builder, data *WorkflowDat
 	if data.EngineConfig != nil {
 		engineID = data.EngineConfig.ID
 	}
-	subAgentDir := engineConfigBaseDirForRegistry(registry, engineID) + "/agents"
+	subAgentDir := path.Join(engineConfigBaseDirForRegistry(registry, engineID), "agents")
 	subAgentExt := parser.GetEngineSubAgentExt(engineID)
 	subAgentStepLog.Printf("Generating restore inline sub-agents step: engine=%s, dir=%s, ext=%s", engineID, subAgentDir, subAgentExt)
 

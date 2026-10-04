@@ -51,7 +51,7 @@ func getLocalHeadSHA(gitRoot string) (string, error) {
 // the spec.
 func buildQualifiedSkillRef(localPath, repoSlug, headSHA string) string {
 	clean := strings.TrimPrefix(localPath, "./")
-	return repoSlug + "/" + clean + "@" + headSHA
+	return strings.Join([]string{repoSlug, clean}, "/") + "@" + headSHA
 }
 
 // applyLocalSkillRefRewriting rewrites any local skill path references in the

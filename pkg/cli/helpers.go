@@ -93,7 +93,7 @@ func readSourceRepoFromFile(path string) string {
 	if len(slashParts) < 2 {
 		return ""
 	}
-	repo := slashParts[0] + "/" + slashParts[1]
+	repo := strings.Join(slashParts[:2], "/")
 	helpersLog.Printf("Extracted source repo: %s", repo)
 	return repo
 }

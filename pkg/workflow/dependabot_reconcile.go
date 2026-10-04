@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	pathutil "path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -130,7 +131,7 @@ func (c *Compiler) ReconcileManagedDependabotIgnores(path string) error {
 		return nil
 	}
 
-	managedPatterns := []string{c.effectiveActionsRepo() + "/*"}
+	managedPatterns := []string{pathutil.Join(c.effectiveActionsRepo(), "*")}
 	changed := false
 	originalStr := string(original)
 	managedPatternsWithComment := managedPatternsWithInlineComment(originalStr, managedPatterns)

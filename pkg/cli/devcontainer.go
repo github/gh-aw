@@ -274,7 +274,7 @@ func buildRepositoryPermissions(repoName, owner string, additionalRepos []string
 				}
 			}
 		} else if owner != "" {
-			fullRepoName = owner + "/" + repo
+			fullRepoName = strings.Join([]string{owner, repo}, "/")
 		}
 
 		if fullRepoName != repoName {

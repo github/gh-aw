@@ -105,7 +105,7 @@ func (w *WorkflowSpec) String() string {
 	}
 
 	// For remote workflows, use the standard format
-	spec := w.RepoSlug + "/" + w.WorkflowPath
+	spec := strings.Join([]string{w.RepoSlug, w.WorkflowPath}, "/")
 	if w.Version != "" {
 		spec += "@" + w.Version
 	}
@@ -500,7 +500,7 @@ func buildSourceStringWithCommitSHA(workflow *WorkflowSpec, commitSHA string) st
 	workflowPath := strings.TrimPrefix(workflow.WorkflowPath, "./")
 
 	// Format: owner/repo/path@commitSHA
-	source := workflow.RepoSlug + "/" + workflowPath
+	source := strings.Join([]string{workflow.RepoSlug, workflowPath}, "/")
 	if commitSHA != "" {
 		source += "@" + commitSHA
 	} else if workflow.Version != "" {

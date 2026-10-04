@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -388,6 +389,8 @@ func buildCentralSlashCommandWorkflowYAML(
 	}
 
 	header := GenerateWorkflowHeader("", "gh-aw", "")
+	setupGlobalsRequire := path.Join(SetupActionDestination, "setup_globals.cjs")
+	routeScriptRequire := path.Join(SetupActionDestination, "route_slash_command.cjs")
 
 	var b strings.Builder
 	b.WriteString("# gh-aw-commands: ")
@@ -432,9 +435,9 @@ jobs:
           GH_AW_SLASH_COMMAND_DOCS_URL: 'https://github.github.com/gh-aw/reference/command-triggers/'
         with:
           script: |
-            const { setupGlobals } = require('` + SetupActionDestination + `/setup_globals.cjs');
+            const { setupGlobals } = require('` + setupGlobalsRequire + `');
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require('` + SetupActionDestination + `/route_slash_command.cjs');
+            const { main } = require('` + routeScriptRequire + `');
             await main();
 `)
 	finalYAML, err := finalizeRunnerTempSafety(b.String())

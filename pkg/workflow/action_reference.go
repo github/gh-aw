@@ -68,7 +68,7 @@ func resolveSetupActionModeRef(ctx context.Context, actionTag string, version st
 	if !ok {
 		return localPath
 	}
-	actionRepo := actionsOrgRepo + "/setup"
+	actionRepo := strings.Join([]string{actionsOrgRepo, "setup"}, "/")
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
 	ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode")
 	if ref != "" {

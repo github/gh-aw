@@ -444,7 +444,7 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 		}
 
 		// Embed the source field for future conflict detection.
-		depSourceString := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
+		depSourceString := strings.Join([]string{spec.RepoSlug, remoteFilePath}, "/") + "@" + ref
 		if updated, srcErr := addSourceToWorkflow(string(workflowContent), depSourceString); srcErr == nil {
 			workflowContent = []byte(updated)
 		}
@@ -560,7 +560,7 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 		}
 
 		// Build expected full source string now so it can be used in the conflict check below.
-		expectedSource := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
+		expectedSource := strings.Join([]string{spec.RepoSlug, remoteFilePath}, "/") + "@" + ref
 
 		fileExists := false
 		if _, statErr := os.Stat(targetPath); statErr == nil {
@@ -758,7 +758,7 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 		}
 
 		// Build expected full source string now so it can be used in the conflict check below.
-		expectedSource := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
+		expectedSource := strings.Join([]string{spec.RepoSlug, remoteFilePath}, "/") + "@" + ref
 
 		fileExists := false
 		if _, statErr := os.Stat(targetPath); statErr == nil {

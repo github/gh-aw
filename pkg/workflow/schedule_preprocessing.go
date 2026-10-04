@@ -54,7 +54,7 @@ func (c *Compiler) normalizeScheduleString(scheduleStr string, itemIndex int) (p
 		if IsRelease() {
 			// Release mode: use repository slug if available
 			if c.repositorySlug != "" {
-				seed = c.repositorySlug + "/" + c.workflowIdentifier
+				seed = strings.Join([]string{c.repositorySlug, c.workflowIdentifier}, "/")
 			} else {
 				// Warn if repository slug is not available - scattering will not be org-aware
 				schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")

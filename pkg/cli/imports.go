@@ -23,7 +23,7 @@ var importsLog = logger.New("cli:imports")
 // If commitSHA is provided, it takes precedence over version.
 // If neither is provided, returns the path without a version suffix.
 func buildWorkflowSpecRef(repoSlug, path, commitSHA, version string) string {
-	workflowSpec := repoSlug + "/" + path
+	workflowSpec := strings.Join([]string{repoSlug, path}, "/")
 	if commitSHA != "" {
 		workflowSpec += "@" + commitSHA
 	} else if version != "" {

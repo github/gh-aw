@@ -112,7 +112,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		if err != nil {
 			return fmt.Errorf("failed to get GitHub username for default trial repo: %w", err)
 		}
-		hostRepoSlug = username + "/gh-aw-trial"
+		hostRepoSlug = strings.Join([]string{username, "gh-aw-trial"}, "/")
 		trialLog.Printf("Using default host repository: %s", hostRepoSlug)
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Host repository (default): "+hostRepoSlug))
 	}

@@ -219,7 +219,7 @@ func ComputeOutcomeSummary(reports []OutcomeReport, mapping *github.ObjectiveMap
 func escapeOwnerRepo(ownerRepo string) string {
 	parts := strings.SplitN(ownerRepo, "/", 2)
 	if len(parts) == 2 {
-		return url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1])
+		return strings.Join([]string{url.PathEscape(parts[0]), url.PathEscape(parts[1])}, "/")
 	}
 	return url.PathEscape(ownerRepo)
 }
@@ -374,7 +374,7 @@ func parseRepoFromURL(url string) string {
 	}
 	parts := strings.SplitN(rest, "/", 3)
 	if len(parts) >= 2 {
-		return parts[0] + "/" + parts[1]
+		return strings.Join(parts[:2], "/")
 	}
 	return ""
 }

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -330,7 +331,7 @@ func buildCustomScriptFilesStep(scripts map[string]*SafeScriptConfig) ([]string,
 		scriptConfig := scripts[scriptName]
 		normalizedName := stringutil.NormalizeSafeOutputIdentifier(scriptName)
 		filename := safeOutputScriptFilename(normalizedName)
-		filePath := SetupActionDestinationShell + "/" + filename
+		filePath := path.Join(SetupActionDestinationShell, filename)
 		scriptContent := generateSafeOutputScriptContent(scriptName, scriptConfig)
 		delimiter := GenerateHeredocDelimiterFromContent("SAFE_OUTPUT_SCRIPT_"+strings.ToUpper(normalizedName), scriptContent)
 

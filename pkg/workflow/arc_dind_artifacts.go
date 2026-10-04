@@ -22,7 +22,7 @@ func rewriteTmpGhAwPathsForArcDind(paths []string) []string {
 	for i, p := range paths {
 		if after, ok := strings.CutPrefix(p, constants.TmpGhAwDirSlash); ok {
 			// /tmp/gh-aw/foo → ${{ runner.temp }}/gh-aw/foo
-			result[i] = constants.GhAwRootDir + "/" + after
+			result[i] = strings.Join([]string{constants.GhAwRootDir, after}, "/")
 			rewritten++
 		} else if p == constants.TmpGhAwDir {
 			result[i] = constants.GhAwRootDir
