@@ -90,7 +90,11 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 		Overrides:      make(map[string]any),
 		DisablePlugins: workflowData == nil || len(workflowData.Plugins) == 0,
 	}
-	config.Defaults["features"] = map[string]any{"plugins": !config.DisablePlugins}
+	features := map[string]any{"plugins": !config.DisablePlugins}
+	if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+		features["shell_tool"] = false
+	}
+	config.Defaults["features"] = features
 	if isFirewallEnabled(workflowData) {
 		config.Defaults["model_provider"] = codexOpenAIProxyProviderID
 		config.Defaults["model_providers"] = map[string]any{
@@ -118,7 +122,7 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 				delete(config.Overrides, "mcp_servers")
 			}
 		}
-		if err := validateCodexManagedConfig(config, isFirewallEnabled(workflowData)); err != nil {
+		if err := validateCodexManagedConfig(config, isFirewallEnabled(workflowData), e.ResolveLLMProvider(workflowData) == LLMProviderGitHub); err != nil {
 			return nil, err
 		}
 	}
@@ -165,7 +169,14 @@ func codexNativeServerDefaults(workflowData *WorkflowData, mcpTools []string) ma
 	return servers
 }
 
-func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled bool) error {
+func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled, githubProvider bool) error {
+	if githubProvider {
+		if features, ok := config.Overrides["features"].(map[string]any); ok {
+			if shellTool, exists := features["shell_tool"]; exists && shellTool != false {
+				return errors.New("engine.config: features.shell_tool is disabled for GitHub inference because the Copilot compatibility adapter does not support the Codex exec custom tool")
+			}
+		}
+	}
 	if rawServers, exists := config.Overrides["mcp_servers"]; exists {
 		servers, ok := rawServers.(map[string]any)
 		if !ok {
