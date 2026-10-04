@@ -1,10 +1,33 @@
 ---
-description: Report formatting guidelines for gh-aw workflows (header levels, collapsible details, run-ID links)
+name: reporting
+description: Format reports with HTML details/summary blocks for readable output.
 ---
 
-- Use `###` (or lower) headers only.
-- Keep summary and critical actions visible; move long detail into `<details>` blocks.
-- Structure reports as: overview → key metrics/issues → collapsible detail → next actions.
-- Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`.
-- Include up to 3 most relevant run URLs at end under `**References:**`.
-- Do NOT add footer attribution (system adds automatically).
+# Report Format Guidelines
+
+Use these rules to format reports with collapsible sections.
+
+## Use HTML Details/Summary Tags
+
+Reduce scrolling and improve readability: **wrap reports in HTML `<details>` and `<summary>` tags** so users can expand and collapse sections.
+
+**Basic Structure:**
+
+```markdown
+<details>
+<summary>📊 Report Title - [Date]</summary>
+
+## Report Content
+
+Your detailed report content goes here...
+
+### Section 1
+
+Content for section 1...
+
+### Section 2
+
+Content for section 2...
+
+</details>
+```
