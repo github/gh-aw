@@ -42,10 +42,13 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 
 	// Check each declared schema field
 	for paramName, paramDefRaw := range schemaMap {
-		paramDef, _ := paramDefRaw.(map[string]any)
+		paramDef, isObject := paramDefRaw.(map[string]any)
+		if !isObject {
+			continue
+		}
 
 		// Check required parameters
-		if req, _ := paramDef["required"].(bool); req {
+		if req, isBool := paramDef["required"].(bool); isBool && req {
 			if _, provided := inputs[paramName]; !provided {
 				return fmt.Errorf("import '%s': required 'with' input %q is missing (declared in import-schema)", importPath, paramName)
 			}
@@ -57,8 +60,8 @@ func validateWithImportSchema(inputs map[string]any, fm map[string]any, importPa
 		}
 
 		// Skip type validation when type is not specified
-		declaredType, _ := paramDef["type"].(string)
-		if declaredType == "" {
+		declaredType, isString := paramDef["type"].(string)
+		if !isString || declaredType == "" {
 			continue
 		}
 
@@ -93,9 +96,12 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 	}
 	// Validate each declared property
 	for propName, propDefRaw := range propsMap {
-		propDef, _ := propDefRaw.(map[string]any)
+		propDef, isObject := propDefRaw.(map[string]any)
+		if !isObject {
+			continue
+		}
 		// Check required sub-fields
-		if req, _ := propDef["required"].(bool); req {
+		if req, isBool := propDef["required"].(bool); isBool && req {
 			if _, provided := objMap[propName]; !provided {
 				return fmt.Errorf("import '%s': required property %q of 'with' input %q is missing", importPath, propName, name)
 			}
@@ -104,8 +110,8 @@ func validateObjectInput(name string, value any, paramDef map[string]any, import
 		if !provided {
 			continue
 		}
-		propType, _ := propDef["type"].(string)
-		if propType == "" {
+		propType, isString := propDef["type"].(string)
+		if !isString || propType == "" {
 			continue
 		}
 		qualifiedName := name + "." + propName
@@ -162,9 +168,12 @@ func validateImportInputType(name string, value any, declaredType string, paramD
 		if !hasItems {
 			return nil
 		}
-		itemsDef, _ := itemsDefRaw.(map[string]any)
-		itemType, _ := itemsDef["type"].(string)
-		if itemType == "" {
+		itemsDef, isObject := itemsDefRaw.(map[string]any)
+		if !isObject {
+			return nil
+		}
+		itemType, isString := itemsDef["type"].(string)
+		if !isString || itemType == "" {
 			return nil
 		}
 		for i, item := range arr {

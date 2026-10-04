@@ -11,8 +11,8 @@ func ParseBool(m map[string]any, key string) bool {
 		return false
 	}
 	if v, ok := m[key]; ok {
-		b, _ := v.(bool)
-		return b
+		b, isBool := v.(bool)
+		return isBool && b
 	}
 	return false
 }
