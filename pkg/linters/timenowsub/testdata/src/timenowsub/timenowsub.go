@@ -9,6 +9,10 @@ func bad(t time.Time) {
 	_ = time.Now().Sub(t) // want `time\.Now\(\)\.Sub\(t\) can be simplified to time\.Since\(t\)`
 }
 
+func badParenthesized(t time.Time) {
+	_ = (time.Now()).Sub(t) // want `time\.Now\(\)\.Sub\(t\) can be simplified to time\.Since\(t\)`
+}
+
 func badAssign(start time.Time) time.Duration {
 	return time.Now().Sub(start) // want `time\.Now\(\)\.Sub\(start\) can be simplified to time\.Since\(start\)`
 }

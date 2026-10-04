@@ -37,6 +37,14 @@ describe("rate_limit_helpers", () => {
       expect(remaining).toBe(5000);
     });
 
+    it("should use resources.core when rate is absent", async () => {
+      const { getRateLimitRemaining } = await import("./rate_limit_helpers.cjs");
+      mockGithub.rest.rateLimit.get.mockResolvedValue({
+        data: { resources: { core: { remaining: 3200, limit: 5000, used: 1800, reset: 1700000000 } } },
+      });
+      expect(await getRateLimitRemaining(mockGithub, "test")).toBe(3200);
+    });
+
     it("should return -1 on error", async () => {
       const { getRateLimitRemaining } = await import("./rate_limit_helpers.cjs");
       mockGithub.rest.rateLimit.get.mockRejectedValueOnce(new Error("API error")).mockRejectedValueOnce(new Error("API error"));
@@ -102,6 +110,22 @@ describe("rate_limit_helpers", () => {
       expect(result.remaining).toBe(4000);
       expect(result.limit).toBe(5000);
       expect(result.percentRemaining).toBe(80);
+    });
+
+    it("should use resources.core without warning when rate is absent", async () => {
+      const { checkRateLimitHeadroom } = await import("./rate_limit_helpers.cjs");
+      mockGithub.rest.rateLimit.get.mockResolvedValue({
+        data: { resources: { core: { remaining: 4000, limit: 5000, used: 1000 } } },
+      });
+      expect(await checkRateLimitHeadroom(mockGithub, "test")).toEqual({ remaining: 4000, limit: 5000, percentRemaining: 80 });
+      expect(mockCore.warning).not.toHaveBeenCalled();
+    });
+
+    it("should report an unavailable core quota rather than succeeding", async () => {
+      const { checkRateLimitHeadroom } = await import("./rate_limit_helpers.cjs");
+      mockGithub.rest.rateLimit.get.mockResolvedValue({ data: { resources: {} } });
+      expect(await checkRateLimitHeadroom(mockGithub, "test")).toEqual({ remaining: -1, limit: -1, percentRemaining: -1 });
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("no core quota"));
     });
 
     it("should log info when headroom is above threshold", async () => {

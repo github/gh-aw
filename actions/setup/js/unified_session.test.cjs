@@ -36,6 +36,54 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("emits one execution entry across canonical, stdio, persisted detector, and exit-code evidence", () => {
+    const execution = { type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 1 } };
+    write("agent-session.jsonl", [...require("./claude_session.cjs").normalizeClaudeSession(claudeFixtures.failure), execution]);
+    write("agent-errors.jsonl", [execution]);
+    write("agent-stdio.log", claudeFixtures.failure.map(JSON.stringify).join("\n") + "\n[claude-harness] done: exitCode=1\n");
+    write("agent_execution_exit_code.txt", "0\n");
+    const events = writeUnifiedSession({ rootDir: root, engine: "claude" });
+    const executions = events.filter(event => event.type === "agent.execution");
+    expect(executions).toHaveLength(1);
+    expect(executions[0]).toMatchObject({
+      data: { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["UnknownError", "api_error", "server_error"], exitCode: 0 },
+      provenance: { component: "execution", phase: "agent", path: "agent-errors.jsonl" },
+    });
+    expect(executions[0]).not.toHaveProperty("timestamp");
+    expect(events.filter(event => event.type === "claude.assistant_error")).toHaveLength(1);
+    expect(writeUnifiedSession({ rootDir: root, engine: "claude" })).toEqual(events);
+  });
+
+  it("uses an execution snapshot exit code when the raw exit-code file is absent", () => {
+    write("usage/agent/execution.json", { exit_code: 0, outcome: "success" });
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 0 }, provenance: { path: "usage/agent/execution.json" } }]);
+  });
+
+  it("prefers persisted live detector exit evidence over an earlier canonical observation", () => {
+    const data = { categories: [], errorCodes: [], errorTypes: [] };
+    write("agent-session.jsonl", [{ type: "agent.execution", data: { ...data, exitCode: 1 } }]);
+    write("agent-errors.jsonl", [{ type: "agent.execution", data: { ...data, exitCode: 0 } }]);
+    expect(collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { exitCode: 0 } }]);
+  });
+
+  it("retains observed execution results without requiring a conversation", () => {
+    write("agent-stdio.log", "Access denied by policy settings\n[copilot-harness] done: exitCode=1\n");
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["inference_access_error"], exitCode: 1 } }]);
+  });
+
+  it("rejects malformed recorded exit codes and does not follow an exit-code symlink", () => {
+    write("agent_execution_exit_code.txt", "1 trailing");
+    expect(() => collectUnifiedSession({ rootDir: root })).toThrow("Invalid agent execution exit code");
+    fs.unlinkSync(path.join(root, "agent_execution_exit_code.txt"));
+    fs.symlinkSync(write("private-exit.txt", "139"), path.join(root, "agent_execution_exit_code.txt"));
+    const warnings = [];
+    const { events } = collectUnifiedSession({ rootDir: root, warn: warning => warnings.push(warning) });
+    expect(events.some(event => event.type === "agent.execution")).toBe(false);
+    expect(warnings).toHaveLength(1);
+  });
+
   it("reconstructs OpenCode sessions from stdio with native timestamps and tool correlation", () => {
     write("aw_info.json", { engine_id: "opencode", agent_version: "fixture" });
     write("agent-stdio.log", [
@@ -476,7 +524,8 @@ describe("Unified conclusion session", () => {
       .filter(event => event.provenance.component === "agent")
       .sort((a, b) => a.provenance.index - b.provenance.index)
       .map(({ provenance, ...event }) => event);
-    expect(actual).toEqual(JSON.parse(JSON.stringify(expected.map(normalizeUnifiedSessionEvent))));
+    expect(actual).toEqual(JSON.parse(JSON.stringify(expected.filter(event => event.type !== "agent.execution").map(normalizeUnifiedSessionEvent))));
+    expect(events.filter(event => event.type === "agent.execution").map(event => event.data)).toEqual(expected.filter(event => event.type === "agent.execution").map(event => event.data));
     expect(events.some(event => event.type === "mcp.tool_call")).toBe(true);
     expect(events.every(event => event.type.includes(".") && event.data && typeof event.data === "object")).toBe(true);
   });

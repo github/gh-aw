@@ -31,7 +31,7 @@ function sessionCLI(args) {
       ...(engine ? { engine } : {}),
       warn: message => console.error(message),
     });
-    if (!events.some(event => event.provenance?.component === "agent")) throw new Error("No recognizable agent session found in the agent artifact");
+    if (!events.some(event => event.provenance?.component === "agent" || event.type === "agent.execution")) throw new Error("No recognizable agent session found in the agent artifact");
     return serializeSessionArtifact(events, maskedValues);
   }
   if (mode === "markdown") {

@@ -70,6 +70,19 @@ describe("Session CLI adapter", () => {
     expect(() => sessionCLI(["markdown", write("future.jsonl", [{ type: "session.format", data: { version: 2 }, provenance: { component: "collector" } }])])).toThrow("Unsupported unified session file-format version");
   });
 
+  it("reconstructs an error-only historical startup failure", () => {
+    write("agent-stdio.log", "Access denied by policy settings\n[copilot-harness] done: exitCode=1\n");
+    const events = sessionCLI(["reconstruct", root, "copilot"]).trim().split("\n").map(JSON.parse);
+    expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["inference_access_error"], errorCodes: [], errorTypes: [], exitCode: 1 } }]);
+  });
+
+  it("rejects duplicate or malformed execution entries when reading unified files", () => {
+    const header = { type: "session.format", data: { version: 1 }, provenance: { component: "collector" } };
+    const execution = { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 0 } };
+    expect(() => sessionCLI(["markdown", write("duplicate.jsonl", [header, execution, execution])])).toThrow("multiple agent.execution");
+    expect(() => sessionCLI(["markdown", write("malformed.jsonl", [header, { ...execution, data: { ...execution.data, exitCode: "0" } }])])).toThrow("Invalid agent.execution exitCode");
+  });
+
   it("reports missing input, engine, and invalid modes", () => {
     expect(() => sessionCLI([])).toThrow("input path is required");
     expect(() => sessionCLI(["agent-markdown", root])).toThrow("engine is required");
