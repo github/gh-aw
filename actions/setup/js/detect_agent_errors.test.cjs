@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import { agentErrorDiagnosticText } from "./agent_execution.cjs";
 
 // Minimal mock for @actions/core used by github-script CJS modules (renderLogFromFile).
 const mockCore = {
@@ -36,11 +37,38 @@ const {
   isShellExpansionGuardRejectedError,
   extractMissingModelPricingModelName,
   buildOutputLines,
+  persistAgentExecution,
   findMostRecentLogFile,
   renderInternalEngineLogOnFailure,
 } = require("./detect_agent_errors.cjs");
 
 describe("detect_agent_errors.cjs", () => {
+  it("persists live-only classifications and the recorded final exit for conclusion", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agent-errors-"));
+    try {
+      fs.writeFileSync(path.join(root, "agent_execution_exit_code.txt"), "0\n");
+      persistAgentExecution("", { ...detectErrors(""), agenticEngineTimeout: true, missingModelPricingError: true }, root);
+      const records = fs.readFileSync(path.join(root, "agent-errors.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+      expect(records).toEqual([{ type: "agent.execution", data: { categories: ["agentic_engine_timeout", "missing_model_pricing_error"], errorCodes: [], errorTypes: [], exitCode: 0 } }]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not persist detector classifications from quoted plaintext or tool output", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agent-errors-"));
+    try {
+      const content = "Assistant: The log text says Access denied by policy settings\nTool output: CAPIError: 429 Too Many Requests\n";
+      const results = detectErrors(agentErrorDiagnosticText(content));
+      persistAgentExecution(content, results, root);
+      expect(fs.readFileSync(path.join(root, "agent-errors.jsonl"), "utf8")).toBe("");
+      expect(results.inferenceAccessError).toBe(false);
+      expect(results.capiQuotaExceededError).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   describe("INFERENCE_ACCESS_ERROR_PATTERN", () => {
     it("matches 'Access denied by policy settings'", () => {
       expect(INFERENCE_ACCESS_ERROR_PATTERN.test("Access denied by policy settings")).toBe(true);

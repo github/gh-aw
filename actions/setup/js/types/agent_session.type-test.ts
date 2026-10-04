@@ -11,6 +11,7 @@ const messages: CoreSessionEvent[] = [
   { type: "session.result", data: { numTurns: 0, usage: { input_tokens: 0 }, errors: [{ code: "failed" }] } },
   { type: "detection.result", data: { promptInjection: false } },
   { type: "session.format", data: { version: 1 } },
+  { type: "agent.execution", data: { categories: [], errorCodes: [502, "provider_error"], errorTypes: ["server_error"], exitCode: 0 } },
 ];
 void messages;
 
@@ -42,6 +43,11 @@ createSessionEvent({}, "session.format", { version: 1 });
 createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.
 createSessionEvent({}, "session.format", {});
+createSessionEvent({}, "agent.execution", { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 143 });
+// @ts-expect-error Execution exit codes are numeric.
+createSessionEvent({}, "agent.execution", { categories: [], errorCodes: [], errorTypes: [], exitCode: "1" });
+// @ts-expect-error Native error codes are strings or numbers.
+createSessionEvent({}, "agent.execution", { categories: [], errorCodes: [false], errorTypes: [] });
 
 createSessionEvent({}, "session.result", { status: "completed", sourceType: "turn.completed", usage: { reasoning_output_tokens: 0 } });
 // @ts-expect-error Source terminal status is a string, not a completion flag.
