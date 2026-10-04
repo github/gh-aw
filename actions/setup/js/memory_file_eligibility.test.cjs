@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -41,13 +41,26 @@ describe("memory_file_eligibility.cjs", () => {
       expect(isMemoryFileEligible("sub/notes.json", [".json"], compiledPatterns).eligible).toBe(true);
     });
 
-    it("matches slashless patterns against root-level (depth 0) files, per the documented FILE_GLOB_FILTER contract", () => {
-      // FILE_GLOB_FILTER docs (push_repo_memory.cjs) document that a file at the memory
-      // directory root, e.g. "history.jsonl", is matched by the slashless pattern "*.jsonl".
+    it("matches slashless patterns against filenames at any depth", () => {
       const { compiledPatterns } = compileFileGlobPatterns("*.jsonl");
       expect(isMemoryFileEligible("history.jsonl", [], compiledPatterns).eligible).toBe(true);
-      // A nested file should not match a slashless pattern (single * doesn't cross directories).
-      expect(isMemoryFileEligible("sub/history.jsonl", [], compiledPatterns).eligible).toBe(false);
+      expect(isMemoryFileEligible("sub/history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub\\archive\\history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub/history.json", [], compiledPatterns).eligible).toBe(false);
+    });
+
+    it("matches exact slashless filenames without accepting suffix matches", () => {
+      const { compiledPatterns } = compileFileGlobPatterns("history.jsonl");
+      expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub/old-history.jsonl", [], compiledPatterns).eligible).toBe(false);
+    });
+
+    it("keeps directory-containing patterns relative to the memory root", () => {
+      const { compiledPatterns } = compileFileGlobPatterns("sub/*.json");
+      expect(isMemoryFileEligible("sub/data.json", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("other/sub/data.json", [], compiledPatterns).eligible).toBe(false);
+      expect(isMemoryFileEligible("sub/archive/data.json", [], compiledPatterns).eligible).toBe(false);
     });
   });
 
@@ -65,9 +78,10 @@ describe("memory_file_eligibility.cjs", () => {
 
   describe("filterIneligibleMemoryFiles", () => {
     let tmpDir;
-    const mockCore = { info: () => {} };
+    const mockCore = { info: vi.fn(), warning: vi.fn() };
 
     afterEach(() => {
+      vi.clearAllMocks();
       if (tmpDir) {
         fs.rmSync(tmpDir, { recursive: true, force: true });
         tmpDir = undefined;
@@ -109,6 +123,22 @@ describe("memory_file_eligibility.cjs", () => {
 
       expect(result.kept).toEqual(["sub/keep.json"]);
       expect(result.removed.map(f => f.path).sort()).toEqual(["sub/skip-ext.md", "sub/skip-glob.json"]);
+      expect(mockCore.warning).toHaveBeenCalledOnce();
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("sub/skip-ext.md"));
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("sub/skip-glob.json"));
+    });
+
+    it("keeps nested files matching slashless globs without warning", () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-memory-filter-"));
+      fs.mkdirSync(path.join(tmpDir, "sub", "archive"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, "sub", "archive", "history.jsonl"), '{"id":1}\n');
+
+      const result = filterIneligibleMemoryFiles(tmpDir, [".jsonl"], "*.jsonl", mockCore);
+
+      expect(result.kept).toEqual(["sub/archive/history.jsonl"]);
+      expect(result.removed).toEqual([]);
+      expect(fs.existsSync(path.join(tmpDir, "sub", "archive", "history.jsonl"))).toBe(true);
+      expect(mockCore.warning).not.toHaveBeenCalled();
     });
 
     it("handles nested directories, skipping .git", () => {

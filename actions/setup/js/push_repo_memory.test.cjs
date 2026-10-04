@@ -3,11 +3,81 @@ import { execFileSync, execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { createRequire } from "node:module";
+import vm from "node:vm";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
 import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
 
 const mockCore = { info: vi.fn() };
 global.core = mockCore;
+
+describe("push_repo_memory.cjs - nested memory persistence", () => {
+  it("pushes nested files matching slashless globs and warns with skipped paths", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-nested-"));
+    const artifactDir = path.join(tempDir, "artifact");
+    const workspaceDir = path.join(tempDir, "workspace");
+    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const pushSignedCommits = vi.fn().mockResolvedValue(undefined);
+    const execGitSync = vi.fn(args => {
+      if (args[0] === "status") return "?? archive/deep/history.jsonl\n?? state.json\n";
+      if (args[0] === "rev-parse") return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
+      return "";
+    });
+    const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+    const require = createRequire(import.meta.url);
+    const module = { exports: {} };
+    const mocks = {
+      "./git_helpers.cjs": { execGitSync },
+      "./git_patch_utils.cjs": { getStagedPatchDiffSizeBytes: () => 100 },
+      "./git_auth_helpers.cjs": { getGitAuthEnv: () => ({}) },
+      "./push_signed_commits.cjs": { pushSignedCommits },
+    };
+
+    try {
+      fs.mkdirSync(path.join(artifactDir, "archive", "deep"), { recursive: true });
+      fs.mkdirSync(workspaceDir);
+      fs.writeFileSync(path.join(artifactDir, "archive", "deep", "history.jsonl"), '{"id":1}\n');
+      fs.writeFileSync(path.join(artifactDir, "state.json"), "{}");
+      fs.writeFileSync(path.join(artifactDir, "archive", "ignored.md"), "ignored");
+      fs.writeFileSync(path.join(artifactDir, "archive", "ignored.bin"), "ignored");
+
+      vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
+        require: id => mocks[id] || require(id),
+        module,
+        core,
+        context: { repo: { owner: "owner", repo: "repo" } },
+        github: {},
+        exec: {},
+        process: {
+          env: {
+            ARTIFACT_DIR: artifactDir,
+            GITHUB_WORKSPACE: workspaceDir,
+            MEMORY_ID: "test",
+            TARGET_REPO: "owner/repo",
+            BRANCH_NAME: "memory/test",
+            GH_TOKEN: "test-token",
+            FILE_GLOB_FILTER: "*.json *.jsonl",
+            ALLOWED_EXTENSIONS: '[".json", ".jsonl", ".md"]',
+          },
+        },
+      });
+
+      await module.exports.main();
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(fs.readFileSync(path.join(workspaceDir, "archive", "deep", "history.jsonl"), "utf8")).toBe('{"id":1}\n');
+      expect(fs.existsSync(path.join(workspaceDir, "state.json"))).toBe(true);
+      expect(fs.existsSync(path.join(workspaceDir, "archive", "ignored.md"))).toBe(false);
+      expect(execGitSync).toHaveBeenCalledWith(["add", "--sparse", "--", ":(literal)archive/deep/history.jsonl", ":(literal)state.json"], { stdio: "inherit", cwd: workspaceDir });
+      expect(pushSignedCommits).toHaveBeenCalledOnce();
+      expect(core.warning).toHaveBeenCalledOnce();
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("archive/ignored.md (no pattern matched)"));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('archive/ignored.bin (disallowed extension ".bin")'));
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("push_repo_memory.cjs - untrusted ledger artifacts", () => {
   it("ignores coverage files and artifacts that overwrite trusted shards", () => {
