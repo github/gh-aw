@@ -162,5 +162,37 @@
    "Never auto-installs tools"
   ],
   "blogged": false
+ },
+ "github/gh-aw-firewall": {
+  "kind": "tool",
+  "reviewed": "2026-10-04",
+  "score": 7,
+  "summary": "Squid-based domain-allowlist network firewall with API-proxy sidecar keeping LLM keys out of the agent.",
+  "highlights": [
+   "README.md: three-container design",
+   "--config JSON/YAML with published schema"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-mcpg": {
+  "kind": "mcp-server",
+  "reviewed": "2026-10-04",
+  "score": 7,
+  "summary": "MCP gateway used via sandbox.mcp to give sandboxed agents controlled MCP access.",
+  "highlights": [
+   "README.md: gateway config requires agentId/domain",
+   "docs/CONFIGURATION.md server-field reference"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-actions": {
+  "kind": "shared-component",
+  "reviewed": "2026-10-04",
+  "score": 5,
+  "summary": "Shared actions used by compiled workflows; minimal docs, defers to gh-aw.",
+  "highlights": [
+   "Tags aligned with gh-aw releases"
+  ],
+  "blogged": false
  }
 }
