@@ -395,7 +395,7 @@ func isWriteMethod(name string) bool {
 // isReadMethod checks if a method is a read operation
 func isReadMethod(name string) bool {
 	switch name {
-	case "String", "Bytes", "Len":
+	case "String", "Bytes":
 		return true
 	}
 	return false

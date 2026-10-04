@@ -13,6 +13,14 @@ func okSingleWrite() {
 	_ = buf.String()
 }
 
+func okWriteAfterLengthInspection() {
+	var buf bytes.Buffer
+	buf.WriteString("hello")
+	_ = buf.Len()
+	buf.WriteString(" world")
+	_ = buf.String()
+}
+
 // okResetBetweenWrites is OK - Reset called between writes
 func okResetBetweenWrites() {
 	var buf bytes.Buffer

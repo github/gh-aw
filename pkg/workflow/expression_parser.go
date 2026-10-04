@@ -382,6 +382,7 @@ func BreakLongExpression(expression string) []string {
 			}
 		}
 
+		//nolint:bufferresetbeforereuse // The String() call above only inspects this partial expression.
 		current.WriteByte(char)
 		i++
 	}
