@@ -111,8 +111,12 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
 	if isWorkQueueEnabled(data) {
-		if level, ok := conclusionPerms.Get(PermissionContents); !ok || level == PermissionNone {
-			conclusionPerms.Set(PermissionContents, PermissionRead)
+		scope := PermissionContents
+		if workQueueStorage(data) == "issues" {
+			scope = PermissionIssues
+		}
+		if level, ok := conclusionPerms.Get(scope); !ok || level == PermissionNone {
+			conclusionPerms.Set(scope, PermissionRead)
 		}
 	}
 	// When observability.otlp.github-app is configured without app-id/private-key

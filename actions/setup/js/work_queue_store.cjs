@@ -109,6 +109,10 @@ async function readQueueBranch(githubClient, owner, repo, branch) {
  * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean, core?: {info: (message: string) => void}}} options
  */
 async function readWorkQueueLog({ githubClient, owner, repo, publishUpgrades = true, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+  if (process.env.GH_AW_WORK_QUEUE_STORAGE === "issues") {
+    const { readIssues } = require("./work_queue_issues_store.cjs");
+    return readIssues({ githubClient, owner, repo });
+  }
   const current = await readWorkQueueLogRaw({ githubClient, owner, repo, core: coreApi });
   if (!current.needsUpgrade || !publishUpgrades) return current;
   const upgraded = await applyAndPublishWorkQueueTransactions({ githubClient, owner, repo, intents: [], core: coreApi });
@@ -137,6 +141,10 @@ async function applyAndPublishWorkQueueTransactions({
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   core: coreApi = typeof core === "undefined" ? undefined : core,
 }) {
+  if (process.env.GH_AW_WORK_QUEUE_STORAGE === "issues") {
+    const { applyAndPublishIssues } = require("./work_queue_issues_store.cjs");
+    return applyAndPublishIssues({ githubClient, owner, repo, intents, core: coreApi });
+  }
   if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 10) {
     throw new RangeError("Work queue maxRetries must be an integer between 0 and 10");
   }
