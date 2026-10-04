@@ -343,7 +343,7 @@ _ = typeassertionnil.Analyzer
 ## Design Notes
 
 - The package is intentionally organized as a namespace (`pkg/linters/*`) so individual analyzers remain isolated and independently testable.
-- CI currently enforces selected production analyzers, including `fprintferrorunchecked`, via the native and WebAssembly `LINTER_FLAGS` lists in `.github/workflows/cgo.yml`.
+- CI enforces selected production analyzers via the native and WebAssembly `LINTER_FLAGS` lists in `.github/workflows/cgo.yml`; `fprintferrorunchecked` is temporarily excluded while existing production findings are addressed.
 - `typeassertionnil` is registered but excluded from CI enforcement pending a cross-platform enforcement-readiness audit.
 - `excessivefuncparams` exposes a `-max-params` analyzer flag and defaults to `8` parameters (`DefaultMaxParams`).
 - `largefunc` exposes a `-max-lines` analyzer flag, defaults to `60` lines (`DefaultMaxLines`), and skips `_test.go` files.
