@@ -40,6 +40,7 @@ const trace = [
   event("eval.result", { id: "builds", answer: "no", question: "PRIVATE_EVAL_QUESTION" }, "eval", 0),
   event("usage.report", { input_tokens: 999, output_tokens: 50 }, "usage", 0),
   event("execution.result", { outcome: "failure", duration_ms: 0 }, "execution", 0),
+  event("agent.execution", { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 0 }, "execution", 1),
   event("detection.result", { job_result: "success", conclusion: "warning", reason: "threat_detected", prompt_injection: true, secret_leak: false, malicious_patch: false, reasons: "PRIVATE_DETECTION_REASON" }, "detection", 0),
   event("workflow.info", { engine_id: "copilot", model: "fixture", run_id: 1 }, "workflow", 0),
   event("vendor.progress", { private: "PRIVATE_EXTENSION" }, "agent", 5, undefined, "session-a.jsonl"),
@@ -80,6 +81,7 @@ describe("unified session publication views", () => {
       expect(output).toContain("value=0 unit=ratio passed=false");
       expect(output).toContain("answer=no");
       expect(output).toContain("durationMs=0");
+      expect(output).toContain('categories=["agentic_engine_timeout"] errorCodes=[502] errorTypes=["server_error"] exitCode=0');
       expect(output).toContain("secretLeak=false");
       expect(output).toContain("jobResult=success conclusion=warning reason=threat_detected promptInjection=true secretLeak=false maliciousPatch=false");
       expect(output).toContain("untimedEvents=10");

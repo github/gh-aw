@@ -114,6 +114,19 @@ export interface SessionResultEvent extends EventMetadata {
   data: SessionResultData;
 }
 
+export interface AgentExecutionData {
+  categories: string[];
+  errorCodes: (string | number)[];
+  errorTypes: string[];
+  exitCode?: number;
+  [key: string]: unknown;
+}
+
+export interface AgentExecutionEvent extends EventMetadata {
+  type: "agent.execution";
+  data: AgentExecutionData;
+}
+
 export interface SessionFileFormatData {
   version: number;
   [key: string]: unknown;
@@ -140,9 +153,10 @@ export interface DetectionResultEvent extends EventMetadata {
 }
 
 export type CoreSessionEvent =
-  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | DetectionResultEvent;
+  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | DetectionResultEvent | AgentExecutionEvent;
 
 export interface SessionEventDataMap {
+  "agent.execution": AgentExecutionData;
   "detection.result": DetectionResultData;
   "session.format": SessionFileFormatData;
   "session.init": SessionInitData;

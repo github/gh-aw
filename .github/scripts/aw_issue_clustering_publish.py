@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 
 from aw_issue_clustering import (
-    CLUSTER_LABEL, END, OWNER_MARKER, PREFIX, START, build_corpus, collect_discussions,
+    CLUSTER_LABEL, END, GitHubAPIError, OWNER_MARKER, PREFIX, START, build_corpus, collect_discussions,
     collect_issues, gh_json, graphql, managed, metadata, run_cutoff,
 )
 
@@ -320,11 +320,21 @@ def publish_dashboard(repo, body, staged=False):
         replacement = body.split(START, 1)[1].split(END, 1)[0]
         updated = replace_island(dashboards[0]["body"], START + replacement + END)
         if dashboards[0]["body"] != updated:
-            graphql("""
-              mutation($id:ID!, $body:String!) {
-                updateDiscussion(input:{discussionId:$id, body:$body}) { discussion { id } }
-              }
-            """, id=dashboards[0]["id"], body=updated)
+            try:
+                graphql("""
+                  mutation($id:ID!, $body:String!) {
+                    updateDiscussion(input:{discussionId:$id, body:$body}) { discussion { id } }
+                  }
+                """, id=dashboards[0]["id"], body=updated)
+            except GitHubAPIError as error:
+                if "Resource not accessible by integration" not in str(error):
+                    raise
+                graphql("""
+                  mutation($id:ID!, $body:String!) {
+                    addDiscussionComment(input:{discussionId:$id, body:$body}) { comment { id } }
+                  }
+                """, id=dashboards[0]["id"], body=body)
+                print("Dashboard edit denied; published the current queue as a discussion comment")
     else:
         data = graphql("""
           query($owner:String!, $name:String!) {

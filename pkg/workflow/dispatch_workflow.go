@@ -14,6 +14,7 @@ type DispatchWorkflowConfig struct {
 	Workflows            []string          `yaml:"workflows,omitempty"`            // List of workflow names (without .md extension) to allow dispatching
 	WorkflowFiles        map[string]string `yaml:"workflow_files,omitempty"`       // Map of workflow name to file extension (.lock.yml or .yml) - populated at compile time
 	AwContextWorkflows   []string          `yaml:"aw_context_workflows,omitempty"` // Workflows that declare aw_context in workflow_dispatch.inputs - populated at compile time
+	WorkQueueWorkflows   []string          `yaml:"work_queue_workflows,omitempty"` // Workflows that enable tools.work-queue and declare aw_context - populated at compile time
 	TargetRepoSlug       string            `yaml:"target-repo,omitempty"`          // Target repository for cross-repo dispatch (owner/repo or GitHub Actions expression)
 	AllowedRepos         []string          `yaml:"allowed-repos,omitempty"`        // Allowlist for cross-repository dispatch targets
 	AllowedRefs          []string          `yaml:"allowed-refs,omitempty"`         // Allowlist of ref globs for per-call message.ref overrides
@@ -28,16 +29,7 @@ func (c *Compiler) parseDispatchWorkflowConfig(outputMap map[string]any) *Dispat
 
 		// Check if it's a list of workflow names (array format)
 		if workflowsArray, ok := configData.([]any); ok {
-			dispatchWorkflowLog.Printf("Found dispatch-workflow as array with %d workflows", len(workflowsArray))
-			for _, workflow := range workflowsArray {
-				if workflowStr, ok := workflow.(string); ok {
-					dispatchWorkflowConfig.Workflows = append(dispatchWorkflowConfig.Workflows, workflowStr)
-				}
-			}
-			// Set default max to 1
-			dispatchWorkflowConfig.Max = defaultIntStr(1)
-			dispatchWorkflowConfig.AllowedRefs = []string{defaultDispatchWorkflowAllowedRef}
-			return dispatchWorkflowConfig
+			return parseDispatchWorkflowArray(workflowsArray)
 		}
 
 		// Check if it's a map with configuration options
@@ -84,4 +76,18 @@ func (c *Compiler) parseDispatchWorkflowConfig(outputMap map[string]any) *Dispat
 	}
 
 	return nil
+}
+
+func parseDispatchWorkflowArray(workflows []any) *DispatchWorkflowConfig {
+	dispatchWorkflowLog.Printf("Found dispatch-workflow as array with %d workflows", len(workflows))
+	config := &DispatchWorkflowConfig{
+		BaseSafeOutputConfig: BaseSafeOutputConfig{Max: defaultIntStr(1)},
+		AllowedRefs:          []string{defaultDispatchWorkflowAllowedRef},
+	}
+	for _, workflow := range workflows {
+		if workflowName, ok := workflow.(string); ok {
+			config.Workflows = append(config.Workflows, workflowName)
+		}
+	}
+	return config
 }

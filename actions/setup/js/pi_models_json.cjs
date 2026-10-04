@@ -98,7 +98,7 @@ function buildModelsJSON(options) {
         api: api || "openai-completions",
         // AWF owns the upstream credential; Pi only needs a non-secret placeholder.
         apiKey: "awf-proxy",
-        models: [{ ...metadata, id: modelId, ...(contextWindow ? { contextWindow } : {}) }],
+        models: [{ ...metadata, id: modelId, ...(contextWindow ? { contextWindow } : {}), ...(provider === "github" && modelId === "claude-haiku-4.5" ? { reasoning: false } : {}) }],
       },
       ...(nativeProvider && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider) ? { [nativeProvider]: { baseUrl, apiKey: "awf-proxy" } } : {}),
     },
