@@ -232,6 +232,25 @@ class ClusteringTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "metadata injection"):
             publish.validate_plan(value, corpus())
 
+    def test_clipped_titles_and_prose_fail_but_assigned_scopes_remain_frozen(self):
+        for field, value in (
+            ("title", "Make AI credits accounting resilient to unknown model pricin"),
+            ("summary", "Several workflows fail in post-run ledger/repo-memory push j"),
+            ("fix", "Make push_repo_memory validation non-destructive (never remove the working directory), surface the f"),
+            ("rationale", "Three failed-jobs reports share the push job "),
+            ("acceptance", ["Calling push_repo_memory mid-session leaves files "]),
+        ):
+            candidate = cluster([1, 2])
+            candidate[field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "complete phrase|sentence punctuation"):
+                publish.validate_plan({"clusters": [candidate], "deferred": []}, corpus())
+            data = corpus()
+            data["managed"] = [owned(20, candidate, assignees=[{"login": "operator"}])]
+            self.assertEqual([candidate], publish.validate_plan({
+                "clusters": [candidate], "deferred": [],
+                "shortfall_reason": "Only one actionable assignment is supported.",
+            }, data))
+
     def test_assigned_scope_is_frozen_even_with_closed_sources(self):
         assigned = cluster([1, 2])
         data = corpus(1)

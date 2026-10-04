@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildCorpus, refreshClosed, validatePlan, island, reconcile, publish, collectDiscussions } = require("./aw_issue_clustering_publish.cjs");
+const { buildCorpus, refreshClosed, validatePlan, island, reconcile, publish, publishDashboard, collectDiscussions } = require("./aw_issue_clustering_publish.cjs");
 
 const repo = "github/gh-aw";
 const cutoff = "2026-10-03T00:00:00Z";
@@ -61,6 +61,23 @@ test("unverified or uncovered members and changed assigned scopes are rejected",
   assert.throws(() => validatePlan(plan({ ...cluster(), effort: 3 }), data), /unchanged/);
 });
 
+test("clipped issue titles and prose are rejected, but assigned scopes remain frozen", () => {
+  const data = corpus();
+  for (const [field, value] of [
+    ["title", "Make AI credits accounting resilient to unknown model pricin"],
+    ["summary", "Several workflows fail in post-run ledger/repo-memory push j"],
+    ["fix", "Make push_repo_memory validation non-destructive (never remove the working directory), surface the f"],
+    ["rationale", "Three failed-jobs reports share the push job "],
+    ["acceptance", ["Calling push_repo_memory mid-session leaves files "]],
+  ]) {
+    const clipped = { ...cluster(), [field]: value };
+    assert.throws(() => validatePlan(plan(clipped), data), /complete phrase|sentence punctuation/);
+    data.managed = [owned(20, clipped, { assignees: [{ login: "operator" }] })];
+    assert.equal(validatePlan({ ...plan(clipped), shortfall_reason: "Only one actionable assignment is supported." }, data).length, 1);
+    data.managed = [];
+  }
+});
+
 test("only verified mid-run closures are removed before validating remaining members", () => {
   const data = buildCorpus(
     repo,
@@ -90,6 +107,28 @@ test("linked discussion URLs match the exact repository name", async () => {
   const sources = [issue(1, { body: "https://github.com/github/ghXaw/discussions/12" })];
   assert.deepEqual(await collectDiscussions(github, "github", "gh.aw", sources, { warning() {} }), []);
   assert.equal(queries, 1);
+});
+
+test("live dashboard discovery uses a valid Octokit GraphQL variable", async () => {
+  const calls = [];
+  const github = {
+    graphql: async (document, variables) => {
+      assert.ok(!Object.hasOwn(variables, "query"));
+      calls.push([document, variables]);
+      if (document.includes("search(")) {
+        assert.match(document, /search\(query:\$searchTerm/);
+        assert.equal(variables.searchTerm, 'repo:github/gh-aw in:title "AW Essential 10"');
+        return { search: { pageInfo: { hasNextPage: false }, nodes: [] } };
+      }
+      if (document.includes("discussionCategories(")) {
+        return { repository: { id: "repo-id", discussionCategories: { nodes: [{ id: "category-id", name: "Audits" }], pageInfo: { hasNextPage: false } } } };
+      }
+      return { createDiscussion: { discussion: { id: "discussion-id" } } };
+    },
+  };
+  await publishDashboard(github, "github", "gh-aw", "A valid dashboard body", false, { info() {} });
+  assert.equal(calls.length, 3);
+  assert.match(calls[2][0], /createDiscussion/);
 });
 
 test("staged reconciliation never writes, and preserves operator text and safe prose", async () => {
