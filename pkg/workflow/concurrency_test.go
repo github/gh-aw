@@ -228,8 +228,7 @@ func TestGenerateConcurrencyConfig(t *testing.T) {
 			isAliasTrigger: true,
 			expected: `concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}-${{ github.event_name == 'pull_request' && 'pull_request' || 'command' }}"
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}`,
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}`,
 			description: "Mixed slash_command and pull_request workflows should cancel stale PR runs",
 		},
 		{

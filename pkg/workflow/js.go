@@ -26,10 +26,6 @@ func GetLogParserScript(name string) string {
 	return "EXTERNAL_SCRIPT"
 }
 
-func GetLogParserBootstrap() string {
-	return ""
-}
-
 func GetReadBufferScript() string {
 	return ""
 }

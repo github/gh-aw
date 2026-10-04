@@ -541,6 +541,4 @@ func (e *CodexEngine) GetSquidLogsSteps(workflowData *WorkflowData) []GitHubActi
 
 // updateMostRecentToolWithDuration is implemented in codex_logs.go
 
-// extractCodexTokenUsage is implemented in codex_logs.go
-
 // GetLogParserScriptId is implemented in codex_logs.go
