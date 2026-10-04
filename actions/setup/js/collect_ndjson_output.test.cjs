@@ -6,12 +6,13 @@ import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = _require("./constants.cjs");
 const incompleteOutput = JSON.stringify({
-  items: [{ type: "report_incomplete", reason: "Agent finished without emitting any valid safe outputs; task completion could not be confirmed." }],
+  items: [{ type: "report_incomplete", reason: "missing_terminal_safe_output", details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed." }],
   errors: [],
 });
 describe("collect_ndjson_output.cjs", () => {
   let mockCore, collectScript;
   (beforeEach(() => {
+    fs.rmSync("/tmp/gh-aw/mcp-cli-audit", { recursive: true, force: true });
     (fs.existsSync("/tmp/gh-aw") || fs.mkdirSync("/tmp/gh-aw", { recursive: !0 }),
       (global.originalConsole = global.console),
       (global.console = { log: vi.fn(), error: vi.fn() }),
@@ -235,6 +236,29 @@ describe("collect_ndjson_output.cjs", () => {
         await eval(`(async () => { ${collectScript}; await main(); })()`),
         expect(mockCore.setOutput).toHaveBeenCalledWith("output", incompleteOutput),
         expect(mockCore.info).toHaveBeenCalledWith("Output file is empty"));
+    }),
+    it("adds a terminal incompletion signal when the agent emitted only diagnostics", async () => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      fs.writeFileSync(testFile, '{"type":"missing_tool","tool":"read","reason":"Unavailable","alternatives":"Check permissions"}');
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ missing_tool: {}, report_incomplete: {} }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+      expect(output.items.map(item => item.type)).toEqual(["missing_tool", "report_incomplete"]);
+      expect(output.items[1].reason).toBe("missing_terminal_safe_output");
+    }),
+    it("records a silent driver exit in the collected terminal safe output", async () => {
+      const exitPath = "/tmp/gh-aw/agent_execution_exit_code.txt";
+      fs.writeFileSync(exitPath, "139");
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+      try {
+        await eval(`(async () => { ${collectScript}; await main(); })()`);
+        const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+        expect(output.items[0].reason).toBe("engine_driver_failure");
+        expect(output.items[0].details).toContain("Driver exit code: 139");
+      } finally {
+        fs.unlinkSync(exitPath);
+      }
     }),
     it("should validate and parse valid JSONL content", async () => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt",

@@ -29,6 +29,7 @@ const { readDedupedTokenUsage, TOKEN_USAGE_PATHS } = require("./parse_token_usag
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
+const { EMPTY_OUTPUT_CAUSES } = require("./empty_output_outcome.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -293,6 +294,7 @@ function buildFailureMatchCategories(options) {
   if (options.hasPushRepoMemoryFailure) categories.push("push_repo_memory_failure");
   if (options.hasMissingSafeOutputs) categories.push("missing_safe_outputs");
   if (options.hasReportIncomplete) categories.push("report_incomplete");
+  if (EMPTY_OUTPUT_CAUSES.has(options.emptyOutputCause)) categories.push(options.emptyOutputCause);
   if (options.hasMissingTool) categories.push("missing_tool");
   if (options.hasToolDenialsExceeded) categories.push("tool_denials_exceeded");
   if (options.hasMissingData) categories.push("missing_data");
@@ -357,6 +359,7 @@ function buildFailureMatchCategories(options) {
  * @param {boolean} [options.missingModelPricingError]
  * @param {string} [options.missingModelPricingModelName]
  * @param {boolean} [options.shellExpansionGuardRejected]
+ * @param {string} [options.emptyOutputCause]
  * @returns {string}
  */
 function buildFailureIssueTitle(options) {
@@ -391,6 +394,10 @@ function buildFailureIssueTitle(options) {
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
+  if (options.emptyOutputCause === "engine_driver_failure") return `[aw] ${workflowName} engine driver failed before emitting a terminal safe output`;
+  if (options.emptyOutputCause === "safeoutputs_cli_error") return `[aw] ${workflowName} failed to invoke safeoutputs CLI`;
+  if (options.emptyOutputCause === "invalid_safe_outputs") return `[aw] ${workflowName} produced no valid safe outputs`;
+  if (options.emptyOutputCause === "missing_terminal_safe_output") return `[aw] ${workflowName} finished without a terminal safe output`;
   if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
   if (options.hasMissingSafeOutputs) return `[aw] ${workflowName} produced no safe outputs`;
   if (options.hasMissingTool) return `[aw] ${workflowName} is missing required tool`;
@@ -4267,8 +4274,10 @@ async function main() {
 
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
+    const emptyOutputCause = agentOutputResult?.items?.find(item => item.type === "report_incomplete" && EMPTY_OUTPUT_CAUSES.has(item.reason))?.reason;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      emptyOutputCause,
       isTimedOut,
       hasMissingSafeOutputs,
       hasReportIncomplete,
@@ -4296,6 +4305,7 @@ async function main() {
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
+      emptyOutputCause,
       isTimedOut,
       hasAssignmentErrors,
       hasAssignCopilotFailures,
@@ -4388,7 +4398,8 @@ async function main() {
     }
 
     const agentOutputItems = Array.isArray(agentOutputResult.items) ? agentOutputResult.items : [];
-    const needsFailureDiagnostics = failureCategories.includes("agent_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
+    const needsFailureDiagnostics =
+      failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || agentOutputItems.some(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
     const failingStep = needsFailureDiagnostics ? await getFailedAgentStep() : "";
 
     // Check if parent issue creation is enabled (defaults to false)

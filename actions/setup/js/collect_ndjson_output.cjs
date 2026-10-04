@@ -382,7 +382,7 @@ async function main() {
       }
     }
     core.info(`Successfully parsed ${parsedItems.length} valid output items`);
-    if (parsedItems.length === 0) {
+    if (!parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
       parsedItems.push(buildEmptyOutputOutcome(errors));
     }
     const validatedOutput = {

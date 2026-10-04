@@ -808,9 +808,10 @@ function findInlineJsonPayloadArg(args) {
  * @param {Record<string, {type?: string|string[]}>} [schemaProperties] - Tool input schema properties
  * @param {string | null} [stdinContent] - Pre-read stdin content; used in JSON payload mode
  *   (args empty or `['.']`) and per-field stdin mode (`--key .`).
+ * @param {{rejectPositionalArguments?: boolean}} [options]
  * @returns {{args: Record<string, unknown>, json: boolean}}
  */
-function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
+function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options = {}) {
   /** @type {Record<string, unknown>} */
   const result = {};
   let jsonOutput = false;
@@ -902,6 +903,8 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null) {
         const canonicalKey = resolveSchemaPropertyKey(raw, schemaProperties, normalizedSchemaKeyMap, ambiguousNormalizedSchemaKeys);
         result[canonicalKey] = true;
       }
+    } else if (options.rejectPositionalArguments) {
+      throw new Error("Unexpected positional argument. Pass a single quoted JSON object or use --key value flags.");
     }
     // Skip non-flag arguments
   }
@@ -1708,7 +1711,7 @@ async function main() {
   /** @type {{args: Record<string, unknown>, json: boolean}} */
   let parsedArgs;
   try {
-    parsedArgs = parseToolArgs(toolUserArgs, schemaProperties, stdinContent);
+    parsedArgs = parseToolArgs(toolUserArgs, schemaProperties, stdinContent, { rejectPositionalArguments: serverName === SAFEOUTPUTS_SERVER_NAME });
   } catch (err) {
     const message = getErrorMessage(err);
     auditLog(serverName, { event: "parse_args_error", tool: toolName, error: message });
@@ -1717,20 +1720,6 @@ async function main() {
     return;
   }
   const { args: toolArgs, json: jsonOutput } = parsedArgs;
-
-  // Fail loudly when arguments were supplied but none of them were recognized
-  // (e.g. `safeoutputs noop 'no action needed'`).  Silently dropping them would
-  // leave the agent believing a safe output was emitted when none was.  Structured
-  // payload modes are exempt: an explicit `{}` payload legitimately yields no arguments.
-  const usedStructuredPayload = shouldReadStdin || findInlineJsonPayloadArg(toolUserArgs) !== null;
-  const hasUnrecognizedArguments = toolUserArgs.some(arg => !isJsonFlagToken(arg));
-  if (serverName === SAFEOUTPUTS_SERVER_NAME && Object.keys(toolArgs).length === 0 && hasUnrecognizedArguments && !usedStructuredPayload) {
-    const message = `no arguments were recognized for '${toolName}'. Pass a JSON object inline (${serverName} ${toolName} '{"key":"value"}'), use --key value flags, or pipe JSON on stdin with '.'.`;
-    auditLog(serverName, { event: "unrecognized_args", tool: toolName });
-    process.stderr.write(`Error: ${message}\n`);
-    core.setFailed(`[${serverName}] ${message}`);
-    return;
-  }
 
   if (shouldShowToolHelpForEmptyArgs(serverName, toolArgs, matchedTool)) {
     core.warning(`[${serverName}] No arguments provided for '${toolName}'; showing command help instead of calling the tool`);
