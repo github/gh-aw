@@ -3348,10 +3348,7 @@ describe("safe_outputs_handlers", () => {
       expect(data.error).toContain("3 files");
     });
 
-    it("should ignore ineligible files (disallowed extension) instead of hard-failing on file count", () => {
-      // Regression: the preflight must apply the same allowed-extensions/file-glob
-      // filtering as the agent-side filter step and the push job, so an ineligible
-      // file left in the memory directory does not cause a hard preflight failure.
+    it("should preserve ineligible files (disallowed extension) while excluding them from validation", () => {
       const h = makeHandlersWithMemory({ max_file_count: 1, allowed_extensions: [".json"] });
       fs.mkdirSync(memoryDir, { recursive: true });
       initGitRepo(memoryDir);
@@ -3361,11 +3358,12 @@ describe("safe_outputs_handlers", () => {
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0].text);
       expect(data.result).toBe("success");
-      expect(fs.existsSync(path.join(memoryDir, "notes.json.new"))).toBe(false);
+      expect(data.storage_validation.files).toBe(1);
+      expect(fs.existsSync(path.join(memoryDir, "notes.json.new"))).toBe(true);
       expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
     });
 
-    it("should ignore files not matching file_glob before counting/staging", () => {
+    it("should preserve files not matching file_glob while excluding them from validation", () => {
       const h = makeHandlersWithMemory({ max_file_count: 1, file_glob: "*.json" });
       fs.mkdirSync(memoryDir, { recursive: true });
       initGitRepo(memoryDir);
@@ -3375,8 +3373,32 @@ describe("safe_outputs_handlers", () => {
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0].text);
       expect(data.result).toBe("success");
-      expect(fs.existsSync(path.join(memoryDir, "notes.md"))).toBe(false);
+      expect(data.storage_validation.files).toBe(1);
+      expect(fs.existsSync(path.join(memoryDir, "notes.md"))).toBe(true);
       expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
+    });
+
+    it("should preserve all files in the memory directory during validation", () => {
+      const h = makeHandlersWithMemory({ allowed_extensions: [".md"], file_glob: "deep-report/*.md", max_file_count: 10 });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+
+      const paths = [...Array.from({ length: 6 }, (_, index) => `deep-report/file-${index}.md`), "memory/deep-report/legacy.md", "memory/default/legacy.md"];
+      for (const relativePath of paths) {
+        const fullPath = path.join(memoryDir, relativePath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, `${relativePath}\n`);
+      }
+
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      const data = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBeUndefined();
+      expect(data.result).toBe("success");
+      expect(data.storage_validation.files).toBe(6);
+      for (const relativePath of paths) {
+        expect(fs.readFileSync(path.join(memoryDir, relativePath), "utf8")).toBe(`${relativePath}\n`);
+      }
     });
 
     it("should pass when total folder size is large but staged diff is tiny", () => {
