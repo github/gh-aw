@@ -175,8 +175,11 @@ func safeOutputsJobPermissions(data *WorkflowData) (*Permissions, bool) {
 		permissions.Set(PermissionActions, PermissionWrite)
 	}
 	if isWorkQueueEnabled(data) {
-		// Reconciliation publishes the terminal claim transaction.
-		permissions.Set(PermissionContents, PermissionWrite)
+		if workQueueStorage(data) == "issues" {
+			permissions.Set(PermissionIssues, PermissionWrite)
+		} else {
+			permissions.Set(PermissionContents, PermissionWrite)
+		}
 	}
 	return permissions, IsDetectionJobEnabled(data.SafeOutputs)
 }
@@ -286,15 +289,20 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 	if !isWorkQueueEnabled(data) {
 		return nil
 	}
-	return []string{
+	steps := []string{
 		"      - name: Reconcile work queue claim\n",
 		"        id: work_queue_claim_reconciliation\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
+	}
+	if workQueueStorage(data) == "issues" {
+		steps = append(steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n")
+	}
+	return append(steps,
 		"        with:\n",
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/finish_work_queue_claim.cjs');\n",
 		"            await main({ core, github, context });\n",
-	}
+	)
 }
 
 // buildSafeOutputsUserProvidedSteps converts the user-provided safe-outputs.steps

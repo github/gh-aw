@@ -96,6 +96,38 @@ Compile each work-queue workflow phase.
 	require.Contains(t, conclusion, "await main({ core, githubClient: github, context });")
 }
 
+func TestIssueWorkQueueCompilationPhases(t *testing.T) {
+	dir := testutil.TempDir(t, "work-queue-issues-")
+	workflowPath := filepath.Join(dir, "issue-worker.md")
+	workflow := `---
+on: workflow_dispatch
+name: Issue Work Queue Worker
+engine: claude
+tools:
+  work-queue:
+    storage: issues
+---
+
+Read and finish assigned work.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
+	require.NoError(t, NewCompiler(WithVersion("integration")).CompileWorkflow(workflowPath))
+	lock, err := os.ReadFile(filepath.Join(dir, "issue-worker.lock.yml"))
+	require.NoError(t, err)
+	compiled := string(lock)
+	activation := extractJobSection(compiled, string(constants.ActivationJobName))
+	require.Contains(t, activation, "issues: read")
+	require.Contains(t, activation, "GH_AW_WORK_QUEUE_STORAGE: issues")
+	safeOutputs := extractJobSection(compiled, string(constants.SafeOutputsJobName))
+	require.Contains(t, safeOutputs, "issues: write")
+	require.Contains(t, safeOutputs, "GH_AW_WORK_QUEUE_STORAGE: issues")
+	require.NotContains(t, safeOutputs, "contents: write")
+	conclusion := extractJobSection(compiled, "conclusion")
+	require.Contains(t, conclusion, "GH_AW_WORK_QUEUE_STORAGE: issues")
+	require.Regexp(t, `issues: (read|write)`, conclusion)
+	require.Contains(t, extractJobSection(compiled, string(constants.AgentJobName)), `"work-queue"`)
+}
+
 func TestWorkQueueSmokeVerification(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/smoke-work-queue.md")
 	require.NoError(t, err)
