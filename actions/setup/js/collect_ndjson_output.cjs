@@ -382,12 +382,16 @@ async function main() {
       }
     }
     core.info(`Successfully parsed ${parsedItems.length} valid output items`);
+    let collectorEmptyOutputCause;
     if (!parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
-      parsedItems.push(buildEmptyOutputOutcome(errors));
+      const incompleteOutcome = buildEmptyOutputOutcome(errors);
+      parsedItems.push(incompleteOutcome);
+      collectorEmptyOutputCause = incompleteOutcome.reason;
     }
     const validatedOutput = {
       items: parsedItems,
       errors: errors,
+      ...(collectorEmptyOutputCause ? { collectorEmptyOutputCause } : {}),
     };
     const path = require("path");
     const agentOutputFile = path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME);

@@ -8,6 +8,7 @@ const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = _require("./constants.cjs");
 const incompleteOutput = JSON.stringify({
   items: [{ type: "report_incomplete", reason: "missing_terminal_safe_output", details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed." }],
   errors: [],
+  collectorEmptyOutputCause: "missing_terminal_safe_output",
 });
 describe("collect_ndjson_output.cjs", () => {
   let mockCore, collectScript;
@@ -256,6 +257,7 @@ describe("collect_ndjson_output.cjs", () => {
         const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
         expect(output.items[0].reason).toBe("engine_driver_failure");
         expect(output.items[0].details).toContain("Driver exit code: 139");
+        expect(output.collectorEmptyOutputCause).toBe("engine_driver_failure");
       } finally {
         fs.unlinkSync(exitPath);
       }

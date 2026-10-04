@@ -294,7 +294,7 @@ function buildFailureMatchCategories(options) {
   if (options.hasPushRepoMemoryFailure) categories.push("push_repo_memory_failure");
   if (options.hasMissingSafeOutputs) categories.push("missing_safe_outputs");
   if (options.hasReportIncomplete) categories.push("report_incomplete");
-  if (EMPTY_OUTPUT_CAUSES.has(options.emptyOutputCause)) categories.push(options.emptyOutputCause);
+  if (Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause)) categories.push(options.emptyOutputCause);
   if (options.hasMissingTool) categories.push("missing_tool");
   if (options.hasToolDenialsExceeded) categories.push("tool_denials_exceeded");
   if (options.hasMissingData) categories.push("missing_data");
@@ -394,10 +394,8 @@ function buildFailureIssueTitle(options) {
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
-  if (options.emptyOutputCause === "engine_driver_failure") return `[aw] ${workflowName} engine driver failed before emitting a terminal safe output`;
-  if (options.emptyOutputCause === "safeoutputs_cli_error") return `[aw] ${workflowName} failed to invoke safeoutputs CLI`;
-  if (options.emptyOutputCause === "invalid_safe_outputs") return `[aw] ${workflowName} produced no valid safe outputs`;
-  if (options.emptyOutputCause === "missing_terminal_safe_output") return `[aw] ${workflowName} finished without a terminal safe output`;
+  const emptyOutputCauseTitle = typeof options.emptyOutputCause === "string" && Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause) ? EMPTY_OUTPUT_CAUSES[options.emptyOutputCause] : "";
+  if (emptyOutputCauseTitle) return `[aw] ${workflowName} ${emptyOutputCauseTitle}`;
   if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
   if (options.hasMissingSafeOutputs) return `[aw] ${workflowName} produced no safe outputs`;
   if (options.hasMissingTool) return `[aw] ${workflowName} is missing required tool`;
@@ -4274,7 +4272,8 @@ async function main() {
 
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
-    const emptyOutputCause = agentOutputResult?.items?.find(item => item.type === "report_incomplete" && EMPTY_OUTPUT_CAUSES.has(item.reason))?.reason;
+    // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
+    const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
       emptyOutputCause,

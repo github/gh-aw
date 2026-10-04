@@ -38,14 +38,22 @@ describe("empty output outcome", () => {
     expect(outcome.details).toContain(`Driver exit code: ${exitCode}`);
   });
 
-  it("classifies a malformed CLI invocation without copying payloads from the audit log", () => {
+  it("preserves CLI parse classification when the bridge exits non-zero without copying payloads", () => {
     fs.mkdirSync(path.join(rootDir, "mcp-cli-audit"));
     fs.writeFileSync(path.join(rootDir, "mcp-cli-audit/safeoutputs.jsonl"), 'not JSON\n{"event":"parse_args_error","tool":"noop","error":"private payload"}\n');
-    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "0");
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.reason).toBe("safeoutputs_cli_error");
     expect(outcome.details).toContain("safeoutputs <tool> --help");
     expect(outcome.details).not.toContain("private payload");
+  });
+
+  it.each(["tool_error", "call_error"])("does not classify downstream %s audit events as CLI errors", event => {
+    fs.mkdirSync(path.join(rootDir, "mcp-cli-audit"));
+    fs.writeFileSync(path.join(rootDir, "mcp-cli-audit/safeoutputs.jsonl"), `${JSON.stringify({ event, tool: "create_issue" })}\n`);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("missing_terminal_safe_output");
+    expect(outcome.details).not.toContain("safeoutputs <tool> --help");
   });
 
   it("classifies rejected safe outputs separately from silence", () => {

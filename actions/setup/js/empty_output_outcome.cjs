@@ -10,7 +10,13 @@ const { collectArtifactSecretValues, redactManifestValue } = require("./safe_out
 const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 
-const EMPTY_OUTPUT_CAUSES = new Set(["engine_driver_failure", "safeoutputs_cli_error", "invalid_safe_outputs", "missing_terminal_safe_output"]);
+// Keep cause titles and the category allow-list in sync; schema and docs list these causes too.
+const EMPTY_OUTPUT_CAUSES = Object.freeze({
+  engine_driver_failure: "engine driver failed before emitting a terminal safe output",
+  safeoutputs_cli_error: "failed to invoke safeoutputs CLI",
+  invalid_safe_outputs: "produced no valid safe outputs",
+  missing_terminal_safe_output: "finished without a terminal safe output",
+});
 
 /**
  * Silence is not evidence of an intentional noop. Preserve runtime diagnostics
@@ -41,13 +47,15 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   const secrets = collectArtifactSecretValues();
   const redact = value => redactMaskedValues(String(redactManifestValue(value, secrets)), maskedValues);
   const redactJson = value => JSON.stringify(value, (_key, nested) => (typeof nested === "string" ? redact(nested) : nested));
+  let safeoutputsCliError = false;
   try {
     const auditPath = path.join(rootDir, "mcp-cli-audit/safeoutputs.jsonl");
     if (fs.lstatSync(auditPath).isFile()) {
       for (const line of fs.readFileSync(auditPath, "utf8").split("\n")) {
         try {
           const entry = JSON.parse(line);
-          if (["parse_args_error", "unrecognized_args", "tool_error", "call_error"].includes(entry?.event)) {
+          if (["parse_args_error", "unrecognized_args"].includes(entry?.event)) {
+            safeoutputsCliError = true;
             reason = "safeoutputs_cli_error";
             diagnostics.add("The safeoutputs CLI failed. Run `safeoutputs <tool> --help` and pass a single quoted JSON object or --key value flags.");
           }
@@ -61,7 +69,8 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   }
   for (const event of events) {
     if (event.type === "agent.execution" && event.provenance.component === "execution" && event.provenance.phase === "agent" && event.data.exitCode > 0) {
-      reason = "engine_driver_failure";
+      // A CLI parse error itself makes the bridge exit non-zero; preserve that more specific cause.
+      if (!safeoutputsCliError) reason = "engine_driver_failure";
       diagnostics.add(`Driver exit code: ${event.data.exitCode}. The engine driver exited before a terminal safe output was recorded.`);
     }
     if (event.provenance.component !== "agent") continue;

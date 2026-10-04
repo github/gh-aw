@@ -1711,6 +1711,7 @@ async function main() {
   /** @type {{args: Record<string, unknown>, json: boolean}} */
   let parsedArgs;
   try {
+    // Other MCP bridges retain positional syntax; safeoutputs maps CLI arguments to a strict tool schema.
     parsedArgs = parseToolArgs(toolUserArgs, schemaProperties, stdinContent, { rejectPositionalArguments: serverName === SAFEOUTPUTS_SERVER_NAME });
   } catch (err) {
     const message = getErrorMessage(err);
