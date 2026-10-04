@@ -80,7 +80,7 @@ describe("dispatch_workflow handler factory", () => {
   it("claims available work and injects only trusted assignment into the worker", async () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
-    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true });
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
     const result = await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" }, task: "hello", aw_context: '{"work_queue":{"claim_id":"forged"}}' } }, {});
     expect(result.success).toBe(true);
     const claim = transactions().find(t => t.kind === "Claim");
@@ -100,6 +100,7 @@ describe("dispatch_workflow handler factory", () => {
       workflows: ["worker"],
       workflow_files: { worker: ".lock.yml" },
       aw_context_workflows: ["worker"],
+      work_queue_workflows: ["worker"],
       work_queue_enabled: true,
       "github-token": "test-only",
     });
@@ -113,20 +114,22 @@ describe("dispatch_workflow handler factory", () => {
   it("rejects stale or unauthorized work without dispatching", async () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
-    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true };
+    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true };
     const handler = await main(config);
     expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "missing" } } }, {})).success).toBe(false);
     expect(transactions()).toHaveLength(1);
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
     const ordinary = await main({ ...config, work_queue_enabled: false });
     expect((await ordinary({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    const notQueueEnabled = await main({ ...config, work_queue_workflows: [] });
+    expect((await notQueueEnabled({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
   it("never claims work for an ordinary or staged dispatch", async () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
-    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true };
+    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true };
     const ordinary = await main(config);
     expect((await ordinary({ workflow_name: "worker", inputs: { task: "hello" } }, {})).success).toBe(true);
     const staged = await main({ ...config, staged: true });
@@ -151,13 +154,25 @@ describe("dispatch_workflow handler factory", () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
     global.github.rest.actions.createWorkflowDispatch.mockRejectedValueOnce(new Error("dispatch failed"));
-    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_enabled: true });
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
     expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
     expect(
       transactions()
         .map(t => t.kind)
         .sort()
     ).toEqual(["Claim", "ClaimCancellation", "Work"]);
+  });
+
+  it("identifies a claim when cancellation fails after dispatch failure", async () => {
+    queueWithWork();
+    global.context.runId = 101;
+    const updateRef = global.github.rest.git.updateRef.getMockImplementation();
+    global.github.rest.git.updateRef.mockImplementationOnce(updateRef).mockRejectedValueOnce(new Error("queue write failed"));
+    global.github.rest.actions.createWorkflowDispatch.mockRejectedValueOnce(new Error("dispatch failed"));
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
+
+    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to cancel work queue claim 101:"));
   });
 
   it("should create a handler function", async () => {

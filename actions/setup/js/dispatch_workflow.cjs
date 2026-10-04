@@ -32,6 +32,7 @@ async function main(config = {}) {
   const maxCount = config.max || 1;
   const workflowFiles = config.workflow_files || {}; // Map of workflow name to file extension
   const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept aw_context input
+  const workQueueWorkflows = new Set(config.work_queue_workflows || []); // Queue-enabled workers that accept aw_context
   const githubClient = await createAuthenticatedGitHubClient(config);
   // Queue publication uses the safe-outputs job token, not a dispatch handler's
   // optionally scoped GitHub App token.
@@ -252,8 +253,8 @@ async function main(config = {}) {
       const selection = message.inputs?.work_queue;
       let workId;
       if (selection !== undefined) {
-        if (!config.work_queue_enabled || isCrossRepoDispatch || !awContextWorkflows.has(workflowName)) {
-          throw new Error("Work queue dispatch requires tools.work-queue, a same-repository worker, and a declared aw_context input");
+        if (!config.work_queue_enabled || isCrossRepoDispatch || !awContextWorkflows.has(workflowName) || !workQueueWorkflows.has(workflowName)) {
+          throw new Error("Work queue dispatch requires tools.work-queue, a same-repository worker with aw_context, and tools.work-queue enabled on the worker");
         }
         if (!selection || typeof selection !== "object" || Array.isArray(selection) || Object.keys(selection).length !== 1 || typeof selection.work_id !== "string" || !selection.work_id) {
           throw new TypeError("work_queue must contain only a non-empty work_id");
@@ -357,8 +358,7 @@ async function main(config = {}) {
         });
         if (published.rejected.length > 0) throw new Error("Selected work could not be claimed");
         claimPublished = true;
-        const latest = await readWorkQueueLog({ githubClient: queueClient, owner: repo.owner, repo: repo.repo, core });
-        if (replayTransactions(latest.transactions).claim[claim.claim] !== "effective") {
+        if (replayTransactions(published.transactions).claim[claim.claim] !== "effective") {
           throw new Error("Selected work claim is no longer effective");
         }
         inputs["aw_context"] = JSON.stringify({
@@ -424,15 +424,16 @@ async function main(config = {}) {
     } catch (error) {
       if (claimPublished && !dispatched) {
         try {
-          await applyAndPublishWorkQueueTransactions({
+          const cancellation = await applyAndPublishWorkQueueTransactions({
             githubClient: queueClient,
             owner: repo.owner,
             repo: repo.repo,
             intents: [{ version: CURRENT_VERSION, kind: "ClaimCancellation", work: claim.work, claim: claim.claim, attempt: null }],
             core,
           });
+          if (cancellation.rejected.length > 0) throw new Error("Claim cancellation was rejected");
         } catch {
-          core.warning("Failed to cancel work queue claim after dispatch failure");
+          core.warning(`Failed to cancel work queue claim ${claim.claim} for work ${claim.work} after dispatch failure; inspect the runtime work-queue branch and reconcile this claim.`);
         }
       }
       const errorMessage = getErrorMessage(error);

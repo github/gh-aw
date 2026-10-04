@@ -129,6 +129,7 @@ Read the queue and dispatch an available Work identity.
 	compiled, err := os.ReadFile(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
 	require.NoError(t, err)
 	require.Contains(t, string(compiled), `work_queue_enabled`)
+	require.Contains(t, string(compiled), `work_queue_workflows`)
 	require.Contains(t, string(compiled), `work_queue`)
 }
 

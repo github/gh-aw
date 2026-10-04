@@ -80,6 +80,9 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		if len(c.AwContextWorkflows) > 0 {
 			builder.AddStringSlice("aw_context_workflows", c.AwContextWorkflows)
 		}
+		if len(c.WorkQueueWorkflows) > 0 {
+			builder.AddStringSlice("work_queue_workflows", c.WorkQueueWorkflows)
+		}
 
 		builder.AddIfNotEmpty("target-ref", c.TargetRef)
 		builder.AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "dispatch-workflow", c.GitHubToken))

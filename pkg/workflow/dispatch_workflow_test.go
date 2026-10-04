@@ -175,6 +175,71 @@ This workflow dispatches to test workflow.
 		"Should NOT find workflow in same directory")
 }
 
+func TestPopulateDispatchWorkflowFilesRequiresQueueEnabledWorker(t *testing.T) {
+	tmpDir := t.TempDir()
+	awDir := filepath.Join(tmpDir, ".github", "aw")
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(awDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+
+	for name, frontmatter := range map[string]string{
+		"worker": `tools:
+  work-queue: true
+`,
+		"ordinary-worker": "",
+		"stale-worker": `tools:
+  work-queue: true
+`,
+	} {
+		workflow := `---
+on:
+  workflow_dispatch:
+    inputs:
+      aw_context:
+        type: string
+` + frontmatter + `---
+Run the worker.
+`
+		require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, name+".md"), []byte(workflow), 0600))
+	}
+	for name, extraSteps := range map[string]string{
+		"worker": `  activation:
+    steps:
+      - name: Snapshot work queue state
+  safe_outputs:
+    steps:
+      - name: Reconcile work queue claim
+        id: work_queue_claim_reconciliation
+`,
+		"stale-worker": "",
+	} {
+		compiled := `on:
+  workflow_dispatch:
+    inputs:
+      aw_context:
+        type: string
+jobs:
+` + extraSteps
+		require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, name+".lock.yml"), []byte(compiled), 0600))
+	}
+
+	dispatcherPath := filepath.Join(awDir, "dispatcher.md")
+	require.NoError(t, os.WriteFile(dispatcherPath, []byte("---\non: workflow_dispatch\n---\n"), 0600))
+	data := &WorkflowData{
+		Tools: map[string]any{"work-queue": true},
+		SafeOutputs: &SafeOutputsConfig{
+			DispatchWorkflow: &DispatchWorkflowConfig{
+				Workflows: []string{"worker", "ordinary-worker", "stale-worker"},
+			},
+		},
+	}
+
+	populateDispatchWorkflowFiles(data, dispatcherPath)
+
+	assert.Equal(t, []string{"worker", "ordinary-worker", "stale-worker"}, data.SafeOutputs.DispatchWorkflow.AwContextWorkflows)
+	assert.Equal(t, []string{"worker"}, data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows)
+}
+
 // TestDispatchWorkflowNotFound tests error handling when workflow is not found
 func TestDispatchWorkflowNotFound(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))

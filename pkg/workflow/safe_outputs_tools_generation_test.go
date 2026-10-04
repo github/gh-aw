@@ -54,7 +54,7 @@ func TestGenerateCustomJobToolDefinitionBasic(t *testing.T) {
 }
 
 func TestDispatchWorkflowWorkQueueSelector(t *testing.T) {
-	normal := generateDispatchWorkflowTool("worker", map[string]any{}, nil)
+	normal := generateDispatchWorkflowTool("worker", map[string]any{}, nil, false)
 	normalProps := normal["inputSchema"].(map[string]any)["properties"].(map[string]any)
 	assert.NotContains(t, normalProps, "work_queue")
 
@@ -303,7 +303,7 @@ func TestGenerateDispatchWorkflowToolBasic(t *testing.T) {
 		},
 	}
 
-	tool := generateDispatchWorkflowTool("deploy-app", workflowInputs, nil)
+	tool := generateDispatchWorkflowTool("deploy-app", workflowInputs, nil, false)
 
 	assert.Equal(t, "deploy_app", tool["name"], "Tool name should be normalized")
 	assert.Equal(t, "deploy-app", tool["_workflow_name"], "Internal workflow name should be preserved")
@@ -323,7 +323,7 @@ func TestGenerateDispatchWorkflowToolBasic(t *testing.T) {
 
 // TestGenerateDispatchWorkflowToolEmptyInputs tests dispatch workflow tool with no inputs.
 func TestGenerateDispatchWorkflowToolEmptyInputs(t *testing.T) {
-	tool := generateDispatchWorkflowTool("simple-workflow", make(map[string]any), nil)
+	tool := generateDispatchWorkflowTool("simple-workflow", make(map[string]any), nil, false)
 
 	assert.Equal(t, "simple_workflow", tool["name"], "Name should be normalized")
 
@@ -358,7 +358,7 @@ func TestGenerateDispatchWorkflowToolRequiredSorted(t *testing.T) {
 
 	// Run multiple times to catch non-determinism from map iteration
 	for i := range 10 {
-		tool := generateDispatchWorkflowTool("cleanup-worker", workflowInputs, nil)
+		tool := generateDispatchWorkflowTool("cleanup-worker", workflowInputs, nil, false)
 
 		inputSchema, ok := tool["inputSchema"].(map[string]any)
 		require.True(t, ok, "inputSchema should be present (iteration %d)", i)
@@ -384,7 +384,7 @@ func TestGenerateDispatchWorkflowToolWithAllowedRefs(t *testing.T) {
 	}
 	allowedRefs := []string{"silencer/*", "refs/heads/main"}
 
-	tool := generateDispatchWorkflowTool("t3000-unit-tests", workflowInputs, allowedRefs)
+	tool := generateDispatchWorkflowTool("t3000-unit-tests", workflowInputs, allowedRefs, false)
 
 	assert.Equal(t, "t3000_unit_tests", tool["name"], "Tool name should be normalized")
 
@@ -425,7 +425,7 @@ func TestGenerateDispatchWorkflowToolNoRefWithoutAllowedRefs(t *testing.T) {
 	}
 
 	for _, allowedRefs := range [][]string{nil, {}} {
-		tool := generateDispatchWorkflowTool("build-workflow", workflowInputs, allowedRefs)
+		tool := generateDispatchWorkflowTool("build-workflow", workflowInputs, allowedRefs, false)
 
 		inputSchema, ok := tool["inputSchema"].(map[string]any)
 		require.True(t, ok, "inputSchema should be present")
