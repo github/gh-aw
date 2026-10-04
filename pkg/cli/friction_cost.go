@@ -245,11 +245,11 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	}
 
 	var events []FrictionEvent
-	sources := map[string]bool{}
+	sources := map[string]struct{}{}
 	gatewayFailures := 0
 
 	if mcpUsage != nil {
-		sources["mcp_gateway"] = true
+		sources["mcp_gateway"] = struct{}{}
 		for _, call := range mcpUsage.ToolCalls {
 			if !isFrictionToolCallStatus(call.Status) && call.Error == "" {
 				continue
@@ -303,7 +303,7 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 	}
 
 	if session != nil {
-		sources["agent_session"] = true
+		sources["agent_session"] = struct{}{}
 		// Apply the same fidelity rule as the precomputed model: the gateway
 		// owns overlapping tool failures, the session contributes only excess.
 		if excess := session.FailedToolExecutions - gatewayFailures; session.FailedToolExecutions > 0 {
@@ -397,7 +397,7 @@ func isFrictionToolCallStatus(status string) bool {
 	}
 }
 
-func sortedKeys(set map[string]bool) []string {
+func sortedKeys(set map[string]struct{}) []string {
 	keys := make([]string, 0, len(set))
 	for key := range set {
 		keys = append(keys, key)

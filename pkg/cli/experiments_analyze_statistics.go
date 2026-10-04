@@ -442,13 +442,13 @@ func experimentVariantCounts(exp ExperimentVariantStats, cfg *workflow.Experimen
 // variant. Shared by experimentVariantCounts and reconcileExperimentDetailsWithConfigs so
 // the two callers apply identical reconciliation semantics.
 func filterDeclaredVariantCounts(counts map[string]int, declaredVariants []string) map[string]int {
-	declared := make(map[string]bool, len(declaredVariants))
+	declared := make(map[string]struct{}, len(declaredVariants))
 	for _, name := range declaredVariants {
-		declared[name] = true
+		declared[name] = struct{}{}
 	}
 	filtered := make(map[string]int, typeutil.SafeAllocationCapacity(len(counts), len(declaredVariants)))
 	for name, count := range counts {
-		if declared[name] {
+		if _, ok := declared[name]; ok {
 			filtered[name] = count
 		}
 	}
