@@ -11,7 +11,7 @@ const agentPattern = /copilot|coding.agent|claude|codex|gemini|opencode|reviewer
 const automationPattern = /copilot|github-actions|gh-aw-bot|\[bot\]$|^app\//i;
 const dependencyPattern = /^(?:app\/)?(?:dependabot|renovate)(?:\[bot\])?$/i;
 const failureStates = new Set(["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
-const cooldownMs = 30 * 60 * 1000;
+const idleMs = 10 * 60 * 1000;
 const staleMs = 14 * 24 * 60 * 60 * 1000;
 
 function epoch(value) {
@@ -32,6 +32,15 @@ function normalizedLogin(comment) {
     .toLowerCase();
 }
 
+function authorReply(comment, pr) {
+  const author = normalizedLogin(comment);
+  return author && (author === normalizedLogin(pr) || ["copilot", "github-copilot", "copilot-swe-agent"].includes(author));
+}
+
+function commentTime(comment) {
+  return Math.max(epoch(comment.updatedAt ?? comment.updated_at), epoch(comment.createdAt ?? comment.created_at));
+}
+
 function trusted(comment) {
   return ["gh-aw-bot", "github-actions"].includes(normalizedLogin(comment)) || ["OWNER", "MEMBER", "COLLABORATOR"].includes(comment.authorAssociation ?? comment.author_association);
 }
@@ -47,6 +56,15 @@ function isSousChefComment(comment) {
 
 function isNudge(comment) {
   return isSousChefComment(comment) && (comment.body ?? "").includes("@copilot");
+}
+
+function workTokens(pr) {
+  const work = [
+    ...pr.unresolved_reviews.map(review => ["review", review.id, review.feedback_hash]),
+    ...pr.failed_checks.filter(check => check.conclusion !== "ACTION_REQUIRED").map(check => ["check", check.name, check.conclusion]),
+    ...(pr.zero_diff_stalled ? [["zero_diff"]] : []),
+  ];
+  return [...new Set(work.map(item => createHash("sha256").update(JSON.stringify(item)).digest("hex")))].sort();
 }
 
 export function activeAgent(pr, runs) {
@@ -78,35 +96,40 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   if (unresolved.some(thread => thread.comments.pageInfo.hasNextPage)) {
     return { skip_reason: "incomplete_reviews" };
   }
-  const threads = unresolved.filter(thread => trustedReviewer(thread.comments.nodes[0] ?? {}));
-  const feedback = threads.map(thread => {
-    const reviewerComments = thread.comments.nodes.filter(comment => trustedReviewer(comment) && login(comment) !== (pr.author?.login ?? "") && !/copilot/i.test(login(comment)));
-    // Copilot code-review feedback is actionable, unlike coding-agent replies.
-    const original = thread.comments.nodes[0];
-    if (original && !reviewerComments.includes(original)) reviewerComments.unshift(original);
-    const last = reviewerComments.at(-1);
-    return {
-      id: thread.id,
-      reviewer: login(original ?? {}),
-      url: original?.url,
-      feedback_at: last?.updatedAt ?? last?.createdAt,
-      feedback_hash: createHash("sha256")
-        .update(JSON.stringify(reviewerComments.map(comment => [login(comment), comment.body])))
-        .digest("hex"),
-    };
-  });
+  const feedback = unresolved
+    .filter(thread => trustedReviewer(thread.comments.nodes[0] ?? {}))
+    .flatMap(thread => {
+      const replyAt = Math.max(0, ...thread.comments.nodes.filter(comment => authorReply(comment, pr) && comment.body?.trim()).map(commentTime));
+      const reviewerComments = thread.comments.nodes.filter(comment => trustedReviewer(comment) && !authorReply(comment, pr) && commentTime(comment) > replyAt);
+      if (!reviewerComments.length) return [];
+      const original = reviewerComments[0];
+      const last = [...reviewerComments].sort((a, b) => commentTime(b) - commentTime(a))[0];
+      return {
+        id: thread.id,
+        reviewer: login(original),
+        url: original.url,
+        path: thread.path,
+        line: thread.line ?? thread.originalLine,
+        comments: reviewerComments.map(comment => ({ body: comment.body, url: comment.url })),
+        feedback_at: last.updatedAt ?? last.createdAt,
+        feedback_hash: createHash("sha256")
+          .update(JSON.stringify(reviewerComments.map(comment => [login(comment), comment.body])))
+          .digest("hex"),
+      };
+    });
   const humanComments = comments.filter(comment => trusted(comment) && !automationPattern.test(login(comment)) && !isSousChefComment(comment));
   const activity = Math.max(
-    epoch(detail.commits.nodes[0]?.commit.committedDate ?? pr.createdAt),
+    epoch(pr.createdAt),
+    ...detail.commits.nodes.map(node => epoch(node.commit.committedDate)),
     ...feedback.map(item => epoch(item.feedback_at)),
-    ...humanComments.map(comment => epoch(comment.updated_at ?? comment.created_at)),
-    ...detail.reviews.nodes.filter(review => trusted(review) && !automationPattern.test(login(review))).map(review => epoch(review.submittedAt))
+    ...humanComments.map(commentTime),
+    ...detail.reviews.nodes.filter(review => trustedReviewer(review)).map(review => epoch(review.submittedAt))
   );
   if (now - activity > staleMs) return { skip_reason: "stale" };
+  const lastActivity = Math.max(activity, epoch(pr.updatedAt), ...comments.map(commentTime), ...detail.reviewThreads.nodes.flatMap(thread => thread.comments.nodes.map(commentTime)));
+  if (now - lastActivity < idleMs) return { skip_reason: "not_idle" };
   const nudges = comments.filter(isNudge).sort((a, b) => epoch(b.created_at) - epoch(a.created_at));
   const latest = nudges[0];
-  const recentRequest = comments.some(comment => trusted(comment) && !/copilot/i.test(login(comment)) && (comment.body ?? "").includes("@copilot") && now - epoch(comment.created_at) < cooldownMs);
-  if (recentRequest) return { skip_reason: "cooldown" };
   const failedChecks = checks
     .filter(check => failureStates.has(check.conclusion ?? check.state) || check.status === "WAITING")
     .map(check => ({
@@ -124,19 +147,45 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
         head: pr.headRefOid,
         branch: branchAction,
         checks: [...new Set(failedChecks.map(check => `${check.name}:${check.conclusion}`))],
-        feedback: [...feedback].sort((a, b) => a.id.localeCompare(b.id)),
-        human_activity: humanComments.map(comment => [comment.id, comment.updated_at ?? comment.created_at]),
+        feedback: feedback.map(({ id, feedback_hash }) => ({ id, feedback_hash })).sort((a, b) => a.id.localeCompare(b.id)),
         zero_diff: zeroDiff,
       })
     )
     .digest("hex");
-  if (nudges.some(comment => statePattern.exec(comment.body)?.[1] === state)) {
+  // Recognize fingerprints emitted before replied-feedback filtering was introduced.
+  const alreadyNudged = nudges.some(comment => {
+    const previous = statePattern.exec(comment.body)?.[1];
+    if (previous === state) return true;
+    const previousState = createHash("sha256")
+      .update(
+        JSON.stringify({
+          head: pr.headRefOid,
+          branch: branchAction,
+          checks: [...new Set(failedChecks.map(check => `${check.name}:${check.conclusion}`))],
+          feedback: feedback.map(({ id, reviewer, url, feedback_at, feedback_hash }) => ({ id, reviewer, url, feedback_at, feedback_hash })).sort((a, b) => a.id.localeCompare(b.id)),
+          human_activity: humanComments.filter(item => epoch(item.created_at) <= epoch(comment.created_at)).map(item => [item.id, item.updated_at ?? item.created_at]),
+          zero_diff: zeroDiff,
+        })
+      )
+      .digest("hex");
+    return previous === previousState;
+  });
+  const work = workTokens({ unresolved_reviews: feedback, failed_checks: failedChecks, zero_diff_stalled: zeroDiff });
+  const coveredWork = new Set(
+    nudges
+      .filter(comment => /^Sous-chef head: (\S+)$/m.exec(comment.body)?.[1] === pr.headRefOid)
+      .flatMap(comment => {
+        const recorded = /^Sous-chef work: ([a-f0-9 ]+)$/m.exec(comment.body)?.[1];
+        return recorded?.split(" ") ?? [];
+      })
+  );
+  if (!branchAction && (alreadyNudged || (work.length && work.every(token => coveredWork.has(token))))) {
     return { skip_reason: "unchanged" };
   }
-  if (!branchAction && !zeroDiff && !failedChecks.length && !threads.length && !dismissReviews.length && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) {
+  if (!branchAction && latest && !statePattern.test(latest.body) && activity <= epoch(latest.created_at)) {
     return { skip_reason: "unchanged_legacy" };
   }
-  if (!branchAction && !zeroDiff && !failedChecks.length && !threads.length && !dismissReviews.length) {
+  if (!branchAction && !zeroDiff && !failedChecks.length && !feedback.length && !dismissReviews.length) {
     return { skip_reason: "nothing_actionable" };
   }
   return {
@@ -145,17 +194,19 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
     url: pr.url,
     headRefOid: pr.headRefOid,
     headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
     createdAt: pr.createdAt,
     updatedAt: pr.updatedAt,
     changedFiles: pr.changedFiles,
     mergeStateStatus: pr.mergeStateStatus,
     author: pr.author?.login ?? "unknown",
     state_fingerprint: state,
+    last_activity_at: new Date(lastActivity).toISOString(),
     failed_checks: failedChecks,
     unresolved_reviews: feedback,
     dismiss_reviews: dismissReviews,
     zero_diff_stalled: zeroDiff,
-    priority: branchAction === "CONFLICTING" ? 0 : failedChecks.length ? 1 : threads.length ? 2 : zeroDiff ? 3 : 4,
+    priority: branchAction === "CONFLICTING" ? 0 : failedChecks.length ? 1 : feedback.length ? 2 : zeroDiff ? 3 : 4,
   };
 }
 
@@ -175,16 +226,16 @@ export function fetchActiveRuns(repo, api = gh, branch) {
   return [...activeStatuses].flatMap(status => api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100${branchFilter}`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs));
 }
 
-function inspect(repo, pr, runs) {
+function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   const [owner, name] = repo.split("/");
-  const response = gh([
+  const response = api([
     "api",
     "graphql",
     "-f",
     `query=query($owner:String!,$name:String!,$number:Int!){
       repository(owner:$owner,name:$name){pullRequest(number:$number){
         commits(last:1){nodes{commit{committedDate}}}
-        reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved
+        reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved path line originalLine
           comments(first:100){pageInfo{hasNextPage} nodes{author{login} authorAssociation body createdAt updatedAt url}}}}
         reviews(last:100){pageInfo{hasPreviousPage} nodes{databaseId author{login} authorAssociation state submittedAt}}
       }}}`,
@@ -197,21 +248,49 @@ function inspect(repo, pr, runs) {
   ]);
   if (response.errors?.length) throw new Error(`PR #${pr.number}: ${JSON.stringify(response.errors)}`);
   // Issue comments do not support sort/direction: paginate, then sort locally.
-  const comments = gh(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"]).flat();
-  return classify(pr, response.data.repository.pullRequest, comments, runs);
+  const comments = api(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"]).flat();
+  return classify(pr, response.data.repository.pullRequest, comments, runs, now);
 }
 
-const prFields = "number,title,url,state,isDraft,headRefOid,headRefName,createdAt,updatedAt,changedFiles,author,mergeStateStatus,statusCheckRollup";
+const prFields = "number,updatedAt,author";
 
 export function fetchCandidate(repo, number, api = gh) {
-  const pull = api(["api", `repos/${repo}/pulls/${number}`]);
-  const owner = pull.head?.user?.login;
-  const branch = pull.head?.ref;
-  if (!owner || !branch) throw new Error(`PR #${number}: missing head branch`);
-  const candidates = api(["pr", "list", "--repo", repo, "--state", "all", "--head", `${owner}:${branch}`, "--limit", "100", "--json", prFields]);
-  const candidate = candidates.find(pr => pr.number === Number(number));
-  if (!candidate || !candidate.updatedAt || !candidate.headRefOid) throw new Error(`PR #${number}: could not refresh PR metadata`);
-  return candidate;
+  // gh pr view's union fragments are rewritten incorrectly by the GitHub CLI proxy.
+  const candidate = api(["api", `repos/${repo}/pulls/${number}`]);
+  if (candidate?.number !== Number(number) || !candidate.updated_at || !candidate.head?.sha || !candidate.head.ref || !candidate.base?.ref) throw new Error(`PR #${number}: could not refresh PR metadata`);
+  const checkRuns = api(["api", `repos/${repo}/commits/${candidate.head.sha}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"]).flatMap(page => page.check_runs);
+  const statuses = api(["api", `repos/${repo}/commits/${candidate.head.sha}/status?per_page=100`, "--paginate", "--slurp"]).flatMap(page => page.statuses);
+  return {
+    number: candidate.number,
+    title: candidate.title,
+    url: candidate.html_url,
+    state: candidate.state.toUpperCase(),
+    isDraft: candidate.draft,
+    headRefOid: candidate.head.sha,
+    headRefName: candidate.head.ref,
+    baseRefName: candidate.base.ref,
+    createdAt: candidate.created_at,
+    updatedAt: candidate.updated_at,
+    changedFiles: candidate.changed_files,
+    author: candidate.user ? { login: candidate.user.login } : null,
+    mergeStateStatus: candidate.mergeable_state === "dirty" ? "CONFLICTING" : (candidate.mergeable_state ?? "unknown").toUpperCase(),
+    statusCheckRollup: [
+      ...checkRuns.map(check => ({
+        name: check.name,
+        status: check.status.toUpperCase(),
+        conclusion: check.conclusion?.toUpperCase(),
+        detailsUrl: check.html_url,
+        startedAt: check.started_at,
+        createdAt: check.created_at,
+      })),
+      ...statuses.map(check => ({
+        __typename: "StatusContext",
+        context: check.context,
+        state: check.state.toUpperCase(),
+        targetUrl: check.target_url,
+      })),
+    ],
+  };
 }
 
 export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
@@ -235,21 +314,96 @@ export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
   };
 }
 
+export function formatNudge(pr) {
+  const checks = pr.failed_checks.filter(check => check.conclusion !== "ACTION_REQUIRED");
+  if (!pr.unresolved_reviews.length && !checks.length && !pr.zero_diff_stalled && !["CONFLICTING", "BEHIND"].includes(pr.mergeStateStatus)) return null;
+  const tasks = [`Update this branch with the latest \`${pr.baseRefName ?? "main"}\` using \`make merge-main\`, resolving any conflicts and preserving the intended changes.`];
+  for (const review of pr.unresolved_reviews) {
+    const location = review.path ? ` (${review.path}${review.line ? `:${review.line}` : ""})` : "";
+    for (const comment of review.comments) {
+      const text = comment.body
+        .split(/\n\s*\n/)[0]
+        .replace(/\s+/g, " ")
+        .replace(/@/g, "")
+        .trim();
+      const summary = text.length > 600 ? `${text.slice(0, 600)}...` : text;
+      tasks.push(`Review${location}: ${summary} - ${comment.url}`);
+    }
+  }
+  for (const check of checks) tasks.push(`Fix failing check \`${check.name}\` (${check.conclusion}): ${check.url ?? "see the PR checks"}.`);
+  if (pr.zero_diff_stalled) tasks.push("Implement the requested change, or close this zero-diff PR with a reason.");
+  return [
+    marker,
+    "@copilot address the following outstanding work in one pass:",
+    "",
+    ...tasks.map((task, index) => `${index + 1}. ${task}`),
+    "",
+    "Push the necessary fixes, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved. Use the pr-finisher skill and stop when only human review or CI remains; do not trigger CI.",
+    "",
+    `Sous-chef head: ${pr.headRefOid}`,
+    `Sous-chef work: ${workTokens(pr).join(" ")}`,
+    `Sous-chef state: ${pr.state_fingerprint}`,
+  ].join("\n");
+}
+
+export function checkRateLimit(api = gh) {
+  const response = api(["api", "rate_limit"]);
+  const resources = ["core", "graphql", "search"].map(resource => {
+    const budget = response.resources?.[resource];
+    if (!budget || !Number.isInteger(budget.limit) || !Number.isInteger(budget.remaining) || !Number.isInteger(budget.reset) || budget.limit < 0 || budget.remaining < 0 || budget.remaining > budget.limit)
+      throw new Error(`Missing or invalid GitHub ${resource} rate limit`);
+    const threshold = Math.max(1, Math.ceil(budget.limit * 0.1));
+    return { resource, remaining: budget.remaining, limit: budget.limit, threshold, reset_at: new Date(budget.reset * 1000).toISOString() };
+  });
+  return { low: resources.some(budget => budget.remaining <= budget.threshold), resources };
+}
+
+export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
+  let rateLimit = checkRateLimit(api);
+  const limitedQueue = () => ({
+    fetched: 0,
+    generated_at: new Date(now).toISOString(),
+    skipped: [{ skip_reason: "rate_limit" }],
+    prs: [],
+    deferred: 0,
+    rate_limit: rateLimit,
+  });
+  if (rateLimit.low) return limitedQueue();
+  const candidates = checkNumber
+    ? [fetchCandidate(repo, checkNumber, api)]
+    : api(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
+  if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
+  let runs;
+  const output = buildQueue(
+    candidates,
+    pr => {
+      if (!rateLimit.low) rateLimit = checkRateLimit(api);
+      if (rateLimit.low) return { skip_reason: "rate_limit" };
+      const current = checkNumber ? pr : fetchCandidate(repo, pr.number, api);
+      runs ??= fetchActiveRuns(repo, api, checkNumber ? current.headRefName : undefined);
+      return activeAgent(current, runs) ? { skip_reason: "agent_active" } : inspect(repo, current, runs, api, now);
+    },
+    now
+  );
+  if (rateLimit.low) return limitedQueue();
+  return { ...output, rate_limit: rateLimit };
+}
+
 function main() {
   const repo = process.env.PR_SOUS_CHEF_REPOSITORY ?? process.env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) throw new Error("PR_SOUS_CHEF_REPOSITORY must be owner/repo");
-  const checkNumber = process.argv[2];
-  if (checkNumber && !/^[1-9]\d*$/.test(checkNumber)) throw new Error("Expected a numeric PR number");
-  const candidates = checkNumber
-    ? [fetchCandidate(repo, checkNumber)]
-    : gh(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
-  if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
-  let runs;
-  const output = buildQueue(candidates, pr => {
-    runs ??= fetchActiveRuns(repo, gh, checkNumber ? pr.headRefName : undefined);
-    return activeAgent(pr, runs) ? { skip_reason: "agent_active" } : inspect(repo, pr, runs);
-  });
-  if (checkNumber) {
+  const args = process.argv.slice(2);
+  const simulate = args.includes("--simulate");
+  const numbers = args.filter(arg => arg !== "--simulate");
+  const checkNumber = numbers[0];
+  if (numbers.length > 1 || (checkNumber && !/^[1-9]\d*$/.test(checkNumber))) throw new Error("Expected [PR number] [--simulate]");
+  const output = fetchQueue(repo, checkNumber);
+  if (simulate)
+    output.nudges = output.prs.flatMap(pr => {
+      const body = formatNudge(pr);
+      return body ? [{ pr_number: pr.number, body }] : [];
+    });
+  if (checkNumber || simulate) {
     console.log(JSON.stringify(output));
     return;
   }
@@ -257,7 +411,7 @@ function main() {
   mkdirSync(directory, { recursive: true });
   writeFileSync(`${directory}/pr-sous-chef-candidates-compact.json`, JSON.stringify(output));
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `eligible_count=${output.prs.length}\neligible_pull_request_numbers=${JSON.stringify(output.prs.map(pr => String(pr.number)))}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `eligible_count=${output.prs.length}\neligible_pull_request_numbers=${JSON.stringify(output.prs.map(pr => String(pr.number)))}\nrate_limit_low=${output.rate_limit.low}\n`);
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, formatSummary(output));
@@ -267,7 +421,10 @@ function main() {
 export function formatSummary(output) {
   const counts = new Map();
   for (const item of output.skipped) counts.set(item.skip_reason, (counts.get(item.skip_reason) ?? 0) + 1);
-  return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n`;
+  const budget = output.rate_limit
+    ? `\n\n| API budget | Remaining / limit | No-op at or below | Resets |\n|---|---|---|---|\n${output.rate_limit.resources.map(item => `| ${item.resource} | ${item.remaining} / ${item.limit} | ${item.threshold} | ${item.reset_at} |`).join("\n")}\n`
+    : "";
+  return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n${budget}`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

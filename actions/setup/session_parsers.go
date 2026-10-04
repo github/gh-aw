@@ -16,4 +16,5 @@ import "embed"
 //go:embed js/log_parser_step_summary_builder.cjs js/markdown_unfencing.cjs
 //go:embed js/add_mask_redaction.cjs js/redact_secrets.cjs js/safe_output_manifest.cjs
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
+//go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs
 var SessionParserSources embed.FS

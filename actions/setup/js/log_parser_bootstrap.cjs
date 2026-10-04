@@ -10,6 +10,7 @@ const { projectSessionResult, isTokenCount, observedSessionModel } = require("./
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
+const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -368,8 +369,16 @@ async function runLogParser(options) {
 
     if (Array.isArray(logEntries)) {
       try {
-        writeSessionArtifact("/tmp/gh-aw/agent-session.jsonl", logEntries, [...publicationMasks]);
-        core.info(`[log-parser] Persisted ${logEntries.length} canonical session events`);
+        const exitPath = "/tmp/gh-aw/agent_execution_exit_code.txt";
+        const execution = collectAgentExecution({
+          content,
+          events: logEntries,
+          observations: logEntries.filter(isAgentExecutionEvent).map(event => event.data),
+          ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
+        });
+        const canonicalEntries = [...logEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
+        writeSessionArtifact("/tmp/gh-aw/agent-session.jsonl", canonicalEntries, [...publicationMasks]);
+        core.info(`[log-parser] Persisted ${canonicalEntries.length} canonical session events`);
       } catch (err) {
         core.warning(`[log-parser] Failed to persist canonical agent session: ${getErrorMessage(err)}`);
       }

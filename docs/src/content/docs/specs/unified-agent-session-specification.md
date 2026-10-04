@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.3.0"
+version: "1.4.0"
 status: Draft
-publication_date: "2026-10-02"
+publication_date: "2026-10-03"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.3.0<br>
+**Version**: 1.4.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-02<br>
+**Publication Date**: 2026-10-03<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.3.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.4.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -122,7 +122,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | P — Parser/normalizer | Parse source records and produce canonical traces; shared conversion helpers are included. | 3–7 and applicable tests in 9 |
 | R — Reader/renderer | Read canonical events and produce truthful, privacy-preserving summaries or compatibility views. | 3–6, 8.1, 8.3, and applicable tests in 9 |
 | B — Bootstrap telemetry adapter | Consume canonical results and derive legacy telemetry without altering the trace. | 3, 6, 8.2–8.3, and applicable tests in 9 |
-| M — Artifact merger | Combine canonical agent and runtime observations into the conclusion usage artifact. | 3.5, 4.7, 8.3, and applicable tests in 9 |
+| M — Artifact merger | Combine canonical agent and runtime observations into the conclusion usage artifact. | 3.5, 4.7–4.8, 8.3, and applicable tests in 9 |
 | F — Full pipeline | Satisfy P for all six engines, R for all shared summary renderers, B, and M. | All normative requirements |
 
 A parser supporting fewer engines can conform for its declared engines. Omitting an OPTIONAL field because the source did not expose it is full conformance, not partial conformance. An implementation failing a mandatory requirement is nonconforming for the affected class; “partial implementation” is a progress description, not a weaker compliance level.
@@ -218,6 +218,7 @@ opaque because its essential fields are not defined by this specification.
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
+| Agent execution diagnostics | Unique harness/compiler `categories`, native `errorCodes` and `errorTypes`, and the observed final process `exitCode`; no diagnostic messages or duplicated engine envelopes. |
 | MCP | Server, direction, RPC/call/request IDs, method, tool name, duration, sizes, status, reason, and error code/message; no RPC arguments, response bodies, or error context. |
 | Firewall | Host, method, status, decision, byte count, duration; steering/tracker event, level, message, reason, and request ID. |
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
@@ -470,6 +471,7 @@ source for opaque fields.
 
 | Event type | Source observation |
 | --- | --- |
+| `agent.execution` | One aggregate execution/error observation for the main agent, as defined in Section 4.8. |
 | `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, with flat RPC metadata and error code/message. |
 | `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
 | `mcp.tool_call`, `mcp.event` | Structured gateway calls or other gateway log messages. |
@@ -499,6 +501,77 @@ remain distinguishable. Warnings MUST identify the source and cause without
 printing malformed payloads or unredacted source text.
 Source-event counts and the untimed source-event count exclude the generated
 file-format header and collection diagnostics.
+
+### 4.8 `agent.execution`
+
+**T-UAS-067 — Unique execution diagnostics.** When an agent artifact contains an
+observed process exit code, an engine/provider error, or a harness/compiler error
+classification, the merger MUST emit exactly one `agent.execution` event for the
+main agent. Readers MUST accept older files without this event and MUST reject
+multiple aggregate execution entries. The serialization-format version remains
+`1`; this is an additive vocabulary change.
+
+| Field | Value and availability |
+| --- | --- |
+| `categories` | Required array of unique, nonempty strings containing observed harness/compiler classifications. Empty when no classification was observed. |
+| `errorCodes` | Required array of unique native error/status codes: nonempty strings or safe integers. Numeric `0` and string `"0"` remain distinct. |
+| `errorTypes` | Required array of unique, nonempty native provider error identifiers, terminal reasons, or fatal signal names. |
+| `exitCode` | Source-dependent integer from 0 through 255 for the final execution. Zero MUST be retained. An unavailable code MUST be omitted, not inferred from a failed attempt or job outcome. |
+
+Collections are sorted deterministically. Error codes sort lexicographically by
+their string form, with numbers before strings when the forms are equal; native
+code values and types remain unchanged. Safe integral JSON numbers such as
+`1e3` and `1.0` MUST be accepted consistently by JavaScript and Go readers.
+Equivalent numeric values MUST count as duplicates regardless of their JSON
+spelling; negative zero and zero are the same numeric value.
+Native error type identifiers retain their original spelling.
+Multiple retries, repeated source records,
+canonical events, and detector observations MUST NOT produce duplicate entries.
+Tool failures and errors quoted in user/assistant messages or tool outputs MUST
+NOT become agent execution errors. Original native and canonical error events
+remain available; the aggregate is not a replacement for their evidence.
+Errors from earlier attempts MAY coexist with a final `exitCode: 0`; neither
+the entry nor a nonempty error array asserts that the final execution failed.
+
+The detector persists `agent-errors.jsonl` before artifact upload, retaining
+classifications obtained from the live environment and structured firewall logs,
+including step timeouts without a stdio signature. The collector merges that
+evidence with canonical/native engine errors and supported stdio diagnostics.
+Raw-text mining MUST use recognized engine diagnostic prefixes or anchored
+startup error signatures, not arbitrary substring matches across conversation
+text. Labeled plaintext conversation/tool-output blocks, fenced quotations, and
+harness echoes of child output or commands MUST NOT supply classifications.
+The live detector MUST use the same attribution boundary before persisting
+stdio-derived classifications; environment and structured firewall evidence
+retain their separate sources.
+Exit-code precedence is the recorded `agent_execution_exit_code.txt`, an explicit
+agent execution snapshot, a persisted diagnostic observation, then the last
+anchored harness `done: exitCode=...` line. Intermediate attempt and tool exit
+codes MUST NOT be substituted for the final code. Missing historical evidence
+MUST remain missing; reconstruction MUST NOT use the current clock to invent a
+past timeout.
+
+`provenance.component` is `execution` and `provenance.phase` is `agent`. Its path
+identifies the primary contributing source; other error evidence remains in the
+trace or original artifact. A merger MUST NOT fabricate a timestamp for an
+aggregate covering several attempts.
+
+The compiler's current engine classifications and additional harness labels
+are listed below. Readers MUST accept additional categories and native
+codes/types without requiring a closed enumeration.
+
+| Origin | Observed categories |
+| --- | --- |
+| Compiler error-detection outputs | `inference_access_error`, `mcp_policy_error`, `agentic_engine_timeout`, `model_not_supported_error`, `http_400_response_error`, `capi_quota_exceeded_error`, `invocation_cap_exceeded`, `max_cache_misses_exceeded`, `missing_model_pricing_error`, `shell_expansion_guard_rejected` |
+| Harness retry and proxy guards | `capi_server_error`, `authentication_failed`, `max_ai_credits_exceeded`, `effective_tokens_limit_exceeded`, `permission_denied_limit_exceeded`, `model_policy_violation`, `awf_api_proxy_blocking_requests`, `goal_already_active` |
+| Harness failure reasons and fatal signals | Observed `failure_reason` identifiers such as `harness_retry_path_invalid`, `cancelled_or_timed_out`, and `sandbox_runtime_crash`; crash exit codes preserve the corresponding native signal name. |
+
+Invocation-cap exhaustion takes precedence over generic CAPI quota exhaustion,
+as in compiler outputs. A post-result watchdog termination alone MUST NOT be
+classified as an agent timeout. The existing MCP-derived
+`ai_credits_rate_limit_error` and `unknown_model_ai_credits` signals retain their
+separate runtime provenance; they are not fabricated from an absent detector
+output.
 
 ## 5. Parsing and Normalization (Normative)
 
@@ -915,6 +988,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-051, T-UAS-052, T-UAS-053 | Conformance report and isolated test harness | Applicable IDs covered; structural/round-trip/purity assertions; no real production I/O. |
 | T-UAS-054–T-UAS-064 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; leading numeric format version; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete compact `aw_session.jsonl`, pinned format header, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
 | T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
+| T-UAS-067 | Repeated native/canonical/detector error observations, live timeout evidence, final-zero and missing exits, malformed or duplicate aggregate records, quoted errors and tool failures | One deterministic `agent.execution` record with distinct native codes/types, stable categories, observed exit precedence, unchanged error evidence, and matching JS/Go reader validation. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -1004,6 +1078,25 @@ symlinks, and decoded-secret/add-mask redaction have separate cases.
 `agent_session_telemetry.test.cjs` verifies canonical bootstrap persistence.
 Compiler tests cover engine artifact paths, conclusion ordering, and the usage
 upload path.
+
+`agent_execution.test.cjs` verifies the existing sanitized Claude API-error/retry
+fixture, every current compiler detector classification, native nested provider
+errors, guardrail precedence, watchdog exclusion, and final-zero exits after
+failed attempts. JS collector and CLI tests verify singleton merging and
+error-only startup sessions. Go session parsing validates the same arrays,
+native code types, exit-code range, and singleton contract, and reconstructs
+the same evidence through the embedded JS parsers.
+
+Local reconstruction additionally checked downloaded artifacts from
+[Claude API-error/retry](https://github.com/github/gh-aw/actions/runs/36762044297),
+[Copilot](https://github.com/github/gh-aw/actions/runs/36946387975),
+[Pi HTTP-400 failure](https://github.com/github/gh-aw/actions/runs/37151459460),
+[Codex model failure](https://github.com/github/gh-aw/actions/runs/37100404405),
+and [Codex success](https://github.com/github/gh-aw/actions/runs/37096302208).
+Each produced one byte-stable aggregate on repeated collection. The Copilot
+workflow failed downstream despite its observed agent exit code being zero;
+the entry preserves that distinction. Claude and Pi lacked a final exit-code
+observation, so their entries omit it.
 
 ## 10. Implementation Gap Matrix (Informative)
 
@@ -1310,6 +1403,13 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.4.0 — Draft (2026-10-03)
+
+- Added T-UAS-067: one `agent.execution` entry retaining harness/compiler categories,
+  native error codes/types, and the observed final exit code.
+- Defined detector persistence, historical reconstruction, precedence, retry
+  semantics, and JS/Go reader validation without changing file-format version 1.
 
 ### Version 1.3.0 — Draft (2026-10-02)
 
