@@ -25,14 +25,17 @@ async function check(t, previous, overrides = {}) {
   const result = await checkCadence({
     context: { repo: { owner: "github", repo: "gh-aw" }, runId: 382, payload: { repository: { default_branch: "main" } } },
     github: {
+      async paginate(method, request) {
+        return (await method(request)).data.workflow_runs;
+      },
       rest: {
         actions: {
           async getWorkflowRun() {
-            return { data: { workflow_id: 201005955, created_at: "2026-10-04T04:00:00Z" } };
+            return { data: { workflow_id: 201005955, created_at: "2026-09-24T04:00:00Z", run_started_at: "2026-10-04T04:00:00Z" } };
           },
           async listWorkflowRuns(request) {
             requests.push(request);
-            return { data: { workflow_runs: previous ? [previous] : [] } };
+            return { data: { workflow_runs: Array.isArray(previous) ? previous : previous ? [previous] : [] } };
           },
           ...overrides,
         },
@@ -46,7 +49,7 @@ async function check(t, previous, overrides = {}) {
   return { result, warnings, requests };
 }
 
-const run = created_at => ({ id: 381, created_at, html_url: "https://github.com/github/gh-aw/actions/runs/381" });
+const run = run_started_at => ({ id: 381, run_started_at, html_url: "https://github.com/github/gh-aw/actions/runs/381" });
 
 test("daily successful audits are healthy and use only prior default-branch successes", async t => {
   const { result, warnings, requests } = await check(t, run("2026-10-03T04:00:00Z"));
@@ -60,8 +63,7 @@ test("daily successful audits are healthy and use only prior default-branch succ
       workflow_id: 201005955,
       branch: "main",
       status: "success",
-      created: "<2026-10-04T04:00:00Z",
-      per_page: 1,
+      per_page: 100,
     },
   ]);
 });
@@ -84,7 +86,7 @@ test("intervening failed daily attempts do not hide the September monitoring gap
   const { result, warnings } = await check(t, previous);
   assert.equal(result.status, "stale");
   assert.equal(result.elapsed_hours, 264);
-  assert.deepEqual(result.previous_successful_run, { id: previous.id, created_at: previous.created_at, url: previous.html_url });
+  assert.deepEqual(result.previous_successful_run, { id: previous.id, run_started_at: previous.run_started_at, url: previous.html_url });
   assert.equal(warnings.length, 1);
 });
 
@@ -109,4 +111,19 @@ test("API errors do not prevent the audit and do not leak error details", async 
 test("invalid timestamps cannot be reported as healthy", async t => {
   const { result } = await check(t, run("invalid"));
   assert.equal(result.status, "unknown");
+});
+
+test("successful reruns use execution time rather than original creation order", async t => {
+  const previous = { ...run("2026-10-03T04:00:00Z"), id: 300, created_at: "2026-09-01T04:00:00Z" };
+  const { result } = await check(t, [run("2026-10-01T04:00:00Z"), previous]);
+  assert.equal(result.status, "healthy");
+  assert.equal(result.elapsed_hours, 24);
+  assert.equal(result.previous_successful_run.id, 300);
+});
+
+test("current run and attempts starting after this attempt are excluded", async t => {
+  const previous = run("2026-09-23T04:00:00Z");
+  const { result } = await check(t, [{ ...run("2026-10-04T04:00:00Z"), id: 382 }, { ...run("2026-10-05T04:00:00Z"), id: 383 }, previous]);
+  assert.equal(result.status, "stale");
+  assert.equal(result.previous_successful_run.id, previous.id);
 });
