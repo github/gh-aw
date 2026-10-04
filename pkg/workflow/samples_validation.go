@@ -107,12 +107,20 @@ func extractSharedInputSchemaDefs(tools []struct {
 	Name        string          `json:"name"`
 	InputSchema json.RawMessage `json:"inputSchema"`
 }) map[string]any {
-	if len(tools) == 0 || len(tools[0].InputSchema) == 0 {
+	if len(tools) == 0 {
 		return nil
 	}
 
+	var inputSchema json.RawMessage
+	for _, tool := range tools {
+		inputSchema = tool.InputSchema
+		break
+	}
+	if len(inputSchema) == 0 {
+		return nil
+	}
 	var firstSchema map[string]any
-	if err := json.Unmarshal(tools[0].InputSchema, &firstSchema); err != nil {
+	if err := json.Unmarshal(inputSchema, &firstSchema); err != nil {
 		return nil
 	}
 	defs, ok := firstSchema["$defs"].(map[string]any)
@@ -132,8 +140,8 @@ func normalizeInputSchemaRefs(schema map[string]any, sharedDefs map[string]any) 
 		return
 	}
 
-	localDefs, _ := schema["$defs"].(map[string]any)
-	if localDefs == nil {
+	localDefs, isMap := schema["$defs"].(map[string]any)
+	if !isMap || localDefs == nil {
 		localDefs = map[string]any{}
 		schema["$defs"] = localDefs
 	}
@@ -272,13 +280,17 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case map[string]any:
 		var props map[string]any
 		if schema != nil {
-			props, _ = schema["properties"].(map[string]any)
+			if value, ok := schema["properties"].(map[string]any); ok {
+				props = value
+			}
 		}
 		out := make(map[string]any, len(val))
 		for k, vv := range val {
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				if value, ok := props[k].(map[string]any); ok {
+					propSchema = value
+				}
 			}
 			out[k] = substituteRuntimeExpressionsForValidation(vv, propSchema)
 		}
@@ -286,11 +298,13 @@ func substituteRuntimeExpressionsForValidation(v any, schema map[string]any) any
 	case []any:
 		var itemSchema map[string]any
 		if schema != nil {
-			itemSchema, _ = schema["items"].(map[string]any)
+			if value, ok := schema["items"].(map[string]any); ok {
+				itemSchema = value
+			}
 		}
-		out := make([]any, len(val))
-		for i, vv := range val {
-			out[i] = substituteRuntimeExpressionsForValidation(vv, itemSchema)
+		out := make([]any, 0, len(val))
+		for _, vv := range val {
+			out = append(out, substituteRuntimeExpressionsForValidation(vv, itemSchema))
 		}
 		return out
 	default:
@@ -365,8 +379,14 @@ func placeholderForType(t string, schema map[string]any) any {
 	case "array":
 		return []any{}
 	case "object":
-		props, _ := schema["properties"].(map[string]any)
-		required, _ := schema["required"].([]any)
+		props, hasProperties := schema["properties"].(map[string]any)
+		if !hasProperties {
+			props = nil
+		}
+		required, hasRequired := schema["required"].([]any)
+		if !hasRequired {
+			required = nil
+		}
 		out := make(map[string]any, len(required))
 		for _, rv := range required {
 			k, ok := rv.(string)
@@ -375,7 +395,9 @@ func placeholderForType(t string, schema map[string]any) any {
 			}
 			var propSchema map[string]any
 			if props != nil {
-				propSchema, _ = props[k].(map[string]any)
+				if value, ok := props[k].(map[string]any); ok {
+					propSchema = value
+				}
 			}
 			out[k] = placeholderForSchema(propSchema)
 		}

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -259,7 +260,7 @@ func getAllManifestFiles(extra ...string) []string {
 func getProtectedPathPrefixes(extra ...string) []string {
 	var nonDot []string
 	for _, p := range extra {
-		if len(p) < 2 || p[0] != '.' {
+		if len(p) < 2 || !strings.HasPrefix(p, ".") {
 			nonDot = append(nonDot, p)
 		}
 	}
@@ -275,7 +276,7 @@ func getDotFolderExcludes(excludeFiles []string) []string {
 	for _, f := range excludeFiles {
 		// Must start with ".", end with "/", and have at least one char between
 		// them (e.g. ".agents/" is valid; "./" is not).
-		if len(f) > 2 && f[0] == '.' && f[len(f)-1] == '/' {
+		if len(f) > 2 && strings.HasPrefix(f, ".") && strings.HasSuffix(f, "/") {
 			result = append(result, f)
 		}
 	}

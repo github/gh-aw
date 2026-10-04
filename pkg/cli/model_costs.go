@@ -58,7 +58,7 @@ func initModelPrices() {
 				if normalizedModel == "" { //nolint:tolowerequalfold
 					continue
 				}
-				normalizedID := normalizedProvider + "/" + normalizedModel
+				normalizedID := strings.Join([]string{normalizedProvider, normalizedModel}, "/")
 				record := modelPriceRecord{
 					id:       normalizedID,
 					provider: normalizedProvider,
@@ -89,7 +89,7 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 
 	fullID := normalizedModel
 	if !strings.Contains(fullID, "/") && normalizedProvider != "" {
-		fullID = normalizedProvider + "/" + normalizedModel
+		fullID = strings.Join([]string{normalizedProvider, normalizedModel}, "/")
 	}
 	comparableFullID := modelsdev.NormalizeComparableModelID(fullID)
 
