@@ -76,6 +76,7 @@ import (
 	uncheckedsliceindex "github.com/github/gh-aw/pkg/linters/unchecked-slice-index"
 	"github.com/github/gh-aw/pkg/linters/uncheckedflushreturn"
 	"github.com/github/gh-aw/pkg/linters/uncheckedtypeassertion"
+	unnecessaryelseafterreturn "github.com/github/gh-aw/pkg/linters/unnecessary-else"
 	"github.com/github/gh-aw/pkg/linters/walkfuncerrshadow"
 	"github.com/github/gh-aw/pkg/linters/wgdonenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/writebytestring"
@@ -164,6 +165,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	uncheckedsliceindex.Analyzer,
 	uncheckedtypeassertion.Analyzer,
 	uncheckedflushreturn.Analyzer,
+	unnecessaryelseafterreturn.Analyzer,
 	walkfuncerrshadow.Analyzer,
 	wgdonenotdeferred.Analyzer,
 	writebytestring.Analyzer,
