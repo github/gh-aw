@@ -28,6 +28,7 @@ describe("essential unified session payloads", () => {
 
   it.each([
     ["tool.execution_start", { toolCallId: "call", parameters: false, input: 0, command: "", text: "duplicate" }, { toolCallId: "call", input: 0, command: "" }],
+    ["tool.execution_start", { toolName: "bash", arguments: { command: "cat restricted-file" } }, { toolName: "bash", input: { command: "cat restricted-file" } }],
     ["tool.execution_complete", { result: false, output: null, is_error: true, duration_ms: 0, exit_code: 1, metadata: "duplicate" }, { output: null, isError: true, durationMs: 0, exitCode: 1 }],
     ["session.init", { sourceEngine: "copilot", model: "fixture", session_id: "session", tools: Array(100).fill("large descriptor") }, { sourceEngine: "copilot", model: "fixture", sessionId: "session" }],
     ["firewall.http_access", { domain: "example.com", http_status: 0, squid_request_status: "DENIED", credentials: "omit" }, { host: "example.com", status: 0, decision: "DENIED" }],

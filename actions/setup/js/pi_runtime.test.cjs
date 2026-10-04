@@ -52,9 +52,17 @@ describe("Pi runtime configuration", () => {
     fs.writeFileSync(path.join(dir, "agent/settings.json"), '{"packages":["npm:example@1.0.0"]}');
     const result = preparePiRuntime({ settings: { defaultThinkingLevel: "high", defaultProjectTrust: "always" } });
     expect(result.settings.packages).toEqual(["npm:example@1.0.0"]);
+    expect(result.settings.retry).toEqual({ enabled: true, maxRetries: 2, baseDelayMs: 1000, maxAgentDelayMs: 30000 });
     expect(result.settings.defaultTools).toEqual(["+codemode", "+tool_search"]);
     expect(result.settings.defaultProjectTrust).toBe("never");
     expect(result.settings.defaultThinkingLevel).toBe("high");
+  });
+
+  it("merges retry defaults with partial installed and workflow settings", () => {
+    fs.mkdirSync(path.join(dir, "agent"));
+    fs.writeFileSync(path.join(dir, "agent/settings.json"), JSON.stringify({ retry: { maxRetries: 4 } }));
+    const result = preparePiRuntime({ settings: { retry: { baseDelayMs: 500 } } });
+    expect(result.settings.retry).toEqual({ enabled: true, maxRetries: 4, baseDelayMs: 500, maxAgentDelayMs: 30000 });
   });
 
   it("uses only gateway-authorized MCP servers and preserves scoped headers", () => {

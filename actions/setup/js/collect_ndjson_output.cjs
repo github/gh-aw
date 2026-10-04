@@ -9,6 +9,7 @@ const { isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { getDefaultTargetRepo, parseAllowedRepos, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { isProbingNoopMessage } = require("./intent_probe.cjs");
+const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
 
 async function main() {
   try {
@@ -175,52 +176,22 @@ async function main() {
     }
 
     core.info(`[INGESTION] Output file path: ${outputFile}`);
-    if (!outputFile) {
-      core.info("GH_AW_SAFE_OUTPUTS not set, no output to collect");
-      core.setOutput("output", "");
-      core.setOutput("output_types", "");
-      core.setOutput("has_patch", "false");
-      return;
-    }
-    if (!fs.existsSync(outputFile)) {
-      // Before treating a missing outputs file as a graceful no-op, check whether
-      // the safeoutputs MCP gateway reported 0 registered tools during setup.
-      // When that flag exists the agent could not emit any safe outputs because
-      // every safeoutputs call failed with "unknown tool" — this is a gateway
-      // infrastructure failure, not an intentional no-op, and must surface as an
-      // error rather than a silent green run.
+    const collectionErrors = [];
+    if (!outputFile || !fs.existsSync(outputFile)) {
+      core.info(outputFile ? `Output file does not exist: ${outputFile}` : "GH_AW_SAFE_OUTPUTS not set, no output to collect");
       const runnerTemp = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
       const gatewayEmptyFlagPath = `${runnerTemp}/gh-aw/safeoutputs/gateway_empty.flag`;
       if (fs.existsSync(gatewayEmptyFlagPath)) {
-        core.setFailed(
+        const reason =
           `safeoutputs MCP gateway registered 0 tools during setup; the agent could not emit any safe outputs. ` +
-            `This is a gateway infrastructure failure, not a normal no-op. ` +
-            `Check the MCP gateway startup logs for ECONNRESET errors or delayed backend registration and re-run the workflow.`
-        );
-        return;
+          `This is a gateway infrastructure failure, not a normal no-op. ` +
+          `Check the MCP gateway startup logs for ECONNRESET errors or delayed backend registration and re-run the workflow.`;
+        collectionErrors.push(reason);
+        // eslint-disable-next-line gh-aw-custom/require-return-after-core-setfailed
+        core.setFailed(reason);
       }
-      core.info(`Output file does not exist: ${outputFile} — no safe-output items were emitted; treating as empty collection (graceful no-op)`);
-      const emptyOutput = { items: [], errors: [] };
-      const emptyOutputJson = JSON.stringify(emptyOutput);
-      // Write agent_output.json for consistent downstream handling so the safe_outputs job
-      // always finds a valid (empty) collection file even when the agent emitted nothing.
-      try {
-        fs.mkdirSync(TMP_GH_AW_PATH, { recursive: true });
-        const agentOutputFile = require("path").join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME);
-        fs.writeFileSync(agentOutputFile, emptyOutputJson, "utf8");
-        core.info(`Stored empty collection to: ${agentOutputFile}`);
-        core.exportVariable("GH_AW_AGENT_OUTPUT", agentOutputFile);
-      } catch (writeError) {
-        core.error(`Failed to write empty agent output file: ${getErrorMessage(writeError)}`);
-      }
-      // Always set the step output even if the artifact write failed;
-      // downstream steps reading GH_AW_AGENT_OUTPUT must handle the var being absent.
-      core.setOutput("output", emptyOutputJson);
-      core.setOutput("output_types", "");
-      core.setOutput("has_patch", "false");
-      return;
     }
-    const outputContent = fs.readFileSync(outputFile, "utf8");
+    const outputContent = outputFile && fs.existsSync(outputFile) ? fs.readFileSync(outputFile, "utf8") : "";
     if (outputContent.trim() === "") {
       core.info("Output file is empty");
     }
@@ -294,7 +265,7 @@ async function main() {
     }
 
     const parsedItems = [];
-    const errors = [];
+    const errors = collectionErrors;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line === "") continue;
@@ -411,6 +382,9 @@ async function main() {
       }
     }
     core.info(`Successfully parsed ${parsedItems.length} valid output items`);
+    if (parsedItems.length === 0) {
+      parsedItems.push(buildEmptyOutputOutcome(errors));
+    }
     const validatedOutput = {
       items: parsedItems,
       errors: errors,

@@ -237,12 +237,6 @@ func codexQuotedStringLength(part string) int {
 	return 0
 }
 
-// extractCodexTokenUsage extracts token usage from Codex-specific log lines
-func (e *CodexEngine) extractCodexTokenUsage(line string) int {
-	count, _ := extractCodexLegacyTokenCount(line)
-	return count
-}
-
 func extractCodexLegacyTokenCount(line string) (int, bool) {
 	payload := codexLegacyPayload(line)
 	for _, pattern := range []*regexp.Regexp{codexLegacyTokensPattern, codexLegacyTotalPattern} {

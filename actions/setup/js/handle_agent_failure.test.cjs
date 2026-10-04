@@ -1895,6 +1895,31 @@ describe("handle_agent_failure", () => {
       expect(reportIncompleteContext).toContain(reportIncompleteMarker);
       expect(failureDiagnosticsContext).toContain("Failing step:** Run agent");
     });
+
+    it("renders denied commands and missing capability names from an empty-output outcome", () => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const os = require("os");
+      const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "failure-empty-output-"));
+      try {
+        fs.writeFileSync(
+          path.join(rootDir, "agent-session.jsonl"),
+          [
+            { type: "tool.execution_start", data: { toolCallId: "denied", toolName: "bash", input: { command: "cat restricted-file" } } },
+            { type: "tool.execution_complete", data: { toolCallId: "denied", success: false, error: "Permission denied" } },
+            { type: "tool.execution_complete", data: { toolName: "github.get_file_contents", success: false, error: "Missing read access" } },
+          ]
+            .map(JSON.stringify)
+            .join("\n")
+        );
+        const report = buildReportIncompleteContext([buildEmptyOutputOutcome([], rootDir)]);
+        expect(report).toContain("cat restricted-file");
+        expect(report).toContain("Permission denied");
+        expect(report).toContain("github.get_file_contents");
+        expect(report).toContain("Missing read access");
+      } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("buildSecretVerificationContext", () => {
