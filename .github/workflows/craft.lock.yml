@@ -1237,6 +1237,7 @@ jobs:
             /tmp/gh-aw/agent_execution.json
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent-session.jsonl
+            /tmp/gh-aw/agent-errors.jsonl
             /tmp/gh-aw/sandbox/agent/logs/
             /tmp/gh-aw/redacted-urls.log
             /tmp/gh-aw/mcp-logs/

@@ -71,11 +71,11 @@ func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noL
 
 	// Pattern 1: _ = fmt.Fprintf(...)
 	if len(assign.Lhs) == 1 && len(assign.Rhs) == 1 {
-		blank, ok := assign.Lhs[0].(*ast.Ident)
+		blank, ok := assign.Lhs[0].(*ast.Ident) //nolint:uncheckedsliceindex // len(assign.Lhs) is checked above
 		if !ok || blank.Name != "_" {
 			return
 		}
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
 		if !ok {
 			return
 		}
@@ -105,7 +105,7 @@ func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noL
 			return
 		}
 
-		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		call, ok := assign.Rhs[0].(*ast.CallExpr) //nolint:uncheckedsliceindex // len(assign.Rhs) is checked above
 		if !ok {
 			return
 		}
@@ -122,11 +122,25 @@ func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noL
 
 func reportUncheckedFprint(pass *analysis.Pass, call *ast.CallExpr, funcName string, noLintIndex nolint.DirectiveIndex) {
 	position := pass.Fset.PositionFor(call.Pos(), false)
-	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") {
+	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") || isConsoleOutput(pass, call) {
 		return
 	}
 	pkgLog.Printf("flagging unchecked fmt.%s() error at %s:%d", funcName, position.Filename, position.Line)
 	pass.ReportRangef(call, "error return from fmt.%s() is not checked; write failures may be silently ignored", funcName)
+}
+
+// Console writes are best-effort diagnostics; unlike file or network writes,
+// their errors cannot usefully be recovered by the caller.
+func isConsoleOutput(pass *analysis.Pass, call *ast.CallExpr) bool {
+	if len(call.Args) == 0 {
+		return false
+	}
+	sel, ok := call.Args[0].(*ast.SelectorExpr) //nolint:uncheckedsliceindex // len(call.Args) is checked above
+	if !ok || (sel.Sel.Name != "Stdout" && sel.Sel.Name != "Stderr") {
+		return false
+	}
+	obj := pass.TypesInfo.ObjectOf(sel.Sel)
+	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == "os"
 }
 
 // isFprintFunction returns true if the function name is one of the fprintf functions we check.

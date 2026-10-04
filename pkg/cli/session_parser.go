@@ -3,15 +3,79 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
 )
+
+type agentExecutionData struct {
+	Categories []string          `json:"categories"`
+	ErrorCodes []json.RawMessage `json:"errorCodes"`
+	ErrorTypes []string          `json:"errorTypes"`
+	ExitCode   *int              `json:"exitCode"`
+}
+
+func parseAgentExecution(data json.RawMessage) (*agentExecutionData, error) {
+	var payload struct {
+		agentExecutionData
+		ExitCode json.RawMessage `json:"exitCode"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("invalid agent.execution data: %w", err)
+	}
+	execution := payload.agentExecutionData
+	if execution.Categories == nil || execution.ErrorTypes == nil || execution.ErrorCodes == nil {
+		return nil, errors.New("agent.execution requires categories, errorCodes, and errorTypes arrays")
+	}
+	for _, values := range [][]string{execution.Categories, execution.ErrorTypes} {
+		seen := make(map[string]struct{})
+		for _, value := range values {
+			_, duplicate := seen[value]
+			if value == "" || duplicate {
+				return nil, errors.New("agent.execution categories and errorTypes must contain unique nonempty strings")
+			}
+			seen[value] = struct{}{}
+		}
+	}
+	seenCodes := make(map[string]struct{})
+	for _, raw := range execution.ErrorCodes {
+		var text string
+		key := ""
+		if err := json.Unmarshal(raw, &text); err == nil && text != "" {
+			key = "string:" + text
+		} else if number, valid := parseAgentExecutionNumber(raw); valid {
+			key = "number:" + strconv.FormatInt(int64(number), 10)
+		}
+		_, duplicate := seenCodes[key]
+		if key == "" || duplicate {
+			return nil, errors.New("agent.execution errorCodes must contain unique nonempty strings or safe integers")
+		}
+		seenCodes[key] = struct{}{}
+	}
+	if payload.ExitCode != nil {
+		number, valid := parseAgentExecutionNumber(payload.ExitCode)
+		if !valid || number < 0 || number > 255 {
+			return nil, errors.New("agent.execution exitCode must be an integer between 0 and 255")
+		}
+		exitCode := int(number)
+		execution.ExitCode = &exitCode
+	}
+	return &execution, nil
+}
+
+func parseAgentExecutionNumber(raw json.RawMessage) (float64, bool) {
+	number, err := strconv.ParseFloat(string(raw), 64)
+	return number, err == nil && !math.IsNaN(number) && math.Abs(number) <= 9007199254740991 && math.Trunc(number) == number
+}
 
 func runSessionParser(ctx context.Context, args ...string) ([]byte, error) {
 	return runSessionParserWithSources(ctx, nil, args...)
@@ -54,7 +118,9 @@ func runSessionParserWithSources(ctx context.Context, additionalSources map[stri
 	cmd.Stderr = &diagnostics
 	output, err := cmd.Output()
 	if diagnostics.Len() > 0 {
-		fmt.Fprint(os.Stderr, diagnostics.String())
+		if _, writeErr := fmt.Fprint(os.Stderr, diagnostics.String()); writeErr != nil {
+			return nil, fmt.Errorf("failed to write session parser diagnostics: %w", writeErr)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute session parser (Node.js is required): %w: %s", err, diagnostics.String())

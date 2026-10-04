@@ -47,7 +47,9 @@ Closing a summary as **completed** suppresses its unchanged source findings.
 Newer source activity makes those findings eligible again. Workflow retirement
 uses **not planned**, so reorganizing the queue does not mark its sources fixed.
 There are never more than ten open owned summaries; assigned work counts toward
-that limit. The discussion provides the current rank even for frozen assignments.
+that limit. The discussion provides the current rank even for frozen assignments. If GitHub
+rejects editing its existing bot-authored body, the publisher posts the current
+queue as a new comment on that discussion instead.
 
 The publisher independently refetches GitHub evidence rather than trusting
 agent-editable snapshot files. It validates the full plan before writing, checks

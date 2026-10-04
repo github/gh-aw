@@ -88,7 +88,7 @@ describe("Gemini diagnostic history is not terminal failure", () => {
     }
   });
 
-  it.each(cases)("bootstrap does not fail from $name", async ({ records, terminal }) => {
+  it.each(cases)("bootstrap does not fail from $name", async ({ records, errors, terminal }) => {
     const input = jsonl(records);
     const parsed = parseGeminiLog(input);
     const inputPath = "synthetic-gemini.jsonl";
@@ -133,7 +133,8 @@ describe("Gemini diagnostic history is not terminal failure", () => {
     expect(core.summary.write).toHaveBeenCalledOnce();
     expect(core.summary.addRaw.mock.calls[0][0]).toContain(generateCopilotCliStyleSummary(parsed.logEntries, { parserName: "Gemini" }));
     expect(writeSessionArtifact).toHaveBeenCalledOnce();
-    expect(writeSessionArtifact.mock.calls[0][1]).toEqual(parsed.logEntries);
+    const execution = { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [] } };
+    expect(writeSessionArtifact.mock.calls[0][1]).toEqual([...parsed.logEntries, ...(errors.length ? [execution] : [])]);
     expect(mockFs.writeFileSync).not.toHaveBeenCalled();
     expect(mockFs.appendFileSync).toHaveBeenCalledTimes(Number(terminal));
     if (terminal) {

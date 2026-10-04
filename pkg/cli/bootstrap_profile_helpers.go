@@ -393,10 +393,11 @@ func bootstrapRepositorySecretEnvName(name string) string {
 }
 
 func bootstrapInputEnvName(kind, name string) string {
-	suffix := strings.ToUpper(strings.TrimSpace(name))
+	suffix := strings.TrimSpace(name)
 	if suffix == "" {
 		suffix = "VALUE"
 	}
+	suffix = strings.ToUpper(suffix)
 	var builder strings.Builder
 	lastUnderscore := false
 	for _, ch := range suffix {
