@@ -48,6 +48,7 @@ function isAgentExecutionEvent(event) {
 function recordErrors(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return [];
   const data = record.data ?? record;
+  if (record.type === "error" && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
   if (record.type === "session.result") return [...(Array.isArray(data.errors) ? data.errors : []), ...(data.is_error === true || data.status === "failed" ? [data] : [])];
   if (record.type === "assistant" && record.is_api_error_message === true) return [record];
@@ -59,42 +60,81 @@ function recordErrors(record) {
   return [];
 }
 
+/** @param {string} line @returns {boolean} */
+function isAgentDiagnosticLine(line) {
+  if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:)/.test(line);
+  if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return true;
+  if (/^\[gh-aw\/pi-provider\]\s+\S+\s+provider_error\b/.test(line)) return true;
+  if (/^(?:\[ERROR\]\s*|\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+)/.test(line)) return true;
+  const message = line.replace(/^(?:Error|API Error|error):\s*/i, "");
+  return /^(?:Access denied by policy settings\b|invalid access to inference\b|(?:!\s*\d+\s+)?MCP servers were blocked by policy:|Timeout after \d+ms waiting for session\.idle\b|The requested model is not supported\b|(?:invalid|unknown) model\b|model(?:\s+name)?\s+['"`]?[a-z0-9._:/@-]+['"`]?\s+(?:is\s+)?(?:not found|does not exist|not supported|not available|unavailable)\b|No model available\b|Response status code does not indicate success:|[45]\d{2}\s|CAPIError:|Failed to get response from the AI model;|Maximum (?:LLM invocations|consecutive cache misses|effective tokens|AI credits) exceeded\b|Model\s+"[^"]+"\s+has no AI credits pricing\b|Authentication failed\b|not logged in\b|(?:max_runs_exceeded|max_ai_credits_exceeded|ai_credits_rate_limit_error|max_cache_misses_exceeded|effective_tokens_limit_exceeded|permission_denied_limit_exceeded|model_policy_violation)(?:=true)?$|AWF API proxy blocking requests\b|This thread already has a goal\b|cannot create a new goal because this thread has an unfinished goal\b|could enable arbitrary code execution\b|Command rejected:)/i.test(
+    message
+  );
+}
+
 /**
- * One observation summarizes all attempts; it is not a claim of final failure.
- * Persisted detector categories are authoritative, including timeout-only evidence.
- * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[]}} [options]
- * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
+ * Plain transcript blocks are not diagnostics, even if their text starts with
+ * an error signature. A source-prefixed runtime line restores attribution.
+ * @param {string} content
+ * @returns {{diagnostics: string[], errors: any[]}}
  */
-function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
-  const categorySet = new Set(categories);
-  const codes = new Set();
-  const types = new Set();
-  let observedExit = exitCode;
-  for (const data of observations) {
-    validateAgentExecution(data);
-    for (const category of data.categories) categorySet.add(category);
-    for (const code of data.errorCodes) codes.add(code);
-    for (const type of data.errorTypes) types.add(type);
-    if (observedExit === undefined) observedExit = data.exitCode;
-  }
+function collectAgentErrorEvidence(content) {
   const diagnostics = [];
-  const errors = events.flatMap(recordErrors);
-  for (const line of content.split(/\r?\n/)) {
-    if (!line.trim()) continue;
+  const errors = [];
+  try {
+    const document = JSON.parse(content);
+    for (const value of Array.isArray(document) ? document : [document]) errors.push(...recordErrors(value));
+    return { diagnostics, errors };
+  } catch {
+    // Mixed stdio is parsed as individual records and attributed diagnostic lines.
+  }
+  let transcriptBlock = false;
+  let fencedBlock = false;
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^```/.test(line)) {
+      fencedBlock = !fencedBlock;
+      continue;
+    }
+    if (fencedBlock) continue;
+    if (/^(?:assistant|user|thinking|tool(?: output)?|exec)(?::|\s*$)/i.test(line)) {
+      transcriptBlock = true;
+      continue;
+    }
     let record;
     try {
       record = JSON.parse(line);
     } catch {
-      // Non-JSON diagnostic lines retain the detector's existing text classifiers.
-      diagnostics.push(line);
-      const harness = line.match(/^\[(?:copilot|claude|codex)-harness\].*?\bfailure_reason=([a-z][a-z0-9_]*)/);
-      if (harness) categorySet.add(harness[1]);
-      const terminal = line.match(/^\[(?:copilot|claude|codex)-harness\].*?\bdone: exitCode=(\d+)\b/);
-      if (terminal && exitCode === undefined && !observations.some(data => data.exitCode !== undefined)) observedExit = Number(terminal[1]);
+      const runtimeLine = /^\[(?:(?:copilot|claude|codex)-harness|copilot-sdk-driver|sdk-driver|gh-aw\/pi-provider|ERROR)\]/.test(line) || /^\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+/.test(line);
+      if (runtimeLine) transcriptBlock = false;
+      if (!transcriptBlock && isAgentDiagnosticLine(line)) {
+        diagnostics.push(line);
+        const providerError = line.match(/^\[gh-aw\/pi-provider\].*\bprovider_error\b.*\berror=("(?:[^"\\\u0000-\u001f]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*")$/);
+        if (providerError) errors.push({ errorMessage: JSON.parse(providerError[1]) });
+      }
       continue;
     }
-    for (const value of Array.isArray(record) ? record : [record]) errors.push(...recordErrors(value));
+    if (!transcriptBlock) {
+      for (const value of Array.isArray(record) ? record : [record]) errors.push(...recordErrors(value));
+    }
   }
+  return { diagnostics, errors };
+}
+
+/** @param {string} content @returns {string} */
+function agentErrorDiagnosticText(content) {
+  const { diagnostics, errors } = collectAgentErrorEvidence(content);
+  return [...diagnostics, ...collectNativeErrorEvidence(errors).diagnostics].join("\n");
+}
+
+/**
+ * @param {any[]} errors
+ */
+function collectNativeErrorEvidence(errors) {
+  const diagnostics = [];
+  const codes = new Set();
+  const types = new Set();
   for (const error of errors) {
     diagnostics.push(JSON.stringify(error));
     const queue = [error];
@@ -127,6 +167,35 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
       if (value.metadata?.raw !== undefined) queue.push(value.metadata.raw);
     }
   }
+  return { diagnostics, codes, types };
+}
+
+/**
+ * One observation summarizes all attempts; it is not a claim of final failure.
+ * Persisted detector categories are authoritative, including timeout-only evidence.
+ * @param {{content?: string, events?: SessionEvent[], categories?: string[], exitCode?: number, observations?: AgentExecutionData[]}} [options]
+ * @returns {import("./types/agent_session").AgentExecutionEvent | undefined}
+ */
+function collectAgentExecution({ content = "", events = [], categories = [], exitCode, observations = [] } = {}) {
+  const categorySet = new Set(categories);
+  const { diagnostics, errors: rawErrors } = collectAgentErrorEvidence(content);
+  const errors = [...events.flatMap(recordErrors), ...rawErrors];
+  const { diagnostics: nativeDiagnostics, codes, types } = collectNativeErrorEvidence(errors);
+  let observedExit = exitCode;
+  for (const data of observations) {
+    validateAgentExecution(data);
+    for (const category of data.categories) categorySet.add(category);
+    for (const code of data.errorCodes) codes.add(code);
+    for (const type of data.errorTypes) types.add(type);
+    if (observedExit === undefined) observedExit = data.exitCode;
+  }
+  for (const line of diagnostics) {
+    const harness = line.match(/^\[(?:copilot|claude|codex)-harness\].*?\bfailure_reason=([a-z][a-z0-9_]*)/);
+    if (harness) categorySet.add(harness[1]);
+    const terminal = line.match(/^\[(?:copilot|claude|codex)-harness\].*?\bdone: exitCode=(\d+)\b/);
+    if (terminal && exitCode === undefined && !observations.some(data => data.exitCode !== undefined)) observedExit = Number(terminal[1]);
+  }
+  diagnostics.push(...nativeDiagnostics);
   const text = diagnostics.join("\n");
   for (const diagnostic of diagnostics) {
     for (const match of diagnostic.matchAll(/(?:Response status code does not indicate success:\s*|CAPIError:\s*|Last error:\s*|\bAPI Error:\s*)([45]\d{2})\b/g)) codes.add(Number(match[1]));
@@ -152,7 +221,12 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   if (!categorySet.size && !codes.size && !types.size && observedExit === undefined && !errors.length) return undefined;
   const data = {
     categories: [...categorySet].sort(),
-    errorCodes: [...codes].sort((a, b) => String(a).localeCompare(String(b), "en")),
+    errorCodes: [...codes].sort((a, b) => {
+      const left = String(a);
+      const right = String(b);
+      if (left !== right) return left < right ? -1 : 1;
+      return typeof a === typeof b ? 0 : typeof a === "number" ? -1 : 1;
+    }),
     errorTypes: [...types].sort(),
     ...(observedExit !== undefined ? { exitCode: observedExit } : {}),
   };
@@ -160,4 +234,4 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   return { type: "agent.execution", data };
 }
 
-module.exports = { collectAgentExecution, validateAgentExecution, validateAgentExitCode, parseAgentExitCode, isAgentExecutionEvent };
+module.exports = { collectAgentExecution, agentErrorDiagnosticText, validateAgentExecution, validateAgentExitCode, parseAgentExitCode, isAgentExecutionEvent };

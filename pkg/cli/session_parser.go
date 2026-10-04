@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,10 +25,14 @@ type agentExecutionData struct {
 }
 
 func parseAgentExecution(data json.RawMessage) (*agentExecutionData, error) {
-	var execution agentExecutionData
-	if err := json.Unmarshal(data, &execution); err != nil {
+	var payload struct {
+		agentExecutionData
+		ExitCode json.RawMessage `json:"exitCode"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("invalid agent.execution data: %w", err)
 	}
+	execution := payload.agentExecutionData
 	if execution.Categories == nil || execution.ErrorTypes == nil || execution.ErrorCodes == nil {
 		return nil, errors.New("agent.execution requires categories, errorCodes, and errorTypes arrays")
 	}
@@ -47,8 +52,8 @@ func parseAgentExecution(data json.RawMessage) (*agentExecutionData, error) {
 		key := ""
 		if err := json.Unmarshal(raw, &text); err == nil && text != "" {
 			key = "string:" + text
-		} else if number, err := strconv.ParseInt(string(raw), 10, 64); err == nil && number >= -9007199254740991 && number <= 9007199254740991 {
-			key = "number:" + strconv.FormatInt(number, 10)
+		} else if number, valid := parseAgentExecutionNumber(raw); valid {
+			key = "number:" + strconv.FormatInt(int64(number), 10)
 		}
 		_, duplicate := seenCodes[key]
 		if key == "" || duplicate {
@@ -56,14 +61,20 @@ func parseAgentExecution(data json.RawMessage) (*agentExecutionData, error) {
 		}
 		seenCodes[key] = struct{}{}
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return nil, fmt.Errorf("invalid agent.execution fields: %w", err)
-	}
-	if raw, exists := fields["exitCode"]; exists && (string(raw) == "null" || execution.ExitCode == nil || *execution.ExitCode < 0 || *execution.ExitCode > 255) {
-		return nil, errors.New("agent.execution exitCode must be an integer between 0 and 255")
+	if payload.ExitCode != nil {
+		number, valid := parseAgentExecutionNumber(payload.ExitCode)
+		if !valid || number < 0 || number > 255 {
+			return nil, errors.New("agent.execution exitCode must be an integer between 0 and 255")
+		}
+		exitCode := int(number)
+		execution.ExitCode = &exitCode
 	}
 	return &execution, nil
+}
+
+func parseAgentExecutionNumber(raw json.RawMessage) (float64, bool) {
+	number, err := strconv.ParseFloat(string(raw), 64)
+	return number, err == nil && !math.IsNaN(number) && math.Abs(number) <= 9007199254740991 && math.Trunc(number) == number
 }
 
 func runSessionParser(ctx context.Context, args ...string) ([]byte, error) {

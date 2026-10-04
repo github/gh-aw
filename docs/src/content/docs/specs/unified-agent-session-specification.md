@@ -518,8 +518,14 @@ multiple aggregate execution entries. The serialization-format version remains
 | `errorTypes` | Required array of unique, nonempty native provider error identifiers, terminal reasons, or fatal signal names. |
 | `exitCode` | Source-dependent integer from 0 through 255 for the final execution. Zero MUST be retained. An unavailable code MUST be omitted, not inferred from a failed attempt or job outcome. |
 
-Collections are sorted deterministically. Native codes/types retain their
-original spelling and value types. Multiple retries, repeated source records,
+Collections are sorted deterministically. Error codes sort lexicographically by
+their string form, with numbers before strings when the forms are equal; native
+code values and types remain unchanged. Safe integral JSON numbers such as
+`1e3` and `1.0` MUST be accepted consistently by JavaScript and Go readers.
+Equivalent numeric values MUST count as duplicates regardless of their JSON
+spelling; negative zero and zero are the same numeric value.
+Native error type identifiers retain their original spelling.
+Multiple retries, repeated source records,
 canonical events, and detector observations MUST NOT produce duplicate entries.
 Tool failures and errors quoted in user/assistant messages or tool outputs MUST
 NOT become agent execution errors. Original native and canonical error events
@@ -531,6 +537,13 @@ The detector persists `agent-errors.jsonl` before artifact upload, retaining
 classifications obtained from the live environment and structured firewall logs,
 including step timeouts without a stdio signature. The collector merges that
 evidence with canonical/native engine errors and supported stdio diagnostics.
+Raw-text mining MUST use recognized engine diagnostic prefixes or anchored
+startup error signatures, not arbitrary substring matches across conversation
+text. Labeled plaintext conversation/tool-output blocks, fenced quotations, and
+harness echoes of child output or commands MUST NOT supply classifications.
+The live detector MUST use the same attribution boundary before persisting
+stdio-derived classifications; environment and structured firewall evidence
+retain their separate sources.
 Exit-code precedence is the recorded `agent_execution_exit_code.txt`, an explicit
 agent execution snapshot, a persisted diagnostic observation, then the last
 anchored harness `done: exitCode=...` line. Intermediate attempt and tool exit

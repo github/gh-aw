@@ -1098,7 +1098,6 @@ jobs:
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent-session.jsonl
             /tmp/gh-aw/agent-errors.jsonl
-            /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/pi-streaming.jsonl
             /tmp/gh-aw/agent/pi-sessions/*.jsonl
             /tmp/gh-aw/pi-agent-dir/session.html

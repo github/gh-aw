@@ -75,7 +75,7 @@ const { detectErrors, buildOutputLines, isStepTimeout, sanitizeModelName } = err
 const { parseUnknownModelAICreditsAndModelFromAuditLog, parseMaxCacheMissesExceededFromEventLog } = require("./ai_credits_context.cjs");
 const { renderLogFromFile } = require("./render_detection_log.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { collectAgentExecution, parseAgentExitCode } = require("./agent_execution.cjs");
+const { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode } = require("./agent_execution.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 
@@ -239,7 +239,7 @@ async function main() {
     process.stderr.write(`[detect-agent-errors] Log file not found: ${LOG_FILE}\n`);
   }
 
-  const stdioResults = detectErrors(logContent);
+  const stdioResults = detectErrors(agentErrorDiagnosticText(logContent));
 
   // Also check the AWF firewall structured JSONL logs for the `unknown_model_ai_credits`
   // event — the API proxy event log is preferred and the audit log is used as a fallback.

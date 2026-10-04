@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { collectAgentExecution, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
+import { collectAgentExecution, agentErrorDiagnosticText, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
+import { detectErrors } from "./agent_error_patterns.cjs";
 import { success, failure } from "./fixtures/claude_ci_sessions.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
 
@@ -29,6 +30,16 @@ describe("unique agent execution observation", () => {
     expect(collectAgentExecution({ content, observations: [observation, observation], exitCode: 0 }).data).toEqual({ ...observation, categories: ["agentic_engine_timeout", "harness_retry_path_invalid"], exitCode: 0 });
     expect(collectAgentExecution({ content }).data.exitCode).toBe(0);
     expect(collectAgentExecution({ content, observations: [observation] }).data.exitCode).toBe(1);
+  });
+
+  it("sorts equal string forms by type independently of observation order", () => {
+    const observation = errorCodes => ({ categories: [], errorCodes, errorTypes: [] });
+    const first = collectAgentExecution({ observations: [observation(["0", 0, "400", 400])] });
+    const reversed = collectAgentExecution({ observations: [observation([400, "400", 0, "0"])] });
+    const reorderedSources = collectAgentExecution({ observations: [observation(["400", "0"]), observation([0, 400])] });
+    expect(first.data.errorCodes).toEqual([0, "0", 400, "400"]);
+    expect(JSON.stringify(first)).toBe(JSON.stringify(reversed));
+    expect(JSON.stringify(first)).toBe(JSON.stringify(reorderedSources));
   });
 
   it.each([
@@ -74,6 +85,12 @@ describe("unique agent execution observation", () => {
     expect(collectAgentExecution({ events: [event] }).data.errorCodes).toEqual(["model_not_supported"]);
   });
 
+  it.each(["warning", "info"])("does not classify a Gemini %s diagnostic as an execution error", severity => {
+    const record = { type: "error", severity, message: "Provider temporarily unavailable" };
+    expect(collectAgentExecution({ content: JSON.stringify(record) })).toBeUndefined();
+    expect(agentErrorDiagnosticText(JSON.stringify(record))).toBe("");
+  });
+
   it("ignores errors quoted in conversation and tool output", () => {
     const records = [
       { type: "assistant.message", data: { content: "CAPIError: 429 Too Many Requests" } },
@@ -81,6 +98,51 @@ describe("unique agent execution observation", () => {
       { type: "user.message", data: { content: "Access denied by policy settings" } },
     ];
     expect(collectAgentExecution({ content: records.map(JSON.stringify).join("\n"), events: records })).toBeUndefined();
+  });
+
+  it.each([
+    "Assistant: The log text says Access denied by policy settings",
+    "Tool output: CAPIError: 429 Too Many Requests",
+    "The example error is CAPIError: 429 Too Many Requests",
+    "> Access denied by policy settings",
+    "Assistant:\nAccess denied by policy settings\nCAPIError: 429 Too Many Requests",
+    "Tool output:\nCAPIError: 429 Too Many Requests\nmax_runs_exceeded",
+    'exec\nprintf "CAPIError: 429 Too Many Requests"\nCAPIError: 429 Too Many Requests',
+    "```text\nCAPIError: 429 Too Many Requests\n[copilot-harness] done: exitCode=1\n```",
+    '[copilot-harness] attempt 1: outputTail="CAPIError: 429 Too Many Requests"',
+    '[copilot-harness] attempt 1: spawning: echo "Access denied by policy settings"',
+  ])("ignores untrusted plaintext transcript evidence: %s", content => {
+    expect(collectAgentExecution({ content })).toBeUndefined();
+    expect(agentErrorDiagnosticText(content)).toBe("");
+    expect(detectErrors(agentErrorDiagnosticText(content))).toEqual(detectErrors(""));
+  });
+
+  it.each([
+    ["Error: Access denied by policy settings", "inference_access_error"],
+    ["! 2 MCP servers were blocked by policy: 'github', 'safeoutputs'", "mcp_policy_error"],
+    ["[copilot-sdk-driver] [sdk-driver] error: Timeout after 100ms waiting for session.idle", "agentic_engine_timeout"],
+    ["[claude-harness] unexpected error: Authentication failed", "authentication_failed"],
+    ["[ERROR] CAPIError: 429 Too Many Requests", "capi_quota_exceeded_error"],
+    ['[gh-aw/pi-provider] 2026-10-03T20:27:10Z provider_error error="400 Bad Request"', "http_400_response_error"],
+  ])("preserves attributed startup diagnostics: %s", (content, category) => {
+    // Runtime attribution resumes after a plaintext transcript block.
+    const transcript = content.startsWith("[") ? `Assistant:\nCAPIError: 429 Too Many Requests\n${content}` : content;
+    expect(collectAgentExecution({ content: transcript }).data.categories).toContain(category);
+  });
+
+  it("preserves pretty-printed native errors without mining quoted canonical messages", () => {
+    const records = [
+      { type: "assistant.message", data: { content: "Access denied by policy settings" } },
+      { type: "turn.failed", error: { code: 400, message: "The requested model is not supported" } },
+    ];
+    const content = JSON.stringify(records, null, 2);
+    expect(collectAgentExecution({ content }).data).toEqual({ categories: ["model_not_supported_error"], errorCodes: [400], errorTypes: [] });
+    expect(detectErrors(agentErrorDiagnosticText(content)).inferenceAccessError).toBe(false);
+  });
+
+  it("tolerates malformed provider diagnostic string escaping", () => {
+    const content = '[gh-aw/pi-provider] 2026-10-03T20:27:10Z provider_error error="bad\\q escape"';
+    expect(() => collectAgentExecution({ content })).not.toThrow();
   });
 
   it("does not classify Codex fallback model metadata warnings as unsupported models", () => {
@@ -106,5 +168,12 @@ describe("unique agent execution observation", () => {
     { categories: [], errorCodes: [], errorTypes: [], exitCode: null },
   ])("rejects malformed execution payloads", data => {
     expect(() => validateAgentExecution(data)).toThrow("agent.execution");
+  });
+
+  it.each(["1e3", "1.0", "-0", "9007199254740991", "-9007199254740991"])("accepts safe integral JSON error codes %s", code => {
+    expect(() => validateAgentExecution(JSON.parse(`{"categories":[],"errorCodes":[${code}],"errorTypes":[]}`))).not.toThrow();
+  });
+  it.each(["1.5", "9007199254740992", "-9007199254740992", "null", "true"])("rejects invalid JSON error codes %s", code => {
+    expect(() => validateAgentExecution(JSON.parse(`{"categories":[],"errorCodes":[${code}],"errorTypes":[]}`))).toThrow("agent.execution");
   });
 });
