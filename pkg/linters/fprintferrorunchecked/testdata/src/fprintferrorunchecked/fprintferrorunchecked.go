@@ -3,6 +3,7 @@ package fprintferrorunchecked
 import (
 	"bytes"
 	"fmt"
+	"os"
 )
 
 // BadFprintfMultiReturnAllBlanks discards both return values of fmt.Fprintf with blanks.
@@ -119,4 +120,19 @@ func BadBareCalls() {
 	fmt.Fprintln(w, "text") // want `error return from fmt.Fprintln\(\) is not checked`
 	// nolint:fprintferrorunchecked
 	fmt.Fprintf(w, "intentional")
+}
+
+func GoodConsoleOutput() {
+	fmt.Fprintf(os.Stderr, "diagnostic: %s", "example")
+	_, _ = fmt.Fprintln(os.Stdout, "result")
+	_, _ = fmt.Fprint(os.Stderr, "progress")
+}
+
+func BadNonConsoleFile(f *os.File) {
+	_, _ = fmt.Fprintln(f, "result") // want `error return from fmt.Fprintln\(\) is not checked`
+}
+
+func BadShadowedConsole() {
+	os := struct{ Stderr *os.File }{}
+	fmt.Fprintln(os.Stderr, "result") // want `error return from fmt.Fprintln\(\) is not checked`
 }

@@ -25,7 +25,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `fileclosenotdeferred` — reports non-deferred file `Close()` calls that can leak resources.
 - `execcommandwithoutcontext` — reports `exec.Command(...)` calls inside functions that already receive `context.Context` and should use `exec.CommandContext(...)`.
 - `fmterrorfnoverbs` — reports `fmt.Errorf` calls whose format string contains no verbs, recommending `errors.New` instead.
-- `fprintferrorunchecked` — reports `fmt.Fprintf`, `fmt.Fprint`, and `fmt.Fprintln` assignments that explicitly discard all return values, potentially silencing write failures.
+- `fprintferrorunchecked` — reports unchecked `fmt.Fprintf`, `fmt.Fprint`, and `fmt.Fprintln` writes except direct console output; CI reports findings as warnings.
 - `fprintlnsprintf` — reports `fmt.Fprintln(..., fmt.Sprintf(...))` patterns and recommends direct formatting calls.
 - `generatedyamlheredoc` — reports shell heredocs embedded in generated workflow YAML and recommends passing plain environment-variable content to a JavaScript renderer. Run `make golint-custom` to verify that an unsuppressed heredoc in `pkg/workflow` is reported.
 - `globwalkignorederror` — reports `filepath.Glob` and `os.ReadDir` calls where the error return is discarded with `_`.
@@ -343,7 +343,7 @@ _ = typeassertionnil.Analyzer
 ## Design Notes
 
 - The package is intentionally organized as a namespace (`pkg/linters/*`) so individual analyzers remain isolated and independently testable.
-- CI currently enforces selected production analyzers, including `fprintferrorunchecked`, via the native and WebAssembly `LINTER_FLAGS` lists in `.github/workflows/cgo.yml`.
+- CI enforces selected production analyzers via the native and WebAssembly `LINTER_FLAGS` lists in `.github/workflows/cgo.yml`; it runs `fprintferrorunchecked` separately as a non-blocking warning on native Go code.
 - `typeassertionnil` is registered but excluded from CI enforcement pending a cross-platform enforcement-readiness audit.
 - `excessivefuncparams` exposes a `-max-params` analyzer flag and defaults to `8` parameters (`DefaultMaxParams`).
 - `largefunc` exposes a `-max-lines` analyzer flag, defaults to `60` lines (`DefaultMaxLines`), and skips `_test.go` files.
