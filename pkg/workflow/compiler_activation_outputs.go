@@ -213,10 +213,26 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	ctx.steps = append(ctx.steps,
 		"      - name: Snapshot work queue state\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),
+	)
+	if workQueueStorage(ctx.data) == "issues" {
+		ctx.steps = append(ctx.steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n", "          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n")
+	}
+	ctx.steps = append(ctx.steps,
 		"        with:\n",
 		"          script: |\n",
 		generateGitHubScriptWithRequire("write_work_queue_snapshot.cjs"),
 	)
+}
+
+func workQueueStorage(data *WorkflowData) string {
+	if data != nil {
+		if config, ok := data.Tools["work-queue"].(map[string]any); ok {
+			if storage, ok := config["storage"].(string); ok {
+				return storage
+			}
+		}
+	}
+	return "git"
 }
 
 func isWorkQueueEnabled(data *WorkflowData) bool {

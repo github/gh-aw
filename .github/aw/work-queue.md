@@ -4,7 +4,7 @@ description: Work queue guidance for agentic workflow dispatchers, workers, insp
 
 # Work Queue
 
-Use the Git-backed work queue when independently running dispatchers and workers need durable, replayable work and claim state. For a lightweight checklist, sub-issue, Discussion, or cache-memory backlog, use the [WorkQueueOps pattern](../../docs/src/content/docs/patterns/workqueue-ops.md) instead; those backends are not the `tools.work-queue` protocol.
+Use the Git-backed work queue when independently running dispatchers and workers need durable, replayable work and claim state. Configure `tools.work-queue: {storage: issues}` to use GitHub Issues instead; both backends expose the same agent tools and trusted worker reconciliation. For a lightweight checklist, sub-issue, Discussion, or cache-memory backlog, use the [WorkQueueOps pattern](../../docs/src/content/docs/patterns/workqueue-ops.md) instead; those backends are not the `tools.work-queue` protocol.
 
 ## Dispatcher workflows
 
@@ -25,6 +25,8 @@ Use the Git-backed work queue when independently running dispatchers and workers
 When the runtime advertises the `work-queue` CLI wrapper under `<mcp-clis>`, invoke `work-queue work_queue_read '{}'` or `work-queue work_queue_claim_finish '{"outcome":"completed"}'`. These are MCP tool subcommands, **not** `gh aw work-queue` operator commands.
 
 ## Inspect and manage the queue with the CLI
+
+The issue backend stores one issue per Work identity, marked `aw:work-queue`. The issue body records the Work transaction; claim, cancellation, and completion transactions are append-only comments from the authenticated publisher. Public comments are not queue transactions. State labels `aw:work-queue:available`, `:claimed`, `:completed`, and `:cancelled` are synchronized for visibility; replayed transactions, not labels, determine authority. Configure `tools.work-queue: {storage: issues}` in every dispatcher and worker sharing the queue. Issue storage requires `issues: read` in activation and conclusion and `issues: write` in safe outputs. Do not mix Git and issue backends for the same queue; migration is not automatic. Queue issue bodies and comments are protocol records and must only be edited by trusted writers. Issue storage reads all queue issues and comments on every refresh; prefer Git storage for large queues.
 
 Use `gh aw work-queue --repo owner/repo replay --json` to inspect projected Work and Claims, and `gh aw work-queue --repo owner/repo stats` for state counts. All subcommands accept `--repo`, `--branch`, and `--json`. The default **operator** branch is `gh-aw-work-queue`; `--branch` selects another operator branch. The workflow runtime uses a separate `work-queue` branch and a different transaction format: do not point the operator CLI at the runtime branch or treat its replay as the runtime snapshot.
 
