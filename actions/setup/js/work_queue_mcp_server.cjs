@@ -73,15 +73,15 @@ function readWorkQueueState(snapshot, args = {}) {
     const metadata = new Map(snapshot.projection.transactions.filter(transaction => transaction.kind === "Work").map(transaction => [transaction.work, transaction.enqueued ?? 0]));
     const defaultOrder = new Map(available.map((id, index) => [id, index]));
     available.sort((left, right) => {
-      const leftWork = { id: left, enqueued: metadata.get(left) };
-      const rightWork = { id: right, enqueued: metadata.get(right) };
+      const leftWork = { id: left, enqueued: metadata.get(left) ?? 0 };
+      const rightWork = { id: right, enqueued: metadata.get(right) ?? 0 };
       for (const { expression, direction } of args.sort) {
         const a = evaluateSortExpression(leftWork, expression);
         const b = evaluateSortExpression(rightWork, expression);
         const comparison = typeof a === "string" ? Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8")) : a < b ? -1 : a > b ? 1 : 0;
         if (comparison) return direction === "asc" ? comparison : -comparison;
       }
-      return defaultOrder.get(left) - defaultOrder.get(right);
+      return (defaultOrder.get(left) ?? 0) - (defaultOrder.get(right) ?? 0);
     });
   }
   const workIds = args.work === undefined ? [...available, ...Object.keys(snapshot.projection.work).filter(work => !snapshot.projection.available.includes(work))] : [args.work];
