@@ -142,7 +142,7 @@ func renderGatewayToolCallRow(evt UnifiedTimelineEvent) []string {
 	}
 	detail := tool
 	if evt.ServerName != "" && tool != "" {
-		detail = evt.ServerName + "/" + tool
+		detail = strings.Join([]string{evt.ServerName, tool}, "/")
 	} else if evt.ServerName != "" {
 		detail = evt.ServerName
 	}
@@ -172,7 +172,7 @@ func renderGatewayDIFCFilteredRow(evt UnifiedTimelineEvent) []string {
 
 	detail := evt.ToolName
 	if evt.ServerName != "" && evt.ToolName != "" {
-		detail = evt.ServerName + "/" + evt.ToolName
+		detail = strings.Join([]string{evt.ServerName, evt.ToolName}, "/")
 	} else if evt.ServerName != "" {
 		detail = evt.ServerName
 	}
@@ -197,7 +197,7 @@ func renderGatewayGuardPolicyBlockedRow(evt UnifiedTimelineEvent) []string {
 
 	detail := evt.ToolName
 	if evt.ServerName != "" && evt.ToolName != "" {
-		detail = evt.ServerName + "/" + evt.ToolName
+		detail = strings.Join([]string{evt.ServerName, evt.ToolName}, "/")
 	} else if evt.ServerName != "" {
 		detail = evt.ServerName
 	}
@@ -283,7 +283,7 @@ func renderAgentToolStartRow(evt UnifiedTimelineEvent) []string {
 	kind := timelineEventIcon(TimelineKindAgentToolStart) + " " + timelineEventKindLabel(TimelineKindAgentToolStart)
 	var detail string
 	if evt.ServerName != "" {
-		detail = stringutil.Truncate(evt.ServerName+"/"+evt.ToolName, 48)
+		detail = stringutil.Truncate(strings.Join([]string{evt.ServerName, evt.ToolName}, "/"), 48)
 	} else {
 		detail = stringutil.Truncate(evt.ToolName, 48)
 	}
@@ -302,7 +302,7 @@ func renderAgentToolDoneRow(evt UnifiedTimelineEvent) []string {
 	kind := timelineEventIcon(TimelineKindAgentToolDone) + " " + timelineEventKindLabel(TimelineKindAgentToolDone)
 	var detail string
 	if evt.ServerName != "" {
-		detail = stringutil.Truncate(evt.ServerName+"/"+evt.ToolName, 48)
+		detail = stringutil.Truncate(strings.Join([]string{evt.ServerName, evt.ToolName}, "/"), 48)
 	} else {
 		detail = stringutil.Truncate(evt.ToolName, 48)
 	}
@@ -424,7 +424,7 @@ const streamMaxLineLength = 80
 // when only the tool name is set, and "server" as a last resort.
 func formatStreamToolDetail(serverName, toolName string) string {
 	if serverName != "" && toolName != "" {
-		return serverName + "/" + toolName
+		return strings.Join([]string{serverName, toolName}, "/")
 	}
 	if toolName != "" {
 		return toolName

@@ -1041,6 +1041,12 @@ func TestRenderUnifiedTimelineStream_SteeringEvent(t *testing.T) {
 
 // ─── gatewayEntryToTimelineEvent ───────────────────────────────────────────────
 
+func TestFormatStreamToolDetailPreservesRawNames(t *testing.T) {
+	if got, want := formatStreamToolDetail("server/name", "../tool"), "server/name/../tool"; got != want {
+		t.Fatalf("formatStreamToolDetail() = %q, want %q", got, want)
+	}
+}
+
 func TestGatewayEntryToTimelineEvent(t *testing.T) {
 	t.Parallel()
 	baseTS := "2024-01-15T10:00:00Z"
