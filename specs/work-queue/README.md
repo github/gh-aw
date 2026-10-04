@@ -32,9 +32,12 @@ selects issue storage instead of the default Git branch. Each Work is an issue w
 the `aw:work-queue` label; its Work transaction is in the issue body and later
 transactions are comments. `aw:work-queue:available`, `:claimed`, `:completed`,
 and `:cancelled` labels display the projected state. Comments are replayed in
-publication order; only issues and comments authored by the authenticated
-publisher participate. All queue writers and readers must use the same
-publisher identity. Labels are not used to authorize a worker. The same
+publication order; only issues and comments authored by `github-actions[bot]`
+with a valid HMAC signature participate. Configure the repository secret
+`GH_AW_WORK_QUEUE_HMAC_SECRET` with a random value (for example, generate one
+with `openssl rand -hex 32`) so trusted workflow steps can sign and verify each
+record. Keep this secret unchanged while records exist; rotating it invalidates
+their signatures. Labels are not used to authorize a worker. The same
 snapshot and MCP tools are used with either storage choice. Both backends must
 not be used on the same logical queue without an explicit migration. Issue
 storage needs issues read access at activation and conclusion, and issues write

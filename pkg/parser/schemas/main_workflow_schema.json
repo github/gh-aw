@@ -5053,7 +5053,7 @@
           "examples": [true, null]
         },
         "work-queue": {
-          "description": "Read work queue and claim state from the immutable activation snapshot. The snapshot can become stale while the agent runs.",
+          "description": "Read work queue and claim state from the immutable activation snapshot. The snapshot can become stale while the agent runs. Issue storage requires the repository secret GH_AW_WORK_QUEUE_HMAC_SECRET; all accepted issue bodies and comments are signed.",
           "oneOf": [
             {
               "type": "boolean",
@@ -5071,7 +5071,7 @@
                 "storage": {
                   "type": "string",
                   "enum": ["git", "issues"],
-                  "description": "Queue storage backend; defaults to git."
+                  "description": "Queue storage backend; defaults to git. Choose issues to store queue records on GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret."
                 }
               }
             }

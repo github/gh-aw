@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
+import { createHmac } from "node:crypto";
 import { applyAndPublishIssues, readIssues, QUEUE_LABEL } from "./work_queue_issues_store.cjs";
 import { applyAndPublishWorkQueueTransactions, readWorkQueueLog } from "./work_queue_store.cjs";
 import { CURRENT_VERSION } from "./work_queue_codemods.cjs";
 
+const secret = "test-only-work-queue-hmac-secret";
+const recordPrefix = "<!-- gh-aw-work-queue:v1 -->\n";
 const work = id => ({ version: CURRENT_VERSION, kind: "Work", work: id, claim: null, attempt: null });
 const claim = id => ({ version: CURRENT_VERSION, kind: "Claim", work: "one", claim: id, attempt: null });
 const completion = id => ({ version: CURRENT_VERSION, kind: "Completion", work: "one", claim: id, attempt: "run-1" });
+const canonical = value => {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${canonical(value[key])}`)
+    .join(",")}}`;
+};
+const signedRecord = payload =>
+  `${recordPrefix}${JSON.stringify({
+    payload,
+    sig: createHmac("sha256", secret).update(canonical(payload)).digest("hex"),
+  })}`;
 
 function fakeClient(sameTimestamp = false) {
   const issues = [];
@@ -13,7 +29,6 @@ function fakeClient(sameTimestamp = false) {
   let id = 0;
   const issue = number => issues.find(value => value.number === number);
   const rest = {
-    users: { getAuthenticated: async () => ({ data: { login: "github-actions[bot]" } }) },
     issues: {
       listForRepo: async ({ labels: filter, state, page, per_page }) => ({
         data: issues.filter(value => value.labels.some(label => label.name === filter) && (state === "all" || value.state === state)).slice((page - 1) * per_page, page * per_page),
@@ -49,7 +64,7 @@ function fakeClient(sameTimestamp = false) {
   return { githubClient: { rest }, issues };
 }
 
-const options = fake => ({ githubClient: fake.githubClient, owner: "owner", repo: "repo" });
+const options = fake => ({ githubClient: fake.githubClient, owner: "owner", repo: "repo", secret });
 
 describe("issue-backed work queue", () => {
   it("stores Work in an issue, transactions in comments, and synchronizes state labels", async () => {
@@ -70,7 +85,7 @@ describe("issue-backed work queue", () => {
     await applyAndPublishIssues({ ...options(fake), intents: [work("one"), claim("claim-a"), claim("claim-b"), completion("claim-a")] });
     await fake.githubClient.rest.issues.createComment({
       issue_number: 1,
-      body: `<!-- gh-aw-work-queue:v1 -->\n${JSON.stringify(completion("claim-b"))}`,
+      body: signedRecord(completion("claim-b")),
     });
     expect((await readIssues(options(fake))).transactions).toHaveLength(4);
   });
@@ -85,7 +100,7 @@ describe("issue-backed work queue", () => {
     });
 
     expect((await readIssues(options(fake))).transactions).toHaveLength(1);
-    fake.issues[1].body = fake.issues[0].body.replace('"attempt":null}', '"attempt":null,"enqueued":42}');
+    fake.issues[1].body = signedRecord({ ...work("one"), enqueued: 42 });
     await expect(readIssues(options(fake))).rejects.toThrow("conflicting Work records");
   });
 
@@ -129,10 +144,27 @@ describe("issue-backed work queue", () => {
   it("ignores public comments even when they contain forged or malformed transactions", async () => {
     const fake = fakeClient();
     await applyAndPublishIssues({ ...options(fake), intents: [work("one"), claim("claim-1")] });
-    const comment = (await fake.githubClient.rest.issues.createComment({ issue_number: 1, body: "<!-- gh-aw-work-queue:v1 -->\nnot-json" })).data;
+    const comment = (await fake.githubClient.rest.issues.createComment({ issue_number: 1, body: signedRecord(completion("claim-1")) })).data;
     comment.user.login = "untrusted";
     expect((await readIssues(options(fake))).transactions).toHaveLength(2);
     await applyAndPublishIssues({ ...options(fake), intents: [completion("claim-1")] });
     expect((await readIssues(options(fake))).transactions).toHaveLength(3);
+  });
+
+  it("ignores records without a valid signature", async () => {
+    const fake = fakeClient();
+    await applyAndPublishIssues({ ...options(fake), intents: [work("one")] });
+    await fake.githubClient.rest.issues.createComment({
+      issue_number: 1,
+      body: `${recordPrefix}${JSON.stringify({ payload: completion("forged"), sig: "0".repeat(64) })}`,
+    });
+    expect((await readIssues(options(fake))).transactions).toEqual([work("one")]);
+    fake.issues[0].body = `${recordPrefix}${JSON.stringify(work("one"))}`;
+    await expect(readIssues(options(fake))).rejects.toThrow("Labeled work queue issue has no valid Work record");
+  });
+
+  it("requires the work queue HMAC secret", async () => {
+    const fake = fakeClient();
+    await expect(readIssues({ ...options(fake), secret: "" })).rejects.toThrow("Work queue HMAC secret is not configured");
   });
 });

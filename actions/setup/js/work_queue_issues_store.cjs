@@ -1,22 +1,59 @@
 // @ts-check
 "use strict";
 
+const { createHmac, timingSafeEqual } = require("node:crypto");
 const { applyTransactions, replayTransactions } = require("./work_queue_replay.cjs");
 
 const QUEUE_LABEL = "aw:work-queue";
 const STATE_LABELS = ["aw:work-queue:available", "aw:work-queue:claimed", "aw:work-queue:completed", "aw:work-queue:cancelled"];
 const RECORD_PREFIX = "<!-- gh-aw-work-queue:v1 -->\n";
+// github-script's default GITHUB_TOKEN publishes issues and comments as this bot.
+const PUBLISHER = "github-actions[bot]";
 
-function record(body) {
+function canonical(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${canonical(value[key])}`)
+    .join(",")}}`;
+}
+
+function requireSecret(secret) {
+  if (typeof secret !== "string" || !secret) throw new Error("Work queue HMAC secret is not configured");
+  return secret;
+}
+
+function sign(payload, secret) {
+  return createHmac("sha256", requireSecret(secret)).update(canonical(payload)).digest("hex");
+}
+
+function serializeRecord(payload, secret) {
+  return RECORD_PREFIX + JSON.stringify({ payload, sig: sign(payload, secret) });
+}
+
+function record(body, secret) {
   if (typeof body !== "string" || !body.startsWith(RECORD_PREFIX)) return null;
-  let value;
+  let envelope;
   try {
-    value = JSON.parse(body.slice(RECORD_PREFIX.length));
+    envelope = JSON.parse(body.slice(RECORD_PREFIX.length));
   } catch {
     throw new TypeError("Invalid work queue issue record");
   }
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Invalid work queue issue record");
-  return value;
+  if (
+    !envelope ||
+    typeof envelope !== "object" ||
+    Array.isArray(envelope) ||
+    !envelope.payload ||
+    typeof envelope.payload !== "object" ||
+    Array.isArray(envelope.payload) ||
+    typeof envelope.sig !== "string" ||
+    !/^[a-f0-9]{64}$/.test(envelope.sig)
+  )
+    return null;
+  const expected = Buffer.from(sign(envelope.payload, secret), "hex");
+  const actual = Buffer.from(envelope.sig, "hex");
+  return timingSafeEqual(actual, expected) ? envelope.payload : null;
 }
 
 async function pages(githubClient, method, params) {
@@ -29,23 +66,22 @@ async function pages(githubClient, method, params) {
   }
 }
 
-async function readIssues({ githubClient, owner, repo }) {
-  const authenticated = await githubClient.rest.users.getAuthenticated();
-  const publisher = authenticated.data.login;
-  if (typeof publisher !== "string" || !publisher) throw new TypeError("Work queue publisher identity is unavailable");
+async function readIssues({ githubClient, owner, repo, secret = process.env.WORK_QUEUE_HMAC_SECRET }) {
+  const hmacSecret = requireSecret(secret);
+  const publisher = PUBLISHER;
   const issues = (await pages(githubClient, githubClient.rest.issues.listForRepo, { owner, repo, state: "all", labels: QUEUE_LABEL })).filter(issue => !issue.pull_request).sort((a, b) => a.number - b.number);
   const entries = [];
   const byWork = new Map();
   for (const issue of issues) {
     if (issue.user?.login !== publisher) continue;
-    const work = record(issue.body);
+    const work = record(issue.body, hmacSecret);
     if (!work || work.kind !== "Work") throw new TypeError("Labeled work queue issue has no valid Work record");
     applyTransactions([], [work]);
     if (byWork.has(work.work)) {
       const original = entries.find(entry => entry.transaction.kind === "Work" && entry.transaction.work === work.work);
       if (!original || original.transaction.version !== work.version || original.transaction.enqueued !== work.enqueued) throw new Error("Multiple work queue issues have conflicting Work records");
       const duplicateComments = await pages(githubClient, githubClient.rest.issues.listComments, { owner, repo, issue_number: issue.number });
-      if (duplicateComments.some(comment => comment.user?.login === publisher && record(comment.body))) throw new Error("Duplicate work queue issue has transactions");
+      if (duplicateComments.some(comment => comment.user?.login === publisher && record(comment.body, hmacSecret))) throw new Error("Duplicate work queue issue has transactions");
       continue;
     }
     byWork.set(work.work, issue.number);
@@ -53,7 +89,7 @@ async function readIssues({ githubClient, owner, repo }) {
     const comments = await pages(githubClient, githubClient.rest.issues.listComments, { owner, repo, issue_number: issue.number });
     for (const comment of comments) {
       if (comment.user?.login !== publisher) continue;
-      const transaction = record(comment.body);
+      const transaction = record(comment.body, hmacSecret);
       if (transaction) {
         if (transaction.kind === "Work" || transaction.work !== work.work) throw new TypeError("Work queue comment targets the wrong Work");
         entries.push({ transaction, timestamp: comment.created_at, order: comment.id, issue: issue.number, comment: comment.id });
@@ -98,12 +134,13 @@ async function ensureLabel(githubClient, owner, repo, name) {
   }
 }
 
-async function applyAndPublishIssues({ githubClient, owner, repo, intents, core: coreApi }) {
+async function applyAndPublishIssues({ githubClient, owner, repo, intents, core: coreApi, secret = process.env.WORK_QUEUE_HMAC_SECRET }) {
+  const hmacSecret = requireSecret(secret);
   let persisted = false;
   let idempotent = 0;
   const rejected = [];
   for (const intent of intents) {
-    const current = await readIssues({ githubClient, owner, repo });
+    const current = await readIssues({ githubClient, owner, repo, secret: hmacSecret });
     const applied = applyTransactions(current.transactions, [intent]);
     rejected.push(...applied.rejected);
     idempotent += applied.idempotent;
@@ -121,18 +158,18 @@ async function applyAndPublishIssues({ githubClient, owner, repo, intents, core:
         owner,
         repo,
         title: "Work queue item",
-        body: RECORD_PREFIX + JSON.stringify(intent),
+        body: serializeRecord(intent, hmacSecret),
         labels: [QUEUE_LABEL, STATE_LABELS[0]],
       });
       issueNumber = created.data.number;
     } else {
       if (!issueNumber) throw new Error("Work queue issue is missing");
-      await githubClient.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: RECORD_PREFIX + JSON.stringify(intent) });
+      await githubClient.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: serializeRecord(intent, hmacSecret) });
     }
     persisted = true;
     // Always refresh before trusting the write: a concurrent comment or duplicate
     // issue can invalidate this writer's proposed transaction.
-    const latest = await readIssues({ githubClient, owner, repo });
+    const latest = await readIssues({ githubClient, owner, repo, secret: hmacSecret });
     const accepted = applyTransactions(latest.transactions, [intent]).idempotent === 1;
     if (!accepted) throw new Error("Work queue transaction lost concurrent arbitration");
     if (intent.kind === "Work" && issueNumber !== latest.byWork.get(intent.work)) {
@@ -142,7 +179,7 @@ async function applyAndPublishIssues({ githubClient, owner, repo, intents, core:
     await syncStateLabel(githubClient, owner, repo, latest.byWork.get(intent.work), replayTransactions(latest.transactions).work[intent.work]);
     coreApi?.info("Work queue: issue transaction published");
   }
-  const latest = await readIssues({ githubClient, owner, repo });
+  const latest = await readIssues({ githubClient, owner, repo, secret: hmacSecret });
   return { sha: latest.sha, transactions: latest.transactions, rejected, idempotent, persisted };
 }
 

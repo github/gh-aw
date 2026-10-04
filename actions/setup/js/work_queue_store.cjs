@@ -106,12 +106,12 @@ async function readQueueBranch(githubClient, owner, repo, branch) {
 
 /**
  * Activation is read-only; trusted write-capable readers publish upgrades.
- * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean, core?: {info: (message: string) => void}}} options
+ * @param {{githubClient: any, owner: string, repo: string, publishUpgrades?: boolean, core?: {info: (message: string) => void}, secret?: string}} options
  */
-async function readWorkQueueLog({ githubClient, owner, repo, publishUpgrades = true, core: coreApi = typeof core === "undefined" ? undefined : core }) {
+async function readWorkQueueLog({ githubClient, owner, repo, publishUpgrades = true, core: coreApi = typeof core === "undefined" ? undefined : core, secret = process.env.WORK_QUEUE_HMAC_SECRET }) {
   if (process.env.GH_AW_WORK_QUEUE_STORAGE === "issues") {
     const { readIssues } = require("./work_queue_issues_store.cjs");
-    return readIssues({ githubClient, owner, repo });
+    return readIssues({ githubClient, owner, repo, secret });
   }
   const current = await readWorkQueueLogRaw({ githubClient, owner, repo, core: coreApi });
   if (!current.needsUpgrade || !publishUpgrades) return current;
@@ -129,7 +129,8 @@ async function readWorkQueueLog({ githubClient, owner, repo, publishUpgrades = t
  *   intents: WorkQueueTransaction[],
  *   maxRetries?: number,
  *   sleepFn?: (delay: number) => Promise<void>,
- *   core?: {info: (message: string) => void}
+ *   core?: {info: (message: string) => void},
+ *   secret?: string
  * }} options
  */
 async function applyAndPublishWorkQueueTransactions({
@@ -140,10 +141,11 @@ async function applyAndPublishWorkQueueTransactions({
   maxRetries = DEFAULT_MAX_RETRIES,
   sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
   core: coreApi = typeof core === "undefined" ? undefined : core,
+  secret = process.env.WORK_QUEUE_HMAC_SECRET,
 }) {
   if (process.env.GH_AW_WORK_QUEUE_STORAGE === "issues") {
     const { applyAndPublishIssues } = require("./work_queue_issues_store.cjs");
-    return applyAndPublishIssues({ githubClient, owner, repo, intents, core: coreApi });
+    return applyAndPublishIssues({ githubClient, owner, repo, intents, core: coreApi, secret });
   }
   if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 10) {
     throw new RangeError("Work queue maxRetries must be an integer between 0 and 10");

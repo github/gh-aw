@@ -295,7 +295,7 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 	}
 	if workQueueStorage(data) == "issues" {
-		steps = append(steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n")
+		steps = append(steps, "        env:\n", "          GH_AW_WORK_QUEUE_STORAGE: issues\n", "          WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}\n")
 	}
 	return append(steps,
 		"        with:\n",
