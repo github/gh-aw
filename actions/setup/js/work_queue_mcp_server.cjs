@@ -35,12 +35,56 @@ function loadWorkQueueSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPS
   });
 }
 
+function validateSort(sort) {
+  if (sort === undefined) return;
+  if (!Array.isArray(sort) || sort.length === 0 || sort.length > 4) {
+    throw new TypeError("sort must contain between one and four sort operators");
+  }
+  for (const term of sort) {
+    if (!term || typeof term !== "object" || Array.isArray(term) || Object.keys(term).some(key => !["expression", "direction"].includes(key)) || !["asc", "desc"].includes(term.direction)) {
+      throw new TypeError("each sort operator must have an expression and an asc or desc direction");
+    }
+    const expression = term.expression;
+    if (
+      !expression ||
+      typeof expression !== "object" ||
+      Array.isArray(expression) ||
+      Object.keys(expression).some(key => !["op", "field"].includes(key)) ||
+      !((expression.op === "field" && ["id", "enqueued"].includes(expression.field)) || (expression.op === "length" && expression.field === "id"))
+    ) {
+      throw new TypeError("sort expression must be a field (id or enqueued) or the length of id");
+    }
+  }
+}
+
+function evaluateSortExpression(work, expression) {
+  const value = work[expression.field];
+  return expression.op === "length" ? [...value].length : value;
+}
+
 function readWorkQueueState(snapshot, args = {}) {
   if (args.work !== undefined && (typeof args.work !== "string" || args.work.length === 0)) {
     throw new TypeError("work must be a non-empty string when provided");
   }
+  validateSort(args.sort);
 
-  const workIds = args.work === undefined ? [...snapshot.projection.available, ...Object.keys(snapshot.projection.work).filter(work => !snapshot.projection.available.includes(work))] : [args.work];
+  const available = [...snapshot.projection.available];
+  if (args.sort) {
+    const metadata = new Map(snapshot.projection.transactions.filter(transaction => transaction.kind === "Work").map(transaction => [transaction.work, transaction.enqueued ?? 0]));
+    const defaultOrder = new Map(available.map((id, index) => [id, index]));
+    available.sort((left, right) => {
+      const leftWork = { id: left, enqueued: metadata.get(left) };
+      const rightWork = { id: right, enqueued: metadata.get(right) };
+      for (const { expression, direction } of args.sort) {
+        const a = evaluateSortExpression(leftWork, expression);
+        const b = evaluateSortExpression(rightWork, expression);
+        const comparison = typeof a === "string" ? Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8")) : a < b ? -1 : a > b ? 1 : 0;
+        if (comparison) return direction === "asc" ? comparison : -comparison;
+      }
+      return defaultOrder.get(left) - defaultOrder.get(right);
+    });
+  }
+  const workIds = args.work === undefined ? [...available, ...Object.keys(snapshot.projection.work).filter(work => !snapshot.projection.available.includes(work))] : [args.work];
   const works = workIds.map(work => {
     if (!Object.hasOwn(snapshot.projection.work, work)) {
       return { id: work, state: "absent", winner: null, claims: [] };
@@ -60,18 +104,31 @@ function readWorkQueueState(snapshot, args = {}) {
     };
   });
 
-  return { snapshot_sha: snapshot.sha, next_work: snapshot.projection.available[0] ?? null, works };
+  return { snapshot_sha: snapshot.sha, next_work: available[0] ?? null, works };
 }
 
 function createWorkQueueStateTool(snapshot) {
   return {
     name: "work_queue_read",
     description:
-      "Read the immutable work queue snapshot captured during workflow activation. Available Work is ordered oldest-first; next_work recommends the oldest available item. This view may be stale during agent execution; safe-output processing rechecks authority before publishing changes without enforcing FIFO.",
+      "Read the immutable work queue snapshot captured during workflow activation. Available Work is oldest-first by default; optional sort operators reorder available Work and next_work. This view may be stale during agent execution; safe-output processing rechecks authority without enforcing the requested order.",
     inputSchema: {
       type: "object",
       properties: {
         work: { type: "string", minLength: 1, description: "Optional Work identifier to read." },
+        sort: {
+          type: "array",
+          description: 'Optional ordered sort operators (1–4), e.g. [{"expression":{"op":"field","field":"enqueued"},"direction":"desc"}]. Each expression reads id or enqueued, or computes the length of id. Ties retain oldest-first order.',
+          items: {
+            type: "object",
+            properties: {
+              expression: { type: "object", properties: { op: { type: "string", enum: ["field", "length"] }, field: { type: "string", enum: ["id", "enqueued"] } }, required: ["op", "field"], additionalProperties: false },
+              direction: { type: "string", enum: ["asc", "desc"] },
+            },
+            required: ["expression", "direction"],
+            additionalProperties: false,
+          },
+        },
       },
       additionalProperties: false,
     },

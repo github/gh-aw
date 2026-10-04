@@ -78,6 +78,46 @@ describe("work queue MCP snapshot", () => {
     expect(readWorkQueueState(snapshot, { work: "a-new" }).next_work).toBe("z-old");
   });
 
+  it("sorts available Work with field and length expressions while retaining default ties", () => {
+    const snapshot = loadWorkQueueSnapshot(
+      writeSnapshot({
+        version: 2,
+        sha: "head",
+        transactionLog: serializeTransactionLog([createWorkTransaction("z", 10), createWorkTransaction("aaa", 20), createWorkTransaction("bb", 20), createWorkTransaction("claimed", 30), claim("claimed", "c")]),
+        worker: null,
+      })
+    );
+    const newestFirst = [{ expression: { op: "field", field: "enqueued" }, direction: "desc" }];
+    expect(readWorkQueueState(snapshot, { sort: newestFirst }).works.map(item => item.id)).toEqual(["aaa", "bb", "z", "claimed"]);
+    expect(readWorkQueueState(snapshot, { sort: newestFirst }).next_work).toBe("aaa");
+    expect(readWorkQueueState(snapshot, { work: "z", sort: newestFirst }).next_work).toBe("aaa");
+
+    const byLength = [
+      { expression: { op: "length", field: "id" }, direction: "asc" },
+      { expression: { op: "field", field: "id" }, direction: "desc" },
+    ];
+    expect(readWorkQueueState(snapshot, { sort: byLength }).works.map(item => item.id)).toEqual(["z", "bb", "aaa", "claimed"]);
+    expect(readWorkQueueState(snapshot, { sort: [{ expression: { op: "field", field: "id" }, direction: "desc" }] }).next_work).toBe("z");
+    expect(readWorkQueueState(snapshot).next_work).toBe("z");
+  });
+
+  it("rejects unsupported and unbounded sort operators", () => {
+    const snapshot = loadWorkQueueSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null }));
+    const term = { expression: { op: "field", field: "id" }, direction: "asc" };
+    for (const sort of [
+      [],
+      [term, term, term, term, term],
+      "id",
+      [{ ...term, direction: "random" }],
+      [{ ...term, extra: true }],
+      [{ ...term, expression: { op: "length", field: "enqueued" } }],
+      [{ ...term, expression: { op: "field", field: "state" } }],
+    ]) {
+      expect(() => readWorkQueueState(snapshot, { sort })).toThrow(TypeError);
+    }
+    expect(createWorkQueueStateTool(snapshot).inputSchema.properties.sort.items.required).toEqual(["expression", "direction"]);
+  });
+
   it("loads v1 Work at age zero without changing the snapshot envelope", () => {
     const snapshotPath = writeSnapshot({
       version: 2,
