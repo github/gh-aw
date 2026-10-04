@@ -2628,10 +2628,10 @@ engine:
   # (optional)
   model-provider: "github"
 
-  # Claude permission mode override. Defaults to acceptEdits (or auto when
-  # tools.edit is false).
+  # Claude permission mode override. Defaults to dontAsk for unattended runs. Other
+  # modes may approve actions beyond tools pre-approved by the workflow.
   # (optional)
-  permission-mode: "auto"
+  permission-mode: "default"
 
   # Maximum number of continuations for multi-run autopilot mode. Default is 1
   # (single run, no autopilot). Values greater than 1 enable --autopilot mode for
@@ -4298,8 +4298,10 @@ tools:
   # Format 2: Enable agentic-workflows tool with default settings (same as true)
   agentic-workflows: null
 
-  # Read work queue and claim state from the immutable activation snapshot. The MCP
-  # server does not read Git; the snapshot can become stale while the agent runs.
+  # Read work queue and claim state from the immutable activation snapshot. The
+  # snapshot can become stale while the agent runs. Issue storage requires the
+  # repository secret GH_AW_WORK_QUEUE_HMAC_SECRET; all accepted issue bodies and
+  # comments are signed.
   # (optional)
   # Accepted formats:
 
@@ -4308,6 +4310,12 @@ tools:
 
   # Format 2: Enable the work-queue MCP server.
   work-queue: null
+
+  # Format 3: object
+  work-queue:
+    # Queue storage backend; defaults to git. Choose issues to store queue records on
+    # GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret.
+    storage: "git"
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
@@ -21069,10 +21077,10 @@ safe-outputs:
       # (optional)
       model-provider: "github"
 
-      # Claude permission mode override. Defaults to acceptEdits (or auto when
-      # tools.edit is false).
+      # Claude permission mode override. Defaults to dontAsk for unattended runs. Other
+      # modes may approve actions beyond tools pre-approved by the workflow.
       # (optional)
-      permission-mode: "auto"
+      permission-mode: "default"
 
       # Maximum number of continuations for multi-run autopilot mode. Default is 1
       # (single run, no autopilot). Values greater than 1 enable --autopilot mode for

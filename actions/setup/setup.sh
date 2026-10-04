@@ -388,6 +388,7 @@ SAFE_OUTPUTS_FILES=(
   "invocation_context_helpers.cjs"
   "data_schema_normalizer.cjs"
   "work_queue_store.cjs"
+  "work_queue_issues_store.cjs"
   "work_queue_replay.cjs"
   "work_queue_codemods.cjs"
 )

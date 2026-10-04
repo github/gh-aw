@@ -89,12 +89,23 @@ def validate_plan(plan, corpus):
         require(isinstance(key, str) and re.fullmatch(r"[a-z][a-z0-9-]{2,63}", key), "Invalid cluster key")
         require(key not in keys, "Duplicate cluster key")
         keys.add(key)
+        previous = existing.get(key)
         for field in ("title", "summary", "fix", "rationale"):
             text(cluster.get(field), field, 120 if field == "title" else 4000)
+            if not (previous and previous.get("assignees")):
+                if field == "title":
+                    require(len(cluster[field].strip()) < 60,
+                            "Title must be a complete phrase under 60 characters")
+                else:
+                    require(cluster[field].strip().endswith((".", "!", "?")),
+                            f"{field} must end with sentence punctuation; do not clip prose")
         criteria = cluster.get("acceptance")
         require(isinstance(criteria, list) and 1 <= len(criteria) <= 6, "Missing acceptance criteria")
         for criterion in criteria:
             text(criterion, "acceptance criterion", 1000)
+            if not (previous and previous.get("assignees")):
+                require(criterion.strip().endswith((".", "!", "?")),
+                        "Acceptance criterion must end with sentence punctuation; do not clip prose")
         for field in ("impact", "confidence", "effort"):
             require(type(cluster.get(field)) is int and 1 <= cluster[field] <= 5, f"Invalid {field}")
         members = cluster.get("members")
@@ -104,7 +115,6 @@ def validate_plan(plan, corpus):
             and len(set(members)) == len(members),
             "Members must be unique issue numbers",
         )
-        previous = existing.get(key)
         if previous and previous.get("assignees"):
             require(cluster == metadata(previous), f"Assigned cluster {key} must remain unchanged")
             live_members = set(members) & eligible
