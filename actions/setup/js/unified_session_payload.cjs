@@ -83,7 +83,7 @@ const EVENT_FIELDS = {
   "user.message": { content: ["content"] },
   "assistant.message": { content: ["content"] },
   "assistant.reasoning": { content: ["content"] },
-  "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters"], command: ["command"] },
+  "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
     ...TOOL_FIELDS,
     success: ["success"],

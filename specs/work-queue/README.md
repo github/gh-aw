@@ -27,6 +27,23 @@ permission required for mutations.
 All subcommands support `--json` for machine-readable output. Workflows enable the
 read-only snapshot MCP server with `tools.work-queue: true`.
 
+For the workflow runtime (not the operator CLI), `tools.work-queue: {storage: issues}`
+selects issue storage instead of the default Git branch. Each Work is an issue with
+the `aw:work-queue` label; its Work transaction is in the issue body and later
+transactions are comments. `aw:work-queue:available`, `:claimed`, `:completed`,
+and `:cancelled` labels display the projected state. Comments are replayed in
+publication order; only issues and comments authored by `github-actions[bot]`
+with a valid HMAC signature participate. Configure the repository secret
+`GH_AW_WORK_QUEUE_HMAC_SECRET` with a random value (for example, generate one
+with `openssl rand -hex 32`) so trusted workflow steps can sign and verify each
+record. Keep this secret unchanged while records exist; rotating it invalidates
+their signatures. Labels are not used to authorize a worker. The same
+snapshot and MCP tools are used with either storage choice. Both backends must
+not be used on the same logical queue without an explicit migration. Issue
+storage needs issues read access at activation and conclusion, and issues write
+access at trusted safe-output publication. Each refresh lists the issues and
+comments in full, so the Git backend is preferable for large queues.
+
 | Command | Arguments |
 |---|---|
 | `replay` | Display the projected Work and Claims |
@@ -51,7 +68,7 @@ each operator record before replay or publication. The workflow runtime uses a
 separate `work-queue` branch and the versioned `WorkQueueTransaction` format:
 required fields `version: 2`, `kind`, `work`, `claim`, and `attempt`, plus optional
 `enqueued` on Work. Unused claim/attempt
-fields are explicitly `null`; identities are nonempty strings. Its loader upgrades
+fields are explicitly `null`; identities are nonempty strings. The Git loader upgrades
 unversioned/version-0/version-1 workflow records through successive codemods before
 validation and replay. Version 1 remains the closed five-field format without
 `enqueued`; historical records with extra fields are rejected before upgrading.
@@ -80,7 +97,7 @@ activation, so admission and completion still recheck the durable queue.
 The MCP tools are `work_queue_read` and `work_queue_claim_finish`; the latter
 records a `WorkQueueFinishIntent` containing only `outcome: "completed"` or
 `outcome: "cancelled"`. Artifacts use `work-queue.snapshot.json` and
-`work-queue.finish.jsonl`; the durable transaction file is `work-queue.jsonl`.
+`work-queue.finish.jsonl`; the Git-backed durable transaction file is `work-queue.jsonl`.
 
 When the runtime prompt advertises `work-queue` under `<mcp-clis>`, invoke these
 tools as `work-queue work_queue_read '{"work":"example"}'` and

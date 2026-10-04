@@ -87,6 +87,8 @@ concurrency:
 
 Compiler-generated concurrency groups (the top-level workflow group, and the agent, output, and conclusion jobs) emit `queue: max` by default so back-to-back triggers run sequentially rather than being dropped. The top-level group only emits `queue: max` when `cancel-in-progress` is not enabled, since GitHub Actions rejects the combination of `queue: max` and `cancel-in-progress: true`. Set `features.group-concurrency-queue: false` to omit `queue` from generated groups and revert to the Actions default:
 
+For slash-command workflows that also handle pull request events, the top-level group uses an event-dependent `cancel-in-progress` expression so pull request updates cancel outdated runs without canceling command runs. Because GitHub Actions requires `queue` to be a literal value, the compiler omits it for this mixed-trigger group; the default `single` queue behavior applies.
+
 ```yaml wrap
 features:
   group-concurrency-queue: false

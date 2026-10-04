@@ -31,6 +31,14 @@ imports:
   - ../skills/jqschema/SKILL.md
 
   - shared/otlp.md
+steps:
+  - name: Check successful audit cadence
+    uses: actions/github-script@v9.0.0
+    with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      script: |
+        const { checkCadence } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/safe_output_health_cadence.cjs`);
+        await checkCadence({ github, context, core });
 ---
 
 # Safe Output Health Monitor
@@ -52,6 +60,16 @@ Daily audit all agentic workflow runs from the last 24 hours to identify issues,
 - DO NOT ATTEMPT TO USE GH AW DIRECTLY, it is not authenticated. Use the MCP server instead.
 - Do not attempt to download the `gh aw` extension or build it. If the MCP fails, give up.
 - Run the `status` tool of `gh-aw` MCP server to verify configuration.
+
+### Phase 0.1: Check Monitoring Cadence
+
+Read `/tmp/gh-aw/agent/safe-output-health-cadence.json`, produced by the read-only setup check against this workflow's default-branch run history.
+
+- The expected interval is **24 hours**; a gap **greater than 48 hours** since the previous successful run is a **high-priority monitoring-staleness finding**, even when no safe output errors are found.
+- Include the cadence status, elapsed hours, previous successful run timestamp and link in the Executive Summary. For a stale result, also add a Process Improvements recommendation to investigate the intervening runs and restore successful daily publication.
+- Failed, cancelled, or skipped attempts do not reset the successful-audit baseline. Distinguish missed schedule triggers from scheduled runs that failed before publishing; do not claim the workflow was disabled without evidence.
+- If the check is unavailable, has no successful history, or its file is missing, report cadence as **unknown**, not healthy. Continue the audit and publish the report.
+- Treat this monitor's cadence as an explicit exception to the safe-output-only scope below. Keep the normal log analysis window at 24 hours, and mark historical comparisons across a stale gap as discontinuous.
 
 ### Phase 1: Collect Workflow Logs
 
