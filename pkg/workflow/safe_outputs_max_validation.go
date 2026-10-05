@@ -282,6 +282,11 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
+	if config.ReportIncomplete != nil {
+		if err := checkMaxField("report_incomplete", config.ReportIncomplete.Max); err != nil {
+			return err
+		}
+	}
 	if config.ReplaceLabel != nil {
 		if err := checkMaxField("replace_label", config.ReplaceLabel.Max); err != nil {
 			return err

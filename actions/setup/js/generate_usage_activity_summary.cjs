@@ -1238,6 +1238,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  main,
   writeDetectionUsageResult,
   parseFirewallLogs,
   parseSessionLogs,
