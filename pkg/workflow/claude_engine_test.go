@@ -35,6 +35,9 @@ func TestClaudeEngine(t *testing.T) {
 	if !engine.GetCapabilities().ToolsAllowlist {
 		t.Error("Claude engine should support MCP tools")
 	}
+	if !engine.GetCapabilities().DynamicWorkflows {
+		t.Error("Claude engine should support dynamic workflows")
+	}
 
 	// Test installation steps (should have 2 steps: Node.js setup + install;
 	// secret validation is now in the activation job via GetSecretValidationStep)

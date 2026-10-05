@@ -6,7 +6,7 @@ import { spawnSync } from "child_process";
 
 import { extractDiffGitHeaderEntries } from "./patch_path_helpers.cjs";
 import { countUniquePatchFiles } from "./create_pull_request.cjs";
-import { extractPathsFromPatch } from "./manifest_file_helpers.cjs";
+import { checkForManifestFiles, extractPathsFromPatch } from "./manifest_file_helpers.cjs";
 
 function execGit(args, options = {}) {
   const result = spawnSync("git", args, { encoding: "utf8", ...options });
@@ -82,8 +82,23 @@ describe("patch_path_helpers integration - real git outputs", () => {
     expect(entries[0].parseable).toBe(true);
     expect(entries[1].parseable).toBe(true);
     expect(countUniquePatchFiles(patch)).toBe(2);
-    expect(extractPathsFromPatch(patch)).toContain('foo\\"bar.txt');
-    expect(extractPathsFromPatch(patch)).toContain("foo\\\\bar.txt");
+    expect(extractPathsFromPatch(patch)).toContain('foo"bar.txt');
+    expect(extractPathsFromPatch(patch)).toContain("foo\\bar.txt");
+  });
+
+  it("decodes C-style octal escapes for non-ASCII paths", () => {
+    const filePath = "répo/pyproject.toml";
+    fs.mkdirSync(path.join(repoDir, "répo"), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, filePath), "config\n");
+    execGit(["config", "core.quotePath", "true"], { cwd: repoDir });
+    execGit(["add", "."], { cwd: repoDir });
+    execGit(["commit", "-q", "-m", "add non-ASCII manifest"], { cwd: repoDir });
+    const patch = lastCommitPatch(repoDir);
+
+    expect(patch).toMatch(/diff --git "a\/r\\303\\251po\/pyproject\.toml"/);
+    expect(extractDiffGitHeaderEntries(patch)[0].newPath).toBe(filePath);
+    expect(extractPathsFromPatch(patch)).toContain(filePath);
+    expect(checkForManifestFiles(patch, ["pyproject.toml"], [filePath]).hasManifestFiles).toBe(false);
   });
 
   it("parses real git rename headers and exposes both old/new paths", () => {

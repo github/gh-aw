@@ -66,7 +66,7 @@ func TestConcurrencyQueueSchemaValidation(t *testing.T) {
 	}{
 		{queue: "single"},
 		{queue: "max"},
-		{queue: "${{ github.event_name == 'pull_request' && 'single' || 'max' }}"},
+		{queue: "${{ github.event_name == 'pull_request' && 'single' || 'max' }}", wantErr: true},
 		{queue: "invalid", wantErr: true},
 	} {
 		t.Run(tt.queue, func(t *testing.T) {

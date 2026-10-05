@@ -1845,9 +1845,9 @@ describe("create_pull_request - max limit enforcement", () => {
     const { countUniquePatchFiles, parseDiffGitHeader } = require("./create_pull_request.cjs");
 
     // Embedded escaped quote: "a/foo\"bar" "b/foo\"bar"
-    expect(parseDiffGitHeader('diff --git "a/foo\\"bar" "b/foo\\"bar"')).toBe('foo\\"bar');
+    expect(parseDiffGitHeader('diff --git "a/foo\\"bar" "b/foo\\"bar"')).toBe('foo"bar');
     // Embedded backslash: "a/foo\\bar" "b/foo\\bar"
-    expect(parseDiffGitHeader('diff --git "a/foo\\\\bar" "b/foo\\\\bar"')).toBe("foo\\\\bar");
+    expect(parseDiffGitHeader('diff --git "a/foo\\\\bar" "b/foo\\\\bar"')).toBe("foo\\bar");
     // Plain unquoted form
     expect(parseDiffGitHeader("diff --git a/foo.txt b/foo.txt")).toBe("foo.txt");
     // Path with spaces (git always emits quoted form when path contains spaces)

@@ -23,6 +23,7 @@ func TestProtectedFilesExclude(t *testing.T) {
 		excludeFiles       []string
 		wantExcludedFromPF []string // files that must NOT be in the final protected_files list
 		wantPresentInPF    []string // files that must still be in the protected_files list
+		wantPathExcludes   []string
 	}{
 		{
 			name:               "exclude AGENTS.md from create-pull-request",
@@ -41,6 +42,13 @@ func TestProtectedFilesExclude(t *testing.T) {
 			excludeFiles:       nil,
 			wantExcludedFromPF: []string{"CHANGELOG.md"},
 			wantPresentInPF:    []string{"package.json", "go.mod"},
+		},
+		{
+			name:               "root path exclude keeps nested manifests protected",
+			excludeFiles:       []string{"/pyproject.toml", "AGENTS.md"},
+			wantExcludedFromPF: []string{"AGENTS.md", "CHANGELOG.md"},
+			wantPresentInPF:    []string{"pyproject.toml", "package.json"},
+			wantPathExcludes:   []string{"pyproject.toml"},
 		},
 	}
 
@@ -107,6 +115,18 @@ func TestProtectedFilesExclude(t *testing.T) {
 				assert.Contains(t, pfStrings, present,
 					"non-excluded file %q should still appear in protected_files", present)
 			}
+			if len(tt.wantPathExcludes) > 0 {
+				assert.Equal(t, tt.wantPathExcludes, ParseStringArrayFromConfig(prConfig, "protected_files_path_exclude", nil))
+			} else {
+				assert.NotContains(t, prConfig, "protected_files_path_exclude")
+			}
+
+			generated, err := generateSafeOutputsConfig(workflowData)
+			require.NoError(t, err)
+			var mcpConfig map[string]map[string]any
+			require.NoError(t, json.Unmarshal([]byte(generated), &mcpConfig))
+			assert.Equal(t, prConfig["protected_files"], mcpConfig["create_pull_request"]["protected_files"])
+			assert.Equal(t, prConfig["protected_files_path_exclude"], mcpConfig["create_pull_request"]["protected_files_path_exclude"])
 		})
 	}
 }
@@ -119,7 +139,7 @@ func TestProtectedFilesExcludePushToPRBranch(t *testing.T) {
 		Name: "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{
 			PushToPullRequestBranch: &PushToPullRequestBranchConfig{
-				ProtectedFilesExclude: []string{"AGENTS.md"},
+				ProtectedFilesExclude: []string{"AGENTS.md", "/pyproject.toml"},
 			},
 		},
 	}
@@ -162,6 +182,8 @@ func TestProtectedFilesExcludePushToPRBranch(t *testing.T) {
 	assert.NotContains(t, pfStrings, "AGENTS.md", "AGENTS.md should be excluded from protected_files")
 	assert.NotContains(t, pfStrings, "CHANGELOG.md", "CHANGELOG.md should be excluded by default from protected_files")
 	assert.Contains(t, pfStrings, "package.json", "package.json should still be in protected_files")
+	assert.Contains(t, pfStrings, "pyproject.toml", "nested pyproject.toml files must stay protected")
+	assert.Equal(t, []string{"pyproject.toml"}, ParseStringArrayFromConfig(pushConfig, "protected_files_path_exclude", nil))
 
 	// Dot-folder prefixes are no longer in protected_path_prefixes — they are
 	// covered by the general protect_top_level_dot_folders rule.
