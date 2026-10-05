@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.github.com/gh-aw/schemas/agent-session.schema.json",
+  "title": "Canonical agent session",
+  "description": "Generated from actions/setup/js/types/{agent_session,unified_session}.d.ts. Run make session-schemas; do not edit by hand.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["type", "data"],
+    "properties": { "type": { "type": "string", "pattern": "\\." }, "data": { "type": "object" } },
+    "allOf": [
+      { "$ref": "#/definitions/EventMetadata" },
+      { "if": { "properties": { "type": { "const": "agent.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AgentExecutionData" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } },
+      { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
+      { "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionInitData" } } } },
+      { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "tool.execution_complete" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ToolExecutionCompleteData" } } } },
+      { "if": { "properties": { "type": { "const": "tool.execution_start" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ToolExecutionStartData" } } } },
+      { "if": { "properties": { "type": { "const": "user.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } }
+    ]
+  },
+  "definitions": {
+    "AgentExecutionData": {
+      "type": "object",
+      "properties": {
+        "categories": { "type": "array", "items": { "$ref": "#/definitions/SessionDiagnosticName" }, "uniqueItems": true },
+        "errorCodes": { "type": "array", "items": { "anyOf": [{ "$ref": "#/definitions/SessionDiagnosticName" }, { "$ref": "#/definitions/SessionErrorNumber" }] }, "uniqueItems": true },
+        "errorTypes": { "type": "array", "items": { "$ref": "#/definitions/SessionDiagnosticName" }, "uniqueItems": true },
+        "exitCode": { "$ref": "#/definitions/SessionExitCode" }
+      },
+      "required": ["categories", "errorCodes", "errorTypes"],
+      "additionalProperties": {}
+    },
+    "DetectionResultData": {
+      "type": "object",
+      "properties": {
+        "jobResult": { "type": "string" },
+        "conclusion": { "type": "string" },
+        "reason": { "type": "string" },
+        "promptInjection": { "type": "boolean" },
+        "secretLeak": { "type": "boolean" },
+        "maliciousPatch": { "type": "boolean" }
+      },
+      "additionalProperties": {}
+    },
+    "EventMetadata": { "type": "object", "properties": { "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "timestamp": { "type": ["string", "number"] } }, "additionalProperties": {} },
+    "JsonValue": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
+      ]
+    },
+    "MessageData": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": {} },
+    "SessionCount": { "type": "number", "minimum": 0, "maximum": 9007199254740991, "multipleOf": 1 },
+    "SessionDiagnosticName": { "type": "string", "minLength": 1 },
+    "SessionErrorNumber": { "type": "number", "minimum": -9007199254740991, "maximum": 9007199254740991, "multipleOf": 1 },
+    "SessionExitCode": { "type": "number", "minimum": 0, "maximum": 255, "multipleOf": 1 },
+    "SessionFileFormatData": { "type": "object", "properties": { "version": { "type": "number", "minimum": 1, "multipleOf": 1 } }, "required": ["version"], "additionalProperties": {} },
+    "SessionInitData": {
+      "type": "object",
+      "properties": {
+        "sourceEngine": { "type": "string" },
+        "model": { "type": "string" },
+        "sessionId": { "type": ["string", "null"] },
+        "cwd": { "type": "string" },
+        "tools": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "mcpServers": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "slashCommands": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "modelInfo": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": {}
+    },
+    "SessionMetric": { "type": "number", "minimum": 0 },
+    "SessionResultData": {
+      "type": "object",
+      "properties": {
+        "numTurns": { "$ref": "#/definitions/SessionCount" },
+        "durationMs": { "$ref": "#/definitions/SessionMetric" },
+        "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },
+        "status": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "usage": { "$ref": "#/definitions/SessionUsage" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } }
+      },
+      "additionalProperties": {}
+    },
+    "SessionUsage": {
+      "type": "object",
+      "properties": {
+        "total_tokens": { "$ref": "#/definitions/SessionCount" },
+        "input_tokens": { "$ref": "#/definitions/SessionCount" },
+        "output_tokens": { "$ref": "#/definitions/SessionCount" },
+        "reasoning_output_tokens": { "$ref": "#/definitions/SessionCount" },
+        "cache_creation_input_tokens": { "$ref": "#/definitions/SessionCount" },
+        "cache_read_input_tokens": { "$ref": "#/definitions/SessionCount" },
+        "totalTokens": { "$ref": "#/definitions/SessionCount" },
+        "inputTokens": { "$ref": "#/definitions/SessionCount" },
+        "outputTokens": { "$ref": "#/definitions/SessionCount" },
+        "cacheCreationInputTokens": { "$ref": "#/definitions/SessionCount" },
+        "cacheReadInputTokens": { "$ref": "#/definitions/SessionCount" },
+        "input_tokens_include_cache": { "type": "boolean" },
+        "overflowed_tokens": { "type": "array", "items": { "type": "string" }, "description": "Unavailable aggregate fields whose contributions exceeded safe integer precision." }
+      },
+      "additionalProperties": {}
+    },
+    "ToolExecutionCompleteData": {
+      "type": "object",
+      "properties": {
+        "toolCallId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "success": { "type": "boolean" },
+        "output": { "$ref": "#/definitions/JsonValue" },
+        "result": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/SessionMetric" },
+        "exitCode": { "type": "number" },
+        "status": { "type": "string" },
+        "is_error": { "type": "boolean" },
+        "isError": { "type": "boolean" },
+        "mcpServerName": { "type": "string" }
+      },
+      "additionalProperties": {}
+    },
+    "ToolExecutionStartData": {
+      "type": "object",
+      "properties": {
+        "toolCallId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "input": { "$ref": "#/definitions/JsonValue" },
+        "parameters": { "$ref": "#/definitions/JsonValue" },
+        "command": { "type": "string" },
+        "mcpServerName": { "type": "string" }
+      },
+      "additionalProperties": {}
+    }
+  }
+}

@@ -112,9 +112,13 @@ func isExplicitlyDisabledTool(tool any) bool {
 // allowlist (unlike bypassPermissions which silently ignores it).
 // Panics if callers pass a Claude-specific tools section instead of neutral tools.
 func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig) string {
+	return e.computeAllowedClaudeToolsStringWithDynamicWorkflows(tools, safeOutputs, cacheMemoryConfig, driveMemoryConfig, mcpScripts, sandboxConfig, true)
+}
+
+func (e *ClaudeEngine) computeAllowedClaudeToolsStringWithDynamicWorkflows(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig, dynamicWorkflows bool) string {
 	claudeToolsLog.Print("Computing allowed Claude tools string")
 
-	tools = e.prepareClaudeToolsForAllowedList(tools)
+	tools = e.prepareClaudeToolsForAllowedList(tools, dynamicWorkflows)
 	allowedTools := collectClaudeAllowedTools(tools)
 	allowedTools = appendTopLevelClaudeTools(allowedTools, tools, cacheMemoryConfig, driveMemoryConfig)
 	allowedTools = appendSandboxWritableTools(allowedTools, sandboxConfig)
@@ -133,7 +137,7 @@ func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, saf
 // prepareClaudeToolsForAllowedList expands neutral tool definitions into Claude-specific
 // format. Panics if tools already contains a "claude" section key, since callers must only
 // ever pass neutral tool definitions at this stage (an internal invariant violation).
-func (e *ClaudeEngine) prepareClaudeToolsForAllowedList(tools map[string]any) map[string]any {
+func (e *ClaudeEngine) prepareClaudeToolsForAllowedList(tools map[string]any, dynamicWorkflows bool) map[string]any {
 	if tools == nil {
 		tools = make(map[string]any)
 	}
@@ -149,6 +153,9 @@ func (e *ClaudeEngine) prepareClaudeToolsForAllowedList(tools map[string]any) ma
 	// requiring permission-mode: bypassPermissions. Claude only exposes the Skill
 	// tool when at least one skill is registered, so allowing it is a no-op otherwise.
 	defaultClaudeTools := []string{"Task", "Glob", "Grep", "ExitPlanMode", "TodoWrite", "LS", "Read", "NotebookRead", "Skill"}
+	if dynamicWorkflows {
+		defaultClaudeTools = append(defaultClaudeTools, "Workflow")
+	}
 	ensureDefaultClaudeAllowedTools(tools, defaultClaudeTools)
 	claudeToolsLog.Printf("Added %d default Claude tools to allowed list", len(defaultClaudeTools))
 	return tools

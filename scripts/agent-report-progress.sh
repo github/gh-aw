@@ -84,6 +84,7 @@ eslint_factory_files=()
 action_shell_files=()
 workflow_drift_required=0
 model_alias_validation_required=0
+session_schema_validation_required=0
 
 for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
@@ -132,6 +133,12 @@ for file in "${CHANGED_FILES[@]}"; do
     case "$file" in
         pkg/cli/data/models.json|actions/setup/js/models.json)
             model_alias_validation_required=1
+            ;;
+    esac
+
+    case "$file" in
+        actions/setup/js/types/*session*|actions/setup/js/scripts/*session*|actions/setup/js/agent_session.cjs|actions/setup/js/agent_execution.cjs|actions/setup/js/unified_session*.cjs|actions/setup/js/package*.json|docs/public/schemas/*session.schema.json)
+            session_schema_validation_required=1
             ;;
     esac
 done
@@ -315,6 +322,9 @@ if [ "$model_alias_validation_required" -eq 1 ]; then
     start_job "model alias validation" make --no-print-directory validate-model-alias-chains
 fi
 start_job "schema freshness check" make --no-print-directory check-stale-schema-binary
+if [ "$session_schema_validation_required" -eq 1 ]; then
+    start_job "session schema freshness check" make --no-print-directory check-session-schemas
+fi
 
 if [ "$WITH_TESTS" -eq 1 ]; then
     start_job "impacted Go tests" test_go_packages

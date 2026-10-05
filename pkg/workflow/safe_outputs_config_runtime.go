@@ -82,8 +82,12 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 				excludeFiles := ParseStringArrayFromConfig(handlerConfig, "_protected_files_exclude", nil)
 				delete(handlerConfig, "_protected_files_exclude")
 
-				handlerConfig["protected_files"] = sliceutil.Exclude(fullManifestFiles, excludeFiles...)
-				filteredPrefixes := sliceutil.Exclude(fullPathPrefixes, excludeFiles...)
+				excludeNames, excludePaths := splitProtectedFilesExcludes(excludeFiles)
+				handlerConfig["protected_files"] = sliceutil.Exclude(fullManifestFiles, excludeNames...)
+				if len(excludePaths) > 0 {
+					handlerConfig["protected_files_path_exclude"] = excludePaths
+				}
+				filteredPrefixes := sliceutil.Exclude(fullPathPrefixes, excludeNames...)
 				if len(filteredPrefixes) > 0 {
 					handlerConfig["protected_path_prefixes"] = filteredPrefixes
 				} else {
@@ -91,7 +95,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 				}
 				// Compute which top-level dot-folder prefixes are excluded so the runtime
 				// dot-folder check can skip them.
-				if dotFolderExcludes := getDotFolderExcludes(excludeFiles); len(dotFolderExcludes) > 0 {
+				if dotFolderExcludes := getDotFolderExcludes(excludeNames); len(dotFolderExcludes) > 0 {
 					handlerConfig["protected_dot_folder_excludes"] = dotFolderExcludes
 				}
 			}

@@ -1,5 +1,6 @@
-import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
+import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent } from "./agent_session";
 import { createSessionEvent } from "../agent_session.cjs";
+import type { UnifiedSessionEvent, UnifiedSessionEventDataMap } from "./unified_session";
 
 const messages: CoreSessionEvent[] = [
   { type: "session.init", data: { sourceEngine: "copilot", tools: [] } },
@@ -86,3 +87,21 @@ const invalidProvenance: UnifiedSessionEvent = {
   },
 };
 void invalidProvenance;
+
+const unifiedResult: UnifiedSessionEventDataMap["session.result"] = {
+  numTurns: 0,
+  usage: { inputTokens: 0, reasoningOutputTokens: 2, overflowedTokens: ["outputTokens"] },
+};
+void unifiedResult;
+const invalidUnifiedUsage: UnifiedSessionEventDataMap["session.result"] = {
+  usage: {
+    // @ts-expect-error Unified payloads use camelCase, not parser accounting keys.
+    input_tokens: 1,
+  },
+};
+void invalidUnifiedUsage;
+const invalidUnifiedInit: UnifiedSessionEventDataMap["session.init"] = {
+  // @ts-expect-error Tool inventories are omitted from the essential projection.
+  tools: [],
+};
+void invalidUnifiedInit;
