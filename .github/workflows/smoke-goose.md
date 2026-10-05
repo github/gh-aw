@@ -20,7 +20,7 @@ permissions:
   pull-requests: read
   copilot-requests: write
 name: Smoke Goose
-model: copilot/auto
+model: copilot/gpt-5.4
 engine:
   id: goose
 max-turns: 30
@@ -28,7 +28,6 @@ max-ai-credits: 5
 strict: true
 imports:
   - shared/goose.md
-  - shared/gh.md
   - shared/reporting-otlp.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
@@ -144,22 +143,42 @@ sandbox:
 
 ## Test Requirements
 
-Perform the six checks in order. Never infer or invent success from a missing tool,
+This is a bounded smoke test, not a repository exploration task. Do not run
+`analyze`, scan the repository tree, or read unrelated source files. Perform the
+six checks in order, then write the evidence file before submitting any output.
+Never infer or invent success from a missing tool,
 failed command, or unavailable response. Report a failure explicitly and do not
 mark overall PASS unless every check passed.
 
 1. **GitHub MCP Testing**: Use native GitHub MCP tools to fetch details of exactly 2 distinct merged pull requests from ${{ github.repository }} (title and number only). Do not substitute `gh`, REST calls, or guessed PR data.
-2. **Web Fetch Testing**: Run `mcpscripts fetch-homepage` through your shell capability. This explicit MCP tool fetches https://github.com and returns `containsGitHub: true`; it also records a host-side receipt. Goose has no native gh-aw `web-fetch` tool. Do not substitute curl or a browser.
+2. **Web Fetch Testing**: Call the `fetch-homepage` MCP tool, or run its mounted CLI `mcpscripts fetch-homepage`. It fetches https://github.com and returns `containsGitHub: true`; it also records a host-side receipt. Goose has no native gh-aw `web-fetch` tool. Do not substitute curl or a browser.
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-goose-${{ github.run_id }}.txt` with content "Smoke test passed for Goose at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.
-6. **Runtime Configuration Testing**: Run `goose --version` and verify it equals `GH_AW_ENGINE_VERSION`. With Node.js, verify `GOOSE_PROVIDER` is `openai`, `GOOSE_MODEL` is nonempty, `OPENAI_HOST` and `OPENAI_BASE_PATH` are set, and `GH_AW_MAX_TURNS` is `30`. Parse the file at `GOOSE_ADDITIONAL_CONFIG_FILES` and verify the `github` extension uses `streamable_http`, its URI is not `localhost` or `127.0.0.1`, and it has an Authorization header. Report only PASS/FAIL; never print headers, keys, configuration, or the prompt.
+6. **Runtime Configuration Testing**: Run `goose --version` and verify it equals `GH_AW_ENGINE_VERSION`. Then execute this exact shell probe. It prints no configuration, headers, keys, or prompt:
+
+   ```bash
+   node <<'JS'
+   const assert = require("node:assert/strict");
+   const fs = require("node:fs");
+   assert.equal(process.env.GOOSE_PROVIDER, "openai");
+   assert.ok(process.env.GOOSE_MODEL);
+   assert.ok(process.env.OPENAI_HOST && process.env.OPENAI_BASE_PATH);
+   assert.equal(process.env.GH_AW_MAX_TURNS, "30");
+   const { extensions } = JSON.parse(fs.readFileSync(process.env.GOOSE_ADDITIONAL_CONFIG_FILES, "utf8"));
+   assert.equal(extensions.github.type, "streamable_http");
+   assert.ok(!["localhost", "127.0.0.1"].includes(new URL(extensions.github.uri).hostname));
+   assert.ok(extensions.github.headers.Authorization);
+   console.log("Runtime configuration: PASS");
+   JS
+   ```
 
 Write `/tmp/gh-aw/agent/smoke-test-goose-${{ github.run_id }}.json` with exactly
 `pullRequests` (the two `{number, title}` objects), `webFetch`, `fileWrite`,
 `bash`, `build`, and `runtime` (each a boolean). Set booleans to true only after
 the corresponding check succeeds. The host post-step independently checks this
 evidence and fails the job for missing evidence or any failed check.
+Do not skip this file. A PASS issue without this file is a failed smoke test.
 
 ## Output
 
@@ -171,9 +190,10 @@ evidence and fails the job for missing evidence or any failed check.
   - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
   - Timestamp
 
-  Use `safeoutputs create-issue` through your shell capability to submit the issue.
-  Use `safeoutputs add-comment` and `safeoutputs add-labels` for the conditional
-  PR outputs below; these are mounted MCP CLIs, not native Goose tool names.
+  Use the `create_issue` safe-output tool (or `safeoutputs create-issue`) to submit
+  the issue after writing the evidence file. Use `add_comment`/`add_labels` (or
+  their mounted CLIs) only for the conditional PR outputs below. On
+  `workflow_dispatch` or `schedule`, do not add a comment or label.
 
 **Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with:
 - ✅ or ❌ for each test result

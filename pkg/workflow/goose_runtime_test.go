@@ -140,6 +140,7 @@ func TestGooseSmokeEvidenceContract(t *testing.T) {
 	require.NoError(t, err)
 	for _, expected := range []string{
 		"max-turns: 30", "max-ai-credits: 5", "fetch-homepage:",
+		"model: copilot/gpt-5.4",
 		"Assert Goose smoke evidence", "if: always()", `"Goose execution failed"`,
 		`["bash", "build", "fileWrite", "runtime", "webFetch"]`,
 		`"No successful native GitHub MCP round-trip"`,
@@ -148,6 +149,7 @@ func TestGooseSmokeEvidenceContract(t *testing.T) {
 		assert.Contains(t, string(source), expected)
 	}
 	assert.NotContains(t, string(source), "Use the web-fetch MCP tool")
+	assert.NotContains(t, string(source), "shared/gh.md", "native MCP smoke testing must not enable gh-proxy mode")
 	parts := strings.SplitN(string(source), "---", 3)
 	require.Len(t, parts, 3)
 }
