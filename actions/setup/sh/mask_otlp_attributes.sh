@@ -4,14 +4,14 @@ set +o histexpand
 #
 # mask_otlp_attributes.sh - Mask GH_AW_OTLP_ATTRIBUTES values from GitHub Actions logs
 #
-# Issues the ::add-mask:: workflow command for every value found in the
-# GH_AW_OTLP_ATTRIBUTES JSON object so that user-supplied custom OTLP span
-# attribute values (e.g. session IDs, user IDs) do not leak into GitHub
+# Issues the ::add-mask:: workflow command for values of at least 4 characters
+# found in the GH_AW_OTLP_ATTRIBUTES JSON object so that user-supplied custom
+# OTLP span attribute values (e.g. session IDs, user IDs) are masked in GitHub
 # Actions runner logs (including debug/step-debug logs).
 #
 # GH_AW_OTLP_ATTRIBUTES is a JSON-encoded Record<string, string> injected by
 # the gh-aw compiler from the `observability.otlp.attributes` frontmatter field.
-# Each value is masked individually; empty values are skipped.
+# Each value is masked individually; values shorter than 4 characters are not masked.
 #
 # Requires node to be available on PATH (it is always present on GitHub Actions
 # runners when the gh-aw setup step has run).
@@ -20,6 +20,9 @@ set +o histexpand
 #   0 - Success (variable may be absent or empty, which is a no-op)
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/mask_otlp_common.sh"
 
 _attrs="${GH_AW_OTLP_ATTRIBUTES:-}"
 [ -z "$_attrs" ] && exit 0
@@ -49,5 +52,7 @@ mapfile -t _values < <(
 )
 
 for _val in "${_values[@]}"; do
-  [ -n "$_val" ] && echo '::add-mask::'"$_val"
+  [ -z "$_val" ] && continue
+  [ "${#_val}" -lt "$MIN_MASK_LENGTH" ] && continue
+  echo '::add-mask::'"$_val"
 done

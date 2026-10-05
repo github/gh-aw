@@ -51,6 +51,7 @@ const {
   isCAPIQuotaExceededError,
   isCAPIServerError,
   isHTTP400ResponseError,
+  isToolCallIdSchemaError,
   isSDKSessionIdleTimeoutError,
   PROMPT_FILE_INLINE_THRESHOLD_BYTES,
   resolvePromptFileInput,
@@ -1677,6 +1678,26 @@ describe("copilot_harness.cjs", () => {
     });
   });
 
+  describe("isToolCallIdSchemaError", () => {
+    const schemaError = "400 Invalid 'input[61].id': 'ctc_call_WcucFu1zMaJJNQNn1Y6ioyx6'. Expected an ID that begins with 'fc'.";
+
+    it("matches the tool-call ID mismatch in Copilot output", () => {
+      expect(isToolCallIdSchemaError(`Progress made\n${schemaError}\nChanges +1 -0`)).toBe(true);
+      expect(isToolCallIdSchemaError(schemaError.replace("input[61]", "input[2]"))).toBe(true);
+    });
+
+    it("does not match unrelated validation errors or empty output", () => {
+      expect(isToolCallIdSchemaError("")).toBe(false);
+      expect(isToolCallIdSchemaError("400 Invalid 'input[61].id': 'fc_123'. Expected an ID that begins with 'fc'.")).toBe(false);
+      expect(isToolCallIdSchemaError("400 Invalid 'input[61].id': 'ctc_call_123'. Expected an ID that begins with 'xyz'.")).toBe(false);
+      expect(isToolCallIdSchemaError("CAPIError: 400 The requested model is not supported.")).toBe(false);
+    });
+
+    it("classifies the mismatch separately from partial execution", () => {
+      expect(classifyCopilotFailure({ hasOutput: true, isToolCallIdSchemaError: true })).toBe("tool_call_id_schema_error");
+    });
+  });
+
   describe("no-auth-info detection pattern", () => {
     const NO_AUTH_INFO_PATTERN = /No authentication information found/;
 
@@ -3020,6 +3041,48 @@ process.exit(1);`,
       // Harness exits 0 because the core work (add_comment) already succeeded
       expect(result.status).toBe(0);
       expect(result.stderr).toContain("invocation cap saturated but safe-outputs already contain expected output");
+    });
+  });
+
+  describe("tool-call ID schema failure retry guard", () => {
+    it.each([false, true])("stops on the schema error after an earlier partial attempt: %s", firstAttemptPartial => {
+      const tempDir = makeHarnessTempDir("copilot-tool-call-id-schema-");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const promptPath = path.join(tempDir, "prompt.txt");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+const callsPath = process.env.COPILOT_HARNESS_STUB_CALLS;
+const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").length : 0;
+fs.appendFileSync(callsPath, JSON.stringify(process.argv.slice(2)) + "\\n");
+if (process.env.FIRST_ATTEMPT_PARTIAL === "true" && priorCalls === 0) {
+  process.stdout.write("partial work done\\n");
+  process.exit(1);
+}
+process.stderr.write("400 Invalid 'input[61].id': 'ctc_call_WcucFu1zMaJJNQNn1Y6ioyx6'. Expected an ID that begins with 'fc'.\\n");
+process.exit(1);`,
+        "utf8"
+      );
+      fs.writeFileSync(promptPath, "fix the bug", "utf8");
+
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt-file", promptPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: { ...harnessChildEnv, FIRST_ATTEMPT_PARTIAL: String(firstAttemptPartial), COPILOT_HARNESS_STUB_CALLS: callsPath, GH_AW_SAFE_OUTPUTS: path.join(tempDir, "safe-outputs.jsonl") },
+        encoding: "utf8",
+        timeout: 15000,
+      });
+
+      expect(result.status).toBe(1);
+      const calls = fs
+        .readFileSync(callsPath, "utf8")
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      expect(calls).toHaveLength(firstAttemptPartial ? 2 : 1);
+      if (firstAttemptPartial) expect(calls[1]).toContain("--continue");
+      expect(result.stderr).toContain("failureClass=tool_call_id_schema_error");
+      expect(result.stderr).toContain("tool-call ID schema error — not retrying");
     });
   });
 
