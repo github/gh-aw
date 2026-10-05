@@ -8,7 +8,8 @@ ASSUME Fault \in {"none", "agent-write", "persist-credentials",
                  "checkout-widen", "expired-token", "network-bypass",
                  "untrusted-config", "output-limit", "private-sink",
                  "target-authorization", "retained-push-token", "ambient-agent-fetch",
-                 "cleanup-fail-open", "artifact-invocation", "policy-downgrade"}
+                 "cleanup-fail-open", "artifact-invocation", "policy-downgrade",
+                 "failure-token-retention"}
 ASSUME Profile \in {"sparse", "full"}
 ASSUME Effect \in {"issue", "pull-request"}
 ASSUME DetectionPolicy \in {"required", "disabled", "conditional"}
@@ -356,10 +357,14 @@ Fail(j) ==
     /\ LET owned == IF j = "agent" THEN {"engine"}
                     ELSE IF j = "safe_outputs" THEN {"app-write"} ELSE {}
        IN s' = [s EXCEPT
-           !.status[j] = "failure", !.live = @ \ owned,
+           !.status[j] = "failure",
+           !.live = IF Fault = "failure-token-retention" /\ j = "safe_outputs"
+                   THEN @ ELSE @ \ owned,
            !.privilegedCheckout.credentials =
                IF j = "safe_outputs" THEN None ELSE @,
-           !.revoked = @ \cup owned, !.lastEvent = "Fail:" \o j]
+           !.revoked = IF Fault = "failure-token-retention" /\ j = "safe_outputs"
+                      THEN @ ELSE @ \cup owned,
+           !.lastEvent = "Fail:" \o j]
 
 Next ==
     \/ \E j \in Jobs: Start(j) \/ Skip(j) \/ Finish(j) \/ Fail(j)
@@ -456,7 +461,9 @@ NoImplicitFetch ==
     \A op \in s.operations: op.job = "agent" => op.op \notin {"fetch", "push"}
 TokenLifetime ==
     /\ s.live \cap s.revoked = {}
-    /\ (s.status["safe_outputs"] = "success" => "app-write" \notin s.live)
+    /\ (s.status["agent"] \in {"success", "failure"} => "engine" \notin s.live)
+    /\ (s.status["safe_outputs"] \in {"success", "failure"} =>
+        "app-write" \notin s.live)
 NetworkPolicy ==
     \A e \in s.egress:
         e.destination \in {"inference", "github"}

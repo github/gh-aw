@@ -14,7 +14,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent
-JAR_SHA256 = "b490f45c1de08e4ff9753259a00338981b9cf464f01ca9e9cd5f19f33cf0bb92"
+JAR_SHA256 = "411ab54221cf0c9fa7ae18f07a3e0ebbdf9e5ba6254b79017e7007f1feb44e89"
 MUTATIONS = {
     "agent-write": "JobIsolation",
     "persist-credentials": "NoCredentialPersistence",
@@ -36,6 +36,7 @@ MUTATIONS = {
     "cleanup-fail-open": "NoCredentialPersistence",
     "artifact-invocation": "ArtifactProvenance",
     "policy-downgrade": "DetectionGate",
+    "failure-token-retention": "TokenLifetime",
 }
 MUTATION_EFFECTS = {"retained-push-token": "pull-request"}
 MUTATION_SETTINGS = {
@@ -78,6 +79,7 @@ DELTAS = {
     "cleanup-fail-open": "Historical compiler failure path: ignore failed checkout cleanup or residual credentials and start the agent.",
     "artifact-invocation": "Runtime mutation: accept another reusable invocation's artifact under the same run.",
     "policy-downgrade": "Compiler mutation: omit required detection without an authorized policy opt-out.",
+    "failure-token-retention": "Runtime mutation: fail the safe-output job without revoking its minted app token.",
 }
 
 
