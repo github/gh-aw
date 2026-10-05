@@ -122,16 +122,19 @@ func TestCIEnforcedLintersMatchRegistry(t *testing.T) {
 	flagMatches := linterFlagsRe.FindAllStringSubmatch(string(workflowBytes), -1)
 	require.Len(t, flagMatches, 2, "cgo.yml must define native and wasm LINTER_FLAGS values")
 
-	enforced := make(map[string]struct{})
-	for _, match := range flagMatches {
+	flagSets := make([]map[string]struct{}, len(flagMatches))
+	for i, match := range flagMatches {
+		flagSets[i] = make(map[string]struct{})
 		for flag := range strings.FieldsSeq(match[1]) {
 			if flag == "-test=false" {
 				continue
 			}
 			require.Truef(t, strings.HasPrefix(flag, "-"), "LINTER_FLAGS entry %q must be a flag", flag)
-			enforced[strings.TrimPrefix(flag, "-")] = struct{}{}
+			flagSets[i][strings.TrimPrefix(flag, "-")] = struct{}{}
 		}
 	}
+	assert.Equal(t, flagSets[0], flagSets[1], "native and wasm LINTER_FLAGS in cgo.yml must enforce the same analyzers")
+	enforced := flagSets[0]
 
 	registry := make(map[string]struct{})
 	for _, analyzer := range linters.All() {
