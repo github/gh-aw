@@ -50,6 +50,21 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	}
 }
 
+func TestClaudeWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
+	disabled := false
+	data := &WorkflowData{
+		Name: "Claude workflows", AI: "claude",
+		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
+	}
+	job, err := NewCompiler().buildActivationJob(data, false, "", "claude.lock.yml")
+	require.NoError(t, err)
+	steps := strings.Join(job.Steps, "")
+	save := extractWorkflowStepByName(t, steps, "Save agent config folders for base branch restoration")
+	assert.Contains(t, save, `GH_AW_AGENT_FOLDERS: ".agents .claude .github"`)
+	assert.Contains(t, extractWorkflowStepByName(t, steps, "Upload activation artifact"), "/tmp/gh-aw/base")
+	assert.Less(t, strings.Index(steps, "Save agent config folders for base branch restoration"), strings.Index(steps, "Upload activation artifact"))
+}
+
 func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

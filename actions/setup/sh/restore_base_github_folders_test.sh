@@ -74,12 +74,17 @@ TEST_WORKSPACE=$(mktemp -d)
 
 mkdir -p /tmp/gh-aw/base/.claude/commands
 echo "trusted cmd" >/tmp/gh-aw/base/.claude/commands/cmd.md
+mkdir -p /tmp/gh-aw/base/.claude/workflows/references
+echo "trusted workflow" >/tmp/gh-aw/base/.claude/workflows/review.js
+echo "trusted resource" >/tmp/gh-aw/base/.claude/workflows/references/.context
 mkdir -p /tmp/gh-aw/base/.gemini
 echo '{"trusted":true}' >/tmp/gh-aw/base/.gemini/settings.json
 
 # PR-branch: evil versions
 mkdir -p "${TEST_WORKSPACE}/.claude/commands"
 echo "evil cmd" >"${TEST_WORKSPACE}/.claude/commands/cmd.md"
+mkdir -p "${TEST_WORKSPACE}/.claude/workflows"
+echo "evil workflow" >"${TEST_WORKSPACE}/.claude/workflows/review.js"
 mkdir -p "${TEST_WORKSPACE}/.gemini"
 echo '{"evil":true}' >"${TEST_WORKSPACE}/.gemini/settings.json"
 
@@ -87,6 +92,8 @@ GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
   GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${RESTORE_SCRIPT}" >/dev/null 2>&1
 
 assert ".claude/commands/cmd.md restored" "grep -q 'trusted cmd' '${TEST_WORKSPACE}/.claude/commands/cmd.md'"
+assert "Claude workflow restored" "grep -q 'trusted workflow' '${TEST_WORKSPACE}/.claude/workflows/review.js'"
+assert "nested hidden workflow resource restored" "grep -q 'trusted resource' '${TEST_WORKSPACE}/.claude/workflows/references/.context'"
 assert ".gemini/settings.json restored" "grep -q 'trusted' '${TEST_WORKSPACE}/.gemini/settings.json'"
 rm -rf "${TEST_WORKSPACE}" /tmp/gh-aw/base
 echo ""

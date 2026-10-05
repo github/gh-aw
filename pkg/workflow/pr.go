@@ -138,6 +138,22 @@ func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files 
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
 }
 
+// Restore Claude's config from the activation artifact after workspace checkouts.
+// Copying the entire tree retains saved workflows and their nested support files,
+// without leaving untrusted settings or hooks alongside them.
+func generateRestoreClaudeWorkflowsStep(yaml *strings.Builder) {
+	yaml.WriteString("      - name: Restore Claude workflows from activation artifact\n")
+	yaml.WriteString("        run: |\n")
+	yaml.WriteString("          if [ -d /tmp/gh-aw/base ]; then\n")
+	yaml.WriteString("            src=/tmp/gh-aw/base/.claude\n")
+	yaml.WriteString("            dst=\"$GITHUB_WORKSPACE/.claude\"\n")
+	yaml.WriteString("            rm -rf \"$dst\"\n")
+	yaml.WriteString("            if [ -d \"$src\" ]; then\n")
+	yaml.WriteString("              cp -a \"$src\" \"$dst\"\n")
+	yaml.WriteString("            fi\n")
+	yaml.WriteString("          fi\n")
+}
+
 // generatePRReadyForReviewCheckout generates a step to checkout the PR branch when PR context is available
 func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data *WorkflowData) {
 	prLog.Print("Generating PR checkout step")

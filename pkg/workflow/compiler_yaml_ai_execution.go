@@ -518,6 +518,9 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		)
 		generateRestoreAmbientFoldersStep(yaml, data)
 	}
+	if engine.GetID() == "claude" {
+		generateRestoreClaudeWorkflowsStep(yaml)
+	}
 
 	// Restore inline sub-agents written during the activation job.
 	// This step runs AFTER the base-branch restore so the engine-specific agent directory
