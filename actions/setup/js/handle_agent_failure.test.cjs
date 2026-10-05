@@ -420,6 +420,15 @@ describe("handle_agent_failure", () => {
       expect(buildFailureIssueTitle(baseOptions)).toBe("[aw] Test Workflow failed");
     });
 
+    it.each([
+      ["engine_driver_failure", "[aw] Test Workflow engine driver failed before emitting a terminal safe output"],
+      ["safeoutputs_cli_error", "[aw] Test Workflow failed to invoke safeoutputs CLI"],
+      ["missing_terminal_safe_output", "[aw] Test Workflow finished without a terminal safe output"],
+      ["invalid_safe_outputs", "[aw] Test Workflow produced no valid safe outputs"],
+    ])("distinguishes %s from generic incompletion", (emptyOutputCause, title) => {
+      expect(buildFailureIssueTitle({ ...baseOptions, hasReportIncomplete: true, emptyOutputCause })).toBe(title);
+    });
+
     it("prefers unknownModelAICredits over isTimedOut when both are true", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, unknownModelAICredits: true, isTimedOut: true })).toBe("[aw] Test Workflow has unknown model pricing");
     });
@@ -5437,6 +5446,51 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ["engine_driver_failure", "engine driver failed before emitting a terminal safe output"],
+      ["safeoutputs_cli_error", "failed to invoke safeoutputs CLI"],
+    ])("creates a distinct failure issue for %s", async (reason, titleSuffix) => {
+      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "report_incomplete", reason }], collectorEmptyOutputCause: reason }));
+      const createIssueMock = vi.fn(async () => {
+        throw new Error("stop after capturing issue");
+      });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: createIssueMock },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: `[aw] Test Workflow ${titleSuffix}` }));
+      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      expect(categories).toContain(reason);
+      expect(categories).not.toContain("agent_failure");
+    });
+
+    it.each(["engine_driver_failure", "safeoutputs_cli_error", "invalid_safe_outputs", "missing_terminal_safe_output"])("does not trust agent-authored %s as collector evidence", async reason => {
+      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "report_incomplete", reason }] }));
+      const createIssueMock = vi.fn(async () => {
+        throw new Error("stop after capturing issue");
+      });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: createIssueMock },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+      expect(createIssueMock).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Test Workflow reported incomplete result" }));
+      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      expect(categories).toContain("report_incomplete");
+      expect(categories).not.toContain(reason);
+    });
+
     it("keeps the step failed when failure issue creation fails after a successful agent reports incomplete", async () => {
       process.env.GH_AW_AGENT_CONCLUSION = "success";
       // Agent produced both a non-noop item and a report_incomplete signal
@@ -6214,6 +6268,16 @@ describe("handle_agent_failure", () => {
         hasReportIncomplete: true,
       });
       expect(categories).toContain("report_incomplete");
+    });
+
+    it.each(["engine_driver_failure", "safeoutputs_cli_error", "missing_terminal_safe_output", "invalid_safe_outputs"])("keeps %s distinct for failure issue deduplication", emptyOutputCause => {
+      const categories = buildFailureMatchCategories({ agentConclusion: "failure", hasReportIncomplete: true, emptyOutputCause });
+      expect(categories).toContain(emptyOutputCause);
+      expect(categories).not.toContain("agent_failure");
+    });
+
+    it("does not use arbitrary agent text as a failure category", () => {
+      expect(buildFailureMatchCategories({ hasReportIncomplete: true, emptyOutputCause: "untrusted reason" })).toEqual(["report_incomplete"]);
     });
 
     it("does not add agent_failure when a specific category already exists", () => {

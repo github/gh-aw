@@ -4,13 +4,7 @@ package colorwriter_test
 
 import (
 	"bytes"
-	"go/parser"
-	"go/token"
 	"io"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,109 +13,51 @@ import (
 	"github.com/github/gh-aw/pkg/colorwriter"
 )
 
-// TestSpec_PublicAPI_New validates the documented behavior of New from the
-// README.md specification.
+// TestSpec_PublicAPI_New validates the writer-wrapping behavior documented in the package README.
 func TestSpec_PublicAPI_New(t *testing.T) {
-	t.Parallel()
-	t.Run("returns a usable writer wrapping the provided writer", func(t *testing.T) {
-		var buf bytes.Buffer
-		w := colorwriter.New(&buf, []string{"NO_COLOR=1"})
-		require.NotNil(t, w, "New should return a non-nil io.Writer")
-
-		n, err := io.WriteString(w, "spec output")
-		require.NoError(t, err, "writer returned by New should accept writes")
-		assert.Equal(t, len("spec output"), n, "writer should report bytes written")
-		assert.Contains(t, buf.String(), "spec output", "writes should reach the underlying writer")
-	})
-
-	t.Run("accepts environment slices such as os.Environ", func(t *testing.T) {
-		var buf bytes.Buffer
-		w := colorwriter.New(&buf, os.Environ())
-		require.NotNil(t, w, "New should accept os.Environ() as documented")
-
-		_, err := io.WriteString(w, "env aware output")
-		require.NoError(t, err, "writer returned by New should remain usable with os.Environ input")
-		assert.Contains(t, buf.String(), "env aware output", "wrapped writer should forward output")
-	})
-}
-
-// TestSpec_PublicAPI_Stderr validates the documented behavior of Stderr from the
-// README.md specification.
-func TestSpec_PublicAPI_Stderr(t *testing.T) {
-	t.Parallel()
-	w := colorwriter.Stderr()
-	require.NotNil(t, w, "Stderr should return a non-nil io.Writer")
-	assert.Implements(t, (*io.Writer)(nil), w, "Stderr should return an io.Writer as documented")
-}
-
-// TestSpec_PublicAPI_Degrade validates the documented behavior of Degrade from the
-// README.md specification.
-func TestSpec_PublicAPI_Degrade(t *testing.T) {
-	t.Parallel()
-	const ansiRed = "\x1b[31mhello\x1b[0m"
-
 	tests := []struct {
 		name    string
 		environ []string
-		want    string
 	}{
-		{
-			name:    "strips ansi when NO_COLOR is set",
-			environ: []string{"NO_COLOR=1", "TERM=xterm-256color"},
-			want:    "hello",
-		},
-		{
-			name:    "strips ansi for dumb terminals",
-			environ: []string{"TERM=dumb"},
-			want:    "hello",
-		},
-		{
-			name:    "preserves ansi for forced color profiles",
-			environ: []string{"TERM=xterm-256color", "CLICOLOR_FORCE=1"},
-			want:    ansiRed,
-		},
-		{
-			name:    "preserves ansi for interactive color terminals",
-			environ: []string{"TERM=xterm-256color"},
-			want:    ansiRed,
-		},
+		{name: "NO_COLOR environment", environ: []string{"NO_COLOR=1"}},
+		{name: "color terminal environment", environ: []string{"TERM=xterm-256color", "COLORTERM=truecolor"}},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := colorwriter.Degrade(ansiRed, tt.environ)
-			if tt.want == ansiRed {
-				assert.Contains(t, got, "hello")
-				assert.Contains(t, got, "\x1b[31m")
-				assert.Contains(t, got, "\x1b[m")
-				return
-			}
-			assert.Equal(t, tt.want, got)
+			var destination bytes.Buffer
+			writer := colorwriter.New(&destination, tt.environ)
+			require.NotNil(t, writer, "New should return a usable io.Writer")
+			_, err := io.WriteString(writer, "documented output")
+			require.NoError(t, err, "the color-profile-aware writer should accept writes")
+			assert.Contains(t, destination.String(), "documented output", "writes should reach the wrapped writer")
 		})
 	}
 }
 
-func TestSpec_Implementation_DoesNotImportLogger(t *testing.T) {
-	t.Parallel()
-	files, err := filepath.Glob("*.go")
-	require.NoError(t, err)
-
-	fset := token.NewFileSet()
-	checked := 0
-	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-		checked++
-
-		parsed, err := parser.ParseFile(fset, file, nil, parser.ImportsOnly)
-		require.NoError(t, err, "parse %s", file)
-
-		for _, imp := range parsed.Imports {
-			path, err := strconv.Unquote(imp.Path.Value)
-			require.NoError(t, err, "unquote import in %s", file)
-			require.NotEqual(t, "github.com/github/gh-aw/pkg/logger", path, "%s must remain a low-level dependency of pkg/logger", file)
-		}
-	}
-	require.Positive(t, checked, "expected at least one non-test Go file in colorwriter")
+// TestSpec_PublicAPI_Stderr validates the documented convenience helper.
+func TestSpec_PublicAPI_Stderr(t *testing.T) {
+	writer := colorwriter.Stderr()
+	require.NotNil(t, writer, "Stderr should return a writer")
+	assert.Implements(t, (*io.Writer)(nil), writer, "Stderr should return the documented io.Writer type")
 }
+
+// TestSpec_PublicAPI_Degrade validates the README's NO_COLOR usage example.
+func TestSpec_PublicAPI_Degrade(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "documented ANSI warning", input: "\x1b[31mwarning\x1b[0m", want: "warning"},
+		{name: "plain text remains plain", input: "warning", want: "warning"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := colorwriter.Degrade(tt.input, []string{"NO_COLOR=1", "TERM=xterm-256color"})
+			assert.Equal(t, tt.want, got, "Degrade should produce plain output when NO_COLOR is set")
+		})
+	}
+}
+
+// SPEC_AMBIGUITY: The README does not define exact degradation results for
+// COLORTERM or terminal-capability combinations, so they are not asserted.

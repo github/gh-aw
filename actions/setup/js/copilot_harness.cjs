@@ -32,6 +32,9 @@
  *     history and permanently disables `--continue` for the remainder of the run so the corrupt
  *     state can never be reloaded.  Once `--continue` is disabled this way it is not re-enabled
  *     even if later retries produce output.
+ *   - Tool-call ID schema errors (400 "Invalid 'input[N].id': 'ctc_call_...'.
+ *     Expected an ID that begins with 'fc'") are non-transient. Stop rather than
+ *     resuming poisoned history or restarting after partial execution.
  *   - Exit codes that indicate the CLI subprocess was killed by a fatal OS-level signal
  *     (SIGILL/SIGABRT/SIGBUS/SIGFPE/SIGSEGV/SIGSYS — see harness_crash_signals.cjs) are treated
  *     like the null-type tool_call case: `--continue` is permanently disabled and the next retry
@@ -192,6 +195,7 @@ const FIRST_CONNECTION_REFUSED_RETRY_DELAY_MS = 1000;
 // re-injects the same broken history, producing the same 400 on every subsequent attempt.
 // A fresh restart is required to discard the poisoned history.
 const NULL_TYPE_TOOL_CALL_PATTERN = /tool_calls\[.*?\]\.type.*null/;
+const TOOL_CALL_ID_SCHEMA_ERROR_PATTERN = /400\s+Invalid ['"]input\[\d+\]\.id['"]:\s*['"]ctc_call_[^'"\s]+['"]\.\s*Expected an ID that begins with ['"]fc['"]/i;
 /**
  * Emit a diagnostic log line to stderr.
  * All driver messages are prefixed with "[copilot-harness]" so they are easy to
@@ -309,6 +313,10 @@ function isTransientCAPIError(output) {
  */
 function isHTTP400ResponseError(output) {
   return HTTP_400_RESPONSE_ERROR_PATTERN.test(output);
+}
+
+function isToolCallIdSchemaError(output) {
+  return TOOL_CALL_ID_SCHEMA_ERROR_PATTERN.test(output);
 }
 
 /**
@@ -731,6 +739,7 @@ function extractTokenCountFromOutput(output) {
  *   isMCPPolicy?: boolean,
  *   isModelNotSupported?: boolean,
  *   isHTTP400ResponseError?: boolean,
+ *   isToolCallIdSchemaError?: boolean,
  *   isInvocationCapExceeded?: boolean,
  *   isAPIProxyGuardRejected?: boolean,
  *   isNullTypeToolCall?: boolean,
@@ -756,6 +765,7 @@ function classifyCopilotFailure(detection) {
   if (detection.isCAPIServerError) return "capi_server_error";
   if (detection.isMCPPolicy) return "mcp_policy_blocked";
   if (detection.isModelNotSupported) return "model_not_supported";
+  if (detection.isToolCallIdSchemaError) return "tool_call_id_schema_error";
   if (detection.isHTTP400ResponseError) return "http_400_response_error";
   if (detection.isNullTypeToolCall) return "null_type_tool_call";
   if (detection.isAuthErr) return "no_auth_info";
@@ -1501,6 +1511,7 @@ async function main() {
           const isMCPPolicy = isMCPPolicyError(result.output);
           const isModelNotSupported = isModelNotSupportedError(result.output);
           const hasHTTP400ResponseError = isHTTP400ResponseError(result.output);
+          const hasToolCallIdSchemaError = isToolCallIdSchemaError(result.output);
           const isAuthErr = isNoAuthInfoError(result.output);
           const isAuthenticationFailed = isAuthenticationFailedError(result.output);
           const proxyAuthDiagnostic = buildCopilotProxyAuthFailureDiagnostic(result.output, process.env);
@@ -1539,6 +1550,7 @@ async function main() {
             isMCPPolicy,
             isModelNotSupported,
             isHTTP400ResponseError: hasHTTP400ResponseError,
+            isToolCallIdSchemaError: hasToolCallIdSchemaError,
             isInvocationCapExceeded,
             isAPIProxyGuardRejected: !!apiProxyGuardRejection,
             isNullTypeToolCall,
@@ -1562,6 +1574,7 @@ async function main() {
               ` isMCPPolicyError=${isMCPPolicy}` +
               ` isModelNotSupportedError=${isModelNotSupported}` +
               ` isHTTP400ResponseError=${hasHTTP400ResponseError}` +
+              ` isToolCallIdSchemaError=${hasToolCallIdSchemaError}` +
               ` isNullTypeToolCallError=${isNullTypeToolCall}` +
               ` isSDKSessionIdleTimeoutError=${isSDKSessionIdleTimeout}` +
               ` isMCPGatewayShutdownError=${isMCPGatewayShutdown}` +
@@ -1724,6 +1737,11 @@ async function main() {
             return { action: "stop" };
           }
 
+          if (hasToolCallIdSchemaError) {
+            log(`attempt ${attempt + 1}: tool-call ID schema error — not retrying (conversation state cannot be resumed)`);
+            return { action: "stop" };
+          }
+
           if (hasHTTP400ResponseError) {
             if (attempt < maxRetries && result.hasOutput && useContinueOnRetry) {
               useContinueOnRetry = false;
@@ -1866,6 +1884,7 @@ if (typeof module !== "undefined" && module.exports) {
     isDetectionPhase,
     computeStartupRetryEligible,
     isHTTP400ResponseError,
+    isToolCallIdSchemaError,
     isModelAvailableInReflectData,
     isModelAvailableInReflectFile,
     resolveMultiProviderFromReflect,
