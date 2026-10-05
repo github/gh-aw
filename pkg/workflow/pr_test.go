@@ -299,6 +299,26 @@ func TestRestoreClaudeWorkflowsStep(t *testing.T) {
 	assert.Contains(t, step, "rm -rf \"$dst\"")
 }
 
+func TestCanRestoreClaudeWorkflows(t *testing.T) {
+	tests := []struct {
+		name string
+		data *WorkflowData
+		want bool
+	}{
+		{name: "default checkout", data: &WorkflowData{}, want: true},
+		{name: "checkout disabled", data: &WorkflowData{CheckoutDisabled: true}, want: true},
+		{name: "same repository root", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "${{ github.repository }}"}}}, want: true},
+		{name: "different repository root", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "example/other"}}}},
+		{name: "different repository subdirectory", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "example/other", Path: "other"}}}, want: true},
+		{name: "custom checkout", data: &WorkflowData{CustomSteps: "      - uses: actions/checkout@v4\n"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, canRestoreClaudeWorkflows(tt.data))
+		})
+	}
+}
+
 func TestClaudeWorkflowRestorePrecedesAgentSteps(t *testing.T) {
 	var yaml strings.Builder
 	data := &WorkflowData{AI: "claude", Permissions: "contents: read"}

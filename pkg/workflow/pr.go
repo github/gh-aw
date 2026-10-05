@@ -58,6 +58,28 @@ func isPRCheckoutDisabled(data *WorkflowData) bool {
 	return false
 }
 
+// Claude's activation snapshot belongs to the workflow repository. Do not copy it
+// into a different repository checked out at the workspace root.
+func canRestoreClaudeWorkflows(data *WorkflowData) bool {
+	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
+		return false
+	}
+	for _, checkout := range data.CheckoutConfigs {
+		if checkout == nil {
+			continue
+		}
+		checkoutPath := path.Clean(strings.ReplaceAll(checkout.Path, "\\", "/"))
+		if checkoutPath != "." && !strings.Contains(checkout.Path, "${{") {
+			continue
+		}
+		repository := strings.TrimSpace(checkout.Repository)
+		if checkout.Wiki || (repository != "" && repository != "${{ github.repository }}") {
+			return false
+		}
+	}
+	return true
+}
+
 func resolveAgentManifestPaths(registry *EngineRegistry, data *WorkflowData) (folders, files []string) {
 	folders = []string{".agents", ".github"}
 	if data != nil {
