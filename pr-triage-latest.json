@@ -1,24 +1,24 @@
 {
-  "run_date": "2026-10-05T01:07:31Z",
-  "run_id": 37250030080,
+  "run_date": "2026-10-05T07:01:25.272636Z",
+  "run_id": 37274867210,
   "source": "github-mcp-triage",
-  "eligible_total": 6,
-  "cooldown_skipped": 0,
+  "eligible_total": 9,
+  "cooldown_skipped": 1,
   "category_counts": {
-    "bug": 4,
+    "bug": 7,
     "feature": 2
   },
   "risk_counts": {
-    "high": 3,
-    "medium": 3
+    "high": 5,
+    "medium": 4
   },
   "priority_counts": {
-    "high": 2,
-    "medium": 4
+    "high": 3,
+    "medium": 6
   },
   "action_counts": {
     "fast_track": 2,
-    "batch_review": 4,
+    "batch_review": 7,
     "auto_merge": 0,
     "defer": 0,
     "close": 0
@@ -28,60 +28,56 @@
       "id": "work-queue-safety",
       "count": 3,
       "prs": [
-        65682,
+        65591,
         65660,
-        65591
+        65682
+      ]
+    },
+    {
+      "id": "guardrail-bugfixes",
+      "count": 3,
+      "prs": [
+        65761,
+        65765,
+        65766
       ]
     },
     {
       "id": "repo-memory-reliability",
       "count": 2,
       "prs": [
-        65662,
-        65659
+        65659,
+        65662
       ]
     }
   ],
   "selected_candidates": [
+    65591,
+    65660,
     65682,
     65662,
-    65660,
     65659,
-    65591,
+    65761,
+    65766,
+    65765,
     56568
   ],
   "prs": [
     {
-      "number": 65682,
-      "title": "Support multiple work-queue claims and claim-scoped safe outputs",
+      "number": 65591,
+      "title": "Migrate ESLint factory workflows to work-queue dispatch",
       "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 66,
+      "risk": "high",
+      "priority": "high",
+      "score": 79,
       "score_breakdown": {
-        "impact": 30,
-        "urgency": 22,
-        "quality": 14
-      },
-      "action": "batch_review",
-      "batch": "work-queue-safety",
-      "notes": "Draft PR with strong queue semantics changes; needs a focused review burst before merge."
-    },
-    {
-      "number": 65662,
-      "title": "Make repo-memory validation non-destructive and surface push failures",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 69,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 21,
+        "impact": 38,
+        "urgency": 25,
         "quality": 16
       },
-      "action": "batch_review",
-      "batch": "repo-memory-reliability",
-      "notes": "Low-risk operational fix; strong validation story but should be reviewed alongside sister fixes."
+      "action": "fast_track",
+      "batch": "work-queue-safety",
+      "notes": "High-value infrastructure migration with compounding operational benefit; review promptly."
     },
     {
       "number": 65660,
@@ -97,7 +93,39 @@
       },
       "action": "fast_track",
       "batch": "work-queue-safety",
-      "notes": "Reliability fix for silent-exit classification; should be reviewed quickly because it affects failure reporting."
+      "notes": "Reliability fix for silent-exit classification; should be reviewed quickly."
+    },
+    {
+      "number": 65682,
+      "title": "Support multiple work-queue claims and claim-scoped safe outputs",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 66,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 22,
+        "quality": 14
+      },
+      "action": "batch_review",
+      "batch": "work-queue-safety",
+      "notes": "Moderate-risk queue semantics change; suitable for a focused review burst."
+    },
+    {
+      "number": 65662,
+      "title": "Make repo-memory validation non-destructive and surface push failures",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 69,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 21,
+        "quality": 16
+      },
+      "action": "batch_review",
+      "batch": "repo-memory-reliability",
+      "notes": "Low-risk operational fix with a clear validation story and strong safeguards."
     },
     {
       "number": 65659,
@@ -113,23 +141,55 @@
       },
       "action": "batch_review",
       "batch": "repo-memory-reliability",
-      "notes": "Fixes an operational bug with a good test story; appropriate for batch review with related repo-memory changes."
+      "notes": "Operational bug fix with good regression coverage; pair with the related repo-memory PRs."
     },
     {
-      "number": 65591,
-      "title": "Migrate ESLint factory workflows to work-queue dispatch",
-      "category": "feature",
+      "number": 65761,
+      "title": "Stop Copilot retries on tool-call ID schema errors",
+      "category": "bug",
+      "risk": "high",
+      "priority": "medium",
+      "score": 72,
+      "score_breakdown": {
+        "impact": 34,
+        "urgency": 23,
+        "quality": 15
+      },
+      "action": "batch_review",
+      "batch": "guardrail-bugfixes",
+      "notes": "Important retry-safety fix with clear failure classification; review promptly but not as an emergency."
+    },
+    {
+      "number": 65766,
+      "title": "Support exact-path protected-file exclusions",
+      "category": "bug",
       "risk": "high",
       "priority": "high",
-      "score": 79,
+      "score": 71,
       "score_breakdown": {
-        "impact": 38,
-        "urgency": 25,
-        "quality": 16
+        "impact": 34,
+        "urgency": 23,
+        "quality": 14
       },
-      "action": "fast_track",
-      "batch": "work-queue-safety",
-      "notes": "High-value infrastructure migration with strong review signals and a clear operational benefit."
+      "action": "batch_review",
+      "batch": "guardrail-bugfixes",
+      "notes": "Security-adjacent fix to protected-file enforcement; deserves a quick but focused review."
+    },
+    {
+      "number": 65765,
+      "title": "Warn instead of failing when Node is unavailable in the conclusion job",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "score": 64,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 18,
+        "quality": 17
+      },
+      "action": "batch_review",
+      "batch": "guardrail-bugfixes",
+      "notes": "Small but worthwhile robustness fix with regression coverage; suitable for a grouped review."
     },
     {
       "number": 56568,
@@ -144,13 +204,12 @@
         "quality": 13
       },
       "action": "batch_review",
-      "batch": "legacy-merge-conflict-fix",
-      "notes": "Still a meaningful bug fix, but review comments and age suggest a focused review rather than urgent merge."
+      "notes": "Still a meaningful bug fix, but older and less urgent than the newest queue and repo-memory work."
     }
   ],
   "report_issue": "created",
   "notes": [
-    "All eligible Copilot-authored PRs were triaged; no PRs were within the 1-hour cooldown window.",
-    "Batch clusters are based on work-queue/safe-output and repo-memory reliability themes."
+    "Eligible Copilot-authored PRs were filtered to items older than one hour; PR #65767 was skipped under the cooldown window.",
+    "Batch clusters focus on work-queue safety, repo-memory reliability, and guardrail bugfixes that share review overlap."
   ]
 }
