@@ -115,7 +115,7 @@ observability:
       langfuse.user.id: "{{ github.actor }}"
 ```
 
-    Values are plain strings. Template expressions such as `{{ gh-aw.episode.id }}` or `{{ github.actor }}` are resolved from attributes already computed for the span. Empty values are omitted, and non-empty values are masked in runner logs.
+    Values are plain strings. Template expressions such as `{{ gh-aw.episode.id }}` or `{{ github.actor }}` are resolved from attributes already computed for the span. Empty values are omitted. Values of at least 4 characters are masked in runner logs; shorter values are not masked.
 
 ## Custom resource attributes
 
