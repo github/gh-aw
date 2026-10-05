@@ -30,7 +30,7 @@ func TestSmokeTokenTelemetryCheckIsEngineAware(t *testing.T) {
 					t.Errorf("token telemetry check missing %q", expected)
 				}
 			}
-			unsupported := `contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)`
+			unsupported := `contains(fromJSON('["kiro","cursor"]'), needs.activation.outputs.engine_id)`
 			if strings.Count(check, "!"+unsupported) != 2 || strings.Count(check, "&& "+unsupported) != 1 {
 				t.Error("proxy assertions must run only for supported engines; unsupported engines must receive a notice")
 			}
