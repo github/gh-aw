@@ -73,8 +73,13 @@ emitted through the `safeoutputs` MCP CLI.
 
 ## Output
 
-**ALWAYS create an issue** with `safeoutputs create_issue`, for example
-`safeoutputs create_issue --title "..." --body "..."`:
+**ALWAYS create an issue** by including `safeoutputs create_issue` inside a
+fenced `bash` block in your reply. Plain prose and inline code do not execute:
+
+```bash
+safeoutputs create_issue --title "..." --body "..."
+```
+
 - Title: "Smoke Test: Aider - ${{ github.run_id }}"
 - Body should include:
   - Test results (✅ or ❌ for each test)

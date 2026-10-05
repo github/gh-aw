@@ -120,6 +120,8 @@ func TestAiderSampleProviderExecution(t *testing.T) {
 	assert.False(t, engine.GetCapabilities().MCP)
 	assert.Nil(t, def.Behaviors.ConfigFile, "repository Aider configuration must not be overwritten")
 	assert.NotContains(t, def.Behaviors.HarnessScript, "172.30.0.30")
+	assert.Equal(t, "aider_log_parser", engine.GetLogParserScriptId())
+	assert.Contains(t, engine.GetLogParserScriptSource(), "sourceEngine")
 	for _, test := range []struct{ model, provider string }{
 		{"copilot/auto", "github"},
 		{"openai/gpt-5", "openai"},

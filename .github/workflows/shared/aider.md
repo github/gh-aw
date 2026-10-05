@@ -46,8 +46,79 @@ engine:
         anthropic: api.anthropic.com
         openai: api.openai.com
     execution:
-      command-name: aider
+      command-name: python3
       args:
+        - -c
+        - |
+          import json
+          import os
+          import sys
+          import time
+          from pathlib import Path
+          from uuid import uuid4
+          from aider import main as aider_main
+          from aider.coders import base_coder
+          from aider.io import InputOutput
+
+          session_id = str(uuid4())
+          started_at = time.monotonic()
+          turns = 0
+          errors = []
+
+          def emit(event_type, data):
+              print("\n" + json.dumps({
+                  "type": event_type,
+                  "timestamp": int(time.time() * 1000),
+                  "data": {"sourceEngine": "aider", "sessionId": session_id, **data},
+              }), flush=True)
+
+          class WorkflowInputOutput(InputOutput):
+              def confirm_ask(self, question, *args, **kwargs):
+                  if question in ("Run shell command?", "Run shell commands?"):
+                      kwargs["explicit_yes_required"] = False
+                  return super().confirm_ask(question, *args, **kwargs)
+
+              def assistant_output(self, message, pretty=None):
+                  global turns
+                  if not message:
+                      return super().assistant_output(message, pretty)
+                  turns += 1
+                  emit("assistant.message", {"content": message})
+
+              def tool_error(self, message="", strip=True):
+                  errors.append(str(message))
+                  return super().tool_error(message, strip)
+
+          original_run_cmd = base_coder.run_cmd
+
+          def workflow_run_cmd(command, *args, **kwargs):
+              tool_id = str(uuid4())
+              emit("tool.execution_start", {
+                  "toolCallId": tool_id, "toolName": "bash", "input": {"command": command},
+              })
+              tool_started_at = time.monotonic()
+              exit_code, output = original_run_cmd(command, *args, **kwargs)
+              emit("tool.execution_complete", {
+                  "toolCallId": tool_id, "toolName": "bash", "success": exit_code == 0,
+                  "exitCode": exit_code, "output": output,
+                  "durationMs": int((time.monotonic() - tool_started_at) * 1000),
+              })
+              return exit_code, output
+
+          aider_main.InputOutput = WorkflowInputOutput
+          base_coder.run_cmd = workflow_run_cmd
+          emit("session.init", {"model": os.environ.get("AIDER_MODEL")})
+          emit("user.message", {
+              "content": Path(os.environ["GH_AW_PROMPT"]).read_text(encoding="utf-8"),
+          })
+          try:
+              exit_code = aider_main.main()
+          finally:
+              emit("session.result", {
+                  "numTurns": turns, "durationMs": int((time.monotonic() - started_at) * 1000),
+                  "errors": errors,
+              })
+          sys.exit(exit_code)
         - --yes-always
         - --edit-format
         - diff
@@ -173,6 +244,20 @@ engine:
         log(error instanceof Error ? error.message : String(error));
         if (!process.exitCode) process.exitCode = 1;
       });
+    log-parser: |
+      function parseLog(logContent) {
+        const { parseLogEntries, generateCopilotCliStyleSummary } = require("./log_parser_shared.cjs");
+        const { isSessionEvent } = require("./agent_session.cjs");
+        const logEntries = (parseLogEntries(logContent) || []).filter(
+          entry => isSessionEvent(entry) && entry.data.sourceEngine === "aider"
+        );
+        return {
+          markdown: generateCopilotCliStyleSummary(logEntries),
+          logEntries,
+          mcpFailures: [],
+          maxTurnsHit: false,
+        };
+      }
 ---
 
 ## Aider execution constraints
@@ -187,7 +272,8 @@ single reply is the whole run. Plan for that:
   Chain steps with `&&` or `;` on a single line instead.
 - **Suggest at most a few commands**; they all run from the repository root.
 - **Emit safe outputs through the `safeoutputs` MCP CLI**, for example
-  `safeoutputs noop --message "..."`.
+  `safeoutputs noop --message "..."`. Every `safeoutputs` command must be inside
+  a ```bash block. Commands in prose or inline code are not executed.
 
 <!--
 # Aider CLI
@@ -219,7 +305,16 @@ Without AWF, OpenAI and Anthropic use their provider API key and optional
 `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL`. Copilot requires AWF.
 
 Aider runs in scripting mode: the generated prompt file is passed with
-`--message-file` and all confirmations are auto-accepted (`--yes-always`).
+`--message-file`. A small Python entrypoint subclasses `InputOutput` so
+`--yes-always` also accepts suggested shell commands, which stock Aider
+deliberately declines when explicit confirmation is required. The adapter
+changes only the two shell-command confirmation prompts; other explicit
+confirmation requirements remain intact. Commands run in the configured
+workflow sandbox.
+The entrypoint emits native session events for model replies, shell commands
+and their results, and session boundaries. The declarative log parser publishes
+normalized agent logs used by Actions summaries and the unified session artifact;
+local log reconstruction also recognizes these events.
 The edit format is pinned to `diff` (the editblock coder) because the proxied
 model names are unknown to Aider and would otherwise fall back to the `whole`
 format, which rejects ```bash blocks and cannot run shell commands.
