@@ -1166,6 +1166,13 @@ install: build
 generate-schema-docs:
 	node scripts/generate-schema-docs.js
 
+.PHONY: session-schemas check-session-schemas
+session-schemas:
+	cd actions/setup/js && npm run schema:session
+
+check-session-schemas:
+	cd actions/setup/js && npm run schema:session:check
+
 # Generate agent factory documentation page
 .PHONY: generate-agent-factory
 generate-agent-factory:
@@ -1497,6 +1504,8 @@ help:
 	@echo "  compile-cli-workflows - Compile workflows in pkg/cli/workflows (builds binary if missing)"
 	@echo "  dependabot       - Generate Dependabot manifests for npm dependencies in workflows"
 	@echo "  generate-schema-docs - Generate frontmatter full reference documentation from JSON schema"
+	@echo "  session-schemas - Generate canonical and unified session JSON schemas from TypeScript declarations"
+	@echo "  check-session-schemas - Check generated session schemas for declaration drift"
 	@echo "  generate-agent-factory     - Generate agent factory documentation page"
 	@echo "  generate-llms-txt  - Generate llms.txt at repository root from .github/aw/*.md"
 	@echo "  build-slides     - Build slides with Marp to docs/public/slides/gh-aw.html"

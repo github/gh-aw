@@ -1733,6 +1733,27 @@ Result:
 
 Beyond common parameters, individual safe output types support specialized configuration.
 
+#### Protected-File Exclusions
+
+The `create-pull-request` and `push-to-pull-request-branch` handlers accept `protected-files` as either the existing policy string or an object containing `policy` and `exclude`:
+
+```yaml
+safe-outputs:
+  create-pull-request:
+    protected-files:
+      policy: fallback-to-issue
+      exclude: ["/pyproject.toml"]
+```
+
+The object form MUST preserve the policy values and defaults supported by the corresponding handler's string form. Each `exclude` entry MUST be interpreted as follows:
+
+- An entry without a leading slash MUST retain the existing basename or path-prefix matching behavior.
+- An entry beginning with `/` MUST match only the exact repository-relative path after removing the leading slash. For example, `"/pyproject.toml"` excludes the root `pyproject.toml`, but not `lib/foo/pyproject.toml`.
+
+Implementations MUST apply exact-path exclusions in both patch-time and post-apply protected-file checks. Before comparing paths, implementations MUST normalize patch paths to repository-relative paths and decode Git C-style quoted paths, including octal UTF-8 byte escapes. An exact-path exclusion MUST NOT remove protection for other paths with the same basename.
+
+Protected-file exclusions only affect the protected-file check. Implementations MUST evaluate `allowed-files` independently and MUST NOT treat a protected-file exclusion as permission to modify a path that fails the `allowed-files` check.
+
 **Representative Examples**:
 
 **Issue Creation Extensions**:

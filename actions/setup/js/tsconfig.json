@@ -31,6 +31,6 @@
     "allowUmdGlobalAccess": true,
     "typeRoots": ["./node_modules/@types", "./types"]
   },
-  "include": ["*.cjs", "types/*.d.ts", "types/*.type-test.ts"],
-  "exclude": ["../../../node_modules", "../../../dist", "*.test.cjs", "run_apm_unpack.cjs"]
+  "include": ["*.cjs", "scripts/*.cjs", "types/*.d.ts", "types/*.type-test.ts"],
+  "exclude": ["../../../node_modules", "../../../dist", "**/*.test.cjs", "run_apm_unpack.cjs"]
 }
