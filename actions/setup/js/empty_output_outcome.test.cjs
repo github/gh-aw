@@ -26,8 +26,43 @@ describe("empty output outcome", () => {
   it("records incomplete rather than claiming an intentional noop without evidence", () => {
     expect(buildEmptyOutputOutcome([], rootDir)).toEqual({
       type: "report_incomplete",
-      reason: "Agent finished without emitting any valid safe outputs; task completion could not be confirmed.",
+      reason: "missing_terminal_safe_output",
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.",
     });
+  });
+
+  it.each([1, 137, 139])("classifies a silent driver exit %s separately from agent behavior", exitCode => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("engine_driver_failure");
+    expect(outcome.details).toContain(`Driver exit code: ${exitCode}`);
+  });
+
+  it("preserves CLI parse classification when the bridge exits non-zero without copying payloads", () => {
+    fs.mkdirSync(path.join(rootDir, "mcp-cli-audit"));
+    fs.writeFileSync(path.join(rootDir, "mcp-cli-audit/safeoutputs.jsonl"), 'not JSON\n{"event":"parse_args_error","tool":"noop","error":"private payload"}\n');
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("safeoutputs_cli_error");
+    expect(outcome.details).toContain("safeoutputs <tool> --help");
+    expect(outcome.details).not.toContain("private payload");
+  });
+
+  it.each(["tool_error", "call_error"])("does not classify downstream %s audit events as CLI errors", event => {
+    fs.mkdirSync(path.join(rootDir, "mcp-cli-audit"));
+    fs.writeFileSync(path.join(rootDir, "mcp-cli-audit/safeoutputs.jsonl"), `${JSON.stringify({ event, tool: "create_issue" })}\n`);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.reason).toBe("missing_terminal_safe_output");
+    expect(outcome.details).not.toContain("safeoutputs <tool> --help");
+  });
+
+  it("classifies rejected safe outputs separately from silence", () => {
+    expect(buildEmptyOutputOutcome(["Line 1: Invalid JSON"], rootDir).reason).toBe("invalid_safe_outputs");
+  });
+
+  it("does not mistake a failed tool command for an engine driver crash", () => {
+    writeEvents([{ type: "tool.execution_complete", data: { toolName: "bash", exitCode: 139, error: "Tool command failed" } }]);
+    expect(buildEmptyOutputOutcome([], rootDir).reason).toBe("missing_terminal_safe_output");
   });
 
   it("names a denied shell command and missing read or write capability", () => {

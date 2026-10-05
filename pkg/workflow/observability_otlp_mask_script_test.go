@@ -123,9 +123,10 @@ func TestMaskOTLPAttributesScript(t *testing.T) {
 	scriptPath := filepath.Join(filepath.Dir(file), "..", "..", "actions", "setup", "sh", "mask_otlp_attributes.sh")
 
 	tests := []struct {
-		name string
-		env  []string
-		want []string
+		name    string
+		env     []string
+		want    []string
+		wantNot []string
 	}{
 		{
 			name: "masks each attribute value individually",
@@ -135,6 +136,18 @@ func TestMaskOTLPAttributesScript(t *testing.T) {
 			want: []string{
 				"::add-mask::my-session",
 				"::add-mask::my-user",
+			},
+		},
+		{
+			name: "short attribute values are not emitted as masks",
+			env: []string{
+				`GH_AW_OTLP_ATTRIBUTES={"a":"1","b":"176","c":"abc","d":"abcd"}`,
+			},
+			want: []string{"::add-mask::abcd"},
+			wantNot: []string{
+				"::add-mask::1",
+				"::add-mask::176",
+				"::add-mask::abc",
 			},
 		},
 		{
@@ -165,8 +178,12 @@ func TestMaskOTLPAttributesScript(t *testing.T) {
 			require.NoError(t, err, "mask script should succeed, output:\n%s", out)
 
 			output := string(out)
+			normalizedOutput := "\n" + strings.TrimSpace(output) + "\n"
 			for _, want := range tt.want {
 				assert.Contains(t, output, want)
+			}
+			for _, wantNot := range tt.wantNot {
+				assert.NotContains(t, normalizedOutput, "\n"+wantNot+"\n")
 			}
 			if len(tt.want) == 0 {
 				assert.Empty(t, strings.TrimSpace(output), "expected no output for this case")

@@ -78,6 +78,13 @@ describe("mcp_cli_bridge.cjs", () => {
     });
   });
 
+  it("rejects partially malformed safeoutputs flags instead of silently dropping positional payloads", () => {
+    expect(() => parseToolArgs(["--message", "done", "private payload"], { message: { type: "string" } }, null, { rejectPositionalArguments: true })).toThrow(
+      "Unexpected positional argument. Pass a single quoted JSON object or use --key value flags."
+    );
+    expect(parseToolArgs(["--message", "done"], { message: { type: "string" } }, null, { rejectPositionalArguments: true }).args).toEqual({ message: "done" });
+  });
+
   it("maps dashed arg names to underscored schema keys", () => {
     const schemaProperties = {
       issue_number: { type: "integer" },
@@ -1933,8 +1940,8 @@ describe("mcp_cli_bridge.cjs", () => {
 
       const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
       expect(toolsCallBody).toBeUndefined();
-      expect(stderrChunks.join("")).toContain("no arguments were recognized for 'create_issue'");
-      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
+      expect(stderrChunks.join("")).toContain("Unexpected positional argument");
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("use --key value flags"));
     });
 
     it("fails when --json accompanies an unrecognized positional argument", async () => {
@@ -1944,7 +1951,18 @@ describe("mcp_cli_bridge.cjs", () => {
 
       const toolsCallBody = recordedBodies.find(b => b.method === "tools/call");
       expect(toolsCallBody).toBeUndefined();
-      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("no arguments were recognized"));
+      expect(global.core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Unexpected positional argument"));
+    });
+
+    it("rejects stray positional arguments even alongside recognized flags and records the cause", async () => {
+      setupMainCall(requiredInputTools, ["create_issue", "--title", "valid title", "private payload"]);
+      await main();
+      expect(recordedBodies.find(b => b.method === "tools/call")).toBeUndefined();
+      expect(stderrChunks.join("")).toContain("use --key value flags");
+      expect(stderrChunks.join("")).not.toContain("private payload");
+      const audit = fs.readFileSync("/tmp/gh-aw/mcp-cli-audit/safeoutputs.jsonl", "utf8");
+      expect(audit).toContain('"event":"parse_args_error"');
+      expect(audit).not.toContain("private payload");
     });
 
     it("still shows help for no-flag piped stdin when stdin is truly empty", async () => {

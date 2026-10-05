@@ -1795,6 +1795,10 @@ safe-outputs:
 | `timed_out` | Agent execution exceeded the timeout limit |
 | `missing_safe_outputs` | Agent succeeded but produced no safe outputs |
 | `report_incomplete` | Agent reported that the task could not be completed (infrastructure or tool failures) |
+| `engine_driver_failure` | Engine driver exited with a non-zero code before recording a terminal safe output |
+| `safeoutputs_cli_error` | Safeoutputs CLI failed and no terminal safe output was recorded |
+| `invalid_safe_outputs` | Output validation rejected the agent's outputs, leaving no terminal safe output |
+| `missing_terminal_safe_output` | Agent finished with no terminal safe output, including diagnostic-only exits |
 | `missing_tool` | Required functionality is not available |
 | `missing_data` | Required data is not accessible |
 | `inference_access_error` | AI inference endpoint authentication or access failures |
@@ -1805,6 +1809,8 @@ safe-outputs:
 | `cache_miss_misconfiguration` | Cache configuration errors |
 | `code_push_failures` | Failures pushing code to branches |
 | `assignment_errors` | Failures assigning issues or reviewers |
+
+When no terminal safe output is recorded, post-agent validation adds a `report_incomplete` signal with the detected cause. Driver exit codes and CLI audit errors distinguish runtime failures from agent behavior. Diagnostic-only outputs (`missing_tool` or `missing_data`) do not confirm task completion; silence is not treated as an intentional `noop`.
 
 **Use case: Suppress transient infrastructure failures**
 

@@ -120,14 +120,12 @@ func TestSpec_Constants_CheckState(t *testing.T) {
 }
 
 // TestSpec_Constants_DockerImages validates the documented default scanner images.
-// SPEC_MISMATCH: The README documents unpinned/latest image references, while the
-// exported constants currently contain versioned, digest-pinned references.
 func TestSpec_Constants_DockerImages(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "ghcr.io/zizmorcore/zizmor:latest", cli.ZizmorImage, "ZizmorImage should match the README specification")
-	assert.Equal(t, "ghcr.io/boostsecurityio/poutine:latest", cli.PoutineImage, "PoutineImage should match the README specification")
-	assert.Equal(t, "rhysd/actionlint:1.7.12", cli.ActionlintImage, "ActionlintImage should match the README specification")
-	assert.Equal(t, "ghcr.io/vigilant-llc/runner-guard:latest", cli.RunnerGuardImage, "RunnerGuardImage should match the README specification")
+	assert.Equal(t, "ghcr.io/zizmorcore/zizmor:1.30.1@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101", cli.ZizmorImage, "ZizmorImage should match the README specification")
+	assert.Equal(t, "ghcr.io/boostsecurityio/poutine:1.1.6@sha256:722a8e0999b583c1540fe2974e691032b2d9d21b9256a17965132b6bfd0081b0", cli.PoutineImage, "PoutineImage should match the README specification")
+	assert.Equal(t, "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667", cli.ActionlintImage, "ActionlintImage should match the README specification")
+	assert.Equal(t, "ghcr.io/vigilant-llc/runner-guard:3.1.5@sha256:2df426ef96d21f1622e05b21329f26bd263fc46110609cefb6afe43457613ac0", cli.RunnerGuardImage, "RunnerGuardImage should match the README specification")
 }
 
 // TestSpec_Constants_TimelineEvents validates the documented timeline source and kind values.

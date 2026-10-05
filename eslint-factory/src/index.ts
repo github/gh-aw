@@ -64,6 +64,7 @@ import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
 import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
 import { noUnguardedAsyncTimerCallbackRule } from "./rules/no-unguarded-async-timer-callback";
+import { requireFiniteCheckBeforeDateToIsoStringRule } from "./rules/require-finite-check-before-date-toisostring";
 
 const plugin = {
   meta: {
@@ -136,6 +137,7 @@ const plugin = {
     "no-single-char-string-replace": noSingleCharStringReplaceRule,
     "no-unguarded-async-timer-callback": noUnguardedAsyncTimerCallbackRule,
     "no-async-foreach-callback": noAsyncForEachCallbackRule,
+    "require-finite-check-before-date-toisostring": requireFiniteCheckBeforeDateToIsoStringRule,
   },
 };
 

@@ -48,8 +48,6 @@ import Video from '../../../components/Video.astro';
 
 ## Adding an Automated Daily Status Workflow to Your Repo
 
-### YAML frontmatter
-
 GitHub Agentic Workflows lets developers define AI-powered repository automation in Markdown with YAML frontmatter (the configuration block between the `---` markers at the top of the file) and run AI agents through GitHub Actions. By the end of this guide, you will have a recurring agentic workflow running in your repository with GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, or Pi. This guide takes about 10 minutes and requires only the GitHub CLI.
 
 **⏱️ Estimated time: 10 minutes**
@@ -76,7 +74,7 @@ Before installing, ensure you have:
 - **Logged in to GitHub CLI** - Verify with `gh auth status` and run `gh auth login --scopes repo,workflow` if needed
 - **Operating System**: Linux, macOS, or Windows with WSL
 
-### Step 1 - Install the extension
+## Step 1 - Install the extension
 
 Install the GitHub Agentic Workflows extension:
 
@@ -97,7 +95,7 @@ gh extension install github/gh-aw
 > ```
 
 
-### Step 2 - Add the sample workflow and trigger a run
+## Step 2 - Add the sample workflow and trigger a run
 
 From your repository root, run this command:
 
@@ -128,7 +126,7 @@ This will take you through an interactive process to:
 5. **Optionally add skills for agentic authoring and debugging** - Adds additional files for interactive authoring and debugging of agentic workflows.
 6. **Optionally trigger an initial run** - Starts the workflow immediately.
 
-#### Configuring authentication
+### Configuring authentication
 
 **Copilot**
 
@@ -176,7 +174,7 @@ Pi chooses authentication from the provider prefix in `model:`. It uses Copilot 
 
 Pi also requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. Follow [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) for the complete setup.
 
-### Step 3 - Wait for the workflow to complete
+## Step 3 - Wait for the workflow to complete
 
 An automated workflow run can take 2-3 minutes.
 
@@ -201,7 +199,7 @@ import dailyRepoReportResult from '../../../assets/daily-repo-report-result.png'
 
 <Image src={dailyRepoReportResult} alt="Example of a Daily Repo Status Report issue created by the workflow" />
 
-### Step 4 - Customize your workflow (optional)
+## Step 4 - Customize your workflow (optional)
 
 With GitHub Agentic Workflows, you are in control! Your repository automation is fully customizable. You should shape your repo automation to match your priorities and your needs.
 
@@ -211,7 +209,7 @@ To customize it now:
 
 2. Edit the section "What to include" to list things you are having trouble with regularly in your repository: your issue backlog, your CI setup, your testing, the performance of your software, your roadmap. Any or all of these, or anything else you want to improve. You can also customize the style and process sections to guide the coding agent's behavior.
 
-3. If you changed the [frontmatter](#yaml-frontmatter) (the YAML configuration block between the `---` markers at the top of the file), regenerate the compiled workflow by running:
+3. If you changed the frontmatter (the YAML configuration block between the `---` markers at the top of the file), regenerate the compiled workflow by running:
 
    ```text
    gh aw compile

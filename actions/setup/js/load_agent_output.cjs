@@ -34,7 +34,8 @@ function truncateForLogging(content) {
  *
  * @returns {{
  *   success: true,
- *   items: any[]
+ *   items: any[],
+ *   collectorEmptyOutputCause?: string
  * } | {
  *   success: false,
  *   items?: undefined,
@@ -88,7 +89,11 @@ function loadAgentOutput() {
     return { success: false };
   }
 
-  return { success: true, items: validatedOutput.items };
+  return {
+    success: true,
+    items: validatedOutput.items,
+    ...(typeof validatedOutput.collectorEmptyOutputCause === "string" ? { collectorEmptyOutputCause: validatedOutput.collectorEmptyOutputCause } : {}),
+  };
 }
 
 module.exports = { loadAgentOutput, truncateForLogging, MAX_LOG_CONTENT_LENGTH };
