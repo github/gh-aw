@@ -78,6 +78,8 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-page-counter-increment-in-while-true-loop`](#require-page-counter-increment-in-while-true-loop) | Require page counters to advance in manual `while (true)` pagination loops |
 | [`require-getexecoutput-exitcode-check`](#require-getexecoutput-exitcode-check) | Require `exitCode` / returned exit code to be read after `getExecOutput()` or `exec()` with `{ ignoreReturnCode: true }` |
 | [`prefer-actions-exec-over-child-process`](#prefer-actions-exec-over-child-process) | Prefer `@actions/exec` over `child_process` to spawn processes that run to completion |
+| [`no-unguarded-async-timer-callback`](#no-unguarded-async-timer-callback) | Require async timer callbacks to wrap their entire body in try/catch |
+| [`require-finite-check-before-date-toisostring`](#require-finite-check-before-date-toisostring) | Validate dynamic dates before calling `toISOString()` or `toJSON()` |
 
 ### `no-empty-catch-block`
 
@@ -1220,3 +1222,11 @@ const normalized = value.replace("_", "-");
 ```js
 const normalized = value.replaceAll("_", "-");
 ```
+
+### `no-unguarded-async-timer-callback`
+
+Disallow async callbacks passed to `setTimeout()`, `setInterval()`, or `setImmediate()` unless the entire callback body is wrapped in `try/catch`. These timer functions discard the callback's returned promise, so uncaught errors become unhandled rejections.
+
+### `require-finite-check-before-date-toisostring`
+
+Require validation of dynamic values passed to `new Date(...)` before calling `toISOString()` or `toJSON()`, since invalid dates throw a `RangeError`. Validate the input with `Number.isFinite()` / `Number.isNaN()` or wrap the serialization in `try/catch`.

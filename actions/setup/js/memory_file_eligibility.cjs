@@ -9,9 +9,9 @@ const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 /**
  * Compile a space-separated FILE_GLOB_FILTER string into an array of RegExp patterns.
  * Patterns are matched against the file's path relative to the memory directory root.
- * Slashless patterns (e.g. "*.json") match files directly at that root (depth 0), matching
- * the documented FILE_GLOB_FILTER contract (e.g. "history.jsonl" at the memory directory
- * root matches "*.jsonl"). Patterns containing "/" match the full relative path unchanged.
+ * Slashless patterns (e.g. "*.json") match files at the memory directory root only.
+ * Use a recursive glob pattern to match files in subdirectories. Patterns containing
+ * "/" match the full relative path unchanged.
  *
  * @param {string} fileGlobFilter - Space-separated glob patterns (may be empty)
  * @returns {{ patternStrs: string[], compiledPatterns: RegExp[] }}
@@ -59,13 +59,13 @@ function isMemoryFileEligible(relativeFilePath, allowedExtensions, compiledPatte
 /**
  * Recursively scan a memory directory and delete any file that is not eligible
  * for persistence per the allowed-extensions and file-glob filters. Deleted files
- * are logged (not treated as errors) so that downstream validation, artifact
+ * are reported as warnings (not treated as errors) so that downstream validation, artifact
  * upload, and push steps only ever see the same effective file set.
  *
  * @param {string} memoryDir - Path to the memory directory to filter in place
  * @param {string[]} allowedExtensions - Allowed extensions (e.g. [".json"]); empty means allow all
  * @param {string} fileGlobFilter - Space-separated glob patterns; empty means allow all
- * @param {{ info: (message: string) => void }} core - Actions core module
+ * @param {{ info: (message: string) => void, warning: (message: string) => void }} core - Actions core module
  * @returns {{ kept: string[], removed: Array<{ path: string, reason: string }> }}
  */
 function filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilter, core) {
@@ -112,8 +112,7 @@ function filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilte
   scanDirectory(memoryDir);
 
   if (removed.length > 0) {
-    core.info(`Ignored ${removed.length} ineligible file(s) before validation/upload:`);
-    removed.forEach(f => core.info(`  - ${f.path} (${f.reason})`));
+    core.warning(`Ignored ${removed.length} ineligible file(s) before validation/upload:\n${removed.map(f => `  - ${f.path} (${f.reason})`).join("\n")}`);
   }
 
   return { kept, removed };
