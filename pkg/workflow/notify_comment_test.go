@@ -1367,8 +1367,7 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	}
 	script := string(scriptBytes)
 	assert.Contains(t, allSteps, "/tmp/gh-aw/usage/aw_session.jsonl")
-	assert.Contains(t, script, `node "${RUNNER_TEMP}/gh-aw/actions/unified_session.cjs"`)
-	assert.Less(t, strings.Index(script, "generate_usage_activity_summary.cjs"), strings.Index(script, "unified_session.cjs"), "include generated detection verdicts in the session")
+	assert.NotContains(t, script, "node ")
 	assert.Less(t, strings.Index(allSteps, "Process no-op messages"), strings.Index(allSteps, "Collect usage artifact files"), "collect after conclusion handlers")
 	generatorPath := filepath.Join("..", "..", "actions", "setup", "js", "generate_usage_activity_summary.cjs")
 	generatorBytes, err := os.ReadFile(generatorPath)
@@ -1381,6 +1380,17 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 
 	if !strings.Contains(allSteps, "Collect usage artifact files") {
 		t.Errorf("Expected conclusion job to collect usage artifact files.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "name: Generate usage activity summary and unified session") ||
+		!strings.Contains(allSteps, "uses: actions/github-script@") {
+		t.Errorf("Expected conclusion job to generate usage summaries with actions/github-script.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "require('"+SetupActionDestination+"/generate_usage_activity_summary.cjs')") ||
+		!strings.Contains(allSteps, "require('"+SetupActionDestination+"/unified_session.cjs')") {
+		t.Errorf("Expected conclusion job to load both usage generators from the setup action directory.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "setupGlobals(core, github, context, exec, io, getOctokit)") {
+		t.Errorf("Expected conclusion job to initialize GitHub Actions globals for required generators.\nGenerated steps:\n%s", allSteps)
 	}
 	if !strings.Contains(allSteps, `collect_usage_artifact_files.sh`) {
 		t.Errorf("Expected 'Collect usage artifact files' step to invoke collect_usage_artifact_files.sh.\nGenerated steps:\n%s", allSteps)
@@ -1458,15 +1468,18 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if strings.Contains(allSteps, "name: safe-outputs-items") {
 		t.Errorf("Expected safe-outputs-items download not to use exact artifact name downloads.\nGenerated steps:\n%s", allSteps)
 	}
-	// Verify download step appears before collect step so the manifest is available
-	// when generate_usage_activity_summary.cjs runs.
+	// Verify downloads and collection precede summary generation so inputs are available.
 	downloadIdx := strings.Index(allSteps, "Download Safe Outputs Items Manifest")
 	collectIdx := strings.Index(allSteps, "Collect usage artifact files")
 	if downloadIdx == -1 || collectIdx == -1 || downloadIdx >= collectIdx {
 		t.Errorf("Expected 'Download Safe Outputs Items Manifest' to appear before 'Collect usage artifact files'.\ndownloadIdx=%d collectIdx=%d\nGenerated steps:\n%s", downloadIdx, collectIdx, allSteps)
 	}
+	generationIdx := strings.Index(allSteps, "Generate usage activity summary and unified session")
+	if generationIdx == -1 || collectIdx >= generationIdx {
+		t.Errorf("Expected usage generation to run after file collection.\ncollectIdx=%d generationIdx=%d\nGenerated steps:\n%s", collectIdx, generationIdx, allSteps)
+	}
 	uploadIdx := strings.Index(allSteps, "Upload usage artifact")
-	if collectIdx == -1 || uploadIdx == -1 || collectIdx >= uploadIdx || !strings.Contains(allSteps[collectIdx:uploadIdx], "continue-on-error: true") {
+	if generationIdx == -1 || uploadIdx == -1 || generationIdx >= uploadIdx || !strings.Contains(allSteps[generationIdx:uploadIdx], "continue-on-error: true") {
 		t.Errorf("Expected unavailable working-set data not to fail the conclusion job.\nGenerated steps:\n%s", allSteps)
 	}
 
@@ -1526,20 +1539,11 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(script, "cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Errorf("Expected collect script to copy evals execution evidence into usage artifact staging.\nScript:\n%s", script)
 	}
-	if !strings.Contains(script, "generate_usage_activity_summary.cjs") {
-		t.Errorf("Expected collect script to generate activity summary aggregates.\nScript:\n%s", script)
-	}
 	if !strings.Contains(generator, "calculateWorkingSetFromJSONL") || !strings.Contains(generator, "summary.working_set = workingSet") {
 		t.Errorf("Expected usage activity generator to calculate and persist working-set rebuild metrics.\nGenerator:\n%s", generator)
 	}
-	if !strings.Contains(script, `node "${RUNNER_TEMP}/gh-aw/actions/generate_usage_activity_summary.cjs"`) {
-		t.Errorf("Expected collect script to use quoted shell-safe RUNNER_TEMP form to prevent word-splitting (SC2086).\nScript:\n%s", script)
-	}
-	if strings.Contains(script, "node ${RUNNER_TEMP}/gh-aw/actions/generate_usage_activity_summary.cjs") {
-		t.Errorf("Collect script must use double-quoted RUNNER_TEMP to prevent word-splitting (SC2086).\nScript:\n%s", script)
-	}
-	if strings.Contains(script, "node ${{ runner.temp }}/gh-aw/actions/generate_usage_activity_summary.cjs") {
-		t.Errorf("Collect script must not inline ${{ runner.temp }} in shell code.\nScript:\n%s", script)
+	if !strings.Contains(generator, "module.exports = {\n  main,") {
+		t.Errorf("Expected usage activity generator to export its main function for github-script.\nGenerator:\n%s", generator)
 	}
 }
 

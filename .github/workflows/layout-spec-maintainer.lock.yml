@@ -1530,6 +1530,31 @@ jobs:
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
+      - name: Generate usage activity summary and unified session
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main: generateSummary } = require(path.join(actionsDir, 'generate_usage_activity_summary.cjs'));
+            const { main: generateSession } = require(path.join(actionsDir, 'unified_session.cjs'));
+            for (const [label, generate] of [["usage activity summary", generateSummary], ["unified session", generateSession]]) {
+              try {
+                await generate();
+              } catch (error) {
+                core.warning(`Unable to generate ${label}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            }
+            const fs = require('fs');
+            const listFiles = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+              const entryPath = `${directory}/${entry.name}`;
+              return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
+            }).sort();
+            for (const file of listFiles('/tmp/gh-aw/usage')) core.info(file);
       - name: Upload usage artifact
         id: upload-usage-artifact
         if: always()

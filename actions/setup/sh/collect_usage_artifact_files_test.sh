@@ -27,24 +27,8 @@ done
 touch /tmp/gh-aw/usage/activity/collector-test-marker
 
 output="$(RUNNER_TEMP="$TEST_DIR" PATH="$TEST_DIR/bin" /bin/bash "$SCRIPT" 2>&1)"
-grep -q '::warning::node not found on PATH' <<<"$output"
+! grep -q 'node not found on PATH' <<<"$output"
 grep -q '/tmp/gh-aw/usage/activity/collector-test-marker' <<<"$output"
 test ! -f /tmp/gh-aw/usage/activity/summary.json
-
-cat > "$TEST_DIR/bin/node" <<'EOF'
-#!/bin/sh
-printf '%s\n' "${1##*/}" >> "$NODE_MARKER"
-if [ "${1##*/}" = generate_usage_activity_summary.cjs ]; then
-  printf '{}\n' > /tmp/gh-aw/usage/activity/summary.json
-fi
-EOF
-chmod +x "$TEST_DIR/bin/node"
-
-output="$(RUNNER_TEMP="$TEST_DIR" NODE_MARKER="$TEST_DIR/node-calls" PATH="$TEST_DIR/bin" /bin/bash "$SCRIPT" 2>&1)"
-! grep -q '::warning::node not found' <<<"$output"
-grep -q '/tmp/gh-aw/usage/activity/summary.json' <<<"$output"
-grep -qx 'generate_usage_activity_summary.cjs' "$TEST_DIR/node-calls"
-grep -qx 'unified_session.cjs' "$TEST_DIR/node-calls"
-test -f /tmp/gh-aw/usage/activity/summary.json
 
 echo "Usage collector tests passed"

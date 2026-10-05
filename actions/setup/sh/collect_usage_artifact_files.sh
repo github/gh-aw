@@ -86,10 +86,4 @@ if [ -s /tmp/gh-aw/threat-detection/sandbox/firewall/logs/api-proxy-logs/token-u
 [ -f /tmp/gh-aw/usage/detection/token_usage.jsonl ] || : > /tmp/gh-aw/usage/detection/token_usage.jsonl
 
 mkdir -p /tmp/gh-aw/usage/activity
-if command -v node >/dev/null 2>&1; then
-  node "${RUNNER_TEMP}/gh-aw/actions/generate_usage_activity_summary.cjs"
-  node "${RUNNER_TEMP}/gh-aw/actions/unified_session.cjs"
-else
-  echo "::warning::node not found on PATH; skipping the usage activity summary and unified session"
-fi
 find /tmp/gh-aw/usage -type f -print | sort
