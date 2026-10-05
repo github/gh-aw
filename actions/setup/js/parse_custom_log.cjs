@@ -17,6 +17,11 @@ const main = createEngineLogParser({
  */
 function parseCustomLog(logContent) {
   const entries = parseLogEntries(logContent) ?? [];
+  const { isGooseEvent, parseGooseLog } = require("./parse_goose_log.cjs");
+  if (entries.some(entry => isGooseEvent(entry) && entry.type !== "error")) {
+    const result = parseGooseLog(logContent);
+    return { ...result, markdown: `### Custom Engine Log (Goose format)\n\n${result.markdown}` };
+  }
   const { isOpenCodeEvent, parseOpenCodeLog } = require("./parse_opencode_log.cjs");
   if (entries.some(isOpenCodeEvent)) {
     const result = parseOpenCodeLog(logContent);
@@ -69,7 +74,7 @@ function parseCustomLog(logContent) {
   return {
     markdown: buildStepSummaryDetailsSection(
       "Custom Engine Log",
-      `      Log format not recognized as Claude, Codex, or OpenCode format.
+      `            Log format not recognized as Claude, Codex, Goose, or OpenCode format.
 
 **Basic Statistics:**
 - Lines: ${lineCount}

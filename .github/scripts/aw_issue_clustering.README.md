@@ -16,6 +16,11 @@ marker, or a legacy generated footer linking a run in this repository. Labels,
 title prefixes, or a bot author alone are insufficient. Human issues, WIP issues,
 group containers, and this workflow's own outputs cannot become cluster members.
 New issues created after workflow-run start wait for the next pass.
+Closed source issues are ignored for evidence, seeds, new assignments, and
+deferrals regardless of their closure reason. Closed essential summaries are
+read only to identify completed work for cleanup; they are not candidates.
+Frozen assigned scopes may retain historical references to closed sources,
+which do not count toward eligible backlog coverage.
 
 AW discussions updated in the last 14 days, including closed reports and every
 deep-report briefing, supplement the issue evidence. Older discussions explicitly
@@ -45,9 +50,14 @@ duplicate-membership checks still apply after this reconciliation. This accounts
 for expiry without claiming that an auto-closed source was actually fixed.
 
 Closing a summary as **completed** suppresses its unchanged source findings and
-queues them for trusted cleanup. After validating the complete plan, the publisher
-refetches each completed summary and linked source and closes the source as
-completed only if its AW provenance and activity timestamp are unchanged.
+queues them for trusted cleanup. Each run first performs this cleanup in a
+write-isolated deterministic job, before collecting evidence or recomputing the
+queue. It refetches each completed summary and linked source and closes the source
+as completed only if its AW provenance and activity timestamp are unchanged.
+The collector then reads the cleaned backlog. Cleanup failures stop recomputation;
+the job summary lists the sources closed (or previewed in staged mode).
+After validating the complete plan, the publisher repeats cleanup for summaries
+completed during analysis.
 Human issues, WIP/group containers, revived findings, and sources still linked
 to open assigned summaries cannot be cleanup targets. A reopened or edited
 summary cancels its pending cleanup. No comments, labels or bodies are rewritten

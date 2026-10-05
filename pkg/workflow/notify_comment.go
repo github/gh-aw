@@ -268,6 +268,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction func(string) string) []string {
 	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactCollectionStep(hasDetection)
+	steps = append(steps, buildUsageActivityGenerationStep(pinAction)...)
 	usageArtifactUploadAction := pinAction("actions/upload-artifact")
 	usageArtifactUploadWithLines := []string{
 		"        with:\n",
@@ -344,6 +345,21 @@ func buildUsageArtifactCollectionStep(hasDetection bool) []string {
 	}
 	collectionStep = append(collectionStep, fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell))
 	return collectionStep
+}
+
+func buildUsageActivityGenerationStep(pinAction func(string) string) []string {
+	return []string{
+		"      - name: Generate usage activity summary and unified session\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
+		"        with:\n",
+		"          script: |\n",
+		fmt.Sprintf("            const { setupGlobals } = require('%s/setup_globals.cjs');\n", SetupActionDestination),
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
+		fmt.Sprintf("            const { main } = require('%s/generate_usage_artifacts.cjs');\n", SetupActionDestination),
+		"            await main();\n",
+	}
 }
 
 // isGroupConcurrencyQueueEnabled reports whether compiler-generated concurrency groups
