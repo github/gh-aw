@@ -1,214 +1,16 @@
 {
-  "run_date": "2026-10-05T12:48:49Z",
-  "run_id": 37310795045,
+  "run_date": "2026-10-05T18:32:56Z",
+  "run_id": 37356482871,
   "source": "github-mcp-triage",
-  "eligible_total": 10,
-  "cooldown_skipped": 0,
-  "category_counts": {
-    "bug": 8,
-    "feature": 2
-  },
-  "risk_counts": {
-    "high": 6,
-    "medium": 4
-  },
-  "priority_counts": {
-    "high": 2,
-    "medium": 8
-  },
-  "action_counts": {
-    "fast_track": 2,
-    "batch_review": 7,
-    "auto_merge": 0,
-    "defer": 1,
-    "close": 0
-  },
-  "batches": [
-    {
-      "id": "work-queue-safety",
-      "count": 3,
-      "prs": [
-        65591,
-        65682,
-        65660
-      ]
-    },
-    {
-      "id": "repo-memory-reliability",
-      "count": 2,
-      "prs": [
-        65659,
-        65662
-      ]
-    },
-    {
-      "id": "guardrail-bugfixes",
-      "count": 4,
-      "prs": [
-        65761,
-        65765,
-        65766,
-        65767
-      ]
-    }
-  ],
-  "selected_candidates": [
-    65591,
-    65660,
-    65682,
-    65662,
-    65659,
-    65761,
-    65766,
-    65765,
-    65767,
-    56568
-  ],
+  "eligible_total": 1,
+  "cooldown_skipped": 3,
+  "category_counts": {"bug": 1},
+  "risk_counts": {"high": 1},
+  "priority_counts": {"medium": 1},
+  "action_counts": {"batch_review": 1},
+  "batches": [],
+  "selected_candidates": [56568],
   "prs": [
-    {
-      "number": 65591,
-      "title": "Migrate ESLint factory workflows to work-queue dispatch",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "score": 81,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 24,
-        "quality": 17
-      },
-      "action": "fast_track",
-      "batch": "work-queue-safety",
-      "notes": "High-value workflow migration with operational leverage; review promptly."
-    },
-    {
-      "number": 65660,
-      "title": "Classify silent agent exits and ensure terminal safe outputs",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "score": 79,
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 25,
-        "quality": 16
-      },
-      "action": "fast_track",
-      "batch": "work-queue-safety",
-      "notes": "Reliability fix for silent-exit classification; review quickly."
-    },
-    {
-      "number": 65682,
-      "title": "Support multiple work-queue claims and claim-scoped safe outputs",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 67,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 22,
-        "quality": 15
-      },
-      "action": "batch_review",
-      "batch": "work-queue-safety",
-      "notes": "Moderate-risk queue semantics change; good for a focused review burst."
-    },
-    {
-      "number": 65662,
-      "title": "Make repo-memory validation non-destructive and surface push failures",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 68,
-      "score_breakdown": {
-        "impact": 32,
-        "urgency": 20,
-        "quality": 16
-      },
-      "action": "batch_review",
-      "batch": "repo-memory-reliability",
-      "notes": "Operational fix with strong validation and good clarity; worth a paired review."
-    },
-    {
-      "number": 65659,
-      "title": "Fix nested repo-memory glob matching and restore secrets analysis cache",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 70,
-      "score_breakdown": {
-        "impact": 31,
-        "urgency": 22,
-        "quality": 17
-      },
-      "action": "batch_review",
-      "batch": "repo-memory-reliability",
-      "notes": "Useful reliability fix with clear regression coverage; pair with the sibling repo-memory PR."
-    },
-    {
-      "number": 65761,
-      "title": "Stop Copilot retries on tool-call ID schema errors",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "score": 72,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 22,
-        "quality": 15
-      },
-      "action": "batch_review",
-      "batch": "guardrail-bugfixes",
-      "notes": "Important retry-safety fix with a clear failure classification."
-    },
-    {
-      "number": 65766,
-      "title": "Support exact-path protected-file exclusions",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "score": 72,
-      "score_breakdown": {
-        "impact": 36,
-        "urgency": 22,
-        "quality": 14
-      },
-      "action": "batch_review",
-      "batch": "guardrail-bugfixes",
-      "notes": "Security-adjacent fix to protected-file enforcement; deserves a quick focused review."
-    },
-    {
-      "number": 65765,
-      "title": "Warn instead of failing when Node is unavailable in the conclusion job",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "score": 63,
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 18,
-        "quality": 17
-      },
-      "action": "batch_review",
-      "batch": "guardrail-bugfixes",
-      "notes": "Low-risk robustness improvement; good follow-up after the higher-signal guardrail fixes."
-    },
-    {
-      "number": 65767,
-      "title": "Avoid masking short OTLP attribute values",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "score": 72,
-      "score_breakdown": {
-        "impact": 34,
-        "urgency": 23,
-        "quality": 15
-      },
-      "action": "batch_review",
-      "batch": "guardrail-bugfixes",
-      "notes": "Telemetry bug fix with meaningful downstream impact; batch it with the guardrail set."
-    },
     {
       "number": 56568,
       "title": "Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`",
@@ -216,18 +18,10 @@
       "risk": "high",
       "priority": "medium",
       "score": 68,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 20,
-        "quality": 13
-      },
-      "action": "defer",
-      "notes": "Older fix with clear value, but lower urgency than the active queue/repo-memory work."
+      "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
+      "action": "batch_review",
+      "batch": null,
+      "notes": "High-risk conflict-resolution fix with an active request-for-changes review; keep it in a focused batch instead of fast-tracking."
     }
-  ],
-  "report_issue": "created",
-  "notes": [
-    "Eligible open Copilot-authored PRs were filtered against the one-hour cooldown window; no PRs were skipped this run.",
-    "Batch clusters focus on work-queue safety, repo-memory reliability, and guardrail bugfixes with overlapping review context."
   ]
 }
