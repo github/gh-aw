@@ -60,13 +60,23 @@ func TestCommandConcurrencyCompilation(t *testing.T) {
 }
 
 func TestConcurrencyQueueSchemaValidation(t *testing.T) {
-	for _, queue := range []string{"single", "max", "${{ github.event_name == 'pull_request' && 'single' || 'max' }}", "invalid"} {
-		content := "on: workflow_dispatch\nconcurrency:\n  group: test\n  queue: " + queue + "\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n"
-		err := NewCompiler().validateGitHubActionsSchema(content)
-		if queue == "invalid" {
-			require.Error(t, err)
-		} else {
-			require.NoError(t, err)
-		}
+	for _, tt := range []struct {
+		queue   string
+		wantErr bool
+	}{
+		{queue: "single"},
+		{queue: "max"},
+		{queue: "${{ github.event_name == 'pull_request' && 'single' || 'max' }}", wantErr: true},
+		{queue: "invalid", wantErr: true},
+	} {
+		t.Run(tt.queue, func(t *testing.T) {
+			content := "on: workflow_dispatch\nconcurrency:\n  group: test\n  queue: " + tt.queue + "\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n"
+			err := NewCompiler().validateGitHubActionsSchema(content)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
