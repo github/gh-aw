@@ -97,7 +97,7 @@ function checkForManifestFiles(patchContent, manifestFiles, pathExcludes = []) {
   }
   const changedFiles = extractPathsFromPatch(patchContent)
     .filter(path => !pathExcludes.includes(path))
-    .map(path => path.split("/").pop());
+    .map(path => path.slice(path.lastIndexOf("/") + 1));
   const manifestFileSet = new Set(manifestFiles);
   const manifestFilesFound = [...new Set(changedFiles.filter(f => manifestFileSet.has(f)))];
   return { hasManifestFiles: manifestFilesFound.length > 0, manifestFilesFound };
