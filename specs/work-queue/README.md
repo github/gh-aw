@@ -272,6 +272,67 @@ By induction on execution length, `Spec => []Safety` follows under the modeled a
 
 ## Reproduce verification
 
+### Successor: mandatory fair scheduling and batched workers
+
+The [priority/fairness specification](priority-and-fairness.md) defines the
+replacement protocol. [`FairWorkQueue.tla`](FairWorkQueue.tla) models its causal
+atomic Claim batches, FIFO defaults, two-level integer-pass selection, fresh
+selection after CAS conflicts, request deduplication, and independent Claim
+completion/effect authorization within one worker assignment.
+
+Each Claim consumes a logical slot and one service charge. A worker group consumes
+one native slot until trusted termination/release; completing one member does not
+release that slot. Missing finish intent cancels only that member. Published
+Completions survive recovery, and effects require the same assigned Claim's
+authorization.
+
+The model abstracts a fixed installed policy epoch, one compatible worker profile,
+one dispatch request/group per dispatcher, native run identity as its group
+identity, and canonical causal log order. Work is seeded in the first commit.
+It does not model new arrivals, multi-profile packing, policy edits, idempotency
+fingerprints or replayed transport responses, cryptographic provenance, JSON
+codecs, OTLP delivery, real APIs, or unbounded fairness/liveness. Its Work seed
+positions are causal FIFO positions, not timestamps. The preceding `WorkQueue.tla` checks
+remain regression evidence for the existing implementation, not an operational
+legacy mode in the replacement.
+
+For a focused successor check, set `TLC_MODEL_FILTER=FairWorkQueue`. Omit this
+filter to run the complete original and successor suite. Set
+`TLC_CONFIG_FILTER=FairBatch` to run one named configuration; unknown or
+incompatible filters fail rather than returning a no-op success.
+
+The same `check.sh` additionally runs:
+
+| Configuration | Expected result |
+|---|---|
+| `FairBatch.cfg` | Two dispatchers compete for a two-Claim worker batch; safety, independent logical/native limits, and per-Claim authorization hold |
+| `FairThreeClaim.cfg` | One worker receives three Claims and independently completes, cancels, or omits members across crash/recovery interleavings |
+| `FairPriority.cfg` | Weighted class/key decisions and Claim limits hold |
+| `FairStrict.cfg` | Strict class selection with weighted keys holds |
+| `BrokenBatchSelection.cfg` | Deliberately bypass selection; `DecisionValidity` must fail |
+| `BrokenClaimEffects.cfg` | Use another unfinished Claim's effects after one Claim completes; `EffectAuthorization` must fail |
+| `BrokenAssignmentHandle.cfg` | Finish another worker's Claim; `ClaimClosureAuthority` must fail |
+| `BrokenBatchCAS.cfg` | Overwrite from a stale batch snapshot after Completion; `TerminalPersistence` must fail |
+| `BrokenBatchRelease.cfg` | Release a live group's native slot after only some Claims finish; `RunReleaseAuthority` must fail |
+| `BatchedAssignmentWitness.cfg` | Guarded model reaches a multi-Claim assignment; the deliberately false `NoBatchedAssignment` fails |
+| `PartialCompletionWitness.cfg` | Guarded model reaches one completed and one open member; the deliberately false `NoPartialCompletion` fails |
+
+Successor checks completed on 2026-10-05 with the pinned TLC 2.19/Java 21:
+`FairBatch` exhausted 4,902 distinct states at depth 17; `FairThreeClaim` exhausted
+4,144 at depth 17; `FairPriority` and `FairStrict` each exhausted 283 at depth 14.
+All five negative controls produced
+their named violations; the guarded batching and partial-completion witnesses
+produced their expected counterexamples without a safety failure. These are
+bounded model checks, not an unbounded proof or runtime conformance result.
+
+`Safety` includes state types, single open owner per Work, causal history,
+recomputed selection, logical/native capacities, exact Claim charge counts,
+one dispatch request per group, assignment integrity, one effect authorization
+per Claim, per-handle closure and run-release authority, terminal persistence, and independent
+FIFO/strict-priority assertions. Positive cases must exhaust their bounded state
+space; a trace showing partial completion is reachability evidence, not a proof
+that arbitrary partial completions eventually happen.
+
 Use Java 21 and the official [`tla2tools.jar` v1.7.4](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4), which reports TLC 2.19. Jar SHA-256:
 
 ```text
