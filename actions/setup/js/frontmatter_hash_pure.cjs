@@ -10,6 +10,7 @@ const MAX_FRONTMATTER_HASH_INPUT_BYTES = 1 << 20; // 1 MiB
 const HTTP_STATUS_UNAUTHORIZED = 401;
 const HTTP_STATUS_FORBIDDEN = 403;
 const HTTP_STATUS_NOT_FOUND = 404;
+const githubFileReaders = new WeakSet();
 
 /**
  * Maximum depth for recursive symlink resolution when fetching remote files via the GitHub API.
@@ -453,7 +454,7 @@ async function readRuntimeImportBodyForHash(ref, baseDir, seen, fileReader) {
   for (const candidate of runtimeImportHashCandidatePaths(ref.path, baseDir)) {
     const key = `${candidate}:${ref.startLine ?? 0}-${ref.endLine ?? 0}`;
     if (seen.has(key)) return null;
-    if (fs.existsSync(candidate) && !runtimeImportHashRealPathAllowed(candidate, baseDir)) continue;
+    if (!githubFileReaders.has(fileReader) && fs.existsSync(candidate) && !runtimeImportHashRealPathAllowed(candidate, baseDir)) continue;
     try {
       let content = await fileReader(candidate);
       seen.add(key);
@@ -944,7 +945,9 @@ function createGitHubFileReader(github, owner, repo, ref) {
     }
   }
 
-  return filePath => fetchFile(filePath, 0);
+  const fileReader = filePath => fetchFile(filePath, 0);
+  githubFileReaders.add(fileReader);
+  return fileReader;
 }
 
 module.exports = {

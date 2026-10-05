@@ -47,6 +47,13 @@ engine: copilot
 	assert.Equal(t, "No", isCompiledUpToDate(mdPath, lockPath))
 	require.NoError(t, compiler.CompileWorkflow(absolutePath))
 	assert.Equal(t, "Yes", isCompiledUpToDate(mdPath, lockPath))
+
+	promptPath := filepath.Join(workflowDir, "shared", "context.md")
+	targetPath := filepath.Join(tmpDir, workflowDir, "shared", "target.md")
+	require.NoError(t, os.WriteFile(targetPath, []byte("Use ${{ github.run_id }}."), 0644))
+	require.NoError(t, os.Remove(promptPath))
+	require.NoError(t, os.Symlink(targetPath, promptPath))
+	assert.Equal(t, "Yes", isCompiledUpToDate(mdPath, lockPath), "An absolute-target symlink inside .github should hash identically")
 }
 
 func TestStatusCompiledBodyHash(t *testing.T) {

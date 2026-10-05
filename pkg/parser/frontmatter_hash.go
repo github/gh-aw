@@ -697,11 +697,19 @@ func runtimeImportHashRealPathAllowed(candidate, baseDir string) bool {
 }
 
 func realPathWithinBaseForHash(pathToCheck, baseDir string) bool {
-	realBase, err := filepath.EvalSymlinks(baseDir)
+	absoluteBase, err := filepath.Abs(baseDir)
 	if err != nil {
 		return false
 	}
-	realPath, err := filepath.EvalSymlinks(pathToCheck)
+	absolutePath, err := filepath.Abs(pathToCheck)
+	if err != nil {
+		return false
+	}
+	realBase, err := filepath.EvalSymlinks(absoluteBase)
+	if err != nil {
+		return false
+	}
+	realPath, err := filepath.EvalSymlinks(absolutePath)
 	if err != nil {
 		return false
 	}

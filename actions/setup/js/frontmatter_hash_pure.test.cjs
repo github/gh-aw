@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 const path = require("path");
 const fs = require("fs");
 const {
@@ -189,6 +189,38 @@ engine: copilot`;
       const relativeHash = await computeFrontmatterHash(".github/workflows/relative-workflow.md", { fileReader });
       const absoluteHash = await computeFrontmatterHash("/repo/.github/workflows/relative-workflow.md", { fileReader });
       expect(relativeHash).toBe(absoluteHash);
+    });
+
+    it("should not use local symlink containment when hashing GitHub API content", async () => {
+      const workflowPath = ".github/workflows/remote-context-workflow.md";
+      const promptPath = ".github/prompts/remote-context.md";
+      const files = new Map([
+        [workflowPath, `---\nengine: copilot\n---\n{{#runtime-import ${promptPath}}}`],
+        [promptPath, "Use ${{ github.repository }}."],
+      ]);
+      const github = {
+        rest: {
+          repos: {
+            getContent: vi.fn(async ({ path: filePath }) => {
+              if (!files.has(filePath)) throw new Error(`Missing ${filePath}`);
+              return { data: { content: files.get(filePath) } };
+            }),
+          },
+        },
+      };
+      const fileReader = createGitHubFileReader(github, "source-owner", "source-repo", "source-ref");
+      const originalHash = await computeFrontmatterHash(workflowPath, { fileReader });
+      const exists = vi.spyOn(fs, "existsSync").mockReturnValue(true);
+      const realpath = vi.spyOn(fs, "realpathSync").mockImplementation(() => {
+        throw new Error("Unrelated local checkout");
+      });
+      try {
+        expect(await computeFrontmatterHash(workflowPath, { fileReader })).toBe(originalHash);
+        expect(realpath).not.toHaveBeenCalled();
+      } finally {
+        exists.mockRestore();
+        realpath.mockRestore();
+      }
     });
 
     it("should include the runtime-import expression set in the frontmatter hash", async () => {
