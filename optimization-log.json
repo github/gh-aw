@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-16",
-    "workflow_name": "Package Specification Librarian",
-    "workflow_file": "spec-librarian",
-    "total_aic_analyzed": 956.172,
-    "runs_audited": 1,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 295
-  },
-  {
     "date": "2026-06-17",
     "workflow_name": "[aw] Failure Investigator (6h)",
     "workflow_file": "aw-failure-investigator",
@@ -287,5 +278,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-10-05",
+    "workflow_name": "Test Quality Sentinel",
+    "workflow_file": "test-quality-sentinel",
+    "total_aic_analyzed": 116.32,
+    "runs_audited": 5,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 18
   }
 ]
