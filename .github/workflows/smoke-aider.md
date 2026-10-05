@@ -20,13 +20,12 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Aider
-model: copilot/auto
+model: copilot/claude-sonnet-4.6
 engine:
   id: aider
 strict: true
 imports:
   - shared/aider.md
-  - shared/smoke-test-brevity.md
   - shared/reporting.md
 network:
   allowed: []
@@ -94,6 +93,9 @@ post-steps:
 Aider has no MCP client support, so this smoke test exercises only the CLI-native
 capabilities: prompt delivery, shell commands, and file editing. Safe outputs are
 emitted through the `safeoutputs` MCP CLI.
+
+Reply with the complete SEARCH/REPLACE edit and the verification bash block.
+Omit explanatory prose, but do not omit any required check or the safe-output call.
 
 ## Test Requirements
 
