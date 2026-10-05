@@ -7587,13 +7587,14 @@
                 },
                 "protected-files": {
                   "type": "object",
-                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set.",
+                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set, or a leading / for an exact repository path.",
                   "properties": {
                     "exclude": {
                       "type": "array",
                       "items": {
                         "type": "string"
-                      }
+                      },
+                      "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / excludes only the exact repository path (e.g. /pyproject.toml), leaving same-named nested files protected."
                     }
                   },
                   "additionalProperties": false
@@ -8403,8 +8404,8 @@
                           "items": {
                             "type": "string"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). Use this to allow the agent to modify specific files that are otherwise blocked by default.",
-                          "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"]]
+                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },
                       "additionalProperties": false,
@@ -10706,8 +10707,8 @@
                           "items": {
                             "type": "string"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). Use this to allow the agent to modify specific files that are otherwise blocked by default.",
-                          "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"]]
+                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },
                       "additionalProperties": false,
@@ -14795,6 +14796,11 @@
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
+            "dynamic-workflows": {
+              "type": "boolean",
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
+              "default": true
+            },
             "mcp": {
               "type": "object",
               "description": "Engine-level MCP gateway configuration. Settings here apply to the MCP gateway used by this engine.",
@@ -14987,6 +14993,11 @@
               "type": "boolean",
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
+            },
+            "dynamic-workflows": {
+              "type": "boolean",
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
+              "default": true
             }
           },
           "required": ["runtime"],

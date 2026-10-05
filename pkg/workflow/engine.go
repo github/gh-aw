@@ -69,6 +69,7 @@ type EngineConfig struct {
 	Agent              string // Agent identifier for copilot --agent flag (copilot engine only)
 	APITarget          string // Custom API endpoint hostname (e.g., "api.acme.ghe.com" or "api.enterprise.githubcopilot.com")
 	Bare               bool   // When true, disables automatic loading of context/instructions (copilot: --no-custom-instructions, claude: --bare, codex: --no-system-prompt, gemini: GEMINI_SYSTEM_MD=/dev/null)
+	DynamicWorkflows   *bool  // When false, disables dynamic workflows for engines that support them
 	// Inline definition fields (populated when engine.runtime is specified in frontmatter)
 	IsInlineDefinition bool   // true when the engine is defined inline via engine.runtime + optional engine.provider
 	InlineProviderID   string // engine.provider.id  (e.g. "openai", "anthropic")
@@ -276,6 +277,12 @@ type engineTopLevelConfig struct {
 	maxTurnCacheMisses int
 	maxRuns            int
 	model              string
+}
+
+// DynamicWorkflowsEnabled reports whether dynamic workflows are enabled in the engine configuration.
+// The feature defaults to enabled when the engine setting is omitted.
+func (e *EngineConfig) DynamicWorkflowsEnabled() bool {
+	return e == nil || e.DynamicWorkflows == nil || *e.DynamicWorkflows
 }
 
 // GetMaxAICredits returns the configured engine AI credits budget, falling back to the default.
@@ -743,6 +750,7 @@ func applyEngineExtensionsField(config *EngineConfig, engineObj map[string]any) 
 
 func applyEngineBooleanFields(config *EngineConfig, engineObj map[string]any) {
 	applyEngineBareField(config, engineObj)
+	applyEngineDynamicWorkflowsField(config, engineObj)
 	if sdkVal, ok := engineObj["copilot-sdk"].(bool); ok {
 		config.CopilotSDK = sdkVal
 		engineLog.Printf("Extracted copilot-sdk: %v", config.CopilotSDK)
@@ -750,6 +758,13 @@ func applyEngineBooleanFields(config *EngineConfig, engineObj map[string]any) {
 	if config.Driver != "" && config.ID == "copilot" && !config.CopilotSDK {
 		config.CopilotSDK = true
 		engineLog.Print("Enabled copilot-sdk because driver is configured for copilot engine")
+	}
+}
+
+func applyEngineDynamicWorkflowsField(config *EngineConfig, engineObj map[string]any) {
+	if enabled, ok := engineObj["dynamic-workflows"].(bool); ok {
+		config.DynamicWorkflows = &enabled
+		engineLog.Printf("Extracted dynamic-workflows: %v", enabled)
 	}
 }
 

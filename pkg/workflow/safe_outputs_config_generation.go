@@ -118,10 +118,14 @@ func addStandardHandlerConfigs(safeOutputsConfig map[string]any, data *WorkflowD
 		// exclusion processing — it must not be forwarded to the runtime config.json.
 		delete(handlerCfg, "_protected_files_exclude")
 		if _, hasProtectedFiles := handlerCfg["protected_files"]; hasProtectedFiles {
+			excludeNames, excludePaths := splitProtectedFilesExcludes(excludeFiles)
 			fullManifestFiles := getAllManifestFiles(engineManifestFiles...)
 			fullPathPrefixes := getProtectedPathPrefixes(engineManifestPathPrefixes...)
-			handlerCfg["protected_files"] = sliceutil.Exclude(fullManifestFiles, excludeFiles...)
-			filteredPrefixes := sliceutil.Exclude(fullPathPrefixes, excludeFiles...)
+			handlerCfg["protected_files"] = sliceutil.Exclude(fullManifestFiles, excludeNames...)
+			if len(excludePaths) > 0 {
+				handlerCfg["protected_files_path_exclude"] = excludePaths
+			}
+			filteredPrefixes := sliceutil.Exclude(fullPathPrefixes, excludeNames...)
 			if len(filteredPrefixes) > 0 {
 				handlerCfg["protected_path_prefixes"] = filteredPrefixes
 			} else {
@@ -129,7 +133,7 @@ func addStandardHandlerConfigs(safeOutputsConfig map[string]any, data *WorkflowD
 			}
 			// Compute which top-level dot-folder prefixes are excluded so the runtime
 			// dot-folder check can skip them.
-			if dotFolderExcludes := getDotFolderExcludes(excludeFiles); len(dotFolderExcludes) > 0 {
+			if dotFolderExcludes := getDotFolderExcludes(excludeNames); len(dotFolderExcludes) > 0 {
 				handlerCfg["protected_dot_folder_excludes"] = dotFolderExcludes
 			}
 		}
@@ -143,6 +147,17 @@ func addStandardHandlerConfigs(safeOutputsConfig map[string]any, data *WorkflowD
 		}
 		safeOutputsConfig[handlerName] = handlerCfg
 	}
+}
+
+func splitProtectedFilesExcludes(excludes []string) (names, paths []string) {
+	for _, exclude := range excludes {
+		if path, ok := strings.CutPrefix(exclude, "/"); ok {
+			paths = append(paths, path)
+		} else {
+			names = append(names, exclude)
+		}
+	}
+	return names, paths
 }
 
 // addMentionsConfig adds mentions and max-bot-mentions configuration (consumed by the

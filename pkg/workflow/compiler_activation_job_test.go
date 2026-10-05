@@ -50,6 +50,46 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	}
 }
 
+func TestDynamicWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
+	disabled := false
+	engine := NewClaudeEngine()
+	engine.id = "dynamic-test"
+	compiler := NewCompiler()
+	require.NoError(t, compiler.engineRegistry.Register(engine))
+	data := &WorkflowData{
+		Name: "Dynamic workflows",
+		AI:   "dynamic-test",
+		EngineConfig: &EngineConfig{
+			ID: "dynamic-test",
+		},
+		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
+	}
+	job, err := compiler.buildActivationJob(data, false, "", "dynamic.lock.yml")
+	require.NoError(t, err)
+	steps := strings.Join(job.Steps, "")
+	save := extractWorkflowStepByName(t, steps, "Save agent config folders for base branch restoration")
+	assert.Contains(t, save, `GH_AW_AGENT_FOLDERS: ".agents .claude .github"`)
+	assert.Contains(t, extractWorkflowStepByName(t, steps, "Upload activation artifact"), "/tmp/gh-aw/base")
+	assert.Less(t, strings.Index(steps, "Save agent config folders for base branch restoration"), strings.Index(steps, "Upload activation artifact"))
+}
+
+func TestClaudeWorkflowsNotSavedWhenDynamicWorkflowsDisabled(t *testing.T) {
+	disabled := false
+	data := &WorkflowData{
+		Name: "Claude workflows",
+		AI:   "claude",
+		EngineConfig: &EngineConfig{
+			ID:               "claude",
+			DynamicWorkflows: &disabled,
+		},
+		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
+	}
+	job, err := NewCompiler().buildActivationJob(data, false, "", "claude.lock.yml")
+	require.NoError(t, err)
+
+	assert.NotContains(t, strings.Join(job.Steps, ""), "Save agent config folders for base branch restoration")
+}
+
 func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

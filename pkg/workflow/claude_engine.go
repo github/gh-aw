@@ -42,6 +42,7 @@ func NewClaudeEngine() *ClaudeEngine {
 				BashCommandAllowlist: true,  // Claude enforces tools.bash allowlist via --allowed-tools Bash(cmd)
 				BashDisable:          true,  // Explicit Bash deny rules remove shell execution.
 				Plugins:              true,  // Claude Code loads Agent Plugins via --plugin-dir
+				DynamicWorkflows:     true,
 			},
 			dedicatedLLMGatewayPort: constants.ClaudeLLMGatewayPort,
 		},
@@ -248,7 +249,7 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 
 	// Note: we use --allowed-tools (not the simpler --tools from v2.0.31+) because it provides
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
-	allowedTools = e.computeAllowedClaudeToolsString(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig)
+	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)
 	}

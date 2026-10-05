@@ -1,7 +1,65 @@
 // @ts-check
-const A_PREFIX_LENGTH = 2;
-const B_PREFIX_LENGTH = 2;
-const QUOTED_PREFIX_LENGTH = 3;
+function decodeGitQuotedPath(token) {
+  if (!token.startsWith('"') || !token.endsWith('"')) {
+    return null;
+  }
+
+  const bytes = [];
+  const end = token.length - 1;
+  const escapes = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, "\\": 92 };
+  for (let i = 1; i < end; i++) {
+    if (token[i] === "\\") {
+      if (i + 1 >= end) {
+        return null;
+      }
+      if (/[0-7]/.test(token[i + 1])) {
+        let octal = "";
+        while (i + 1 < end && octal.length < 3 && /[0-7]/.test(token[i + 1])) {
+          octal += token[++i];
+        }
+        const byte = Number.parseInt(octal, 8);
+        if (byte > 0xff) {
+          return null;
+        }
+        bytes.push(byte);
+      } else {
+        const byte = escapes[token[++i]];
+        if (byte === undefined) {
+          return null;
+        }
+        bytes.push(byte);
+      }
+      continue;
+    }
+
+    const codePoint = token.codePointAt(i);
+    for (const byte of Buffer.from(String.fromCodePoint(codePoint), "utf8")) {
+      bytes.push(byte);
+    }
+    if (codePoint > 0xffff) {
+      i++;
+    }
+  }
+
+  return Buffer.from(bytes).toString("utf8");
+}
+
+function parsePathToken(token) {
+  let value = token;
+  if (token.startsWith('"')) {
+    value = decodeGitQuotedPath(token);
+    if (value === null) {
+      return { path: null, parseable: false };
+    }
+  } else if (token.endsWith('"')) {
+    return { path: null, parseable: false };
+  }
+
+  if (value.startsWith("a/") || value.startsWith("b/")) {
+    value = value.slice(2);
+  }
+  return { path: value || null, parseable: true };
+}
 
 /**
  * Parses a single `diff --git` header line and extracts both old/new paths.
@@ -26,21 +84,12 @@ function parseDiffGitHeader(headerLine) {
     const foundSeparatorIndices = [quotedSep, unquotedSep].filter(idx => idx >= 0);
     if (foundSeparatorIndices.length > 0) {
       const sep = foundSeparatorIndices.reduce((smallest, idx) => (idx < smallest ? idx : smallest), foundSeparatorIndices[0]);
-      const oldPath = rest.slice(A_PREFIX_LENGTH, sep) || null;
+      const oldToken = rest.slice(0, sep);
       const newToken = rest.slice(sep + 1).trimEnd();
-      /** @type {any} */
-      let newPath = null;
-      if (newToken.startsWith('"b/')) {
-        if (newToken.endsWith('"')) {
-          newPath = newToken.slice(QUOTED_PREFIX_LENGTH, -1) || null;
-        } else {
-          newPath = newToken.slice(QUOTED_PREFIX_LENGTH) || null;
-        }
-      } else if (newToken.startsWith("b/")) {
-        newPath = newToken.slice(B_PREFIX_LENGTH) || null;
-      }
-      if (oldPath || newPath) {
-        return { oldPath, newPath, parseable: true };
+      const oldResult = parsePathToken(oldToken);
+      const newResult = parsePathToken(newToken);
+      if (oldResult.parseable && newResult.parseable && (oldResult.path || newResult.path)) {
+        return { oldPath: oldResult.path, newPath: newResult.path, parseable: true };
       }
     }
   }
@@ -86,23 +135,13 @@ function parseDiffGitHeader(headerLine) {
     return { oldPath: null, newPath: null, parseable: false };
   }
 
-  const stripPrefix = tok => {
-    if (tok.startsWith('"a/') || tok.startsWith('"b/')) {
-      return tok.slice(QUOTED_PREFIX_LENGTH, tok.endsWith('"') ? -1 : undefined);
-    }
-    if (tok.startsWith("a/") || tok.startsWith("b/")) {
-      return tok.slice(B_PREFIX_LENGTH);
-    }
-    return tok;
-  };
-
-  const oldPath = stripPrefix(tokens[0]) || null;
-  const newPath = stripPrefix(tokens[1]) || null;
-  if (!oldPath && !newPath) {
+  const oldResult = parsePathToken(tokens[0]);
+  const newResult = parsePathToken(tokens[1]);
+  if (!oldResult.parseable || !newResult.parseable || (!oldResult.path && !newResult.path)) {
     return { oldPath: null, newPath: null, parseable: false };
   }
 
-  return { oldPath, newPath, parseable: true };
+  return { oldPath: oldResult.path, newPath: newResult.path, parseable: true };
 }
 
 /**

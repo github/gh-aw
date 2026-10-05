@@ -36,7 +36,7 @@ function sessionTimestamp(record, unit = "milliseconds") {
  * Source-local positions disambiguate repeated native IDs and expanded records.
  * Equal timestamps and untimed observations retain deterministic source order.
  * @param {SessionSource[]} sources
- * @returns {import("./types/agent_session").UnifiedSession}
+ * @returns {import("./types/unified_session").UnifiedSession}
  */
 function mergeSessionSources(sources) {
   const events = sources.flatMap(source =>
@@ -127,7 +127,7 @@ function parseEngineSession(content, engine) {
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
  * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void}} [options]
- * @returns {{events: import("./types/agent_session").UnifiedSession, maskedValues: string[]}}
+ * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message) } = {}) {
   /** @type {SessionSource[]} */

@@ -14,7 +14,7 @@ The `protected-files` configuration field on `create-pull-request` and `push-to-
 
 ### Decision
 
-We will extend the `protected-files` field to accept either the existing string enum (`"blocked"`, `"allowed"`, `"fallback-to-issue"`) or a new object form `{ policy: string, exclude: []string }`. The `exclude` list names files or path prefixes that should be removed from the default protected set at compile time, leaving the rest of the protection intact. The object form is normalized in-place during parsing via `preprocessProtectedFilesField` so the rest of the compiler pipeline sees only the (now-narrowed) protected file list — no runtime changes are required.
+We extend the `protected-files` field to accept either the existing string enum (`"blocked"`, `"allowed"`, `"fallback-to-issue"`) or an object form `{ policy: string, exclude: []string }`. Exclusions without a leading slash retain basename or path-prefix matching and are applied at compile time. Exclusions beginning with `/` identify exact repository-relative paths; these are carried to the runtime handler so patch-time and post-apply checks can skip only that exact path. The `allowed-files` allowlist remains an independent check and is never bypassed by a protected-file exclusion.
 
 ### Alternatives Considered
 
@@ -30,9 +30,9 @@ Adding a sibling YAML key (e.g., `protected-files-exclude: [AGENTS.md]`) would h
 
 The existing `allowed-files` field is a strict *allowlist* of patterns that must pass for any file the agent touches. Its semantics are orthogonal to `protected-files`' *blocklist* semantics, and the two checks are evaluated independently. Using `allowed-files` to carve out exceptions from the protected set is unintuitive and would not actually suppress the protected-files check — it would only add a second, unrelated gate.
 
-#### Alternative 4: Compile-time generated separate configuration key
+#### Alternative 4: Apply every exclusion at compile time
 
-Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protected_files` and teaching the runtime handler to apply the exclusion at execution time was considered. It was rejected because it would require coordinated changes to every runtime handler that reads `protected_files`, expanding the blast radius significantly. The compile-time sentinel approach (`_protected_files_exclude`) confines all filtering logic to the compiler and requires zero runtime changes.
+Filtering every exclusion from the compile-time basename and prefix lists was considered. It cannot represent an exact-path exception: removing a manifest basename would also unprotect files with that basename at every directory depth. Exact-path exclusions therefore use the runtime `protected_files_path_exclude` key, while the existing compile-time sentinel continues to carry exclusions through handler generation and is stripped before serialization.
 
 ### Consequences
 
@@ -40,7 +40,8 @@ Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protecte
 - Workflow authors can unblock specific AI-modifiable instruction files (e.g., `AGENTS.md`) without degrading protection for dependency manifests or CI configuration.
 - The string form is fully backward-compatible — no existing workflow configuration changes are required.
 - Import set-merge semantics ensure that a base workflow imported via `imports:` can contribute exclusions without overwriting the importing workflow's full handler configuration.
-- The sentinel key (`_protected_files_exclude`) is stripped before the runtime `config.json` is emitted, so the runtime handler API surface is unchanged.
+- Exact-path exclusions permit a single repository path to be unprotected without removing protection for same-named files elsewhere.
+- The internal `_protected_files_exclude` sentinel is stripped before serialization; only normalized exact paths are added to the runtime handler configuration.
 
 #### Negative
 - `protected-files` is now a polymorphic `oneOf` field (string | object). JSON Schema validators and tooling that previously relied on it being a simple string enum require schema updates.
@@ -49,7 +50,8 @@ Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protecte
 
 #### Neutral
 - The `excludeFromSlice` and `mergeUnique` utilities added in `runtime_definitions.go` are general-purpose helpers that may prove reusable for future protected-path filtering work.
-- All exclusion logic is concentrated in the compiler layer; the runtime handler receives a pre-filtered `protected_files` list and is unaware of the `exclude` feature.
+- Basename and path-prefix exclusions continue to be applied by the compiler; exact-path exclusions are checked by the runtime handler in both patch-time and post-apply checks.
+- The `allowed-files` check remains independent, so protected-file exclusions do not authorize paths outside that allowlist.
 - Tests cover the sentinel stripping, the import-merge set semantics, and the preprocessing helper, providing regression coverage for the non-obvious two-phase design.
 
 ---
@@ -62,7 +64,7 @@ Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protecte
 
 1. The `protected-files` field **MUST** accept either a plain string enum value (`"blocked"`, `"allowed"`, or `"fallback-to-issue"`) or an object with an optional `policy` string and an optional `exclude` string array.
 2. When the object form is used, the `policy` sub-field **MUST** be one of the same three enum values if present; an absent or empty `policy` **MUST** be treated as equivalent to `"blocked"`.
-3. The `exclude` sub-field **MUST** be treated as a list of filenames or path prefixes to remove from the default protected file set; each entry **MUST** be matched by basename (e.g., `"AGENTS.md"`) or path prefix (e.g., `".agents/"`).
+3. The `exclude` sub-field **MUST** be treated as a list of filenames, path prefixes, or exact repository-relative paths. Entries without a leading slash **MUST** retain basename matching (e.g., `"AGENTS.md"`) or path-prefix matching (e.g., `".agents/"`). An entry beginning with `/` **MUST** match only the exact repository-relative path after removing that leading slash (e.g., `"/pyproject.toml"`).
 4. Additional properties on the object form **MUST NOT** be accepted; the JSON Schema `additionalProperties: false` constraint **MUST** be enforced.
 
 ### Compile-Time Preprocessing
@@ -73,6 +75,14 @@ Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protecte
 4. The compiler **MUST** emit the sentinel key `_protected_files_exclude` in the handler registry config map to carry exclusions from the handler builder to `addHandlerManagerConfigEnvVar`.
 5. `addHandlerManagerConfigEnvVar` **MUST** read and delete the `_protected_files_exclude` sentinel before serializing the runtime config so that the sentinel **MUST NOT** appear in the environment variable or in `config.json`.
 6. `generateSafeOutputsConfig` **MUST** also delete `_protected_files_exclude` from any handler config before writing `config.json`.
+7. Exact-path exclusions **MUST** be emitted as `protected_files_path_exclude` in runtime handler configuration. The internal `_protected_files_exclude` sentinel **MUST NOT** appear in runtime configuration.
+
+### Runtime Enforcement
+
+1. Runtime patch-time and post-apply protection checks **MUST** skip a protected file only when its normalized repository-relative path exactly matches a `protected_files_path_exclude` entry.
+2. The runtime **MUST** decode Git C-style quoted path escapes before exact-path comparison, including octal UTF-8 byte escapes.
+3. The runtime **MUST** check `allowed-files` independently; an exact-path protected-file exclusion **MUST NOT** bypass that allowlist.
+4. Existing basename and path-prefix exclusions **MUST** preserve their established behavior.
 
 ### Import Merge Semantics
 
@@ -82,7 +92,7 @@ Emitting a new runtime key (e.g., `protected_files_exclude`) alongside `protecte
 
 ### Conformance
 
-An implementation is considered conformant with this ADR if it satisfies all **MUST** and **MUST NOT** requirements above. Failure to meet any **MUST** or **MUST NOT** requirement constitutes non-conformance.
+An implementation is considered conformant with this ADR if it satisfies all **MUST** and **MUST NOT** requirements above, including a regression test proving that an exact exclusion for a quoted non-ASCII path does not unprotect a same-named nested file and does not bypass `allowed-files`.
 
 ---
 

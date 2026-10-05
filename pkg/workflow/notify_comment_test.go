@@ -1367,7 +1367,7 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	}
 	script := string(scriptBytes)
 	assert.Contains(t, allSteps, "/tmp/gh-aw/usage/aw_session.jsonl")
-	assert.NotRegexp(t, `(?m)^\s*(?:command\s+)?node(?:js)?\s+`, script)
+	assert.NotRegexp(t, `(?m)(?:^|[;&|]\s*)(?:if\s+)?(?:!\s*)?node\s`, script)
 	assert.Less(t, strings.Index(allSteps, "Process no-op messages"), strings.Index(allSteps, "Collect usage artifact files"), "collect after conclusion handlers")
 	generatorPath := filepath.Join("..", "..", "actions", "setup", "js", "generate_usage_activity_summary.cjs")
 	generatorBytes, err := os.ReadFile(generatorPath)

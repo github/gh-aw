@@ -161,7 +161,7 @@ func (c *Compiler) addActivationCheckoutAndBaseRestoreStep(ctx *activationJobBui
 	data := ctx.data
 	checkoutSteps := c.generateCheckoutGitHubFolderForActivation(data)
 	ctx.steps = append(ctx.steps, checkoutSteps...)
-	if len(checkoutSteps) > 0 && !isPRCheckoutDisabled(data) {
+	if len(checkoutSteps) > 0 && (!isPRCheckoutDisabled(data) || dynamicWorkflowsEnabled(ctx.engine, data.EngineConfig)) {
 		compilerActivationJobLog.Print("Adding step to save agent config folders for base branch restoration")
 		folders, files := resolveAgentManifestPaths(c.engineRegistry, data)
 		ctx.steps = append(ctx.steps, generateSaveBaseGitHubFoldersStep(
