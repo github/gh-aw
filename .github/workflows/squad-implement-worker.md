@@ -11,10 +11,6 @@ on:
         description: Issue number to implement
         required: true
         type: string
-      aw_context:
-        description: Originating agentic workflow context
-        required: false
-        type: string
   pull_request:
     types: [closed]
 if: >-

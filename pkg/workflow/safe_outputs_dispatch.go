@@ -21,8 +21,9 @@ var safeOutputsDispatchWorkflowLog = logger.New("workflow:safe_outputs_dispatch"
 // populateDispatchWorkflowFiles resolves the file extension for each dispatch
 // workflow listed in SafeOutputsConfig.DispatchWorkflow.Workflows. The resolved
 // extension is stored in WorkflowFiles for later use by the runtime handler.
-// It also detects which workflows declare aw_context and which additionally enable
-// the work-queue protocol, so runtime dispatch can enforce each worker's contract.
+// It also detects which workflows accept compiler-managed aw_context and work_queue_claim
+// inputs and which additionally enable the work-queue protocol, so runtime dispatch can
+// enforce each worker's contract.
 //
 // Priority order: .lock.yml > .yml > .md (same-batch compilation target)
 func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
@@ -61,14 +62,16 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 		data.SafeOutputs.DispatchWorkflow.WorkflowFiles[workflowName] = extension
 		safeOutputsConfigLog.Printf("Mapped workflow %s to extension %s", workflowName, extension)
 
-		// Check if the target workflow declares aw_context in its workflow_dispatch.inputs.
-		// We check the lock file first (compiled YAML), falling back to the markdown frontmatter.
+		// Compiler-generated workflows accept caller context and queue claims through
+		// reserved inputs. External YAML workflows must declare their supported inputs.
 		if workflowHasAwContextInput(fileResult, workflowName) {
 			data.SafeOutputs.DispatchWorkflow.AwContextWorkflows = append(
 				data.SafeOutputs.DispatchWorkflow.AwContextWorkflows, workflowName,
 			)
-			safeOutputsConfigLog.Printf("Workflow %s declares aw_context input", workflowName)
-			if data.SafeOutputs.WorkQueueEnabled && workflowHasWorkQueueTools(fileResult, workflowName) {
+			safeOutputsConfigLog.Printf("Workflow %s accepts aw_context input", workflowName)
+			if data.SafeOutputs.WorkQueueEnabled &&
+				workflowHasWorkQueueClaimInput(fileResult, workflowName) &&
+				workflowHasWorkQueueTools(fileResult, workflowName) {
 				data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows = append(
 					data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows, workflowName,
 				)
@@ -98,8 +101,8 @@ func workflowHasWorkQueueTools(fileResult *findWorkflowFileResult, workflowName 
 	return enabled
 }
 
-// workflowHasAwContextInput reports whether the workflow identified by fileResult
-// has aw_context declared in its workflow_dispatch.inputs.
+// workflowHasAwContextInput reports whether the target accepts compiler-managed
+// caller context or declares an aw_context input in an external workflow file.
 func workflowHasAwContextInput(fileResult *findWorkflowFileResult, workflowName string) bool {
 	var inputs map[string]any
 	var err error
@@ -109,7 +112,12 @@ func workflowHasAwContextInput(fileResult *findWorkflowFileResult, workflowName 
 	} else if fileResult.ymlExists {
 		inputs, err = extractWorkflowDispatchInputs(fileResult.ymlPath)
 	} else if fileResult.mdExists {
-		inputs, err = extractMDWorkflowDispatchInputs(fileResult.mdPath)
+		hasDispatch, dispatchErr := mdHasWorkflowDispatch(fileResult.mdPath)
+		if dispatchErr != nil || !hasDispatch {
+			return false
+		}
+		// The compiler injects aw_context into every workflow_dispatch source.
+		return true
 	} else {
 		return false
 	}
@@ -119,6 +127,32 @@ func workflowHasAwContextInput(fileResult *findWorkflowFileResult, workflowName 
 	}
 	_, hasAwContext := inputs["aw_context"]
 	return hasAwContext
+}
+
+func workflowHasWorkQueueClaimInput(fileResult *findWorkflowFileResult, workflowName string) bool {
+	var inputs map[string]any
+	var err error
+
+	if fileResult.lockExists {
+		inputs, err = extractWorkflowDispatchInputs(fileResult.lockPath)
+	} else if fileResult.ymlExists {
+		inputs, err = extractWorkflowDispatchInputs(fileResult.ymlPath)
+	} else if fileResult.mdExists {
+		hasDispatch, dispatchErr := mdHasWorkflowDispatch(fileResult.mdPath)
+		if dispatchErr != nil || !hasDispatch {
+			return false
+		}
+		enabled, toolsErr := mdHasWorkQueueTools(fileResult.mdPath)
+		return toolsErr == nil && enabled
+	} else {
+		return false
+	}
+	if err != nil {
+		safeOutputsConfigLog.Printf("Warning: error extracting queue claim input for %s: %v", workflowName, err)
+		return false
+	}
+	_, hasClaimInput := inputs[WorkQueueClaimInputName]
+	return hasClaimInput
 }
 
 // generateDispatchWorkflowTool generates an MCP tool definition for a specific workflow.
@@ -145,23 +179,15 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	if !ok {
 		return tool
 	}
-	_, acceptsContext := workflowInputs["aw_context"]
-	if workQueueEnabled && acceptsContext {
-		// The handler supplies aw_context in both ordinary and queue dispatches.
-		delete(properties, "aw_context")
-		if required, ok := inputSchema["required"].([]string); ok {
-			inputSchema["required"] = slices.DeleteFunc(required, func(name string) bool { return name == "aw_context" })
-		}
-		properties["work_queue"] = map[string]any{
-			"type":        "object",
-			"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
-			"properties": map[string]any{
-				"work_id": map[string]any{"type": "string", "minLength": 1},
-			},
-			"required":             []string{"work_id"},
-			"additionalProperties": false,
-		}
+	// These values are compiler-managed and must never be agent-selected inputs.
+	delete(properties, AwContextInputName)
+	delete(properties, WorkQueueClaimInputName)
+	if required, ok := inputSchema["required"].([]string); ok {
+		inputSchema["required"] = slices.DeleteFunc(required, func(name string) bool {
+			return name == AwContextInputName || name == WorkQueueClaimInputName
+		})
 	}
+	addWorkQueueDispatchProperty(properties, workflowInputs, workQueueEnabled)
 
 	// When allowed-refs is configured, inject a 'ref' property so the agent can
 	// specify the target branch/tag/SHA. The runtime handler validates the value
@@ -186,4 +212,19 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	}
 	safeOutputsDispatchWorkflowLog.Printf("Generated dispatch-workflow tool: name=%s, properties=%d, required=%d", tool["name"], len(properties), requiredCount)
 	return tool
+}
+
+func addWorkQueueDispatchProperty(properties, workflowInputs map[string]any, workQueueEnabled bool) {
+	if _, acceptsQueueClaim := workflowInputs[WorkQueueClaimInputName]; !workQueueEnabled || !acceptsQueueClaim {
+		return
+	}
+	properties["work_queue"] = map[string]any{
+		"type":        "object",
+		"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
+		"properties": map[string]any{
+			"work_id": map[string]any{"type": "string", "minLength": 1},
+		},
+		"required":             []string{"work_id"},
+		"additionalProperties": false,
+	}
 }

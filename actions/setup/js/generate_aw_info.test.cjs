@@ -417,6 +417,25 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.warning).not.toHaveBeenCalled();
   });
 
+  it("normalizes the compiler-managed work_queue_claim input into context", async () => {
+    const assignment = { work_id: "w", claim_id: "c", work: { task: "test" } };
+    const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
+    const expected = { ...caller, work_queue: assignment };
+    await main(mockCore, {
+      ...mockContext,
+      payload: {
+        inputs: {
+          aw_context: JSON.stringify(caller),
+          work_queue_claim: JSON.stringify(assignment),
+        },
+      },
+    });
+
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toEqual(expected);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(expected));
+    expect(mockCore.warning).not.toHaveBeenCalled();
+  });
+
   it.each([null, [], "claim", { work_id: "", claim_id: "c", work: {} }, { work_id: "w", claim_id: "", work: {} }, { work_id: "w", claim_id: "c", work: [] }, { work_id: "w", claim_id: "c", work: {}, unexpected: true }])(
     "rejects a malformed work_queue assignment without publishing context",
     async work_queue => {

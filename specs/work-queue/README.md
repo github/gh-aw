@@ -78,18 +78,21 @@ of the transaction version. These formats
 are not interchangeable; the CLI branch also preserves Work payloads and run
 provenance, which the workflow fact format does not contain.
 
-Trusted workflow assignments use `aw_context.work_queue`, containing `work_id`,
-`claim_id`, and the `work` payload object (`WorkQueueAssignment`). Activation
-checks that the Claim is currently effective before capturing the assignment.
+Trusted workflow assignments use the compiler-managed `work_queue_claim`
+workflow-dispatch input, containing `work_id`, `claim_id`, and the `work` payload
+object (`WorkQueueAssignment`). `aw_context` remains reserved for caller metadata.
+Activation checks that the Claim is currently effective before capturing the assignment.
 When `tools.work-queue: true` and `safe-outputs.dispatch-workflow` are both
 configured, a dispatcher can read an available identity with `work_queue_read`
 and pass `work_queue: {work_id: "..."}` to an allowed same-repository worker's
-dispatch tool. The worker must declare a `workflow_dispatch` `aw_context` input
-and enable `tools.work-queue: true` so its activation admission and completion
-reconciliation are compiled.
+dispatch tool. The worker enables `tools.work-queue: true`; the compiler adds its
+reserved `work_queue_claim` input so activation admission and completion
+reconciliation are compiled. Workflows must not declare `aw_context` or
+`work_queue_claim` themselves.
 Trusted safe-output processing refreshes the queue, publishes a new Claim for
 that identity, verifies it is effective, and injects the assignment with
-`work: {id: work_id}`. The selection is not forwarded as a workflow input.
+`work: {id: work_id}` through `work_queue_claim`. The `work_queue` selector is
+not forwarded as a workflow input.
 Dispatch errors attempt to cancel the Claim. An ordinary dispatch without a
 selection and a staged preview create no Claim; `call-workflow` does not create
 one either. Concurrent Claims may supersede an assignment before worker

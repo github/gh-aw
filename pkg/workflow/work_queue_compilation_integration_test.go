@@ -39,12 +39,15 @@ Compile each work-queue workflow phase.
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
 
 	compiler := NewCompiler(WithVersion("integration"))
+	compiler.SetApprove(true)
 	require.NoError(t, compiler.CompileWorkflow(workflowPath))
 
 	lockPath := filepath.Join(dir, "work-queue-worker.lock.yml")
 	lockContent, err := os.ReadFile(lockPath)
 	require.NoError(t, err)
 	compiled := string(lockContent)
+	require.Contains(t, compiled, "work_queue_claim:")
+	require.Contains(t, compiled, "aw_context:")
 
 	activation := extractJobSection(compiled, string(constants.ActivationJobName))
 	require.Contains(t, activation, "Snapshot work queue state")
@@ -145,9 +148,6 @@ func TestWorkQueueDispatchCompilerConfiguration(t *testing.T) {
 	require.NoError(t, os.WriteFile(workerPath, []byte(`---
 on:
   workflow_dispatch:
-    inputs:
-      aw_context:
-        type: string
 tools:
   work-queue:
     storage: issues

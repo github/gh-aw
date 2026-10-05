@@ -70,7 +70,7 @@ describe("write work queue activation snapshot", () => {
     expect(snapshot.transactionLog).toBe(`${JSON.stringify({ version: 2, ...legacy })}\n`);
   });
 
-  it("admits only a trusted inbound assignment that is the current effective claim", () => {
+  it("admits only a trusted work_queue_claim input that is the current effective claim", () => {
     const transactions = [
       { version: 2, kind: "Work", work: "w", claim: null, attempt: null },
       { version: 2, kind: "Claim", work: "w", claim: "claim-b", attempt: null },
@@ -78,14 +78,13 @@ describe("write work queue activation snapshot", () => {
     ];
     const payload = {
       inputs: {
-        aw_context: JSON.stringify({
-          work_queue: { work_id: "w", claim_id: "claim-a", work: { input: "trusted" } },
-        }),
+        aw_context: JSON.stringify({ repo: "owner/repo", run_id: "1", workflow_id: "dispatcher" }),
+        work_queue_claim: JSON.stringify({ work_id: "w", claim_id: "claim-a", work: { input: "trusted" } }),
       },
     };
 
     expect(resolveWorkerAssignment(payload, transactions)).toEqual({ work_id: "w", claim_id: "claim-a" });
-    expect(() => resolveWorkerAssignment({ ...payload, inputs: { aw_context: JSON.stringify({ work_queue: { work_id: "w", claim_id: "claim-b", work: {} } }) } }, transactions)).toThrow(/not currently effective/);
+    expect(() => resolveWorkerAssignment({ ...payload, inputs: { work_queue_claim: JSON.stringify({ work_id: "w", claim_id: "claim-b", work: {} }) } }, transactions)).toThrow(/not currently effective/);
     expect(replayTransactions(transactions).winner.w).toBe("claim-a");
   });
 
@@ -96,6 +95,7 @@ describe("write work queue activation snapshot", () => {
     ];
     const assignment = { work_id: "w", claim_id: "c", work: { task: "test" } };
     expect(resolveWorkerAssignment({ client_payload: { aw_context: { work_queue: assignment } } }, transactions)).toEqual({ work_id: "w", claim_id: "c" });
+    expect(resolveWorkerAssignment({ inputs: { work_queue_claim: JSON.stringify(assignment) } }, transactions)).toEqual({ work_id: "w", claim_id: "c" });
     expect(resolveWorkerAssignment({ inputs: { aw_context: "{}" } }, transactions)).toBeNull();
     for (const work_queue of [null, [], "claim", { ...assignment, work_id: "" }, { ...assignment, claim_id: "" }, { ...assignment, work: [] }, { ...assignment, extra: true }]) {
       expect(() => resolveWorkerAssignment({ client_payload: { aw_context: { work_queue } } }, transactions)).toThrow(/invalid shape/);

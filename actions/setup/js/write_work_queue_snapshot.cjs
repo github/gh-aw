@@ -5,12 +5,12 @@ const fs = require("fs");
 const path = require("path");
 const { readWorkQueueLog } = require("./work_queue_store.cjs");
 const { replayTransactions, serializeTransactionLog } = require("./work_queue_replay.cjs");
-const { readInboundAwContext, readWorkQueueAssignment } = require("./aw_context.cjs");
+const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 
 const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
 
 function resolveWorkerAssignment(payload, transactions) {
-  const assignment = readWorkQueueAssignment(readInboundAwContext(payload));
+  const assignment = readInboundWorkQueueAssignment(payload);
   if (!assignment) return null;
 
   const projection = replayTransactions(transactions);

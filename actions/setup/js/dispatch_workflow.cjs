@@ -31,8 +31,8 @@ async function main(config = {}) {
   const allowedWorkflows = config.workflows || [];
   const maxCount = config.max || 1;
   const workflowFiles = config.workflow_files || {}; // Map of workflow name to file extension
-  const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept aw_context input
-  const workQueueWorkflows = new Set(config.work_queue_workflows || []); // Queue-enabled workers that accept aw_context
+  const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept compiler-managed aw_context
+  const workQueueWorkflows = new Set(config.work_queue_workflows || []); // Queue-enabled workers that accept compiler-managed claims
   const githubClient = await createAuthenticatedGitHubClient(config);
   // Queue publication uses the safe-outputs job token, not a dispatch handler's
   // optionally scoped GitHub App token.
@@ -271,7 +271,7 @@ async function main(config = {}) {
         const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
         for (const [key, value] of Object.entries(message.inputs)) {
-          if (key === "work_queue" && workId !== undefined) continue;
+          if (key === "work_queue" || key === "aw_context" || key === "work_queue_claim") continue;
           // Convert value to string
           let strValue;
           if (value === null || value === undefined) {
@@ -308,9 +308,8 @@ async function main(config = {}) {
         }
       }
 
-      // Inject aw_context if the target workflow declares it as an input.
-      // Only workflows listed in aw_context_workflows (populated at compile time) support this.
-      if (awContextWorkflows.has(workflowName) && workId === undefined) {
+      // Inject caller context into any compiler-managed workflow_dispatch target.
+      if (awContextWorkflows.has(workflowName)) {
         inputs["aw_context"] = JSON.stringify(buildAwContext());
       }
 
@@ -361,9 +360,10 @@ async function main(config = {}) {
         if (replayTransactions(published.transactions).claim[claim.claim] !== "effective") {
           throw new Error("Selected work claim is no longer effective");
         }
-        inputs["aw_context"] = JSON.stringify({
-          ...buildAwContext(),
-          work_queue: { work_id: workId, claim_id: claim.claim, work: { id: workId } },
+        inputs["work_queue_claim"] = JSON.stringify({
+          work_id: workId,
+          claim_id: claim.claim,
+          work: { id: workId },
         });
       }
 
