@@ -141,7 +141,7 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 		steps = append(steps, fmt.Sprintf("          %s: %q\n", maxDailyAICBackendEnvVar, data.MaxDailyAICBackend))
 	}
 	if data.MaxDailyAICBackend == maxDailyAICBackendRepoMemory {
-		steps = append(steps, "          GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC: ${{ vars.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC || 'false' }}\n")
+		steps = append(steps, "          GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED: \"true\"\n          GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC: ${{ vars.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC || 'false' }}\n")
 	}
 	if entry, ok := dailyAICRepoMemoryEntry(data); ok {
 		steps = append(steps, fmt.Sprintf("          GH_AW_DAILY_AIC_REPO_MEMORY_DIR: %s\n", dailyAICRepoMemoryDir(entry)))

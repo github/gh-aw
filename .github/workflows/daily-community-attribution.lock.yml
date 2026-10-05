@@ -237,6 +237,7 @@ jobs:
           GH_AW_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_MAX_DAILY_AI_CREDITS: "10000"
           GH_AW_MAX_DAILY_AI_CREDITS_BACKEND: "repo-memory"
+          GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED: "true"
           GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC: ${{ vars.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC || 'false' }}
           GH_AW_DAILY_AIC_REPO_MEMORY_DIR: /tmp/gh-aw/repo-memory/default
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
