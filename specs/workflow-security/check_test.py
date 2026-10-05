@@ -62,6 +62,13 @@ class ResultContractTest(unittest.TestCase):
         push = next(example for example in examples["examples"] if example["case"] == "privileged-push")
         self.assertTrue(any(operation["job"] == "safe_outputs" and operation["op"] == "push"
                             for operation in push["final_state"]["operations"]))
+        retained = next(example for example in examples["examples"]
+                        if example["case"] == "failure-token-retention")
+        self.assertLess(retained["events"].index("Fail:safe_outputs"),
+                        retained["events"].index("AppTokenPost"))
+        self.assertEqual(retained["final_state"]["status"]["safe_outputs"], "failure")
+        self.assertEqual(retained["final_state"]["appTokenPost"], "complete")
+        self.assertIn("app-write", retained["final_state"]["live"])
 
     def test_compiled_corpus_contract(self):
         for outcome in ["success", "violation", "tool-failure", "malformed-policy"]:

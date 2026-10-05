@@ -29,6 +29,7 @@ describe("validateMemoryStep", () => {
     const messages = [];
     const core = {
       info: message => messages.push(message),
+      warning: message => messages.push(`warning: ${message}`),
       error: message => messages.push(`error: ${message}`),
       setFailed: message => messages.push(`failed: ${message}`),
     };
@@ -42,6 +43,7 @@ describe("validateMemoryStep", () => {
     fs.writeFileSync(path.join(tempDir, "state.json"), "{}");
     const core = {
       info: () => {},
+      warning: () => {},
       error: () => {},
       setFailed: () => {},
     };
@@ -56,6 +58,7 @@ describe("validateMemoryStep", () => {
     const messages = [];
     const core = {
       info: message => messages.push(message),
+      warning: message => messages.push(`warning: ${message}`),
       error: message => messages.push(`error: ${message}`),
       setFailed: message => messages.push(`failed: ${message}`),
     };
@@ -65,6 +68,7 @@ describe("validateMemoryStep", () => {
     }
 
     expect(messages.some(m => m.startsWith("failed:"))).toBe(false);
+    expect(messages).toContain('warning: Ignored 1 ineligible file(s) before validation/upload:\n  - notes.json.new (disallowed extension ".new")');
     expect(fs.existsSync(path.join(tempDir, "notes.json"))).toBe(true);
     expect(fs.existsSync(path.join(tempDir, "notes.json.new"))).toBe(false);
   });
