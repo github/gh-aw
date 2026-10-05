@@ -487,13 +487,11 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.288
       - name: Restore agent config folders from base branch
+        if: steps.checkout-pr.outcome == 'success'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .claude .github"
           GH_AW_AGENT_FILES: "AGENTS.md CLAUDE.md"
-        run: |
-          if [ -d /tmp/gh-aw/base ]; then
-            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-          fi
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".claude/agents"

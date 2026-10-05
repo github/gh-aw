@@ -7,11 +7,12 @@
       "edit": false,
       "webFetch": true,
       "webSearch": false,
+      "dynamicWorkflows": true,
       "mcp": false,
       "cliProxy": false
     },
     "permissions": {
-      "allowedTools": ["read", "web_fetch"]
+      "allowedTools": ["read", "web_fetch", "workflow"]
     },
     "explicitlyDisabledTools": ["bash", "cli-proxy", "edit", "github"]
   }

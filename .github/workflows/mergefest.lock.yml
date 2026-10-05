@@ -605,13 +605,11 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
+        if: steps.checkout-pr.outcome == 'success'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github"
           GH_AW_AGENT_FILES: "AGENTS.md"
-        run: |
-          if [ -d /tmp/gh-aw/base ]; then
-            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-          fi
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".github/agents"
@@ -1017,7 +1015,7 @@ jobs:
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
           GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(gh:*)","--allow-tool","shell(git add)","--allow-tool","shell(git add:*)","--allow-tool","shell(git branch)","--allow-tool","shell(git branch:*)","--allow-tool","shell(git checkout)","--allow-tool","shell(git checkout:*)","--allow-tool","shell(git commit)","--allow-tool","shell(git commit:*)","--allow-tool","shell(git config)","--allow-tool","shell(git diff)","--allow-tool","shell(git fetch)","--allow-tool","shell(git log)","--allow-tool","shell(git merge)","--allow-tool","shell(git merge:*)","--allow-tool","shell(git pull)","--allow-tool","shell(git reset)","--allow-tool","shell(git rev-parse)","--allow-tool","shell(git rm:*)","--allow-tool","shell(git status)","--allow-tool","shell(git switch:*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(ls)","--allow-tool","shell(make fmt)","--allow-tool","shell(make lint)","--allow-tool","shell(make recompile)","--allow-tool","shell(make test-unit)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--allow-tool","workflow","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(date)","shell(echo)","shell(gh:*)","shell(git add)","shell(git add:*)","shell(git branch)","shell(git branch:*)","shell(git checkout)","shell(git checkout:*)","shell(git commit)","shell(git commit:*)","shell(git config)","shell(git diff)","shell(git fetch)","shell(git log)","shell(git merge)","shell(git merge:*)","shell(git pull)","shell(git reset)","shell(git rev-parse)","shell(git rm:*)","shell(git status)","shell(git switch:*)","shell(grep)","shell(head)","shell(ls)","shell(make fmt)","shell(make lint)","shell(make recompile)","shell(make test-unit)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(uniq)","shell(wc)","shell(yq)","write"]}}'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":true,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(date)","shell(echo)","shell(gh:*)","shell(git add)","shell(git add:*)","shell(git branch)","shell(git branch:*)","shell(git checkout)","shell(git checkout:*)","shell(git commit)","shell(git commit:*)","shell(git config)","shell(git diff)","shell(git fetch)","shell(git log)","shell(git merge)","shell(git merge:*)","shell(git pull)","shell(git reset)","shell(git rev-parse)","shell(git rm:*)","shell(git status)","shell(git switch:*)","shell(grep)","shell(head)","shell(ls)","shell(make fmt)","shell(make lint)","shell(make recompile)","shell(make test-unit)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(uniq)","shell(wc)","shell(yq)","workflow","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 3

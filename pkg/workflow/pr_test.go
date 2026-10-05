@@ -336,14 +336,16 @@ func TestRestoreEngineConfigFoldersForDynamicWorkflows(t *testing.T) {
 		{id: "copilot", directory: ".github", workflows: "extensions"},
 	} {
 		for _, tt := range []struct {
-			name         string
-			baseExists   bool
-			snapshot     bool
-			keepOriginal bool
+			name            string
+			baseExists      bool
+			snapshot        bool
+			keepOriginal    bool
+			afterPRCheckout bool
 		}{
 			{name: "restores nested support files", baseExists: true, snapshot: true},
 			{name: "removes PR-only configuration", baseExists: true},
 			{name: "leaves workspace unchanged without activation snapshot", keepOriginal: true},
+			{name: "removes PR-provided config when the activation snapshot is missing", afterPRCheckout: true},
 		} {
 			t.Run(engine.id+"/"+tt.name, func(t *testing.T) {
 				root := t.TempDir()
@@ -367,9 +369,11 @@ func TestRestoreEngineConfigFoldersForDynamicWorkflows(t *testing.T) {
 				data := &WorkflowData{EngineConfig: &EngineConfig{ID: engine.id}}
 				folders, files := resolveAgentManifestPaths(NewEngineRegistry(), data)
 				var yaml strings.Builder
-				generateRestoreBaseGitHubFoldersStep(&yaml, folders, files, false)
-				_, script, found := strings.Cut(yaml.String(), "        run: |\n")
+				generateRestoreBaseGitHubFoldersStep(&yaml, folders, files, tt.afterPRCheckout)
+				_, script, found := strings.Cut(yaml.String(), "        run: ")
 				require.True(t, found)
+				script = strings.TrimPrefix(script, "|\n")
+				assert.Equal(t, tt.afterPRCheckout, strings.Contains(yaml.String(), "if: steps.checkout-pr.outcome == 'success'"))
 				scriptPath := filepath.Join(root, "restore.sh")
 				isolatedRestoreScript := strings.ReplaceAll(string(restoreScript), `SRC="/tmp/gh-aw/base"`, "SRC="+shellEscapeArg(base))
 				require.NoError(t, os.WriteFile(scriptPath, []byte(isolatedRestoreScript), 0644))
@@ -431,7 +435,8 @@ func TestEngineConfigRestorePrecedesAgentSteps(t *testing.T) {
 			want            bool
 			afterPRCheckout bool
 		}{
-			{name: "default", data: &WorkflowData{Permissions: "contents: read"}, want: true},
+			{name: "default", data: &WorkflowData{Permissions: "contents: read"}, want: true, afterPRCheckout: true},
+			{name: "PR checkout with no activation checkout", data: &WorkflowData{Permissions: "contents: read", Features: map[string]any{"action-tag": "v1.0.0"}}, want: true, afterPRCheckout: true},
 			{name: "PR checkout disabled", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}}, want: true},
 			{name: "checkout disabled", data: &WorkflowData{CheckoutDisabled: true}, want: true},
 			{name: "dynamic workflows disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &disabled}}},

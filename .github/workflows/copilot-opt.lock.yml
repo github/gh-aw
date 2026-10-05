@@ -597,13 +597,11 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
+        if: steps.checkout-pr.outcome == 'success'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github"
           GH_AW_AGENT_FILES: "AGENTS.md"
-        run: |
-          if [ -d /tmp/gh-aw/base ]; then
-            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-          fi
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".github/agents"
@@ -1017,7 +1015,7 @@ jobs:
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
           GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(./.github/skills/jqschema/jqschema.sh)","--allow-tool","shell(cat)","--allow-tool","shell(cp)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find)","--allow-tool","shell(gh api)","--allow-tool","shell(gh:*)","--allow-tool","shell(git:*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(jq)","--allow-tool","shell(ln)","--allow-tool","shell(ls)","--allow-tool","shell(mkdir)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(python)","--allow-tool","shell(rm)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(tee)","--allow-tool","shell(uniq)","--allow-tool","shell(unzip)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--allow-tool","workflow","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(./.github/skills/jqschema/jqschema.sh)","shell(cat)","shell(cp)","shell(date)","shell(echo)","shell(find)","shell(gh api)","shell(gh:*)","shell(git:*)","shell(grep)","shell(head)","shell(jq)","shell(ln)","shell(ls)","shell(mkdir)","shell(printf)","shell(pwd)","shell(python)","shell(rm)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(tee)","shell(uniq)","shell(unzip)","shell(wc)","shell(yq)","write"]}}'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":true,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(./.github/skills/jqschema/jqschema.sh)","shell(cat)","shell(cp)","shell(date)","shell(echo)","shell(find)","shell(gh api)","shell(gh:*)","shell(git:*)","shell(grep)","shell(head)","shell(jq)","shell(ln)","shell(ls)","shell(mkdir)","shell(printf)","shell(pwd)","shell(python)","shell(rm)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(tee)","shell(uniq)","shell(unzip)","shell(wc)","shell(yq)","workflow","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 3
@@ -2087,7 +2085,7 @@ jobs:
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
           GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","shell","--allow-tool","workflow"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":false,"webFetch":false,"webSearch":false,"mcp":false,"cliProxy":false},"permissions":{"allowedTools":["read","shell"]}}'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":false,"webFetch":false,"webSearch":false,"dynamicWorkflows":true,"mcp":false,"cliProxy":false},"permissions":{"allowedTools":["read","shell","workflow"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS || '400' }}
           GH_AW_MAX_TOOL_DENIALS: 3

@@ -619,13 +619,11 @@ jobs:
           GH_AW_APPROVAL_LABELS_VAR: ${{ vars.GH_AW_GITHUB_APPROVAL_LABELS || '' }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/parse_guard_list.sh"
       - name: Restore agent config folders from base branch
+        if: steps.checkout-pr.outcome == 'success'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .claude .github"
           GH_AW_AGENT_FILES: "AGENTS.md CLAUDE.md"
-        run: |
-          if [ -d /tmp/gh-aw/base ]; then
-            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-          fi
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".claude/agents"

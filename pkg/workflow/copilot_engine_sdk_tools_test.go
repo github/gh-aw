@@ -39,8 +39,8 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 				Tools:        map[string]any{},
 				ParsedTools:  NewTools(map[string]any{}),
 			},
-			capabilities: copilotSDKToolCapabilities{},
-			permissions:  []string{"read"},
+			capabilities: copilotSDKToolCapabilities{DynamicWorkflows: true},
+			permissions:  []string{"read", "workflow"},
 		},
 		{
 			name: "explicit false remains distinguishable from absence",
@@ -65,8 +65,8 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 					"bash": {}, "cli-proxy": {}, "edit": {}, "github": {}, "web-fetch": {},
 				},
 			},
-			capabilities: copilotSDKToolCapabilities{},
-			permissions:  []string{"read"},
+			capabilities: copilotSDKToolCapabilities{DynamicWorkflows: true},
+			permissions:  []string{"read", "workflow"},
 			disabled:     []string{"bash", "cli-proxy", "edit", "github", "web-fetch"},
 		},
 		{
@@ -98,9 +98,9 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 				"--allow-tool", "github",
 			},
 			capabilities: copilotSDKToolCapabilities{
-				Bash: true, Edit: true, WebFetch: true, WebSearch: true, MCP: true, CLIProxy: true,
+				Bash: true, Edit: true, WebFetch: true, WebSearch: true, DynamicWorkflows: true, MCP: true, CLIProxy: true,
 			},
-			permissions: []string{"github", "read", "shell", "web_fetch", "web_search", "write"},
+			permissions: []string{"github", "read", "shell", "web_fetch", "web_search", "workflow", "write"},
 		},
 		{
 			name: "empty bash allowlist is explicitly disabled",
@@ -110,8 +110,8 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 				ParsedTools:  NewTools(map[string]any{"bash": []any{}}),
 				BashDisabled: true,
 			},
-			capabilities: copilotSDKToolCapabilities{},
-			permissions:  []string{"read"},
+			capabilities: copilotSDKToolCapabilities{DynamicWorkflows: true},
+			permissions:  []string{"read", "workflow"},
 			disabled:     []string{"bash"},
 		},
 		{
@@ -125,8 +125,8 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 					"web-search": nil,
 				}),
 			},
-			capabilities: copilotSDKToolCapabilities{},
-			permissions:  []string{"read"},
+			capabilities: copilotSDKToolCapabilities{DynamicWorkflows: true},
+			permissions:  []string{"read", "workflow"},
 		},
 		{
 			// Default-tool resolution re-adds a "github" entry for steering issue comments
@@ -143,8 +143,8 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 				}),
 				ExplicitlyDisabledTools: map[string]struct{}{"github": {}},
 			},
-			capabilities: copilotSDKToolCapabilities{},
-			permissions:  []string{"read"},
+			capabilities: copilotSDKToolCapabilities{DynamicWorkflows: true},
+			permissions:  []string{"read", "workflow"},
 			disabled:     []string{"github"},
 		},
 	}
@@ -163,6 +163,34 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 			}
 			if !reflect.DeepEqual(config.ExplicitlyDisabledTools, tt.disabled) {
 				t.Errorf("ExplicitlyDisabledTools = %#v, want %#v", config.ExplicitlyDisabledTools, tt.disabled)
+			}
+		})
+	}
+}
+
+func TestBuildCopilotSDKToolConfigDynamicWorkflows(t *testing.T) {
+	enabled, disabled := true, false
+	for _, tt := range []struct {
+		name    string
+		setting *bool
+		want    bool
+	}{
+		{name: "default", want: true},
+		{name: "enabled", setting: &enabled, want: true},
+		{name: "disabled", setting: &disabled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{EngineConfig: &EngineConfig{CopilotSDK: true, DynamicWorkflows: tt.setting}}
+			config := buildCopilotSDKToolConfig(data, nil)
+			if config.Capabilities.DynamicWorkflows != tt.want {
+				t.Errorf("DynamicWorkflows = %v, want %v", config.Capabilities.DynamicWorkflows, tt.want)
+			}
+			expected := []string{"read"}
+			if tt.want {
+				expected = append(expected, "workflow")
+			}
+			if !reflect.DeepEqual(config.Permissions.AllowedTools, expected) {
+				t.Errorf("AllowedTools = %#v, want %#v", config.Permissions.AllowedTools, expected)
 			}
 		})
 	}
