@@ -32,8 +32,9 @@
 
 const fs = require("fs");
 const path = require("path");
-const { fetchAWFReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
+const { fetchAWFReflect, getCatalogModelEntry, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig } = require("./pi_runtime.cjs");
 
 const DEFAULT_PI_CODING_AGENT_DIR = "/tmp/gh-aw/pi-agent-dir";
@@ -151,7 +152,54 @@ function resolvePiApiForProvider(provider) {
   return provider === "anthropic" ? "anthropic-messages" : "openai-completions";
 }
 
-/** @param {{ loadSDK?: typeof loadPiSDK }} [options] */
+/**
+ * Fail before inference when a completed proxy model inventory excludes the selected model.
+ *
+ * @param {{ provider: string, modelId: string, reflectData?: any }} options
+ */
+function validatePiModelAvailability(options) {
+  const { provider, modelId, reflectData } = options;
+  if (!reflectData || reflectData.models_fetch_complete !== true) return;
+
+  const normalizedProvider = normalizeReflectProviderName(provider);
+  const aliases = REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
+  const endpoint = reflectData.endpoints?.find(endpoint => endpoint?.configured === true && aliases.has(normalizeReflectProviderName(endpoint.provider)));
+  if (!endpoint || !Array.isArray(endpoint.models)) return;
+
+  const normalizedModelId = modelId.split("?")[0].toLowerCase();
+  const advertisedModels = endpoint.models.map(model => {
+    if (typeof model === "string") return model.toLowerCase();
+    if (model && typeof model === "object") return String(model.id || model.name || "").toLowerCase();
+    return "";
+  });
+  if (!advertisedModels.includes(normalizedModelId)) {
+    throw new Error(`Pi model "${modelId}" is not advertised by the configured ${endpoint.provider} proxy endpoint; choose a model listed by AWF /reflect`);
+  }
+}
+
+/**
+ * Resolve a model-specific Pi API from model metadata, rejecting an explicit
+ * chat-completions override when the model only supports the Responses API.
+ *
+ * @param {{ provider: string, modelId: string, model?: any, modelsJson?: any, overrideApi?: string }} options
+ * @returns {string}
+ */
+function resolvePiApiForModel(options) {
+  const { provider, modelId, model, modelsJson, overrideApi } = options;
+  const catalogProvider = ["github", "copilot", "github-copilot"].includes(provider) ? "github-copilot" : provider;
+  const catalogEntry = getCatalogModelEntry(modelsJson, modelId, catalogProvider);
+  const wireApi = String(catalogEntry?.wire_api || catalogEntry?.wireApi || "")
+    .toLowerCase()
+    .trim();
+  const requiresResponses = model?.api === "openai-responses" || wireApi === "responses";
+  if (requiresResponses && overrideApi && overrideApi !== "openai-responses") {
+    throw new Error(`Pi model "${modelId}" requires the OpenAI Responses API, but engine.config.model.api is "${overrideApi}"`);
+  }
+  if (requiresResponses) return "openai-responses";
+  return overrideApi || model?.api || resolvePiApiForProvider(provider);
+}
+
+/** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson }} [options] */
 async function main(options = {}) {
   const logger = DEFAULT_LOGGER;
   const modelId = process.env.GH_AW_PI_MODEL_ID || "";
@@ -181,14 +229,13 @@ async function main(options = {}) {
     }
   }
 
+  validatePiModelAvailability({ provider, modelId, reflectData });
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
-  let api = resolvePiApiForProvider(provider);
-  logger(`resolved gateway api=${api} (provider=${provider})`);
-
   const overrides = parsePiConfig().model || {};
   const nativeProvider = nativePiProvider(process.env.GH_AW_PI_NATIVE_PROVIDER || provider);
+  const modelsJson = (options.loadModelsJson || loadModelsJson)();
   let catalogModel;
   if (["reasoning", "input", "contextWindow", "maxTokens"].every(key => Object.hasOwn(overrides, key))) {
     logger(`using explicit model metadata for ${nativeProvider}/${modelId}`);
@@ -197,7 +244,8 @@ async function main(options = {}) {
     const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
     catalogModel = runtime.getModel(nativeProvider, modelId.split("?")[0]);
   }
-  if (catalogModel && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider)) api = catalogModel.api;
+  let api = resolvePiApiForModel({ provider, modelId, model: catalogModel, modelsJson, overrideApi: overrides.api });
+  logger(`resolved gateway api=${api} (provider=${provider}, model=${modelId})`);
   const metadata = {};
   if (catalogModel) {
     for (const key of ["name", "reasoning", "thinkingLevelMap", "input", "inputLimits", "cost", "promptCache", "contextWindow", "maxTokens", "samplingParams", "compat"]) {
@@ -229,4 +277,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, DEFAULT_PI_CODING_AGENT_DIR };
+module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, resolvePiApiForModel, validatePiModelAvailability, DEFAULT_PI_CODING_AGENT_DIR };

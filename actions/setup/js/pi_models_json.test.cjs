@@ -206,6 +206,57 @@ describe("pi_models_json.cjs", () => {
     });
   });
 
+  describe("resolvePiApiForModel", () => {
+    it("routes a reflected Copilot model marked Responses-only through the Responses API", () => {
+      expect(
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "gpt-5.5",
+          modelsJson: { providers: { "github-copilot": { models: { "gpt-5.5": { wire_api: "responses" } } } } },
+        })
+      ).toBe("openai-responses");
+    });
+
+    it("rejects a chat-completions override for a Responses-only model", () => {
+      expect(() =>
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "gpt-5.5",
+          modelsJson: { providers: { "github-copilot": { models: { "gpt-5.5": { wire_api: "responses" } } } } },
+          overrideApi: "openai-completions",
+        })
+      ).toThrow('Pi model "gpt-5.5" requires the OpenAI Responses API');
+    });
+  });
+
+  describe("validatePiModelAvailability", () => {
+    it("rejects a model absent from a completed reflected endpoint inventory", () => {
+      expect(() =>
+        piModelsJson.validatePiModelAvailability({
+          provider: "github",
+          modelId: "gpt-5.5",
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, models: ["gpt-4o"] }],
+          },
+        })
+      ).toThrow('Pi model "gpt-5.5" is not advertised by the configured copilot proxy endpoint');
+    });
+
+    it("does not reject when reflected model discovery is incomplete", () => {
+      expect(() =>
+        piModelsJson.validatePiModelAvailability({
+          provider: "github",
+          modelId: "gpt-5.5",
+          reflectData: {
+            models_fetch_complete: false,
+            endpoints: [{ provider: "copilot", configured: true, models: [] }],
+          },
+        })
+      ).not.toThrow();
+    });
+  });
+
   describe("main", () => {
     it("preserves native thinking, vision, token limits, pricing, and cache metadata", async () => {
       process.env.GH_AW_PI_MODEL_ID = "gpt-5.4";
@@ -246,6 +297,59 @@ describe("pi_models_json.cjs", () => {
       expect(written.providers["aw-gateway"].models).toEqual([{ id: "gpt-4.1" }]);
       expect(written.providers["aw-gateway"].api).toBe("openai-responses");
       expect(fetch).toHaveBeenCalled();
+    });
+
+    it("routes an advertised Responses-only Copilot model before Pi starts", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "gpt-5.5";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["gpt-5.5"] }],
+          }),
+        })
+      );
+
+      await piModelsJson.main({
+        loadSDK,
+        loadModelsJson: () => ({ providers: { "github-copilot": { models: { "gpt-5.5": { wire_api: "responses" } } } } }),
+      });
+
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].api).toBe("openai-responses");
+    });
+
+    it("fails before generating models.json when a completed reflected inventory excludes the model", async () => {
+      process.env.GH_AW_PI_MODEL_ID = "gpt-5.5";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["gpt-4o"] }],
+          }),
+        })
+      );
+
+      await expect(piModelsJson.main({ loadSDK, loadModelsJson: () => ({ providers: {} }) })).rejects.toThrow('Pi model "gpt-5.5" is not advertised by the configured copilot proxy endpoint');
+      expect(fs.existsSync(path.join(tmpDir, "models.json"))).toBe(false);
     });
 
     it("writes models.json using the fallback port when AWF_REFLECT_ENABLED is not set", async () => {
