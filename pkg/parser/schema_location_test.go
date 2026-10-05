@@ -574,6 +574,25 @@ func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsDailyAICred
 	}
 }
 
+func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsTerminalSafeOutputCategories(t *testing.T) {
+	for _, category := range []string{"engine_driver_failure", "safeoutputs_cli_error", "invalid_safe_outputs", "missing_terminal_safe_output"} {
+		for _, prefix := range []string{"", "!"} {
+			t.Run(prefix+category, func(t *testing.T) {
+				frontmatter := map[string]any{
+					"on": "workflow_dispatch",
+					"safe-outputs": map[string]any{
+						"create-issue":            map[string]any{},
+						"report-failure-as-issue": []any{prefix + category},
+					},
+				}
+				if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "/test/workflow.md"); err != nil {
+					t.Fatalf("terminal safe output category rejected: %v", err)
+				}
+			})
+		}
+	}
+}
+
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_AcceptsAllowedBaseBranchesInCreatePullRequest(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{

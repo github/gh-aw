@@ -6,9 +6,18 @@ import path from "path";
 import { createRequire } from "node:module";
 import vm from "node:vm";
 import { globPatternToRegex } from "./glob_pattern_helpers.cjs";
-import { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, pushRepoMemoryChangesWithRetry } from "./push_repo_memory.cjs";
+import {
+  applyTemporaryIdSubstitutions,
+  configureRepoMemoryMergePolicy,
+  getCustomValidationFailureDetail,
+  isDeterministicPushValidationError,
+  isUntrustedLedgerArtifact,
+  pushRepoMemoryChangesWithRetry,
+  redactFailureSummary,
+  setPushRepoMemoryFailure,
+} from "./push_repo_memory.cjs";
 
-const mockCore = { info: vi.fn() };
+const mockCore = { info: vi.fn(), setFailed: vi.fn() };
 global.core = mockCore;
 
 describe("push_repo_memory.cjs - nested memory persistence", () => {
@@ -86,6 +95,49 @@ describe("push_repo_memory.cjs - untrusted ledger artifacts", () => {
     expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000000.jsonl", trusted)).toBe(true);
     expect(isUntrustedLedgerArtifact("ledger/shards/00000000-0000-4000-8000-000000000001.jsonl", trusted)).toBe(false);
     expect(isUntrustedLedgerArtifact("summary.json", trusted)).toBe(false);
+  });
+});
+
+describe("push_repo_memory.cjs - validation failure details", () => {
+  it("includes stdout and stderr diagnostics", () => {
+    expect(getCustomValidationFailureDetail({ stdout: "generic-looking stdout", stderr: "domain schema failed" })).toBe("generic-looking stdout\ndomain schema failed");
+  });
+
+  it.each([
+    ["GH_TOKEN", "gh-token-secret"],
+    ["GITHUB_TOKEN", "github-token-secret"],
+    ["GITHUB_APP_TOKEN", "github-app-token-secret"],
+  ])("redacts %s from failure details", (environmentVariable, secret) => {
+    const previousSecret = process.env[environmentVariable];
+    process.env[environmentVariable] = secret;
+    try {
+      expect(redactFailureSummary(`Failure includes ${secret}`)).toBe("Failure includes [REDACTED]");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env[environmentVariable];
+      } else {
+        process.env[environmentVariable] = previousSecret;
+      }
+    }
+  });
+
+  it("logs and reports failures without configured credentials", async () => {
+    const environmentVariable = "GITHUB_APP_TOKEN";
+    const secret = "github-app-token-secret";
+    const previousSecret = process.env[environmentVariable];
+    process.env[environmentVariable] = secret;
+    try {
+      await setPushRepoMemoryFailure(`Push failed with ${secret}`);
+
+      expect(mockCore.info).toHaveBeenCalledWith("Repo-memory push failed: Push failed with [REDACTED]");
+      expect(mockCore.setFailed).toHaveBeenCalledWith("Push failed with [REDACTED]");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env[environmentVariable];
+      } else {
+        process.env[environmentVariable] = previousSecret;
+      }
+    }
   });
 });
 
@@ -2046,11 +2098,21 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
     it("should fail deterministic validation errors without retrying", async () => {
       const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-validation-"));
       const setFailed = vi.fn();
-      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_VALIDATION: merge commit detected"));
-      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed };
+      const summaryContents = [];
+      const summary = {
+        addRaw: vi.fn(content => {
+          summaryContents.push(content);
+          return { write: vi.fn().mockResolvedValue(undefined) };
+        }),
+        write: vi.fn(),
+      };
+      const previousGitHubToken = process.env.GH_TOKEN;
+      process.env.GH_TOKEN = "not-a-real-token";
+      const pushSignedCommitsFn = vi.fn().mockRejectedValue(new Error("ERR_VALIDATION: merge commit detected with not-a-real-token"));
+      global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed, summary };
       try {
         execSync("git init && git remote add origin https://github.com/owner/repo.git", { cwd: repoDir, stdio: "pipe" });
-        await pushRepoMemoryChangesWithRetry({
+        const pushed = await pushRepoMemoryChangesWithRetry({
           githubClient: {},
           targetOwner: "owner",
           targetRepoName: "repo",
@@ -2066,9 +2128,18 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         });
 
         expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
-        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected");
+        expect(pushed).toBe(false);
+        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
+        expect(global.core.info).toHaveBeenCalledWith("Repo-memory push failed: Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
+        expect(summaryContents.join("\n")).toContain("ERR_VALIDATION: merge commit detected with [REDACTED]");
+        expect(summaryContents.join("\n")).not.toContain("not-a-real-token");
         expect(isDeterministicPushValidationError("ERR_VALIDATION: policy violation")).toBe(true);
       } finally {
+        if (previousGitHubToken === undefined) {
+          delete process.env.GH_TOKEN;
+        } else {
+          process.env.GH_TOKEN = previousGitHubToken;
+        }
         delete global.core;
         fs.rmSync(repoDir, { recursive: true, force: true });
       }

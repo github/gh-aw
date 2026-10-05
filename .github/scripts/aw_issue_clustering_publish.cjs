@@ -427,6 +427,16 @@ async function cleanupCompleted(github, owner, repo, corpus, staged, core) {
   return cleaned;
 }
 
+async function cleanupBeforeRecompute({ github, context, core, staged = false }) {
+  const { owner, repo } = context.repo;
+  const cutoff = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId })).data.created_at;
+  const issues = await collectIssues(github, owner, repo, cutoff);
+  const corpus = buildCorpus(`${owner}/${repo}`, issues, [], cutoff);
+  const cleaned = await cleanupCompleted(github, owner, repo, corpus, staged, core);
+  core.info(`Cleanup before recomputation: ${staged ? "would close" : "closed"} ${cleaned.length} unchanged AW sources`);
+  return cleaned;
+}
+
 function dashboardBody(result, plan, corpus, runId, cleanup = [], staged = false) {
   const rows = [
     start,
@@ -533,9 +543,16 @@ async function publish({ github, context, core, createIssue }) {
   requireValid(items.length === 1, "Exactly one publish_essential_issues plan required");
   requireValid(items[0].plan_path === "agent/aw-issue-clustering/plan.json", "Invalid clustering plan artifact path");
   const planFile = path.join(path.dirname(process.env.GH_AW_AGENT_OUTPUT), items[0].plan_path);
-  const stat = fs.lstatSync(planFile);
-  requireValid(stat.isFile() && stat.size <= 1048576, "Plan artifact must be a regular JSON file no larger than 1 MiB");
-  const plan = JSON.parse(fs.readFileSync(planFile, "utf8"));
+  let planText;
+  const fd = fs.openSync(planFile, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    const stat = fs.fstatSync(fd);
+    requireValid(stat.isFile() && stat.size <= 1048576, "Plan artifact must be a regular JSON file no larger than 1 MiB");
+    planText = fs.readFileSync(fd, "utf8");
+  } finally {
+    fs.closeSync(fd);
+  }
+  const plan = JSON.parse(planText);
   const cutoff = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId })).data.created_at;
   const issues = await collectIssues(github, owner, repo, cutoff);
   const sources = buildCorpus(`${owner}/${repo}`, issues, [], cutoff).issues;
@@ -577,4 +594,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { publish, buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, dashboardBody, publishDashboard, collectDiscussions, collectIssues, metadata };
+module.exports = { publish, buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, cleanupBeforeRecompute, dashboardBody, publishDashboard, collectDiscussions, collectIssues, metadata };

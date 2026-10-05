@@ -17,6 +17,37 @@ const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = requ
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
+function redactFailureSummary(message) {
+  let safeMessage = String(message);
+  for (const secret of [process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN]) {
+    if (secret) {
+      safeMessage = safeMessage.split(secret).join("[REDACTED]");
+    }
+  }
+  return safeMessage.replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
+}
+
+function getCustomValidationFailureDetail({ stdout, stderr }) {
+  return redactFailureSummary([stdout, stderr].filter(Boolean).join("\n"));
+}
+
+async function setPushRepoMemoryFailure(message) {
+  const safeMessage = redactFailureSummary(message);
+  core.info(`Repo-memory push failed: ${safeMessage}`);
+  const summary = core.summary;
+  if (summary && typeof summary.addRaw === "function" && typeof summary.write === "function") {
+    const safeSummaryMessage = safeMessage.replace(/```/g, "``\u200b`");
+    try {
+      await summary.addRaw(`### Repo-memory push failed\n\n\`\`\`text\n${safeSummaryMessage}\n\`\`\`\n`).write();
+    } catch (error) {
+      if (typeof core.warning === "function") {
+        core.warning(`Failed to write repo-memory failure summary: ${redactFailureSummary(getErrorMessage(error))}`);
+      }
+    }
+  }
+  return core.setFailed(safeMessage);
+}
+
 /**
  * Exclude agent-supplied files that can mutate trusted ledger state.
  *
@@ -176,7 +207,7 @@ async function pushRepoMemoryChangesWithRetry({
     } catch (error) {
       const errMsg = getErrorMessage(error);
       if (isDeterministicPushValidationError(errMsg)) {
-        core.setFailed(`Failed to push changes: ${errMsg}`);
+        await setPushRepoMemoryFailure(`Failed to push changes: ${errMsg}`);
         return false;
       }
       if (attempt < MAX_RETRIES) {
@@ -210,8 +241,8 @@ async function pushRepoMemoryChangesWithRetry({
                 gitAuthEnv: getGitAuthEnv(ghToken),
               });
             } catch (reconcileError) {
-              core.setFailed(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
-              return;
+              await setPushRepoMemoryFailure(`Failed to reconcile repo-memory changes onto refreshed head before retry: ${getErrorMessage(reconcileError)}`);
+              return false;
             }
           }
         } catch (lsRemoteError) {
@@ -222,14 +253,14 @@ async function pushRepoMemoryChangesWithRetry({
         // Surface a helpful message when the repository's signed-commits
         // ruleset rejects the git-push fallback path.
         if (/GH013|must have verified signatures|Commits must have verified signatures/i.test(errMsg)) {
-          core.setFailed(
+          await setPushRepoMemoryFailure(
             `repo-memory: push to branch ${branchName} was rejected because the repository requires verified (signed) commits. ` +
               `Commits pushed via the GitHub GraphQL API are signed automatically, but the signed-commit path could not be used for this push. ` +
               `If your memory files contain symlinks, executable files, or submodule references, remove them and use regular plain-text files (.json, .jsonl, .txt, .md, .csv). ` +
               `Original error: ${errMsg}`
           );
         } else {
-          core.setFailed(`Failed to push changes after ${MAX_RETRIES + 1} attempts: ${errMsg}`);
+          await setPushRepoMemoryFailure(`Failed to push changes after ${MAX_RETRIES + 1} attempts: ${errMsg}`);
         }
         return false;
       }
@@ -355,7 +386,7 @@ async function main() {
     !Number.isSafeInteger(validationTimeoutSeconds) ||
     validationTimeoutSeconds <= 0
   ) {
-    core.setFailed("Memory size, count, patch size, and validation timeout limits must be positive integers");
+    await setPushRepoMemoryFailure("Memory size, count, patch size, and validation timeout limits must be positive integers");
     return;
   }
 
@@ -365,7 +396,7 @@ async function main() {
     try {
       allowedExtensions = JSON.parse(process.env.ALLOWED_EXTENSIONS);
     } catch (/** @type {any} */ error) {
-      core.setFailed(`Failed to parse ALLOWED_EXTENSIONS environment variable: ${getErrorMessage(error)}. Expected JSON array format.`);
+      await setPushRepoMemoryFailure(`Failed to parse ALLOWED_EXTENSIONS environment variable: ${getErrorMessage(error)}. Expected JSON array format.`);
       return;
     }
   }
@@ -413,7 +444,7 @@ async function main() {
 
   // Validate required environment variables
   if (!artifactDir || !memoryId || !targetRepo || !branchName || !ghToken) {
-    core.setFailed("Missing required environment variables: ARTIFACT_DIR, MEMORY_ID, TARGET_REPO, BRANCH_NAME, GH_TOKEN");
+    await setPushRepoMemoryFailure("Missing required environment variables: ARTIFACT_DIR, MEMORY_ID, TARGET_REPO, BRANCH_NAME, GH_TOKEN");
     return;
   }
 
@@ -434,11 +465,11 @@ async function main() {
   const isKnownWikiBranch = branchName === "master" || branchName === "main" || branchName === "gh-pages";
   const isWikiRepo = targetRepo.endsWith(".wiki");
   if (!isNamespaced && !isKnownWikiBranch) {
-    core.setFailed(`ERR_VALIDATION: Invalid branch name "${branchName}": branch name must be namespaced (e.g. "memory/default") or a known wiki branch ("master", "main", "gh-pages")`);
+    await setPushRepoMemoryFailure(`ERR_VALIDATION: Invalid branch name "${branchName}": branch name must be namespaced (e.g. "memory/default") or a known wiki branch ("master", "main", "gh-pages")`);
     return;
   }
   if (isKnownWikiBranch && !isWikiRepo) {
-    core.setFailed(`ERR_VALIDATION: Branch name "${branchName}" is only valid for wiki repositories (TARGET_REPO must end with ".wiki", got "${targetRepo}")`);
+    await setPushRepoMemoryFailure(`ERR_VALIDATION: Branch name "${branchName}" is only valid for wiki repositories (TARGET_REPO must end with ".wiki", got "${targetRepo}")`);
     return;
   }
 
@@ -449,7 +480,7 @@ async function main() {
 
   const repoValidation = validateRepo(targetRepo, defaultRepo, allowedRepos);
   if (!repoValidation.valid) {
-    core.setFailed(`E004: ${repoValidation.error}`);
+    await setPushRepoMemoryFailure(`E004: ${repoValidation.error}`);
     return;
   }
 
@@ -458,7 +489,7 @@ async function main() {
     const allPatternStrs = fileGlobFilter.trim().split(/\s+/).filter(Boolean);
     for (const pat of allPatternStrs) {
       if (pat.startsWith("/")) {
-        core.setFailed(`FILE_GLOB_FILTER contains an unsupported pattern: "${pat}". Patterns must not start with "/" (absolute paths are not allowed).`);
+        await setPushRepoMemoryFailure(`FILE_GLOB_FILTER contains an unsupported pattern: "${pat}". Patterns must not start with "/" (absolute paths are not allowed).`);
         return;
       }
     }
@@ -516,7 +547,7 @@ async function main() {
       const fetchErrMsg = getErrorMessage(fetchError);
       const isMissingBranch = /couldn't find remote ref/i.test(fetchErrMsg) || /remote branch .* not found/i.test(fetchErrMsg);
       if (!isMissingBranch) {
-        // Re-throw so the outer catch calls core.setFailed with the real cause.
+        // Re-throw so the outer catch reports the real cause.
         throw fetchError;
       }
 
@@ -588,7 +619,7 @@ async function main() {
       }
     }
   } catch (error) {
-    core.setFailed(`Failed to checkout branch: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to checkout branch: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -685,7 +716,6 @@ async function main() {
         // Validate file size
         if (stats.size > maxFileSize) {
           core.error(`File exceeds size limit: ${relativeFilePath} (${stats.size} bytes > ${maxFileSize} bytes)`);
-          core.setFailed("File size validation failed");
           throw new Error("File size validation failed");
         }
 
@@ -715,7 +745,7 @@ async function main() {
       core.info(`  ... and ${filesToCopy.length - 10} more`);
     }
   } catch (error) {
-    core.setFailed(`Failed to scan artifact directory: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to scan artifact directory: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -736,7 +766,7 @@ async function main() {
       const resolvedRoot = path.resolve(destMemoryPath) + path.sep;
       const resolvedDest = path.resolve(destFilePath);
       if (!resolvedDest.startsWith(resolvedRoot)) {
-        core.setFailed(`Refusing to write outside repo-memory directory: ${file.relativePath}`);
+        await setPushRepoMemoryFailure(`Refusing to write outside repo-memory directory: ${file.relativePath}`);
         return;
       }
 
@@ -747,7 +777,7 @@ async function main() {
       fs.copyFileSync(file.source, destFilePath);
       core.info(`Copied: ${file.relativePath} (${file.size} bytes)`);
     } catch (error) {
-      core.setFailed(`Failed to copy file ${file.relativePath}: ${getErrorMessage(error)}`);
+      await setPushRepoMemoryFailure(`Failed to copy file ${file.relativePath}: ${getErrorMessage(error)}`);
       return;
     }
   }
@@ -760,7 +790,7 @@ async function main() {
       substitutedFiles.forEach(file => core.info(`  - ${file}`));
     }
   } catch (error) {
-    core.setFailed(`Failed to apply temporary ID substitutions to repo-memory files: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to apply temporary ID substitutions to repo-memory files: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -775,7 +805,7 @@ async function main() {
         core.info(`Formatted JSON: ${formattedFile}`);
       }
     } catch (error) {
-      core.setFailed(`Failed to format JSON files: ${getErrorMessage(error)}`);
+      await setPushRepoMemoryFailure(`Failed to format JSON files: ${getErrorMessage(error)}`);
       return;
     }
   }
@@ -791,23 +821,24 @@ async function main() {
     });
     if (!customValidation.ok) {
       const reason = customValidation.timedOut ? `timed out after ${validationTimeoutSeconds} second(s)` : `exited with code ${customValidation.exitCode}`;
-      const errorMessage = `Custom repo-memory validation failed for '${memoryId}': ${reason}.`;
+      const failureDetail = getCustomValidationFailureDetail(customValidation);
+      const errorMessage = `Custom repo-memory validation failed for '${memoryId}': ${reason}${failureDetail ? `:\n${failureDetail}` : "."}`;
       if (customValidation.stdout) {
-        core.info(`Custom repo-memory validation stdout:\n${customValidation.stdout}`);
+        core.info(`Custom repo-memory validation stdout:\n${redactFailureSummary(customValidation.stdout)}`);
       }
       if (customValidation.stderr) {
-        core.error(`Custom repo-memory validation stderr:\n${customValidation.stderr}`);
+        core.error(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
       }
       core.setOutput("validation_failed", "true");
       core.setOutput("validation_error", errorMessage);
-      core.setFailed(errorMessage);
+      await setPushRepoMemoryFailure(errorMessage);
       return;
     }
     if (customValidation.stdout) {
-      core.info(`Custom repo-memory validation stdout:\n${customValidation.stdout}`);
+      core.info(`Custom repo-memory validation stdout:\n${redactFailureSummary(customValidation.stdout)}`);
     }
     if (customValidation.stderr) {
-      core.info(`Custom repo-memory validation stderr:\n${customValidation.stderr}`);
+      core.info(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
     }
     core.info("Custom repo-memory validation passed.");
   }
@@ -832,7 +863,7 @@ async function main() {
       .filter(Boolean);
     changedFileCount = changedEntries.length;
   } catch (error) {
-    core.setFailed(`Failed to check git status: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to check git status: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -843,7 +874,7 @@ async function main() {
   }
 
   if (changedFileCount > maxFileCount) {
-    core.setFailed(`Too many changed files in working directory (${changedFileCount} > ${maxFileCount})`);
+    await setPushRepoMemoryFailure(`Too many changed files in working directory (${changedFileCount} > ${maxFileCount})`);
     return;
   }
 
@@ -867,7 +898,7 @@ async function main() {
     }
     execGitSync(addArgs, { stdio: "inherit", cwd: workspaceDir });
   } catch (error) {
-    core.setFailed(`Failed to stage changes: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to stage changes: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -898,7 +929,7 @@ async function main() {
         core.warning(`Could not retrieve diff stat: ${getErrorMessage(statError)}`);
       }
       core.setOutput("patch_size_exceeded", "true");
-      core.setFailed(
+      await setPushRepoMemoryFailure(
         `Patch diff size (${patchSizeKb} KB, ${patchSizeBytes} bytes) exceeds maximum allowed size (${effectiveMaxPatchSizeKb} KB, ${effectiveMaxPatchSize} bytes, configured limit: ${maxPatchSizeKb} KB with 20% overhead allowance). Reduce the number or size of changes, or increase max-patch-size.`
       );
       return;
@@ -909,7 +940,7 @@ async function main() {
       core.info(patchSizeMessage);
     }
   } catch (error) {
-    core.setFailed(`Failed to compute patch diff size: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to compute patch diff size: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -917,7 +948,7 @@ async function main() {
   try {
     execGitSync(["commit", "-m", `Update repo memory from workflow run ${githubRunId}`], { stdio: "inherit" });
   } catch (error) {
-    core.setFailed(`Failed to commit changes: ${getErrorMessage(error)}`);
+    await setPushRepoMemoryFailure(`Failed to commit changes: ${getErrorMessage(error)}`);
     return;
   }
 
@@ -930,7 +961,7 @@ async function main() {
   // strict signed-commits ruleset that fallback will also be rejected —
   // that is expected behaviour: remove the unsupported file types and
   // re-run.
-  await pushRepoMemoryChangesWithRetry({
+  ledgerActivity.saving.pushed = await pushRepoMemoryChangesWithRetry({
     githubClient: github,
     targetOwner,
     targetRepoName,
@@ -941,8 +972,18 @@ async function main() {
     ghToken,
     serverHost,
   });
-  ledgerActivity.saving.pushed = true;
   await writeLedgerSummary();
 }
 
-module.exports = { applyTemporaryIdSubstitutions, configureRepoMemoryMergePolicy, isDeterministicPushValidationError, isUntrustedLedgerArtifact, main, pushRepoMemoryChangesWithRetry, reconcileRepoMemoryRetry };
+module.exports = {
+  applyTemporaryIdSubstitutions,
+  configureRepoMemoryMergePolicy,
+  getCustomValidationFailureDetail,
+  isDeterministicPushValidationError,
+  isUntrustedLedgerArtifact,
+  main,
+  pushRepoMemoryChangesWithRetry,
+  reconcileRepoMemoryRetry,
+  redactFailureSummary,
+  setPushRepoMemoryFailure,
+};

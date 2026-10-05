@@ -149,9 +149,13 @@ Branches auto-create as orphans by default, or clone with `--depth 1`. After val
 
 Use `validation.script` when generic storage limits are not enough. The script is a JavaScript body executed with Node.js over the complete configured memory directory after `format-json` normalization and before artifact upload or branch commit. It runs in the agent job and is re-run in the repo-memory push job as defense in depth.
 
-Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"repo"`). The working directory is the memory root. Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
+Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"repo"`). These paths and the working directory point to a temporary copy of the memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
+
+Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
 
 Throw an exception, return `false`, time out, exit nonzero, or modify a memory file to reject persistence. Validator stdout and stderr are reported separately from built-in storage validation output so agents can distinguish domain-schema validation from size/count checks.
+
+In the repo-memory push job, validation failures set `validation_failed` to `true` and include both non-empty output streams in `validation_error` and the **Repo-memory push failed** job summary. Push failures are also logged with their underlying error. Configured `GH_TOKEN`, `GITHUB_TOKEN`, and `GITHUB_APP_TOKEN` values and HTTP authorization credentials are redacted from these diagnostics; validators should never print secrets.
 
 Commits use the [GitHub GraphQL `createCommitOnBranch` mutation](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch), so they are automatically **Verified** with GitHub's GPG key and satisfy rulesets that require signed commits.
 
@@ -176,7 +180,7 @@ For fast 7-day caching without version control, see [Cache Memory](/gh-aw/refere
 
 - **Branch not created**: Ensure `create-orphan: true` is enabled, or create the branch manually.
 - **Validation or patch-size failures**: Keep changes within `file-glob`, `max-file-size` (100KB default), `max-file-count` (100 default), and `max-patch-size` (10KB default).
-- **Changes not persisting**: Confirm the directory path, let the workflow finish, and check the logs for push errors.
+- **Changes not persisting**: Confirm the directory path, let the workflow finish, and check the push job's **Repo-memory push failed** summary and logs for the underlying error. Custom validation failures include both stdout and stderr; updates rejected by validation are not committed or pushed.
 - **Merge conflicts**: Concurrent pushes are replayed onto the latest remote state, so your file changes win. `.jsonl` files are merged with `merge=union`, so rows written by concurrent runs are all kept; other file types keep the local version.
 - **Many runs finishing at once**: Pushes are not serialized. Each run commits with a compare-and-swap on the remote branch head and, if another run wins the race, re-reads the head, rebases its change with JSONL union merging, and retries with exponential backoff. To avoid conflicts entirely, have each run write its own file instead of all runs editing the same file, for example `runs/${{ matrix.worker }}.jsonl` or `targets/${{ matrix.target }}.jsonl`.
 - **GH013 — Commits must have verified signatures**: This usually means the artifact included a symlink, executable file, or submodule entry, which forced a fallback to plain `git push`. Remove the unsupported file type and re-run.

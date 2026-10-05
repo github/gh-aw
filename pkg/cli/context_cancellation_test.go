@@ -118,9 +118,14 @@ func TestRunWorkflowsOnGitHubCancellationDuringExecution(t *testing.T) {
 // TestDownloadWorkflowLogsTimeoutRespected tests that timeout-minutes is respected
 func TestDownloadWorkflowLogsTimeoutRespected(t *testing.T) {
 	originalFetch := logsFetchWorkflowRunBatch
+	originalFetchRateLimit := fetchRateLimitForHostFunc
 	t.Cleanup(func() {
 		logsFetchWorkflowRunBatch = originalFetch
+		fetchRateLimitForHostFunc = originalFetchRateLimit
 	})
+	fetchRateLimitForHostFunc = func(context.Context, string) (rateLimitResource, error) {
+		return rateLimitResource{}, nil
+	}
 	logsFetchWorkflowRunBatch = func(ctx context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
 		<-ctx.Done()
 		return workflowRunBatch{}, ctx.Err()

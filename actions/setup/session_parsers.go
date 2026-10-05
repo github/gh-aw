@@ -7,7 +7,7 @@ import "embed"
 //
 //go:embed js/session_cli.cjs js/unified_session.cjs js/unified_session_payload.cjs js/unified_session_render.cjs
 //go:embed js/parse_claude_log.cjs js/parse_codex_log.cjs js/parse_copilot_log.cjs js/parse_gemini_log.cjs
-//go:embed js/parse_custom_log.cjs js/parse_pi_log.cjs js/parse_opencode_log.cjs
+//go:embed js/parse_custom_log.cjs js/parse_pi_log.cjs js/parse_opencode_log.cjs js/parse_goose_log.cjs
 //go:embed js/agent_session.cjs js/agent_session_render.cjs js/claude_session.cjs
 //go:embed js/codex_session.cjs js/codex_log_framing.cjs js/copilot_session.cjs
 //go:embed js/gemini_session.cjs
