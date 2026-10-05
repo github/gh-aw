@@ -1,5 +1,5 @@
 {
-  "serverArgs": ["--disable-builtin-mcps", "--no-ask-user", "--allow-tool", "web_fetch"],
+  "serverArgs": ["--disable-builtin-mcps", "--no-ask-user", "--allow-tool", "web_fetch", "--allow-tool", "workflow"],
   "toolConfig": {
     "version": 1,
     "capabilities": {
