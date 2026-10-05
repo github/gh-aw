@@ -227,6 +227,27 @@ Test workflow.
 	}
 }
 
+func TestCompileWorkflowWithDynamicWorkflowsDisabled(t *testing.T) {
+	dir := t.TempDir()
+	workflowPath := filepath.Join(dir, "claude.md")
+	source := `---
+on:
+  workflow_dispatch:
+engine:
+  id: claude
+  dynamic-workflows: false
+strict: false
+---
+Run the workflow.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0644))
+	require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+
+	lock, err := os.ReadFile(filepath.Join(dir, "claude.lock.yml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(lock), "Restore Claude workflows from activation artifact")
+}
+
 func TestPRCheckoutRestoreWithCustomCheckout(t *testing.T) {
 	dir := t.TempDir()
 	source := `---
@@ -330,6 +351,16 @@ func TestClaudeWorkflowRestorePrecedesAgentSteps(t *testing.T) {
 
 	yaml.Reset()
 	data.AI = "copilot"
+	_, err = NewCompiler().generateEngineInstallAndPreAgentSteps(&yaml, data, false)
+	require.NoError(t, err)
+	assert.NotContains(t, yaml.String(), "Restore Claude workflows from activation artifact")
+
+	yaml.Reset()
+	disabled := false
+	data = &WorkflowData{
+		AI:           "claude",
+		EngineConfig: &EngineConfig{DynamicWorkflows: &disabled},
+	}
 	_, err = NewCompiler().generateEngineInstallAndPreAgentSteps(&yaml, data, false)
 	require.NoError(t, err)
 	assert.NotContains(t, yaml.String(), "Restore Claude workflows from activation artifact")

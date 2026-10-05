@@ -14795,6 +14795,11 @@
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
             },
+            "dynamic-workflows": {
+              "type": "boolean",
+              "description": "Whether Claude Code dynamic workflows use the Claude-specific activation artifact restore path and whether the Workflow tool is preapproved. Defaults to true.",
+              "default": true
+            },
             "mcp": {
               "type": "object",
               "description": "Engine-level MCP gateway configuration. Settings here apply to the MCP gateway used by this engine.",
@@ -14987,6 +14992,11 @@
               "type": "boolean",
               "description": "When true, disables automatic loading of context and custom instructions where supported. Copilot uses --no-custom-instructions, Claude uses --bare, and Pi disables context-file, skill, prompt-template, extension, and theme discovery while retaining explicit workflow infrastructure extensions. Codex and Gemini do not support this option and emit a warning. Defaults to false.",
               "default": false
+            },
+            "dynamic-workflows": {
+              "type": "boolean",
+              "description": "Whether Claude Code dynamic workflows use the Claude-specific activation artifact restore path and whether the Workflow tool is preapproved. Defaults to true.",
+              "default": true
             }
           },
           "required": ["runtime"],

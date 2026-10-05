@@ -518,7 +518,7 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		)
 		generateRestoreAmbientFoldersStep(yaml, data)
 	}
-	if engine.GetID() == "claude" && canRestoreClaudeWorkflows(data) {
+	if engine.GetID() == "claude" && data.EngineConfig.DynamicWorkflowsEnabled() && canRestoreClaudeWorkflows(data) {
 		generateRestoreClaudeWorkflowsStep(yaml)
 	}
 

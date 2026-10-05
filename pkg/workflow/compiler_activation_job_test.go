@@ -65,6 +65,23 @@ func TestClaudeWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
 	assert.Less(t, strings.Index(steps, "Save agent config folders for base branch restoration"), strings.Index(steps, "Upload activation artifact"))
 }
 
+func TestClaudeWorkflowsNotSavedWhenDynamicWorkflowsDisabled(t *testing.T) {
+	disabled := false
+	data := &WorkflowData{
+		Name: "Claude workflows",
+		AI:   "claude",
+		EngineConfig: &EngineConfig{
+			ID:               "claude",
+			DynamicWorkflows: &disabled,
+		},
+		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
+	}
+	job, err := NewCompiler().buildActivationJob(data, false, "", "claude.lock.yml")
+	require.NoError(t, err)
+
+	assert.NotContains(t, strings.Join(job.Steps, ""), "Save agent config folders for base branch restoration")
+}
+
 func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

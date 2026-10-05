@@ -373,6 +373,24 @@ func TestClaudeEngineComputeAllowedTools(t *testing.T) {
 	}
 }
 
+func TestClaudeWorkflowToolFollowsDynamicWorkflowsSetting(t *testing.T) {
+	engine := NewClaudeEngine()
+	enabledTools := engine.computeAllowedClaudeToolsStringWithDynamicWorkflows(map[string]any{}, nil, nil, nil, nil, nil, true)
+	disabledTools := engine.computeAllowedClaudeToolsStringWithDynamicWorkflows(map[string]any{}, nil, nil, nil, nil, nil, false)
+
+	if !strings.Contains(enabledTools, "Workflow") {
+		t.Fatalf("Workflow should be approved by default, got %q", enabledTools)
+	}
+	if strings.Contains(disabledTools, "Workflow") {
+		t.Fatalf("Workflow should not be approved when dynamic workflows are disabled, got %q", disabledTools)
+	}
+	for _, tool := range []string{"Read", "Skill", "Task"} {
+		if !strings.Contains(disabledTools, tool) {
+			t.Errorf("existing tool %q should remain approved, got %q", tool, disabledTools)
+		}
+	}
+}
+
 func TestClaudeEngineComputeAllowedToolsDeduplicatesNormalizedBashEntries(t *testing.T) {
 	engine := NewClaudeEngine()
 

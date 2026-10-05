@@ -1312,6 +1312,54 @@ func TestNilEngineConfig(t *testing.T) {
 	}
 }
 
+func TestEngineDynamicWorkflowsFieldExtraction(t *testing.T) {
+	compiler := NewCompiler()
+	tests := []struct {
+		name    string
+		engine  any
+		enabled bool
+	}{
+		{
+			name:    "engine string defaults to enabled",
+			engine:  "claude",
+			enabled: true,
+		},
+		{
+			name: "engine object defaults to enabled",
+			engine: map[string]any{
+				"id": "claude",
+			},
+			enabled: true,
+		},
+		{
+			name: "explicitly enabled",
+			engine: map[string]any{
+				"id":                "claude",
+				"dynamic-workflows": true,
+			},
+			enabled: true,
+		},
+		{
+			name: "explicitly disabled",
+			engine: map[string]any{
+				"id":                "claude",
+				"dynamic-workflows": false,
+			},
+			enabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, config, _ := compiler.ExtractEngineConfig(map[string]any{"engine": tt.engine})
+			if !assert.NotNil(t, config) {
+				return
+			}
+			assert.Equal(t, tt.enabled, config.DynamicWorkflowsEnabled())
+		})
+	}
+}
+
 func TestEngineBareFieldExtraction(t *testing.T) {
 	compiler := NewCompiler()
 
