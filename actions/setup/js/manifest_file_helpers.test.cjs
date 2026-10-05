@@ -267,12 +267,23 @@ index 0000000..abc
       expect(result).toHaveLength(1);
     });
 
-    it("should preserve full escaped paths from quoted headers", () => {
+    it("should decode quoted path escapes", () => {
       const patch = `diff --git "a/foo\\\\bar/config.json" "b/foo\\\\bar/config.json"
 index abc..def 100644
 `;
       const result = extractPathsFromPatch(patch);
-      expect(result).toContain("foo\\\\bar/config.json");
+      expect(result).toContain("foo\\bar/config.json");
+    });
+
+    it("should match exact exclusions for quoted non-ASCII paths", () => {
+      const patch = `diff --git "a/r\\303\\251po/pyproject.toml" "b/r\\303\\251po/pyproject.toml"
+index abc..def 100644
+diff --git "a/lib/foo/pyproject.toml" "b/lib/foo/pyproject.toml"
+index abc..def 100644
+`;
+      const result = checkForManifestFiles(patch, ["pyproject.toml"], ["répo/pyproject.toml"]);
+      expect(result.hasManifestFiles).toBe(true);
+      expect(result.manifestFilesFound).toEqual(["pyproject.toml"]);
     });
   });
 
