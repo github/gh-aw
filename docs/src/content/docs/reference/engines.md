@@ -55,7 +55,7 @@ enforcement, or prove that a provider honored the requested model.
 
 ## Unsupported engine samples
 
-The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI integrations in this repository are **samples only**. They are not officially supported by gh-aw and have no compatibility or maintenance commitment.
+The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, and Pydantic AI integrations in this repository are **samples only**. They are not officially supported by gh-aw and have no compatibility or maintenance commitment.
 
 | Sample engine | Sample definition |
 |---------------|-------------------|
@@ -64,6 +64,7 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI inte
 | [Crush](https://github.com/charmbracelet/crush) | `.github/workflows/shared/crush.md` |
 | [Cursor](https://cursor.com/docs/cli) | `.github/workflows/shared/cursor.md` |
 | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | `.github/workflows/shared/deepseek-harness.md` |
+| [Goose](https://github.com/aaif-goose/goose) | `.github/workflows/shared/goose.md` |
 | [Kiro](https://kiro.dev/) | `.github/workflows/shared/kiro.md` |
 | [Pydantic AI](https://ai.pydantic.dev/) | `pydantic/pydantic-ai/src/pydantic_ai_harness/gh-aw/pydantic.md@main` |
 
@@ -77,6 +78,16 @@ Runtime configuration overlays preserve repository JSON/JSONC settings; OpenCode
 may add a missing `$schema` field. Runtime overrides disable
 automatic updates, sharing, default plugins, and LSP downloads; native npm plugins
 are not gh-aw Agent Plugins. The shared definition documents these limitations.
+
+The Goose sample pins CLI v1.53.0 and verifies its Linux archive checksum. It
+uses Goose's OpenAI-compatible provider through AWF endpoint discovery, native
+authenticated MCP extensions, file-based headless prompts, and JSONL tool and
+usage events. Configuration and session state are temporary and keyring access
+is disabled. Goose has no native gh-aw `web-fetch` tool; supply an MCP tool or
+use the shell explicitly.
+Copilot inference uses `${{ github.token }}` with
+`permissions: { copilot-requests: write }`; no PAT or `COPILOT_GITHUB_TOKEN`
+secret is required.
 
 ## Which engine should I choose?
 
