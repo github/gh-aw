@@ -21,16 +21,8 @@ set +o histexpand
 
 set -euo pipefail
 
-# Ignore mask values shorter than 4 characters because GHES may over-mask
-# subsequent logs when receiving very short ::add-mask:: entries.
-MIN_MASK_LENGTH=4
-
-emit_mask() {
-  local _value="${1:-}"
-  [ -z "$_value" ] && return
-  [ "${#_value}" -lt "$MIN_MASK_LENGTH" ] && return
-  echo '::add-mask::'"$_value"
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/mask_otlp_common.sh"
 
 _attrs="${GH_AW_OTLP_ATTRIBUTES:-}"
 [ -z "$_attrs" ] && exit 0
@@ -60,5 +52,7 @@ mapfile -t _values < <(
 )
 
 for _val in "${_values[@]}"; do
-  emit_mask "$_val"
+  [ -z "$_val" ] && continue
+  [ "${#_val}" -lt "$MIN_MASK_LENGTH" ] && continue
+  echo '::add-mask::'"$_val"
 done
