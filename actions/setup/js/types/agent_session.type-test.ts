@@ -1,6 +1,6 @@
-import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent, UnifiedSessionEvent } from "./agent_session";
+import type { CoreSessionEvent, DetectionResultEvent, SessionEventDataMap, ToolExecutionCompleteEvent } from "./agent_session";
 import { createSessionEvent } from "../agent_session.cjs";
-import type { UnifiedSessionEventDataMap } from "./unified_session";
+import type { UnifiedSessionEvent, UnifiedSessionEventDataMap } from "./unified_session";
 
 const messages: CoreSessionEvent[] = [
   { type: "session.init", data: { sourceEngine: "copilot", tools: [] } },

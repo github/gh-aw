@@ -14,7 +14,7 @@
     "ajv": "^8.17.1",
     "minimatch": ">=10.2.6",
     "prettier": "^3.9.8",
-    "ts-json-schema-generator": "^2.4.0",
+    "ts-json-schema-generator": "2.4.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"

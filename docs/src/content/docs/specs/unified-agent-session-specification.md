@@ -384,8 +384,8 @@ values where the merger preserves source-specific values rather than coercing th
 | [Unified session schema](/gh-aw/schemas/unified-session.schema.json) | JSON-array schema for essential payloads and provenance, requiring the leading version-1 collector header. |
 | `make session-schemas` | Regenerate both checked-in JSON Schema Draft-07 files using `ts-json-schema-generator` and deterministic formatting. |
 | `make check-session-schemas` | Regenerate in memory and fail on missing or byte-different schemas; never rewrite files. |
-| `npm --prefix actions/setup/js run session:validate -- agent agent-session.jsonl` | Validate a canonical source trace. |
-| `npm --prefix actions/setup/js run session:validate -- unified aw_session.jsonl` | Validate the unified artifact, including compact JSONL framing, provenance paths, ordering, and execution singleton semantics. |
+| `node actions/setup/js/scripts/validate_session.cjs agent agent-session.jsonl` | Validate a canonical source trace. |
+| `node actions/setup/js/scripts/validate_session.cjs unified aw_session.jsonl` | Validate the unified artifact, including compact JSONL framing, provenance paths, ordering, and execution singleton semantics. |
 
 The validator also accepts JSON arrays: a `.json` filename selects array input,
 or a final `json`/`jsonl` argument selects the format explicitly. JSONL schemas
@@ -393,6 +393,8 @@ describe the logical array of decoded records, not the line framing itself.
 Each schema is self-contained and can be used by standard Draft-07 validators.
 The local validator reports record counts on stdout and structural diagnostics
 on stderr, exits nonzero on failure, and does not print source payloads.
+Validation reads the complete input and materializes its events in memory, so
+very large session files may require substantial memory.
 The existing `session_cli.cjs markdown` mode supplies a privacy-preserving
 rendered view; schema validation does not replace rendering or redaction.
 

@@ -80,7 +80,7 @@ async function generateSessionSchemas() {
     /** @type {Schema} */
     const schema = {
       $schema: "http://json-schema.org/draft-07/schema#",
-      $id: `https://github.github.io/gh-aw/schemas/${filename}`,
+      $id: `https://github.github.com/gh-aw/schemas/${filename}`,
       title: kind === "agent" ? "Canonical agent session" : "Unified agent session file",
       description: "Generated from actions/setup/js/types/{agent_session,unified_session}.d.ts. Run make session-schemas; do not edit by hand.",
       type: "array",

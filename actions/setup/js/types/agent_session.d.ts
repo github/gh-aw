@@ -223,5 +223,3 @@ export interface SessionProvenance {
   /** Preserves a source event's preexisting provenance field. */
   native?: unknown;
 }
-
-export type { UnifiedSessionEvent, UnifiedSession } from "./unified_session";

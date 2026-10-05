@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.github.io/gh-aw/schemas/agent-session.schema.json",
+  "$id": "https://github.github.com/gh-aw/schemas/agent-session.schema.json",
   "title": "Canonical agent session",
   "description": "Generated from actions/setup/js/types/{agent_session,unified_session}.d.ts. Run make session-schemas; do not edit by hand.",
   "type": "array",
