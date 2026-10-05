@@ -218,42 +218,51 @@ describe("pi_models_json.cjs", () => {
     });
 
     it("rejects a chat-completions override for a Responses-only model", () => {
+      const logs = [];
       expect(() =>
         piModelsJson.resolvePiApiForModel({
           provider: "github",
           modelId: "gpt-5.5",
           modelsJson: { providers: { "github-copilot": { models: { "gpt-5.5": { wire_api: "responses" } } } } },
           overrideApi: "openai-completions",
+          logger: message => logs.push(message),
         })
       ).toThrow('Pi model "gpt-5.5" requires the OpenAI Responses API');
+      expect(logs).toContain("warning: Pi model API override conflicts with Responses-only model (model=gpt-5.5, override_api=openai-completions)");
     });
   });
 
   describe("validatePiModelAvailability", () => {
     it("rejects a model absent from a completed reflected endpoint inventory", () => {
+      const logs = [];
       expect(() =>
         piModelsJson.validatePiModelAvailability({
           provider: "github",
           modelId: "gpt-5.5",
+          logger: message => logs.push(message),
           reflectData: {
             models_fetch_complete: true,
             endpoints: [{ provider: "copilot", configured: true, models: ["gpt-4o"] }],
           },
         })
       ).toThrow('Pi model "gpt-5.5" is not advertised by the configured copilot proxy endpoint');
+      expect(logs).toContain("warning: awf-reflect model availability check failed (provider=copilot, model=gpt-5.5)");
     });
 
     it("does not reject when reflected model discovery is incomplete", () => {
+      const logs = [];
       expect(() =>
         piModelsJson.validatePiModelAvailability({
           provider: "github",
           modelId: "gpt-5.5",
+          logger: message => logs.push(message),
           reflectData: {
             models_fetch_complete: false,
             endpoints: [{ provider: "copilot", configured: true, models: [] }],
           },
         })
       ).not.toThrow();
+      expect(logs).toContain("awf-reflect: model availability check skipped (model discovery incomplete)");
     });
   });
 
@@ -326,6 +335,8 @@ describe("pi_models_json.cjs", () => {
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].api).toBe("openai-responses");
+      expect(stderrOutput.join("")).toContain("awf-reflect: model availability confirmed (provider=copilot, model=gpt-5.5)");
+      expect(stderrOutput.join("")).toContain("resolved model API=openai-responses");
     });
 
     it("fails before generating models.json when a completed reflected inventory excludes the model", async () => {

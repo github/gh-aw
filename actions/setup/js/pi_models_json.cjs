@@ -155,16 +155,30 @@ function resolvePiApiForProvider(provider) {
 /**
  * Fail before inference when a completed proxy model inventory excludes the selected model.
  *
- * @param {{ provider: string, modelId: string, reflectData?: any }} options
+ * @param {{ provider: string, modelId: string, reflectData?: any, logger?: (msg: string) => void }} options
  */
 function validatePiModelAvailability(options) {
-  const { provider, modelId, reflectData } = options;
-  if (!reflectData || reflectData.models_fetch_complete !== true) return;
+  const { provider, modelId, reflectData, logger = () => {} } = options;
+  if (!reflectData) {
+    logger("awf-reflect: model availability check skipped (reflection data unavailable)");
+    return;
+  }
+  if (reflectData.models_fetch_complete !== true) {
+    logger("awf-reflect: model availability check skipped (model discovery incomplete)");
+    return;
+  }
 
   const normalizedProvider = normalizeReflectProviderName(provider);
   const aliases = REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
   const endpoint = reflectData.endpoints?.find(endpoint => endpoint?.configured === true && aliases.has(normalizeReflectProviderName(endpoint.provider)));
-  if (!endpoint || !Array.isArray(endpoint.models)) return;
+  if (!endpoint) {
+    logger(`awf-reflect: model availability check skipped (no configured endpoint for provider=${normalizedProvider})`);
+    return;
+  }
+  if (!Array.isArray(endpoint.models)) {
+    logger(`awf-reflect: model availability check skipped (endpoint=${endpoint.provider} has no model inventory)`);
+    return;
+  }
 
   const normalizedModelId = modelId.split("?")[0].toLowerCase();
   const advertisedModels = endpoint.models.map(model => {
@@ -172,31 +186,38 @@ function validatePiModelAvailability(options) {
     if (model && typeof model === "object") return String(model.id || model.name || "").toLowerCase();
     return "";
   });
-  if (!advertisedModels.includes(normalizedModelId)) {
-    throw new Error(`Pi model "${modelId}" is not advertised by the configured ${endpoint.provider} proxy endpoint; choose a model listed by AWF /reflect`);
+  if (advertisedModels.includes(normalizedModelId)) {
+    logger(`awf-reflect: model availability confirmed (provider=${endpoint.provider}, model=${modelId})`);
+    return;
   }
+  logger(`warning: awf-reflect model availability check failed (provider=${endpoint.provider}, model=${modelId})`);
+  throw new Error(`Pi model "${modelId}" is not advertised by the configured ${endpoint.provider} proxy endpoint; choose a model listed by AWF /reflect`);
 }
 
 /**
  * Resolve a model-specific Pi API from model metadata, rejecting an explicit
  * chat-completions override when the model only supports the Responses API.
  *
- * @param {{ provider: string, modelId: string, model?: any, modelsJson?: any, overrideApi?: string }} options
+ * @param {{ provider: string, modelId: string, model?: any, modelsJson?: any, overrideApi?: string, logger?: (msg: string) => void }} options
  * @returns {string}
  */
 function resolvePiApiForModel(options) {
-  const { provider, modelId, model, modelsJson, overrideApi } = options;
+  const { provider, modelId, model, modelsJson, overrideApi, logger = () => {} } = options;
   const catalogProvider = ["github", "copilot", "github-copilot"].includes(provider) ? "github-copilot" : provider;
   const catalogEntry = getCatalogModelEntry(modelsJson, modelId, catalogProvider);
   const wireApi = String(catalogEntry?.wire_api || catalogEntry?.wireApi || "")
     .toLowerCase()
     .trim();
   const requiresResponses = model?.api === "openai-responses" || wireApi === "responses";
+  logger(`Pi model API metadata (provider=${provider}, model=${modelId}, catalog_wire_api=${wireApi || "(unset)"}, catalog_api=${model?.api || "(unset)"}, override_api=${overrideApi || "(unset)"})`);
   if (requiresResponses && overrideApi && overrideApi !== "openai-responses") {
+    logger(`warning: Pi model API override conflicts with Responses-only model (model=${modelId}, override_api=${overrideApi})`);
     throw new Error(`Pi model "${modelId}" requires the OpenAI Responses API, but engine.config.model.api is "${overrideApi}"`);
   }
-  if (requiresResponses) return "openai-responses";
-  return overrideApi || model?.api || resolvePiApiForProvider(provider);
+  const api = requiresResponses ? "openai-responses" : overrideApi || model?.api || resolvePiApiForProvider(provider);
+  const source = overrideApi ? "engine.config.model.api" : model?.api ? "Pi model catalog" : wireApi === "responses" ? "AWF model catalog" : "provider default";
+  logger(`resolved model API=${api} (provider=${provider}, model=${modelId}, source=${source})`);
+  return api;
 }
 
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson }} [options] */
@@ -229,7 +250,7 @@ async function main(options = {}) {
     }
   }
 
-  validatePiModelAvailability({ provider, modelId, reflectData });
+  validatePiModelAvailability({ provider, modelId, reflectData, logger });
   const { baseUrl, source } = resolveGatewayBaseUrl({ provider, fallbackPort, reflectData, logger });
   logger(`resolved gateway baseUrl=${baseUrl} (source=${source}, provider=${provider}, fallbackPort=${fallbackPort})`);
 
@@ -244,7 +265,7 @@ async function main(options = {}) {
     const runtime = await sdk.ModelRuntime.create({ modelsPath: null });
     catalogModel = runtime.getModel(nativeProvider, modelId.split("?")[0]);
   }
-  let api = resolvePiApiForModel({ provider, modelId, model: catalogModel, modelsJson, overrideApi: overrides.api });
+  let api = resolvePiApiForModel({ provider, modelId, model: catalogModel, modelsJson, overrideApi: overrides.api, logger });
   logger(`resolved gateway api=${api} (provider=${provider}, model=${modelId})`);
   const metadata = {};
   if (catalogModel) {
