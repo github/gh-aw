@@ -526,7 +526,7 @@ test("publisher rejects arbitrary paths, duplicate calls, symlinks, oversized an
     await assert.rejects(publish({ context: { repo: { owner: "github", repo: "gh-aw" } } }), /1 MiB/);
     fs.unlinkSync(planFile);
     fs.symlinkSync(filename, planFile);
-    await assert.rejects(publish({ context: { repo: { owner: "github", repo: "gh-aw" } } }), /regular JSON/);
+    await assert.rejects(publish({ context: { repo: { owner: "github", repo: "gh-aw" } } }), { code: "ELOOP" });
     fs.unlinkSync(planFile);
     await assert.rejects(publish({ context: { repo: { owner: "github", repo: "gh-aw" } } }), /ENOENT/);
   });
