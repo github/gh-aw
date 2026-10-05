@@ -45,12 +45,6 @@ engine:
         copilot: api.githubcopilot.com
         anthropic: api.anthropic.com
         openai: api.openai.com
-    config-file:
-      path: .aider.conf.yml
-      step-name: Write Aider Config
-      content: |-
-        openai-api-base: http://172.30.0.30:10002
-        openai-api-key: awf-copilot-proxy
     execution:
       command-name: aider
       args:
@@ -65,15 +59,8 @@ engine:
         - --no-stream
         - --no-fancy-input
         - --analytics-disable
-        - --openai-api-base
-        - http://172.30.0.30:10002
-        - --set-env
-        - OPENAI_BASE_URL=http://172.30.0.30:10002
-        - --openai-api-key
-        - awf-copilot-proxy
       step-name: Execute Aider CLI
       model-env-var: AIDER_MODEL
-      model-env-provider-prefix: openai
       provider-env-mode: universal-llm-consumer
       write-timestamp: true
       env:
@@ -81,43 +68,111 @@ engine:
         AIDER_CHECK_UPDATE: "false"
         AIDER_ANALYTICS_DISABLE: "true"
     harness-script: |
-      const { spawnSync } = require("child_process");
+      const { readFileSync } = require("fs");
       const { join } = require("path");
       const { homedir } = require("os");
+      const { runProcess } = require("./process_runner.cjs");
+      const { fetchAWFReflect, deriveBaseUrlFromModelsURL, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...commandArgs] = process.argv.slice(2);
+      const log = message => process.stderr.write(`[aider-harness] ${message}\n`);
 
-      const fail = (result, output, action) => {
-        if (result.error) throw result.error;
-        if (result.status !== 0) {
-          const detail = result.signal ? `signal ${result.signal}` : `exit code ${result.status ?? "unknown"}`;
-          throw new Error(`${action} failed with ${detail}`);
+      const main = async () => {
+        if (!command) throw new Error("Aider command is required");
+        const selectedModel = process.env.AIDER_MODEL;
+        const separator = selectedModel?.indexOf("/") ?? -1;
+        if (separator <= 0 || separator === selectedModel.length - 1) {
+          throw new Error("AIDER_MODEL must use provider/model format");
         }
-        if (/\blitellm\.\w*Error:/.test(output)) {
-          throw new Error(`${action} reported a LiteLLM error`);
+        const provider = process.env.GH_AW_LLM_PROVIDER;
+        if (!["github", "anthropic", "openai"].includes(provider)) {
+          throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
         }
+        const isAnthropic = provider === "anthropic";
+        let model = selectedModel.slice(separator + 1);
+        if (provider === "github") {
+          model = model.replace(/^(claude-(?:haiku|sonnet|opus)-\d+)-(\d+)$/, "$1.$2");
+        }
+        const promptFile = process.env.GH_AW_PROMPT;
+        if (!promptFile) throw new Error("GH_AW_PROMPT is not set");
+        readFileSync(promptFile, "utf8");
+
+        let baseURL;
+        let apiKey;
+        if (process.env.AWF_REFLECT_ENABLED === "1") {
+          const result = await fetchAWFReflect({ logger: log });
+          if (!result.ok || !result.reflectData) {
+            throw new Error("Unable to discover the Aider LLM endpoint from /reflect");
+          }
+          const aliases = REFLECT_PROVIDER_ALIASES[provider];
+          const endpoint = result.reflectData.endpoints?.find(
+            entry => entry?.configured === true && aliases.has(normalizeReflectProviderName(entry.provider))
+          );
+          if (!endpoint || typeof endpoint.models_url !== "string") {
+            throw new Error(`No configured /reflect models endpoint found for provider ${provider}`);
+          }
+          baseURL = deriveBaseUrlFromModelsURL(endpoint.models_url);
+          apiKey = "awf-proxy";
+        } else {
+          if (provider === "github") throw new Error("Aider Copilot routing requires the AWF sandbox");
+          baseURL = isAnthropic ? process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com" : process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+          apiKey = isAnthropic ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY || process.env.CODEX_API_KEY;
+          if (!apiKey) throw new Error("Aider provider API key is required without AWF");
+        }
+        const localBin = join(homedir(), ".local", "bin");
+        const env = {
+          ...process.env,
+          PATH: `${localBin}:${process.env.PATH || ""}`,
+          AIDER_MODEL: `${isAnthropic ? "anthropic" : "openai"}/${model}`,
+        };
+        delete env.GITHUB_COPILOT_TOKEN;
+        delete env.COPILOT_GITHUB_TOKEN;
+        delete env.CODEX_API_KEY;
+        if (isAnthropic) {
+          // LiteLLM 1.81.10 appends /v1/messages to the Anthropic base URL.
+          const anthropicBaseURL = baseURL.replace(/\/+$/, "").replace(/\/v1$/, "");
+          env.ANTHROPIC_API_BASE = anthropicBaseURL;
+          env.ANTHROPIC_BASE_URL = anthropicBaseURL;
+          env.ANTHROPIC_API_KEY = apiKey;
+          env.AIDER_ANTHROPIC_API_KEY = apiKey;
+          delete env.OPENAI_API_KEY;
+          delete env.AIDER_OPENAI_API_KEY;
+          delete env.AIDER_OPENAI_API_BASE;
+        } else {
+          env.OPENAI_API_BASE = baseURL;
+          env.OPENAI_BASE_URL = baseURL;
+          env.AIDER_OPENAI_API_BASE = baseURL;
+          env.OPENAI_API_KEY = apiKey;
+          env.AIDER_OPENAI_API_KEY = apiKey;
+          delete env.ANTHROPIC_API_KEY;
+          delete env.AIDER_ANTHROPIC_API_KEY;
+        }
+        let reportedError = false;
+        const observeLine = line => {
+          if (/\blitellm\.\w*Error:/.test(line)) reportedError = true;
+        };
+        const result = await runProcess({
+          command,
+          args: [...commandArgs, "--message-file", promptFile],
+          logArgs: ["(configured arguments)", "--message-file", "(prompt file)"],
+          attempt: 0,
+          log,
+          env,
+          maxCollectedOutputBytes: 1024 * 1024,
+          onStdoutLine: observeLine,
+          onStderrLine: observeLine,
+        });
+        if (result.exitCode !== 0) {
+          process.exitCode = result.exitCode;
+          throw new Error(`Aider execution failed with exit code ${result.exitCode}`);
+        }
+        if (reportedError) throw new Error("Aider execution reported a LiteLLM error");
       };
 
-      const localBin = join(homedir(), ".local", "bin");
-      const env = { ...process.env, PATH: `${localBin}:${process.env.PATH || ""}` };
-      delete env.GITHUB_COPILOT_TOKEN;
-      env.AIDER_MODEL = env.AIDER_MODEL?.replace(
-        /^(openai\/claude-(?:haiku|sonnet|opus)-\d+)-(\d+)$/,
-        "$1.$2"
-      );
-
-      const promptFile = process.env.GH_AW_PROMPT;
-      if (!promptFile) {
-        throw new Error("GH_AW_PROMPT is not set");
-      }
-
-      const result = spawnSync(command, [...commandArgs, "--message-file", promptFile], {
-        encoding: "utf8",
-        env,
+      main().catch(error => {
+        log(error instanceof Error ? error.message : String(error));
+        if (!process.exitCode) process.exitCode = 1;
       });
-      process.stdout.write(result.stdout || "");
-      process.stderr.write(result.stderr || "");
-      fail(result, `${result.stdout || ""}\n${result.stderr || ""}`, "Aider execution");
 ---
 
 ## Aider execution constraints
@@ -137,7 +192,7 @@ single reply is the whole run. Plan for that:
 <!--
 # Aider CLI
 
-Shared engine definition for [Aider](https://github.com/Aider-AI/aider), the
+Unsupported sample engine definition for [Aider](https://github.com/Aider-AI/aider), the
 open-source AI pair programming CLI ([docs](https://aider.chat/docs/)).
 Import this file and set `engine: id: aider` to use it:
 
@@ -150,11 +205,18 @@ imports:
 ```
 
 `model` must use `provider/model` format. Supported providers are `copilot`,
-`anthropic`, and `openai`. Requests are routed through the AWF proxy, so the
-model name is rewritten to Aider's `openai/<model>` LiteLLM form and the
-generated `.aider.conf.yml` configures the OpenAI-compatible proxy endpoint.
+`anthropic`, `openai`, and `codex` (an alias for `openai`). The sample pins
+`aider-chat==0.86.2`, the latest stable PyPI package (GitHub's latest release
+entry still names 0.86.0).
+Requests use the selected provider's configured AWF `/reflect` endpoint,
+preserving its API path prefix. Copilot and OpenAI use Aider's
+`openai/<model>` LiteLLM form; Anthropic uses native `anthropic/<model>` requests.
+Endpoint and authentication settings are supplied through environment variables,
+without overwriting repository `.aider.conf.yml` settings.
 Copilot Claude aliases such as `claude-sonnet-4-5` are normalized to the dotted
 model IDs exposed by the proxy, such as `claude-sonnet-4.5`.
+Without AWF, OpenAI and Anthropic use their provider API key and optional
+`OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL`. Copilot requires AWF.
 
 Aider runs in scripting mode: the generated prompt file is passed with
 `--message-file` and all confirmations are auto-accepted (`--yes-always`).
@@ -163,6 +225,8 @@ model names are unknown to Aider and would otherwise fall back to the `whole`
 format, which rejects ```bash blocks and cannot run shell commands.
 Aider reports some LiteLLM request failures with exit code 0, so the harness
 also detects those errors in its output and fails the workflow.
+Output is forwarded as it arrives, without Node's synchronous output-buffer
+limit, and child exit codes and termination signals are preserved.
 Aider has no MCP client, so the compiler exposes MCP-backed tools through
 `cli-proxy` and GitHub access through `gh-proxy`. Both proxies are enabled
 automatically and cannot be disabled for this engine.
