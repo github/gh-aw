@@ -332,6 +332,16 @@ func TestExtractImportsFromText_ObjectFormPathImport(t *testing.T) {
 		"Object-form path: import path must be extracted")
 }
 
+func TestRuntimeImportHashWorkspaceRoot(t *testing.T) {
+	t.Parallel()
+	for _, baseDir := range []string{".github", ".github/workflows", ".github/workflows/shared", "./.github/workflows"} {
+		t.Run(baseDir, func(t *testing.T) {
+			assert.Equal(t, ".", runtimeImportHashWorkspaceRoot(filepath.FromSlash(baseDir)))
+			assert.Equal(t, []string{filepath.FromSlash(".github/prompts/context.md")}, runtimeImportHashCandidatePaths(".github/prompts/context.md", filepath.FromSlash(baseDir)))
+		})
+	}
+}
+
 func TestCollectRuntimeImportTemplateExpressionsTopologies(t *testing.T) {
 	tempDir := t.TempDir()
 	workflowDir := filepath.Join(tempDir, ".github", "workflows")

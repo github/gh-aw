@@ -766,7 +766,10 @@ func runtimeImportHashCandidatePaths(importPath, baseDir string) []string {
 }
 
 func runtimeImportHashWorkspaceRoot(baseDir string) string {
-	normalized := filepath.ToSlash(baseDir)
+	normalized := filepath.ToSlash(filepath.Clean(baseDir))
+	if normalized == ".github" || strings.HasPrefix(normalized, constants.GithubDir) {
+		return "."
+	}
 	if before, _, ok := strings.Cut(normalized, "/.github/"); ok {
 		return filepath.FromSlash(before)
 	}

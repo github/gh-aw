@@ -173,6 +173,24 @@ engine: copilot`;
       expect(extractAllTemplateExpressions("A $" + "{{ needs.a.outputs.x }} B $" + "{{ vars.CFG }}")).toEqual(["$" + "{{ needs.a.outputs.x }}", "$" + "{{ vars.CFG }}"]);
     });
 
+    it("should hash runtime imports identically for relative and absolute workflow paths", async () => {
+      const content = "---\nengine: copilot\n---\n{{#runtime-import .github/prompts/relative-context.md}}";
+      const prompt = "Use ${{ github.repository }}.";
+      const files = new Map([
+        [".github/workflows/relative-workflow.md", content],
+        [".github/prompts/relative-context.md", prompt],
+        ["/repo/.github/workflows/relative-workflow.md", content],
+        ["/repo/.github/prompts/relative-context.md", prompt],
+      ]);
+      const fileReader = async filePath => {
+        if (!files.has(filePath)) throw new Error(`File not found: ${filePath}`);
+        return files.get(filePath);
+      };
+      const relativeHash = await computeFrontmatterHash(".github/workflows/relative-workflow.md", { fileReader });
+      const absoluteHash = await computeFrontmatterHash("/repo/.github/workflows/relative-workflow.md", { fileReader });
+      expect(relativeHash).toBe(absoluteHash);
+    });
+
     it("should include the runtime-import expression set in the frontmatter hash", async () => {
       const workflowPath = "/repo/.github/workflows/runtime-import-hash.md";
       const promptPath = "/repo/.github/prompts/runtime.md";

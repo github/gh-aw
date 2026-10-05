@@ -176,7 +176,7 @@ model: claude-sonnet-4
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("E009"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("CONFIG_HASH_MISMATCH"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter has changed"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Source 'test-owner/test-repo/.github/workflows/test.md@abc123' has a frontmatter hash mismatch"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("gh aw compile"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
@@ -220,7 +220,7 @@ model: claude-sonnet-4
       await main();
 
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter has changed"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
@@ -491,7 +491,7 @@ model: claude-sonnet-4
       await main();
 
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter has changed"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
@@ -695,7 +695,7 @@ engine: copilot
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("local filesystem fallback"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("frontmatter has changed"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Source 'source-org/source-repo/.github/workflows/test.md@v1' has a frontmatter hash mismatch"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
@@ -1541,6 +1541,11 @@ on: push`;
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Body hashes differ"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Source 'test-owner/test-repo/.github/workflows/test.md@abc123' has a body hash mismatch"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("body hash mismatch"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(`Recomputed body hash: \`${differentBodyHash.substring(0, 12)}...`));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(`Stored hash: \`${testWorkflowBodyHash.substring(0, 12)}...`));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("stale_lock_file_failed", "true");
     });
 
     it("should skip body hash check when lock file has no body hash (backward compat)", async () => {
@@ -1642,6 +1647,8 @@ on: push`;
 
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Body hashes differ"));
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("body hash mismatch"));
+        expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(`Recomputed body hash: \`${differentBodyHash.substring(0, 12)}...`));
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
         delete process.env.GITHUB_WORKSPACE;

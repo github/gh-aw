@@ -472,20 +472,35 @@ func isCompiledUpToDateWithCache(workflowPath, lockFilePath string, cache *parse
 
 	metadata, _, err := workflow.ExtractMetadataFromLockFile(string(lockContent))
 	if err != nil || metadata == nil || metadata.FrontmatterHash == "" {
-		// Legacy lock file without a hash — assume compiled to avoid false negatives
-		return "Yes"
+		return "No"
 	}
 
 	currentHash, err := parser.ComputeFrontmatterHashFromFile(workflowPath, cache)
 	if err != nil {
 		statusLog.Printf("Failed to compute frontmatter hash for %s: %v", workflowPath, err)
-		return "Yes"
+		return "No"
 	}
 
-	if currentHash == metadata.FrontmatterHash {
-		return "Yes"
+	if currentHash != metadata.FrontmatterHash {
+		return "No"
 	}
-	return "No"
+	if metadata.BodyHash != "" {
+		content, err := os.ReadFile(workflowPath)
+		if err != nil {
+			return "No"
+		}
+		result, err := parser.ExtractFrontmatterFromContent(string(content))
+		if err != nil {
+			return "No"
+		}
+		if on, ok := result.Frontmatter["on"].(map[string]any); ok && on["stale-check"] == "full" {
+			bodyHash, err := parser.ComputeBodyHashFromFile(workflowPath)
+			if err != nil || bodyHash != metadata.BodyHash {
+				return "No"
+			}
+		}
+	}
+	return "Yes"
 }
 
 // fetchLatestRunsByRef fetches the latest workflow run for each workflow from a specific ref (branch or tag)

@@ -537,7 +537,10 @@ function runtimeImportHashCandidatePaths(importPath, baseDir) {
  * @returns {string}
  */
 function runtimeImportHashWorkspaceRoot(baseDir) {
-  const normalized = baseDir.replace(/\\/g, "/");
+  const normalized = path.normalize(baseDir).replace(/\\/g, "/");
+  if (normalized === ".github" || normalized.startsWith(".github/")) {
+    return ".";
+  }
   const markerIndex = normalized.indexOf("/.github/");
   if (markerIndex >= 0) {
     return normalized.substring(0, markerIndex);
