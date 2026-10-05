@@ -32,18 +32,20 @@ function getCustomValidationFailureDetail({ stdout, stderr }) {
 }
 
 async function setPushRepoMemoryFailure(message) {
+  const safeMessage = redactFailureSummary(message);
+  core.info(`Repo-memory push failed: ${safeMessage}`);
   const summary = core.summary;
   if (summary && typeof summary.addRaw === "function" && typeof summary.write === "function") {
-    const safeMessage = redactFailureSummary(message).replace(/```/g, "``\u200b`");
+    const safeSummaryMessage = safeMessage.replace(/```/g, "``\u200b`");
     try {
-      await summary.addRaw(`### Repo-memory push failed\n\n\`\`\`text\n${safeMessage}\n\`\`\`\n`).write();
+      await summary.addRaw(`### Repo-memory push failed\n\n\`\`\`text\n${safeSummaryMessage}\n\`\`\`\n`).write();
     } catch (error) {
       if (typeof core.warning === "function") {
-        core.warning(`Failed to write repo-memory failure summary: ${getErrorMessage(error)}`);
+        core.warning(`Failed to write repo-memory failure summary: ${redactFailureSummary(getErrorMessage(error))}`);
       }
     }
   }
-  return core.setFailed(message);
+  return core.setFailed(safeMessage);
 }
 
 /**
@@ -834,10 +836,10 @@ async function main() {
       return;
     }
     if (customValidation.stdout) {
-      core.info(`Custom repo-memory validation stdout:\n${customValidation.stdout}`);
+      core.info(`Custom repo-memory validation stdout:\n${redactFailureSummary(customValidation.stdout)}`);
     }
     if (customValidation.stderr) {
-      core.info(`Custom repo-memory validation stderr:\n${customValidation.stderr}`);
+      core.info(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
     }
     core.info("Custom repo-memory validation passed.");
   }
@@ -984,4 +986,5 @@ module.exports = {
   pushRepoMemoryChangesWithRetry,
   reconcileRepoMemoryRetry,
   redactFailureSummary,
+  setPushRepoMemoryFailure,
 };

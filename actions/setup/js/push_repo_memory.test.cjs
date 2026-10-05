@@ -12,9 +12,10 @@ import {
   isUntrustedLedgerArtifact,
   pushRepoMemoryChangesWithRetry,
   redactFailureSummary,
+  setPushRepoMemoryFailure,
 } from "./push_repo_memory.cjs";
 
-const mockCore = { info: vi.fn() };
+const mockCore = { info: vi.fn(), setFailed: vi.fn() };
 global.core = mockCore;
 
 describe("push_repo_memory.cjs - untrusted ledger artifacts", () => {
@@ -41,6 +42,25 @@ describe("push_repo_memory.cjs - validation failure details", () => {
     process.env[environmentVariable] = secret;
     try {
       expect(redactFailureSummary(`Failure includes ${secret}`)).toBe("Failure includes [REDACTED]");
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env[environmentVariable];
+      } else {
+        process.env[environmentVariable] = previousSecret;
+      }
+    }
+  });
+
+  it("logs and reports failures without configured credentials", async () => {
+    const environmentVariable = "GITHUB_APP_TOKEN";
+    const secret = "github-app-token-secret";
+    const previousSecret = process.env[environmentVariable];
+    process.env[environmentVariable] = secret;
+    try {
+      await setPushRepoMemoryFailure(`Push failed with ${secret}`);
+
+      expect(mockCore.info).toHaveBeenCalledWith("Repo-memory push failed: Push failed with [REDACTED]");
+      expect(mockCore.setFailed).toHaveBeenCalledWith("Push failed with [REDACTED]");
     } finally {
       if (previousSecret === undefined) {
         delete process.env[environmentVariable];
@@ -2039,7 +2059,8 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
 
         expect(pushSignedCommitsFn).toHaveBeenCalledTimes(1);
         expect(pushed).toBe(false);
-        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected with not-a-real-token");
+        expect(setFailed).toHaveBeenCalledWith("Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
+        expect(global.core.info).toHaveBeenCalledWith("Repo-memory push failed: Failed to push changes: ERR_VALIDATION: merge commit detected with [REDACTED]");
         expect(summaryContents.join("\n")).toContain("ERR_VALIDATION: merge commit detected with [REDACTED]");
         expect(summaryContents.join("\n")).not.toContain("not-a-real-token");
         expect(isDeterministicPushValidationError("ERR_VALIDATION: policy violation")).toBe(true);
