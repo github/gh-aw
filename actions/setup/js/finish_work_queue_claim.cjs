@@ -182,7 +182,9 @@ async function reconcileWorkerClaim(options = {}) {
   const results = [];
   for (const item of workers) {
     const outcome = completeBatch ? finishIntent.get(item.claim_id) : "cancelled";
-    results.push(await reconcileSingleClaim(item, outcome, options, await readLog({ githubClient, owner, repo, core: coreApi }), attempt, coreApi, githubClient, owner, repo, readLog));
+    // Queue attempts may complete only one work item, so batch completions need claim-scoped identities.
+    const claimAttempt = `${attempt}/claim/${encodeURIComponent(item.claim_id)}`;
+    results.push(await reconcileSingleClaim(item, outcome, options, await readLog({ githubClient, owner, repo, core: coreApi }), claimAttempt, coreApi, githubClient, owner, repo, readLog));
   }
   const completed = new Set(workers.filter((_, index) => results[index].authorized).map(item => item.claim_id));
   const allCompleted = completed.size === workers.length;
@@ -197,6 +199,9 @@ async function main(options = {}) {
     const result = await reconcileWorkerClaim(options);
     coreApi.setOutput("authorized", String(result.authorized));
     coreApi.setOutput("all_authorized", String(result.allAuthorized ?? result.authorized));
+    const outputPath = options.agentOutputPath || `${TMP_GH_AW_PATH}/${AGENT_OUTPUT_FILENAME}`;
+    const items = result.authorized && fs.existsSync(outputPath) ? JSON.parse(fs.readFileSync(outputPath, "utf8")).items : [];
+    coreApi.setOutput("output_types", [...new Set(items.map(item => item.type))].join(","));
     coreApi.info(`Work queue claim reconciliation: ${result.status}`);
     await coreApi.summary.addRaw(renderSummary(result.status)).write();
     return result;

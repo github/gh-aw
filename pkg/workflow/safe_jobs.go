@@ -334,6 +334,9 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 
 		// Safe-jobs depend on agent job
 		job.Needs = append(job.Needs, string(constants.AgentJobName))
+		if isWorkQueueEnabled(data) {
+			job.Needs = append(job.Needs, string(constants.SafeOutputsJobName))
+		}
 
 		// When threat detection is enabled, safe-jobs also depend on the detection job
 		// so that the condition can gate on needs.detection.result == 'success'
@@ -377,6 +380,9 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 				buildDetectionPassedCondition(),
 			)
 		}
+		if isWorkQueueEnabled(data) {
+			baseCondition = BuildAnd(baseCondition, buildWorkQueueSafeOutputCondition(normalizedJobName, true))
+		}
 
 		if jobConfig.If != "" {
 			// If user provided a custom condition, combine it with the base condition
@@ -394,13 +400,19 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 		// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 		// Safe-jobs depend on the agent job, so the prefix comes from needs.agent.outputs.
 		agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
-		downloadSteps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		downloadConfig := ArtifactDownloadConfig{
 			ArtifactName:     agentArtifactPrefix + constants.AgentArtifactName.String(),
 			FallbackArtifact: agentArtifactPrefix + constants.AgentOutputFallbackArtifactName.String(),
 			DownloadPath:     SafeJobsDownloadDirExpr,
 			SetupEnvStep:     false, // We'll handle env vars separately to add job-specific ones
 			StepName:         "Download agent output artifact",
-		}, c.getActionPin)
+		}
+		if isWorkQueueEnabled(data) {
+			downloadConfig.ArtifactName = agentArtifactPrefix + workQueueReconciledArtifactName
+			downloadConfig.FallbackArtifact = ""
+			downloadConfig.ContinueOnError = new(false)
+		}
+		downloadSteps := buildArtifactDownloadSteps(downloadConfig, c.getActionPin)
 		steps = append(steps, downloadSteps...)
 
 		// the download artifacts always creates a folder, then unpacks in that folder

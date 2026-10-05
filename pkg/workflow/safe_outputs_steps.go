@@ -42,7 +42,7 @@ func (c *Compiler) buildCustomActionStep(data *WorkflowData, config GitHubScript
 	// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 	// These steps are used in jobs that depend on the agent job (not activation), so use
 	// the agent-downstream prefix expression.
-	steps = append(steps, buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), c.getActionPin)...)
+	steps = append(steps, buildSafeOutputJobDownloadSteps(data, c.getActionPin)...)
 
 	// Step name and metadata
 	steps = append(steps, fmt.Sprintf("      - name: %s\n", config.StepName))
@@ -167,7 +167,7 @@ func (c *Compiler) buildGitHubScriptStepCommon(data *WorkflowData, config GitHub
 		// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 		// These steps are used in jobs that depend on the agent job (not activation), so use
 		// the agent-downstream prefix expression.
-		steps = append(steps, buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), c.getActionPin)...)
+		steps = append(steps, buildSafeOutputJobDownloadSteps(data, c.getActionPin)...)
 	}
 
 	// Step name and metadata
@@ -217,6 +217,23 @@ func (c *Compiler) buildGitHubScriptStepCommon(data *WorkflowData, config GitHub
 	}
 
 	return steps
+}
+
+func buildSafeOutputJobDownloadSteps(data *WorkflowData, pinAction func(string) string) []string {
+	prefix := artifactPrefixExprForAgentDownstreamJob(data)
+	if !isWorkQueueEnabled(data) {
+		return buildAgentOutputDownloadSteps(prefix, pinAction)
+	}
+	return buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		ArtifactName:     prefix + workQueueReconciledArtifactName,
+		ArtifactFilename: constants.AgentOutputFilename.String(),
+		DownloadPath:     constants.TmpGhAwDirSlash,
+		SetupEnvStep:     true,
+		EnvVarName:       "GH_AW_AGENT_OUTPUT",
+		StepName:         "Download reconciled work queue output",
+		StepID:           "download-agent-output",
+		ContinueOnError:  new(false),
+	}, pinAction)
 }
 
 // buildAgentOutputDownloadSteps creates steps to download the agent output artifact

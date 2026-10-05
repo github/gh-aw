@@ -1852,6 +1852,9 @@ jobs:
       process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
+      work_queue_all_authorized: ${{ steps.work_queue_claim_reconciliation.outputs.all_authorized }}
+      work_queue_authorized: ${{ steps.work_queue_claim_reconciliation.outputs.authorized }}
+      work_queue_output_types: ${{ steps.work_queue_claim_reconciliation.outputs.output_types }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -43,6 +43,38 @@ afterEach(() => {
 });
 
 describe("work queue claim reconciliation", () => {
+  it.each([
+    ["partial", '{"claim_id":"claim-a","outcome":"completed"}\n{"claim_id":"claim-b","outcome":"cancelled"}\n', "upload_asset", "false"],
+    ["completed", '{"claim_id":"claim-a","outcome":"completed"}\n{"claim_id":"claim-b","outcome":"completed"}\n', "upload_asset,deploy", "true"],
+    ["cancelled", '{"claim_id":"claim-a","outcome":"completed"}\n', "", "false"],
+  ])("exposes only reconciled output types for %s batches", async (status, intents, types, allAuthorized) => {
+    const second = { work_id: "w2", claim_id: "claim-b" };
+    const fake = setup([...initialTransactions, { version: CURRENT_VERSION, kind: "Work", work: "w2", claim: null, attempt: null }, { version: CURRENT_VERSION, kind: "Claim", work: "w2", claim: "claim-b", attempt: null }]);
+    const outputPath = path.join(tempDirectory, "agent_output.json");
+    fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "upload_asset", claim_id: "claim-a" }, { type: "deploy" }, { type: "unknown_claim", claim_id: "unknown" }] }));
+    fs.writeFileSync(fake.finishIntentPath, intents);
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
+    const result = await main({
+      worker: [worker, second],
+      ...fake,
+      agentOutputPath: outputPath,
+      core,
+      githubClient: {},
+      context: { repo: { owner: "o", repo: "r" }, runId: 42 },
+    });
+    expect(result.status).toBe(status);
+    expect(core.setOutput).toHaveBeenCalledWith("output_types", types);
+    expect(core.setOutput).toHaveBeenCalledWith("all_authorized", allAuthorized);
+    const repeated = await reconcileWorkerClaim({
+      worker: [worker, second],
+      ...fake,
+      agentOutputPath: outputPath,
+      context: { repo: { owner: "o", repo: "r" }, runId: 42 },
+    });
+    expect(repeated.status).toBe(status);
+    expect(new Set(fake.transactions.filter(item => item.kind === "Completion").map(item => item.attempt)).size).toBe(status === "completed" ? 2 : status === "partial" ? 1 : 0);
+  });
+
   it("reconciles each explicitly finished claim and filters outputs to completed claims", async () => {
     const second = { work_id: "w2", claim_id: "claim-b" };
     const fake = setup([...initialTransactions, { version: CURRENT_VERSION, kind: "Work", work: "w2", claim: null, attempt: null }, { version: CURRENT_VERSION, kind: "Claim", work: "w2", claim: "claim-b", attempt: null }]);

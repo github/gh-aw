@@ -197,6 +197,10 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 
 	// Build job dependencies — always include activation job for OTLP trace ID correlation
 	needs := []string{mainJobName, string(constants.ActivationJobName)}
+	if isWorkQueueEnabled(data) {
+		needs = append(needs, string(constants.SafeOutputsJobName))
+		jobCondition = BuildAnd(jobCondition, buildWorkQueueSafeOutputCondition("upload_asset", false))
+	}
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its
 	// files live in the workspace. The upload_assets step does a git checkout to the assets

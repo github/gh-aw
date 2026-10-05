@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -1759,4 +1760,56 @@ func TestGateSafeOutputStepsForPartialWorkQueueClaims(t *testing.T) {
 	result := strings.Join(steps, "")
 	assert.Contains(t, result, "if: "+combineGitHubIfExpressions(workQueueClaimAuthorizedExpression, "")+"\n        id: process_safe_outputs")
 	assert.Contains(t, result, "id: action_notify\n        if: "+combineGitHubIfExpressions("steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true'", "success()"))
+}
+
+func TestWorkQueueDownstreamSafeOutputs(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, trigger := range []string{"workflow_dispatch", "workflow_call"} {
+			t.Run(fmt.Sprintf("queue=%t/%s", enabled, trigger), func(t *testing.T) {
+				compiler := NewCompiler()
+				data := &WorkflowData{
+					On:    "on:\n  " + trigger + ":\n",
+					Tools: map[string]any{"work-queue": enabled},
+					SafeOutputs: &SafeOutputsConfig{
+						UploadAssets: &UploadAssetsConfig{},
+						Jobs: map[string]*SafeJobConfig{
+							"deploy": {Steps: []any{map[string]any{"run": "echo deploy"}}},
+						},
+					},
+				}
+				assets, err := compiler.buildUploadAssetsJob(data, "agent", false)
+				require.NoError(t, err)
+				_, err = compiler.buildSafeJobs(data, false)
+				require.NoError(t, err)
+				custom, exists := compiler.jobManager.GetJob("deploy")
+				require.True(t, exists)
+				for _, job := range []*Job{assets, custom} {
+					steps := strings.Join(job.Steps, "")
+					if enabled {
+						assert.Contains(t, job.Needs, "safe_outputs")
+						assert.Contains(t, job.If, "needs.safe_outputs.outputs.work_queue_output_types")
+						assert.Contains(t, steps, workQueueReconciledArtifactName)
+						assert.NotContains(t, steps, constants.AgentOutputFallbackArtifactName.String())
+					} else {
+						assert.NotContains(t, job.Needs, "safe_outputs")
+						assert.NotContains(t, job.If, "needs.safe_outputs.outputs.work_queue_")
+						assert.NotContains(t, steps, workQueueReconciledArtifactName)
+					}
+				}
+				if enabled {
+					assert.Contains(t, assets.If, "needs.safe_outputs.outputs.work_queue_authorized == 'true'")
+					assert.Contains(t, custom.If, "needs.safe_outputs.outputs.work_queue_all_authorized == 'true'")
+					setup, err := compiler.buildSafeOutputsSetupAndDownloadSteps(data, artifactPrefixExprForDownstreamJob(data))
+					require.NoError(t, err)
+					setupText := strings.Join(setup, "")
+					assert.Less(t, strings.Index(setupText, "Reconcile work queue claim"), strings.Index(setupText, "Upload reconciled work queue output"))
+					assert.Contains(t, setupText, "if-no-files-found: error")
+					if trigger == "workflow_call" {
+						assert.Contains(t, strings.Join(assets.Steps, ""), "needs.agent.outputs.artifact_prefix")
+						assert.Contains(t, setupText, "needs.activation.outputs.artifact_prefix")
+					}
+				}
+			})
+		}
+	}
 }

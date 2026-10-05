@@ -22,6 +22,7 @@ const stepNameLinePrefix = "      - name: "
 // It must match the literal slice appended in buildPreambleTokenSteps.
 const uploadArtifactStagingDownloadStepCount = 6
 const workQueueClaimAuthorizedExpression = "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
+const workQueueReconciledArtifactName = "work-queue-reconciled-output"
 
 // getSafeOutputsHeadApp returns the first non-nil HeadGitHubApp config from
 // create-pull-request or push-to-pull-request-branch handlers, used to generate
@@ -194,6 +195,18 @@ func (c *Compiler) buildSafeOutputsSetupAndDownloadSteps(data *WorkflowData, age
 	steps = append(steps, c.buildSafeOutputsSetupSteps(data)...)
 	steps = append(steps, c.buildSafeOutputsDownloadSteps(data, agentArtifactPrefix)...)
 	steps = append(steps, c.buildWorkQueueClaimReconciliationStep(data)...)
+	if isWorkQueueEnabled(data) && (data.SafeOutputs.UploadAssets != nil || len(data.SafeOutputs.Jobs) > 0) {
+		steps = append(steps,
+			"      - name: Upload reconciled work queue output\n",
+			"        if: ${{ "+workQueueClaimAuthorizedExpression+" }}\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+			"        with:\n",
+			fmt.Sprintf("          name: %s%s\n", agentArtifactPrefix, workQueueReconciledArtifactName),
+			"          path: ${{ runner.temp }}/gh-aw/agent_output.json\n",
+			"          retention-days: 1\n",
+			"          if-no-files-found: error\n",
+		)
+	}
 
 	// Configure GH_HOST for GHES/GHEC compatibility.
 	// The safe-outputs job runs as an independent GitHub Actions job and does not
@@ -305,6 +318,17 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 	)
 }
 
+func buildWorkQueueSafeOutputCondition(outputType string, requireAll bool) ConditionNode {
+	authorization := "work_queue_authorized"
+	if requireAll {
+		authorization = "work_queue_all_authorized"
+	}
+	return BuildAnd(
+		BuildEquals(BuildPropertyAccess("needs.safe_outputs.outputs."+authorization), BuildStringLiteral("true")),
+		BuildFunctionCall("contains", BuildPropertyAccess("needs.safe_outputs.outputs.work_queue_output_types"), BuildStringLiteral(outputType)),
+	)
+}
+
 // buildSafeOutputsUserProvidedSteps converts the user-provided safe-outputs.steps
 // frontmatter entries into pinned, YAML-rendered workflow steps.
 func (c *Compiler) buildSafeOutputsUserProvidedSteps(data *WorkflowData) ([]string, error) {
@@ -348,6 +372,11 @@ func (c *Compiler) buildSafeOutputsUserProvidedSteps(data *WorkflowData) ([]stri
 // It returns the collected steps, outputs map, and the list of safe-output step names registered.
 func (c *Compiler) buildSafeOutputsHandlerOutputsAndActionSteps(data *WorkflowData, agentArtifactPrefix, markdownPath string) ([]string, map[string]string, []string, error) {
 	state := safeOutputsHandlerOutputsAndActionState{outputs: make(map[string]string)}
+	if isWorkQueueEnabled(data) {
+		state.outputs["work_queue_authorized"] = "${{ steps.work_queue_claim_reconciliation.outputs.authorized }}"
+		state.outputs["work_queue_all_authorized"] = "${{ steps.work_queue_claim_reconciliation.outputs.all_authorized }}"
+		state.outputs["work_queue_output_types"] = "${{ steps.work_queue_claim_reconciliation.outputs.output_types }}"
+	}
 	if err := c.appendCustomScriptFilesStep(data, &state); err != nil {
 		return nil, nil, nil, err
 	}

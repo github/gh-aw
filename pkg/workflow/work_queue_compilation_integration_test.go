@@ -27,6 +27,11 @@ tools:
 safe-outputs:
   create-issue:
     max: 1
+  upload-asset:
+  jobs:
+    deploy:
+      steps:
+        - run: echo "must wait for all claims"
   steps:
     - name: User side effect
       run: echo "must wait for claim reconciliation"
@@ -57,6 +62,8 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, "contents: write")
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
 	require.Contains(t, safeOutputs, "Reconcile work queue claim")
+	require.Contains(t, safeOutputs, "Upload reconciled work queue output")
+	require.Contains(t, safeOutputs, "work_queue_output_types: ${{ steps.work_queue_claim_reconciliation.outputs.output_types }}")
 	gate := "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
 	require.Contains(t, safeOutputs, gate)
 	require.Less(t,
@@ -75,7 +82,7 @@ Compile each work-queue workflow phase.
 	userEnd := strings.Index(safeOutputs[userStart:], "      - name:")
 	require.GreaterOrEqual(t, userStepStart, 0)
 	require.Greater(t, userEnd, 0)
-	require.Contains(t, safeOutputs[userStepStart:userStart+userEnd], gate)
+	require.Contains(t, safeOutputs[userStepStart:userStart+userEnd], "steps.work_queue_claim_reconciliation.outputs.all_authorized == 'true'")
 
 	handlerID := strings.Index(safeOutputs, "id: process_safe_outputs")
 	handlerStart := strings.LastIndex(safeOutputs[:handlerID], "      - name:")
@@ -88,6 +95,16 @@ Compile each work-queue workflow phase.
 	}
 
 	require.Contains(t, safeOutputs[handlerStart:handlerStart+handlerEnd], gate)
+
+	for _, jobName := range []string{"upload_assets", "deploy"} {
+		job := extractJobSection(compiled, jobName)
+		require.Contains(t, job, "- safe_outputs")
+		require.Contains(t, job, "needs.safe_outputs.outputs.work_queue_output_types")
+		require.Contains(t, job, workQueueReconciledArtifactName)
+		require.NotContains(t, job, constants.AgentOutputFallbackArtifactName.String())
+	}
+	require.Contains(t, extractJobSection(compiled, "upload_assets"), "needs.safe_outputs.outputs.work_queue_authorized == 'true'")
+	require.Contains(t, extractJobSection(compiled, "deploy"), "needs.safe_outputs.outputs.work_queue_all_authorized == 'true'")
 
 	conclusion := extractJobSection(compiled, "conclusion")
 	require.Contains(t, conclusion, "contents: read")
