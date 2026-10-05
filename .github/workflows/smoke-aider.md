@@ -57,6 +57,36 @@ features:
 sandbox:
   agent:
     id: awf
+post-steps:
+  - name: Verify Aider smoke test evidence
+    if: always()
+    env:
+      SMOKE_FILE_PATH: /tmp/gh-aw/agent/smoke-test-aider-${{ github.run_id }}.txt
+      SMOKE_STDIO_PATH: /tmp/gh-aw/agent-stdio.log
+    run: |
+      node <<'NODE'
+      const fs = require("fs");
+      const path = require("path");
+      const { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "log_parser_shared.cjs"));
+      const content = fs.readFileSync(process.env.SMOKE_FILE_PATH, "utf8");
+      if (content.trim() !== "Smoke test passed for Aider") {
+        throw new Error("Aider did not create the expected smoke-test file content");
+      }
+      const events = (parseLogEntries(fs.readFileSync(process.env.SMOKE_STDIO_PATH, "utf8")) || [])
+        .filter(event => event.data?.sourceEngine === "aider");
+      const commands = new Map(events.filter(event => event.type === "tool.execution_start")
+        .map(event => [event.data.toolCallId, event.data.input?.command]));
+      const verifiedRepository = events.some(event => {
+        if (event.type !== "tool.execution_complete" || event.data.success !== true) return false;
+        const command = commands.get(event.data.toolCallId) || "";
+        const output = String(event.data.output || "").replace(/\x1b\[[0-9;]*m/g, "");
+        return /\bgit\s+(?:--no-pager\s+)?log\b/.test(command) && /^[0-9a-f]{7,40} \S.*$/m.test(output);
+      });
+      if (!verifiedRepository) {
+        throw new Error("Aider did not verify repository access with a successful git log command");
+      }
+      console.log("Verified Aider file writing, shell execution, repository access, and native session evidence");
+      NODE
 ---
 
 # Smoke Test: Aider Engine Validation
@@ -67,18 +97,24 @@ emitted through the `safeoutputs` MCP CLI.
 
 ## Test Requirements
 
-1. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-aider-${{ github.run_id }}.txt` with content "Smoke test passed for Aider" (create the directory if it doesn't exist)
+1. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-aider-${{ github.run_id }}.txt` with content "Smoke test passed for Aider". Use a *SEARCH/REPLACE* block with an empty SEARCH section, not a shell redirect.
 2. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 3. **Repository Access Testing**: Run `git log --oneline -1` in the repository checkout and confirm a commit is reported
 
 ## Output
 
-**ALWAYS create an issue** by including `safeoutputs create_issue` inside a
-fenced `bash` block in your reply. Plain prose and inline code do not execute:
+After creating the file, **verify its contents and repository access before
+creating the issue**. Include this single command inside a fenced `bash` block
+in your reply. Keep the whole command on one line; plain prose and inline code
+do not execute. Only report PASS after both checks succeed:
 
 ```bash
-safeoutputs create_issue --title "..." --body "..."
+test "$(cat /tmp/gh-aw/agent/smoke-test-aider-${{ github.run_id }}.txt)" = "Smoke test passed for Aider" && git log --oneline -1 && safeoutputs create_issue --title "Smoke Test: Aider - ${{ github.run_id }}" --body "File writing: PASS. Bash execution: PASS. Repository access: PASS. Overall status: PASS. Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 ```
+
+If a check fails, create the issue with overall status FAIL and describe the
+failure instead. A deterministic post-agent check rejects missing repository
+access evidence even if the issue body claims PASS.
 
 - Title: "Smoke Test: Aider - ${{ github.run_id }}"
 - Body should include:
