@@ -186,6 +186,27 @@ func TestCollectSampleEntries_DeterministicOrdering(t *testing.T) {
 	}
 }
 
+func TestCollectSampleEntries_ReportIncomplete(t *testing.T) {
+	cfg := &SafeOutputsConfig{
+		ReportIncomplete: &ReportIncompleteConfig{
+			BaseSafeOutputConfig: BaseSafeOutputConfig{
+				Samples: []map[string]any{
+					{
+						"reason":  "intentional sample",
+						"details": "replay this report_incomplete call",
+					},
+				},
+			},
+		},
+	}
+
+	entries := collectSampleEntries(cfg)
+	require.Len(t, entries, 1)
+	require.Equal(t, "report_incomplete", entries[0].Tool)
+	require.Equal(t, "intentional sample", entries[0].Arguments["reason"])
+	require.Equal(t, "replay this report_incomplete call", entries[0].Arguments["details"])
+}
+
 // TestCollectSampleEntries_SidecarPartitioning verifies that sidecar fields
 // land in Sidecars (not Arguments) so the driver knows what to pre-stage.
 func TestCollectSampleEntries_SidecarPartitioning(t *testing.T) {

@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { collect, seedClusters, writeEvidence, features } = require("./aw_issue_clustering.cjs");
-const { buildCorpus, collectIssues, collectDiscussions, island } = require("./aw_issue_clustering_publish.cjs");
+const { buildCorpus, collectIssues, collectDiscussions, island, cleanupBeforeRecompute } = require("./aw_issue_clustering_publish.cjs");
 
 const repo = "github/gh-aw";
 const cutoff = "2026-10-03T00:00:00Z";
@@ -111,6 +111,33 @@ test("only verified sources closed during analysis qualify for reconciliation", 
   const closed = { state: "closed", closed_at: "2026-10-03T01:00:00Z" };
   const data = buildCorpus(repo, [issue(1, closed), issue(2, { ...closed, user: { type: "User" } }), issue(3, { ...closed, closed_at: "2026-10-02T01:00:00Z" }), owned(20, closed)], [], cutoff);
   assert.deepEqual(data.recently_closed, [1]);
+});
+
+test("closed issues never enter evidence, seeds or the active assignment queue", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aw-clustering-closed-"));
+  const closed = ["completed", "not_planned", "duplicate"].map((state_reason, index) => issue(index + 1, { state: "closed", state_reason, closed_at: cutoff }));
+  const summary = owned(20, { state: "closed", state_reason: "completed", closed_at: cutoff });
+  try {
+    const corpus = buildCorpus(repo, [...closed, summary, issue(4)], [], cutoff);
+    const index = writeEvidence(corpus, directory);
+    assert.deepEqual(
+      index.issues.map(item => item.number),
+      [4]
+    );
+    assert.deepEqual(
+      index.seeds.flatMap(item => item.members),
+      [4]
+    );
+    assert.deepEqual(index.managed, []);
+    assert.deepEqual(
+      index.completed.map(item => item.number),
+      [20]
+    );
+    assert.deepEqual(index.cleanup, []);
+    for (const number of [1, 2, 3, 20]) assert.equal(fs.existsSync(path.join(directory, "issues", `${number}.json`)), false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("REST pagination combines all inventories, deduplicates and excludes pull requests", async () => {
@@ -238,4 +265,96 @@ test("github-script collection uses injected credentials and trusted run cutoff 
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("trusted cleanup closes resolved sources before collection recomputes seeds", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aw-clustering-cleanup-"));
+  const sources = [issue(1), issue(2), issue(3)];
+  const summary = owned(20, { state: "closed", state_reason: "completed", closed_at: cutoff, labels: [{ name: "aw-essential" }] });
+  const events = [];
+  const github = {
+    rest: {
+      actions: { getWorkflowRun: async () => ({ data: { created_at: cutoff } }) },
+      issues: {
+        listForRepo() {},
+        get: async ({ issue_number }) => ({ data: issue_number === 20 ? summary : sources.find(item => item.number === issue_number) }),
+        update: async ({ issue_number, state, state_reason }) => {
+          assert.equal(state, "closed");
+          assert.equal(state_reason, "completed");
+          events.push(`close:${issue_number}`);
+          Object.assign(
+            sources.find(item => item.number === issue_number),
+            { state, state_reason, closed_at: cutoff }
+          );
+        },
+      },
+    },
+    paginate: async (fn, params) => (params.state === "open" ? sources.filter(item => item.state === "open") : [summary, ...sources.filter(item => item.state === "closed")]),
+    graphql: async () => {
+      events.push("collect-reports");
+      return page([]);
+    },
+  };
+  const args = { github, context: { repo: { owner: "github", repo: "gh-aw" }, runId: 123 }, core: { info() {} } };
+  try {
+    assert.deepEqual(
+      (await cleanupBeforeRecompute(args)).map(item => item.number),
+      [1, 2]
+    );
+    const index = await collect({ ...args, output: directory });
+    assert.deepEqual(events, ["close:1", "close:2", "collect-reports"]);
+    assert.deepEqual(
+      index.issues.map(item => item.number),
+      [3]
+    );
+    assert.deepEqual(
+      index.seeds.flatMap(item => item.members),
+      [3]
+    );
+    assert.equal(index.counts.cleanup, 0);
+    assert.deepEqual(await cleanupBeforeRecompute(args), []);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("pre-recompute cleanup honors staged mode and propagates API failures", async () => {
+  const source = issue(1);
+  const summary = owned(20, { state: "closed", state_reason: "completed", closed_at: cutoff });
+  const github = {
+    rest: {
+      actions: { getWorkflowRun: async () => ({ data: { created_at: cutoff } }) },
+      issues: {
+        listForRepo() {},
+        get: async ({ issue_number }) => ({ data: issue_number === 20 ? summary : source }),
+        update: async () => {
+          throw new Error("permission denied");
+        },
+      },
+    },
+    paginate: async (fn, params) => (params.state === "open" ? [source] : [summary]),
+  };
+  const args = { github, context: { repo: { owner: "github", repo: "gh-aw" }, runId: 123 }, core: { info() {} } };
+  assert.deepEqual(
+    (await cleanupBeforeRecompute({ ...args, staged: true })).map(item => item.number),
+    [1]
+  );
+  assert.equal(source.state, "open");
+  await assert.rejects(cleanupBeforeRecompute(args), /permission denied/);
+  github.paginate = async () => {
+    throw new Error("collection failed");
+  };
+  await assert.rejects(cleanupBeforeRecompute(args), /collection failed/);
+});
+
+test("workflow gates read-only recomputation on successful write-isolated cleanup", () => {
+  const workflow = fs.readFileSync(path.join(__dirname, "../workflows/aw-issue-clustering.md"), "utf8");
+  assert.match(workflow, /^if: needs\.cleanup_completed_sources\.result == 'success'$/m);
+  const cleanup = workflow.split("\njobs:\n")[1].split("\nsteps:\n")[0];
+  assert.match(cleanup, /issues: write/);
+  assert.match(cleanup, /persist-credentials: false/);
+  assert.match(cleanup, /GH_AW_SAFE_OUTPUTS_STAGED: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.staged \}\}/);
+  assert.match(cleanup, /await cleanupBeforeRecompute\(\{ github, context, core, staged \}\)/);
+  assert.match(workflow.split("\nengine:")[0], /issues: read/);
+  assert.match(workflow.split("\nsteps:\n")[1], /await collect\(\{ github, context, core \}\)/);
 });
