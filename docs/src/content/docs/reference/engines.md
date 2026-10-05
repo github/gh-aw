@@ -85,6 +85,9 @@ authenticated MCP extensions, file-based headless prompts, and JSONL tool and
 usage events. Configuration and session state are temporary and keyring access
 is disabled. Goose has no native gh-aw `web-fetch` tool; supply an MCP tool or
 use the shell explicitly.
+Its parser emits canonical unified-session events, merges streaming text
+deltas, correlates tool calls and results, and retains native token/cache usage.
+The same parser handles Actions artifacts and CLI session reconstruction.
 Copilot inference uses `${{ github.token }}` with
 `permissions: { copilot-requests: write }`; no PAT or `COPILOT_GITHUB_TOKEN`
 secret is required.

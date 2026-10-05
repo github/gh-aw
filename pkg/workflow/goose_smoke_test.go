@@ -42,7 +42,15 @@ func writeGooseSmokeFixtures(t *testing.T, dir string) {
 		"agent-stdio.log": `[goose-harness] verified Goose 1.53.0
 {"type":"message","message":{"role":"assistant","content":[{"type":"toolRequest","id":"tool-1","toolCall":{"status":"success","value":{"name":"github__pull_request_read"}}}]}}
 {"type":"message","message":{"role":"user","content":[{"type":"toolResponse","id":"tool-1","toolResult":{"status":"success","value":{"content":[]}}}]}}
+{"type":"message","message":{"id":"text-1","role":"assistant","content":[{"type":"text","text":"Done."}]}}
 {"type":"complete","input_tokens":10,"output_tokens":5}
+`,
+		"agent-session.jsonl": `{"type":"session.init","data":{"sourceEngine":"goose"}}
+{"type":"tool.execution_start","data":{"toolCallId":"tool-1","toolName":"github__pull_request_read"}}
+{"type":"tool.execution_complete","data":{"toolCallId":"tool-1","toolName":"github__pull_request_read","success":true}}
+{"type":"assistant.message","data":{"content":"Done."}}
+{"type":"session.result","data":{"status":"completed","usage":{"input_tokens":10,"output_tokens":5,"input_tokens_include_cache":true}}}
+{"type":"agent.execution","data":{"exitCode":0}}
 `,
 	} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o700))
@@ -65,6 +73,8 @@ func TestGooseSmokeCheckerRequiresOperationalEvidence(t *testing.T) {
 		{name: "invented PR", file: "smoke-test-goose-123.json", content: `{"pullRequests":[{"number":1,"title":"invented"},{"number":2,"title":"PR 2"}],"bash":true,"build":true,"fileWrite":true,"runtime":true,"webFetch":true}`, wantError: "invented"},
 		{name: "missing web receipt", file: "web-fetch.json", wantError: "ENOENT"},
 		{name: "missing build binary", file: "gh-aw", wantError: "ENOENT"},
+		{name: "missing unified session", file: "agent-session.jsonl", wantError: "ENOENT"},
+		{name: "legacy session events", file: "agent-session.jsonl", content: `{"type":"assistant","message":{"content":[{"type":"text","text":"Done."}]}}`, wantError: "Goose session contains non-canonical events"},
 		{name: "failed MCP", file: "agent-stdio.log", content: `[goose-harness] verified Goose 1.53.0
 {"type":"message","message":{"content":[{"type":"toolRequest","id":"tool-1","toolCall":{"status":"success","value":{"name":"github__pull_request_read"}}},{"type":"toolResponse","id":"tool-1","toolResult":{"status":"success","value":{"isError":true,"content":[]}}}]}}
 {"type":"complete"}
@@ -106,7 +116,7 @@ func runGooseSmokeChecker(t *testing.T, dir, checker, execution string) (string,
 const path = require("node:path");
 const wrapper = name => name === "node:fs" ? {
 	...fs,
-	readFileSync: (file, ...args) => fs.readFileSync(file === "/tmp/gh-aw/agent-stdio.log" ? path.join(process.env.SMOKE_ROOT, "agent-stdio.log") : file, ...args)
+	readFileSync: (file, ...args) => fs.readFileSync(["/tmp/gh-aw/agent-stdio.log", "/tmp/gh-aw/agent-session.jsonl"].includes(file) ? path.join(process.env.SMOKE_ROOT, path.basename(file)) : file, ...args)
 } : require(name);
 const github = { rest: { pulls: { get: async ({pull_number}) => ({data: {merged_at: "2026-10-01", title: "PR " + pull_number}}) } } };
 const summary = {addHeading() {return this;}, addRaw() {return this;}, async write() {}};

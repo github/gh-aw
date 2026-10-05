@@ -60,6 +60,36 @@ exports.resolveOpenAICompatibleEndpointFromReflect = () => ({provider: "github",
 	assert.Contains(t, string(output), `"name":"probe__echo"`)
 	assert.Equal(t, int32(1), toolCalls.Load(), "real CLI must perform an authenticated MCP call")
 	assert.Equal(t, int32(2), inferenceCalls.Load(), "real CLI must resume inference after the tool result")
+	parser := exec.Command("node", "-e", `const fs = require("fs"); const { parseGooseLog } = require("./parse_goose_log.cjs"); process.stdout.write(JSON.stringify(parseGooseLog(fs.readFileSync(0, "utf8")).logEntries));`)
+	parser.Dir = "../../actions/setup/js"
+	parser.Stdin = strings.NewReader(string(output))
+	parsed, err := parser.CombinedOutput()
+	require.NoError(t, err, "%s", parsed)
+	var events []struct {
+		Type string `json:"type"`
+		Data struct {
+			ToolName string `json:"toolName"`
+			Usage    struct {
+				InputTokens  int `json:"input_tokens"`
+				OutputTokens int `json:"output_tokens"`
+			} `json:"usage"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(parsed, &events))
+	var toolResult, usageResult bool
+	for _, event := range events {
+		assert.Contains(t, event.Type, ".")
+		if event.Type == "tool.execution_complete" && event.Data.ToolName == "probe__echo" {
+			toolResult = true
+		}
+		if event.Type == "session.result" {
+			usageResult = true
+			assert.Equal(t, 20, event.Data.Usage.InputTokens)
+			assert.Equal(t, 10, event.Data.Usage.OutputTokens)
+		}
+	}
+	assert.True(t, toolResult, "native MCP call must survive unified-session parsing")
+	assert.True(t, usageResult, "native usage must survive unified-session parsing")
 }
 
 func gooseRuntimeHandler(t *testing.T, tools, inference *atomic.Int32) http.Handler {
@@ -139,7 +169,7 @@ func TestGooseSmokeEvidenceContract(t *testing.T) {
 	source, err := os.ReadFile("../../.github/workflows/smoke-goose.md")
 	require.NoError(t, err)
 	for _, expected := range []string{
-		"max-turns: 30", "max-ai-credits: 5", "fetch-homepage:",
+		"max-turns: 30", "max-ai-credits: 20", "fetch-homepage:",
 		"model: copilot/gpt-5.4",
 		"Assert Goose smoke evidence", "if: always()", `"Goose execution failed"`,
 		`["bash", "build", "fileWrite", "runtime", "webFetch"]`,

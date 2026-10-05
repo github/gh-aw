@@ -207,21 +207,19 @@ process.exit(Number(process.env.TEST_EXIT || 0));
 
 func TestGooseStructuredLogParser(t *testing.T) {
 	def := loadGooseSample(t)
-	dir := t.TempDir()
-	parser := filepath.Join(dir, "parser.cjs")
-	require.NoError(t, os.WriteFile(parser, []byte(def.Behaviors.LogParser+`
+	script := def.Behaviors.LogParser + `
 const fs = require("fs");
 console.log(JSON.stringify(parseLog(fs.readFileSync(0, "utf8"))));
-`), 0o600))
+`
 	log := `[INFO] infrastructure
 Warning: Failed to start extension 'broken' (connection error)
 {"type":"message","message":{"id":"a","role":"assistant","content":[{"type":"text","text":"Checking"},{"type":"toolRequest","id":"t","toolCall":{"status":"success","value":{"name":"github__pull_request_read","arguments":{"method":"get","pullNumber":42}}}}]}}
 {"type":"message","message":{"id":"b","role":"user","content":[{"type":"toolResponse","id":"t","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"PR 42"}]}}}]}}
 {"type":"message","message":{"id":"c","role":"assistant","content":[{"type":"text","text":"Done"}]}}
 {"type":"complete","input_tokens":123,"output_tokens":45,"cache_read_input_tokens":67}
-{"type":"error","error":"Maximum turns reached"}
 `
-	cmd := exec.Command("node", parser)
+	cmd := exec.Command("node", "-e", script)
+	cmd.Dir = "../../actions/setup/js"
 	cmd.Stdin = strings.NewReader(log)
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
@@ -232,11 +230,16 @@ Warning: Failed to start extension 'broken' (connection error)
 	}
 	require.NoError(t, json.Unmarshal(output, &result))
 	assert.Equal(t, []string{"broken"}, result.MCPFailures)
-	assert.True(t, result.MaxTurnsHit)
-	require.Len(t, result.LogEntries, 6)
-	assert.Contains(t, string(output), `"name":"github__pull_request_read"`)
-	assert.Contains(t, string(output), `"tool_use_id":"t"`)
-	assert.Equal(t, map[string]any{"input_tokens": float64(123), "output_tokens": float64(45), "cache_read_input_tokens": float64(67)}, result.LogEntries[5]["usage"])
+	assert.False(t, result.MaxTurnsHit)
+	require.Len(t, result.LogEntries, 7)
+	assert.Contains(t, string(output), `"toolName":"github__pull_request_read"`)
+	assert.Contains(t, string(output), `"toolCallId":"t"`)
+	data := result.LogEntries[6]["data"].(map[string]any)
+	assert.Equal(t, map[string]any{"input_tokens": float64(123), "output_tokens": float64(45), "cache_read_input_tokens": float64(67), "input_tokens_include_cache": true}, data["usage"])
+	for _, event := range result.LogEntries {
+		assert.Contains(t, event["type"], ".")
+		assert.Contains(t, event, "data")
+	}
 }
 
 func TestGooseDetectionDoesNotInheritCLIVersion(t *testing.T) {

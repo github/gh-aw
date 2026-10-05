@@ -24,7 +24,7 @@ model: copilot/gpt-5.4
 engine:
   id: goose
 max-turns: 30
-max-ai-credits: 5
+max-ai-credits: 20
 strict: true
 imports:
   - shared/goose.md
@@ -113,7 +113,27 @@ post-steps:
         const responses = events.flatMap(event => event.message?.content || []).filter(item =>
           item.type === "toolResponse" && item.toolResult?.status === "success" && item.toolResult.value.isError !== true);
         assert.ok(requests.some(request => responses.some(response => response.id === request.id)), "No successful native GitHub MCP round-trip");
-        await core.summary.addHeading("Goose smoke: PASS", 2).addRaw("All six checks passed with host-verified file, build, web-fetch, PR, and native MCP evidence.\n").write();
+        const session = fs.readFileSync("/tmp/gh-aw/agent-session.jsonl", "utf8").trim().split("\n").map(line => JSON.parse(line));
+        assert.ok(session.every(event => event.type.includes(".") && event.data && typeof event.data === "object"), "Goose session contains non-canonical events");
+        assert.ok(session.some(event => event.type === "session.init" && event.data.sourceEngine === "goose"), "Goose session initialization is missing");
+        assert.ok(session.some(event => event.type === "assistant.message" && typeof event.data.content === "string"), "Goose assistant text is missing");
+        const starts = session.filter(event => event.type === "tool.execution_start");
+        const completions = session.filter(event => event.type === "tool.execution_complete");
+        assert.ok(starts.length > 0 && completions.length > 0, "Goose tool events are missing");
+        assert.equal(new Set(starts.map(event => event.data.toolCallId)).size, starts.length, "Goose tool starts are duplicated");
+        for (const event of completions) {
+          assert.ok(starts.some(start => start.data.toolCallId === event.data.toolCallId), "Goose tool completion has no matching start");
+        }
+        const native = events.findLast(event => event.type === "complete");
+        const parsed = session.findLast(event => event.type === "session.result").data;
+        assert.equal(parsed.status, "completed", "Goose session result is not complete");
+        for (const key of ["input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens"]) {
+          if (native[key] !== undefined) assert.equal(parsed.usage[key], native[key], `Goose session ${key} differs from native usage`);
+        }
+        if (native.cache_write_input_tokens !== undefined) assert.equal(parsed.usage.cache_creation_input_tokens, native.cache_write_input_tokens);
+        assert.equal(parsed.usage.input_tokens_include_cache, true);
+        assert.ok(session.some(event => event.type === "agent.execution" && event.data.exitCode === 0), "Goose execution result is missing");
+        await core.summary.addHeading("Goose smoke: PASS", 2).addRaw("All six checks passed with host-verified file, build, web-fetch, PR, native MCP, and canonical unified-session evidence.\n").write();
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
