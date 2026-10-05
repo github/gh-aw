@@ -217,6 +217,23 @@ describe("pi_models_json.cjs", () => {
       ).toBe("openai-responses");
     });
 
+    it("infers the Responses API for GPT-5 Copilot models when the catalog is missing or stale", () => {
+      expect(
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "gpt-5.5",
+          modelsJson: null,
+        })
+      ).toBe("openai-responses");
+      expect(
+        piModelsJson.resolvePiApiForModel({
+          provider: "github",
+          modelId: "gpt-5.5",
+          modelsJson: { providers: { "github-copilot": { models: { "gpt-5.5": { id: "gpt-5.5" } } } } },
+        })
+      ).toBe("openai-responses");
+    });
+
     it("rejects a chat-completions override for a Responses-only model", () => {
       const logs = [];
       expect(() =>
@@ -263,6 +280,19 @@ describe("pi_models_json.cjs", () => {
         })
       ).not.toThrow();
       expect(logs).toContain("awf-reflect: model availability check skipped (model discovery incomplete)");
+    });
+
+    it("validates Google models against the Gemini endpoint", () => {
+      expect(() =>
+        piModelsJson.validatePiModelAvailability({
+          provider: "google",
+          modelId: "gemini-2.5-pro",
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider: "gemini", configured: true, models: ["gemini-2.5-pro"] }],
+          },
+        })
+      ).not.toThrow();
     });
   });
 

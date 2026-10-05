@@ -85,10 +85,10 @@ const REFLECT_PROVIDER_ANTHROPIC = "anthropic";
  */
 
 const REFLECT_PROVIDER_ALIASES = {
-  // Only GitHub has multiple externally-visible aliases in reflect payloads.
   github: new Set(["github", "copilot", "github-copilot", "github_models"]),
   openai: new Set(["openai"]),
   anthropic: new Set(["anthropic"]),
+  google: new Set(["google", "gemini"]),
 };
 
 const DEFAULT_API_PROXY_HOST_BRIDGE = "host.docker.internal";

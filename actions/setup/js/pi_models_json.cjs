@@ -32,7 +32,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { fetchAWFReflect, getCatalogModelEntry, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
+const { fetchAWFReflect, getCatalogModelEntry, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES, resolveProviderEndpointFromReflect } = require("./awf_reflect.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { loadPiSDK, nativePiProvider, parsePiConfig } = require("./pi_runtime.cjs");
@@ -208,14 +208,17 @@ function resolvePiApiForModel(options) {
   const wireApi = String(catalogEntry?.wire_api || catalogEntry?.wireApi || "")
     .toLowerCase()
     .trim();
-  const requiresResponses = model?.api === "openai-responses" || wireApi === "responses";
-  logger(`Pi model API metadata (provider=${provider}, model=${modelId}, catalog_wire_api=${wireApi || "(unset)"}, catalog_api=${model?.api || "(unset)"}, override_api=${overrideApi || "(unset)"})`);
+  const inferredWireApi = catalogProvider === "github-copilot" ? inferWireApiForModel("openai", modelId, catalogEntry) : undefined;
+  const requiresResponses = model?.api === "openai-responses" || wireApi === "responses" || inferredWireApi === "responses";
+  logger(
+    `Pi model API metadata (provider=${provider}, model=${modelId}, catalog_wire_api=${wireApi || "(unset)"}, inferred_wire_api=${inferredWireApi || "(unset)"}, catalog_api=${model?.api || "(unset)"}, override_api=${overrideApi || "(unset)"})`
+  );
   if (requiresResponses && overrideApi && overrideApi !== "openai-responses") {
     logger(`warning: Pi model API override conflicts with Responses-only model (model=${modelId}, override_api=${overrideApi})`);
     throw new Error(`Pi model "${modelId}" requires the OpenAI Responses API, but engine.config.model.api is "${overrideApi}"`);
   }
   const api = requiresResponses ? "openai-responses" : overrideApi || model?.api || resolvePiApiForProvider(provider);
-  const source = overrideApi ? "engine.config.model.api" : model?.api ? "Pi model catalog" : wireApi === "responses" ? "AWF model catalog" : "provider default";
+  const source = overrideApi ? "engine.config.model.api" : model?.api ? "Pi model catalog" : wireApi === "responses" ? "AWF model catalog" : inferredWireApi === "responses" ? "GPT model heuristic" : "provider default";
   logger(`resolved model API=${api} (provider=${provider}, model=${modelId}, source=${source})`);
   return api;
 }
