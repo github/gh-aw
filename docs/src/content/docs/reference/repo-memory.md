@@ -139,7 +139,7 @@ tools:
 ---
 ```
 
-Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs always match the relative path within the artifact directory, so never include the branch name; slashless patterns such as `*.json` match only files at the artifact root (depth 0).
+Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs match paths relative to the memory directory, so never include the branch name. Slashless patterns such as `*.json` match files at the memory root only. Use `**/*.json` to match nested JSON files; combine it with `*.json` to match both root and nested files. Patterns containing `/`, such as `metrics/*.json`, match the full relative path; `*` does not cross directories, while `**` does. Files excluded by the glob or extension filters produce warnings listing their paths.
 
 ## Behavior
 
