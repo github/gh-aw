@@ -9,7 +9,7 @@ ASSUME Fault \in {"none", "agent-write", "persist-credentials",
                  "untrusted-config", "output-limit", "private-sink",
                  "target-authorization", "retained-push-token", "ambient-agent-fetch",
                  "cleanup-fail-open", "artifact-invocation", "policy-downgrade",
-                 "failure-token-retention"}
+                 "failure-token-retention", "cross-job-token-output"}
 ASSUME Profile \in {"sparse", "full"}
 ASSUME Effect \in {"issue", "pull-request"}
 ASSUME DetectionPolicy \in {"required", "disabled", "conditional"}
@@ -86,8 +86,9 @@ Init ==
     s = [status |-> [j \in Jobs |-> IF j = "detection" /\ ~ActualDetectionRuns
                                   THEN "skipped" ELSE "queued"],
          step |-> [j \in Jobs |-> 1],
-    safeOutputResult |-> "none", appTokenPost |-> "not-registered",
-    started |-> {},
+         safeOutputResult |-> "none", appTokenPost |-> "not-registered",
+         appTokenOutput |-> None, crossJobTokenOutputs |-> {}, jobOutputsChecked |-> FALSE,
+         started |-> {},
          grants |-> [j \in Jobs |-> Grants(j)],
          live |-> {}, revoked |-> {},
          agentSecrets |-> {},
@@ -296,6 +297,7 @@ MintAppToken ==
     /\ s' = [s EXCEPT
         !.live = IF s.approved THEN @ \cup {"app-write"} ELSE @,
         !.appTokenPost = IF s.approved THEN "pending" ELSE @,
+        !.appTokenOutput = IF s.approved THEN "app-write" ELSE @,
         !.appScope = IF s.approved
                      THEN IF Fault = "app-scope"
                           THEN {EffectPermission, "administration"}
@@ -345,6 +347,19 @@ AppTokenPost ==
            !.live = IF retain THEN @ ELSE @ \ {"app-write"},
            !.revoked = IF retain THEN @ ELSE @ \cup {"app-write"},
            !.lastEvent = "AppTokenPost"]
+
+FinalizeJobOutputs ==
+    /\ s.status["safe_outputs"] \in {"success", "failure"}
+    /\ s.appTokenPost \in {"not-registered", "complete"}
+    /\ ~s.jobOutputsChecked
+    /\ s' = [s EXCEPT
+        !.jobOutputsChecked = TRUE,
+        !.crossJobTokenOutputs =
+            IF Fault = "cross-job-token-output" /\ s.appTokenOutput # None
+            THEN @ \cup {s.appTokenOutput} ELSE @,
+        !.lastEvent = IF Fault = "cross-job-token-output" /\ s.appTokenOutput # None
+                      THEN "BypassTokenOutputRedaction"
+                      ELSE "RedactTokenJobOutput"]
 
 CleanupPrivilegedCheckout ==
     /\ At("safe_outputs", 5)
@@ -396,7 +411,7 @@ Next ==
     \/ Publish \/ TamperOrigin \/ Consume
     \/ \E result \in {"pass", "deny"}: Detect(result)
     \/ Validate \/ MintAppToken \/ PrepareEffect \/ Execute
-    \/ CleanupPrivilegedCheckout \/ AppTokenPost
+    \/ CleanupPrivilegedCheckout \/ AppTokenPost \/ FinalizeJobOutputs
     \/ \E channel \in Channels: Leak(channel)
     \/ UseExpired \/ ExceedLimit
 
@@ -407,6 +422,9 @@ TypeOK ==
     /\ s.step \in [Jobs -> 1..6]
     /\ s.safeOutputResult \in {"none", "success", "failure"}
     /\ s.appTokenPost \in {"not-registered", "pending", "complete"}
+    /\ s.appTokenOutput \in Tokens \cup {None}
+    /\ s.crossJobTokenOutputs \subseteq Tokens
+    /\ s.jobOutputsChecked \in BOOLEAN
     /\ s.started \subseteq Jobs
     /\ s.grants \in [Jobs -> SUBSET Permissions]
     /\ s.live \subseteq Tokens /\ s.revoked \subseteq Tokens
@@ -469,6 +487,7 @@ SecretConfinement ==
     /\ s.agentSecrets \subseteq {"engine-token"}
     /\ \A t \in s.transfers: ~t.secret
     /\ \A a \in Artifacts: ~s.artifacts[a].secret
+NoCrossJobTokenOutputs == s.crossJobTokenOutputs = {}
 TrustedExecution ==
     \A w \in s.writes: w.execution = "trusted-handler"
 GitAuthorization ==
@@ -496,7 +515,7 @@ PrivateSinkPolicy == \A w \in s.writes: ~w.private
 Safety == TypeOK /\ JobIsolation /\ NoCredentialPersistence
           /\ ArtifactProvenance /\ DetectionGate /\ ValidatedEffects
           /\ AppLeastPrivilege /\ PrivilegedCheckoutIsolation
-          /\ SecretConfinement /\ TrustedExecution
+          /\ SecretConfinement /\ NoCrossJobTokenOutputs /\ TrustedExecution
           /\ GitAuthorization /\ NoImplicitFetch /\ TokenLifetime
           /\ NetworkPolicy /\ TrustedConfiguration /\ OutputLimit /\ PrivateSinkPolicy
 

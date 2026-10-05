@@ -1,5 +1,5 @@
 {
-  "model_sha256": "494acb76aa7c05eeb137fefadf9cb0c71d86d5b32ae5c0bea8a380f79446fb73",
+  "model_sha256": "8bddbb815f58e923c480d7d1a9e22561990641d9fc577386e98b1bc5cd1ca7e9",
   "jar_sha256": "411ab54221cf0c9fa7ae18f07a3e0ebbdf9e5ba6254b79017e7007f1feb44e89",
   "confirmed_product_bug": false,
   "examples": [
@@ -45,6 +45,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "pending",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -219,6 +222,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -364,6 +370,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -493,6 +502,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -616,6 +628,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation"],
         "grants": {
           "detection": ["contents-read"],
@@ -748,6 +763,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "pending",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -915,6 +933,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1038,6 +1059,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1161,6 +1185,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1312,6 +1339,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "pending",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -1467,6 +1497,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "not-registered",
+        "appTokenOutput": "none",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1612,6 +1645,9 @@
         },
         "safeOutputResult": "none",
         "appTokenPost": "pending",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -1789,6 +1825,9 @@
         },
         "safeOutputResult": "failure",
         "appTokenPost": "complete",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": [],
+        "jobOutputsChecked": false,
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -1912,6 +1951,177 @@
         "appScope": ["issues-write"],
         "appRepos": ["main"],
         "lastEvent": "AppTokenPost"
+      }
+    },
+    {
+      "case": "cross-job-token-output",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "NoCrossJobTokenOutputs",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "Fail:safe_outputs",
+        "AppTokenPost",
+        "BypassTokenOutputRedaction"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "failure"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 3
+        },
+        "safeOutputResult": "failure",
+        "appTokenPost": "complete",
+        "appTokenOutput": "app-write",
+        "crossJobTokenOutputs": ["app-write"],
+        "jobOutputsChecked": true,
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": [],
+        "revoked": ["app-write", "engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 0,
+        "requestValid": true,
+        "target": "main",
+        "detection": "pass",
+        "approved": true,
+        "appScope": ["issues-write"],
+        "appRepos": ["main"],
+        "lastEvent": "BypassTokenOutputRedaction"
       }
     }
   ]

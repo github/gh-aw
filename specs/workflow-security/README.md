@@ -33,9 +33,9 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 |---|---|---|
 | Configuration | `context`, `Activate`, `TrustedConfiguration` | Trusted activation instructions; PR-base provenance is an implementation obligation. |
 | Untrusted data | `AgentRequest`, `requestValid`, `target`, `request.private` | Declarative operation, schema validity, repository selection, and private-source classification remain separate from artifact origin. |
-| Jobs and steps | `status`, `step`, `started`, `safeOutputResult`, `appTokenPost`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and the app-token action post step. |
+| Jobs and steps | `status`, `step`, `started`, `safeOutputResult`, `appTokenPost`, `appTokenOutput`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and the app-token action post step. |
 | Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run and invocation identity, naming prefix, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
-| Outputs and logs | `transfers` | Artifact, output, and log channels carry independently tracked secret labels. This abstracts covered redaction, not arbitrary encoded-secret detection. |
+| Outputs and logs | `transfers`, `crossJobTokenOutputs`, `FinalizeJobOutputs` | The app token is available as a same-job action output; GitHub Actions redacts it if mapped to a job output. Artifact/output/log transfer labels remain independent. This does not model arbitrary encoded-secret detection. |
 | Permissions | `grants`, `TokenPermissions`, `ValidatedEffects` | Repository read, issue write, content write, and inference capabilities are distinct. Workspace edits are not repository-resource writes. |
 | Apps and secrets | `live`, `revoked`, `appScope`, `appRepos`, `agentSecrets` | Read-only checkout credentials, authorized engine credentials, and privileged installation tokens have different consumers and lifetimes. |
 | Networking | `ToolCall`, `egress`, `NetworkPolicy` | Authorized GitHub/inference services, blocked destinations, and service-bound engine authentication. |
@@ -83,6 +83,7 @@ agent execution, including the failure paths found by the corpus trial.
 | `AppLeastPrivilege` | Installation repositories and permissions are explicit and within this profile's grant. | A:428–440,666–674; K:157–190 | [`buildGitHubAppTokenMintStepWithMeta`](../../pkg/workflow/safe_outputs_app_config.go):427–461; [`validateAppTokenPermissions`](../../pkg/workflow/app_token_permissions_validation.go):41–100. |
 | `PrivilegedCheckoutIsolation` | Persisted push credentials exist only in a live privileged processor context. | K:175–205; AR1–4 | [`buildSharedPRCheckoutSteps`](../../pkg/workflow/compiler_safe_outputs_steps.go):32–100; [`GenerateConfigureGitCredentialsSteps`](../../pkg/workflow/checkout_step_generator.go):259–382. |
 | `SecretConfinement` | Write credentials cannot reach the agent or any modeled publication channel; authorized inference credentials remain permitted. | CTR-017; AR4; MCP scripts SN-SCOPE | [`ComputeAWFExcludeEnvVarNames`](../../pkg/workflow/awf_env.go):84–182; [`classifyStepSecrets`](../../pkg/workflow/strict_mode_steps_validation.go):27–190; [`StepOrderTracker`](../../pkg/workflow/step_order_validation.go):94–189. |
+| `NoCrossJobTokenOutputs` | A token-valued action output is not propagated as a job output to another job. | GitHub Actions secret job-output redaction | `FinalizeJobOutputs` models platform redaction; the synthetic `cross-job-token-output` mutation bypasses that guard. |
 | `TrustedExecution` | Request bytes remain data, not privileged executable code. | SG-01; CTR-006/009/010 | [`template_injection_validation`](../../pkg/workflow/template_injection_validation.go); [`safe_output_handler_manager`](../../actions/setup/js/safe_output_handler_manager.cjs). |
 | `GitAuthorization` | Authenticated remote operations use credentials scoped to that repository and operation. | K:122–130,157–205 | [`resolveCheckoutTokenExpression`](../../pkg/workflow/checkout_step_generator.go):733–751; [`resolvePRCheckoutToken`](../../pkg/workflow/github_token.go):131–191. |
 | `NoImplicitFetch` | Credential-free reasoning never silently fetches or pushes to compensate for missing local objects. | K:212–229; checkout credential policy | [`generateFetchStepLines`](../../pkg/workflow/checkout_step_generator.go):680–730; [`safe_outputs_push_to_pr_branch.md`](../../actions/setup/md/safe_outputs_push_to_pr_branch.md). |
@@ -154,10 +155,10 @@ The results directory must not already exist. Every case includes a self-contain
 model/config, full TLC log, and saved state data. Secure configurations exhaust
 the reachable graph, not a depth-constrained prefix. Ten positive configurations
 cover sparse/full checkout, issue/pull-request effects, force-clean lifecycle,
-reusable invocation naming, and declared detection modes. Twenty-one deliberately
-broken protections (including failure-path token retention) and eight reachability
-witnesses cover authenticated push, temporary host credentials, and a blocking
-cleanup failure.
+reusable invocation naming, and declared detection modes. Twenty-two deliberately
+broken protections (including failure-path token retention and cross-job token
+output redaction) and eight reachability witnesses cover authenticated push,
+temporary host credentials, and a blocking cleanup failure.
 
 Counterexamples include raw `tlc-trace.json`, normalized `trace.json`, and
 `events.txt`. Negative controls also generate `source.md` and

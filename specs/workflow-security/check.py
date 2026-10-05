@@ -37,6 +37,7 @@ MUTATIONS = {
     "artifact-invocation": "ArtifactProvenance",
     "policy-downgrade": "DetectionGate",
     "failure-token-retention": "TokenLifetime",
+    "cross-job-token-output": "NoCrossJobTokenOutputs",
 }
 MUTATION_EFFECTS = {"retained-push-token": "pull-request"}
 MUTATION_SETTINGS = {
@@ -80,6 +81,7 @@ DELTAS = {
     "artifact-invocation": "Runtime mutation: accept another reusable invocation's artifact under the same run.",
     "policy-downgrade": "Compiler mutation: omit required detection without an authorized policy opt-out.",
     "failure-token-retention": "Runtime mutation: omit app-token revocation in the safe-output action post step after job failure.",
+    "cross-job-token-output": "Synthetic model fault: bypass GitHub Actions secret redaction for a token-valued job output.",
 }
 
 
@@ -247,7 +249,7 @@ def check_sources(compiler, results):
 def write_examples(results, cases):
     selected = list(WITNESSES) + [
         "persist-credentials", "skip-detection", "cross-repo-token", "private-sink",
-        "failure-token-retention",
+        "failure-token-retention", "cross-job-token-output",
     ]
     examples = []
     for name in selected:

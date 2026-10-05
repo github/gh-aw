@@ -69,6 +69,10 @@ class ResultContractTest(unittest.TestCase):
         self.assertEqual(retained["final_state"]["status"]["safe_outputs"], "failure")
         self.assertEqual(retained["final_state"]["appTokenPost"], "complete")
         self.assertIn("app-write", retained["final_state"]["live"])
+        output = next(example for example in examples["examples"]
+                      if example["case"] == "cross-job-token-output")
+        self.assertIn("app-write", output["final_state"]["crossJobTokenOutputs"])
+        self.assertIn("BypassTokenOutputRedaction", output["events"])
 
     def test_compiled_corpus_contract(self):
         for outcome in ["success", "violation", "tool-failure", "malformed-policy"]:
