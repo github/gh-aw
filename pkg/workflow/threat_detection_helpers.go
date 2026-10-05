@@ -170,7 +170,7 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 }
 
 // resolveExternalDetectorEngineConfig determines the EngineConfig used to install and
-// execute the engine on the external detector path. Precedence:
+// execute the engine on both detector paths. Precedence:
 //  1. An explicit safe-outputs.threat-detection.engine override — cloned with its ID
 //     normalized to the resolved detection engine ID (handles cases like the pi->copilot
 //     detection normalization where the override's declared ID differs from the engine
@@ -190,7 +190,7 @@ func resolveExternalDetectorEngineConfig(data *WorkflowData, engineID string) *E
 	if hasThreatDetectionEngineOverride {
 		return cloneThreatDetectionEngineConfig(engineID, data.SafeOutputs.ThreatDetection.EngineConfig)
 	}
-	if data.EngineConfig != nil && (data.EngineConfig.ID == "" || data.EngineConfig.ID == engineID) {
+	if data.EngineConfig != nil && ResolveEngineID(data) == engineID {
 		config := cloneThreatDetectionEngineConfig(engineID, data.EngineConfig)
 		resetDetectionEngineTaskSettings(config)
 		return config
@@ -213,14 +213,26 @@ func resetDetectionEngineTaskSettings(config *EngineConfig) {
 }
 
 // cloneThreatDetectionEngineConfig returns a shallow copy of source with engine ID
-// normalized to the provided detection engineID. If source is nil, it returns a
-// minimal config containing only the ID.
+// normalized to the provided detection engineID. Runtime-specific settings cannot
+// cross engine identities; provider and detection policy settings remain available.
+// If source is nil, it returns a minimal config containing only the ID.
 func cloneThreatDetectionEngineConfig(engineID string, source *EngineConfig) *EngineConfig {
 	if source == nil {
 		return &EngineConfig{ID: engineID}
 	}
 	cloned := *source
 	cloned.ID = engineID
+	if source.ID != "" && source.ID != engineID {
+		threatLog.Printf("Resetting runtime settings when normalizing %q to detection engine %q", source.ID, engineID)
+		cloned.Version = ""
+		cloned.Command = ""
+		cloned.Config = ""
+		cloned.Args = nil
+		cloned.HarnessScript = ""
+		cloned.Driver = ""
+		cloned.InlineDriver = nil
+		cloned.Extensions = nil
+	}
 	return &cloned
 }
 

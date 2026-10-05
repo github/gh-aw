@@ -25,7 +25,6 @@ engine:
 strict: true
 imports:
   - shared/kiro.md
-  - shared/gh.md
   - shared/reporting-otlp.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
@@ -34,6 +33,10 @@ network:
   allowed:
     - defaults
     - github
+    - go
+runtimes:
+  go:
+    version: "1.26"
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
@@ -63,10 +66,11 @@ sandbox:
 
 ## Test Requirements
 
-1. **GitHub MCP Testing**: Use GitHub MCP tools to fetch details of exactly 2 merged pull requests from ${{ github.repository }} (title and number only)
+1. **GitHub MCP Testing**: Use native GitHub MCP tools to fetch details of exactly 2 merged pull requests from ${{ github.repository }} (title and number only). Do not substitute `gh`, curl, or another CLI for this test. If native GitHub MCP tools are unavailable or fail, mark this test as FAIL.
 2. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-kiro-${{ github.run_id }}.txt` with content "Smoke test passed for Kiro at $(date)" (create the directory if it doesn't exist)
 3. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 4. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as failed and report the failure.
+5. **Runtime Configuration Testing**: Verify `kiro-cli --version` matches `GH_AW_ENGINE_VERSION`. Use Node.js to inspect `GH_AW_MCP_CONFIG` and verify it contains a native GitHub MCP server with `type: "http"`, a container-reachable URL, and an authorization header. Report only PASS or FAIL; never print configuration contents, headers, keys, or the prompt.
 
 ## Output
 
