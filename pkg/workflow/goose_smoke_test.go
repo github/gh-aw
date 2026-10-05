@@ -130,3 +130,25 @@ new AsyncFunction("require", "github", "context", "core", fs.readFileSync(proces
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
+
+func TestGooseSmokeRuntimeProbeTrimsNativeVersionOutput(t *testing.T) {
+	source, err := os.ReadFile("../../.github/workflows/smoke-goose.md")
+	require.NoError(t, err)
+	_, probe, ok := strings.Cut(string(source), "   node <<'JS'\n")
+	require.True(t, ok)
+	probe, _, ok = strings.Cut(probe, "\n   JS\n")
+	require.True(t, ok)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "goose"), []byte("#!/bin/sh\nprintf ' 1.53.0\\n'\n"), 0o700))
+	config := filepath.Join(dir, "config.json")
+	require.NoError(t, os.WriteFile(config, []byte(`{"extensions":{"github":{"type":"streamable_http","uri":"http://awmg-mcpg:8080/mcp/github","headers":{"Authorization":"Bearer test-only"}}}}`), 0o600))
+	cmd := exec.Command("node", "-e", probe)
+	cmd.Env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"GH_AW_ENGINE_VERSION=1.53.0", "GOOSE_PROVIDER=openai", "GOOSE_MODEL=gpt-5.4",
+		"OPENAI_HOST=http://test-proxy", "OPENAI_BASE_PATH=chat/completions",
+		"GH_AW_MAX_TURNS=30", "GOOSE_ADDITIONAL_CONFIG_FILES="+config)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	assert.Equal(t, "Runtime configuration: PASS\n", string(output))
+	assert.NotContains(t, string(output), "Bearer test-only")
+}

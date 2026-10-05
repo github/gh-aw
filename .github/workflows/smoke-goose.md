@@ -175,12 +175,14 @@ mark overall PASS unless every check passed.
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-goose-${{ github.run_id }}.txt` with content "Smoke test passed for Goose at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.
-6. **Runtime Configuration Testing**: Run `goose --version` and verify it equals `GH_AW_ENGINE_VERSION`. Then execute this exact shell probe. It prints no configuration, headers, keys, or prompt:
+6. **Runtime Configuration Testing**: Execute this exact shell probe. Goose's `--version` output includes leading whitespace, so trim it before comparing with `GH_AW_ENGINE_VERSION`. The probe prints no configuration, headers, keys, version output, or prompt:
 
    ```bash
    node <<'JS'
    const assert = require("node:assert/strict");
    const fs = require("node:fs");
+   const { execFileSync } = require("node:child_process");
+   assert.equal(execFileSync("goose", ["--version"], { encoding: "utf8" }).trim(), process.env.GH_AW_ENGINE_VERSION);
    assert.equal(process.env.GOOSE_PROVIDER, "openai");
    assert.ok(process.env.GOOSE_MODEL);
    assert.ok(process.env.OPENAI_HOST && process.env.OPENAI_BASE_PATH);
