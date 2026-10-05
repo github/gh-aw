@@ -39,9 +39,9 @@ func GenerateConcurrencyConfig(workflowData *WorkflowData, isCommandTrigger bool
 		concurrencyLog.Print("Enabling cancel-in-progress for concurrency group")
 		if isCommandTrigger {
 			concurrencyConfig += "\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
-			// GitHub Actions only accepts literal single/max values for queue.
-			// Omit it for mixed triggers so the default single queue remains
-			// compatible with cancellation on pull_request events.
+			if isGroupConcurrencyQueueEnabled(workflowData) {
+				concurrencyConfig += "\n  queue: ${{ github.event_name == 'pull_request' && 'single' || 'max' }}"
+			}
 		} else {
 			concurrencyConfig += "\n  cancel-in-progress: true"
 		}
