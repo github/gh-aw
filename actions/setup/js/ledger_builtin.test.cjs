@@ -246,6 +246,22 @@ test("notes projection rejects malformed records and missing vote targets", () =
   assert.throws(() => reducer.apply(note, { id: "" }), /canonical record ID/);
 });
 
+test("note_state rejects votes mutated after validation instead of counting them as downvotes", () => {
+  const reducer = createReducer({ type: "notes" });
+  const noteId = finalId("notes", 0);
+  reducer.apply({ id: noteId, operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] });
+  const vote = { id: finalId("notes", 1), operation: "vote", note_id: noteId, vote: "up" };
+  reducer.apply(vote);
+  for (const invalidVote of ["neutral", "", null, undefined]) {
+    vote.vote = invalidVote;
+    assert.throws(() => reducer.output(), /up or down vote/);
+  }
+  vote.vote = "down";
+  assert.deepEqual(reducer.output().tables.note_state.rows, [{ note_id: noteId, upvotes: 0, downvotes: 1, net_votes: -1, last_vote_at: null, last_positive_vote_at: null }]);
+  vote.vote = "up";
+  assert.deepEqual(reducer.output().tables.note_state.rows, [{ note_id: noteId, upvotes: 1, downvotes: 0, net_votes: 1, last_vote_at: null, last_positive_vote_at: null }]);
+});
+
 test("note_state derives zero votes and null last-vote timestamps", () => {
   const payload = { operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
   const records = [{ id: finalId("envelope", 0), timestamp: "2026-01-01T00:00:00.000Z", sha: `sha256:${"a".repeat(64)}`, payload }];

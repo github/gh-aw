@@ -68,6 +68,33 @@ test("normalizes the safe-output type discriminator before validating built-in a
   }
 });
 
+test("rejects invalid append envelopes with input kinds but without payload contents", async () => {
+  const handler = await main({ ledgers: [{ name: "events", type: "log" }] });
+  for (const [message, receivedType] of [
+    [null, "null"],
+    [[], "array"],
+    [undefined, "undefined"],
+    ["private payload", "string"],
+    [42, "number"],
+    [true, "boolean"],
+  ]) {
+    await assert.rejects(() => handler(message), { name: "TypeError", message: `Invalid ledger append message: expected an object, received ${receivedType}` });
+  }
+  for (const [type, receivedType] of [
+    ["private discriminator", "string"],
+    [null, "null"],
+    [[], "array"],
+    [{ private: "payload" }, "object"],
+    [42, "number"],
+    [false, "boolean"],
+  ]) {
+    await assert.rejects(() => handler({ type, ledger: "events", operation: "append", value: "private payload" }), {
+      name: "TypeError",
+      message: `Invalid ledger append message type: expected "ledger_append", received ${receivedType}`,
+    });
+  }
+});
+
 test("rejects invalid records at finalization", async () => {
   const handler = await main({ ledgers: [{ name: "findings", schema: { type: "object", required: ["subject"] } }] });
   await handler({ record: { other: true } });

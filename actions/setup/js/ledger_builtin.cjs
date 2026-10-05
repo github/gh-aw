@@ -16,6 +16,10 @@ const MAX_REPLAY_CELL_BYTES = 65536;
 const NOTE_LIMITS = { subject: 512, note: 4096, reason: 1024, citations: 32, citationBytes: 2048 };
 const NOTE_STATE_COLUMNS = { note_id: "text", upvotes: "integer", downvotes: "integer", net_votes: "integer", last_vote_at: "text", last_positive_vote_at: "text" };
 
+function emptyVoteState() {
+  return { upvotes: 0, downvotes: 0, last_vote_at: null, last_positive_vote_at: null };
+}
+
 function validateCitation(citation) {
   if (!citation || typeof citation !== "object" || Array.isArray(citation)) return false;
   switch (citation.type) {
@@ -171,12 +175,14 @@ function createReducer(config) {
       const voteRows = [...votes].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
       const voteState = new Map();
       for (const [, { record, timestamp }] of voteRows) {
-        const state = voteState.get(record.note_id) || { upvotes: 0, downvotes: 0, last_vote_at: null, last_positive_vote_at: null };
+        const state = voteState.get(record.note_id) || emptyVoteState();
         if (record.vote === "up") {
           state.upvotes++;
           if (timestamp !== null && (state.last_positive_vote_at === null || timestamp > state.last_positive_vote_at)) state.last_positive_vote_at = timestamp;
-        } else {
+        } else if (record.vote === "down") {
           state.downvotes++;
+        } else {
+          throw new TypeError("Vote requires an up or down vote");
         }
         if (timestamp !== null && (state.last_vote_at === null || timestamp > state.last_vote_at)) state.last_vote_at = timestamp;
         voteState.set(record.note_id, state);
@@ -210,7 +216,7 @@ function createReducer(config) {
           columns: NOTE_STATE_COLUMNS,
           primaryKey: ["note_id"],
           rows: noteRows.map(([note_id]) => {
-            const state = voteState.get(note_id) || { upvotes: 0, downvotes: 0, last_vote_at: null, last_positive_vote_at: null };
+            const state = voteState.get(note_id) || emptyVoteState();
             return {
               note_id,
               upvotes: state.upvotes,
