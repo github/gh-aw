@@ -11,8 +11,10 @@
     "@types/node": "^26.6.3",
     "@vitest/coverage-v8": "^5.0.2",
     "@vitest/ui": "^5.0.1",
+    "ajv": "^8.17.1",
     "minimatch": ">=10.2.6",
     "prettier": "^3.9.8",
+    "ts-json-schema-generator": "^2.4.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
@@ -21,8 +23,11 @@
     "undici": "^6.23.0"
   },
   "scripts": {
+    "schema:session": "node scripts/generate_session_schemas.cjs",
+    "schema:session:check": "node scripts/generate_session_schemas.cjs --check",
+    "session:validate": "node scripts/validate_session.cjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && vitest run --no-file-parallelism",
+    "test": "npm run typecheck && npm run schema:session:check && vitest run --no-file-parallelism",
     "test:js": "vitest run",
     "test:js-integration-live-api": "vitest run --config vitest.integration.config.mjs --no-file-parallelism",
     "test:js-integration-artifact": "vitest run --config vitest.artifact-integration.config.mjs --no-file-parallelism",

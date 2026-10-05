@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.4.0"
+version: "1.5.0"
 status: Draft
-publication_date: "2026-10-03"
+publication_date: "2026-10-05"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.4.0<br>
+**Version**: 1.5.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-03<br>
+**Publication Date**: 2026-10-05<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -24,13 +24,13 @@ editors:
 
 ## Abstract
 
-This specification defines the session traces used by GitHub Agentic Workflows: ordered arrays of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving parser contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, and a conclusion-job projection of essential agent, MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval payloads. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Native evidence, canonical parser traces, and existing accounting artifacts remain available separately.
+This specification defines the session traces used by GitHub Agentic Workflows: ordered arrays of Copilot-compatible event objects containing `type`, `data`, and optional native metadata. It establishes a loss-preserving parser contract for Claude, Copilot, Codex, Gemini, Pi, and custom engines, including OpenCode and Goose sample integrations, and a conclusion-job projection of essential agent, MCP gateway (MCPG), agent workflow firewall (AWF), safe-output, experiment, grader, and eval payloads. The serialized `usage/aw_session.jsonl` begins with a numeric file-format version header, followed by timestamp-ordered evidence with source provenance; untimed observations remain available without invented timestamps. Native evidence, canonical parser traces, and existing accounting artifacts remain available separately. TypeScript declarations generate machine-readable schemas for both representations.
 
 ## Status of This Document
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.4.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records pre-implementation gaps. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.5.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -94,7 +94,7 @@ JSONL accounting, activity summary, and result files remain available.
 | Term | Meaning |
 | --- | --- |
 | Canonical event | An object with a dot-namespaced `type`, a `data` object, and any supplied native metadata. |
-| Core event | One of the seven event types defined in Section 4. |
+| Core event | One of the seven common agent event types in Sections 4.1–4.6. Runtime observations and file metadata have additional declared signatures. |
 | Native extension event | A native event with another dot-namespaced type, such as `session.shutdown` or `assistant.message_delta`, retaining its original payload. |
 | Legacy entry | A supported pre-event record, such as `system`/`init`, `assistant`, `user`, or `result`. |
 | Raw engine record | An engine-specific record that still needs mapping, such as Gemini `tool_result` or Codex `item.completed`. |
@@ -123,7 +123,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 | R — Reader/renderer | Read canonical events and produce truthful, privacy-preserving summaries or compatibility views. | 3–6, 8.1, 8.3, and applicable tests in 9 |
 | B — Bootstrap telemetry adapter | Consume canonical results and derive legacy telemetry without altering the trace. | 3, 6, 8.2–8.3, and applicable tests in 9 |
 | M — Artifact merger | Combine canonical agent and runtime observations into the conclusion usage artifact. | 3.5, 4.7–4.8, 8.3, and applicable tests in 9 |
-| F — Full pipeline | Satisfy P for all six engines, R for all shared summary renderers, B, and M. | All normative requirements |
+| F — Full pipeline | Satisfy P for Claude, Copilot, Codex, Gemini, Pi, custom, and any additional declared integrations; R for all shared summary renderers; B; and M. | All applicable normative requirements |
 
 A parser supporting fewer engines can conform for its declared engines. Omitting an OPTIONAL field because the source did not expose it is full conformance, not partial conformance. An implementation failing a mandatory requirement is nonconforming for the affected class; “partial implementation” is a progress description, not a weaker compliance level.
 
@@ -170,9 +170,10 @@ Existing native payload fields, including fields not understood by the implement
 ### 3.4 TypeScript message signatures (Informative)
 
 [`types/agent_session.d.ts`](https://github.com/github/gh-aw/blob/main/actions/setup/js/types/agent_session.d.ts)
-defines the TypeScript interfaces for every core message signature. `CoreSessionEvent`
-is their discriminated union; `SessionEventDataMap` associates each core event type
-with its payload interface. `AgentSession` also accepts native dot-namespaced extension
+defines the TypeScript interfaces for common agent signatures and the declared
+`agent.execution`, `detection.result`, and `session.format` observations.
+`CoreSessionEvent` is their discriminated union; `SessionEventDataMap` associates
+each declared event type with its payload interface. `AgentSession` also accepts native dot-namespaced extension
 events. CommonJS implementations import these types through JSDoc, without introducing
 a TypeScript runtime dependency.
 
@@ -188,7 +189,9 @@ const completion: ToolExecutionCompleteEvent = {
 The generic `createSessionEvent` factory checks known event payload signatures.
 `types/agent_session.type-test.ts` checks valid signatures and rejects incorrect
 outcome types, metric types, and legacy event names during `npm run typecheck`.
-Numeric range checks remain runtime responsibilities.
+`SessionCount` and `SessionMetric` annotate numeric ranges for schema generation;
+JavaScript runtime types remain numbers. Range enforcement belongs to validators,
+not TypeScript's static type system.
 
 ### 3.5 Conclusion session artifact
 
@@ -365,6 +368,55 @@ retention policy, not a default summary or a public log preview. Its size can
 exceed the former telemetry-only usage artifact; summary display budgets do not
 truncate this file.
 
+### 3.6 Generated schemas and local tools (Informative)
+
+The declaration files are the machine-readable signature source.
+[`types/unified_session.d.ts`](https://github.com/github/gh-aw/blob/main/actions/setup/js/types/unified_session.d.ts)
+defines essential runtime payloads and `UnifiedSessionUsage`, whose camelCase
+keys differ from parser-trace accounting. `UnifiedSessionEventDataMap` covers the
+known projection vocabulary, including collector records. Unknown native
+extension payloads remain open. Runtime scalar observations use JSON-compatible
+values where the merger preserves source-specific values rather than coercing them.
+
+| Artifact or command | Purpose |
+| --- | --- |
+| [Canonical agent schema](/gh-aw/schemas/agent-session.schema.json) | JSON-array schema for parser traces and the records in `agent-session.jsonl`; an empty trace is valid and no header is required. |
+| [Unified session schema](/gh-aw/schemas/unified-session.schema.json) | JSON-array schema for essential payloads and provenance, requiring the leading version-1 collector header. |
+| `make session-schemas` | Regenerate both checked-in JSON Schema Draft-07 files using `ts-json-schema-generator` and deterministic formatting. |
+| `make check-session-schemas` | Regenerate in memory and fail on missing or byte-different schemas; never rewrite files. |
+| `npm --prefix actions/setup/js run session:validate -- agent agent-session.jsonl` | Validate a canonical source trace. |
+| `npm --prefix actions/setup/js run session:validate -- unified aw_session.jsonl` | Validate the unified artifact, including compact JSONL framing, provenance paths, ordering, and execution singleton semantics. |
+
+The validator also accepts JSON arrays: a `.json` filename selects array input,
+or a final `json`/`jsonl` argument selects the format explicitly. JSONL schemas
+describe the logical array of decoded records, not the line framing itself.
+Each schema is self-contained and can be used by standard Draft-07 validators.
+The local validator reports record counts on stdout and structural diagnostics
+on stderr, exits nonzero on failure, and does not print source payloads.
+The existing `session_cli.cjs markdown` mode supplies a privacy-preserving
+rendered view; schema validation does not replace rendering or redaction.
+
+Generation dispatches known types conditionally: malformed known payloads cannot
+pass as opaque native extensions. Canonical schemas allow native additions;
+known essential projection interfaces omit discarded inventories, envelopes,
+and accounting aliases. These schemas check declared writer signatures, not
+every historical diagnostic value that a tolerant parser can retain. Validation
+does not mutate, repair, redact, or drop records. A schema pass alone cannot
+establish loss preservation, correct engine accounting, safe publication, or full
+conformance; those requirements remain covered by behavioral tests.
+
+### 3.7 Session downloads (Informative)
+
+`gh aw sessions download <run-id-or-url> --format jsonl` prefers a published
+`usage/aw_session.jsonl` and returns its validated bytes unchanged. When that file
+is absent, it reconstructs the current format from available agent artifacts,
+including supported legacy names and nested layouts, using the same embedded
+JavaScript parsers as Actions. Reconstruction requires recognizable agent or
+execution evidence and cannot recover missing downstream artifacts.
+`--format markdown` uses the shared privacy-preserving renderer.
+Ambiguous called-workflow artifact matches and invalid published files fail
+explicitly; invalid published data does not silently fall back to reconstruction.
+
 ## 4. Core Event Vocabulary (Normative)
 
 The following tables describe the common fields in `data`. Optional native and previously supported fields are not prohibited. A field marked **source-dependent** is preserved or mapped when supplied and meaningful; its absence is not an error. This avoids making unsupported metrics or IDs prerequisites for canonical conversion.
@@ -375,7 +427,7 @@ The following tables describe the common fields in `data`. Optional native and p
 
 | Field | Value and availability |
 | --- | --- |
-| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
+| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, `goose`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
 | `model` | Source-dependent model string. |
 | `sessionId` | Source-dependent native session or thread identifier. |
 | `cwd` | Source-dependent working-directory string, unchanged. |
@@ -787,9 +839,9 @@ The adapter can discover a reported model from a finalized turn without inventin
 
 **T-UAS-041 — Custom format detection.** The custom adapter MUST select a delegate from actual supported input signatures. Parseable JSON alone, any dot-containing type alone, a nonempty markdown result, or a delegate's fabricated initialization MUST NOT establish detection. Existing Claude-compatible and Codex fallback support MUST remain available, and native canonical events MUST remain supported.
 
-Recognized candidates include the native event envelope, Claude legacy message/init/result shapes, Codex known JSONL lifecycle/item shapes, and Codex legacy tool/exec/thinking layouts with their actual framing. Mere namespace matches with no supported payload are insufficient. Signature detection uses valid supported records even when unknown or malformed records are adjacent.
+Recognized candidates include the native event envelope, Claude legacy message/init/result shapes, Codex known JSONL lifecycle/item shapes, Codex legacy tool/exec/thinking layouts with their actual framing, and the OpenCode and Goose signatures below. Mere namespace matches with no supported payload are insufficient. Signature detection uses valid supported records even when unknown or malformed records are adjacent.
 
-Delegation is deterministic. Native event recognition and per-record mixed conversion take precedence over broad fallbacks; remaining delegate ties use the existing Claude-before-Codex preference. A custom adapter MAY support additional documented engine signatures, but those signatures follow the same preservation contract. A delegated initialization MAY retain the detected engine's `sourceEngine`; custom-origin metadata, when supplied, is preserved separately. A custom engine emitting its own mapped initialization uses `sourceEngine: "custom"`.
+Delegation is deterministic. Specific Goose signatures precede OpenCode signatures; native event recognition and Claude-compatible per-record mixed conversion precede broad Codex fallbacks. A Goose `error` record alone does not establish custom format detection. A custom adapter MAY support additional documented engine signatures, but those signatures follow the same preservation contract. A delegated initialization MAY retain the detected engine's `sourceEngine`; custom-origin metadata, when supplied, is preserved separately. A custom engine emitting its own mapped initialization uses `sourceEngine: "custom"`.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
 
@@ -819,6 +871,36 @@ cache-write tokens are separate from the reported input count; reasoning tokens
 are an output subset, not an additional contribution to total tokens.
 Synthetic coverage lives in `parse_opencode_log.test.cjs` and
 `opencode_workflow.test.cjs`; it is not evidence of a live smoke run.
+
+### 7.8 Goose sample
+
+**T-UAS-068 — Goose adapter.** An implementation declaring Goose support MUST
+recognize `run --output-format stream-json` message, completion, and error records
+and native canonical events. It MUST retain source message identities, observed
+text and thinking, independent tool lifecycles, explicit failures, and available
+cumulative accounting. The sample integration uses the same parser for Actions,
+unified collection, custom delegation, and local reconstruction.
+
+| Source observation | Canonical mapping |
+| --- | --- |
+| `message` with string `message.id`, assistant/user role, and content array | First recognized message supplies `session.init` with `sourceEngine: "goose"`; observed inference metadata can supply its requested model. |
+| Content `text` / `thinking` | User/assistant message or assistant reasoning; same-message/channel deltas concatenate without trimming. |
+| `toolRequest` with string `id` and structured `toolCall` | Start with native call ID, successful call's name and arguments; malformed requests produce coverage warnings rather than fabricated executions. |
+| `toolResponse` with string `id` and valid success/error `toolResult` | Completion with native call ID, matched name, exact content or structured-only result, and explicit outcome; absent starts do not create invented starts. |
+| `complete` with observed token fields | One cumulative `session.result` snapshot; map input/output/total/cache-read counts and cache-write → cache-creation, preserving valid zero counts and exposed `cost_usd`. |
+| `error` with string error | Preserve `session.error` and terminal `session.result.errors`; recognized maximum-turn diagnostics also emit `goose.max_turns` and set `maxTurnsHit`. |
+| Recognized extension-start warning or canonical `goose.mcp_failure` | Preserve the server name and report `mcpFailures`, not arbitrary quoted error prose. |
+
+`Message.created` uses Unix seconds. The parser retains the original envelope
+and derives an ISO timestamp from valid source seconds for timeline ordering;
+the original source seconds remain available in the canonical trace.
+Distinct assistant message IDs supply the source-defined turn count only when
+a terminal observation exists; an incomplete stream does not invent a result.
+Tool IDs suppress repeated lifecycle observations, while completion usage is a
+snapshot, never another per-turn contribution. Cache counts are included in the
+reported input count (`input_tokens_include_cache: true`).
+Synthetic protocol and collection coverage lives in `parse_goose_log.test.cjs`;
+it does not alone establish conformance for every Goose version.
 
 ## 8. Renderers and Bootstrap Telemetry (Normative)
 
@@ -950,7 +1032,7 @@ privacy boundaries, version failures, and end-to-end publication.
 
 ### 9.1 Test procedure and coverage
 
-**T-UAS-051 — Requirement coverage.** A conformance test suite MUST exercise every applicable requirement ID, every declared engine signature, and the edge cases in the matrices below. Full-pipeline conformance MUST cover all six engines, shared helpers, all shared renderers, and bootstrap telemetry. A report MUST identify failures and unavailable coverage; current implementation tests alone are not a conformance declaration.
+**T-UAS-051 — Requirement coverage.** A conformance test suite MUST exercise every applicable requirement ID, every declared engine signature, and the edge cases in the matrices below. Full-pipeline conformance MUST cover the engines declared in Section 2.2, shared helpers, all shared renderers, and bootstrap telemetry. A report MUST identify failures and unavailable coverage; current implementation tests alone are not a conformance declaration.
 
 **T-UAS-052 — Preservation assertions.** Tests MUST compare ordered canonical arrays and nested values, not only markdown substrings. They MUST check normalization twice for idempotence, repeated equal inputs for determinism, JSON round trips for supported fields, and input deep equality before/after conversion and reading. Frozen input fixtures SHOULD be used to expose accidental mutation.
 
@@ -989,6 +1071,7 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | T-UAS-054–T-UAS-064 | Six engine adapters; interleaved MCPG/AWF sources; downstream snapshots/results; leading numeric format version; timestamp units and ties; malformed/missing logs; read/write failure; escaped secrets and symlinks | Complete compact `aw_session.jsonl`, pinned format header, provenance and payload preservation, deterministic chronology and untimed tail, explicit coverage, safe atomic persistence, existing accounting unchanged. |
 | T-UAS-065–T-UAS-066 | Unified file through both publication sinks and the conversation renderer; colliding source IDs; overlapping accounting; hostile/secret text; exhausted summary budget | Known runtime types remain visible, scopes and accounting remain independent, private prompts/payloads stay omitted, output is bounded and safely redacted, source artifact remains intact. |
 | T-UAS-067 | Repeated native/canonical/detector error observations, live timeout evidence, final-zero and missing exits, malformed or duplicate aggregate records, quoted errors and tool failures | One deterministic `agent.execution` record with distinct native codes/types, stable categories, observed exit precedence, unchanged error evidence, and matching JS/Go reader validation. |
+| T-UAS-068 | Goose stream messages/deltas, tool requests/results, cumulative completion usage, source-second timestamps, malformed records, error-only and partial sessions | Exact supported content and IDs, observed outcomes only, no duplicated snapshots or invented partial results, explicit diagnostics. |
 
 ### 9.3 Engine and integration fixture matrix
 
@@ -1000,6 +1083,8 @@ Recommended execution is fixture parsing, canonical structural assertions, accou
 | Gemini | Flat JSONL init, user/assistant messages, whitespace-only deltas, tool use/result, final stats, unknown/debug/partial lines; false/zero/object outputs | Exact streaming text; typed outputs; canonical result present; `tool_calls` retained but never used as turns. |
 | Pi | Flat and v3 streams; session metadata; tool end before finalized turn; streaming-only partial turn; orphan end; reasoning; empty-content provider error; two finalized usage reports; terminal snapshot | No reorder for pairing, no lost partial tools/text, cumulative input/output/cache fields once, absent duration/cost, canonical result only. |
 | Custom | Actual native/Claude/Codex signatures; deterministic delegate ties; mixed legacy/events; unrelated JSON, unknown-only dotted record, plain prose, delegate fallback markdown | Correct supported detection and delegation; no false format recognition from parseability or nonempty markdown. |
+| OpenCode | Recognized session/part envelopes; tool lifecycle; distinct step finishes; structured errors; budget/server diagnostics | Source IDs and millisecond timestamps, accounting once, independent failures and absent metrics. |
+| Goose | Message/channel deltas; source-second timestamps; repeated tool observations; structured-only results; zero/invalid cumulative metrics; startup and maximum-turn errors | Exact content, retained identities, snapshot accounting, observed turn counts, explicit malformed-record warnings and no fabricated outcomes. |
 | Shared helpers | Per-record mixed conversion; JSON round trip; reversible supported-field interchange; missing IDs; structured/falsy values; source extras; frozen nested fixtures | Open vocabulary, exact values/metadata/order, deterministic/idempotent normalization, no mutation or fabricated results. |
 | Renderers | All three summary functions and information/statistics paths; canonical-only and normalized mixed fixtures; command/MCP forms; structured outputs; trailing extension; partial execution; private prompt | Compatible display, known-zero versus unknown accounting, truthful success counts, no new prompt exposure, unchanged canonical trace. |
 | Bootstrap | Canonical `session.result` only; token aliases; multiple snapshots; zero/absent/invalid values; preexisting legacy telemetry; line separation; redaction; I/O failure | Legacy metric projection derives from canonical data, remains idempotent/best-effort, and never appends legacy result to `logEntries`. |
@@ -1098,12 +1183,36 @@ workflow failed downstream despite its observed agent exit code being zero;
 the entry preserves that distinction. Claude and Pi lacked a final exit-code
 observation, so their entries omit it.
 
+### 9.6 Mechanical contract checks (Informative)
+
+`scripts/session_schemas.test.cjs`, relative to `actions/setup/js/`, checks
+byte-identical regeneration, independent schema compilation, all eight current
+parser labels, raw engine mappings, and collected runtime payload families.
+Negative cases include invalid known payloads that would otherwise match the
+open native union, unsafe/fractional token counts, legacy event names, absent
+provenance, wrong file headers, invalid paths, ordering errors, duplicate execution
+records, malformed lines, and noncompact JSONL. CLI tests check exit status and
+diagnostics without printing payloads.
+
+```bash
+make check-session-schemas
+npm --prefix actions/setup/js run typecheck
+npm --prefix actions/setup/js run test:js -- scripts/session_schemas.test.cjs
+```
+
+`npm test` checks schema freshness before its behavioral suites.
+The change-scoped `make agent-report-progress` gate also checks freshness when
+session declarations, tooling, or generated schemas change. Generated schemas
+are committed with declaration changes; changing prose alone does not regenerate
+or change the serialization format. Native invalid diagnostic values may require
+inspection rather than a successful writer-signature validation.
+
 ## 10. Implementation Gap Matrix (Informative)
 
 These observations record the code **before** the implementation accompanying this
 draft. They are a historical gap inventory, not claims about the updated code or an
 exhaustive defect inventory. The normative sections and conformance suites define
-the behavior implemented and verified by this change.
+the contract; current implementation coverage must be assessed separately.
 
 | Area and source function | Observed behavior | Contract to implement |
 | --- | --- | --- |
@@ -1131,9 +1240,11 @@ separately from the historical parser gap inventory above.
 | Missing evidence | No unified coverage record distinguished missing, empty, untimed, or malformed sources. | Append explicit collection coverage and warnings; preserve untimed observations and fail visibly on I/O errors. |
 
 Remaining boundaries are intentional: unobserved execution times are not
-reconstructed, clocks are not corrected, binary threat-detection runs do not
-become fabricated agent conversations, and Go CLI readers are not automatically
-changed to consume the richer artifact. Actions step-summary and action-output
+reconstructed, clocks are not corrected, and binary threat-detection runs do not
+become fabricated agent conversations. Go audit readers consume selected
+detection and execution evidence; `gh aw sessions download` exports published
+or reconstructed unified files, rather than independently reimplementing every
+JavaScript engine mapping. Actions step-summary and action-output
 renderers consume the unified file as defined in Section 8.5. Evals contribute recorded
 results/accounting, not an invented conversation transcript. Current collection
 loads selected files and the merged array into memory; streaming external sort
@@ -1157,6 +1268,10 @@ These links identify inspected implementation surfaces. They are not external en
 - **[Gemini]** [`actions/setup/js/parse_gemini_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_gemini_log.cjs).
 - **[Pi]** [`actions/setup/js/parse_pi_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_pi_log.cjs).
 - **[Custom]** [`actions/setup/js/parse_custom_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_custom_log.cjs).
+- **[OpenCode]** [`actions/setup/js/parse_opencode_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_opencode_log.cjs).
+- **[Goose]** [`actions/setup/js/parse_goose_log.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/parse_goose_log.cjs).
+- **[Schema tooling]** [`generate_session_schemas.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/scripts/generate_session_schemas.cjs), [`validate_session.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/scripts/validate_session.cjs), and the declaration maps in `actions/setup/js/types/`.
+- **[Session downloads]** [`pkg/cli/sessions_download.go`](https://github.com/github/gh-aw/blob/main/pkg/cli/sessions_download.go) and [`actions/setup/js/session_cli.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/session_cli.cjs).
 - **[Formatters]** [`actions/setup/js/log_parser_format.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/log_parser_format.cjs).
 - **[Bootstrap]** [`actions/setup/js/log_parser_bootstrap.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/log_parser_bootstrap.cjs).
 - **[Merger]** [`actions/setup/js/unified_session.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/unified_session.cjs), [`session_artifact.cjs`](https://github.com/github/gh-aw/blob/main/actions/setup/js/session_artifact.cjs), and [`collect_usage_artifact_files.sh`](https://github.com/github/gh-aw/blob/main/actions/setup/sh/collect_usage_artifact_files.sh).
@@ -1168,7 +1283,7 @@ These links identify inspected implementation surfaces. They are not external en
 
 ### 12.1 Appendix A: Complete canonical example
 
-This example includes every core type, native metadata, an extension, structured/false/zero outputs, explicit failure, and reported zero cost. All identifiers and metrics represent supplied example source evidence. The user prompt is retained internally but omitted from default summaries.
+This example includes all seven common agent types, native metadata, an extension, structured/false/zero outputs, explicit failure, and reported zero cost. It is a parser trace, not a unified file, so it has no collector header or provenance. All identifiers and metrics represent supplied example source evidence. The user prompt is retained internally but omitted from default summaries.
 
 ```json
 [
@@ -1403,6 +1518,14 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.5.0 — Draft (2026-10-05)
+
+- Added Goose's stream-JSON mapping (T-UAS-068), custom delegate precedence, and current engine labels.
+- Separated canonical and essential unified payload declarations, including their accounting-key conventions.
+- Added mechanically generated Draft-07 schemas, deterministic drift checks, and JSON/JSONL validation tools.
+- Documented published-session downloads and historical reconstruction; clarified historical gaps and schema-validation limits.
+- Retained numeric serialization-format version 1.
 
 ### Version 1.4.0 — Draft (2026-10-03)
 

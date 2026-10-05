@@ -1,0 +1,388 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.github.io/gh-aw/schemas/unified-session.schema.json",
+  "title": "Unified agent session file",
+  "description": "Generated from actions/setup/js/types/{agent_session,unified_session}.d.ts. Run make session-schemas; do not edit by hand.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["type", "data", "provenance"],
+    "properties": { "type": { "type": "string", "pattern": "\\." }, "data": { "type": "object" }, "provenance": { "$ref": "#/definitions/SessionProvenance" } },
+    "allOf": [
+      { "$ref": "#/definitions/EventMetadata" },
+      { "if": { "properties": { "type": { "const": "agent.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AgentExecutionData" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
+      { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
+      { "if": { "properties": { "type": { "const": "experiment.state" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentStateData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.http_access" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallAccessData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
+      { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
+      { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.guard.blocked" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
+      { "if": { "properties": { "type": { "const": "safe_output.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
+      { "if": { "properties": { "type": { "const": "safe_output.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
+      { "if": { "properties": { "type": { "const": "session.collection" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionData" } } } },
+      { "if": { "properties": { "type": { "const": "session.collection_warning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionWarningData" } } } },
+      { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] },
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22)%3E" } } }
+      },
+      { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UnifiedSessionResultData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "session.start" } }, "required": ["type"] },
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CSessionInitData%2C(%22sourceEngine%22%7C%22model%22%7C%22sessionId%22%7C%22cwd%22)%3E" } } }
+      },
+      {
+        "if": { "properties": { "type": { "const": "tool.execution_complete" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22)%3E"
+            }
+          }
+        }
+      },
+      {
+        "if": { "properties": { "type": { "const": "tool.execution_start" } }, "required": ["type"] },
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CToolExecutionStartData%2C(%22toolCallId%22%7C%22toolName%22%7C%22input%22%7C%22command%22%7C%22mcpServerName%22)%3E" } } }
+      },
+      { "if": { "properties": { "type": { "const": "usage.report" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
+      { "if": { "properties": { "type": { "const": "user.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "workflow.info" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/WorkflowInfoData" } } } }
+    ]
+  },
+  "minItems": 1,
+  "allOf": [
+    {
+      "items": [
+        {
+          "properties": {
+            "type": { "const": "session.format" },
+            "data": { "properties": { "version": { "const": 1 } }, "required": ["version"] },
+            "provenance": { "properties": { "component": { "const": "collector" }, "phase": { "const": "conclusion" }, "path": { "const": "usage/aw_session.jsonl" }, "index": { "const": 0 } }, "not": { "required": ["timestampMs"] } }
+          },
+          "not": { "required": ["timestamp"] }
+        }
+      ]
+    }
+  ],
+  "definitions": {
+    "AgentExecutionData": {
+      "type": "object",
+      "properties": {
+        "categories": { "type": "array", "items": { "$ref": "#/definitions/SessionDiagnosticName" }, "uniqueItems": true },
+        "errorCodes": { "type": "array", "items": { "anyOf": [{ "$ref": "#/definitions/SessionDiagnosticName" }, { "$ref": "#/definitions/SessionErrorNumber" }] }, "uniqueItems": true },
+        "errorTypes": { "type": "array", "items": { "$ref": "#/definitions/SessionDiagnosticName" }, "uniqueItems": true },
+        "exitCode": { "$ref": "#/definitions/SessionExitCode" }
+      },
+      "required": ["categories", "errorCodes", "errorTypes"],
+      "additionalProperties": {}
+    },
+    "CollectionData": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "component": { "type": "string" },
+              "phase": { "type": "string" },
+              "path": { "type": "string" },
+              "events": { "$ref": "#/definitions/SessionCount" },
+              "timestampUnit": { "type": "string", "enum": ["seconds", "milliseconds"] }
+            },
+            "required": ["component", "phase", "path", "events"],
+            "additionalProperties": false
+          }
+        },
+        "warnings": { "$ref": "#/definitions/SessionCount" },
+        "untimedEvents": { "$ref": "#/definitions/SessionCount" },
+        "absentComponents": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["sources", "warnings", "untimedEvents", "absentComponents"],
+      "additionalProperties": false
+    },
+    "CollectionWarningData": { "type": "object", "properties": { "code": { "type": "string" }, "path": { "type": "string" }, "line": { "type": "number", "minimum": 1, "multipleOf": 1 } }, "required": ["code"], "additionalProperties": {} },
+    "DetectionResultData": {
+      "type": "object",
+      "properties": {
+        "jobResult": { "type": "string" },
+        "conclusion": { "type": "string" },
+        "reason": { "type": "string" },
+        "promptInjection": { "type": "boolean" },
+        "secretLeak": { "type": "boolean" },
+        "maliciousPatch": { "type": "boolean" }
+      },
+      "additionalProperties": {}
+    },
+    "EvalResultData": {
+      "type": "object",
+      "properties": { "id": { "$ref": "#/definitions/JsonValue" }, "answer": { "$ref": "#/definitions/JsonValue" }, "model": { "$ref": "#/definitions/JsonValue" }, "error": { "$ref": "#/definitions/JsonValue" } },
+      "additionalProperties": false
+    },
+    "EventMetadata": { "type": "object", "properties": { "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "timestamp": { "type": ["string", "number"] } }, "additionalProperties": {} },
+    "ExecutionResultData": {
+      "type": "object",
+      "properties": {
+        "outcome": { "$ref": "#/definitions/JsonValue" },
+        "conclusion": { "$ref": "#/definitions/JsonValue" },
+        "exitCode": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/JsonValue" },
+        "startedAt": { "$ref": "#/definitions/JsonValue" },
+        "finishedAt": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "ExperimentAssignmentData": { "type": "object", "properties": { "assignments": { "$ref": "#/definitions/JsonValue" } }, "required": ["assignments"], "additionalProperties": false },
+    "ExperimentStateData": {
+      "type": "object",
+      "properties": { "runId": { "$ref": "#/definitions/JsonValue" }, "assignments": { "$ref": "#/definitions/JsonValue" }, "counts": { "$ref": "#/definitions/JsonValue" } },
+      "additionalProperties": false
+    },
+    "FirewallAccessData": {
+      "type": "object",
+      "properties": {
+        "host": { "$ref": "#/definitions/JsonValue" },
+        "method": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "decision": { "$ref": "#/definitions/JsonValue" },
+        "bytes": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "GraderData": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/JsonValue" },
+        "name": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "value": { "$ref": "#/definitions/JsonValue" },
+        "score": { "$ref": "#/definitions/JsonValue" },
+        "unit": { "$ref": "#/definitions/JsonValue" },
+        "passed": { "$ref": "#/definitions/JsonValue" },
+        "direction": { "$ref": "#/definitions/JsonValue" },
+        "threshold": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "GraderManifestData": { "type": "object", "properties": { "graders": { "type": "array", "items": { "$ref": "#/definitions/GraderData" } } }, "additionalProperties": false },
+    "GraderResultData": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/JsonValue" },
+        "name": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "value": { "$ref": "#/definitions/JsonValue" },
+        "score": { "$ref": "#/definitions/JsonValue" },
+        "unit": { "$ref": "#/definitions/JsonValue" },
+        "passed": { "$ref": "#/definitions/JsonValue" },
+        "direction": { "$ref": "#/definitions/JsonValue" },
+        "threshold": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" },
+        "results": { "type": "array", "items": { "$ref": "#/definitions/GraderData" } }
+      },
+      "additionalProperties": false
+    },
+    "JsonValue": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
+      ]
+    },
+    "McpObservationData": {
+      "type": "object",
+      "properties": {
+        "serverName": { "$ref": "#/definitions/JsonValue" },
+        "direction": { "$ref": "#/definitions/JsonValue" },
+        "rpcId": { "$ref": "#/definitions/JsonValue" },
+        "method": { "$ref": "#/definitions/JsonValue" },
+        "toolName": { "$ref": "#/definitions/JsonValue" },
+        "toolCallId": { "$ref": "#/definitions/JsonValue" },
+        "requestId": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/JsonValue" },
+        "inputSize": { "$ref": "#/definitions/JsonValue" },
+        "outputSize": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "reason": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },
+    "Pick<SessionInitData,(\"sourceEngine\"|\"model\"|\"sessionId\"|\"cwd\")>": {
+      "type": "object",
+      "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\")>": {
+      "type": "object",
+      "properties": {
+        "toolCallId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "success": { "type": "boolean" },
+        "output": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/SessionMetric" },
+        "exitCode": { "type": "number" },
+        "status": { "type": "string" },
+        "mcpServerName": { "type": "string" },
+        "isError": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "Pick<ToolExecutionStartData,(\"toolCallId\"|\"toolName\"|\"input\"|\"command\"|\"mcpServerName\")>": {
+      "type": "object",
+      "properties": { "toolCallId": { "type": "string" }, "toolName": { "type": "string" }, "input": { "$ref": "#/definitions/JsonValue" }, "command": { "type": "string" }, "mcpServerName": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "RuntimeObservationData": {
+      "type": "object",
+      "properties": {
+        "event": { "$ref": "#/definitions/JsonValue" },
+        "level": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "message": { "$ref": "#/definitions/JsonValue" },
+        "reason": { "$ref": "#/definitions/JsonValue" },
+        "requestId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false,
+      "description": "Runtime observations retain supplied JSON values, including null and false."
+    },
+    "SafeOutputData": {
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/definitions/JsonValue" },
+        "repo": { "$ref": "#/definitions/JsonValue" },
+        "number": { "$ref": "#/definitions/JsonValue" },
+        "provider": { "$ref": "#/definitions/JsonValue" },
+        "identifier": { "$ref": "#/definitions/JsonValue" },
+        "url": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "message": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" },
+        "errorCode": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "SafeOutputErrorData": {
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/definitions/JsonValue" },
+        "repo": { "$ref": "#/definitions/JsonValue" },
+        "number": { "$ref": "#/definitions/JsonValue" },
+        "provider": { "$ref": "#/definitions/JsonValue" },
+        "identifier": { "$ref": "#/definitions/JsonValue" },
+        "url": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "message": { "$ref": "#/definitions/JsonValue" },
+        "error": { "$ref": "#/definitions/JsonValue" },
+        "errorCode": { "$ref": "#/definitions/JsonValue" },
+        "errors": {
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/definitions/SafeOutputData" }, { "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" }, { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } }] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SessionCount": { "type": "number", "minimum": 0, "maximum": 9007199254740991, "multipleOf": 1 },
+    "SessionDiagnosticName": { "type": "string", "minLength": 1 },
+    "SessionErrorNumber": { "type": "number", "minimum": -9007199254740991, "maximum": 9007199254740991, "multipleOf": 1 },
+    "SessionExitCode": { "type": "number", "minimum": 0, "maximum": 255, "multipleOf": 1 },
+    "SessionFileFormatData": { "type": "object", "properties": { "version": { "type": "number", "minimum": 1, "multipleOf": 1 } }, "required": ["version"], "additionalProperties": {} },
+    "SessionMetric": { "type": "number", "minimum": 0 },
+    "SessionProvenance": {
+      "type": "object",
+      "properties": {
+        "component": { "type": "string" },
+        "phase": { "type": "string" },
+        "path": { "type": "string" },
+        "index": { "$ref": "#/definitions/SessionCount", "description": "Position in the source's normalized event array, not necessarily a raw line." },
+        "timestampMs": { "type": "number", "description": "Ordering key only; numeric native timestamp units are schema-dependent." },
+        "native": { "description": "Preserves a source event's preexisting provenance field." }
+      },
+      "required": ["component", "phase", "path", "index"],
+      "additionalProperties": false,
+      "description": "Collector metadata is separate from native engine event metadata."
+    },
+    "UnifiedSessionResultData": {
+      "type": "object",
+      "properties": {
+        "numTurns": { "$ref": "#/definitions/SessionCount" },
+        "durationMs": { "$ref": "#/definitions/SessionMetric" },
+        "totalCostUsd": { "$ref": "#/definitions/SessionMetric" },
+        "status": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "permissionDenials": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    },
+    "UnifiedSessionUsage": {
+      "type": "object",
+      "properties": {
+        "totalTokens": { "$ref": "#/definitions/SessionCount" },
+        "inputTokens": { "$ref": "#/definitions/SessionCount" },
+        "outputTokens": { "$ref": "#/definitions/SessionCount" },
+        "reasoningOutputTokens": { "$ref": "#/definitions/SessionCount" },
+        "cacheReadInputTokens": { "$ref": "#/definitions/SessionCount" },
+        "cacheCreationInputTokens": { "$ref": "#/definitions/SessionCount" },
+        "inputTokensIncludeCache": { "type": "boolean" },
+        "overflowedTokens": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false,
+      "description": "Essential accounting projection; parser traces retain their snake_case usage."
+    },
+    "UsageReportData": {
+      "type": "object",
+      "properties": {
+        "provider": { "$ref": "#/definitions/JsonValue" },
+        "model": { "$ref": "#/definitions/JsonValue" },
+        "requestId": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" },
+        "aic": { "$ref": "#/definitions/JsonValue" },
+        "totalAic": { "$ref": "#/definitions/JsonValue" },
+        "premiumRequests": { "$ref": "#/definitions/JsonValue" },
+        "durationMs": { "$ref": "#/definitions/JsonValue" },
+        "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowInfoData": {
+      "type": "object",
+      "properties": {
+        "engineId": { "$ref": "#/definitions/JsonValue" },
+        "agentVersion": { "$ref": "#/definitions/JsonValue" },
+        "cliVersion": { "$ref": "#/definitions/JsonValue" },
+        "awfVersion": { "$ref": "#/definitions/JsonValue" },
+        "mcpgVersion": { "$ref": "#/definitions/JsonValue" },
+        "requestedModel": { "$ref": "#/definitions/JsonValue" },
+        "triggerType": { "$ref": "#/definitions/JsonValue" },
+        "workflow": { "$ref": "#/definitions/JsonValue" },
+        "repository": { "$ref": "#/definitions/JsonValue" },
+        "runId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
