@@ -624,6 +624,16 @@ jobs:
           GH_AW_AGENT_FOLDERS: ".agents .github"
           GH_AW_AGENT_FILES: "AGENTS.md"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
+      - name: Restore Copilot workflows from activation artifact
+        run: |
+          if [ -d /tmp/gh-aw/base ]; then
+            src=/tmp/gh-aw/base/.github
+            dst="$GITHUB_WORKSPACE/.github"
+            rm -rf "$dst"
+            if [ -d "$src" ]; then
+              cp -a "$src" "$dst"
+            fi
+          fi
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".github/agents"
@@ -1013,7 +1023,7 @@ jobs:
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
-          printf '%s' '{"builtInAgents":{"rubberDuck":false}}' > "$HOME/.copilot/settings.json"
+          printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}' > "$HOME/.copilot/settings.json"
           export XDG_CONFIG_HOME="$HOME"
           export GH_AW_MCP_CONFIG="$HOME/.copilot/mcp-config.json"
           GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
@@ -1073,7 +1083,7 @@ jobs:
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","serena","--allow-tool","shell(awk)","--allow-tool","shell(bc)","--allow-tool","shell(cat pkg/**/*.go)","--allow-tool","shell(cat)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find pkg -name \"*.go\" ! -name \"*_test.go\" -type f)","--allow-tool","shell(find pkg -type f -name \"*.go\" ! -name \"*_test.go\")","--allow-tool","shell(find pkg/ -maxdepth 1 -ls)","--allow-tool","shell(find pkg/workflow/ -maxdepth 1 -ls)","--allow-tool","shell(find)","--allow-tool","shell(git:*)","--allow-tool","shell(github:*)","--allow-tool","shell(grep -r \"func \" pkg --include=\"*.go\")","--allow-tool","shell(grep)","--allow-tool","shell(head -n * pkg/**/*.go)","--allow-tool","shell(head)","--allow-tool","shell(jq)","--allow-tool","shell(ls)","--allow-tool","shell(mkdir)","--allow-tool","shell(mv)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sed)","--allow-tool","shell(serena:*)","--allow-tool","shell(set)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(uniq)","--allow-tool","shell(wc -l pkg/**/*.go)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","serena","--allow-tool","shell(awk)","--allow-tool","shell(bc)","--allow-tool","shell(cat pkg/**/*.go)","--allow-tool","shell(cat)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find pkg -name \"*.go\" ! -name \"*_test.go\" -type f)","--allow-tool","shell(find pkg -type f -name \"*.go\" ! -name \"*_test.go\")","--allow-tool","shell(find pkg/ -maxdepth 1 -ls)","--allow-tool","shell(find pkg/workflow/ -maxdepth 1 -ls)","--allow-tool","shell(find)","--allow-tool","shell(git:*)","--allow-tool","shell(github:*)","--allow-tool","shell(grep -r \"func \" pkg --include=\"*.go\")","--allow-tool","shell(grep)","--allow-tool","shell(head -n * pkg/**/*.go)","--allow-tool","shell(head)","--allow-tool","shell(jq)","--allow-tool","shell(ls)","--allow-tool","shell(mkdir)","--allow-tool","shell(mv)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sed)","--allow-tool","shell(serena:*)","--allow-tool","shell(set)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(uniq)","--allow-tool","shell(wc -l pkg/**/*.go)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--allow-tool","workflow","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
           GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","serena","shell(awk)","shell(bc)","shell(cat pkg/**/*.go)","shell(cat)","shell(date)","shell(echo)","shell(find pkg -name \"*.go\" ! -name \"*_test.go\" -type f)","shell(find pkg -type f -name \"*.go\" ! -name \"*_test.go\")","shell(find pkg/ -maxdepth 1 -ls)","shell(find pkg/workflow/ -maxdepth 1 -ls)","shell(find)","shell(git:*)","shell(github:*)","shell(grep -r \"func \" pkg --include=\"*.go\")","shell(grep)","shell(head -n * pkg/**/*.go)","shell(head)","shell(jq)","shell(ls)","shell(mkdir)","shell(mv)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sed)","shell(serena:*)","shell(set)","shell(sort)","shell(tail)","shell(uniq)","shell(wc -l pkg/**/*.go)","shell(wc)","shell(yq)","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_TOOL_DENIALS: 3
@@ -1086,6 +1096,7 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: true
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
@@ -1852,6 +1863,7 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: true
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -2104,7 +2116,7 @@ jobs:
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
-          printf '%s' '{"builtInAgents":{"rubberDuck":false}}' > "$HOME/.copilot/settings.json"
+          printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}' > "$HOME/.copilot/settings.json"
           export XDG_CONFIG_HOME="$HOME"
           GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
           if [ -z "$GH_AW_COPILOT_SRC" ] || [ ! -x "$GH_AW_COPILOT_SRC" ]; then
@@ -2163,7 +2175,7 @@ jobs:
           COPILOT_MODEL: evals
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","shell"]'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","shell","--allow-tool","workflow"]'
           GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":false,"webFetch":false,"webSearch":false,"mcp":false,"cliProxy":false},"permissions":{"allowedTools":["read","shell"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_TOOL_DENIALS: 3
@@ -2175,6 +2187,7 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: true
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SERVER_URL: ${{ github.server_url }}

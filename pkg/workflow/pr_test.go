@@ -3,7 +3,9 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -228,24 +230,33 @@ Test workflow.
 }
 
 func TestCompileWorkflowWithDynamicWorkflowsDisabled(t *testing.T) {
-	dir := t.TempDir()
-	workflowPath := filepath.Join(dir, "claude.md")
-	source := `---
+	for _, engineID := range []string{"claude", "copilot"} {
+		t.Run(engineID, func(t *testing.T) {
+			dir := t.TempDir()
+			workflowPath := filepath.Join(dir, engineID+".md")
+			source := fmt.Sprintf(`---
 on:
   workflow_dispatch:
 engine:
-  id: claude
+  id: %s
   dynamic-workflows: false
 strict: false
 ---
 Run the workflow.
-`
-	require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0644))
-	require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+`, engineID)
+			require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0644))
+			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
 
-	lock, err := os.ReadFile(filepath.Join(dir, "claude.lock.yml"))
-	require.NoError(t, err)
-	assert.NotContains(t, string(lock), "Restore Claude workflows from activation artifact")
+			lock, err := os.ReadFile(filepath.Join(dir, engineID+".lock.yml"))
+			require.NoError(t, err)
+			assert.NotContains(t, string(lock), "workflows from activation artifact")
+			if engineID == "copilot" {
+				assert.Contains(t, string(lock), `"EXTENSIONS":false`)
+				assert.Contains(t, string(lock), "--deny-tool workflow")
+				assert.NotContains(t, string(lock), "--allow-tool workflow")
+			}
+		})
+	}
 }
 
 func TestPRCheckoutRestoreWithCustomCheckout(t *testing.T) {
@@ -288,6 +299,9 @@ permissions:
   contents: read
 checkout:
   pull-request: false
+engine:
+  id: copilot
+  dynamic-workflows: false
 strict: false
 ---
 Test workflow.
@@ -311,16 +325,63 @@ Test workflow.
 }
 
 func TestRestoreClaudeWorkflowsStep(t *testing.T) {
-	var yaml strings.Builder
-	generateRestoreClaudeWorkflowsStep(&yaml)
-	step := yaml.String()
+	step := strings.Join(NewClaudeEngine().GetDynamicWorkflowRestoreStep(), "\n")
 	assert.Contains(t, step, "src=/tmp/gh-aw/base/.claude")
 	assert.Contains(t, step, "dst=\"$GITHUB_WORKSPACE/.claude\"")
 	assert.Contains(t, step, "cp -a \"$src\" \"$dst\"")
 	assert.Contains(t, step, "rm -rf \"$dst\"")
 }
 
-func TestCanRestoreClaudeWorkflows(t *testing.T) {
+func TestRestoreCopilotWorkflowsStep(t *testing.T) {
+	step := strings.Join(NewCopilotEngine().GetDynamicWorkflowRestoreStep(), "\n")
+	assert.Contains(t, step, "src=/tmp/gh-aw/base/.github")
+	assert.Contains(t, step, `dst="$GITHUB_WORKSPACE/.github"`)
+	assert.NotContains(t, step, ".claude")
+
+	for _, tt := range []struct {
+		name     string
+		snapshot bool
+	}{
+		{name: "restores nested support files", snapshot: true},
+		{name: "removes PR-only extensions"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			base := filepath.Join(root, "base")
+			workspace := filepath.Join(root, "workspace")
+			extensions := filepath.Join(workspace, ".github", "extensions")
+			require.NoError(t, os.MkdirAll(base, 0755))
+			require.NoError(t, os.MkdirAll(extensions, 0755))
+			untrusted := filepath.Join(extensions, "untrusted.mjs")
+			require.NoError(t, os.WriteFile(untrusted, []byte("untrusted"), 0644))
+			untrustedSettings := filepath.Join(workspace, ".github", "settings.json")
+			require.NoError(t, os.WriteFile(untrustedSettings, []byte(`{"extensions":{"mode":"disabled"}}`), 0644))
+			if tt.snapshot {
+				source := filepath.Join(base, ".github", "extensions", "review", "support")
+				require.NoError(t, os.MkdirAll(source, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(source, "data.json"), []byte(`{"trusted":true}`), 0644))
+			}
+			_, script, found := strings.Cut(step, "        run: |\n")
+			require.True(t, found)
+			script = strings.ReplaceAll(script, "/tmp/gh-aw/base", base)
+			cmd := exec.Command("bash", "-e", "-c", script)
+			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, string(output))
+			assert.NoFileExists(t, untrusted)
+			assert.NoFileExists(t, untrustedSettings)
+			if tt.snapshot {
+				content, err := os.ReadFile(filepath.Join(extensions, "review", "support", "data.json"))
+				require.NoError(t, err)
+				assert.JSONEq(t, `{"trusted":true}`, string(content))
+			} else {
+				assert.NoDirExists(t, extensions)
+			}
+		})
+	}
+}
+
+func TestCanRestoreDynamicWorkflows(t *testing.T) {
 	tests := []struct {
 		name string
 		data *WorkflowData
@@ -335,7 +396,7 @@ func TestCanRestoreClaudeWorkflows(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, canRestoreClaudeWorkflows(tt.data))
+			assert.Equal(t, tt.want, canRestoreDynamicWorkflows(tt.data))
 		})
 	}
 }
@@ -354,6 +415,7 @@ func TestClaudeWorkflowRestorePrecedesAgentSteps(t *testing.T) {
 	_, err = NewCompiler().generateEngineInstallAndPreAgentSteps(&yaml, data, false)
 	require.NoError(t, err)
 	assert.NotContains(t, yaml.String(), "Restore Claude workflows from activation artifact")
+	assert.Contains(t, yaml.String(), "Restore Copilot workflows from activation artifact")
 
 	yaml.Reset()
 	disabled := false
@@ -364,6 +426,40 @@ func TestClaudeWorkflowRestorePrecedesAgentSteps(t *testing.T) {
 	_, err = NewCompiler().generateEngineInstallAndPreAgentSteps(&yaml, data, false)
 	require.NoError(t, err)
 	assert.NotContains(t, yaml.String(), "Restore Claude workflows from activation artifact")
+}
+
+func TestCopilotWorkflowRestorePrecedesAgentSteps(t *testing.T) {
+	disabled := false
+	for _, tt := range []struct {
+		name string
+		data *WorkflowData
+		want bool
+	}{
+		{name: "default", data: &WorkflowData{Permissions: "contents: read"}, want: true},
+		{name: "PR checkout disabled", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}}, want: true},
+		{name: "checkout disabled", data: &WorkflowData{CheckoutDisabled: true}, want: true},
+		{name: "dynamic workflows disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &disabled}}},
+		{name: "other repository at root", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "example/other"}}}},
+		{name: "custom checkout", data: &WorkflowData{CustomSteps: "      - uses: actions/checkout@v4\n"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.data.AI = "copilot"
+			tt.data.PreAgentSteps = "pre-agent-steps:\n  - name: Prepare extensions\n    run: echo prepare\n"
+			var yaml strings.Builder
+			_, err := NewCompiler().generateEngineInstallAndPreAgentSteps(&yaml, tt.data, false)
+			require.NoError(t, err)
+			steps := yaml.String()
+			restore := strings.Index(steps, "Restore Copilot workflows from activation artifact")
+			assert.Equal(t, tt.want, restore >= 0)
+			assert.NotContains(t, steps, "Restore Claude workflows from activation artifact")
+			if tt.want {
+				assert.Less(t, restore, strings.Index(steps, "Prepare extensions"))
+				if checkout := strings.Index(steps, "Checkout PR branch"); checkout >= 0 {
+					assert.Less(t, checkout, restore)
+				}
+			}
+		})
+	}
 }
 
 func TestResolveAgentManifestPaths(t *testing.T) {

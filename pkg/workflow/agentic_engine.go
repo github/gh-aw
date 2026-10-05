@@ -174,6 +174,11 @@ type PostConfigPluginInstallationProvider interface {
 	GetPostConfigPluginInstallationSteps(workflowData *WorkflowData) []GitHubActionStep
 }
 
+// DynamicWorkflowProvider restores trusted dynamic workflow definitions after checkout.
+type DynamicWorkflowProvider interface {
+	GetDynamicWorkflowRestoreStep() GitHubActionStep
+}
+
 // CapabilityProvider detects what capabilities an engine supports.
 // Engines can optionally implement this to indicate feature support.
 type CapabilityProvider interface {

@@ -178,6 +178,10 @@ func (e *ClaudeEngine) GetAgentManifestPathPrefixes() []string {
 	return []string{".claude/"}
 }
 
+func (e *ClaudeEngine) GetDynamicWorkflowRestoreStep() GitHubActionStep {
+	return generateRestoreDynamicWorkflowsStep("Claude", ".claude")
+}
+
 // GetExecutionSteps returns the GitHub Actions steps for executing Claude
 func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string) []GitHubActionStep {
 	claudeLog.Printf("Generating execution steps for Claude engine: workflow=%s, firewall=%v", workflowData.Name, isFirewallEnabled(workflowData))

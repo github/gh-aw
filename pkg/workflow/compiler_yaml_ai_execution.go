@@ -518,8 +518,11 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		)
 		generateRestoreAmbientFoldersStep(yaml, data)
 	}
-	if dynamicWorkflowsEnabled(engine, data.EngineConfig) && canRestoreClaudeWorkflows(data) {
-		generateRestoreClaudeWorkflowsStep(yaml)
+	if restorer, ok := engine.(DynamicWorkflowProvider); ok && dynamicWorkflowsEnabled(engine, data.EngineConfig) && canRestoreDynamicWorkflows(data) {
+		for _, line := range restorer.GetDynamicWorkflowRestoreStep() {
+			yaml.WriteString(line)
+			yaml.WriteByte('\n')
+		}
 	}
 
 	// Restore inline sub-agents written during the activation job.

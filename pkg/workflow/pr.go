@@ -58,9 +58,9 @@ func isPRCheckoutDisabled(data *WorkflowData) bool {
 	return false
 }
 
-// Claude's activation snapshot belongs to the workflow repository. Do not copy it
+// The activation snapshot belongs to the workflow repository. Do not copy it
 // into a different repository checked out at the workspace root.
-func canRestoreClaudeWorkflows(data *WorkflowData) bool {
+func canRestoreDynamicWorkflows(data *WorkflowData) bool {
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
 		return false
 	}
@@ -160,20 +160,22 @@ func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files 
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
 }
 
-// Restore Claude's config from the activation artifact after workspace checkouts.
+// Restore engine config from the activation artifact after workspace checkouts.
 // Copying the entire tree retains saved workflows and their nested support files,
 // without leaving untrusted settings or hooks alongside them.
-func generateRestoreClaudeWorkflowsStep(yaml *strings.Builder) {
-	yaml.WriteString("      - name: Restore Claude workflows from activation artifact\n")
+func generateRestoreDynamicWorkflowsStep(engineName, directory string) GitHubActionStep {
+	var yaml strings.Builder
+	yaml.WriteString("      - name: Restore " + engineName + " workflows from activation artifact\n")
 	yaml.WriteString("        run: |\n")
 	yaml.WriteString("          if [ -d /tmp/gh-aw/base ]; then\n")
-	yaml.WriteString("            src=/tmp/gh-aw/base/.claude\n")
-	yaml.WriteString("            dst=\"$GITHUB_WORKSPACE/.claude\"\n")
+	yaml.WriteString("            src=/tmp/gh-aw/base/" + directory + "\n")
+	yaml.WriteString("            dst=\"$GITHUB_WORKSPACE/" + directory + "\"\n")
 	yaml.WriteString("            rm -rf \"$dst\"\n")
 	yaml.WriteString("            if [ -d \"$src\" ]; then\n")
 	yaml.WriteString("              cp -a \"$src\" \"$dst\"\n")
 	yaml.WriteString("            fi\n")
 	yaml.WriteString("          fi\n")
+	return GitHubActionStep(strings.Split(strings.TrimSuffix(yaml.String(), "\n"), "\n"))
 }
 
 // generatePRReadyForReviewCheckout generates a step to checkout the PR branch when PR context is available

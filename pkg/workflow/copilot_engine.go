@@ -50,6 +50,7 @@ func NewCopilotEngine() *CopilotEngine {
 				BareMode:             true, // Copilot CLI supports --no-custom-instructions
 				BashCommandAllowlist: true, // Copilot enforces tools.bash allowlist via --allow-tool shell(cmd)
 				Plugins:              true, // Copilot CLI supports Agent Plugins
+				DynamicWorkflows:     true,
 			},
 			dedicatedLLMGatewayPort: constants.CopilotLLMGatewayPort,
 		},
@@ -171,6 +172,10 @@ func (e *CopilotEngine) GetAgentManifestFiles() []string {
 // files, and copilot-setup-steps.yml — any of which can alter agent behaviour.
 func (e *CopilotEngine) GetAgentManifestPathPrefixes() []string {
 	return []string{constants.GithubDir}
+}
+
+func (e *CopilotEngine) GetDynamicWorkflowRestoreStep() GitHubActionStep {
+	return generateRestoreDynamicWorkflowsStep("Copilot", ".github")
 }
 
 // GetHarnessScriptName returns the filename of the JavaScript harness script that wraps
