@@ -243,6 +243,18 @@ func isWorkQueueEnabled(data *WorkflowData) bool {
 	return configured && value != false
 }
 
+func isWorkQueueWorker(data *WorkflowData) bool {
+	if data == nil || data.Tools == nil {
+		return false
+	}
+	config, ok := data.Tools["work-queue"].(map[string]any)
+	if !ok {
+		return false
+	}
+	worker, ok := config["worker"].(bool)
+	return ok && worker
+}
+
 func workQueueRequiresAssignment(data *WorkflowData) bool {
 	if data == nil || data.Tools == nil {
 		return false

@@ -186,6 +186,7 @@ func TestPopulateDispatchWorkflowFilesRequiresQueueEnabledWorker(t *testing.T) {
 		"worker": `tools:
   work-queue:
     storage: issues
+    worker: true
 `,
 		"ordinary-worker": "",
 		"stale-worker": `tools:

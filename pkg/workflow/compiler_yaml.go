@@ -56,7 +56,7 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 	// can receive caller metadata (repo, run_id, actor, etc.) from dispatch_workflow.
 	// String-based injection preserves existing YAML comments and formatting.
 	onSection = injectAwContextIntoOnYAML(onSection)
-	if isWorkQueueEnabled(data) {
+	if isWorkQueueEnabled(data) && isWorkQueueWorker(data) {
 		onSection = injectWorkQueueClaimIntoOnYAML(onSection)
 	}
 	onSection = injectNetworkAllowedIntoOnYAML(onSection, data.NetworkPermissions)

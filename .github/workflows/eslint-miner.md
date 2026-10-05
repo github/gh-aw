@@ -36,6 +36,7 @@ tools:
   work-queue:
     storage: git
     require-assignment: true
+    worker: true
   cli-proxy: true
   github:
     mode: gh-proxy

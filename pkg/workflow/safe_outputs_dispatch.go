@@ -71,7 +71,8 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 			safeOutputsConfigLog.Printf("Workflow %s accepts aw_context input", workflowName)
 			if data.SafeOutputs.WorkQueueEnabled &&
 				workflowHasWorkQueueClaimInput(fileResult, workflowName) &&
-				workflowHasWorkQueueTools(fileResult, workflowName) {
+				workflowHasWorkQueueTools(fileResult, workflowName) &&
+				workflowHasWorkQueueWorker(fileResult, workflowName) {
 				data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows = append(
 					data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows, workflowName,
 				)
@@ -99,6 +100,18 @@ func workflowHasWorkQueueTools(fileResult *findWorkflowFileResult, workflowName 
 		}
 	}
 	return enabled
+}
+
+func workflowHasWorkQueueWorker(fileResult *findWorkflowFileResult, workflowName string) bool {
+	if !fileResult.mdExists {
+		return false
+	}
+	worker, err := mdHasWorkQueueWorker(fileResult.mdPath)
+	if err != nil {
+		safeOutputsConfigLog.Printf("Warning: error checking work-queue worker opt-in for %s: %v", workflowName, err)
+		return false
+	}
+	return worker
 }
 
 // workflowHasAwContextInput reports whether the target accepts compiler-managed
@@ -142,8 +155,8 @@ func workflowHasWorkQueueClaimInput(fileResult *findWorkflowFileResult, workflow
 		if dispatchErr != nil || !hasDispatch {
 			return false
 		}
-		enabled, toolsErr := mdHasWorkQueueTools(fileResult.mdPath)
-		return toolsErr == nil && enabled
+		worker, workerErr := mdHasWorkQueueWorker(fileResult.mdPath)
+		return workerErr == nil && worker
 	} else {
 		return false
 	}

@@ -54,11 +54,6 @@ on:
     - cron: "0 0 */2 * *"  # Friendly format: every 2 days
   workflow_dispatch:
     inputs:
-      work_queue_claim:
-        default: ""
-        description: "Trusted work queue assignment (Reserved for Agentic Workflows)."
-        required: false
-        type: string
       aw_context:
         default: ""
         description: "Agent caller context (Reserved for Agentic Workflows)."

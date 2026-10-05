@@ -41,6 +41,7 @@ tools:
   work-queue:
     storage: git
     require-assignment: true
+    worker: true
   bash:
   - cat eslint-factory/package.json
   - find actions/setup/js -name "*.cjs" -type f

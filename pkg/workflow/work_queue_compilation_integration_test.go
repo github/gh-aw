@@ -26,6 +26,7 @@ tools:
   work-queue:
     storage: git
     require-assignment: true
+    worker: true
 safe-outputs:
   create-issue:
     max: 1
@@ -113,6 +114,7 @@ engine: claude
 tools:
   work-queue:
     storage: issues
+    worker: true
 ---
 
 Read and finish assigned work.
@@ -151,6 +153,7 @@ on:
 tools:
   work-queue:
     storage: issues
+    worker: true
 ---
 Process the assigned work.
 `), 0o600))
@@ -175,6 +178,9 @@ Read the queue and dispatch an available Work identity.
 	require.Contains(t, string(compiled), `work_queue_workflows`)
 	require.Contains(t, string(compiled), `work_queue`)
 	require.Equal(t, 4, strings.Count(string(compiled), "WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}"))
+	inputs, err := extractWorkflowDispatchInputs(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
+	require.NoError(t, err)
+	require.NotContains(t, inputs, WorkQueueClaimInputName)
 }
 
 func TestWorkQueueSmokeVerification(t *testing.T) {
