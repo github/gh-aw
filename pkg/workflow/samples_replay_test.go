@@ -118,6 +118,45 @@ Trivial workflow whose only job is to be compiled with --use-samples.
 	})
 }
 
+func TestUseSamplesIncludesReportIncomplete(t *testing.T) {
+	const md = `---
+on:
+  workflow_dispatch:
+engine: copilot
+safe-outputs:
+  report-incomplete:
+    samples:
+      - reason: "intentional sample"
+        details: "replay this report_incomplete call"
+---
+
+Report the task as incomplete.
+`
+
+	tmpFile, err := os.CreateTemp("", "report-incomplete-samples-*.md")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Remove(tmpFile.Name()))
+	})
+	_, err = tmpFile.WriteString(md)
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	compiler := NewCompiler()
+	compiler.SetUseSamples(true)
+	require.NoError(t, compiler.CompileWorkflow(tmpFile.Name()))
+
+	lockPath := strings.TrimSuffix(tmpFile.Name(), ".md") + ".lock.yml"
+	t.Cleanup(func() {
+		require.NoError(t, os.Remove(lockPath))
+	})
+	lockContent, err := os.ReadFile(lockPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(lockContent), `"tool":"report_incomplete"`)
+	assert.Contains(t, string(lockContent), `"reason":"intentional sample"`)
+	assert.NotContains(t, string(lockContent), "GH_AW_SAMPLES: |\n          []")
+}
+
 // TestFeaturesSamplesOptInReplacesAgentStep verifies that a workflow
 // declaring `features: { samples: true }` in its own frontmatter compiles
 // into samples-mode output under a plain `gh aw compile`, without needing

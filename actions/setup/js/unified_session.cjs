@@ -113,6 +113,7 @@ function parseEngineSession(content, engine) {
     gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
     pi: ["parse_pi_log.cjs", "parsePiLog"],
     opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
+    goose: ["parse_goose_log.cjs", "parseGooseLog"],
     custom: ["parse_custom_log.cjs", "parseCustomLog"],
   };
   const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;

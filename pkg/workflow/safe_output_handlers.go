@@ -676,6 +676,8 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 	{
 		Key:         "report-incomplete",
 		StructField: "ReportIncomplete",
+		ToolName:    "report_incomplete",
+		Builtin:     true,
 		PermissionBuilder: func(safeOutputs *SafeOutputsConfig) *Permissions {
 			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "ReportIncomplete") || safeOutputs.ReportIncomplete == nil {
 				return nil

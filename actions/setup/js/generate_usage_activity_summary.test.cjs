@@ -24,9 +24,16 @@ const {
   buildFrictionStepSummary,
   writeFrictionStepSummary,
   readTokenUsageContent,
+  main,
   MANIFEST_FILE_PATH,
   writeDetectionUsageResult,
 } = req("./generate_usage_activity_summary.cjs");
+
+describe("generate_usage_activity_summary.cjs", () => {
+  it("exports its main function for github-script execution", () => {
+    expect(typeof main).toBe("function");
+  });
+});
 
 describe("writeDetectionUsageResult", () => {
   const original = {

@@ -427,6 +427,16 @@ async function cleanupCompleted(github, owner, repo, corpus, staged, core) {
   return cleaned;
 }
 
+async function cleanupBeforeRecompute({ github, context, core, staged = false }) {
+  const { owner, repo } = context.repo;
+  const cutoff = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId })).data.created_at;
+  const issues = await collectIssues(github, owner, repo, cutoff);
+  const corpus = buildCorpus(`${owner}/${repo}`, issues, [], cutoff);
+  const cleaned = await cleanupCompleted(github, owner, repo, corpus, staged, core);
+  core.info(`Cleanup before recomputation: ${staged ? "would close" : "closed"} ${cleaned.length} unchanged AW sources`);
+  return cleaned;
+}
+
 function dashboardBody(result, plan, corpus, runId, cleanup = [], staged = false) {
   const rows = [
     start,
@@ -584,4 +594,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { publish, buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, dashboardBody, publishDashboard, collectDiscussions, collectIssues, metadata };
+module.exports = { publish, buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, cleanupBeforeRecompute, dashboardBody, publishDashboard, collectDiscussions, collectIssues, metadata };

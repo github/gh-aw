@@ -30,13 +30,9 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	// otherwise main engine.
 	engineSetting := c.getThreatDetectionEngineID(data)
 
-	engineConfig := data.EngineConfig
 	hasThreatDetectionEngineConfig := data.SafeOutputs != nil &&
 		data.SafeOutputs.ThreatDetection != nil &&
 		data.SafeOutputs.ThreatDetection.EngineConfig != nil
-	if hasThreatDetectionEngineConfig {
-		engineConfig = data.SafeOutputs.ThreatDetection.EngineConfig
-	}
 	// Preserve the original engine identity before Pi is normalized to Copilot for
 	// detection. Precedence matches runtime engine resolution: explicit
 	// threat-detection.engine.id overrides the main engine config, which overrides
@@ -58,16 +54,8 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 
 	// Preserve execution policy and authentication while resetting task-specific settings.
 	// Detection resolves its own budgets independently of the main agent.
-	detectionEngineConfig := engineConfig
-	if detectionEngineConfig == nil {
-		detectionEngineConfig = &EngineConfig{ID: engineSetting}
-	} else {
-		detectionEngineConfig = cloneThreatDetectionEngineConfig(engineSetting, detectionEngineConfig)
-		resetDetectionEngineTaskSettings(detectionEngineConfig)
-	}
-	if detectionEngineConfig.ID == "" {
-		detectionEngineConfig.ID = engineSetting
-	}
+	detectionEngineConfig := resolveExternalDetectorEngineConfig(data, engineSetting)
+	resetDetectionEngineTaskSettings(detectionEngineConfig)
 	detectionEngineConfig.Env = mergeThreatDetectionEngineEnv(data, detectionEngineConfig.Env)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits

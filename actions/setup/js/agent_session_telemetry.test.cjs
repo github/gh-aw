@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import { runLogParser } from "./log_parser_bootstrap.cjs";
 import { parseCodexLog } from "./parse_codex_log.cjs";
+import { parseGooseLog } from "./parse_goose_log.cjs";
 
 const STDIO = "/tmp/gh-aw/agent-stdio.log";
 const SOURCE = "/fixture/session.jsonl";
@@ -62,6 +63,26 @@ describe("Unified session bootstrap telemetry conformance", () => {
     await parse(events);
     expect(JSON.parse(files.get(STDIO))).toEqual({ type: "result", num_turns: 2, usage: { input_tokens: 0, output_tokens: 5 } });
     expect(events).toEqual(original);
+  });
+
+  it("persists canonical Goose tool, text and usage events through the production bootstrap", async () => {
+    const source = [
+      { type: "message", message: { id: "goose-1", role: "assistant", content: [{ type: "text", text: "Done." }] } },
+      { type: "complete", input_tokens: 10, output_tokens: 2, total_tokens: 12, cache_read_input_tokens: 4, cache_write_input_tokens: 0 },
+    ]
+      .map(event => JSON.stringify(event))
+      .join("\n");
+    files.set(SOURCE, source);
+    await runLogParser({ parserName: "Goose", parseLog: parseGooseLog });
+    const published = files.get("/tmp/gh-aw/agent-session.jsonl").trimEnd().split("\n").map(JSON.parse);
+    expect(published.filter(event => event.type !== "agent.execution")).toEqual(JSON.parse(JSON.stringify(parseGooseLog(source).logEntries)));
+    expect(published.every(event => event.type.includes(".") && event.data)).toBe(true);
+    expect(JSON.parse(files.get(STDIO))).toMatchObject({
+      type: "result",
+      num_turns: 1,
+      usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12, cache_read_input_tokens: 4, cache_creation_input_tokens: 0, input_tokens_include_cache: true },
+    });
+    expect(global.core.setFailed).not.toHaveBeenCalled();
   });
 
   it("T-UAS-047: zero is retained and absent output tokens/turns stay absent", async () => {
