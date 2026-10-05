@@ -215,6 +215,7 @@ test("notes projection derives vote state from canonical records across compacti
       const db = new DatabaseSync(file, { readOnly: true });
       try {
         return {
+          stateType: db.prepare("SELECT type FROM sqlite_master WHERE name = 'note_state'").get()?.type,
           notes: db
             .prepare("SELECT * FROM notes ORDER BY id")
             .all()
@@ -242,6 +243,7 @@ test("notes projection derives vote state from canonical records across compacti
     };
     const projected = inspect(before);
     assert.deepEqual(inspect(after), projected);
+    assert.equal(projected.stateType, "table");
     assert.deepEqual(projected.notes, [{ id: noteId, subject: "README", note: "Contains instructions", reason: "Read the source", created_at: envelopes.get(noteId).timestamp, record_sha: envelopes.get(noteId).sha }]);
     assert.deepEqual(projected.citations, [
       { note_id: noteId, ordinal: 0, citation_type: "repository", path: "README.md", start_line: 1, end_line: null },
@@ -269,6 +271,36 @@ test("notes projection derives vote state from canonical records across compacti
   } finally {
     first.close();
     second.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("notes projection materializes empty tables for read-only first-run validation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-notes-empty-projection-"));
+  const sourceDir = path.join(root, "source");
+  const databasePath = path.join(root, "projection", "ledger.db");
+  fs.mkdirSync(sourceDir, { recursive: true });
+  try {
+    createProjection({
+      sourceDir,
+      databasePath,
+      config: { name: "knowledge", type: "notes", max_record_kb: 32, max_segment_kb: 100, max_patch_kb: 10 },
+    });
+    const db = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      assert.equal(db.prepare("SELECT type FROM sqlite_master WHERE name = 'note_state'").get()?.type, "table");
+      assert.deepEqual(
+        db
+          .prepare("PRAGMA table_info(note_state)")
+          .all()
+          .map(column => column.name),
+        ["note_id", "upvotes", "downvotes", "net_votes", "last_vote_at", "last_positive_vote_at"]
+      );
+      assert.deepEqual(db.prepare("SELECT * FROM note_state").all(), []);
+    } finally {
+      db.close();
+    }
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

@@ -18,7 +18,10 @@ async function main(config = {}) {
 
   const requests = [];
   const handleLedgerAppend = async message => {
-    requests.push(message);
+    if (!message || typeof message !== "object" || Array.isArray(message)) throw new TypeError("Invalid ledger append message");
+    const { type, ...request } = message;
+    if (type !== undefined && type !== "ledger_append") throw new TypeError("Invalid ledger append message type");
+    requests.push(request);
     return { success: true, queued: true };
   };
 

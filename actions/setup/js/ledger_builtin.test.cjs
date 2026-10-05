@@ -4,7 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { NOTE_STATE_VIEW, createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
+import { createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
 import { normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { finalId } from "./ledger_transactions.cjs";
 import { validateTransactions } from "./push_ledger_changes.cjs";
@@ -252,8 +252,7 @@ test("note_state derives zero votes and null last-vote timestamps", () => {
   const output = replayBuiltin({ type: "notes" }, records);
   const db = new DatabaseSync(":memory:");
   try {
-    materializeReplay(db, "notes", "builtin:notes", records, output, 2);
-    db.exec(NOTE_STATE_VIEW);
+    materializeReplay(db, "notes", "builtin:notes", records, output, 3);
     assert.deepEqual({ ...db.prepare("SELECT * FROM note_state").get() }, { note_id: records[0].id, upvotes: 0, downvotes: 0, net_votes: 0, last_vote_at: null, last_positive_vote_at: null });
   } finally {
     db.close();
