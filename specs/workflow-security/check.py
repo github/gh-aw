@@ -79,7 +79,7 @@ DELTAS = {
     "cleanup-fail-open": "Historical compiler failure path: ignore failed checkout cleanup or residual credentials and start the agent.",
     "artifact-invocation": "Runtime mutation: accept another reusable invocation's artifact under the same run.",
     "policy-downgrade": "Compiler mutation: omit required detection without an authorized policy opt-out.",
-    "failure-token-retention": "Runtime mutation: fail the safe-output job without revoking its minted app token.",
+    "failure-token-retention": "Runtime mutation: omit app-token revocation in the safe-output action post step after job failure.",
 }
 
 
@@ -247,6 +247,7 @@ def check_sources(compiler, results):
 def write_examples(results, cases):
     selected = list(WITNESSES) + [
         "persist-credentials", "skip-detection", "cross-repo-token", "private-sink",
+        "failure-token-retention",
     ]
     examples = []
     for name in selected:

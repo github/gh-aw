@@ -33,7 +33,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 |---|---|---|
 | Configuration | `context`, `Activate`, `TrustedConfiguration` | Trusted activation instructions; PR-base provenance is an implementation obligation. |
 | Untrusted data | `AgentRequest`, `requestValid`, `target`, `request.private` | Declarative operation, schema validity, repository selection, and private-source classification remain separate from artifact origin. |
-| Jobs and steps | `status`, `step`, `started`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and cleanup. |
+| Jobs and steps | `status`, `step`, `started`, `safeOutputResult`, `appTokenPost`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and the app-token action post step. |
 | Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run and invocation identity, naming prefix, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
 | Outputs and logs | `transfers` | Artifact, output, and log channels carry independently tracked secret labels. This abstracts covered redaction, not arbitrary encoded-secret detection. |
 | Permissions | `grants`, `TokenPermissions`, `ValidatedEffects` | Repository read, issue write, content write, and inference capabilities are distinct. Workspace edits are not repository-resource writes. |
@@ -50,8 +50,9 @@ Detection may run after **agent failure**, and valid already-emitted requests
 may still be processed after successful detection. This follows the emitted
 `needs.agent.result != 'skipped'` policy rather than assuming all upstream jobs
 must succeed. Failure before request publication causes origin validation to
-fail. Failures revoke modeled job-owned credentials; eventual platform cleanup
-is an explicit environmental assumption.
+fail. Agent failures revoke the modeled engine credential. A minted installation
+token remains live until the `actions/create-github-app-token` post step, which
+revokes it after either safe-output success or failure.
 
 `DetectionPolicy` independently declares required, disabled, or conditional
 detection. `DetectionEnabled` selects a conditional run. Required detection
@@ -85,7 +86,7 @@ agent execution, including the failure paths found by the corpus trial.
 | `TrustedExecution` | Request bytes remain data, not privileged executable code. | SG-01; CTR-006/009/010 | [`template_injection_validation`](../../pkg/workflow/template_injection_validation.go); [`safe_output_handler_manager`](../../actions/setup/js/safe_output_handler_manager.cjs). |
 | `GitAuthorization` | Authenticated remote operations use credentials scoped to that repository and operation. | K:122–130,157–205 | [`resolveCheckoutTokenExpression`](../../pkg/workflow/checkout_step_generator.go):733–751; [`resolvePRCheckoutToken`](../../pkg/workflow/github_token.go):131–191. |
 | `NoImplicitFetch` | Credential-free reasoning never silently fetches or pushes to compensate for missing local objects. | K:212–229; checkout credential policy | [`generateFetchStepLines`](../../pkg/workflow/checkout_step_generator.go):680–730; [`safe_outputs_push_to_pr_branch.md`](../../actions/setup/md/safe_outputs_push_to_pr_branch.md). |
-| `TokenLifetime` | Revoked tokens cannot become live again; successful or failed jobs retain no modeled engine or app token. | Job-scoped credentials, AR1–4 | App mint steps do not disable the external create-github-app-token post-action revocation. Platform cleanup/TTL is assumed, not locally proved. |
+| `TokenLifetime` | Revoked tokens cannot become live again; completed successful or failed jobs retain no modeled engine or app token. | Job-scoped credentials, AR1–4 | Models the `actions/create-github-app-token` post step revoking a minted token after success or failure; `skip-token-revoke` disables this cleanup. |
 | `NetworkPolicy` | Egress follows the effective allowlist and engine auth goes only to inference. | NI-01–14; CTR-011 | [`GetAllowedDomains` / `GetBlockedDomains`](../../pkg/workflow/domains.go); [`appendEnvAndMountArgs`](../../pkg/workflow/awf_command_builder.go):482–499. External firewall enforcement is assumed. |
 | `TrustedConfiguration` | Activation instruction authority is not inherited from attacker-controlled configuration. | CTR-028/030 | [`activationCheckoutRef`](../../pkg/workflow/compiler_activation_job.go):494–501; [`restore_base_github_folders.sh`](../../actions/setup/sh/restore_base_github_folders.sh):40–83. |
 | `OutputLimit` | The declared maximum of one effect is not exceeded. | OI validation / configured operation bounds | [`safe_output_validator`](../../actions/setup/js/safe_output_validator.cjs), operation-specific safe-output handlers. |

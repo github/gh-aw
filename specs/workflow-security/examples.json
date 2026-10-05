@@ -1,5 +1,5 @@
 {
-  "model_sha256": "37b88da07c21f826f7cf619aa447e55f7a44f9f2e17649548839bee44ac2889c",
+  "model_sha256": "494acb76aa7c05eeb137fefadf9cb0c71d86d5b32ae5c0bea8a380f79446fb73",
   "jar_sha256": "411ab54221cf0c9fa7ae18f07a3e0ebbdf9e5ba6254b79017e7007f1feb44e89",
   "confirmed_product_bug": false,
   "examples": [
@@ -43,6 +43,8 @@
           "agent": 3,
           "safe_outputs": 5
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "pending",
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -215,6 +217,8 @@
           "agent": 3,
           "safe_outputs": 2
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -358,6 +362,8 @@
           "agent": 2,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -485,6 +491,8 @@
           "agent": 1,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -606,6 +614,8 @@
           "agent": 1,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation"],
         "grants": {
           "detection": ["contents-read"],
@@ -736,6 +746,8 @@
           "agent": 3,
           "safe_outputs": 5
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "pending",
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -901,6 +913,8 @@
           "agent": 1,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1022,6 +1036,8 @@
           "agent": 1,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1143,6 +1159,8 @@
           "agent": 2,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1292,6 +1310,8 @@
           "agent": 3,
           "safe_outputs": 5
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "pending",
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -1445,6 +1465,8 @@
           "agent": 1,
           "safe_outputs": 1
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "not-registered",
         "started": ["activation", "agent"],
         "grants": {
           "detection": ["contents-read"],
@@ -1588,6 +1610,8 @@
           "agent": 3,
           "safe_outputs": 5
         },
+        "safeOutputResult": "none",
+        "appTokenPost": "pending",
         "started": ["detection", "activation", "agent", "safe_outputs"],
         "grants": {
           "detection": ["contents-read"],
@@ -1721,6 +1745,173 @@
         "appScope": ["issues-write"],
         "appRepos": ["main"],
         "lastEvent": "Execute"
+      }
+    },
+    {
+      "case": "failure-token-retention",
+      "classification": "synthetic-negative-control",
+      "expected_violation": "TokenLifetime",
+      "events": [
+        "Init",
+        "Start:activation",
+        "Activate",
+        "Finish:activation",
+        "Start:agent",
+        "Checkout:main",
+        "Checkout:private_dependency",
+        "CheckoutComplete",
+        "Git:diff:main",
+        "ToolCall:inference",
+        "AgentRequest",
+        "Fail:agent",
+        "Start:detection",
+        "Consume",
+        "Detect:pass",
+        "Finish:detection",
+        "Start:safe_outputs",
+        "Validate",
+        "MintAppToken",
+        "Fail:safe_outputs",
+        "AppTokenPost"
+      ],
+      "final_state": {
+        "status": {
+          "detection": "success",
+          "activation": "success",
+          "agent": "failure",
+          "safe_outputs": "failure"
+        },
+        "step": {
+          "detection": 3,
+          "activation": 2,
+          "agent": 3,
+          "safe_outputs": 3
+        },
+        "safeOutputResult": "failure",
+        "appTokenPost": "complete",
+        "started": ["detection", "activation", "agent", "safe_outputs"],
+        "grants": {
+          "detection": ["contents-read"],
+          "activation": ["contents-read"],
+          "agent": ["contents-read", "inference"],
+          "safe_outputs": ["contents-read", "issues-write"]
+        },
+        "live": ["app-write"],
+        "revoked": ["engine"],
+        "agentSecrets": ["engine-token"],
+        "checkouts": {
+          "main": {
+            "sparse": true,
+            "exists": true,
+            "credentials": "none",
+            "shallow": true,
+            "blobs": ["README.md"],
+            "refs": ["HEAD"]
+          },
+          "private_dependency": {
+            "sparse": false,
+            "exists": true,
+            "credentials": "none",
+            "shallow": false,
+            "blobs": ["README.md", "src/code.go"],
+            "refs": ["HEAD", "base"]
+          }
+        },
+        "cleanup": {
+          "main": "not-required",
+          "private_dependency": "not-required"
+        },
+        "agentBegan": true,
+        "privilegedCheckout": {
+          "sparse": false,
+          "exists": false,
+          "credentials": "none",
+          "shallow": false,
+          "blobs": [],
+          "refs": []
+        },
+        "artifacts": {
+          "context": {
+            "exists": true,
+            "producer": "activation",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          },
+          "request": {
+            "exists": true,
+            "producer": "agent",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": false
+          },
+          "verdict": {
+            "exists": true,
+            "producer": "detection",
+            "run": "current-run",
+            "invocation": "current-invocation",
+            "prefix": "",
+            "secret": false,
+            "private": false,
+            "trusted": true
+          }
+        },
+        "transfers": [
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "activation"
+          },
+          {
+            "secret": false,
+            "channel": "artifact",
+            "job": "agent"
+          }
+        ],
+        "operations": [
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "main",
+            "token": "checkout-main"
+          },
+          {
+            "job": "agent",
+            "op": "checkout",
+            "repo": "private_dependency",
+            "token": "checkout-dependency"
+          },
+          {
+            "job": "agent",
+            "op": "diff",
+            "repo": "main",
+            "token": "none"
+          }
+        ],
+        "writes": [],
+        "errors": [],
+        "gitDone": true,
+        "networkDone": true,
+        "egress": [
+          {
+            "destination": "inference",
+            "credential": "engine-token"
+          }
+        ],
+        "effects": 0,
+        "requestValid": true,
+        "target": "main",
+        "detection": "pass",
+        "approved": true,
+        "appScope": ["issues-write"],
+        "appRepos": ["main"],
+        "lastEvent": "AppTokenPost"
       }
     }
   ]
