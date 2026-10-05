@@ -41,17 +41,24 @@ describe("memory_file_eligibility.cjs", () => {
       expect(isMemoryFileEligible("sub/notes.json", [".json"], compiledPatterns).eligible).toBe(true);
     });
 
-    it("matches slashless patterns against filenames at any depth", () => {
+    it("matches slashless patterns only at the memory root", () => {
       const { compiledPatterns } = compileFileGlobPatterns("*.jsonl");
       expect(isMemoryFileEligible("history.jsonl", [], compiledPatterns).eligible).toBe(true);
-      expect(isMemoryFileEligible("sub/history.jsonl", [], compiledPatterns).eligible).toBe(true);
-      expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(true);
-      expect(isMemoryFileEligible("sub\\archive\\history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub/history.jsonl", [], compiledPatterns).eligible).toBe(false);
+      expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(false);
+      expect(isMemoryFileEligible("sub\\archive\\history.jsonl", [], compiledPatterns).eligible).toBe(false);
       expect(isMemoryFileEligible("sub/history.json", [], compiledPatterns).eligible).toBe(false);
     });
 
     it("matches exact slashless filenames without accepting suffix matches", () => {
       const { compiledPatterns } = compileFileGlobPatterns("history.jsonl");
+      expect(isMemoryFileEligible("history.jsonl", [], compiledPatterns).eligible).toBe(true);
+      expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(false);
+      expect(isMemoryFileEligible("sub/old-history.jsonl", [], compiledPatterns).eligible).toBe(false);
+    });
+
+    it("matches nested files only when a recursive glob is configured", () => {
+      const { compiledPatterns } = compileFileGlobPatterns("**/history.jsonl");
       expect(isMemoryFileEligible("sub/archive/history.jsonl", [], compiledPatterns).eligible).toBe(true);
       expect(isMemoryFileEligible("sub/old-history.jsonl", [], compiledPatterns).eligible).toBe(false);
     });
@@ -128,12 +135,12 @@ describe("memory_file_eligibility.cjs", () => {
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("sub/skip-glob.json"));
     });
 
-    it("keeps nested files matching slashless globs without warning", () => {
+    it("keeps nested files matching recursive globs without warning", () => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-memory-filter-"));
       fs.mkdirSync(path.join(tmpDir, "sub", "archive"), { recursive: true });
       fs.writeFileSync(path.join(tmpDir, "sub", "archive", "history.jsonl"), '{"id":1}\n');
 
-      const result = filterIneligibleMemoryFiles(tmpDir, [".jsonl"], "*.jsonl", mockCore);
+      const result = filterIneligibleMemoryFiles(tmpDir, [".jsonl"], "**/*.jsonl", mockCore);
 
       expect(result.kept).toEqual(["sub/archive/history.jsonl"]);
       expect(result.removed).toEqual([]);
