@@ -15,7 +15,7 @@ jobs:
           path: /tmp/gh-aw/
 
       - name: Assert token_usage.jsonl is non-empty
-        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
+        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","cursor"]'), needs.activation.outputs.engine_id)
         run: |
           # The AWF firewall proxy writes token_usage.jsonl for every LLM API call.
           # If all token_usage.jsonl files are missing or empty, the emitter is broken.
@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Assert agent_usage.json has non-zero token counts
-        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
+        if: steps.download-agent.outcome == 'success' && !contains(fromJSON('["kiro","cursor"]'), needs.activation.outputs.engine_id)
         run: |
           USAGE_FILE="/tmp/gh-aw/agent_usage.json"
           if [ ! -f "${USAGE_FILE}" ]; then
@@ -59,7 +59,7 @@ jobs:
           echo "OK: agent_usage.json reports ${INPUT_TOKENS} input tokens"
 
       - name: Report engines without proxy token telemetry
-        if: steps.download-agent.outcome == 'success' && contains(fromJSON('["kiro","goose","cursor"]'), needs.activation.outputs.engine_id)
+        if: steps.download-agent.outcome == 'success' && contains(fromJSON('["kiro","cursor"]'), needs.activation.outputs.engine_id)
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 ---
 <!--
@@ -67,7 +67,7 @@ jobs:
 
 This shared workflow adds a `check_token_telemetry` job that runs after the `agent` job
 and asserts that AWF firewall proxy token telemetry is functioning correctly
-for engines that provide proxy token counts. Kiro, Goose, and Cursor do not
+for engines that provide proxy token counts, including Goose. Kiro and Cursor do not
 currently provide these counts, so the job reports that the assertions are
 not applicable instead of treating missing proxy records as a regression.
 

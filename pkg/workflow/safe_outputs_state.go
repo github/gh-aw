@@ -92,6 +92,7 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 		safeOutputs.CallWorkflow != nil ||
 		safeOutputs.MissingTool != nil ||
 		safeOutputs.MissingData != nil ||
+		safeOutputs.ReportIncomplete != nil ||
 		safeOutputs.SetIssueType != nil ||
 		safeOutputs.SetIssueField != nil ||
 		safeOutputs.NoOp != nil ||
