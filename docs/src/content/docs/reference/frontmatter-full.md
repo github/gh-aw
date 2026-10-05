@@ -2858,6 +2858,11 @@ engine:
   # (optional)
   bare: true
 
+  # Whether dynamic workflows are enabled for engines that support them. Defaults to
+  # true.
+  # (optional)
+  dynamic-workflows: true
+
   # Engine-level MCP gateway configuration. Settings here apply to the MCP gateway
   # used by this engine.
   # (optional)
@@ -3013,6 +3018,11 @@ engine:
   # not support this option and emit a warning. Defaults to false.
   # (optional)
   bare: true
+
+  # Whether dynamic workflows are enabled for engines that support them. Defaults to
+  # true.
+  # (optional)
+  dynamic-workflows: true
 
 # Format 4: Engine definition: full declarative metadata for a named engine entry
 # (used in builtin engine shared workflow files such as @builtin:engines/*.md)
@@ -21307,6 +21317,11 @@ safe-outputs:
       # (optional)
       bare: true
 
+      # Whether dynamic workflows are enabled for engines that support them. Defaults to
+      # true.
+      # (optional)
+      dynamic-workflows: true
+
       # Engine-level MCP gateway configuration. Settings here apply to the MCP gateway
       # used by this engine.
       # (optional)
@@ -21462,6 +21477,11 @@ safe-outputs:
       # not support this option and emit a warning. Defaults to false.
       # (optional)
       bare: true
+
+      # Whether dynamic workflows are enabled for engines that support them. Defaults to
+      # true.
+      # (optional)
+      dynamic-workflows: true
 
     # Format 4: Engine definition: full declarative metadata for a named engine entry
     # (used in builtin engine shared workflow files such as @builtin:engines/*.md)

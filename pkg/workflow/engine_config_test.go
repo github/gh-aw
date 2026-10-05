@@ -1360,6 +1360,18 @@ func TestEngineDynamicWorkflowsFieldExtraction(t *testing.T) {
 	}
 }
 
+func TestDynamicWorkflowsEnabledUsesEngineCapability(t *testing.T) {
+	engine := NewClaudeEngine()
+	engine.id = "not-claude"
+	assert.True(t, dynamicWorkflowsEnabled(engine, nil))
+
+	disabled := false
+	assert.False(t, dynamicWorkflowsEnabled(engine, &EngineConfig{DynamicWorkflows: &disabled}))
+
+	engine.capabilities.DynamicWorkflows = false
+	assert.False(t, dynamicWorkflowsEnabled(engine, nil))
+}
+
 func TestEngineBareFieldExtraction(t *testing.T) {
 	compiler := NewCompiler()
 

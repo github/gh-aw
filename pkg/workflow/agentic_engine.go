@@ -159,6 +159,9 @@ type EngineCapabilities struct {
 
 	// Plugins reports whether the engine can install Agent Plugins.
 	Plugins bool
+
+	// DynamicWorkflows reports whether the engine supports loading saved dynamic workflows.
+	DynamicWorkflows bool
 }
 
 // PluginInstallationProvider generates installation steps for Agent Plugins.
@@ -175,6 +178,10 @@ type PostConfigPluginInstallationProvider interface {
 // Engines can optionally implement this to indicate feature support.
 type CapabilityProvider interface {
 	GetCapabilities() EngineCapabilities
+}
+
+func dynamicWorkflowsEnabled(engine CapabilityProvider, config *EngineConfig) bool {
+	return engine != nil && engine.GetCapabilities().DynamicWorkflows && config.DynamicWorkflowsEnabled()
 }
 
 // MCPProxyEngine provides the identity and MCP capability information needed to

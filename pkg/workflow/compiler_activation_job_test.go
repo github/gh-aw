@@ -50,13 +50,21 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 	}
 }
 
-func TestClaudeWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
+func TestDynamicWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
 	disabled := false
+	engine := NewClaudeEngine()
+	engine.id = "dynamic-test"
+	compiler := NewCompiler()
+	require.NoError(t, compiler.engineRegistry.Register(engine))
 	data := &WorkflowData{
-		Name: "Claude workflows", AI: "claude",
+		Name: "Dynamic workflows",
+		AI:   "dynamic-test",
+		EngineConfig: &EngineConfig{
+			ID: "dynamic-test",
+		},
 		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
 	}
-	job, err := NewCompiler().buildActivationJob(data, false, "", "claude.lock.yml")
+	job, err := compiler.buildActivationJob(data, false, "", "dynamic.lock.yml")
 	require.NoError(t, err)
 	steps := strings.Join(job.Steps, "")
 	save := extractWorkflowStepByName(t, steps, "Save agent config folders for base branch restoration")

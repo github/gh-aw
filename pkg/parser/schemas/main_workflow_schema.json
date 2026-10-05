@@ -14797,7 +14797,7 @@
             },
             "dynamic-workflows": {
               "type": "boolean",
-              "description": "Whether Claude Code dynamic workflows use the Claude-specific activation artifact restore path and whether the Workflow tool is preapproved. Defaults to true.",
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
               "default": true
             },
             "mcp": {
@@ -14995,7 +14995,7 @@
             },
             "dynamic-workflows": {
               "type": "boolean",
-              "description": "Whether Claude Code dynamic workflows use the Claude-specific activation artifact restore path and whether the Workflow tool is preapproved. Defaults to true.",
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
               "default": true
             }
           },
