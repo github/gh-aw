@@ -194,5 +194,27 @@
    "Tags aligned with gh-aw releases"
   ],
   "blogged": false
+ },
+ "ianwieds/awesome-agentic-workflows": {
+  "kind": "other",
+  "reviewed": "2026-10-05",
+  "score": 5,
+  "summary": "Curated awesome-list of gh-aw workflows, collections, tools and MCP servers; new (Oct 2026), 1 star.",
+  "highlights": [
+   "README.md: categorized by job (triage, CI repair, security, releases)",
+   "Sections for safe outputs/shared imports and MCP servers"
+  ],
+  "blogged": false
+ },
+ "haslam93/gh-aw-demo-lab": {
+  "kind": "other",
+  "reviewed": "2026-10-05",
+  "score": 5,
+  "summary": "Interactive demo lab with runnable compiled workflows (personas, slash command, no-PAT copilot-requests billing); teaching material, inactive since July.",
+  "highlights": [
+   "README.md: demo table mapping workflows to concepts",
+   "copilot-requests: write instead of PAT"
+  ],
+  "blogged": false
  }
 }

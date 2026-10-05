@@ -23,6 +23,10 @@
   {
    "q": "gh-aw in:readme agentic workflows",
    "last_run": "2026-10-04"
+  },
+  {
+   "q": "\"agentic workflows\" gh in:description fork:false archived:false",
+   "last_run": "2026-10-05"
   }
  ]
 }
