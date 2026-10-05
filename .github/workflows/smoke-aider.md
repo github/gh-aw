@@ -20,7 +20,7 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Aider
-model: copilot/claude-sonnet-4.6
+model: copilot/gpt-5.4
 engine:
   id: aider
 strict: true
