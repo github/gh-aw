@@ -118,6 +118,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // Compute hash for a real public agentic workflow
       const hash = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
 
       // Verify hash format
@@ -127,6 +128,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // Verify determinism
       const hash2 = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
       expect(hash2).toBe(hash);
     });
@@ -144,6 +146,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // audit-workflows.md has imports, so this tests the full import resolution
       const hash = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
 
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -171,6 +174,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // archie.md is a simpler workflow without imports
       const hash = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
 
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -229,6 +233,7 @@ describe("frontmatter_hash with GitHub API", () => {
       for (let i = 0; i < 3; i++) {
         const hash = await computeFrontmatterHash(workflowPath, {
           fileReader,
+          readerMode: "github-api",
         });
         hashes.push(hash);
       }
@@ -253,6 +258,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // Test with a workflow that has imports from subdirectories
       const hash = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
 
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -274,6 +280,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // audit-workflows.md contains template expressions like ${{ github.repository }}
       const hash = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
 
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -333,7 +340,7 @@ describe("frontmatter_hash with GitHub API", () => {
 
       // Test with smoke-codex.md which has imports
       const workflowPath = ".github/workflows/smoke-codex.md";
-      const hash = await computeFrontmatterHash(workflowPath, { fileReader });
+      const hash = await computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" });
 
       // Verify hash was computed successfully
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
@@ -363,6 +370,7 @@ describe("frontmatter_hash with GitHub API", () => {
       const fileReader = createGitHubFileReader(mockGitHub, owner, repo, ref);
       const apiHash = await computeFrontmatterHash(".github/workflows/smoke-codex.md", {
         fileReader,
+        readerMode: "github-api",
       });
 
       // Hashes should match (this was broken before the fix)
@@ -407,6 +415,7 @@ describe("frontmatter_hash with GitHub API", () => {
       try {
         hash = await computeFrontmatterHash(workflowPath, {
           fileReader,
+          readerMode: "github-api",
         });
       } catch (err) {
         if (err.message?.toLowerCase().includes("rate limit")) {
@@ -426,6 +435,7 @@ describe("frontmatter_hash with GitHub API", () => {
       // Verify determinism with second call to live API
       const hash2 = await computeFrontmatterHash(workflowPath, {
         fileReader,
+        readerMode: "github-api",
       });
       expect(hash2).toBe(hash);
 

@@ -15,6 +15,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseStaleCheckMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		on       any
+		disabled bool
+		full     bool
+	}{
+		{name: "missing"},
+		{name: "missing on section", on: "workflow_dispatch"},
+		{name: "enabled", on: map[string]any{"stale-check": true}},
+		{name: "disabled", on: map[string]any{"stale-check": false}, disabled: true},
+		{name: "full", on: map[string]any{"stale-check": "full"}, full: true},
+		{name: "other string", on: map[string]any{"stale-check": "true"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			disabled, full := ParseStaleCheckMode(map[string]any{"on": tt.on})
+			assert.Equal(t, tt.disabled, disabled)
+			assert.Equal(t, tt.full, full)
+		})
+	}
+}
+
 // TestStaleCheckInActivationJob tests that the frontmatter hash check step is correctly
 // added or omitted based on the on.stale-check flag.
 func TestStaleCheckInActivationJob(t *testing.T) {

@@ -208,15 +208,20 @@ engine: copilot`;
           },
         },
       };
-      const fileReader = createGitHubFileReader(github, "source-owner", "source-repo", "source-ref");
-      const originalHash = await computeFrontmatterHash(workflowPath, { fileReader });
+      const apiFileReader = createGitHubFileReader(github, "source-owner", "source-repo", "source-ref");
+      const fileReader = async filePath => apiFileReader(filePath);
+      const readerOptions = { fileReader, readerMode: "github-api" };
+      const originalHash = await computeFrontmatterHash(workflowPath, readerOptions);
       const exists = vi.spyOn(fs, "existsSync").mockReturnValue(true);
       const realpath = vi.spyOn(fs, "realpathSync").mockImplementation(() => {
         throw new Error("Unrelated local checkout");
       });
       try {
-        expect(await computeFrontmatterHash(workflowPath, { fileReader })).toBe(originalHash);
+        expect(await computeFrontmatterHash(workflowPath, readerOptions)).toBe(originalHash);
         expect(realpath).not.toHaveBeenCalled();
+        const localModeHash = await computeFrontmatterHash(workflowPath, { fileReader });
+        expect(localModeHash).not.toBe(originalHash);
+        expect(realpath).toHaveBeenCalled();
       } finally {
         exists.mockRestore();
         realpath.mockRestore();
@@ -1362,7 +1367,7 @@ describe("symlink traversal regression for activation hash symlink handling", ()
       const apiReader = createGitHubFileReader(github, "owner", "repo", "main");
 
       const fsHash = await computeFrontmatterHash(mainPath, { fileReader: fsReader });
-      const apiHash = await computeFrontmatterHash(mainPath, { fileReader: apiReader });
+      const apiHash = await computeFrontmatterHash(mainPath, { fileReader: apiReader, readerMode: "github-api" });
 
       // Both hashes must agree — this is the invariant the activation job relies on
       expect(apiHash).toBe(fsHash);

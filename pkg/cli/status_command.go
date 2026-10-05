@@ -493,7 +493,8 @@ func isCompiledUpToDateWithCache(workflowPath, lockFilePath string, cache *parse
 		if err != nil {
 			return "No"
 		}
-		if on, ok := result.Frontmatter["on"].(map[string]any); ok && on["stale-check"] == "full" {
+		_, fullStaleCheck := workflow.ParseStaleCheckMode(result.Frontmatter)
+		if fullStaleCheck {
 			bodyHash, err := parser.ComputeBodyHashFromFile(workflowPath)
 			if err != nil || bodyHash != metadata.BodyHash {
 				return "No"

@@ -316,7 +316,7 @@ async function main() {
       // Compute hash using pure JavaScript implementation
       // Create a GitHub file reader for fetching workflow files via API
       const fileReader = createGitHubFileReader(github, owner, repo, ref);
-      const recomputedHash = await computeFrontmatterHash(workflowMdPath, { fileReader });
+      const recomputedHash = await computeFrontmatterHash(workflowMdPath, { fileReader, readerMode: "github-api" });
 
       const match = storedHash === recomputedHash;
 
@@ -387,7 +387,7 @@ async function main() {
         return;
       }
 
-      await computeFrontmatterHash(workflowMdPath, { fileReader, verbose: true });
+      await computeFrontmatterHash(workflowMdPath, { fileReader, readerMode: "github-api", verbose: true });
     } catch (debugErr) {
       core.info(`  Debug recomputation encountered an error: ${getErrorMessage(debugErr)}`);
     }
