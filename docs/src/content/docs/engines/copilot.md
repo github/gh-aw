@@ -55,9 +55,9 @@ Copilot supports the broadest set of `gh-aw` engine-specific features: native cu
 
 Copilot CLI [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are enabled by default. gh-aw enables the CLI's `EXTENSIONS` feature flag, loads project extensions in prompt mode, and pre-approves workflow runs. Save reusable definitions and supporting files under `.github/extensions/<name>/extension.mjs`, and explicitly request the registered workflow by name in the prompt. Their agents remain subject to the configured tool permissions and sandbox policies.
 
-gh-aw snapshots `.github/` recursively from the activation checkout and restores it after agent checkouts, including when `checkout.pull-request: false` is set. Restoring the entire configuration directory prevents PR-head extension code, settings, and hooks from replacing trusted definitions. Use `ambient-folders` for supporting files elsewhere in the repository. Dynamic workflow availability also depends on the Copilot account; enabling extensions does not make workflows available with a BYOK provider.
+gh-aw's existing engine-config restoration snapshots the engine-declared folders, including Copilot's `.github/`, recursively from the activation checkout and restores them after agent checkouts, including when `checkout.pull-request: false` is set. Restoring the entire configuration directory prevents PR-head extension code, settings, and hooks from replacing trusted definitions. Use `ambient-folders` for supporting files elsewhere in the repository. Dynamic workflow availability also depends on the Copilot account; enabling extensions does not make workflows available with a BYOK provider.
 
-Set `engine.dynamic-workflows: false` to disable the CLI's extension feature flag and project extension loading, deny workflow runs, and skip the dynamic-workflow-specific artifact restore:
+Set `engine.dynamic-workflows: false` to disable the CLI's extension feature flag and project extension loading, deny workflow runs, and restore engine configuration only when PR checkout requires it:
 
 ```yaml
 engine:

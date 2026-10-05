@@ -174,10 +174,6 @@ func (e *CopilotEngine) GetAgentManifestPathPrefixes() []string {
 	return []string{constants.GithubDir}
 }
 
-func (e *CopilotEngine) GetDynamicWorkflowRestoreStep() GitHubActionStep {
-	return generateRestoreDynamicWorkflowsStep("Copilot", ".github")
-}
-
 // GetHarnessScriptName returns the filename of the JavaScript harness script that wraps
 // the Copilot CLI with retry logic for transient CAPIError 400 errors.
 func (e *CopilotEngine) GetHarnessScriptName() string {

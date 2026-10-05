@@ -544,15 +544,13 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
-      - name: Restore Copilot workflows from activation artifact
+      - name: Restore agent config folders from base branch
+        env:
+          GH_AW_AGENT_FOLDERS: ".agents .github"
+          GH_AW_AGENT_FILES: "AGENTS.md"
         run: |
           if [ -d /tmp/gh-aw/base ]; then
-            src=/tmp/gh-aw/base/.github
-            dst="$GITHUB_WORKSPACE/.github"
-            rm -rf "$dst"
-            if [ -d "$src" ]; then
-              cp -a "$src" "$dst"
-            fi
+            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
           fi
       - name: Restore inline sub-agents from activation artifact
         env:

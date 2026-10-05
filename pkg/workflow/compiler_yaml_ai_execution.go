@@ -505,24 +505,20 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	// Restore agent config folders from the base branch snapshot in the activation artifact.
 	// The activation job saved these before the PR checkout ran, so this step overwrites any
 	// PR-branch-injected files (e.g. forked skill/instruction files) with trusted base content.
-	// The .github/mcp.json file is also removed since it may come from the PR branch.
+	// The .mcp.json file is also removed since it may come from the PR branch.
 	// The folder and file lists match those used in the save step (derived from engine registry).
 	//
 	// IMPORTANT: This must run BEFORE pre-agent-steps (below) so that APM-restored skills
 	// placed in .github/skills/ by pre-agent-steps are not clobbered by this restore.
-	if ShouldGeneratePRCheckoutStep(data) {
+	restoreFromActivation := dynamicWorkflowsEnabled(engine, data.EngineConfig) && canRestoreAgentConfigFolders(data)
+	if ShouldGeneratePRCheckoutStep(data) || restoreFromActivation {
 		folders, files := resolveAgentManifestPaths(c.engineRegistry, data)
 		generateRestoreBaseGitHubFoldersStep(yaml,
 			folders,
 			files,
+			!restoreFromActivation,
 		)
 		generateRestoreAmbientFoldersStep(yaml, data)
-	}
-	if restorer, ok := engine.(DynamicWorkflowProvider); ok && dynamicWorkflowsEnabled(engine, data.EngineConfig) && canRestoreDynamicWorkflows(data) {
-		for _, line := range restorer.GetDynamicWorkflowRestoreStep() {
-			yaml.WriteString(line)
-			yaml.WriteByte('\n')
-		}
 	}
 
 	// Restore inline sub-agents written during the activation job.

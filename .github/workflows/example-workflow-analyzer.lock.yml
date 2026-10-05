@@ -580,20 +580,12 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .claude .github"
           GH_AW_AGENT_FILES: "AGENTS.md CLAUDE.md"
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-      - name: Restore Claude workflows from activation artifact
         run: |
           if [ -d /tmp/gh-aw/base ]; then
-            src=/tmp/gh-aw/base/.claude
-            dst="$GITHUB_WORKSPACE/.claude"
-            rm -rf "$dst"
-            if [ -d "$src" ]; then
-              cp -a "$src" "$dst"
-            fi
+            bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
           fi
       - name: Restore inline sub-agents from activation artifact
         env:
