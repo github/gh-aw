@@ -101,6 +101,18 @@ describe("Goose unified session parser", () => {
     expect(result.logEntries.some(event => event.type === "session.result")).toBe(false);
   });
 
+  it.each([{ status: "success" }, { status: "success", value: { content: [], isError: "false" } }, { status: "error" }])("does not invent a successful tool completion for malformed result %j", toolResult => {
+    const result = parseGooseLog(jsonl([fixture[0], message("user-1", "user", [{ ...response, toolResult }])]));
+    expect(result.logEntries.some(event => event.type === "tool.execution_complete")).toBe(false);
+    expect(result.logEntries.find(event => event.type === "session.collection_warning").data).toEqual({ code: "malformed_tool_response", toolCallId: "call-1" });
+  });
+
+  it("retains successful structured-only MCP results without inventing text", () => {
+    const toolResult = { status: "success", value: { structuredContent: { answer: 42 } } };
+    const result = parseGooseLog(jsonl([fixture[0], message("user-1", "user", [{ ...response, toolResult }])]));
+    expect(result.logEntries.find(event => event.type === "tool.execution_complete").data).toMatchObject({ success: true, output: { answer: 42 } });
+  });
+
   it.each([false, true])("collects Goose session events with canonical artifact present=%s", canonical => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-goose-session-"));
     roots.push(root);

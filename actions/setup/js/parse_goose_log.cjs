@@ -103,12 +103,20 @@ function parseGooseLog(content) {
           if (call?.status === "error") emit("session.error", { error: call.error, toolCallId: item.id });
         } else if (item.type === "toolResponse" && typeof item.id === "string" && !toolCompletions.has(item.id)) {
           const result = item.toolResult;
+          const value = result?.value;
+          const validSuccess =
+            result?.status === "success" && value && typeof value === "object" && !Array.isArray(value) && (value.content === undefined || Array.isArray(value.content)) && (value.isError === undefined || typeof value.isError === "boolean");
+          const validError = result?.status === "error" && typeof result.error === "string";
+          if (!validSuccess && !validError) {
+            emit("session.collection_warning", { code: "malformed_tool_response", toolCallId: item.id });
+            continue;
+          }
           const success = result?.status === "success" && result.value?.isError !== true;
           emit("tool.execution_complete", {
             toolCallId: item.id,
             toolName: toolStarts.get(item.id)?.toolName,
             success,
-            ...(result?.value?.content !== undefined ? { output: result.value.content } : {}),
+            ...(value?.content !== undefined ? { output: value.content } : value?.structuredContent !== undefined ? { output: value.structuredContent } : {}),
             ...(result?.error !== undefined ? { error: result.error } : {}),
           });
           toolCompletions.add(item.id);
@@ -118,6 +126,7 @@ function parseGooseLog(content) {
       const usage = {};
       for (const key of ["input_tokens", "output_tokens", "total_tokens", "cache_read_input_tokens"]) {
         if (isTokenCount(raw[key])) usage[key] = raw[key];
+        else if (raw[key] != null) emit("session.collection_warning", { code: "invalid_usage", field: key });
       }
       if (isTokenCount(raw.cache_write_input_tokens)) usage.cache_creation_input_tokens = raw.cache_write_input_tokens;
       if (Object.keys(usage).length) usage.input_tokens_include_cache = true;
