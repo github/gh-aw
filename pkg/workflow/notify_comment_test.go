@@ -1385,9 +1385,8 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 		!strings.Contains(allSteps, "uses: actions/github-script@") {
 		t.Errorf("Expected conclusion job to generate usage summaries with actions/github-script.\nGenerated steps:\n%s", allSteps)
 	}
-	if !strings.Contains(allSteps, "require('"+SetupActionDestination+"/generate_usage_activity_summary.cjs')") ||
-		!strings.Contains(allSteps, "require('"+SetupActionDestination+"/unified_session.cjs')") {
-		t.Errorf("Expected conclusion job to load both usage generators from the setup action directory.\nGenerated steps:\n%s", allSteps)
+	if !strings.Contains(allSteps, "require('"+SetupActionDestination+"/generate_usage_artifacts.cjs')") {
+		t.Errorf("Expected conclusion job to load usage artifact generation from the setup action directory.\nGenerated steps:\n%s", allSteps)
 	}
 	if !strings.Contains(allSteps, "setupGlobals(core, github, context, exec, io, getOctokit)") {
 		t.Errorf("Expected conclusion job to initialize GitHub Actions globals for required generators.\nGenerated steps:\n%s", allSteps)

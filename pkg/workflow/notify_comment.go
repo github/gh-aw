@@ -357,21 +357,8 @@ func buildUsageActivityGenerationStep(pinAction func(string) string) []string {
 		"          script: |\n",
 		fmt.Sprintf("            const { setupGlobals } = require('%s/setup_globals.cjs');\n", SetupActionDestination),
 		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
-		fmt.Sprintf("            const { main: generateSummary } = require('%s/generate_usage_activity_summary.cjs');\n", SetupActionDestination),
-		fmt.Sprintf("            const { main: generateSession } = require('%s/unified_session.cjs');\n", SetupActionDestination),
-		"            for (const [label, generate] of [[\"usage activity summary\", generateSummary], [\"unified session\", generateSession]]) {\n",
-		"              try {\n",
-		"                await generate();\n",
-		"              } catch (error) {\n",
-		"                core.warning(`Unable to generate ${label}: ${error instanceof Error ? error.message : String(error)}`);\n",
-		"              }\n",
-		"            }\n",
-		"            const fs = require('fs');\n",
-		"            const listFiles = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {\n",
-		"              const entryPath = `${directory}/${entry.name}`;\n",
-		"              return entry.isDirectory() ? listFiles(entryPath) : [entryPath];\n",
-		"            }).sort();\n",
-		"            for (const file of listFiles('/tmp/gh-aw/usage')) core.info(file);\n",
+		fmt.Sprintf("            const { main } = require('%s/generate_usage_artifacts.cjs');\n", SetupActionDestination),
+		"            await main();\n",
 	}
 }
 
