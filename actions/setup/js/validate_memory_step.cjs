@@ -4,7 +4,7 @@ const { formatJSONFiles, runCustomMemoryValidation, writeValidationMarker, clear
 const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
 
 /**
- * @param {{ error: (message: string) => void, info: (message: string) => void, setFailed: (message: string) => void }} core
+ * @param {{ error: (message: string) => void, info: (message: string) => void, warning: (message: string) => void, setFailed: (message: string) => void }} core
  * @param {{
  *   kind: "repo" | "cache" | "drive",
  *   formatJSON?: boolean,

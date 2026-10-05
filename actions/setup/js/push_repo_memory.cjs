@@ -734,8 +734,7 @@ async function main() {
     scanDirectory(sourceMemoryPath);
     core.info(`Scan complete: ${filesToCopy.length} file(s) accepted, ${filteredOutFiles.length} file(s) filtered out`);
     if (filteredOutFiles.length > 0) {
-      core.info(`Filtered-out files (${filteredOutFiles.length}):`);
-      filteredOutFiles.forEach(f => core.info(`  - ${f.path} (${f.reason})`));
+      core.warning(`Filtered-out files (${filteredOutFiles.length}):\n${filteredOutFiles.map(f => `  - ${f.path} (${f.reason})`).join("\n")}`);
     }
     if (filesToCopy.length > 0 && filesToCopy.length <= 10) {
       core.info("Accepted files:");

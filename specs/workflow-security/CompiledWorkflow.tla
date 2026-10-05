@@ -8,7 +8,8 @@ ASSUME Fault \in {"none", "agent-write", "persist-credentials",
                  "checkout-widen", "expired-token", "network-bypass",
                  "untrusted-config", "output-limit", "private-sink",
                  "target-authorization", "retained-push-token", "ambient-agent-fetch",
-                 "cleanup-fail-open", "artifact-invocation", "policy-downgrade"}
+                 "cleanup-fail-open", "artifact-invocation", "policy-downgrade",
+                 "failure-token-retention"}
 ASSUME Profile \in {"sparse", "full"}
 ASSUME Effect \in {"issue", "pull-request"}
 ASSUME DetectionPolicy \in {"required", "disabled", "conditional"}
@@ -22,7 +23,7 @@ ActualDetectionRuns == DetectionRuns /\ Fault # "policy-downgrade"
 Jobs == {"activation", "agent", "detection", "safe_outputs"}
 Repos == {"main", "private_dependency"}
 Channels == {"artifact", "output", "log"}
-States == {"queued", "running", "success", "failure", "skipped"}
+States == {"queued", "running", "post", "success", "failure", "skipped"}
 Permissions == {"contents-read", "contents-write", "issues-write", "inference",
                 "administration"}
 Secrets == {"app-key", "checkout-token", "write-token", "engine-token"}
@@ -85,7 +86,8 @@ Init ==
     s = [status |-> [j \in Jobs |-> IF j = "detection" /\ ~ActualDetectionRuns
                                   THEN "skipped" ELSE "queued"],
          step |-> [j \in Jobs |-> 1],
-         started |-> {},
+    safeOutputResult |-> "none", appTokenPost |-> "not-registered",
+    started |-> {},
          grants |-> [j \in Jobs |-> Grants(j)],
          live |-> {}, revoked |-> {},
          agentSecrets |-> {},
@@ -128,7 +130,12 @@ Skip(j) ==
 
 Finish(j) ==
     /\ At(j, StepCount(j) + 1)
-    /\ s' = [s EXCEPT !.status[j] = "success", !.lastEvent = "Finish:" \o j]
+    /\ s' = [s EXCEPT
+        !.status[j] = IF j = "safe_outputs" /\ s.appTokenPost = "pending"
+                      THEN "post" ELSE "success",
+        !.safeOutputResult = IF j = "safe_outputs" /\ s.appTokenPost = "pending"
+                             THEN "success" ELSE @,
+        !.lastEvent = "Finish:" \o j]
 
 Activate ==
     /\ At("activation", 1)
@@ -288,6 +295,7 @@ MintAppToken ==
     /\ At("safe_outputs", 2)
     /\ s' = [s EXCEPT
         !.live = IF s.approved THEN @ \cup {"app-write"} ELSE @,
+        !.appTokenPost = IF s.approved THEN "pending" ELSE @,
         !.appScope = IF s.approved
                      THEN IF Fault = "app-scope"
                           THEN {EffectPermission, "administration"}
@@ -326,12 +334,24 @@ Execute ==
         !.effects = IF s.approved THEN @ + 1 ELSE @,
         !.step["safe_outputs"] = 5, !.lastEvent = "Execute"]
 
-Revoke ==
+AppTokenPost ==
+    /\ s.status["safe_outputs"] = "post"
+    /\ s.appTokenPost = "pending"
+    /\ LET retain == Fault = "failure-token-retention"
+                   /\ s.safeOutputResult = "failure"
+       IN s' = [s EXCEPT
+           !.status["safe_outputs"] = s.safeOutputResult,
+           !.appTokenPost = "complete",
+           !.live = IF retain THEN @ ELSE @ \ {"app-write"},
+           !.revoked = IF retain THEN @ ELSE @ \cup {"app-write"},
+           !.lastEvent = "AppTokenPost"]
+
+CleanupPrivilegedCheckout ==
     /\ At("safe_outputs", 5)
     /\ s' = [s EXCEPT
-        !.live = @ \ {"app-write"}, !.revoked = @ \cup {"app-write"},
-        !.privilegedCheckout.credentials = IF Fault = "retained-push-token" THEN @ ELSE None,
-        !.step["safe_outputs"] = 6, !.lastEvent = "Revoke"]
+        !.privilegedCheckout.credentials =
+            IF Fault = "retained-push-token" THEN @ ELSE None,
+        !.step["safe_outputs"] = 6, !.lastEvent = "CleanupPrivilegedCheckout"]
 
 Leak(channel) ==
     /\ Fault = "secret-channel"
@@ -353,13 +373,15 @@ ExceedLimit ==
 
 Fail(j) ==
     /\ s.status[j] = "running"
-    /\ LET owned == IF j = "agent" THEN {"engine"}
-                    ELSE IF j = "safe_outputs" THEN {"app-write"} ELSE {}
+    /\ LET hasPost == j = "safe_outputs" /\ s.appTokenPost = "pending"
        IN s' = [s EXCEPT
-           !.status[j] = "failure", !.live = @ \ owned,
+           !.status[j] = IF hasPost THEN "post" ELSE "failure",
+           !.safeOutputResult = IF hasPost THEN "failure" ELSE @,
+           !.live = IF j = "agent" THEN @ \ {"engine"} ELSE @,
            !.privilegedCheckout.credentials =
                IF j = "safe_outputs" THEN None ELSE @,
-           !.revoked = @ \cup owned, !.lastEvent = "Fail:" \o j]
+           !.revoked = IF j = "agent" THEN @ \cup {"engine"} ELSE @,
+           !.lastEvent = "Fail:" \o j]
 
 Next ==
     \/ \E j \in Jobs: Start(j) \/ Skip(j) \/ Finish(j) \/ Fail(j)
@@ -373,7 +395,8 @@ Next ==
            AgentRequest(valid, target, channel, private)
     \/ Publish \/ TamperOrigin \/ Consume
     \/ \E result \in {"pass", "deny"}: Detect(result)
-    \/ Validate \/ MintAppToken \/ PrepareEffect \/ Execute \/ Revoke
+    \/ Validate \/ MintAppToken \/ PrepareEffect \/ Execute
+    \/ CleanupPrivilegedCheckout \/ AppTokenPost
     \/ \E channel \in Channels: Leak(channel)
     \/ UseExpired \/ ExceedLimit
 
@@ -382,6 +405,8 @@ Spec == Init /\ [][Next]_vars
 TypeOK ==
     /\ s.status \in [Jobs -> States]
     /\ s.step \in [Jobs -> 1..6]
+    /\ s.safeOutputResult \in {"none", "success", "failure"}
+    /\ s.appTokenPost \in {"not-registered", "pending", "complete"}
     /\ s.started \subseteq Jobs
     /\ s.grants \in [Jobs -> SUBSET Permissions]
     /\ s.live \subseteq Tokens /\ s.revoked \subseteq Tokens
@@ -456,7 +481,9 @@ NoImplicitFetch ==
     \A op \in s.operations: op.job = "agent" => op.op \notin {"fetch", "push"}
 TokenLifetime ==
     /\ s.live \cap s.revoked = {}
-    /\ (s.status["safe_outputs"] = "success" => "app-write" \notin s.live)
+    /\ (s.status["agent"] \in {"success", "failure"} => "engine" \notin s.live)
+    /\ (s.status["safe_outputs"] \in {"success", "failure"} =>
+        "app-write" \notin s.live)
 NetworkPolicy ==
     \A e \in s.egress:
         e.destination \in {"inference", "github"}

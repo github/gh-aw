@@ -31,6 +31,7 @@ tools:
     mode: gh-proxy
     toolsets: [default, discussions]
   bash: true
+  cache-memory: true
 timeout-minutes: 20
 imports:
   - uses: shared/daily-audit-base.md
@@ -192,9 +193,11 @@ fi
 
 If available, compare with historical data (this will work after first run):
 
+Read `/tmp/gh-aw/cache-memory/secrets-stats.json` if it exists and compare it with today's statistics before overwriting it. If no baseline exists, report that this is the first run.
+
 ```bash
 # Save current stats for next run
-cat > /tmp/gh-aw/agent/secrets-stats.json << EOF
+cat > /tmp/gh-aw/cache-memory/secrets-stats.json << EOF
 {
   "date": "$(date -I)",
   "total_workflows": $TOTAL_WORKFLOWS,
