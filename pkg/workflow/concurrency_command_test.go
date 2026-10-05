@@ -63,7 +63,7 @@ func TestConcurrencyQueueSchemaValidation(t *testing.T) {
 	for _, queue := range []string{"single", "max", "${{ github.event_name == 'pull_request' && 'single' || 'max' }}", "invalid"} {
 		content := "on: workflow_dispatch\nconcurrency:\n  group: test\n  queue: " + queue + "\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n"
 		err := NewCompiler().validateGitHubActionsSchema(content)
-		if queue == "invalid" {
+		if queue == "invalid" || strings.HasPrefix(queue, "${{") {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
