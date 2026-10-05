@@ -12,7 +12,7 @@ const mockCore = { info: vi.fn() };
 global.core = mockCore;
 
 describe("push_repo_memory.cjs - nested memory persistence", () => {
-  it("pushes nested files matching recursive globs and warns with skipped paths", async () => {
+  it("pushes nested files matching slashless globs and warns with skipped paths", async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-nested-"));
     const artifactDir = path.join(tempDir, "artifact");
     const workspaceDir = path.join(tempDir, "workspace");
@@ -56,7 +56,7 @@ describe("push_repo_memory.cjs - nested memory persistence", () => {
             TARGET_REPO: "owner/repo",
             BRANCH_NAME: "memory/test",
             GH_TOKEN: "test-token",
-            FILE_GLOB_FILTER: "*.json **/*.jsonl",
+            FILE_GLOB_FILTER: "*.json *.jsonl",
             ALLOWED_EXTENSIONS: '[".json", ".jsonl", ".md"]',
           },
         },

@@ -118,11 +118,11 @@ semantics and migration guidance.
 **File Glob Matching Rules**:
 
 - Patterns are matched against the **relative path** within the artifact directory — do **not** include the branch name.
-- **Slashless patterns** (no `/` in the pattern, e.g. `*.json`, `*.md`) match files at the **artifact root (depth 0)** only. They do _not_ match files inside subfolders (depth 1+) — use a recursive pattern such as `**/*.json` for that.
+- **Slashless patterns** (no `/` in the pattern, e.g. `*.json`, `*.md`) are matched against the full relative path, so a single `*` only matches files at the **artifact root (depth 0)**. They do _not_ match files inside subfolders (depth 1+) — use a pattern containing `/` (e.g. `**/*.json`) for that.
 - **Patterns containing `/`** (e.g. `metrics/**`, `data/*.csv`) are matched against the full relative path from the artifact root and work as standard glob expressions.
 - **Absolute paths** (patterns starting with `/`) are **not supported** and are rejected at compile time and runtime.
 
-Example: with the filter `["*.json", "*.md"]`, the root-level file `processed-discussions.json` is persisted (depth 0 ✓), but `discussion-task-miner/processed-discussions.json` (depth 1) is not. Add `["**/*.json", "**/*.md"]` to also match files nested in subfolders.
+Example: with the default filter `["*.json", "*.md"]`, the root-level file `processed-discussions.json` is persisted (depth 0 ✓), but `discussion-task-miner/processed-discussions.json` (depth 1) is not — use `["**/*.json", "**/*.md"]` to also match files nested in subfolders.
 
 ## Multiple Configurations
 
@@ -139,7 +139,7 @@ tools:
 ---
 ```
 
-Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs match paths relative to the memory directory, so never include the branch name. Slashless patterns such as `*.json` match files at the memory root only. Use `**/*.json` to match nested JSON files; combine it with `*.json` to match both root and nested files. Patterns containing `/`, such as `metrics/*.json`, match the full relative path; `*` does not cross directories, while `**` does. Files excluded by the glob or extension filters produce warnings listing their paths.
+Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs match paths relative to the memory directory, so never include the branch name. Slashless patterns such as `*.json` match filenames at any depth, including `archive/data.json`. Patterns containing `/`, such as `metrics/*.json`, match the full relative path; `*` does not cross directories, while `**` does. Files excluded by the glob or extension filters produce warnings listing their paths.
 
 ## Behavior
 
