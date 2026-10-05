@@ -207,7 +207,7 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("resolvePiApiForModel", () => {
-    it("routes a reflected Copilot model marked Responses-only through the Responses API", () => {
+    it("routes a Copilot model marked Responses-only through the Responses API", () => {
       expect(
         piModelsJson.resolvePiApiForModel({
           provider: "github",
