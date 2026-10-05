@@ -611,8 +611,11 @@ Daily AIC guardrail with repo-memory ledger`
 	if !strings.Contains(lockStr, "GH_AW_MAX_DAILY_AI_CREDITS_BACKEND: \"repo-memory\"") {
 		t.Fatal("expected activation guardrail to receive repo-memory backend env")
 	}
-	if !strings.Contains(lockStr, "GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED: \"true\"") {
-		t.Fatal("expected activation guardrail to trust the ledger after its repo-memory clone succeeds")
+	if !strings.Contains(lockStr, "id: daily-aic-repo-memory-clone") {
+		t.Fatal("expected repo-memory clone step to expose its clone result")
+	}
+	if !strings.Contains(lockStr, "GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED: ${{ steps.daily-aic-repo-memory-clone.outputs.cloned == 'true' }}") {
+		t.Fatal("expected activation guardrail to trust the ledger only after a successful clone")
 	}
 	preGuardrailCloneIdx := strings.Index(lockStr, "Clone daily AIC repo-memory ledger (default)")
 	guardrailCheckIdx := strings.Index(lockStr, "name: Check daily workflow token guardrail")

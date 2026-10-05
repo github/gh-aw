@@ -76,6 +76,12 @@ harden_repo_memory_git_state() {
   fi
 }
 
+write_clone_output() {
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf 'cloned=%s\n' "$1" >> "$GITHUB_OUTPUT"
+  fi
+}
+
 # Validate required environment variables
 if [ -z "$GH_TOKEN" ]; then
   echo "ERROR: GH_TOKEN environment variable is required"
@@ -121,15 +127,28 @@ export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="http.extraheader"
 export GIT_CONFIG_VALUE_0="$AUTH_HEADER"
 
-# Try to clone the branch (don't fail if it doesn't exist)
-set +e
-git clone --depth 1 --single-branch --branch "$BRANCH_NAME" "$SAFE_ORIGIN_URL" "$MEMORY_DIR" 2>/dev/null
-CLONE_EXIT_CODE=$?
-set -e
+write_clone_output false
+
+# Verify the branch before cloning so only a confirmed missing branch can
+# fall back to an orphan. Authentication and transport failures must fail closed.
+if git ls-remote --exit-code --heads "$SAFE_ORIGIN_URL" "refs/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+  if ! git clone --depth 1 --single-branch --branch "$BRANCH_NAME" "$SAFE_ORIGIN_URL" "$MEMORY_DIR" 2>/dev/null; then
+    echo "ERROR: failed to clone repo-memory branch after it was confirmed to exist" >&2
+    exit 1
+  fi
+  CLONE_SUCCEEDED=true
+else
+  LS_REMOTE_EXIT_CODE=$?
+  if [ "$LS_REMOTE_EXIT_CODE" -ne 2 ]; then
+    echo "ERROR: failed to verify repo-memory branch; refusing to create an orphan branch" >&2
+    exit 1
+  fi
+  CLONE_SUCCEEDED=false
+fi
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 
-if [ $CLONE_EXIT_CODE -ne 0 ]; then
-  # Clone failed - branch doesn't exist
+if [ "$CLONE_SUCCEEDED" = "false" ]; then
+  # The remote confirmed that the branch does not exist.
   if [ "$CREATE_ORPHAN" = "true" ]; then
     echo "Branch $BRANCH_NAME does not exist, creating orphan branch"
     mkdir -p "$MEMORY_DIR"
@@ -165,6 +184,7 @@ else
   git remote remove origin >/dev/null 2>&1 || true
   git remote add origin "$SAFE_ORIGIN_URL"
   harden_repo_memory_git_state "$MEMORY_DIR" "$SAFE_ORIGIN_URL"
+  write_clone_output true
 fi
 unset AUTH_HEADER
 
