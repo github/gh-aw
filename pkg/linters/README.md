@@ -34,6 +34,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `httpnoctx` — reports HTTP client and package-level HTTP calls that do not accept a `context.Context`.
 - `httprespbodyclose` — reports HTTP responses whose `Body.Close()` call is missing or not deferred.
 - `httpstatuscode` — reports raw HTTP status-code integer literals that should use `net/http` named constants.
+- `indexcomparetocontains` — reports `strings.Index()`, `strings.LastIndex()`, `strings.IndexByte()`, `bytes.Index()`, `bytes.LastIndex()`, and `bytes.IndexByte()` calls compared with `-1` or `0` that should use `strings.Contains()` or `bytes.Contains()` and their negations instead.
 - `ioutildeprecated` — reports uses of deprecated `io/ioutil` functions (deprecated since Go 1.16) and suggests their replacements in the `io` and `os` packages.
 - `jsonmarshalignoredeerror` — reports `json.Marshal` and `json.Unmarshal` calls where the error return is discarded.
 - `largefunc` — reports function bodies that exceed a configurable line-count threshold.

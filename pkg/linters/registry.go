@@ -32,6 +32,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/httprespbodyclose"
 	"github.com/github/gh-aw/pkg/linters/httpstatuscode"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
+	"github.com/github/gh-aw/pkg/linters/indexcomparetocontains"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
 	"github.com/github/gh-aw/pkg/linters/lenstringsplit"
@@ -119,6 +120,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	httpnoctx.Analyzer,
 	httprespbodyclose.Analyzer,
 	ioutildeprecated.Analyzer,
+	indexcomparetocontains.Analyzer,
 	httpstatuscode.Analyzer,
 	largefunc.Analyzer,
 	logfatallibrary.Analyzer,
