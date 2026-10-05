@@ -36,6 +36,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       setFailed,
       info: vi.fn(),
       warning: vi.fn(),
+      summary: { addDetails: vi.fn(), write: vi.fn() },
     };
     global.github = {};
     global.context = { repo: { owner: "test-owner", repo: "test-repo" } };
@@ -43,6 +44,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
     process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND = "repo-memory";
     process.env.GITHUB_EVENT_NAME = "schedule";
     delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
+    delete process.env.GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED;
     vi.resetModules();
     const mod = await import("./check_daily_aic_workflow_guardrail.cjs");
     exports = mod.default || mod;
@@ -52,13 +54,75 @@ describe("check_daily_aic_workflow_guardrail", () => {
       expect(outputs.daily_ai_credits_guardrail_status).toBe("structural_error");
       expect(outputs.daily_ai_credits_guardrail_error).toContain("untrusted");
       expect(setFailed).toHaveBeenCalledOnce();
+
+      process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC = "true";
+      await exports.main({ repoMemoryDir: scanCacheDirectory });
+      expect(outputs.daily_ai_credits_guardrail_status).toBe("under_budget");
+      expect(setFailed).toHaveBeenCalledOnce();
     } finally {
       delete global.core;
       delete global.github;
       delete global.context;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND;
+      delete process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC;
       delete process.env.GITHUB_EVENT_NAME;
+    }
+  });
+
+  it("accepts a prior-run ledger written by the normal writer when provenance is trusted", async () => {
+    const outputs = {};
+    const setFailed = vi.fn();
+    global.core = {
+      setOutput: (key, value) => {
+        outputs[key] = value;
+      },
+      setFailed,
+      info: vi.fn(),
+      warning: vi.fn(),
+      summary: { addDetails: vi.fn(), write: vi.fn() },
+    };
+    global.github = {};
+    global.context = { repo: { owner: "test-owner", repo: "test-repo" } };
+    const repoMemoryDir = path.join(scanCacheDirectory, "memory");
+    const usageRoot = path.join(scanCacheDirectory, "usage");
+    fs.mkdirSync(usageRoot, { recursive: true });
+    fs.writeFileSync(path.join(usageRoot, "agent_usage.jsonl"), `${JSON.stringify({ aic: 4 })}\n`, "utf8");
+    const now = Date.now();
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS = "100";
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND = "repo-memory";
+    process.env.GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED = "true";
+    process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR = repoMemoryDir;
+    process.env.GH_AW_WORKFLOW_ID = "daily-code-metrics";
+    process.env.GITHUB_EVENT_NAME = "schedule";
+    process.env.GITHUB_RUN_ID = "41";
+    process.env.GITHUB_REPOSITORY = "test-owner/test-repo";
+    try {
+      const ledgerModule = await import("./daily_aic_repo_memory_ledger.cjs");
+      const ledger = ledgerModule.default || ledgerModule;
+      ledger.appendCurrentRunLedgerEntry({
+        repoMemoryDir,
+        usageRoot,
+        now: now - 60_000,
+      });
+
+      await exports.main({ repoMemoryDir });
+
+      expect(outputs.daily_ai_credits_guardrail_status).toBe("under_budget");
+      expect(outputs.daily_ai_credits_total).toBe("4");
+      expect(setFailed).not.toHaveBeenCalled();
+    } finally {
+      delete global.core;
+      delete global.github;
+      delete global.context;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS_BACKEND;
+      delete process.env.GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED;
+      delete process.env.GH_AW_DAILY_AIC_REPO_MEMORY_DIR;
+      delete process.env.GH_AW_WORKFLOW_ID;
+      delete process.env.GITHUB_EVENT_NAME;
+      delete process.env.GITHUB_RUN_ID;
+      delete process.env.GITHUB_REPOSITORY;
     }
   });
 

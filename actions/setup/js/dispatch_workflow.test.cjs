@@ -77,7 +77,7 @@ describe("dispatch_workflow handler factory", () => {
     return () => parseTransactionLog(log);
   }
 
-  it("claims available work and injects only trusted assignment into the worker", async () => {
+  it("claims available work and injects the trusted assignment separately from caller context", async () => {
     const transactions = queueWithWork();
     global.context.runId = 101;
     const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
@@ -88,7 +88,8 @@ describe("dispatch_workflow handler factory", () => {
     const inputs = global.github.rest.actions.createWorkflowDispatch.mock.calls[0][0].inputs;
     expect(inputs).not.toHaveProperty("work_queue");
     expect(inputs.task).toBe("hello");
-    expect(JSON.parse(inputs.aw_context).work_queue).toEqual({ work_id: "task-1", claim_id: claim.claim, work: { id: "task-1" } });
+    expect(JSON.parse(inputs.aw_context)).not.toHaveProperty("work_queue");
+    expect(JSON.parse(inputs.work_queue_claim)).toEqual({ work_id: "task-1", claim_id: claim.claim, work: { id: "task-1" } });
   });
 
   it("uses the safe-outputs job token for queue writes with a separate dispatch token", async () => {

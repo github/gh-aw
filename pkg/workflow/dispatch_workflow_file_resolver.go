@@ -147,6 +147,28 @@ func mdHasWorkQueueTools(mdPath string) (bool, error) {
 	return configured && value != false, nil
 }
 
+// mdHasWorkQueueWorker reports whether a workflow source declares itself as a queue worker.
+func mdHasWorkQueueWorker(mdPath string) (bool, error) {
+	content, err := os.ReadFile(mdPath) // #nosec G304 -- mdPath is validated via isPathWithinDir in findWorkflowFile
+	if err != nil {
+		return false, err
+	}
+	result, err := parser.ExtractFrontmatterFromContent(string(content))
+	if err != nil || result == nil {
+		return false, err
+	}
+	tools, ok := result.Frontmatter["tools"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	workQueue, ok := tools["work-queue"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	worker, ok := workQueue["worker"].(bool)
+	return ok && worker, nil
+}
+
 // lockHasWorkQueueProtocol reports whether a compiled workflow includes both queue admission and reconciliation.
 func lockHasWorkQueueProtocol(lockPath string) (bool, error) {
 	content, err := os.ReadFile(lockPath) // #nosec G304 -- lockPath is validated via isPathWithinDir in findWorkflowFile

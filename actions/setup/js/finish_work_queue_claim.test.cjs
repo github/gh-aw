@@ -147,6 +147,25 @@ describe("work queue claim reconciliation", () => {
     expect(fake.transactions).toEqual(initialTransactions);
   });
 
+  it("blocks safe outputs when a required worker assignment is missing", async () => {
+    const fake = setup();
+    const core = { info: vi.fn() };
+    const publish = vi.fn(fake.applyAndPublish);
+    const result = await reconcileWorkerClaim({
+      worker: null,
+      requireAssignment: true,
+      core,
+      readWorkQueueLog: fake.readWorkQueueLog,
+      applyAndPublish: publish,
+      context: { repo: { owner: "owner", repo: "repo" }, runId: 123 },
+    });
+
+    expect(result).toEqual({ authorized: false, status: "missing" });
+    expect(publish).not.toHaveBeenCalled();
+    expect(fake.transactions).toEqual(initialTransactions);
+    expect(renderSummary(result.status)).toContain("ordinary safe outputs were blocked");
+  });
+
   it("rejects conflicting finish intents and emits a redacted progressive summary", async () => {
     const fake = setup();
     fs.writeFileSync(fake.finishIntentPath, '{"outcome":"completed"}\n{"outcome":"cancelled"}\n');

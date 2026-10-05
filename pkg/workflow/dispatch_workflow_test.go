@@ -186,6 +186,7 @@ func TestPopulateDispatchWorkflowFilesRequiresQueueEnabledWorker(t *testing.T) {
 		"worker": `tools:
   work-queue:
     storage: issues
+    worker: true
 `,
 		"ordinary-worker": "",
 		"stale-worker": `tools:
@@ -195,9 +196,6 @@ func TestPopulateDispatchWorkflowFilesRequiresQueueEnabledWorker(t *testing.T) {
 		workflow := `---
 on:
   workflow_dispatch:
-    inputs:
-      aw_context:
-        type: string
 ` + frontmatter + `---
 Run the worker.
 `
@@ -214,12 +212,18 @@ Run the worker.
 `,
 		"stale-worker": "",
 	} {
+		queueClaimInput := ""
+		if name == "worker" {
+			queueClaimInput = `      work_queue_claim:
+        type: string
+`
+		}
 		compiled := `on:
   workflow_dispatch:
     inputs:
       aw_context:
         type: string
-jobs:
+` + queueClaimInput + `jobs:
 ` + extraSteps
 		require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, name+".lock.yml"), []byte(compiled), 0600))
 	}

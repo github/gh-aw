@@ -13,8 +13,8 @@ type DispatchWorkflowConfig struct {
 	BaseSafeOutputConfig `yaml:",inline"`
 	Workflows            []string          `yaml:"workflows,omitempty"`            // List of workflow names (without .md extension) to allow dispatching
 	WorkflowFiles        map[string]string `yaml:"workflow_files,omitempty"`       // Map of workflow name to file extension (.lock.yml or .yml) - populated at compile time
-	AwContextWorkflows   []string          `yaml:"aw_context_workflows,omitempty"` // Workflows that declare aw_context in workflow_dispatch.inputs - populated at compile time
-	WorkQueueWorkflows   []string          `yaml:"work_queue_workflows,omitempty"` // Workflows that enable tools.work-queue and declare aw_context - populated at compile time
+	AwContextWorkflows   []string          `yaml:"aw_context_workflows,omitempty"` // Compiler-managed workflows that accept caller context - populated at compile time
+	WorkQueueWorkflows   []string          `yaml:"work_queue_workflows,omitempty"` // Explicit queue workers that accept work_queue_claim - populated at compile time
 	TargetRepoSlug       string            `yaml:"target-repo,omitempty"`          // Target repository for cross-repo dispatch (owner/repo or GitHub Actions expression)
 	AllowedRepos         []string          `yaml:"allowed-repos,omitempty"`        // Allowlist for cross-repository dispatch targets
 	AllowedRefs          []string          `yaml:"allowed-refs,omitempty"`         // Allowlist of ref globs for per-call message.ref overrides

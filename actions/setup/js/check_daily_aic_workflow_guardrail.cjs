@@ -663,7 +663,9 @@ async function main(options = {}) {
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || process.env.GH_AW_WORKFLOW_ID || "workflow";
     let actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || process.env.GITHUB_ACTOR || "";
     if (backend === REPO_MEMORY_BACKEND) {
-      if (process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC !== "true") {
+      const trustedLedger = process.env.GH_AW_DAILY_AIC_REPO_MEMORY_TRUSTED === "true";
+      const allowInsecureLedger = process.env.GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC === "true";
+      if (!trustedLedger && !allowInsecureLedger) {
         const message = "Daily workflow AI Credits repo-memory ledger is untrusted; set GH_AW_ALLOW_INSECURE_REPO_MEMORY_AIC to true to explicitly allow it.";
         core.setOutput("daily_ai_credits_guardrail_status", "structural_error");
         core.setOutput("daily_ai_credits_guardrail_error", message);

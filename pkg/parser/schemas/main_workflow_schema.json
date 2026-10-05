@@ -5072,11 +5072,19 @@
                   "type": "string",
                   "enum": ["git", "issues"],
                   "description": "Queue storage backend; defaults to git. Choose issues to store queue records on GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret."
+                },
+                "require-assignment": {
+                  "type": "boolean",
+                  "description": "Fail closed and block safe outputs when no trusted inbound worker assignment is present."
+                },
+                "worker": {
+                  "type": "boolean",
+                  "description": "Declare this workflow as a work-queue worker eligible to receive trusted queue claims."
                 }
               }
             }
           ],
-          "examples": [true, null, { "storage": "issues" }]
+          "examples": [true, null, { "storage": "issues" }, { "storage": "git", "worker": true, "require-assignment": true }]
         },
         "cache-memory": {
           "description": "Cache memory MCP configuration for persistent memory storage",

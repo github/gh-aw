@@ -49,6 +49,7 @@ function readFinishIntent(finishIntentPath = process.env.GH_AW_WORK_QUEUE_FINISH
 function renderSummary(status) {
   const labels = {
     unassigned: "No worker claim was assigned; safe outputs may proceed.",
+    missing: "No worker claim was assigned; ordinary safe outputs were blocked.",
     completed: "The effective worker claim was durably completed and verified; safe outputs may proceed.",
     cancelled: "The worker claim was cancelled; ordinary safe outputs were skipped.",
     superseded: "The worker claim is no longer effective; ordinary safe outputs were skipped.",
@@ -71,7 +72,8 @@ async function reconcileWorkerClaim(options = {}) {
 
   if (!worker) {
     coreApi?.info("Work queue: no inbound worker claim; skipping queue reconciliation");
-    return { authorized: true, status: "unassigned" };
+    const requireAssignment = options.requireAssignment === true;
+    return { authorized: !requireAssignment, status: requireAssignment ? "missing" : "unassigned" };
   }
 
   const finishIntent = readFinishIntent(options.finishIntentPath);
