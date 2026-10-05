@@ -1,3 +1,3 @@
 {
-  "sub_agent_strategy": "inline_strict"
+  "sub_agent_strategy": "single_agent_control"
 }
