@@ -9,6 +9,42 @@ SCRIPT="${SCRIPT_DIR}/clone_repo_memory_branch.sh"
 TESTS_PASSED=0
 TESTS_FAILED=0
 WORKSPACE="$(mktemp -d)"
+REAL_GIT="$(command -v git)"
+MOCK_BIN="${WORKSPACE}/mock-bin"
+SOURCE_REPO="${WORKSPACE}/source.git"
+mkdir -p "${MOCK_BIN}"
+
+cat > "${MOCK_BIN}/git" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "ls-remote" ]; then
+  case "${GIT_TEST_LS_REMOTE:-missing}" in
+    missing) exit 2 ;;
+    exists|clone-fail)
+      printf '%s\trefs/heads/%s\n' "1111111111111111111111111111111111111111" "$BRANCH_NAME"
+      exit 0
+      ;;
+    error) exit 128 ;;
+  esac
+fi
+if [ "$1" = "clone" ] && [ "${GIT_TEST_LS_REMOTE:-missing}" != "missing" ]; then
+  if [ "${GIT_TEST_LS_REMOTE}" = "clone-fail" ]; then
+    exit 128
+  fi
+  exec "$REAL_GIT" clone --depth 1 --single-branch --branch "$BRANCH_NAME" "$GIT_TEST_SOURCE_REPO" "$MEMORY_DIR"
+fi
+exec "$REAL_GIT" "$@"
+EOF
+chmod +x "${MOCK_BIN}/git"
+
+SOURCE_WORKTREE="${WORKSPACE}/source-worktree"
+mkdir -p "${SOURCE_WORKTREE}"
+"${REAL_GIT}" -C "${SOURCE_WORKTREE}" init -q -b repo-memory-test
+"${REAL_GIT}" -C "${SOURCE_WORKTREE}" config user.name "Test"
+"${REAL_GIT}" -C "${SOURCE_WORKTREE}" config user.email "test@example.com"
+echo "ledger" > "${SOURCE_WORKTREE}/ledger.jsonl"
+"${REAL_GIT}" -C "${SOURCE_WORKTREE}" add ledger.jsonl
+"${REAL_GIT}" -C "${SOURCE_WORKTREE}" commit -qm "Add ledger"
+"${REAL_GIT}" clone -q --bare "${SOURCE_WORKTREE}" "${SOURCE_REPO}"
 
 cleanup() {
   rm -rf "${WORKSPACE}"
@@ -29,13 +65,21 @@ assert() {
 
 run_script() {
   local memory_dir="$1"
+  local ls_remote_mode="${2:-missing}"
+  local output_file="${memory_dir}.output"
+  rm -f "${output_file}"
+  GITHUB_OUTPUT="${output_file}" \
   GH_TOKEN="test-token" \
   BRANCH_NAME="repo-memory-test" \
   TARGET_REPO="octo/test" \
   MEMORY_DIR="${memory_dir}" \
   CREATE_ORPHAN="true" \
   GITHUB_SERVER_URL="https://127.0.0.1:9" \
-  bash "${SCRIPT}" 2>&1 || true
+  GIT_TEST_LS_REMOTE="${ls_remote_mode}" \
+  GIT_TEST_SOURCE_REPO="${SOURCE_REPO}" \
+  REAL_GIT="${REAL_GIT}" \
+  PATH="${MOCK_BIN}:${PATH}" \
+  bash "${SCRIPT}" 2>&1
 }
 
 echo "Testing clone_repo_memory_branch.sh"
@@ -50,6 +94,7 @@ D="${WORKSPACE}/test2"
 mkdir -p "${D}"
 OUTPUT="$(run_script "${D}")"
 assert "orphan branch message emitted" "printf '%s' \"${OUTPUT}\" | grep -q 'creating orphan branch'"
+assert "missing branch is not trusted" "grep -q '^cloned=false$' '${D}.output'"
 assert "git metadata exists" "[ -d '${D}/.git' ]"
 assert "hooks path hardened" "[ \"\$(git -C '${D}' config --default '' core.hooksPath)\" = '/dev/null' ]"
 assert "fsmonitor hardened" "[ \"\$(git -C '${D}' config --default '' core.fsmonitor)\" = 'false' ]"
@@ -138,6 +183,37 @@ else
   assert "origin url has no x-access-token" "! printf '%s' \"${ORIGIN_URL}\" | grep -q 'x-access-token'"
   assert "origin url has no embedded token" "! printf '%s' \"${ORIGIN_URL}\" | grep -q 'test-token'"
 fi
+echo ""
+
+echo "Test 7: Existing branch is cloned and marked trusted"
+D="${WORKSPACE}/test7"
+OUTPUT="$(run_script "${D}" exists)"
+assert "existing branch cloned" "[ -f '${D}/ledger.jsonl' ]"
+assert "successful clone is trusted" "grep -q '^cloned=true$' '${D}.output'"
+echo ""
+
+echo "Test 8: Failed clone after branch verification does not create an orphan"
+D="${WORKSPACE}/test8"
+if OUTPUT="$(run_script "${D}" clone-fail)"; then
+  CLONE_STATUS=0
+else
+  CLONE_STATUS=$?
+fi
+assert "failed clone exits unsuccessfully" "[ '${CLONE_STATUS}' -ne 0 ]"
+assert "failed clone does not create git metadata" "[ ! -e '${D}/.git' ]"
+assert "failed clone remains untrusted" "grep -q '^cloned=false$' '${D}.output'"
+echo ""
+
+echo "Test 9: Unclassified remote failure does not create an orphan"
+D="${WORKSPACE}/test9"
+if OUTPUT="$(run_script "${D}" error)"; then
+  REMOTE_STATUS=0
+else
+  REMOTE_STATUS=$?
+fi
+assert "remote verification failure exits unsuccessfully" "[ '${REMOTE_STATUS}' -ne 0 ]"
+assert "remote verification failure does not create git metadata" "[ ! -e '${D}/.git' ]"
+assert "remote verification failure remains untrusted" "grep -q '^cloned=false$' '${D}.output'"
 echo ""
 
 echo "Tests passed: ${TESTS_PASSED}"

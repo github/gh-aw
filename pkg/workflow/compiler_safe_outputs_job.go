@@ -289,6 +289,10 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 	if !isWorkQueueEnabled(data) {
 		return nil
 	}
+	mainCall := "            await main({ core, github, context });\n"
+	if workQueueRequiresAssignment(data) {
+		mainCall = "            await main({ core, github, context, requireAssignment: true });\n"
+	}
 	steps := []string{
 		"      - name: Reconcile work queue claim\n",
 		"        id: work_queue_claim_reconciliation\n",
@@ -301,7 +305,7 @@ func (c *Compiler) buildWorkQueueClaimReconciliationStep(data *WorkflowData) []s
 		"        with:\n",
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/finish_work_queue_claim.cjs');\n",
-		"            await main({ core, github, context });\n",
+		mainCall,
 	)
 }
 

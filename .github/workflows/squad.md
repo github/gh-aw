@@ -22,10 +22,6 @@ on:
         description: 'Issue number to implement when run manually'
         required: false
         type: string
-      aw_context:
-        description: 'Originating agentic workflow context'
-        required: false
-        type: string
 permissions:
   contents: read
   copilot-requests: write

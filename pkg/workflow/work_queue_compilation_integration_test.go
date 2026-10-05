@@ -23,7 +23,10 @@ on: workflow_dispatch
 name: Work Queue Worker Integration
 engine: claude
 tools:
-  work-queue: true
+  work-queue:
+    storage: git
+    require-assignment: true
+    worker: true
 safe-outputs:
   create-issue:
     max: 1
@@ -37,12 +40,15 @@ Compile each work-queue workflow phase.
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflow), 0o600))
 
 	compiler := NewCompiler(WithVersion("integration"))
+	compiler.SetApprove(true)
 	require.NoError(t, compiler.CompileWorkflow(workflowPath))
 
 	lockPath := filepath.Join(dir, "work-queue-worker.lock.yml")
 	lockContent, err := os.ReadFile(lockPath)
 	require.NoError(t, err)
 	compiled := string(lockContent)
+	require.Contains(t, compiled, "work_queue_claim:")
+	require.Contains(t, compiled, "aw_context:")
 
 	activation := extractJobSection(compiled, string(constants.ActivationJobName))
 	require.Contains(t, activation, "Snapshot work queue state")
@@ -57,6 +63,7 @@ Compile each work-queue workflow phase.
 	require.Contains(t, safeOutputs, "contents: write")
 	require.Contains(t, safeOutputs, "Download activation artifact for work queue")
 	require.Contains(t, safeOutputs, "Reconcile work queue claim")
+	require.Contains(t, safeOutputs, "requireAssignment: true")
 	gate := "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
 	require.Contains(t, safeOutputs, gate)
 	require.Less(t,
@@ -107,6 +114,7 @@ engine: claude
 tools:
   work-queue:
     storage: issues
+    worker: true
 ---
 
 Read and finish assigned work.
@@ -142,12 +150,10 @@ func TestWorkQueueDispatchCompilerConfiguration(t *testing.T) {
 	require.NoError(t, os.WriteFile(workerPath, []byte(`---
 on:
   workflow_dispatch:
-    inputs:
-      aw_context:
-        type: string
 tools:
   work-queue:
     storage: issues
+    worker: true
 ---
 Process the assigned work.
 `), 0o600))
@@ -172,6 +178,9 @@ Read the queue and dispatch an available Work identity.
 	require.Contains(t, string(compiled), `work_queue_workflows`)
 	require.Contains(t, string(compiled), `work_queue`)
 	require.Equal(t, 4, strings.Count(string(compiled), "WORK_QUEUE_HMAC_SECRET: ${{ secrets.GH_AW_WORK_QUEUE_HMAC_SECRET }}"))
+	inputs, err := extractWorkflowDispatchInputs(filepath.Join(workflowsDir, "dispatcher.lock.yml"))
+	require.NoError(t, err)
+	require.NotContains(t, inputs, WorkQueueClaimInputName)
 }
 
 func TestWorkQueueSmokeVerification(t *testing.T) {

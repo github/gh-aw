@@ -178,7 +178,7 @@ async function main(core, ctx, githubClient) {
         core.warning(`aw_context must be a JSON object, got: ${typeof parsed}`);
       } else {
         try {
-          parsed = normalizeWorkQueueContext(parsed);
+          parsed = normalizeWorkQueueContext(parsed, ctx.payload?.inputs?.work_queue_claim ?? ctx.payload?.client_payload?.work_queue_claim);
         } catch (error) {
           core.warning(`${getErrorMessage(error)}. Ignoring aw_context.`);
           parsed = null;

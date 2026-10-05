@@ -10,12 +10,6 @@ on:
     strategy: centralized
     events: [issues, issue_comment, pull_request, pull_request_comment]
   workflow_dispatch:
-    inputs:
-      aw_context:
-        description: Agent caller context (used internally by Agentic Workflows).
-        required: false
-        type: string
-        default: ""
   pull_request:
     types: [labeled]
     names: ["smoke"]

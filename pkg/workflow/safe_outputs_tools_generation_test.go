@@ -61,9 +61,14 @@ func TestDispatchWorkflowWorkQueueSelector(t *testing.T) {
 	withoutContext := generateDispatchWorkflowTool("worker", map[string]any{}, nil, true)
 	assert.NotContains(t, withoutContext["inputSchema"].(map[string]any)["properties"].(map[string]any), "work_queue")
 
-	queue := generateDispatchWorkflowTool("worker", map[string]any{"aw_context": map[string]any{"type": "string", "required": true}}, nil, true)
+	queue := generateDispatchWorkflowTool("worker", map[string]any{
+		"aw_context":       map[string]any{"type": "string", "required": true},
+		"work_queue_claim": map[string]any{"type": "string", "required": true},
+	}, nil, true)
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["properties"].(map[string]any), "aw_context")
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["required"], "aw_context")
+	assert.NotContains(t, queue["inputSchema"].(map[string]any)["properties"].(map[string]any), "work_queue_claim")
+	assert.NotContains(t, queue["inputSchema"].(map[string]any)["required"], "work_queue_claim")
 	props := queue["inputSchema"].(map[string]any)["properties"].(map[string]any)
 	selector := props["work_queue"].(map[string]any)
 	assert.Equal(t, false, selector["additionalProperties"])

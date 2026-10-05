@@ -113,7 +113,7 @@ union WorkQueueTransaction {
   WorkQueueCompletionTransaction,
 }
 
-@doc("Trusted inbound assignment supplied as aw_context.work_queue.")
+@doc("Trusted inbound assignment supplied as the compiler-managed work_queue_claim input.")
 @jsonSchema
 model WorkQueueAssignment {
   work_id: WorkQueueIdentity;

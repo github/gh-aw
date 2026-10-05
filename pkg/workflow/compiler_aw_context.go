@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,10 @@ var awContextLog = logger.New("workflow:compiler_aw_context")
 // AwContextInputName is the name of the internal aw_context workflow_dispatch input.
 // It is managed internally by the agentic workflow system and should not be surfaced to users.
 const AwContextInputName = "aw_context"
+
+// WorkQueueClaimInputName is the internal workflow_dispatch input that carries
+// a trusted work queue assignment to queue-enabled workers.
+const WorkQueueClaimInputName = "work_queue_claim"
 
 // NetworkAllowedInputName is the optional workflow_call input that extends the compiled
 // network allowlist at runtime for reusable workflows.
@@ -43,6 +48,37 @@ func injectAwContextIntoOnYAML(onSection string) string {
 	return updated
 }
 
+func injectWorkQueueClaimIntoOnYAML(onSection string) string {
+	return injectInputIntoTrigger(onSection, "workflow_dispatch", WorkQueueClaimInputName, buildWorkQueueClaimInputLines)
+}
+
+func validateReservedWorkflowInputs(data *WorkflowData) error {
+	if data == nil || data.RawFrontmatter == nil {
+		return nil
+	}
+	on, ok := data.RawFrontmatter["on"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	for _, trigger := range []string{"workflow_dispatch", "workflow_call"} {
+		triggerConfig, ok := on[trigger].(map[string]any)
+		if !ok {
+			continue
+		}
+		inputs, ok := triggerConfig["inputs"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, inputName := range []string{AwContextInputName, WorkQueueClaimInputName} {
+			if _, exists := inputs[inputName]; exists {
+				return fmt.Errorf("on.%s.inputs.%s is reserved and managed by the compiler; remove it from workflow inputs", trigger, inputName)
+			}
+		}
+	}
+	return nil
+}
+
 func injectNetworkAllowedIntoOnYAML(onSection string, network *NetworkPermissions) string {
 	if network == nil || !network.AllowedInput {
 		return onSection
@@ -57,6 +93,7 @@ func injectInputIntoTrigger(onSection string, triggerName string, inputName stri
 	}
 	awContextLog.Printf("Injecting %s input into %s trigger", inputName, triggerName)
 
+	onSection = expandInlineOnTriggers(onSection)
 	lines := strings.Split(onSection, "\n")
 	triggerLineIdx, triggerIndent := findBareTriggerLine(lines, triggerName)
 
@@ -73,6 +110,55 @@ func injectInputIntoTrigger(onSection string, triggerName string, inputName stri
 	}
 
 	return insertTriggerInputLines(lines, triggerLineIdx, triggerIndent, inputsLineIdx, buildInputLines(triggerIndent))
+}
+
+func expandInlineOnTriggers(onSection string) string {
+	lines := strings.Split(onSection, "\n")
+	for i, line := range lines {
+		if strings.TrimLeft(line, " \t") != line {
+			continue
+		}
+		onKey := ""
+		for _, candidate := range []string{"on:", `"on":`, "'on':"} {
+			if strings.HasPrefix(line, candidate) {
+				onKey = candidate
+				break
+			}
+		}
+		if onKey == "" {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, onKey))
+		if value == "" || value == "null" || value == "~" || strings.HasPrefix(value, "#") {
+			continue
+		}
+
+		var events []string
+		if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+			for event := range strings.SplitSeq(strings.TrimSpace(value[1:len(value)-1]), ",") {
+				events = append(events, strings.Trim(strings.TrimSpace(event), "'\""))
+			}
+		} else {
+			events = []string{strings.Trim(value, "'\"")}
+		}
+		if len(events) == 0 {
+			continue
+		}
+
+		expanded := []string{onKey}
+		for _, event := range events {
+			if event == "" || strings.ContainsAny(event, " \t{}[]:#") {
+				expanded = nil
+				break
+			}
+			expanded = append(expanded, "  "+event+":")
+		}
+		if expanded != nil {
+			lines = append(lines[:i], append(expanded, lines[i+1:]...)...)
+			return strings.Join(lines, "\n")
+		}
+	}
+	return onSection
 }
 
 func findBareTriggerLine(lines []string, triggerName string) (int, int) {
@@ -173,6 +259,18 @@ func buildAwContextInputLines(wdIndent int) []string {
 		awIndent + AwContextInputName + ":",
 		propIndent + "default: \"\"",
 		propIndent + "description: " + strconv.Quote(awContextInputDescription),
+		propIndent + "required: false",
+		propIndent + "type: string",
+	}
+}
+
+func buildWorkQueueClaimInputLines(wdIndent int) []string {
+	inputIndent := strings.Repeat(" ", wdIndent+4)
+	propIndent := strings.Repeat(" ", wdIndent+6)
+	return []string{
+		inputIndent + WorkQueueClaimInputName + ":",
+		propIndent + `default: ""`,
+		propIndent + `description: "Trusted work queue assignment (Reserved for Agentic Workflows)."`,
 		propIndent + "required: false",
 		propIndent + "type: string",
 	}

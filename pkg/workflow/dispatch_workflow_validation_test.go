@@ -206,6 +206,49 @@ safe-outputs:
 	require.ErrorContains(t, err, "workflow 'missing-workflow' not found")
 }
 
+func TestDispatchWorkflowValidation_RequiresWorkerOptInForQueueClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		worker  string
+		wantErr bool
+	}{
+		{name: "non-worker", wantErr: true},
+		{name: "worker", worker: "    worker: true\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			awDir := filepath.Join(tmpDir, ".github", "aw")
+			workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(awDir, 0o700))
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
+
+			workerWorkflow := `---
+on: workflow_dispatch
+tools:
+  work-queue:
+    storage: git
+` + tc.worker + `---
+Run assigned work.
+`
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "worker.md"), []byte(workerWorkflow), 0o600))
+
+			dispatcherPath := filepath.Join(awDir, "dispatcher.md")
+			data := &WorkflowData{
+				Tools: map[string]any{"work-queue": true},
+				SafeOutputs: &SafeOutputsConfig{
+					DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"worker"}},
+				},
+			}
+			err := NewCompiler(WithVersion("1.0.0")).validateDispatchWorkflow(data, dispatcherPath)
+			if tc.wantErr {
+				require.ErrorContains(t, err, "tools.work-queue.worker: true")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestDispatchWorkflowValidation_UsesWorkflowDirEnvOverride(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 
