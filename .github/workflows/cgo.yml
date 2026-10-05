@@ -50,6 +50,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       with:
+        # Keep the PR merge commit and its base parent for incremental linting.
         fetch-depth: 2
         persist-credentials: false
     - name: Check Go dependency changes
@@ -1348,8 +1349,12 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     concurrency:
-      group: ci-${{ github.ref }}-lint-go-golangci
+      group: ci-${{ github.ref }}-lint-go-golangci-${{ matrix.shard }}
       cancel-in-progress: true
     steps:
     - name: Restore checkout
@@ -1427,35 +1432,73 @@ jobs:
         echo "✓ golangci-lint $GOLANGCI_LINT_VERSION installed"
         "$GOPATH/bin/$BINARY_NAME" version
 
-      # Run golangci-lint via Makefile for consistency
-      # Uses incremental linting on PRs for faster CI (50-75% speedup)
-      # Performance optimizations in .golangci.yml:
-      # - timeout: 5m prevents hanging
-      # - modules-download-mode: readonly uses cached modules only
+      # Split the configured linters across jobs without hard-coding their names.
     - name: Run golangci-lint
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_BASE_REF: ${{ github.base_ref }}
+        LINTER_SHARD: ${{ matrix.shard }}
       run: |
         export PATH="$PATH:$(go env GOPATH)/bin"
-        if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-          # Incremental linting on PRs - only check changed files
-          # This provides 50-75% faster linting on typical PRs.
-          # The checkout is shallow (and restored from cache), so "origin/<base>"
-          # is usually missing. resolve-base-commit.sh fetches/deepens history as
-          # needed and falls back to HEAD~1, so incremental linting still applies.
-          BASE_REF="origin/$GITHUB_BASE_REF"
-          if BASE_COMMIT=$(bash scripts/resolve-base-commit.sh --base-ref "$BASE_REF") && [ -n "$BASE_COMMIT" ]; then
-            echo "Using incremental lint against $BASE_REF ($BASE_COMMIT)"
-            make golint-incremental BASE_REF="$BASE_COMMIT"
-          else
-            echo "Base ref $BASE_REF could not be resolved, falling back to full lint"
-            make golint
-          fi
-        else
-          # Full scan on main branch to ensure comprehensive coverage
-          make golint
+        # Disable the other shards' linters while retaining the shared settings
+        # and exclusions from .golangci.yml.
+        DISABLED_LINTERS=$(golangci-lint linters --json | jq -r --argjson shard "$LINTER_SHARD" \
+          '[.Enabled | to_entries[] | select(.key % 3 != $shard) | .value.name] | join(",")')
+        if [ -z "$DISABLED_LINTERS" ]; then
+          echo "Could not partition the enabled golangci-lint linters"
+          exit 1
         fi
+        if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && git rev-parse --verify -q 'HEAD^2^{commit}' >/dev/null; then
+          # A PR checkout is a merge commit: its first parent is the base branch.
+          # Both commits are in the depth-2 checkout; no network fetch is needed.
+          golangci-lint run --disable "$DISABLED_LINTERS" --new-from-rev=HEAD^1 ./cmd/... ./pkg/...
+        else
+          # Full scan on main or if a PR checkout does not contain a merge commit.
+          golangci-lint run --disable "$DISABLED_LINTERS" ./cmd/... ./pkg/...
+        fi
+
+  lint-go-govulncheck:
+    needs: [checkout-cache]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: ci-${{ github.ref }}-lint-go-govulncheck
+      cancel-in-progress: true
+    steps:
+    - name: Restore checkout
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+      with:
+        path: .
+        key: checkout-cgo-${{ github.head_ref || github.ref_name }}-${{ github.sha }}
+        fail-on-cache-miss: true
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e   # v6
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Download dependencies with retry
+      run: |
+        set -e
+        MAX_RETRIES=3
+        RETRY_DELAY=5
+
+        for ((i = 1; i <= MAX_RETRIES; i++)); do
+          echo "Attempt $i of $MAX_RETRIES: Downloading Go modules..."
+          if go mod download; then
+            echo "Successfully downloaded Go modules"
+            break
+          else
+            if [ "$i" -eq "$MAX_RETRIES" ]; then
+              echo "Failed to download Go modules after $MAX_RETRIES attempts"
+              exit 1
+            fi
+            echo "Download failed, retrying in ${RETRY_DELAY}s..."
+            sleep "$RETRY_DELAY"
+          fi
+        done
 
     - name: Run govulncheck
       run: make security-govulncheck
@@ -2674,6 +2717,7 @@ jobs:
     - check-validator-sizes
     - lint-go-format
     - lint-go-golangci
+    - lint-go-govulncheck
     - lint-go-custom
     - lint-error-messages
     - actions-build
