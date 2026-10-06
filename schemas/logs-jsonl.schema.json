@@ -2416,10 +2416,14 @@
                     },
                     "repository": {
                       "type": "string"
+                    },
+                    "dry_run": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "engine_id"
+                    "engine_id",
+                    "dry_run"
                   ],
                   "additionalProperties": false
                 },
@@ -5080,6 +5084,9 @@
                 "staged": {
                   "type": "boolean"
                 },
+                "dry_run": {
+                  "type": "boolean"
+                },
                 "awf_version": {
                   "type": "string"
                 },
@@ -5225,6 +5232,7 @@
                 "version",
                 "workflow_name",
                 "staged",
+                "dry_run",
                 "cache_memory",
                 "created_at"
               ],
