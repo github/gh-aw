@@ -98,7 +98,7 @@ on:
     outputs:
       operation_completed:
         description: 'The maintenance operation that was completed (empty when none ran or a scheduled job ran)'
-        value: ${{ jobs.run_operation.outputs.operation || inputs.operation }}
+        value: ${{ jobs.run_operation.outputs.operation || (inputs.operation == 'safe_outputs' || inputs.operation == 'create_labels' || inputs.operation == 'activity_report' || inputs.operation == 'close_agentic_workflows_issues' || inputs.operation == 'update_pull_request_branches' || inputs.operation == 'validate' || inputs.operation == 'forecast' || inputs.operation == 'clean_cache_memories' || inputs.operation == 'compact_ledger') && inputs.operation || '' }}
       applied_run_url:
         description: 'The run URL that safe outputs were applied from'
         value: ${{ jobs.apply_safe_outputs.outputs.run_url }}
@@ -945,6 +945,7 @@ jobs:
     name: Validate secrets
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Read repository scripts to check configured integration secrets without write access.
     permissions:
       contents: read
     steps:

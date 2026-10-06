@@ -130,3 +130,26 @@ func TestOptionalGeneratedJobAnnotations(t *testing.T) {
 		require.Contains(t, job.PermissionsComment, "# Permissions for the")
 	}
 }
+
+func TestSourceJobPermissionCommentsWithWideIndentation(t *testing.T) {
+	source := strings.Join([]string{
+		"on:",
+		"    issues:",
+		"        types: [opened]",
+		"    # Trigger permissions",
+		"    permissions:",
+		"        issues: read # Read issue",
+		"jobs:",
+		"    probe:",
+		"        runs-on: ubuntu-latest",
+		"        # Job permissions",
+		"        permissions:",
+		"            # Read source",
+		"            contents: read # Checkout",
+		"        steps:",
+		"            - run: echo ok",
+	}, "\n")
+	comments := sourceJobPermissionComments(source)
+	require.Equal(t, []string{"# Trigger permissions", "# Read issue"}, comments["pre_activation"])
+	require.Equal(t, []string{"# Job permissions", "# Read source", "# Checkout"}, comments["probe"])
+}

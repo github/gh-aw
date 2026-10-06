@@ -62,6 +62,7 @@ func (c *Compiler) annotateGeneratedJobs(data *WorkflowData) {
 func sourceJobPermissionComments(frontmatter string) map[string][]string { //nolint:largefunc // Tracks YAML nesting and attached comments in a single ordered pass.
 	result := make(map[string][]string)
 	section, jobName, inPermissions := "", "", false
+	onIndent, jobIndent, permissionIndent := 0, 0, 0
 	var precedingComments []string
 	for line := range strings.SplitSeq(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -70,10 +71,6 @@ func sourceJobPermissionComments(frontmatter string) map[string][]string { //nol
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-		permissionIndent := 2
-		if section == "jobs" {
-			permissionIndent = 4
-		}
 		if strings.HasPrefix(trimmed, "#") {
 			if inPermissions && indent > permissionIndent {
 				id := jobName
@@ -81,7 +78,7 @@ func sourceJobPermissionComments(frontmatter string) map[string][]string { //nol
 					id = string(constants.PreActivationJobName)
 				}
 				result[id] = append(result[id], trimmed)
-			} else if (section == "on" || (section == "jobs" && jobName != "")) && indent == permissionIndent {
+			} else if (section == "on" || (section == "jobs" && jobName != "")) && (indent == permissionIndent || permissionIndent == 0 && indent > jobIndent) {
 				precedingComments = append(precedingComments, trimmed)
 			} else {
 				precedingComments = nil
@@ -91,13 +88,25 @@ func sourceJobPermissionComments(frontmatter string) map[string][]string { //nol
 		if indent == 0 {
 			section = strings.TrimSuffix(trimmed, ":")
 			jobName, inPermissions = "", false
+			onIndent, jobIndent, permissionIndent = 0, 0, 0
 			precedingComments = nil
 			continue
 		}
-		if section == "jobs" && indent == 2 {
+		if section == "on" && onIndent == 0 {
+			onIndent = indent
+			permissionIndent = indent
+		}
+		if section == "jobs" && jobIndent == 0 {
+			jobIndent = indent
+		}
+		if section == "jobs" && indent == jobIndent {
 			jobName, inPermissions = strings.TrimSuffix(trimmed, ":"), false
+			permissionIndent = 0
 			precedingComments = nil
 			continue
+		}
+		if section == "jobs" && jobName != "" && permissionIndent == 0 && indent > jobIndent {
+			permissionIndent = indent
 		}
 		if indent == permissionIndent {
 			inPermissions = (section == "on" || section == "jobs") && (trimmed == "permissions:" || strings.HasPrefix(trimmed, "permissions: #"))

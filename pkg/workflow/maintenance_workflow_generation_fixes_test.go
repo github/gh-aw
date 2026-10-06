@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,13 @@ func TestMaintenanceWorkflowJobMetadata(t *testing.T) {
 	require.False(t, doc.Concurrency.CancelInProgress)
 	require.Contains(t, generated, "# Jobs request only the permissions needed")
 	require.Contains(t, generated, "# Replay can create or update any supported safe-output resource.")
+	lines := strings.Split(generated, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "permissions:" || strings.TrimSpace(line) == "permissions: {}" {
+			require.Positive(t, i)
+			require.True(t, strings.HasPrefix(strings.TrimSpace(lines[i-1]), "#"), "permissions on line %d needs an adjacent explanation", i+1)
+		}
+	}
 	for _, job := range []string{
 		"close-expired-discussions", "close-expired-issues", "close-expired-pull-requests",
 		"cleanup-cache-memory", "run_operation", "update_pull_request_branches",
@@ -46,6 +54,23 @@ func TestMaintenanceWorkflowJobMetadata(t *testing.T) {
 	} {
 		require.NotEmpty(t, doc.Jobs[job].Name, "job %s needs a readable name", job)
 	}
+}
+
+func TestMaintenanceWorkflowDisabledManualJobsAcceptedByConfig(t *testing.T) {
+	for _, job := range []string{
+		"run_operation", "cleanup-cache-memory", "update_pull_request_branches",
+		"apply_safe_outputs", "create_labels", "activity_report",
+		"forecast_report", "close_agentic_workflows_issues", "validate_workflows",
+	} {
+		t.Run(job, func(t *testing.T) {
+			config := &MaintenanceConfig{DisabledJobs: []string{job}}
+			require.NoError(t, validateRepoConfigValues(&RepoConfig{Maintenance: config}))
+			require.True(t, config.IsJobDisabled(job))
+		})
+	}
+	require.ErrorContains(t, validateRepoConfigValues(&RepoConfig{
+		Maintenance: &MaintenanceConfig{DisabledJobs: []string{"validate"}},
+	}), `unrecognized maintenance.disabled_jobs entry "validate"`)
 }
 
 func TestMaintenanceWorkflowOptionalCacheCleanup(t *testing.T) {
@@ -87,10 +112,28 @@ func TestMaintenanceWorkflowDisabledManualJobs(t *testing.T) {
 					require.Contains(t, generated, "\n  "+other+":", "%s must remain enabled", other)
 				}
 			}
+
 			if disabled == "run_operation" {
-				require.Contains(t, generated, "value: ${{ inputs.operation }}")
+				require.Contains(t, generated, "inputs.operation == 'safe_outputs'")
+				require.NotContains(t, generated, "value: ${{ inputs.operation }}")
 				require.NotContains(t, generated, "jobs.run_operation.outputs.operation")
 			}
 		})
 	}
+}
+
+func TestMaintenanceDisabledOperationIsNotReportedComplete(t *testing.T) {
+	opts := buildMaintenanceWorkflowYAMLOptions{
+		cronSchedule: "37 0 * * *", scheduleDesc: "Daily", runsOnValue: "ubuntu-slim",
+		actionMode: ActionModeRelease, version: "v1.0.0",
+		maintenanceConfig: &MaintenanceConfig{DisabledJobs: []string{
+			"run_operation", "apply_safe_outputs", "validate_workflows",
+		}},
+	}
+	generated, err := buildMaintenanceWorkflowYAML(context.Background(), opts)
+	require.NoError(t, err)
+	require.NotContains(t, generated, "jobs.run_operation.outputs.operation")
+	require.NotContains(t, generated, "inputs.operation == 'safe_outputs'")
+	require.NotContains(t, generated, "inputs.operation == 'validate'")
+	require.Contains(t, generated, "inputs.operation == 'create_labels'")
 }

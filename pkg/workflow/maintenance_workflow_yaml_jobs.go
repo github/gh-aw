@@ -721,6 +721,7 @@ func buildMaintenanceSecretValidationJob(opts buildMaintenanceWorkflowYAMLOption
     name: Validate secrets
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnly()) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Read repository scripts to check configured integration secrets without write access.
     permissions:
       contents: read
     steps:

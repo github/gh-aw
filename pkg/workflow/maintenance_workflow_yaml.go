@@ -128,7 +128,7 @@ func buildMaintenanceWorkflowTriggerYAML(
 	}
 	hasLedgers := len(opts.compactionLedgers) > 0
 	yaml.WriteString(buildMaintenanceDispatchInputsYAML(hasLedgers, opts.hasCacheMemory))
-	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers, opts.hasCacheMemory, opts.maintenanceConfig.IsJobDisabled("run_operation")))
+	yaml.WriteString(buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue, hasLedgers, opts.hasCacheMemory, opts.maintenanceConfig))
 	yaml.WriteString("\n# Jobs request only the permissions needed for their individual maintenance operations.\npermissions: {}\n\n# Serialize maintenance runs to avoid overlapping writes to repository resources.\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.repository }}\n  cancel-in-progress: false\n\njobs:\n")
 	return yaml.String()
 }
@@ -183,16 +183,13 @@ func buildMaintenanceDispatchInputsYAML(hasLedgers, hasCacheMemory bool) string 
 }
 
 // buildMaintenanceWorkflowCallYAML returns the workflow_call trigger block.
-func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers, hasCacheMemory, runOperationDisabled bool) string {
+func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLValue string, hasLedgers, hasCacheMemory bool, config *MaintenanceConfig) string {
 	operations := "disable, enable, update, upgrade, safe_outputs, create_labels, activity_report, close_agentic_workflows_issues"
 	if hasCacheMemory {
 		operations += ", clean_cache_memories"
 	}
 	operations += ", update_pull_request_branches, validate, forecast"
-	completedOperation := "${{ jobs.run_operation.outputs.operation || inputs.operation }}"
-	if runOperationDisabled {
-		completedOperation = "${{ inputs.operation }}"
-	}
+	completedOperation := maintenanceCompletedOperationExpression(hasLedgers, hasCacheMemory, config)
 	ledgerInput := ""
 	if hasLedgers {
 		operations += ", " + maintenanceCompactLedgerOperation
@@ -223,4 +220,35 @@ func buildMaintenanceWorkflowCallYAML(appliedRunURLDescription, appliedRunURLVal
         description: '` + appliedRunURLDescription + `'
         value: ` + appliedRunURLValue + `
 `
+}
+
+func maintenanceCompletedOperationExpression(hasLedgers, hasCacheMemory bool, config *MaintenanceConfig) string {
+	enabledOperations := []string{}
+	for _, operation := range []struct{ name, job string }{
+		{"safe_outputs", "apply_safe_outputs"},
+		{"create_labels", "create_labels"},
+		{"activity_report", "activity_report"},
+		{"close_agentic_workflows_issues", "close_agentic_workflows_issues"},
+		{"update_pull_request_branches", "update_pull_request_branches"},
+		{"validate", "validate_workflows"},
+		{"forecast", "forecast_report"},
+	} {
+		if !config.IsJobDisabled(operation.job) {
+			enabledOperations = append(enabledOperations, "inputs.operation == '"+operation.name+"'")
+		}
+	}
+	if hasCacheMemory && !config.IsJobDisabled("cleanup-cache-memory") {
+		enabledOperations = append(enabledOperations, "inputs.operation == 'clean_cache_memories'")
+	}
+	if hasLedgers {
+		enabledOperations = append(enabledOperations, "inputs.operation == '"+maintenanceCompactLedgerOperation+"'")
+	}
+	completion := "''"
+	if len(enabledOperations) > 0 {
+		completion = "(" + strings.Join(enabledOperations, " || ") + ") && inputs.operation || ''"
+	}
+	if !config.IsJobDisabled("run_operation") {
+		completion = "jobs.run_operation.outputs.operation || " + completion
+	}
+	return "${{ " + completion + " }}"
 }
