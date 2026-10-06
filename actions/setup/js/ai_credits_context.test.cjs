@@ -60,6 +60,11 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
     process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
   }
 
+  function writeAgentStdio(content) {
+    fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), content, "utf8");
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+  }
+
   describe("parseMaxAICreditsExceededFromAuditLog", () => {
     it("detects max_ai_credits_exceeded: true field", () => {
       writeAuditLog([{ type: "response", max_ai_credits_exceeded: true, ai_credits: 105000, max_ai_credits: 100000 }]);
@@ -175,10 +180,11 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
       expect(result.maxAICreditsExceeded).toBe(false);
     });
 
-    it("reports trusted token totals against the compiled cap for a failed run", () => {
+    it("reports token totals against the compiled cap for a failed run with local proxy HTTP 403 evidence", () => {
       writeAuditLog([{ event: "http_access", status: 200 }]);
       writeAWFConfig(240);
       writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).");
       process.env.GH_AW_AGENT_CONCLUSION = "failure";
       expect(resolveAICreditsFailureState({ logProvenance: false })).toEqual({
         aiCredits: "240.22396",
@@ -188,9 +194,27 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
       });
     });
 
+    it("does not infer budget exhaustion from token totals without local proxy rejection evidence", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
+    });
+
+    it("does not treat an unrelated provider HTTP 403 as local proxy rejection evidence", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at https://api.github.com (HTTP 403).");
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
+    });
+
     it("uses trusted token totals when only the conclusion environment supplies the cap", () => {
       writeAuditLog([{ event: "http_access", status: 200 }]);
       writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at http://api-proxy:10002 (HTTP 403).");
       process.env.GH_AW_MAX_AI_CREDITS = "240";
       process.env.GH_AW_AGENT_CONCLUSION = "failure";
       expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(true);

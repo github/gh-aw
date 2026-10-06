@@ -15,6 +15,7 @@ const MAX_AI_CREDITS_EXCEEDED_FIELDS = new Set(["max_ai_credits_exceeded", "maxA
 const AI_CREDITS_TOTAL_FIELDS = new Set(["ai_credits_total", "aiCreditsTotal"]);
 /** @type {{ aiCredits: string, maxAICredits: string, rateLimitError: boolean, maxAICreditsExceeded: boolean }} */
 const EMPTY_AI_CREDITS_STATE = { aiCredits: "", maxAICredits: "", rateLimitError: false, maxAICreditsExceeded: false };
+const EMPTY_AGENT_STDIO_STATE = { ...EMPTY_AI_CREDITS_STATE, proxyHTTP403: false };
 const BUDGET_EXCEEDED_EVENT = "budget_exceeded";
 // The literal error type emitted by the AWF API proxy (HTTP 400) when maxAiCredits is active
 // and the requested model is not in the built-in pricing table.
@@ -685,13 +686,13 @@ function resolveAICreditsFailureState({ logProvenance = true } = {}) {
   const rawAICreditsRateLimitError = auditRateLimitError || stdioSignals.rateLimitError || envRateLimitSignalHasEvidence;
   const aiCreditsRateLimitError = shouldReportAICreditsRateLimitError(rawAICreditsRateLimitError);
   // A completed response can cross the cap without another request being rejected.
-  // Only infer budget exhaustion from token totals when the agent job failed.
-  const tokenBudgetExceeded = process.env.GH_AW_AGENT_CONCLUSION === "failure" && !!tokenAICredits && !!maxAICredits && Number.parseFloat(tokenAICredits) >= Number.parseFloat(maxAICredits);
+  // Require a failed job and evidence that the local proxy rejected a request.
+  const tokenBudgetExceeded = process.env.GH_AW_AGENT_CONCLUSION === "failure" && stdioSignals.proxyHTTP403 && !!tokenAICredits && !!maxAICredits && Number.parseFloat(tokenAICredits) >= Number.parseFloat(maxAICredits);
   return { aiCredits, maxAICredits, aiCreditsRateLimitError, maxAICreditsExceeded: auditMaxAICreditsExceeded || stdioSignals.maxAICreditsExceeded || tokenBudgetExceeded };
 }
 
 /**
- * @returns {{ aiCredits: string, maxAICredits: string, rateLimitError: boolean, maxAICreditsExceeded: boolean }}
+ * @returns {{ aiCredits: string, maxAICredits: string, rateLimitError: boolean, maxAICreditsExceeded: boolean, proxyHTTP403: boolean }}
  */
 function parseAICreditsExceededFromAgentStdio() {
   try {
@@ -701,11 +702,11 @@ function parseAICreditsExceededFromAgentStdio() {
     // silently break detection.
     const derivedPath = agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : null;
     const stdioLogPath = derivedPath && fs.existsSync(derivedPath) ? derivedPath : DEFAULT_AGENT_STDIO_LOG;
-    if (!fs.existsSync(stdioLogPath)) return EMPTY_AI_CREDITS_STATE;
+    if (!fs.existsSync(stdioLogPath)) return EMPTY_AGENT_STDIO_STATE;
     // Read only the tail to avoid OOM on large logs; the error token always
     // appears near the end of the file.
     const stat = fs.statSync(stdioLogPath);
-    if (stat.size === 0) return EMPTY_AI_CREDITS_STATE;
+    if (stat.size === 0) return EMPTY_AGENT_STDIO_STATE;
     const readSize = Math.min(stat.size, AGENT_STDIO_LOG_MAX_TAIL);
     const buf = Buffer.alloc(readSize);
     const fd = fs.openSync(stdioLogPath, "r");
@@ -715,12 +716,16 @@ function parseAICreditsExceededFromAgentStdio() {
       fs.closeSync(fd);
     }
     const content = buf.toString("utf8");
+    const proxyHTTP403 = content.split(/\r?\n/).some(line => {
+      const proxyFailure = line.match(/Authentication failed with provider at (\S+) \(HTTP 403\)\.?/i);
+      return proxyFailure !== null && isLikelyAWFAPIProxyURL(proxyFailure[1]);
+    });
     // Use matchAll and take the last occurrence — in retried runs the final
     // entry carries the authoritative (highest) credit values.
     const RE_G = new RegExp(MAX_AI_CREDITS_EXCEEDED_STDIO_RE.source, "gi");
     const allMatches = [...content.matchAll(RE_G)];
     const match = allMatches.at(-1);
-    if (!match) return EMPTY_AI_CREDITS_STATE;
+    if (!match) return { ...EMPTY_AGENT_STDIO_STATE, proxyHTTP403 };
     const aiCredits = parsePositiveNumberString(match[1] || "");
     const maxAICredits = parsePositiveNumberString(match[2] || "");
     return {
@@ -728,9 +733,33 @@ function parseAICreditsExceededFromAgentStdio() {
       maxAICredits,
       rateLimitError: true,
       maxAICreditsExceeded: true,
+      proxyHTTP403,
     };
   } catch {
-    return EMPTY_AI_CREDITS_STATE;
+    return EMPTY_AGENT_STDIO_STATE;
+  }
+}
+
+/**
+ * @param {string} providerUrl
+ * @returns {boolean}
+ */
+function isLikelyAWFAPIProxyURL(providerUrl) {
+  try {
+    const { hostname, port } = new URL(providerUrl);
+    const normalizedHostname = hostname.toLowerCase();
+    return (
+      port === "10002" &&
+      (normalizedHostname === "api-proxy" ||
+        normalizedHostname === "host.docker.internal" ||
+        normalizedHostname === "localhost" ||
+        /^127(?:\.\d{1,3}){3}$/.test(normalizedHostname) ||
+        /^10(?:\.\d{1,3}){3}$/.test(normalizedHostname) ||
+        /^192\.168(?:\.\d{1,3}){2}$/.test(normalizedHostname) ||
+        /^172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}$/.test(normalizedHostname))
+    );
+  } catch {
+    return false;
   }
 }
 
