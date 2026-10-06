@@ -1,489 +1,495 @@
 [
- {
-  "date": "2026-04-04",
-  "total_tokens": 122587011,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 806
- },
- {
-  "date": "2026-04-06",
-  "total_tokens": 96544531,
-  "total_cost": 0,
-  "total_runs": 89,
-  "total_action_minutes": 719
- },
- {
-  "date": "2026-04-07",
-  "total_tokens": 87979806,
-  "total_cost": 0,
-  "total_runs": 82,
-  "total_action_minutes": 757
- },
- {
-  "date": "2026-04-09",
-  "total_tokens": 54741919,
-  "total_cost": 0.0,
-  "total_runs": 99,
-  "total_action_minutes": 680.0
- },
- {
-  "date": "2026-04-10",
-  "total_tokens": 110226271,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 893.0
- },
- {
-  "date": "2026-04-12",
-  "total_tokens": 104215473,
-  "total_cost": 0.0,
-  "total_runs": 99,
-  "total_action_minutes": 651.0
- },
- {
-  "date": "2026-04-13",
-  "total_tokens": 97031167,
-  "total_cost": 0,
-  "total_runs": 96,
-  "total_action_minutes": 808
- },
- {
-  "date": "2026-04-14",
-  "total_tokens": 68304965,
-  "total_cost": 0.0,
-  "total_runs": 99,
-  "total_action_minutes": 661.0
- },
- {
-  "date": "2026-04-15",
-  "total_tokens": 74512455,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 661
- },
- {
-  "date": "2026-04-16",
-  "total_tokens": 88283048,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 833
- },
- {
-  "date": "2026-04-17",
-  "total_tokens": 96078318,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 747
- },
- {
-  "date": "2026-04-18",
-  "total_tokens": 78068958,
-  "total_cost": 0.0,
-  "total_runs": 99,
-  "total_action_minutes": 544.0
- },
- {
-  "date": "2026-04-20",
-  "total_tokens": 83684481,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 665
- },
- {
-  "date": "2026-04-21",
-  "total_tokens": 73752567,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 620
- },
- {
-  "date": "2026-04-22",
-  "total_tokens": 76596700,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 630
- },
- {
-  "date": "2026-04-23",
-  "total_tokens": 71581398,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 652
- },
- {
-  "date": "2026-04-24",
-  "total_tokens": 54842866,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 683
- },
- {
-  "date": "2026-04-27",
-  "total_tokens": 78315611,
-  "total_cost": 0,
-  "total_runs": 140,
-  "total_action_minutes": 962
- },
- {
-  "date": "2026-04-28",
-  "total_tokens": 48474287,
-  "total_cost": 0,
-  "total_runs": 99,
-  "total_action_minutes": 569
- },
- {
-  "date": "2026-04-29",
-  "total_tokens": 43252414,
-  "total_cost": 0.0,
-  "total_runs": 94,
-  "total_action_minutes": 620.0
- },
- {
-  "date": "2026-04-30",
-  "total_tokens": 72562018,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 820
- },
- {
-  "date": "2026-05-01",
-  "total_tokens": 38308171,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 622
- },
- {
-  "date": "2026-05-04",
-  "total_tokens": 74854995,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 718
- },
- {
-  "date": "2026-05-05",
-  "total_tokens": 73271957,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 640
- },
- {
-  "date": "2026-05-20",
-  "total_tokens": 62659262,
-  "total_cost": 0.0,
-  "total_runs": 97,
-  "total_action_minutes": 901
- },
- {
-  "date": "2026-05-21",
-  "total_tokens": 70350368,
-  "total_cost": 0.0,
-  "total_runs": 97,
-  "total_action_minutes": 880.0
- },
- {
-  "date": "2026-05-22",
-  "total_tokens": 122495725,
-  "total_cost": 78.0,
-  "total_runs": 98,
-  "total_action_minutes": 854.0
- },
- {
-  "date": "2026-05-27",
-  "total_tokens": 99986945,
-  "total_cost": 0,
-  "total_runs": 95,
-  "total_action_minutes": 932
- },
- {
-  "date": "2026-05-28",
-  "total_tokens": 117370174,
-  "total_cost": 0,
-  "total_runs": 98,
-  "total_action_minutes": 929
- },
- {
-  "date": "2026-05-29",
-  "total_runs": 95,
-  "total_tokens": 138000015,
-  "total_cost": 0,
-  "total_action_minutes": 945
- },
- {
-  "date": "2026-06-01",
-  "total_tokens": 58318839,
-  "total_cost": 0.0,
-  "total_runs": 97,
-  "total_action_minutes": 701
- },
- {
-  "date": "2026-06-02",
-  "total_tokens": 113270937,
-  "total_runs": 98,
-  "total_action_minutes": 1013.0
- },
- {
-  "date": "2026-06-03",
-  "total_tokens": 73748276,
-  "total_runs": 98,
-  "total_action_minutes": 817
- },
- {
-  "date": "2026-06-04",
-  "total_tokens": 93381234,
-  "total_runs": 91,
-  "total_action_minutes": 888.0
- },
- {
-  "date": "2026-06-05",
-  "total_tokens": 87294844,
-  "total_runs": 95,
-  "total_action_minutes": 942
- },
- {
-  "date": "2026-06-08",
-  "total_aic": 13224.33994,
-  "total_runs": 97,
-  "total_action_minutes": 1145
- },
- {
-  "date": "2026-06-09",
-  "total_aic": 14462.46868,
-  "total_runs": 95,
-  "total_action_minutes": 1178
- },
- {
-  "date": "2026-06-10",
-  "total_aic": 13388.9599,
-  "total_runs": 97,
-  "total_action_minutes": 1038.0
- },
- {
-  "date": "2026-06-11",
-  "total_aic": 10907.7061,
-  "total_runs": 96,
-  "total_action_minutes": 1235
- },
- {
-  "date": "2026-06-12",
-  "total_aic": 27465.3108,
-  "total_runs": 96,
-  "total_action_minutes": 1140
- },
- {
-  "date": "2026-06-14",
-  "total_aic": 19985.16492,
-  "total_runs": 97,
-  "total_action_minutes": 1011.0
- },
- {
-  "date": "2026-06-15",
-  "total_aic": 17404.2915,
-  "total_runs": 79,
-  "total_action_minutes": 943
- },
- {
-  "date": "2026-06-16",
-  "total_aic": 25650.98025,
-  "total_runs": 95,
-  "total_action_minutes": 1236
- },
- {
-  "date": "2026-06-17",
-  "total_aic": 0.0,
-  "total_runs": 94,
-  "total_action_minutes": 976.0
- },
- {
-  "date": "2026-06-18",
-  "total_aic": 0,
-  "total_runs": 97,
-  "total_action_minutes": 1008
- },
- {
-  "date": "2026-06-19",
-  "total_aic": 9239.031235,
-  "total_runs": 99,
-  "total_action_minutes": 1133.0
- },
- {
-  "date": "2026-06-22",
-  "total_aic": 0.0,
-  "total_runs": 100,
-  "total_action_minutes": 1248
- },
- {
-  "date": "2026-06-23",
-  "total_aic": 7954.926,
-  "total_runs": 99,
-  "total_action_minutes": 1149
- },
- {
-  "date": "2026-06-24",
-  "total_aic": 8734.424,
-  "total_runs": 100,
-  "total_action_minutes": 1127
- },
- {
-  "date": "2026-06-25",
-  "total_aic": 6906.526,
-  "total_runs": 100,
-  "total_action_minutes": 1076.0
- },
- {
-  "date": "2026-06-26",
-  "total_aic": 6812.027,
-  "total_runs": 100,
-  "total_action_minutes": 1103
- },
- {
-  "date": "2026-06-29",
-  "total_aic": 6272.093,
-  "total_runs": 100,
-  "total_action_minutes": 1279.0
- },
- {
-  "date": "2026-06-30",
-  "total_aic": 8595.741,
-  "total_runs": 99,
-  "total_action_minutes": 1262
- },
- {
-  "date": "2026-07-01",
-  "total_aic": 6683.794,
-  "total_runs": 100,
-  "total_action_minutes": 1185.0
- },
- {
-  "date": "2026-07-02",
-  "total_aic": 7171.168,
-  "total_runs": 100,
-  "total_action_minutes": 1130
- },
- {
-  "date": "2026-07-03",
-  "total_aic": 7761.196,
-  "total_runs": 100,
-  "total_action_minutes": 1186
- },
- {
-  "date": "2026-07-06",
-  "total_aic": 6943.688,
-  "total_runs": 100,
-  "total_action_minutes": 1227
- },
- {
-  "date": "2026-07-07",
-  "total_aic": 7259.584,
-  "total_runs": 100,
-  "total_action_minutes": 1203
- },
- {
-  "date": "2026-07-08",
-  "total_aic": 7887.301,
-  "total_runs": 100,
-  "total_action_minutes": 1293
- },
- {
-  "date": "2026-09-08",
-  "total_aic": 4993.25316,
-  "total_runs": 100,
-  "total_action_minutes": 1361
- },
- {
-  "date": "2026-09-09",
-  "total_aic": 2287.9074,
-  "total_runs": 100,
-  "total_action_minutes": 768.0
- },
- {
-  "date": "2026-09-10",
-  "total_aic": 5511.313328,
-  "total_runs": 100,
-  "total_action_minutes": 1173
- },
- {
-  "date": "2026-09-11",
-  "total_aic": 4986.1228,
-  "total_runs": 99,
-  "total_action_minutes": 1361
- },
- {
-  "date": "2026-09-14",
-  "total_aic": 0,
-  "total_runs": 96,
-  "total_action_minutes": 1069
- },
- {
-  "date": "2026-09-15",
-  "total_aic": 5009.975987,
-  "total_runs": 100,
-  "total_action_minutes": 1112
- },
- {
-  "date": "2026-09-16",
-  "total_aic": 3452.56899,
-  "total_runs": 100,
-  "total_action_minutes": 979
- },
- {
-  "date": "2026-09-22",
-  "total_aic": 5034.077839,
-  "total_runs": 100,
-  "total_action_minutes": 1120
- },
- {
-  "date": "2026-09-23",
-  "total_aic": 4813.0619,
-  "total_runs": 100,
-  "total_action_minutes": 1142.0
- },
- {
-  "date": "2026-09-24",
-  "total_aic": 4611.187186,
-  "total_runs": 100,
-  "total_action_minutes": 1169
- },
- {
-  "date": "2026-09-25",
-  "total_aic": 5279.351067,
-  "total_runs": 99,
-  "total_action_minutes": 951.0
- },
- {
-  "date": "2026-09-28",
-  "total_aic": 5174.614195,
-  "total_runs": 100,
-  "total_action_minutes": 965
- },
- {
-  "date": "2026-09-29",
-  "total_aic": 4076.5566,
-  "total_runs": 99,
-  "total_action_minutes": 1007.0
- },
- {
-  "date": "2026-09-30",
-  "total_aic": 4276.7258,
-  "total_runs": 100,
-  "total_action_minutes": 1035.0
- },
- {
-  "date": "2026-10-01",
-  "total_aic": 3236.32,
-  "total_runs": 100,
-  "total_action_minutes": 903.0
- },
- {
-  "date": "2026-10-02",
-  "total_aic": 2931.4105,
-  "total_runs": 100,
-  "total_action_minutes": 967
- },
- {
-  "date": "2026-10-05",
-  "total_aic": 4295.65,
-  "total_runs": 100,
-  "total_action_minutes": 852
- }
+  {
+    "date": "2026-04-04",
+    "total_tokens": 122587011,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 806
+  },
+  {
+    "date": "2026-04-06",
+    "total_tokens": 96544531,
+    "total_cost": 0,
+    "total_runs": 89,
+    "total_action_minutes": 719
+  },
+  {
+    "date": "2026-04-07",
+    "total_tokens": 87979806,
+    "total_cost": 0,
+    "total_runs": 82,
+    "total_action_minutes": 757
+  },
+  {
+    "date": "2026-04-09",
+    "total_tokens": 54741919,
+    "total_cost": 0.0,
+    "total_runs": 99,
+    "total_action_minutes": 680.0
+  },
+  {
+    "date": "2026-04-10",
+    "total_tokens": 110226271,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 893.0
+  },
+  {
+    "date": "2026-04-12",
+    "total_tokens": 104215473,
+    "total_cost": 0.0,
+    "total_runs": 99,
+    "total_action_minutes": 651.0
+  },
+  {
+    "date": "2026-04-13",
+    "total_tokens": 97031167,
+    "total_cost": 0,
+    "total_runs": 96,
+    "total_action_minutes": 808
+  },
+  {
+    "date": "2026-04-14",
+    "total_tokens": 68304965,
+    "total_cost": 0.0,
+    "total_runs": 99,
+    "total_action_minutes": 661.0
+  },
+  {
+    "date": "2026-04-15",
+    "total_tokens": 74512455,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 661
+  },
+  {
+    "date": "2026-04-16",
+    "total_tokens": 88283048,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 833
+  },
+  {
+    "date": "2026-04-17",
+    "total_tokens": 96078318,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 747
+  },
+  {
+    "date": "2026-04-18",
+    "total_tokens": 78068958,
+    "total_cost": 0.0,
+    "total_runs": 99,
+    "total_action_minutes": 544.0
+  },
+  {
+    "date": "2026-04-20",
+    "total_tokens": 83684481,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 665
+  },
+  {
+    "date": "2026-04-21",
+    "total_tokens": 73752567,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 620
+  },
+  {
+    "date": "2026-04-22",
+    "total_tokens": 76596700,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 630
+  },
+  {
+    "date": "2026-04-23",
+    "total_tokens": 71581398,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 652
+  },
+  {
+    "date": "2026-04-24",
+    "total_tokens": 54842866,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 683
+  },
+  {
+    "date": "2026-04-27",
+    "total_tokens": 78315611,
+    "total_cost": 0,
+    "total_runs": 140,
+    "total_action_minutes": 962
+  },
+  {
+    "date": "2026-04-28",
+    "total_tokens": 48474287,
+    "total_cost": 0,
+    "total_runs": 99,
+    "total_action_minutes": 569
+  },
+  {
+    "date": "2026-04-29",
+    "total_tokens": 43252414,
+    "total_cost": 0.0,
+    "total_runs": 94,
+    "total_action_minutes": 620.0
+  },
+  {
+    "date": "2026-04-30",
+    "total_tokens": 72562018,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 820
+  },
+  {
+    "date": "2026-05-01",
+    "total_tokens": 38308171,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 622
+  },
+  {
+    "date": "2026-05-04",
+    "total_tokens": 74854995,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 718
+  },
+  {
+    "date": "2026-05-05",
+    "total_tokens": 73271957,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 640
+  },
+  {
+    "date": "2026-05-20",
+    "total_tokens": 62659262,
+    "total_cost": 0.0,
+    "total_runs": 97,
+    "total_action_minutes": 901
+  },
+  {
+    "date": "2026-05-21",
+    "total_tokens": 70350368,
+    "total_cost": 0.0,
+    "total_runs": 97,
+    "total_action_minutes": 880.0
+  },
+  {
+    "date": "2026-05-22",
+    "total_tokens": 122495725,
+    "total_cost": 78.0,
+    "total_runs": 98,
+    "total_action_minutes": 854.0
+  },
+  {
+    "date": "2026-05-27",
+    "total_tokens": 99986945,
+    "total_cost": 0,
+    "total_runs": 95,
+    "total_action_minutes": 932
+  },
+  {
+    "date": "2026-05-28",
+    "total_tokens": 117370174,
+    "total_cost": 0,
+    "total_runs": 98,
+    "total_action_minutes": 929
+  },
+  {
+    "date": "2026-05-29",
+    "total_runs": 95,
+    "total_tokens": 138000015,
+    "total_cost": 0,
+    "total_action_minutes": 945
+  },
+  {
+    "date": "2026-06-01",
+    "total_tokens": 58318839,
+    "total_cost": 0.0,
+    "total_runs": 97,
+    "total_action_minutes": 701
+  },
+  {
+    "date": "2026-06-02",
+    "total_tokens": 113270937,
+    "total_runs": 98,
+    "total_action_minutes": 1013.0
+  },
+  {
+    "date": "2026-06-03",
+    "total_tokens": 73748276,
+    "total_runs": 98,
+    "total_action_minutes": 817
+  },
+  {
+    "date": "2026-06-04",
+    "total_tokens": 93381234,
+    "total_runs": 91,
+    "total_action_minutes": 888.0
+  },
+  {
+    "date": "2026-06-05",
+    "total_tokens": 87294844,
+    "total_runs": 95,
+    "total_action_minutes": 942
+  },
+  {
+    "date": "2026-06-08",
+    "total_aic": 13224.33994,
+    "total_runs": 97,
+    "total_action_minutes": 1145
+  },
+  {
+    "date": "2026-06-09",
+    "total_aic": 14462.46868,
+    "total_runs": 95,
+    "total_action_minutes": 1178
+  },
+  {
+    "date": "2026-06-10",
+    "total_aic": 13388.9599,
+    "total_runs": 97,
+    "total_action_minutes": 1038.0
+  },
+  {
+    "date": "2026-06-11",
+    "total_aic": 10907.7061,
+    "total_runs": 96,
+    "total_action_minutes": 1235
+  },
+  {
+    "date": "2026-06-12",
+    "total_aic": 27465.3108,
+    "total_runs": 96,
+    "total_action_minutes": 1140
+  },
+  {
+    "date": "2026-06-14",
+    "total_aic": 19985.16492,
+    "total_runs": 97,
+    "total_action_minutes": 1011.0
+  },
+  {
+    "date": "2026-06-15",
+    "total_aic": 17404.2915,
+    "total_runs": 79,
+    "total_action_minutes": 943
+  },
+  {
+    "date": "2026-06-16",
+    "total_aic": 25650.98025,
+    "total_runs": 95,
+    "total_action_minutes": 1236
+  },
+  {
+    "date": "2026-06-17",
+    "total_aic": 0.0,
+    "total_runs": 94,
+    "total_action_minutes": 976.0
+  },
+  {
+    "date": "2026-06-18",
+    "total_aic": 0,
+    "total_runs": 97,
+    "total_action_minutes": 1008
+  },
+  {
+    "date": "2026-06-19",
+    "total_aic": 9239.031235,
+    "total_runs": 99,
+    "total_action_minutes": 1133.0
+  },
+  {
+    "date": "2026-06-22",
+    "total_aic": 0.0,
+    "total_runs": 100,
+    "total_action_minutes": 1248
+  },
+  {
+    "date": "2026-06-23",
+    "total_aic": 7954.926,
+    "total_runs": 99,
+    "total_action_minutes": 1149
+  },
+  {
+    "date": "2026-06-24",
+    "total_aic": 8734.424,
+    "total_runs": 100,
+    "total_action_minutes": 1127
+  },
+  {
+    "date": "2026-06-25",
+    "total_aic": 6906.526,
+    "total_runs": 100,
+    "total_action_minutes": 1076.0
+  },
+  {
+    "date": "2026-06-26",
+    "total_aic": 6812.027,
+    "total_runs": 100,
+    "total_action_minutes": 1103
+  },
+  {
+    "date": "2026-06-29",
+    "total_aic": 6272.093,
+    "total_runs": 100,
+    "total_action_minutes": 1279.0
+  },
+  {
+    "date": "2026-06-30",
+    "total_aic": 8595.741,
+    "total_runs": 99,
+    "total_action_minutes": 1262
+  },
+  {
+    "date": "2026-07-01",
+    "total_aic": 6683.794,
+    "total_runs": 100,
+    "total_action_minutes": 1185.0
+  },
+  {
+    "date": "2026-07-02",
+    "total_aic": 7171.168,
+    "total_runs": 100,
+    "total_action_minutes": 1130
+  },
+  {
+    "date": "2026-07-03",
+    "total_aic": 7761.196,
+    "total_runs": 100,
+    "total_action_minutes": 1186
+  },
+  {
+    "date": "2026-07-06",
+    "total_aic": 6943.688,
+    "total_runs": 100,
+    "total_action_minutes": 1227
+  },
+  {
+    "date": "2026-07-07",
+    "total_aic": 7259.584,
+    "total_runs": 100,
+    "total_action_minutes": 1203
+  },
+  {
+    "date": "2026-07-08",
+    "total_aic": 7887.301,
+    "total_runs": 100,
+    "total_action_minutes": 1293
+  },
+  {
+    "date": "2026-09-08",
+    "total_aic": 4993.25316,
+    "total_runs": 100,
+    "total_action_minutes": 1361
+  },
+  {
+    "date": "2026-09-09",
+    "total_aic": 2287.9074,
+    "total_runs": 100,
+    "total_action_minutes": 768.0
+  },
+  {
+    "date": "2026-09-10",
+    "total_aic": 5511.313328,
+    "total_runs": 100,
+    "total_action_minutes": 1173
+  },
+  {
+    "date": "2026-09-11",
+    "total_aic": 4986.1228,
+    "total_runs": 99,
+    "total_action_minutes": 1361
+  },
+  {
+    "date": "2026-09-14",
+    "total_aic": 0,
+    "total_runs": 96,
+    "total_action_minutes": 1069
+  },
+  {
+    "date": "2026-09-15",
+    "total_aic": 5009.975987,
+    "total_runs": 100,
+    "total_action_minutes": 1112
+  },
+  {
+    "date": "2026-09-16",
+    "total_aic": 3452.56899,
+    "total_runs": 100,
+    "total_action_minutes": 979
+  },
+  {
+    "date": "2026-09-22",
+    "total_aic": 5034.077839,
+    "total_runs": 100,
+    "total_action_minutes": 1120
+  },
+  {
+    "date": "2026-09-23",
+    "total_aic": 4813.0619,
+    "total_runs": 100,
+    "total_action_minutes": 1142.0
+  },
+  {
+    "date": "2026-09-24",
+    "total_aic": 4611.187186,
+    "total_runs": 100,
+    "total_action_minutes": 1169
+  },
+  {
+    "date": "2026-09-25",
+    "total_aic": 5279.351067,
+    "total_runs": 99,
+    "total_action_minutes": 951.0
+  },
+  {
+    "date": "2026-09-28",
+    "total_aic": 5174.614195,
+    "total_runs": 100,
+    "total_action_minutes": 965
+  },
+  {
+    "date": "2026-09-29",
+    "total_aic": 4076.5566,
+    "total_runs": 99,
+    "total_action_minutes": 1007.0
+  },
+  {
+    "date": "2026-09-30",
+    "total_aic": 4276.7258,
+    "total_runs": 100,
+    "total_action_minutes": 1035.0
+  },
+  {
+    "date": "2026-10-01",
+    "total_aic": 3236.32,
+    "total_runs": 100,
+    "total_action_minutes": 903.0
+  },
+  {
+    "date": "2026-10-02",
+    "total_aic": 2931.4105,
+    "total_runs": 100,
+    "total_action_minutes": 967
+  },
+  {
+    "date": "2026-10-05",
+    "total_aic": 4295.65,
+    "total_runs": 100,
+    "total_action_minutes": 852
+  },
+  {
+    "date": "2026-10-06",
+    "total_aic": 4005.09,
+    "total_runs": 100,
+    "total_action_minutes": 945.0
+  }
 ]
