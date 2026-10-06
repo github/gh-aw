@@ -4,6 +4,7 @@
 /** @typedef {Record<string, string[]>} Fields */
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
 const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs");
+const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
@@ -89,6 +90,17 @@ const MESSAGE_FIELDS = {
   parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
 };
 
+/** @type {Fields} */
+const TASK_FIELDS = {
+  taskId: ["taskId", "task_id"],
+  toolCallId: ["toolCallId", "tool_use_id"],
+  taskType: ["taskType", "task_type"],
+  workflowName: ["workflowName", "workflow_name"],
+  status: ["status"],
+  sessionId: ["sessionId", "session_id"],
+  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+};
+
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
   ...COPILOT_WORKFLOW_EVENT_FIELDS,
@@ -111,6 +123,10 @@ const EVENT_FIELDS = {
     exitCode: ["exitCode", "exit_code"],
     status: ["status"],
     isError: ["isError", "is_error"],
+    taskId: ["taskId"],
+    taskType: ["taskType"],
+    workflowName: ["workflowName"],
+    workflowRunId: ["workflowRunId"],
   },
   "session.result": {
     numTurns: ["numTurns", "num_turns"],
@@ -198,6 +214,9 @@ const EVENT_FIELDS = {
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
 EVENT_FIELDS["usage.report"] = EVENT_FIELDS["firewall.token_usage"];
+for (const type of Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES)) {
+  EVENT_FIELDS[type] = TASK_FIELDS;
+}
 
 /**
  * Prefer an explicitly supplied canonical field, including false, zero, and null.
@@ -247,6 +266,29 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (known && event.type.startsWith("dynamicWorkflows.")) {
+    if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
+    const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });
+    if (Object.keys(usage).length) data.usage = usage;
+    if (Array.isArray(source.tasks)) data.tasks = source.tasks.map(task => selectFields(task, TASK_FIELDS));
+    const progress = source.workflowProgress ?? source.workflow_progress;
+    if (Array.isArray(progress)) {
+      data.workflowProgress = progress.map(item =>
+        selectFields(item, {
+          type: ["type"],
+          index: ["index"],
+          phaseIndex: ["phaseIndex"],
+          agentId: ["agentId"],
+          model: ["model"],
+          state: ["state"],
+          attempt: ["attempt"],
+          startedAt: ["startedAt"],
+          queuedAt: ["queuedAt"],
+          lastProgressAt: ["lastProgressAt"],
+        })
+      );
+    }
+  }
   if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
     const metadata = selectFields(event, MESSAGE_FIELDS);
     delete metadata.content;

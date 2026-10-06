@@ -18,6 +18,11 @@
         "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CAssistantRefusalData%2C(%22reason%22%7C%22content%22%7C%22policyCategory%22%7C%22explanation%22%7C%22partial%22)%3E" } } }
       },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.background_tasks_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_notification" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_started" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
       { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
@@ -58,7 +63,7 @@
         "then": {
           "properties": {
             "data": {
-              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22)%3E"
+              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22%7C%22taskId%22%7C%22taskType%22%7C%22workflowName%22%7C%22workflowRunId%22)%3E"
             }
           }
         }
@@ -148,6 +153,55 @@
         "maliciousPatch": { "type": "boolean" }
       },
       "additionalProperties": {}
+    },
+    "DynamicWorkflowObservationData": {
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "toolCallId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "status": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "parentToolUseId": { "type": ["string", "null"] },
+        "usage": {
+          "type": "object",
+          "properties": { "totalTokens": { "$ref": "#/definitions/SessionCount" }, "toolUses": { "$ref": "#/definitions/SessionCount" }, "durationMs": { "$ref": "#/definitions/SessionMetric" } },
+          "additionalProperties": false
+        },
+        "tasks": { "type": "array", "items": { "$ref": "#/definitions/DynamicWorkflowTaskData" } },
+        "workflowProgress": { "type": "array", "items": { "$ref": "#/definitions/DynamicWorkflowProgressData" } }
+      },
+      "additionalProperties": false
+    },
+    "DynamicWorkflowProgressData": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "index": { "$ref": "#/definitions/SessionCount" },
+        "phaseIndex": { "$ref": "#/definitions/SessionCount" },
+        "agentId": { "type": "string" },
+        "model": { "type": "string" },
+        "state": { "type": "string" },
+        "attempt": { "$ref": "#/definitions/SessionCount" },
+        "startedAt": { "$ref": "#/definitions/SessionMetric" },
+        "queuedAt": { "$ref": "#/definitions/SessionMetric" },
+        "lastProgressAt": { "$ref": "#/definitions/SessionMetric" }
+      },
+      "additionalProperties": false
+    },
+    "DynamicWorkflowTaskData": {
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "toolCallId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "status": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "parentToolUseId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
     },
     "EvalResultData": {
       "type": "object",
@@ -283,7 +337,7 @@
       "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" } },
       "additionalProperties": false
     },
-    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\")>": {
+    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\")>": {
       "type": "object",
       "properties": {
         "toolCallId": { "type": "string" },
@@ -295,7 +349,11 @@
         "exitCode": { "type": "number" },
         "status": { "type": "string" },
         "mcpServerName": { "type": "string" },
-        "isError": { "type": "boolean" }
+        "isError": { "type": "boolean" },
+        "taskId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "workflowRunId": { "type": "string" }
       },
       "additionalProperties": false
     },
