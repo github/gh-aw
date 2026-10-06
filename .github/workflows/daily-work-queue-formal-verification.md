@@ -29,9 +29,13 @@ jobs:
         config: [FairDAGGitHub, QueueOrdering]
     env:
       FORMAL_CONFIG: ${{ matrix.config }}
-      RESULTS_DIR: ${{ runner.temp }}/work-queue-formal/${{ matrix.config }}
-      TLA2TOOLS_JAR: ${{ runner.temp }}/tla2tools.jar
     steps:
+      - name: Initialize verification paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'RESULTS_DIR=%s/work-queue-formal/%s\n' "$RUNNER_TEMP" "$FORMAL_CONFIG" >> "$GITHUB_ENV"
+          printf 'TLA2TOOLS_JAR=%s/tla2tools.jar\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Initialize analysis artifact
         uses: actions/github-script@v9.0.0
         with:
