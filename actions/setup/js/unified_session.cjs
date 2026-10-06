@@ -151,10 +151,10 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void}} [options]
+ * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
-function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message) } = {}) {
+function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message), dailyAIC = process.env } = {}) {
   /** @type {SessionSource[]} */
   const sources = [];
   const masks = new Set();
@@ -492,6 +492,23 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
         ? "agent-stdio.log"
         : (finalCopilotSource?.path ?? agentSources[0]?.path);
     sources.push({ component: "execution", phase: "agent", path: primary ?? executionSource?.path ?? path.relative(rootDir, exitFile), events: [execution] });
+  }
+  const status = dailyAIC.GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS;
+  if (typeof status === "string" && ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error"].includes(status) && !sources.some(source => source.events.some(event => event.type === "guardrail.daily_aic"))) {
+    /** @type {Record<string, string | number | boolean>} */
+    const data = { status };
+    if (dailyAIC.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "true" || dailyAIC.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "false") {
+      data.exceeded = dailyAIC.GH_AW_DAILY_AI_CREDITS_EXCEEDED === "true";
+    }
+    for (const [field, name] of [
+      ["total", "GH_AW_DAILY_AI_CREDITS_TOTAL"],
+      ["estimated", "GH_AW_DAILY_AI_CREDITS_ESTIMATED"],
+      ["threshold", "GH_AW_DAILY_AI_CREDITS_THRESHOLD"],
+    ]) {
+      const raw = dailyAIC[name];
+      if (raw !== undefined && raw !== "" && Number.isFinite(Number(raw)) && Number(raw) >= 0) data[field] = Number(raw);
+    }
+    sources.push({ component: "guardrail", phase: "activation", path: "usage/aw_session.jsonl", events: [{ type: "guardrail.daily_aic", data }] });
   }
   /** @type {SessionEvent} */
   const summary = {
