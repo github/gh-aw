@@ -166,6 +166,32 @@ type InlineSubAgent struct {
 	Content string
 }
 
+// SubAgentModel identifies a declared model and the agent requesting it.
+type SubAgentModel struct {
+	Name  string
+	Model string
+}
+
+// ExtractSubAgentModels reads model declarations from inline agent frontmatter.
+// Malformed frontmatter is handled by the existing advisory validation.
+func ExtractSubAgentModels(body string) []SubAgentModel {
+	_, agents, err := ExtractInlineSubAgents(body)
+	if err != nil {
+		return nil
+	}
+	var models []SubAgentModel
+	for _, agent := range agents {
+		parsed, err := ExtractFrontmatterFromContent(agent.Content)
+		if err != nil {
+			continue
+		}
+		if model, ok := parsed.Frontmatter["model"].(string); ok && strings.TrimSpace(model) != "" {
+			models = append(models, SubAgentModel{Name: agent.Name, Model: strings.TrimSpace(model)})
+		}
+	}
+	return models
+}
+
 // subAgentSeparatorRegex matches the inline sub-agent start marker line.
 //
 // Format (anchored to line boundaries via (?m)):

@@ -284,9 +284,14 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		if err != nil {
 			return "", NewValidationError("engine.model-routing.allowed-models", "", "invalid model-routing candidates", err.Error())
 		}
-		allowedModels, err = intersectModelRoutingPolicy(candidates, allowedModels, disallowedModels)
+		policyAllowed := allowedModels
+		allowedModels, err = intersectModelRoutingPolicy(candidates, policyAllowed, disallowedModels)
 		if err != nil {
 			return "", NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
+		}
+		if awfVersionAtLeast(firewallConfig, constants.AWFRoutingCandidateModelsMinVersion) {
+			apiProxy.Routing.CandidateModels = allowedModels
+			allowedModels, _ = subAgentRequestModels(config.WorkflowData, allowedModels, policyAllowed, disallowedModels)
 		}
 	}
 	if len(allowedModels) > 0 {

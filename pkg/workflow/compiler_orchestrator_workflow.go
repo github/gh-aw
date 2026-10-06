@@ -135,6 +135,7 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	}
 	c.warnCodexCopilotModelCompatibility(ctx.workflowData, ctx.cleanPath)
 	c.warnUnknownConfiguredModels(ctx.workflowData, ctx.cleanPath)
+	c.warnRoutedSubAgentModels(ctx.workflowData)
 	if err := c.validateWorkflowEngineSettings(ctx.cleanPath, ctx.workflowData); err != nil {
 		return err
 	}

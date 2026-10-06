@@ -100,7 +100,8 @@ type importAccumulator struct {
 	excludedEnv    []string
 	excludedEnvSet map[string]bool
 	// Best-effort sub-agent frontmatter warnings collected during BFS traversal.
-	warnings []string
+	warnings       []string
+	subAgentModels []SubAgentModel
 }
 
 const (
@@ -246,6 +247,12 @@ func (acc *importAccumulator) collectInlineSubAgentWarnings(importPath, rawConte
 		bodyForValidation = origParsed.Markdown
 	}
 	agentWarnings := validateSubAgentFrontmatterWarnings(bodyForValidation, rawContent)
+	if bodyForValidation == "" {
+		if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
+			bodyForValidation = parsed.Markdown
+		}
+	}
+	acc.subAgentModels = append(acc.subAgentModels, ExtractSubAgentModels(bodyForValidation)...)
 	for _, w := range agentWarnings {
 		msg := fmt.Sprintf("import '%s': %s", importPath, w)
 		acc.warnings = append(acc.warnings, msg)
@@ -1067,6 +1074,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedDefaultAiCreditsPricing: acc.defaultAiCreditsPricing,
 		MergedObservability:           mergeObservabilityConfigs(acc.observabilityConfigs),
 		AgentFile:                     acc.agentFile,
+		SubAgentModels:                acc.subAgentModels,
 		AgentImportSpec:               acc.agentImportSpec,
 		RepositoryImports:             acc.repositoryImports,
 		ImportInputs:                  acc.importInputs,

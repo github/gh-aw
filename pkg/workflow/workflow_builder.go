@@ -87,6 +87,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		Runtimes:                   toolsResult.runtimes,
 		RunInstallScripts:          toolsResult.runInstallScripts,
 		MarkdownContent:            toolsResult.markdownContent,
+		SubAgentModels:             append(toolsResult.subAgentModels, importsResult.SubAgentModels...),
 		AI:                         engineSetup.engineSetting,
 		Model:                      engineSetup.model,
 		EngineConfig:               engineSetup.engineConfig,
