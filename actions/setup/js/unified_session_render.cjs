@@ -6,6 +6,7 @@ const { collapseStreamedMessages, boundSummaryLines, escapeSummaryText, redactSe
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
+const { COPILOT_WORKFLOW_EVENT_FIELDS, COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { validateAgentExecution } = require("./agent_execution.cjs");
 
@@ -71,6 +72,9 @@ function fields(value, keys) {
 /** @param {any} event @returns {string | undefined} */
 function eventDetail(event) {
   const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
+  if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
+    return fields({ ...data, agentId: event.agentId }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
+  }
   switch (event.type) {
     case "session.format":
       return `version=${inline(data.version)}`;
