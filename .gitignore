@@ -150,6 +150,9 @@ pkg/cli/.github/aw/actions-lock.json
 # Test run artifacts (legacy - now uses system temp)
 test-runs/
 
+# Local queue validation tooling and caches
+/.queue-validation-cache/
+
 # Security scan reports
 # Local tool binaries are installed via `go install` (see Makefile `tools` target)
 # and must never be committed as opaque build artifacts.
