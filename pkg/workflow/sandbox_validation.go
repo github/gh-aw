@@ -101,8 +101,7 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 		}
 		sandboxValidationLog.Printf("sandbox.agent: false permitted by features.%s: true", flag)
 
-		if workflowData.EngineConfig != nil &&
-			workflowData.EngineConfig.ID == string(constants.CodexEngine) &&
+		if ResolveEngineID(workflowData) == string(constants.CodexEngine) &&
 			NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
 			return NewValidationError(
 				"sandbox.agent",

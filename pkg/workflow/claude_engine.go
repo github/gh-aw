@@ -71,8 +71,7 @@ func (e *ClaudeEngine) GetAPMTarget() string {
 // is needed and only common MCP secrets are returned.
 func (e *ClaudeEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
 	provider := e.ResolveLLMProvider(workflowData)
-	if provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) ||
-		provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData) {
+	if claudeSkipsStaticSecret(provider, workflowData) {
 		return collectCommonMCPSecrets(workflowData)
 	}
 	return append(llmProviderSecretNames(provider), collectCommonMCPSecrets(workflowData)...)
@@ -95,10 +94,14 @@ func (e *ClaudeEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHu
 		EngineName:  "Claude Code",
 		DocsURL:     llmProviderDocsURL(provider),
 		Skip: func(workflowData *WorkflowData) bool {
-			return provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) ||
-				provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData)
+			return claudeSkipsStaticSecret(provider, workflowData)
 		},
 	})
+}
+
+func claudeSkipsStaticSecret(provider LLMProvider, workflowData *WorkflowData) bool {
+	return provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) ||
+		provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData)
 }
 
 // isAnthropicWIF returns true when the workflow is configured to use Anthropic

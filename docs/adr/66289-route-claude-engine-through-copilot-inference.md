@@ -1,7 +1,7 @@
 # ADR-66289: Route Claude Engine Inference Through GitHub Copilot via Model Prefix
 
-**Date**: 2026-04-27
-**Status**: Draft
+**Date**: 2026-10-06
+**Status**: Proposed
 **Deciders**: pelikhan (PR #66289 author), gh-aw maintainers
 
 ---
@@ -26,7 +26,7 @@ The pre-existing behaviour reused the Anthropic credential slot for the Copilot 
 
 #### Alternative 3: Allow Copilot inference without the agent sandbox
 
-Permitting sandbox-less runs would broaden where the feature works. It was rejected because the routing depends on AWF `/reflect` endpoint resolution; without the sandbox there is no proxy to reflect, and the harness would fall back to direct Anthropic calls with a placeholder key. `validateSandboxConfig` now rejects this combination at compile time instead.
+Permitting sandbox-less runs would broaden where the feature works. It was rejected because the routing depends on AWF `/reflect` endpoint resolution; without the sandbox there is no proxy to reflect. The harness rejects a missing Copilot endpoint rather than falling back to direct Anthropic calls, and `validateSandboxConfig` rejects an explicit sandbox opt-out at compile time.
 
 ### Consequences
 
@@ -44,9 +44,9 @@ Permitting sandbox-less runs would broaden where the feature works. It was rejec
 
 #### Neutral
 - Behaviour changes for existing explicit GitHub-provider Claude workflows (env var names change), so their lock files were regenerated.
-- `normalizeClaudeModel` is enforced in the JS harness as well as the compiler, duplicating the prefix rule across Go and Node by design (defence in depth for dynamically selected models via `GH_AW_LLM_PROVIDER_EXPLICIT`).
+- `normalizeClaudeModel` is enforced in the JS harness as well as the compiler, duplicating the prefix rule across Go and Node by design. The harness normalizes both environment models and CLI arguments, including repository-variable defaults; `GH_AW_LLM_PROVIDER_EXPLICIT` preserves explicit provider overrides.
 - Inline and external threat-detection jobs inherit the same credential export path, keeping detection consistent with the main agent step.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed for maintainer review. Live CAPI compatibility remains unverified.*

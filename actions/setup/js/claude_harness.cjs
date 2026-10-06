@@ -63,6 +63,7 @@ const {
   fetchAWFReflect,
   fetchModelsFromUrl,
   normalizeReflectProviderName,
+  REFLECT_PROVIDER_ALIASES,
   resolveProviderEndpointFromReflect,
 } = require("./awf_reflect.cjs");
 const { emitMissingToolPermissionIssue, emitInfrastructureIncomplete, hasExpectedSafeOutputs, hasNoopInSafeOutputs, hasTerminalSafeOutput } = require("./safeoutputs_cli.cjs");
@@ -70,7 +71,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
-const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
+const { applyModelFallback, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 
 // Pattern to detect Anthropic API overload errors (HTTP 529).
@@ -374,12 +375,12 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log)
   applyClaudeRuntimeTimeouts(childEnv);
   applyModelFallback(childEnv, "ANTHROPIC_MODEL", logger);
   const provider = normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "anthropic");
-  const copilotProvider = /^(github|copilot|github-copilot|github_models)$/.test(provider);
+  const copilotProvider = REFLECT_PROVIDER_ALIASES.github.has(provider);
   if (childEnv.ANTHROPIC_MODEL) {
     childEnv.ANTHROPIC_MODEL = normalizeClaudeModel(childEnv.ANTHROPIC_MODEL, provider, childEnv);
   }
   const resolved = reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
-  if (copilotProvider && (!resolved || !/^(github|copilot|github-copilot|github_models)$/.test(resolved.endpointProvider))) {
+  if (copilotProvider && (!resolved || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(resolved.endpointProvider)))) {
     throw new Error("Claude GitHub Copilot inference requires a configured Copilot endpoint from AWF /reflect; keep the agent sandbox enabled and configure permissions.copilot-requests: write or COPILOT_GITHUB_TOKEN");
   }
   if (resolved?.baseUrl) {
@@ -413,7 +414,8 @@ async function main() {
   try {
     const resolved = resolveClaudePromptFileArgs(args);
     prompt = resolved.prompt;
-    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(resolved.args), process.env));
+    const modelArgs = normalizeClaudeModelArgs(resolved.args, normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic"), process.env);
+    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(modelArgs), process.env));
     initialArgs = capabilities.args;
     pluginDir = capabilities.pluginDir;
   } catch (err) {

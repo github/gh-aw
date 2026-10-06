@@ -501,6 +501,37 @@ describe("claude_harness.cjs", () => {
   });
 
   describe("shouldRetryWithContinue", () => {
+    it("normalizes repository-variable model arguments on initial, resume and fresh retry runs", () => {
+      const model = "copilot/claude-haiku-4.5";
+      const stubScript = `
+const fs = require("fs");
+const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
+const args = process.argv.slice(2);
+const priorCalls = fs.existsSync(callsPath) ? fs.readFileSync(callsPath, "utf8").trim().split("\\n").filter(Boolean).length : 0;
+fs.appendFileSync(callsPath, JSON.stringify({ args, stdin: fs.readFileSync(0, "utf8") }) + "\\n", "utf8");
+if (priorCalls === 0) {
+  process.stdout.write('{"type":"assistant","session_id":"test-session","message":{"content":[{"type":"text","text":"Working"}]}}\\n');
+  process.stderr.write("API Error: Connection refused\\n");
+  process.exit(1);
+}
+if (priorCalls === 1) {
+  process.stderr.write("Error: No deferred tool marker found in the resumed session.\\n");
+  process.exit(1);
+}
+process.exit(0);
+`;
+      const { result, calls } = runHarnessWithStub({
+        stubScript,
+        extraArgs: ["--model", model],
+        extraEnv: { GH_AW_MODEL_AGENT_CLAUDE: model, GH_AW_LLM_PROVIDER: "anthropic", GH_AW_LLM_PROVIDER_EXPLICIT: "1" },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, true, false]);
+      for (const call of calls) {
+        expect(call.args[call.args.indexOf("--model") + 1]).toBe("claude-haiku-4.5");
+      }
+    }, 50000);
+
     it("does not use --continue for signal-style termination exit codes", () => {
       for (const exitCode of [137, 143]) {
         const result = shouldRetryWithContinue({

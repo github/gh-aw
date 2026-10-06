@@ -1,5 +1,7 @@
 "use strict";
 
+const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
 
 function readTrimmedEnv(env, name) {
@@ -59,7 +61,7 @@ function modelFlagPrefix(argument) {
 function normalizeCodexModel(model, provider, options = {}) {
   const match = /^(openai|copilot|github|github-copilot|github_models|anthropic)\/(.+)$/i.exec(model.trim());
   if (!match) return model.trim();
-  const normalize = value => (/^(copilot|github|github-copilot|github_models)$/.test(value.toLowerCase()) ? "github" : value.toLowerCase());
+  const normalize = value => (REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(value)) ? "github" : normalizeReflectProviderName(value));
   if (normalize(match[1]) !== normalize(provider.trim().toLowerCase())) {
     const env = options.env ?? process.env;
     if (env.GH_AW_LLM_PROVIDER_EXPLICIT === "1" && ["openai", "github"].includes(normalize(match[1]))) {
@@ -75,10 +77,24 @@ function normalizeCodexModel(model, provider, options = {}) {
 function normalizeClaudeModel(model, provider, env) {
   const match = /^copilot\/(.+)$/i.exec(model.trim());
   if (!match) return model.trim();
-  if (!/^(github|copilot|github-copilot|github_models)$/.test(provider) && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
+  if (!REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(provider)) && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
     throw new Error("A copilot/ Claude model requires engine.model-provider: github when the model is selected dynamically; configure the provider and its credentials before running Claude");
   }
   return match[1];
+}
+
+/** @param {string[]} args @param {string} provider @param {NodeJS.ProcessEnv} env @returns {string[]} */
+function normalizeClaudeModelArgs(args, provider, env) {
+  const normalized = [...args];
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i] === "--") break;
+    if (normalized[i] === "--model" && i + 1 < normalized.length) {
+      normalized[++i] = normalizeClaudeModel(normalized[i], provider, env);
+    } else if (normalized[i].startsWith("--model=")) {
+      normalized[i] = `--model=${normalizeClaudeModel(normalized[i].slice("--model=".length), provider, env)}`;
+    }
+  }
+  return normalized;
 }
 
 /** @param {string[]} args @param {string} provider @param {{ env?: NodeJS.ProcessEnv, logger?: (message: string) => void }} [options] @returns {string[]} */
@@ -104,4 +120,5 @@ module.exports = {
   normalizeCodexModel,
   normalizeCodexModelArgs,
   normalizeClaudeModel,
+  normalizeClaudeModelArgs,
 };

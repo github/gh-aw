@@ -38,7 +38,7 @@ The `copilot/` prefix selects the provider and is removed from the model ID pass
 
 Claude uses its native Messages API, not the OpenAI Responses or Chat Completions API. Select an Anthropic model available to the account; `copilot/auto` and non-Anthropic models are not compatibility guarantees. Model access, beta headers, and request features are subject to GitHub Copilot API (CAPI) support.
 
-The [`smoke-claude-copilot` canary](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-copilot.md) exercises native streaming inference, an MCP tool call, and inference after the tool result. Its host-side assertions require a real tool receipt and the expected safe output. Model fallback is disabled so an unsupported CAPI request cannot pass by silently selecting another model. Failures retain the Claude transcript and AWF proxy diagnostics; local compilation alone does not establish live CAPI compatibility.
+The [`smoke-claude-copilot` canary](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-copilot.md) exercises native streaming inference, an MCP tool call, and inference after the tool result. Its host-side assertions require a real tool receipt containing an unpredictable nonce and a subsequent safe output echoing it, so precomputed tool calls cannot pass. Model fallback is disabled so an unsupported CAPI request cannot pass by silently selecting another model. Failures retain the Claude transcript and AWF proxy diagnostics; local compilation alone does not establish live CAPI compatibility.
 
 ## Example: scheduled repository report
 

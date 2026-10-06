@@ -101,6 +101,42 @@ func TestClaudeCopilotRequiresSandbox(t *testing.T) {
 	require.NoError(t, validateSandboxConfig(data))
 }
 
+func TestCopilotRequiresSandboxForLegacyEngine(t *testing.T) {
+	for _, engine := range []string{"claude", "codex"} {
+		t.Run(engine, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:       engine,
+				Model:    "copilot/claude-haiku-4.5",
+				Features: map[string]any{"dangerously-disable-sandbox-agent": true},
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{Disabled: true},
+				},
+			}
+			require.ErrorContains(t, validateSandboxConfig(data), "requires the agent sandbox")
+			data.EngineConfig = &EngineConfig{ID: engine, LLMProvider: LLMProviderAnthropic}
+			require.NoError(t, validateSandboxConfig(data))
+		})
+	}
+}
+
+func TestClaudeCopilotSmokeCompilation(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "smoke-claude-copilot.md"))
+	require.NoError(t, err)
+	workflowPath := filepath.Join(t.TempDir(), "smoke-claude-copilot.md")
+	require.NoError(t, os.WriteFile(workflowPath, source, 0600))
+	compiler := NewCompiler()
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+	lock, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	require.NoError(t, err)
+	agent := extractJobSection(string(lock), "agent")
+	assert.Contains(t, agent, "awf --")
+	assert.Contains(t, agent, `export ANTHROPIC_API_KEY="$COPILOT_DUMMY_BYOK"`)
+	assert.Contains(t, agent, `\"modelFallback\":{\"enabled\":false}`)
+	assert.Contains(t, agent, "crypto.randomBytes(32)")
+	assert.Contains(t, agent, `flag: "wx"`)
+}
+
 func TestClaudeCopilotCompilationIncludesDetectionRouting(t *testing.T) {
 	for _, external := range []bool{false, true} {
 		t.Run(map[bool]string{false: "inline", true: "external"}[external], func(t *testing.T) {
