@@ -74,7 +74,7 @@ function fields(value, keys) {
 function eventDetail(event) {
   const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
   if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
-    return fields({ ...data, agentId: event.agentId }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
+    return fields({ ...data, agentId: event.agentId, ...(event.parentId !== undefined ? { parentId: event.parentId } : {}) }, ["agentId", ...Object.keys(COPILOT_WORKFLOW_EVENT_FIELDS[event.type])]);
   }
   if (Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES).includes(event.type)) {
     if (event.type === DYNAMIC_WORKFLOW_EVENT_TYPES.background_tasks_changed) {

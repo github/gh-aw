@@ -12,7 +12,7 @@ on:
 
 jobs:
   call-smoke-workflow-call:
-    if: (github.event_name == 'workflow_dispatch' && !inputs.dynamic-workflow) || github.event.label.name == 'smoke-workflow-call'
+    if: (github.event_name == 'workflow_dispatch' && !inputs['dynamic-workflow']) || github.event.label.name == 'smoke-workflow-call'
     uses: ./.github/workflows/smoke-workflow-call.lock.yml
     secrets: inherit
     permissions:
@@ -23,7 +23,7 @@ jobs:
       pull-requests: write
 
   call-smoke-copilot-dynamic-workflow:
-    if: (github.event_name == 'workflow_dispatch' && inputs.dynamic-workflow) || github.event.label.name == 'smoke-copilot-dynamic-workflow'
+    if: (github.event_name == 'workflow_dispatch' && inputs['dynamic-workflow']) || github.event.label.name == 'smoke-copilot-dynamic-workflow'
     uses: ./.github/workflows/smoke-copilot-dynamic-workflow.lock.yml
     secrets: inherit
     permissions:
