@@ -68,6 +68,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -86,7 +87,9 @@ env:
 
 jobs:
   activation:
+    name: Activation
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -391,9 +394,11 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -1192,6 +1197,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -1203,6 +1209,7 @@ jobs:
       needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
       issues: write
@@ -1523,11 +1530,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
+    name: Detection
     needs:
       - activation
       - agent
     if: always() && needs.agent.result != 'skipped'
     runs-on: ubuntu-latest
+    # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
     timeout-minutes: 10
@@ -1819,12 +1828,14 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write
     timeout-minutes: 45

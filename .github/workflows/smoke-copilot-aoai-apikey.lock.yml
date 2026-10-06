@@ -85,6 +85,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -103,12 +104,14 @@ env:
 
 jobs:
   activation:
+    name: Activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && ((fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request') &&
       (fromJSON(github.event.inputs.aw_context || '{}').trigger_label == 'smoke') || !(fromJSON(github.event.inputs.aw_context ||
       '{}').event_type == 'pull_request'))
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -558,9 +561,11 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -2586,11 +2591,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
+    name: Check token telemetry
     needs:
       - activation
       - agent
     if: needs.agent.result == 'success'
     runs-on: ubuntu-latest
+    # Permissions for the check_token_telemetry job (workflow permissions default to none).
     permissions:
       contents: read
     steps:
@@ -2656,6 +2663,7 @@ jobs:
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -2673,6 +2681,7 @@ jobs:
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: write
       checks: write
@@ -3036,11 +3045,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
+    name: Detection
     needs:
       - activation
       - agent
     if: always() && needs.agent.result != 'skipped'
     runs-on: ubuntu-latest
+    # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
     timeout-minutes: 10
@@ -3377,12 +3388,14 @@ jobs:
             }
 
   evals:
+    name: Evaluations
     needs:
       - activation
       - agent
       - detection
     if: always() && needs.agent.result == 'success'
     runs-on: ubuntu-latest
+    # Permissions for the evals job (workflow permissions default to none).
     permissions:
       contents: read
     env:
@@ -3675,10 +3688,12 @@ jobs:
           persist-credentials: false
 
   pre_activation:
+    name: Pre-activation
     if: >
       (fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request') && (fromJSON(github.event.inputs.aw_context ||
       '{}').trigger_label == 'smoke') || !(fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request')
     runs-on: ubuntu-slim
+    # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
       pull-requests: read
@@ -3743,11 +3758,13 @@ jobs:
             await main();
 
   push_evals_state:
+    name: Push evaluations state
     needs:
       - activation
       - evals
     if: always() && (!cancelled()) && needs.evals.result != 'skipped'
     runs-on: ubuntu-slim
+    # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
       contents: write
     env:
@@ -3828,9 +3845,11 @@ jobs:
           persist-credentials: false
 
   push_experiments_state:
+    name: Push experiments state
     needs: activation
     if: always() && (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the push_experiments_state job (workflow permissions default to none).
     permissions:
       contents: write
     env:
@@ -3909,12 +3928,14 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       actions: write
       checks: write
@@ -4055,11 +4076,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   send_slack_message:
+    name: Send Slack message
     needs:
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'send_slack_message')
     runs-on: ubuntu-latest
+    # Permissions for the send_slack_message job (workflow permissions default to none).
     permissions:
       contents: read
     env:
@@ -4107,12 +4130,14 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
 
   update_cache_memory:
+    name: Update cache memory
     needs:
       - activation
       - agent
       - detection
     if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
       contents: read

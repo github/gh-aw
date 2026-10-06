@@ -100,6 +100,38 @@ Verify MCP gateway custom env transport.
 	assert.NotContains(t, gatewayStep, "export BASH_ENV=")
 }
 
+func TestMCPGatewayGuardListsUseStepEnvironment(t *testing.T) {
+	lockContent := compileMCPGatewayWorkflowLock(t, `---
+on: workflow_dispatch
+strict: false
+engine: copilot
+tools:
+  github:
+    min-integrity: approved
+    blocked-users: [spam-bot]
+    trusted-users: [reviewer]
+    approval-labels: [approved]
+---
+
+# Guard lists
+`)
+	agentSection := extractJobSection(lockContent, "agent")
+	gatewayStep := extractMCPGatewayStepSection(agentSection, "Start MCP Gateway")
+	require.NotEmpty(t, gatewayStep)
+	for _, name := range []string{"blocked_users", "trusted_users", "approval_labels"} {
+		envName := "GH_AW_GUARD_" + strings.ToUpper(name)
+		assert.Contains(t, gatewayStep, envName+": ${{ steps.parse-guard-vars.outputs."+name+" }}")
+		assert.Contains(t, gatewayStep, "${"+envName+"}")
+		runIndex := strings.Index(gatewayStep, "        run: |")
+		require.GreaterOrEqual(t, runIndex, 0)
+		assert.NotContains(t, gatewayStep[runIndex:], "steps.parse-guard-vars.outputs."+name)
+	}
+	assert.Contains(t, agentSection, "id: parse-guard-vars")
+	assert.Contains(t, agentSection, "GH_AW_BLOCKED_USERS_EXTRA: spam-bot")
+	assert.Contains(t, agentSection, "GH_AW_TRUSTED_USERS_EXTRA: reviewer")
+	assert.Contains(t, agentSection, "GH_AW_APPROVAL_LABELS_EXTRA: approved")
+}
+
 func TestMCPGatewayCustomEnvIntegrationKeepsMetadataNameUnique(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "mcp-gateway-env-collision")
 	sharedMCPPath := filepath.Join(tmpDir, "shared-mcp.md")

@@ -98,17 +98,25 @@ on:
     outputs:
       operation_completed:
         description: 'The maintenance operation that was completed (empty when none ran or a scheduled job ran)'
-        value: ${{ jobs.run_operation.outputs.operation || inputs.operation }}
+        value: ${{ jobs.run_operation.outputs.operation || (inputs.operation == 'safe_outputs' || inputs.operation == 'create_labels' || inputs.operation == 'activity_report' || inputs.operation == 'close_agentic_workflows_issues' || inputs.operation == 'update_pull_request_branches' || inputs.operation == 'validate' || inputs.operation == 'forecast' || inputs.operation == 'clean_cache_memories' || inputs.operation == 'compact_ledger') && inputs.operation || '' }}
       applied_run_url:
         description: 'The run URL that safe outputs were applied from'
         value: ${{ jobs.apply_safe_outputs.outputs.run_url }}
 
+# Jobs request only the permissions needed for their individual maintenance operations.
 permissions: {}
+
+# Serialize maintenance runs to avoid overlapping writes to repository resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   close-expired-discussions:
+    name: Close expired discussions
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       discussions: write
     steps:
@@ -136,8 +144,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'close_expired_discussions.cjs'));
             await main();
   close-expired-issues:
+    name: Close expired issues
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       issues: write
     steps:
@@ -165,8 +175,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'close_expired_issues.cjs'));
             await main();
   close-expired-pull-requests:
+    name: Close expired pull requests
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       pull-requests: write
     steps:
@@ -195,8 +207,10 @@ jobs:
             await main();
 
   cleanup-cache-memory:
+    name: Cleanup cache memory
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'clean_cache_memories') }}
     runs-on: ubuntu-slim
+    # Removing obsolete Actions caches requires actions: write.
     permissions:
       actions: write
     steps:
@@ -225,8 +239,10 @@ jobs:
             await main();
 
   run_operation:
+    name: Run maintenance operation
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && inputs.operation != 'compact_ledger' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Updates, upgrades, and workflow enable/disable operations need repository write access.
     permissions:
       actions: write
       contents: write
@@ -288,8 +304,10 @@ jobs:
         run: echo "operation=$GH_AW_OPERATION" >> "$GITHUB_OUTPUT"
 
   update_pull_request_branches:
+    name: Update pull request branches
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'update_pull_request_branches' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Branch updates may write commits and update pull requests.
     permissions:
       contents: write
       pull-requests: write
@@ -334,8 +352,10 @@ jobs:
             await main();
 
   apply_safe_outputs:
+    name: Apply safe outputs
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'safe_outputs' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Replay can create or update any supported safe-output resource.
     permissions:
       actions: read
       contents: write
@@ -392,8 +412,10 @@ jobs:
         run: echo "run_url=$GH_AW_RUN_URL" >> "$GITHUB_OUTPUT"
 
   create_labels:
+    name: Create labels
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'create_labels' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Creating repository labels uses the issues API.
     permissions:
       contents: read
       issues: write
@@ -444,9 +466,11 @@ jobs:
             await main();
 
   activity_report:
+    name: activity report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'activity_report' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     timeout-minutes: 120
+    # Read workflow logs and create the resulting report issue.
     permissions:
       actions: read
       contents: read
@@ -555,9 +579,11 @@ jobs:
             core.info('Created issue #' + createdIssue.data.number + ': ' + createdIssue.data.html_url);
 
   forecast_report:
+    name: forecast report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'forecast' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     timeout-minutes: 60
+    # Read workflow logs and create the resulting report issue.
     permissions:
       actions: read
       contents: read
@@ -663,8 +689,10 @@ jobs:
             await main();
 
   close_agentic_workflows_issues:
+    name: Close agentic workflows issues
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'close_agentic_workflows_issues' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Closing no-repro issues requires issues: write.
     permissions:
       issues: write
     steps:
@@ -706,8 +734,10 @@ jobs:
             await main();
 
   validate_workflows:
+    name: Validate workflows
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'validate' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-latest
+    # Read workflow sources and file issues for validation findings.
     permissions:
       contents: read
       issues: write
@@ -758,8 +788,10 @@ jobs:
             await main();
 
   label_disable_agentic_workflow:
+    name: Disable agentic workflow by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:disable' }}
     runs-on: ubuntu-slim
+    # Label requests disable workflow runs and update the requesting issue.
     permissions:
       actions: write
       contents: read
@@ -805,8 +837,10 @@ jobs:
             await main();
 
   label_apply_safe_outputs:
+    name: Apply safe outputs by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:apply-safe-outputs' }}
     runs-on: ubuntu-slim
+    # Applying safe outputs can update each supported repository resource.
     permissions:
       actions: read
       contents: write
@@ -856,11 +890,13 @@ jobs:
             await main();
 
   compile-workflows:
+    name: Compile workflows
     if: ${{ (!(github.event.repository.fork)) && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
     concurrency:
       group: ${{ github.workflow }}-compile-workflows-${{ github.repository }}
       cancel-in-progress: true
+    # Detect drift by reading sources and open a tracking issue when necessary.
     permissions:
       contents: read
       issues: write
@@ -906,8 +942,10 @@ jobs:
             await main();
 
   secret-validation:
+    name: Validate secrets
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Read repository scripts to check configured integration secrets without write access.
     permissions:
       contents: read
     steps:
@@ -962,8 +1000,10 @@ jobs:
           if-no-files-found: warn
 
   ledger_compaction_plan:
+    name: Plan ledger compaction
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') }}
     runs-on: ubuntu-slim
+    # Planning treats ledger content as untrusted and must remain read-only.
     permissions:
       contents: read
     outputs:
@@ -1459,9 +1499,11 @@ jobs:
         run: exit 1
 
   ledger_compaction_apply:
+    name: Apply ledger compaction
     needs: ledger_compaction_plan
     if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ubuntu-slim
+    # Applying a validated plan commits updated ledger content.
     permissions:
       contents: write
     steps:
