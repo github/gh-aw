@@ -45,7 +45,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 // permissions, concurrency, run-name, environment variables, cache comments, and jobs.
 func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowData) {
 	// Write basic workflow structure
-	fmt.Fprintf(yaml, "name: \"%s\"\n", data.Name)
+	fmt.Fprintf(yaml, "name: \"%s\"\n", data.Name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 
 	// Inject on.workflow_call.outputs when workflow_call is configured and safe-outputs are present
 	onSection := data.On
@@ -69,6 +69,7 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 
 	// Always write empty permissions at the top level
 	// Agent permissions are applied only to the agent job
+	yaml.WriteString("# Jobs receive only their explicitly declared permissions.\n")
 	yaml.WriteString("permissions: {}\n\n")
 
 	yaml.WriteString(data.Concurrency)
@@ -92,7 +93,7 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 	c.jobManager.WriteJobsYAML(yaml)
 }
 
-func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) {
+func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) { //nolint:largefunc // Existing workflow YAML assembly keeps generation steps in order.
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
 
 	repoConfig, err := c.loadRepoConfig()

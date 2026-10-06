@@ -76,6 +76,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -94,9 +95,11 @@ env:
 
 jobs:
   activation:
+    name: Activation
     needs: pre_activation
     if: needs.pre_activation.outputs.activated == 'true'
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -425,12 +428,14 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs:
       - activation
       - purelock_precompute
     if: >
       (needs.purelock_precompute.outputs.has_candidates == 'true') && (needs.activation.outputs.daily_ai_credits_exceeded != 'true')
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -1344,6 +1349,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -1360,6 +1366,7 @@ jobs:
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error' || needs.activation.outputs.steering_issue_number != '')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
       contents: write
@@ -1710,11 +1717,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
+    name: Detection
     needs:
       - activation
       - agent
     if: always() && needs.agent.result != 'skipped'
     runs-on: ubuntu-latest
+    # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -2011,12 +2020,14 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   evals:
+    name: Evaluations
     needs:
       - activation
       - agent
       - detection
     if: always() && needs.agent.result == 'success'
     runs-on: ubuntu-latest
+    # Permissions for the evals job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -2344,7 +2355,9 @@ jobs:
           persist-credentials: false
 
   pre_activation:
+    name: Pre-activation
     runs-on: ubuntu-slim
+    # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
     env:
@@ -2411,6 +2424,7 @@ jobs:
   purelock_precompute:
     needs: activation
     runs-on: ubuntu-latest
+    # Permissions for the purelock_precompute job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -2514,11 +2528,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
 
   push_evals_state:
+    name: Push evaluations state
     needs:
       - activation
       - evals
     if: always() && (!cancelled()) && needs.evals.result != 'skipped'
     runs-on: ubuntu-slim
+    # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
       contents: write
     env:
@@ -2599,12 +2615,14 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       contents: write
       issues: write
@@ -2761,12 +2779,14 @@ jobs:
           persist-credentials: false
 
   update_cache_memory:
+    name: Update cache memory
     needs:
       - activation
       - agent
       - detection
     if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
       contents: read
@@ -2838,11 +2858,13 @@ jobs:
           path: /tmp/gh-aw/cache-memory
 
   upload_code_coverage:
+    name: Upload code coverage
     needs:
       - agent
       - safe_outputs
     if: needs.safe_outputs.outputs.upload_code_coverage_file != ''
     runs-on: ubuntu-slim
+    # Permissions for the upload_code_coverage job (workflow permissions default to none).
     permissions:
       code-quality: write
       contents: read

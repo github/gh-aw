@@ -2,21 +2,19 @@ package workflow
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 )
 
 // guardExprSentinel is a prefix that marks a string value in the guard-policies map as a
-// raw GitHub Actions expression that should be emitted verbatim (without surrounding JSON
+// raw shell variable reference that should be emitted verbatim (without surrounding JSON
 // string quotes) in the final output.
 //
 // Background: json.MarshalIndent cannot emit non-JSON content verbatim (it validates
 // json.RawMessage content), so we use a sentinel string that json.MarshalIndent can safely
 // encode as part of a regular JSON string, then post-process the output to un-quote those
-// values. Paired with toJSON() in the expression, this ensures the variable value is
-// properly JSON-encoded at runtime even if it contains double quotes or backslashes.
+// values. The parse-guard-vars step produces JSON-encoded arrays for these variables.
 const guardExprSentinel = "__GH_AW_GUARD_EXPR:"
 
 // sinkVisibilityEnvVar is the environment variable name that holds the repository visibility
@@ -32,16 +30,14 @@ const sinkVisibilityRuntimeExpr = "${" + sinkVisibilityEnvVar + "}"
 
 // guardExprRE matches sentinel-prefixed expression values in the JSON output:
 //
-//	"__GH_AW_GUARD_EXPR:${{ expr }}"  →  ${{ expr }}
+//	"__GH_AW_GUARD_EXPR:${GH_AW_GUARD_BLOCKED_USERS}"  →  ${GH_AW_GUARD_BLOCKED_USERS}
 //
-// Expressions are always of the form ${{ ... }} and must not contain double quotes
-// (our generated expressions use single-quoted strings inside the GitHub Actions expression,
-// so this invariant holds for all compiler-generated fallback values).
+// Only compiler-generated guard list variables are unquoted.
 var guardExprNeverMatchRE = regexp.MustCompile(`$^`)
 
 var guardExprRE = func() *regexp.Regexp {
 	//nolint:regexpcompileinfunction // The pattern is initialized once at package load.
-	re, err := regexp.Compile(`"` + regexp.QuoteMeta(guardExprSentinel) + `(\$\{\{[^"]+\}\})"`) //nolint:regexpdynamicpattern // The sentinel is quoted and the fixed suffix is valid.
+	re, err := regexp.Compile(`"` + regexp.QuoteMeta(guardExprSentinel) + `(\$\{GH_AW_GUARD_(?:BLOCKED_USERS|TRUSTED_USERS|APPROVAL_LABELS)\})"`) //nolint:regexpdynamicpattern // The sentinel is quoted and the fixed suffix is valid.
 	if err != nil {
 		return guardExprNeverMatchRE
 	}
@@ -52,9 +48,8 @@ var guardExprRE = func() *regexp.Regexp {
 // The policies map contains policy names (e.g., "allow-only") mapped to their configurations.
 // Renders as the last field (no trailing comma) with the given base indent.
 //
-// Any string value that starts with guardExprSentinel is treated as a raw GitHub Actions
-// expression. After json.MarshalIndent, those sentinel-prefixed strings are replaced with
-// the un-quoted expression so that toJSON() can properly encode the value at runtime.
+// Sentinel-prefixed guard list variables are unquoted after json.MarshalIndent so the
+// JSON arrays produced by parse-guard-vars can be expanded by the shell at runtime.
 func renderGuardPoliciesJSON(yaml *strings.Builder, policies map[string]any, indent string) {
 	if len(policies) == 0 {
 		return
@@ -68,14 +63,10 @@ func renderGuardPoliciesJSON(yaml *strings.Builder, policies map[string]any, ind
 		return
 	}
 
-	// Un-quote sentinel-prefixed expression values so they are emitted as raw GitHub Actions
-	// expressions. For example:
-	//   Before: "blocked-users": "__GH_AW_GUARD_EXPR:${{ toJSON(vars.X || '') }}"
-	//   After:  "blocked-users": ${{ toJSON(vars.X || '') }}
-	// At runtime, GitHub Actions evaluates toJSON() which properly JSON-encodes the value.
+	// Unquote the JSON arrays supplied through the Start MCP Gateway step's env.
 	output := guardExprRE.ReplaceAllString(string(jsonBytes), `$1`)
 
-	fmt.Fprintf(yaml, "%s\"guard-policies\": %s\n", indent, output)
+	yaml.WriteString(indent + "\"guard-policies\": " + output + "\n")
 }
 
 // renderGuardPoliciesToml renders a "guard-policies" section in TOML format for a given server.

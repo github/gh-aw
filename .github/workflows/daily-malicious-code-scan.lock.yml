@@ -71,6 +71,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -89,7 +90,9 @@ env:
 
 jobs:
   activation:
+    name: Activation
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -386,9 +389,11 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -1199,6 +1204,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -1212,6 +1218,7 @@ jobs:
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
       discussions: write
@@ -1510,11 +1517,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   evals:
+    name: Evaluations
     needs:
       - activation
       - agent
     if: always() && needs.agent.result == 'success'
     runs-on: ubuntu-latest
+    # Permissions for the evals job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -1812,11 +1821,13 @@ jobs:
           persist-credentials: false
 
   push_evals_state:
+    name: Push evaluations state
     needs:
       - activation
       - evals
     if: always() && (!cancelled()) && needs.evals.result != 'skipped'
     runs-on: ubuntu-slim
+    # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
       contents: write
     env:
@@ -1897,11 +1908,13 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
     if: (!cancelled()) && needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       discussions: write
       issues: write
@@ -2029,11 +2042,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   upload_code_scanning_sarif:
+    name: Upload code scanning results
     needs:
       - activation
       - safe_outputs
     if: needs.safe_outputs.outputs.sarif_file != ''
     runs-on: ubuntu-slim
+    # Permissions for the upload_code_scanning_sarif job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read

@@ -94,6 +94,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -112,9 +113,11 @@ env:
 
 jobs:
   activation:
+    name: Activation
     needs: pre_activation
     if: "needs.pre_activation.outputs.activated == 'true' && ((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') && (github.event_name == 'issues' && (startsWith(github.event.issue.body, '/squad ') || startsWith(github.event.issue.body, '/squad\n') || startsWith(github.event.issue.body, '/squad\r') || github.event.issue.body == '/squad') || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/squad ') || startsWith(github.event.comment.body, '/squad\n') || startsWith(github.event.comment.body, '/squad\r') || github.event.comment.body == '/squad') && github.event.issue.pull_request == null || github.event_name == 'pull_request_review_comment' && (startsWith(github.event.comment.body, '/squad ') || startsWith(github.event.comment.body, '/squad\n') || startsWith(github.event.comment.body, '/squad\r') || github.event.comment.body == '/squad')) || !(github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment'))"
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -514,9 +517,11 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -1914,6 +1919,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -1925,6 +1931,7 @@ jobs:
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: write
       contents: write
@@ -2267,11 +2274,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
+    name: Detection
     needs:
       - activation
       - agent
     if: always() && needs.agent.result != 'skipped'
     runs-on: ubuntu-latest
+    # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -2566,8 +2575,10 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   pre_activation:
+    name: Pre-activation
     if: "(github.event_name != 'issue_comment' && github.event_name != 'pull_request_review_comment' || contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.comment.author_association) || github.actor == 'github-actions[bot]') && ((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') && (github.event_name == 'issues' && (startsWith(github.event.issue.body, '/squad ') || startsWith(github.event.issue.body, '/squad\n') || startsWith(github.event.issue.body, '/squad\r') || github.event.issue.body == '/squad') || github.event_name == 'issue_comment' && (startsWith(github.event.comment.body, '/squad ') || startsWith(github.event.comment.body, '/squad\n') || startsWith(github.event.comment.body, '/squad\r') || github.event.comment.body == '/squad') && github.event.issue.pull_request == null || github.event_name == 'pull_request_review_comment' && (startsWith(github.event.comment.body, '/squad ') || startsWith(github.event.comment.body, '/squad\n') || startsWith(github.event.comment.body, '/squad\r') || github.event.comment.body == '/squad')) || !(github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment'))"
     runs-on: ubuntu-slim
+    # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
     env:
@@ -2633,12 +2644,14 @@ jobs:
             await main();
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       actions: write
       contents: write

@@ -189,7 +189,7 @@ func TestGenerateMaintenanceWorkflow_PushTrigger(t *testing.T) {
 	})
 
 	t.Run("compile-workflows can create pull requests with custom token secret", func(t *testing.T) {
-		const compileJobSectionSearchRange = 500
+		const compileJobSectionSearchRange = 650
 		tmpDir := t.TempDir()
 		repoConfig := &RepoConfig{
 			Maintenance: &MaintenanceConfig{

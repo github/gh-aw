@@ -75,6 +75,7 @@ on:
         required: false
         type: string
 
+# Jobs receive only their explicitly declared permissions.
 permissions: {}
 
 concurrency:
@@ -93,6 +94,7 @@ env:
 
 jobs:
   activation:
+    name: Activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && (((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
@@ -100,6 +102,7 @@ jobs:
       github.event.pull_request.stack.position == github.event.pull_request.stack.size)) && (github.event_name != 'pull_request' ||
       github.event.action != 'labeled' || github.event.label.name == 'firewall-escape-test'))
     runs-on: ubuntu-slim
+    # Permissions for the activation job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -435,9 +438,11 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
+    name: Agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
+    # Permissions for the agent job (workflow permissions default to none).
     permissions:
       actions: read
       contents: read
@@ -1280,6 +1285,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
+    name: Conclusion
     needs:
       - activation
       - agent
@@ -1294,6 +1300,7 @@ jobs:
       needs.activation.outputs.daily_ai_credits_exceeded == 'true' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' ||
       needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
       discussions: write
@@ -1620,11 +1627,13 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
+    name: Detection
     needs:
       - activation
       - agent
     if: always() && needs.agent.result != 'skipped'
     runs-on: ubuntu-latest
+    # Permissions for the detection job (workflow permissions default to none).
     permissions:
       contents: read
       copilot-requests: write
@@ -1921,6 +1930,7 @@ jobs:
     needs: agent
     if: failure()
     runs-on: ubuntu-latest
+    # Permissions for the post-issue job (workflow permissions default to none).
     permissions:
       issues: write
     steps:
@@ -1955,12 +1965,14 @@ jobs:
             });
 
   pre_activation:
+    name: Pre-activation
     if: >
       ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
       ((github.event_name != 'pull_request' && github.event_name != 'pull_request_review') || github.event.pull_request.stack == null ||
       github.event.pull_request.stack.position == github.event.pull_request.stack.size)) && (github.event_name != 'pull_request' ||
       github.event.action != 'labeled' || github.event.label.name == 'firewall-escape-test')
     runs-on: ubuntu-slim
+    # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:
       contents: read
     env:
@@ -2010,6 +2022,7 @@ jobs:
             await main();
 
   push_repo_memory:
+    name: Push repository memory
     needs:
       - activation
       - agent
@@ -2019,6 +2032,7 @@ jobs:
       always() && (!cancelled()) && (needs.detection.result == 'success' || needs.detection.result == 'skipped') &&
       needs.agent.result != 'skipped'
     runs-on: ubuntu-slim
+    # Permissions for the push_repo_memory job (workflow permissions default to none).
     permissions:
       contents: write
     timeout-minutes: 10
@@ -2114,12 +2128,14 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
+    name: Safe outputs
     needs:
       - activation
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       discussions: write
       issues: write
@@ -2241,12 +2257,14 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_cache_memory:
+    name: Update cache memory
     needs:
       - activation
       - agent
       - detection
     if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
     runs-on: ubuntu-slim
+    # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
       contents: read

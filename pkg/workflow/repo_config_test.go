@@ -336,6 +336,25 @@ func TestLoadRepoConfig_DisabledJobs(t *testing.T) {
 	assert.False(t, cfg.Maintenance.IsJobDisabled("create_labels"), "unlisted jobs should remain enabled")
 }
 
+func TestLoadRepoConfig_DisabledManualMaintenanceJobs(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"maintenance": {"disabled_jobs": [
+		"run_operation", "update_pull_request_branches", "validate_workflows",
+		"activity_report", "forecast_report", "close_agentic_workflows_issues",
+		"create_labels", "cleanup-cache-memory"
+	]}}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err)
+	for _, job := range []string{
+		"run_operation", "update_pull_request_branches", "validate_workflows",
+		"activity_report", "forecast_report", "close_agentic_workflows_issues",
+		"create_labels", "cleanup_cache_memory",
+	} {
+		assert.True(t, cfg.Maintenance.IsJobDisabled(job), "expected %s to be disabled", job)
+	}
+}
+
 func TestLoadRepoConfig_DisabledJobsRejectsInvalidOrDuplicateValues(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -109,6 +109,14 @@ var validDisabledMaintenanceJobs = map[string]string{
 	normalizeMaintenanceJobName("apply_safe_outputs"):             "apply_safe_outputs",
 	normalizeMaintenanceJobName("label_disable_agentic_workflow"): "label_disable_agentic_workflow",
 	normalizeMaintenanceJobName("label_apply_safe_outputs"):       "label_apply_safe_outputs",
+	normalizeMaintenanceJobName("run_operation"):                  "run_operation",
+	normalizeMaintenanceJobName("update_pull_request_branches"):   "update_pull_request_branches",
+	normalizeMaintenanceJobName("validate_workflows"):             "validate_workflows",
+	normalizeMaintenanceJobName("activity_report"):                "activity_report",
+	normalizeMaintenanceJobName("forecast_report"):                "forecast_report",
+	normalizeMaintenanceJobName("close_agentic_workflows_issues"): "close_agentic_workflows_issues",
+	normalizeMaintenanceJobName("create_labels"):                  "create_labels",
+	normalizeMaintenanceJobName("cleanup-cache-memory"):           "cleanup-cache-memory",
 }
 
 // IsLabelTriggerEnabled returns true only when label_triggers is explicitly set to true.
@@ -402,7 +410,7 @@ func validateRepoConfigValues(cfg *RepoConfig) error {
 				return fmt.Errorf("%s has a blank entry in maintenance.disabled_jobs. Expected a non-empty job name, for example: \"stale-issue-cleanup\"", RepoConfigFileName)
 			}
 			if _, ok := validDisabledMaintenanceJobs[normalizedJobName]; !ok {
-				return fmt.Errorf("%s references unrecognized maintenance.disabled_jobs entry %q. Valid values are: close-expired-entities, apply_safe_outputs, label_disable_agentic_workflow, label_apply_safe_outputs. Example:\nmaintenance:\n  disabled_jobs:\n    - close-expired-entities", RepoConfigFileName, jobName)
+				return fmt.Errorf("%s references unrecognized maintenance.disabled_jobs entry %q. Valid values are: close-expired-entities, apply_safe_outputs, label_disable_agentic_workflow, label_apply_safe_outputs, run_operation, update_pull_request_branches, validate_workflows, activity_report, forecast_report, close_agentic_workflows_issues, create_labels, cleanup-cache-memory. Example:\nmaintenance:\n  disabled_jobs:\n    - close-expired-entities", RepoConfigFileName, jobName)
 			}
 			if previous, exists := seenDisabledJobs[normalizedJobName]; exists {
 				return fmt.Errorf("%s has duplicate maintenance.disabled_jobs entries %q and %q after normalization. Expected each job to be listed once. Example:\nmaintenance:\n  disabled_jobs:\n    - close-expired-entities", RepoConfigFileName, previous, jobName)
@@ -463,7 +471,7 @@ func validateCronExpression(expr string) error {
 		return fmt.Errorf("cron expression should have exactly 5 fields, got %d. Example: \"0 9 * * 1\"", len(fields))
 	}
 	for i, field := range fields {
-		r := cronFieldRanges[i]
+		r := cronFieldRanges[i] //nolint:uncheckedsliceindex // Five input fields and five field ranges.
 		if err := validateCronField(field, r.min, r.max); err != nil {
 			return fmt.Errorf("field %d (%s): %w", i+1, r.name, err)
 		}
