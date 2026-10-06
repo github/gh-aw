@@ -70,7 +70,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
-const { applyModelFallback } = require("./model_fallback.cjs");
+const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 
 // Pattern to detect Anthropic API overload errors (HTTP 529).
@@ -364,19 +364,27 @@ function stripContinueArgs(args) {
 
 /**
  * Build Claude child process env with provider endpoint overrides resolved from /reflect.
+ * @param {import("./awf_reflect.cjs").ReflectData | null} reflectData
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {(message: string) => void} [logger]
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-async function buildClaudeChildEnv(reflectData) {
-  const childEnv = { ...process.env };
+async function buildClaudeChildEnv(reflectData, env = process.env, logger = log) {
+  const childEnv = { ...env };
   applyClaudeRuntimeTimeouts(childEnv);
-  applyModelFallback(childEnv, "ANTHROPIC_MODEL", log);
-  const provider = normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic");
-  if (reflectData) {
-    const resolved = resolveProviderEndpointFromReflect({ provider, reflectData, logger: log });
-    if (resolved && resolved.baseUrl) {
-      childEnv.ANTHROPIC_BASE_URL = resolved.baseUrl;
-      log(`configured ANTHROPIC_BASE_URL from /reflect for provider=${provider}: ${resolved.baseUrl}`);
-    }
+  applyModelFallback(childEnv, "ANTHROPIC_MODEL", logger);
+  const provider = normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "anthropic");
+  const copilotProvider = /^(github|copilot|github-copilot|github_models)$/.test(provider);
+  if (childEnv.ANTHROPIC_MODEL) {
+    childEnv.ANTHROPIC_MODEL = normalizeClaudeModel(childEnv.ANTHROPIC_MODEL, provider, childEnv);
+  }
+  const resolved = reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
+  if (copilotProvider && (!resolved || !/^(github|copilot|github-copilot|github_models)$/.test(resolved.endpointProvider))) {
+    throw new Error("Claude GitHub Copilot inference requires a configured Copilot endpoint from AWF /reflect; keep the agent sandbox enabled and configure permissions.copilot-requests: write or COPILOT_GITHUB_TOKEN");
+  }
+  if (resolved?.baseUrl) {
+    childEnv.ANTHROPIC_BASE_URL = resolved.baseUrl;
+    logger(`configured ANTHROPIC_BASE_URL from /reflect for provider=${provider}: ${resolved.baseUrl}`);
   }
   return childEnv;
 }
@@ -752,6 +760,7 @@ if (typeof module !== "undefined" && module.exports) {
     resolveRetryConfig,
     resolveStartupRetryLimit,
     applyModelFallback,
+    buildClaudeChildEnv,
   };
 }
 

@@ -28,6 +28,7 @@ const {
   buildMissingToolPermissionIssuePayload,
   resolveRetryConfig,
   resolveStartupRetryLimit,
+  buildClaudeChildEnv,
 } = require("./claude_harness.cjs");
 
 const agentTempDir = "/tmp/gh-aw/agent";
@@ -68,6 +69,46 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 }
 
 describe("claude_harness.cjs", () => {
+  describe("Copilot inference environment", () => {
+    const reflectData = {
+      endpoints: [
+        { provider: "anthropic", configured: false, port: 10001 },
+        { provider: "copilot", configured: true, port: 43123, models_url: "http://api-proxy:43123/models" },
+      ],
+    };
+
+    it.each(["github", "copilot", "github-copilot", "github_models"])("routes Claude's native Messages API to the reflected Copilot endpoint for %s", async provider => {
+      const env = { GH_AW_LLM_PROVIDER: provider, ANTHROPIC_MODEL: "copilot/claude-haiku-4.5", ANTHROPIC_API_KEY: "sandbox-placeholder" };
+      const child = await buildClaudeChildEnv(reflectData, env, () => {});
+      expect(child.ANTHROPIC_BASE_URL).toBe("http://api-proxy:43123");
+      expect(child.ANTHROPIC_MODEL).toBe("claude-haiku-4.5");
+      expect(child.ANTHROPIC_API_KEY).toBe("sandbox-placeholder");
+      expect(env.ANTHROPIC_MODEL).toBe("copilot/claude-haiku-4.5");
+    });
+
+    it.each([null, { endpoints: [{ provider: "anthropic", configured: true, port: 10001 }] }, { endpoints: [{ provider: "copilot", configured: false, port: 10002 }] }])(
+      "fails closed without a configured reflected Copilot endpoint",
+      async reflect => {
+        await expect(buildClaudeChildEnv(reflect, { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_BASE_URL: "https://api.anthropic.com" }, () => {})).rejects.toThrow("configured Copilot endpoint");
+      }
+    );
+
+    it("normalizes a dynamically selected fallback model on the provisioned route", async () => {
+      const child = await buildClaudeChildEnv(reflectData, { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_FALLBACK: "copilot/claude-sonnet-4.6" }, () => {});
+      expect(child.ANTHROPIC_MODEL).toBe("claude-sonnet-4.6");
+    });
+
+    it("rejects a dynamic provider switch without provisioning Copilot credentials", async () => {
+      await expect(buildClaudeChildEnv(null, { ANTHROPIC_MODEL: "copilot/claude-haiku-4.5" }, () => {})).rejects.toThrow("engine.model-provider: github");
+    });
+
+    it("preserves explicit provider overrides and custom Anthropic model slugs", async () => {
+      const env = { GH_AW_LLM_PROVIDER: "anthropic", GH_AW_LLM_PROVIDER_EXPLICIT: "1", ANTHROPIC_MODEL: "copilot/claude-sonnet-4-6", ANTHROPIC_BASE_URL: "https://custom.example/anthropic" };
+      expect(await buildClaudeChildEnv(null, env, () => {})).toMatchObject({ ANTHROPIC_MODEL: "claude-sonnet-4-6", ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL });
+      expect(await buildClaudeChildEnv(null, { ANTHROPIC_MODEL: "anthropic/custom-model" }, () => {})).toMatchObject({ ANTHROPIC_MODEL: "anthropic/custom-model" });
+    });
+  });
+
   describe("resolveClaudePromptFileArgs", () => {
     it("separates prompt content from child arguments", () => {
       const promptFile = path.join(os.tmpdir(), `claude-harness-prompt-${Date.now()}.txt`);

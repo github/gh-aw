@@ -71,6 +71,16 @@ function normalizeCodexModel(model, provider, options = {}) {
   return match[2];
 }
 
+/** @param {string} model @param {string} provider @param {NodeJS.ProcessEnv} env @returns {string} */
+function normalizeClaudeModel(model, provider, env) {
+  const match = /^copilot\/(.+)$/i.exec(model.trim());
+  if (!match) return model.trim();
+  if (!/^(github|copilot|github-copilot|github_models)$/.test(provider) && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
+    throw new Error("A copilot/ Claude model requires engine.model-provider: github when the model is selected dynamically; configure the provider and its credentials before running Claude");
+  }
+  return match[1];
+}
+
 /** @param {string[]} args @param {string} provider @param {{ env?: NodeJS.ProcessEnv, logger?: (message: string) => void }} [options] @returns {string[]} */
 function normalizeCodexModelArgs(args, provider, options = {}) {
   const normalized = [...args];
@@ -93,4 +103,5 @@ module.exports = {
   injectModelFlagAfterExec,
   normalizeCodexModel,
   normalizeCodexModelArgs,
+  normalizeClaudeModel,
 };

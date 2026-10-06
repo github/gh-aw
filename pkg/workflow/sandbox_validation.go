@@ -111,6 +111,15 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 				"Enable the agent sandbox or select a non-Copilot model.",
 			)
 		}
+		if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) &&
+			NewClaudeEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+			return NewValidationError(
+				"sandbox.agent",
+				"false",
+				"Claude with GitHub Copilot inference requires the agent sandbox for credential-isolated routing",
+				"Enable the agent sandbox or select an Anthropic-hosted model.",
+			)
+		}
 	}
 
 	// Validate mounts syntax if specified in agent config

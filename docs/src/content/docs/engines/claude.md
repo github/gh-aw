@@ -21,6 +21,25 @@ To authenticate, either
 
 Claude subscription OAuth tokens such as `CLAUDE_CODE_OAUTH_TOKEN` are not supported.
 
+### GitHub Copilot inference
+
+Select a Copilot-hosted Anthropic model to run Claude Code with inference billed through GitHub Copilot:
+
+```aw wrap
+engine: claude
+model: copilot/claude-haiku-4.5
+permissions:
+  copilot-requests: write
+```
+
+`copilot-requests: write` authenticates inference with `${{ github.token }}`; no PAT, `COPILOT_GITHUB_TOKEN` secret, or `ANTHROPIC_API_KEY` is required. Without that permission, configure `COPILOT_GITHUB_TOKEN` instead. The default agent sandbox is required: AWF holds the GitHub credential, and Claude receives only a placeholder key and the reflected Copilot proxy endpoint.
+
+The `copilot/` prefix selects the provider and is removed from the model ID passed to Claude. An explicit `engine.model-provider` overrides provider selection. For a fully dynamic model expression whose provider cannot be inferred at compile time, set `engine.model-provider: github`.
+
+Claude uses its native Messages API, not the OpenAI Responses or Chat Completions API. Select an Anthropic model available to the account; `copilot/auto` and non-Anthropic models are not compatibility guarantees. Model access, beta headers, and request features are subject to GitHub Copilot API (CAPI) support.
+
+The [`smoke-claude-copilot` canary](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-copilot.md) exercises native streaming inference, an MCP tool call, and inference after the tool result. Its host-side assertions require a real tool receipt and the expected safe output. Model fallback is disabled so an unsupported CAPI request cannot pass by silently selecting another model. Failures retain the Claude transcript and AWF proxy diagnostics; local compilation alone does not establish live CAPI compatibility.
+
 ## Example: scheduled repository report
 
 ```aw wrap title=".github/workflows/daily-status.md"
