@@ -174,6 +174,13 @@ const EVENT_FIELDS = {
     secretLeak: ["secretLeak", "secret_leak"],
     maliciousPatch: ["maliciousPatch", "malicious_patch"],
   },
+  "guardrail.daily_aic": {
+    status: ["status"],
+    exceeded: ["exceeded"],
+    total: ["total"],
+    estimated: ["estimated"],
+    threshold: ["threshold"],
+  },
   "workflow.info": {
     engineId: ["engineId", "engine_id", "engine"],
     agentVersion: ["agentVersion", "agent_version"],

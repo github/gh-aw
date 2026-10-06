@@ -81,6 +81,35 @@ describe("Unified conclusion session", () => {
     expect(warnings[0]).toContain("aw-prompts/system.txt");
   });
 
+  it("records the daily AIC activation decision once, including zero accounting values", () => {
+    const dailyAIC = {
+      GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: "exceeded",
+      GH_AW_DAILY_AI_CREDITS_EXCEEDED: "true",
+      GH_AW_DAILY_AI_CREDITS_TOTAL: "0",
+      GH_AW_DAILY_AI_CREDITS_ESTIMATED: "0",
+      GH_AW_DAILY_AI_CREDITS_THRESHOLD: "0",
+    };
+    const events = writeUnifiedSession({ rootDir: root, dailyAIC });
+    expect(events.filter(event => event.type === "guardrail.daily_aic")).toEqual([
+      {
+        type: "guardrail.daily_aic",
+        data: { status: "exceeded", exceeded: true, total: 0, estimated: 0, threshold: 0 },
+        provenance: { component: "guardrail", phase: "activation", path: "usage/aw_session.jsonl", index: 0 },
+      },
+    ]);
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toContain('"type":"guardrail.daily_aic"');
+    expect(writeUnifiedSession({ rootDir: root, dailyAIC })).toEqual(events);
+  });
+
+  it("omits an absent decision and does not duplicate existing guardrail evidence", () => {
+    expect(collectUnifiedSession({ rootDir: root, dailyAIC: {} }).events.some(event => event.type === "guardrail.daily_aic")).toBe(false);
+    const existing = { type: "guardrail.daily_aic", data: { status: "skipped", exceeded: false } };
+    write("agent-session.jsonl", [existing]);
+    const events = collectUnifiedSession({ rootDir: root, dailyAIC: { GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: "under_budget" } }).events;
+    expect(events.filter(event => event.type === "guardrail.daily_aic")).toMatchObject([{ data: existing.data }]);
+    expect(events.filter(event => event.type === "guardrail.daily_aic")).toHaveLength(1);
+  });
+
   it("emits one execution entry across canonical, stdio, persisted detector, and exit-code evidence", () => {
     const execution = { type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 1 } };
     write("agent-session.jsonl", [...require("./claude_session.cjs").normalizeClaudeSession(claudeFixtures.failure), execution]);
