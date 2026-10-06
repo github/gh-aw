@@ -62,6 +62,10 @@ Claude Code [dynamic workflows](https://code.claude.com/docs/en/workflows) can r
 
 The built-in harness passes a short continuation prompt when resuming an interrupted session, preserving its session ID and prior work. It uses `CLAUDE_CODE_MAX_RETRIES: 0` to leave transient-error retries to the harness; `ANTHROPIC_MAX_RETRIES` does not control the Claude CLI retry loop.
 
+The repository's [`smoke-claude-dynamic` workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-dynamic.md) is a minimal end-to-end example. It explicitly enables dynamic workflows with `bare: false`, invokes a saved script with structured arguments, and verifies that the script and a nested hidden fixture match the trusted activation artifact. Its post-step checks native `Workflow` tool evidence and the returned result instead of accepting an agent's success claim.
+
+Unified session traces distinguish a successful background launch from workflow completion. The Claude adapter maps task lifecycle observations to engine-independent events (`dynamicWorkflows.task_started`, `dynamicWorkflows.task_progress`, `dynamicWorkflows.task_updated`, `dynamicWorkflows.task_notification`, and `dynamicWorkflows.background_tasks_changed`). These retain task/tool correlation and expose observed progress and completion status without publishing embedded workflow scripts or agent prompts. Task usage snapshots are shown separately, not added to the parent session's token totals.
+
 For an offline native-CLI compatibility check against an installed version, run the opt-in contract suite from `actions/setup/js`:
 
 ```bash

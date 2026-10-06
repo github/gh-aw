@@ -10,6 +10,7 @@ import type {
   SessionEventDataMap,
   SessionFileFormatData,
   SessionInitData,
+  SessionMetric,
   SessionProvenance,
   SessionResultData,
   ToolExecutionCompleteData,
@@ -30,6 +31,39 @@ export interface UnifiedSessionUsage {
 
 export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials"> {
   usage?: UnifiedSessionUsage | null;
+}
+
+export interface DynamicWorkflowTaskData {
+  taskId?: string;
+  toolCallId?: string;
+  taskType?: string;
+  workflowName?: string;
+  status?: string;
+  sessionId?: string;
+  parentToolUseId?: string | null;
+}
+
+export interface DynamicWorkflowProgressData {
+  type?: string;
+  index?: SessionCount;
+  phaseIndex?: SessionCount;
+  agentId?: string;
+  model?: string;
+  state?: string;
+  attempt?: SessionCount;
+  startedAt?: SessionMetric;
+  queuedAt?: SessionMetric;
+  lastProgressAt?: SessionMetric;
+}
+
+export interface DynamicWorkflowObservationData extends DynamicWorkflowTaskData {
+  usage?: {
+    totalTokens?: SessionCount;
+    toolUses?: SessionCount;
+    durationMs?: SessionMetric;
+  };
+  tasks?: DynamicWorkflowTaskData[];
+  workflowProgress?: DynamicWorkflowProgressData[];
 }
 
 /** Runtime observations retain supplied JSON values, including null and false. */
@@ -212,7 +246,15 @@ export interface UnifiedSessionEventDataMap {
   "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
   "assistant.reasoning": Pick<MessageData, "content">;
   "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
-  "tool.execution_complete": Pick<ToolExecutionCompleteData, "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError">;
+  "tool.execution_complete": Pick<
+    ToolExecutionCompleteData,
+    "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
+  >;
+  "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_progress": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_updated": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_notification": DynamicWorkflowObservationData;
+  "dynamicWorkflows.background_tasks_changed": DynamicWorkflowObservationData;
   "session.result": UnifiedSessionResultData;
   "mcp.rpc.request": McpObservationData;
   "mcp.rpc.response": McpObservationData;
