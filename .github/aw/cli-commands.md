@@ -72,7 +72,7 @@ gh aw compile --approve           # Approve new secrets / action changes
 
 Trigger a workflow on demand using `workflow_dispatch`.
 
-For troubleshooting, first follow the shared [strategy](local-debug.md):
+For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md):
 respect explicit no-dispatch contexts, and handle `403 Forbidden` from a
 permitted run attempt by stopping live debugging and returning to diagnosis/
 patching. Do not retry unchanged or bypass the denial. `--dev` is a compilation

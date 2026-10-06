@@ -297,7 +297,7 @@ be treated as approved artifacts.
 
 For diagnosis/patching versus active debugging, live-test review gates, and
 Codespaces/SAML triage, follow the
-[shared local-debugging strategy](https://github.com/github/gh-aw/blob/main/.github/aw/local-debug.md).
+[shared local-debugging strategy](https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md).
 
 ## Debugging Compilation
 

@@ -9,7 +9,7 @@ description: Diagnose gh-aw failures using logs and audits; follow the shared st
 Use this reference to diagnose workflows: download/analyze existing logs, audit
 runs, and trace failures. These reads are not an active debug loop.
 
-Follow the [shared local-first strategy](../../aw/local-debug.md) for all
+Follow the [shared local-first strategy](../../aw/debug-agentic-workflow.md) for all
 reproduction, fixes, uploads, and live tests. This page is an evidence and CLI
 reference, not a separate execution policy. Respect explicit no-dispatch contexts.
 Apply its live-outcome table, credential triage and untrusted-evidence rules.

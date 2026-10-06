@@ -14,7 +14,7 @@ Only a hosted run exercises the real lock file, approvals, secrets, and runner b
 
 Use local compilation and bounded component reproduction as the first debugging steps. `gh aw compile --dev` enables strict validation, staging, image/model/analysis checks, and all scanners, rejecting bypass options and explicitly disabled required flags. Warnings become failures; workflow-local diagnostics remain attached to their workflow, while batch diagnostics are reported separately. Development compilation disables `push_` jobs and conclusion issue/comment reporting without removing diagnostic handlers, summaries, or usage artifacts. It adds no memory-tool staging fields.
 
-`gh aw compile --environment NAME` replaces the environment on every generated job, including approval jobs, with a validated literal name. Reusable-workflow caller jobs fail explicitly because GitHub Actions forbids an environment on them. Installed and embedded debugging instructions share `.github/aw/local-debug.md`, which separates local diagnosis/patching from bounded, human-validated live debugging. Neither flag authorizes workflow execution.
+`gh aw compile --environment NAME` replaces the environment on every generated job, including approval jobs, with a validated literal name. Reusable-workflow caller jobs fail explicitly because GitHub Actions forbids an environment on them. Installed and embedded debugging instructions share `.github/aw/debug-agentic-workflow.md`, which unifies local diagnosis/patching, evidence triage, and bounded, human-validated live debugging. Neither flag authorizes workflow execution.
 
 ### Alternatives Considered
 
@@ -39,7 +39,7 @@ The override is a debugging-time concern rather than a persistent source setting
 - Push jobs and conclusion issue/comment reporting are disabled for development testing; diagnostic evidence remains available.
 - `--environment` makes live verification explicitly scoped and reviewable, including on approval jobs, instead of relying on authors remembering to hand-edit lock files.
 - The reusable-workflow caller case fails loudly with actionable guidance rather than emitting a lock file that GitHub Actions would reject at run time.
-- Unifying installed and embedded routers on `local-debug.md` removes drift between the two instruction copies.
+- Unifying installed and embedded routers on `debug-agentic-workflow.md` removes drift between the two instruction copies.
 
 #### Negative
 
