@@ -31,9 +31,7 @@ tools:
   github: false
   edit: false
   bash:
-    - "mkdir *"
-    - "node *"
-    - "cat *"
+    - "node:*"
 safe-outputs:
   noop:
 post-steps:
@@ -105,6 +103,8 @@ background-launch acknowledgement. It must contain `status: "PASS"`,
 `workflow: "smoke-claude-dynamic"`, the fixture token, and this run's ID.
 Write that returned object as JSON to
 `/tmp/gh-aw/agent/claude-dynamic-smoke.json` using Bash and Node.
+Perform this write yourself; do not launch additional agents outside the saved
+workflow.
 
 If the saved workflow is missing, the Workflow tool is unavailable, or execution
 fails, report the exact error; do not synthesize a passing result. The deterministic

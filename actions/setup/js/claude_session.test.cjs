@@ -3,6 +3,7 @@ const { normalizeClaudeSession } = require("./claude_session.cjs");
 const { parseClaudeLog } = require("./parse_claude_log.cjs");
 const { projectSessionResult, normalizeAgentSession } = require("./agent_session.cjs");
 const { success, failure } = require("./fixtures/claude_ci_sessions.cjs");
+const { dynamicWorkflow } = require("./fixtures/claude_dynamic_workflow.cjs");
 
 const parse = records => parseClaudeLog(records.map(record => JSON.stringify(record)).join("\n"));
 const text = (events, type) =>
@@ -46,7 +47,8 @@ describe("Claude CI session shapes", () => {
       tool_use_result: { stdout: "example\n", stderr: "", interrupted: false },
     });
     expect(completions[1].data).toMatchObject({ toolCallId: "tool-failed", toolName: "Read", success: false, output: "Example file does not exist." });
-    expect(events.filter(event => event.type === "claude.system").map(event => event.data.subtype)).toEqual(["thinking_tokens", "task_started", "task_notification"]);
+    expect(events.filter(event => event.type === "claude.system").map(event => event.data.subtype)).toEqual(["thinking_tokens"]);
+    expect(events.filter(event => event.type.startsWith("claude.task_")).map(event => event.data.subtype)).toEqual(["task_started", "task_notification"]);
   });
 
   it("uses authoritative terminal usage once, including Claude's disjoint cache inputs", () => {
@@ -132,6 +134,60 @@ describe("Claude CI session shapes", () => {
     expect(normalizeAgentSession(events)).toEqual(events);
     const roundTrip = JSON.parse(JSON.stringify(events));
     expect(normalizeClaudeSession(roundTrip)).toEqual(roundTrip);
+  });
+});
+
+describe("Claude dynamic workflow transport", () => {
+  it("preserves launch metadata, workflow phases, agent progress, task patches and terminal notifications", () => {
+    const records = freeze(structuredClone(dynamicWorkflow));
+    const events = normalizeClaudeSession(records);
+    const completion = events.find(event => event.type === "tool.execution_complete");
+    expect(completion.data).toMatchObject({
+      toolCallId: "workflow-tool",
+      toolName: "Workflow",
+      success: true,
+      tool_use_result: { status: "async_launched", taskId: "dynamic-task", taskType: "local_workflow", workflowName: "smoke-claude-dynamic", runId: "dynamic-run" },
+    });
+    expect(events.find(event => event.type === "claude.task_started").data).toMatchObject({
+      task_id: "dynamic-task",
+      tool_use_id: "workflow-tool",
+      task_type: "local_workflow",
+      workflow_name: "smoke-claude-dynamic",
+      prompt: "PRIVATE_WORKFLOW_SCRIPT",
+    });
+    const progress = events.filter(event => event.type === "claude.task_progress");
+    expect(progress).toHaveLength(2);
+    expect(progress[0].data.usage).toEqual({ total_tokens: 0, tool_uses: 0, duration_ms: 0 });
+    expect(progress[0].data.workflow_progress[1]).toMatchObject({ agentId: "dynamic-agent", phaseIndex: 1, state: "start", promptPreview: "PRIVATE_AGENT_PROMPT" });
+    expect(progress[1].data.workflow_progress[1].state).toBe("done");
+    expect(events.find(event => event.type === "claude.task_updated").data.patch).toEqual({ status: "completed", end_time: 1791298671939 });
+    expect(events.find(event => event.type === "claude.task_notification")).toMatchObject({
+      uuid: "dynamic-completion",
+      session_id: "dynamic-session",
+      data: { task_id: "dynamic-task", tool_use_id: "workflow-tool", status: "completed", usage: { total_tokens: 250 } },
+    });
+    expect(events.filter(event => event.type === "claude.background_tasks_changed").map(event => event.data.tasks.length)).toEqual([1, 0]);
+    expect(projectSessionResult(events).usage).toMatchObject({ input_tokens: 7, output_tokens: 11 });
+    expect(events.filter(event => event.type === "session.result")).toHaveLength(1);
+    expect(records).toEqual(dynamicWorkflow);
+    expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(events);
+  });
+
+  it.each(["failed", "stopped", "future-status"])("retains task status %s without turning a launch acknowledgement into task success or a session result", status => {
+    const records = dynamicWorkflow.slice(0, -1).filter(record => !["task_progress", "task_updated"].includes(record.subtype));
+    const events = normalizeClaudeSession(records.map(record => (record.subtype === "task_notification" ? { ...record, status } : record)));
+    expect(events.find(event => event.type === "tool.execution_complete").data.success).toBe(true);
+    expect(events.find(event => event.type === "claude.task_notification").data.status).toBe(status);
+    expect(events.filter(event => event.type === "session.result")).toEqual([]);
+  });
+
+  it("retains partial and orphan task observations without synthesizing a launch, completion, or usage result", () => {
+    const event = dynamicWorkflow.find(record => record.subtype === "task_progress");
+    const events = normalizeClaudeSession([event]);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("claude.task_progress");
+    expect(events[0].data.tool_use_id).toBe("workflow-tool");
+    expect(projectSessionResult(events)).toBeUndefined();
   });
 });
 

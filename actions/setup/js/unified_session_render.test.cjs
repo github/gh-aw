@@ -5,6 +5,9 @@ import path from "node:path";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary, generateConversationMarkdown, formatToolUse, formatInitializationSummary, MAX_STEP_SUMMARY_SIZE } from "./log_parser_shared.cjs";
 import { publishUnifiedSessionSummary, validateSessionFileHeader } from "./unified_session_render.cjs";
 import { main } from "./unified_session.cjs";
+import { normalizeClaudeSession } from "./claude_session.cjs";
+import { mergeSessionSources } from "./unified_session.cjs";
+import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 
 function event(type, data, component, index, timestampMs, sourcePath = `${component}.jsonl`) {
   return { type, data, provenance: { component, phase: component === "agent" ? "agent" : "conclusion", path: sourcePath, index, ...(timestampMs !== undefined ? { timestampMs } : {}) } };
@@ -97,6 +100,22 @@ describe("unified session publication views", () => {
     const markdown = generateCopilotCliStyleSummary(trace);
     expect(markdown).toContain("Done &lt;details&gt;");
     expect(markdown).toContain("<details><summary>Unified trace details</summary>");
+  });
+
+  it.each(["completed", "failed", "stopped"])("distinguishes a Workflow launch from task status %s and renders progress without embedded prompts", status => {
+    const records = dynamicWorkflow.map(record => (record.subtype === "task_notification" ? { ...record, status } : record));
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: normalizeClaudeSession(records) }]);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("[launch succeeded; workflow outcome pending]");
+      expect(output).toContain("workflowName=smoke-claude-dynamic workflowRunId=dynamic-run");
+      expect(output).toContain("claude.task_started taskId=dynamic-task toolCallId=workflow-tool taskType=local_workflow");
+      expect(output).toContain("claude.task_progress taskId=dynamic-task toolCallId=workflow-tool totalTokens=0 toolUses=0 durationMs=0");
+      expect(output).toContain("agentId=dynamic-agent model=claude-sonnet-4-6 state=done");
+      expect(output).toContain(`claude.task_notification taskId=dynamic-task toolCallId=workflow-tool status=${status}`);
+      expect(output).toContain("claude.background_tasks_changed tasks=[]");
+      expect(output).toContain("Tokens: 18 total (7 in / 11 out)");
+      expect(output).not.toContain("PRIVATE_");
+    }
   });
 
   it("scopes agent pairing, snapshots and accounting without adding firewall usage", () => {

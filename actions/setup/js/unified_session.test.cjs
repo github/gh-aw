@@ -10,6 +10,7 @@ const req = require;
 const { writeDetectionUsageResult } = req("./generate_usage_activity_summary.cjs");
 const { success: piSuccess } = req("./fixtures/pi_ci_stream.cjs");
 const claudeFixtures = req("./fixtures/claude_ci_sessions.cjs");
+const { dynamicWorkflow } = req("./fixtures/claude_dynamic_workflow.cjs");
 const codexNoTools = fs.readFileSync(new URL("./test_data/codex_ci_no_tools.jsonl", import.meta.url), "utf8");
 
 describe("Unified conclusion session", () => {
@@ -35,6 +36,35 @@ describe("Unified conclusion session", () => {
     fs.writeFileSync(target, typeof entries === "string" ? entries : file.endsWith(".json") ? JSON.stringify(entries) : entries.map(entry => JSON.stringify(entry)).join("\n") + "\n");
     return target;
   }
+
+  it("persists Claude workflow launch and lifecycle projections without scripts, prompts, or duplicate parent usage", () => {
+    write("agent-stdio.log", dynamicWorkflow.map(JSON.stringify).join("\n"));
+    const events = writeUnifiedSession({ rootDir: root, engine: "claude" });
+    const launch = events.find(event => event.type === "tool.execution_complete");
+    expect(launch.data).toMatchObject({
+      toolName: "Workflow",
+      toolCallId: "workflow-tool",
+      success: true,
+      status: "async_launched",
+      taskId: "dynamic-task",
+      taskType: "local_workflow",
+      workflowName: "smoke-claude-dynamic",
+      workflowRunId: "dynamic-run",
+    });
+    const started = events.find(event => event.type === "claude.task_started");
+    expect(started.data).toMatchObject({ taskId: "dynamic-task", toolCallId: "workflow-tool", taskType: "local_workflow", workflowName: "smoke-claude-dynamic", sessionId: "dynamic-session" });
+    const progress = events.filter(event => event.type === "claude.task_progress");
+    expect(progress[0].data.usage).toEqual({ totalTokens: 0, toolUses: 0, durationMs: 0 });
+    expect(progress[1].data.workflowProgress[1]).toMatchObject({ agentId: "dynamic-agent", phaseIndex: 1, model: "claude-sonnet-4-6", state: "done" });
+    expect(events.find(event => event.type === "claude.task_updated").data).toMatchObject({ taskId: "dynamic-task", status: "completed" });
+    expect(events.find(event => event.type === "claude.task_notification").data).toMatchObject({ taskId: "dynamic-task", toolCallId: "workflow-tool", status: "completed", usage: { totalTokens: 250, toolUses: 2, durationMs: 5000 } });
+    expect(events.find(event => event.type === "session.result").data.usage).toEqual({ inputTokens: 7, outputTokens: 11, inputTokensIncludeCache: false });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted).not.toContain("PRIVATE_");
+    for (const event of events.filter(event => event.type !== "session.collection")) {
+      expect(normalizeUnifiedSessionEvent(normalizeUnifiedSessionEvent(event))).toEqual(normalizeUnifiedSessionEvent(event));
+    }
+  });
 
   it.each([0, 2])("preserves explicit mixed native execution exit %i without a runtime exit artifact", exitCode => {
     const execution = { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode } };

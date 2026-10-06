@@ -64,6 +64,8 @@ The built-in harness passes a short continuation prompt when resuming an interru
 
 The repository's [`smoke-claude-dynamic` workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-dynamic.md) is a minimal end-to-end example. It explicitly enables dynamic workflows with `bare: false`, invokes a saved script with structured arguments, and verifies that the script and a nested hidden fixture match the trusted activation artifact. Its post-step checks native `Workflow` tool evidence and the returned result instead of accepting an agent's success claim.
 
+Unified session traces distinguish a successful background launch from workflow completion. Claude task lifecycle events (`claude.task_started`, `claude.task_progress`, `claude.task_updated`, `claude.task_notification`, and `claude.background_tasks_changed`) retain task/tool correlation and expose observed progress and completion status without publishing embedded workflow scripts or agent prompts. Task usage snapshots are shown separately, not added to the parent session's token totals.
+
 For an offline native-CLI compatibility check against an installed version, run the opt-in contract suite from `actions/setup/js`:
 
 ```bash

@@ -230,7 +230,8 @@ function normalizeClaudeSession(records) {
       }
       terminalResults.push(emit(source, "session.result", data));
     } else if (source.type === "system" && typeof source.subtype === "string") {
-      native(source, "claude.system");
+      const taskEvent = ["task_started", "task_progress", "task_updated", "task_notification", "background_tasks_changed"].includes(source.subtype);
+      native(source, taskEvent ? `claude.${source.subtype}` : "claude.system");
       if (source.subtype === "api_retry" && source.error != null) {
         reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
       } else if (source.error != null) {
