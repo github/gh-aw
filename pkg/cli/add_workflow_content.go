@@ -87,7 +87,13 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 
 func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error {
 	if !opts.DisableSecurityScanner {
-		if findings := workflow.ScanMarkdownSecurity(string(resolved.Content)); len(findings) > 0 {
+		var findings []workflow.SecurityFinding
+		if resolved.IsPackageResourceFile && !strings.EqualFold(filepath.Ext(resolved.Spec.DestinationPath), ".md") {
+			findings = workflow.ScanResourceSecurity(string(resolved.Content))
+		} else {
+			findings = workflow.ScanMarkdownSecurity(string(resolved.Content))
+		}
+		if len(findings) > 0 {
 			addLog.Printf("Security scan failed for %s: %d finding(s)", resolved.Spec.WorkflowPath, len(findings))
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for workflow"))
 			fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings, resolved.Spec.WorkflowPath))

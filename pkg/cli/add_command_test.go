@@ -1057,7 +1057,7 @@ func TestAddWorkflowsWithTracking_PackageSharedScriptResourceWritesOwnershipReco
 	tempDir := testutil.TempDir(t, "test-package-shared-script-resource-*")
 	setupMinimalGitRepo(t, tempDir)
 
-	resourceContent := []byte("export function run() {}\n")
+	resourceContent := []byte("export function registrationPage() {\n  return `<form action=\"/register\"><script>document.forms[0].submit()</script></form>`;\n}\n")
 	workflows := []*ResolvedWorkflow{
 		{
 			Spec: &WorkflowSpec{
@@ -1084,11 +1084,16 @@ func TestAddWorkflowsWithTracking_PackageSharedScriptResourceWritesOwnershipReco
 	}
 
 	err := addWorkflowsWithTracking(context.Background(), workflows, NewFileTracker(), AddOptions{
-		NoGitattributes:        true,
-		DisableSecurityScanner: true,
-		Quiet:                  true,
+		NoGitattributes: true,
+		Quiet:           true,
 	})
 	require.NoError(t, err)
+	err = addWorkflowsWithTracking(context.Background(), workflows, NewFileTracker(), AddOptions{
+		NoGitattributes: true,
+		Force:           true,
+		Quiet:           true,
+	})
+	require.NoError(t, err, "reapplying the resource must not require disabling security scanning")
 
 	resourcePath := filepath.Join(tempDir, ".github", "workflows", "shared", "runtime.mjs")
 	written, err := os.ReadFile(resourcePath)
@@ -1103,6 +1108,51 @@ func TestAddWorkflowsWithTracking_PackageSharedScriptResourceWritesOwnershipReco
 	assert.Contains(t, string(record), `"source": "owner/repo/packages/repo-assist@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
 	assert.Contains(t, string(record), `"destination": ".github/workflows/shared/runtime.mjs"`)
 	assert.Contains(t, string(record), `"sha256":`)
+
+	unsafeMarkdown := &ResolvedWorkflow{
+		Spec:    &WorkflowSpec{WorkflowPath: ".github/workflows/unsafe.md", WorkflowName: "unsafe"},
+		Content: []byte("<script>alert(1)</script>"),
+	}
+	err = addWorkflowsWithTracking(context.Background(), append(workflows, unsafeMarkdown), NewFileTracker(), AddOptions{
+		NoGitattributes: true,
+		Force:           true,
+		Quiet:           true,
+	})
+	require.ErrorContains(t, err, "failed security scan")
+	written, err = os.ReadFile(resourcePath)
+	require.NoError(t, err)
+	assert.Equal(t, resourceContent, written)
+	assert.NoFileExists(t, filepath.Join(tempDir, ".github", "workflows", "unsafe.md"))
+}
+
+func TestValidateWorkflowSecurity_PackageResourceContent(t *testing.T) {
+	tests := []struct {
+		name        string
+		path        string
+		content     string
+		isResource  bool
+		wantFinding bool
+	}{
+		{"javascript template", ".github/workflows/shared/page.mjs", "const page = `<form><script>alert(1)</script></form>`;", true, false},
+		{"unicode in javascript", ".github/workflows/shared/page.mjs", "const value = 'safe\u202Eunsafe';", true, true},
+		{"markdown resource", ".github/aw/instructions.md", "<script>alert(1)</script>", true, true},
+		{"workflow markdown", ".github/workflows/unsafe.md", "<script>alert(1)</script>", false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved := &ResolvedWorkflow{
+				Spec:                  &WorkflowSpec{WorkflowPath: tt.path, DestinationPath: tt.path},
+				Content:               []byte(tt.content),
+				IsPackageResourceFile: tt.isResource,
+			}
+			err := validateWorkflowSecurity(resolved, AddOptions{})
+			if tt.wantFinding {
+				require.ErrorContains(t, err, "failed security scan")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestAddWorkflowsWithTracking_PackageResourceRejectsLocalDrift(t *testing.T) {
