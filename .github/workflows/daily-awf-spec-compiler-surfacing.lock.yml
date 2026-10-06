@@ -2486,13 +2486,14 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"expires\":168,\"labels\":[\"automation\",\"awf\",\"compiler\",\"specifications\"],\"max\":1,\"title_prefix\":\"[awf-feature-surfacing] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":8,\"max_segment_kb\":100,\"name\":\"awf-feature-reviews\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"open_feature_ids\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"outcome\":{\"enum\":[\"issue_created\",\"noop\"]},\"record_type\":{\"enum\":[\"awf_spec_surfacing_review\"]},\"reviewed_at\":{\"type\":\"string\"},\"reviewed_sha\":{\"type\":\"string\"},\"run_id\":{\"type\":\"string\"},\"schema_sha256\":{\"type\":\"string\"}},\"required\":[\"record_type\",\"run_id\",\"reviewed_at\",\"reviewed_sha\",\"schema_sha256\",\"open_feature_ids\",\"outcome\"],\"type\":\"object\"},\"type\":\"\"}],\"max\":100},\"ledger_request_compaction\":{\"ledgers\":[\"awf-feature-reviews\"],\"max\":1,\"workflow\":\"agentics-maintenance.yml\"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{}}"
+          GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
       - name: Upload validated ledger transactions

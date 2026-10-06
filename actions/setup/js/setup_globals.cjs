@@ -31,19 +31,6 @@ function applyGitHubApiVersion(headers, defaults = {}) {
 }
 
 /**
- * Identify only recognizable credential types; never persist or display tokens.
- * @param {string} token
- * @returns {string}
- */
-function credentialSource(token) {
-  if (typeof token !== "string") return "unknown";
-  if (process.env.GITHUB_TOKEN && token === process.env.GITHUB_TOKEN) return "github_actions";
-  if (token.startsWith("github_pat_") || token.startsWith("ghp_")) return "pat";
-  if (token.startsWith("ghs_") || token.startsWith("ghu_")) return "app";
-  return "unknown";
-}
-
-/**
  * Stores GitHub Actions builtin objects (core, github, context, exec, io, getOctokit) in the global scope
  * This must be called before requiring any script that depends on these globals
  *
@@ -57,8 +44,9 @@ function credentialSource(token) {
  * @param {typeof exec} execModule - The @actions/exec module
  * @param {typeof io} ioModule - The @actions/io module
  * @param {typeof getOctokit} getOctokitFn - The getOctokit function (builtin in actions/github-script@v9)
+ * @param {string} [defaultCredentialSource] - Provenance for the injected github client
  */
-function setupGlobals(coreModule, githubModule, contextModule, execModule, ioModule, getOctokitFn) {
+function setupGlobals(coreModule, githubModule, contextModule, execModule, ioModule, getOctokitFn, defaultCredentialSource = "unknown") {
   global.core = coreModule;
   const runtimeFeatures = Object.freeze(parseRuntimeFeatures(process.env.GH_AW_RUNTIME_FEATURES));
   global.runtimeFeatures = runtimeFeatures;
@@ -72,7 +60,7 @@ function setupGlobals(coreModule, githubModule, contextModule, execModule, ioMod
   // @ts-expect-error - Assigning to global properties that are declared as const
   // Wrap the github object so every github.rest.*.*() call automatically logs
   // x-ratelimit-* headers to github_rate_limits.jsonl for observability.
-  global.github = createRateLimitAwareGithub(githubModule);
+  global.github = createRateLimitAwareGithub(githubModule, defaultCredentialSource);
   global.context = contextModule;
   // @ts-expect-error - Assigning to global properties that are declared as const
   global.exec = execModule;
@@ -92,12 +80,15 @@ function setupGlobals(coreModule, githubModule, contextModule, execModule, ioMod
           "at: https://github.com/settings/personal-access-tokens/new"
       );
     }
-    const client = getOctokitFn(token, options);
+    const clientOptions = { ...options };
+    const source = clientOptions.credentialSource;
+    delete clientOptions.credentialSource;
+    const client = getOctokitFn(token, clientOptions);
     // Octokit constructor options do not apply top-level headers to requests.
     client.hook.before("request", requestOptions => {
-      applyGitHubApiVersion(requestOptions.headers, options.headers);
+      applyGitHubApiVersion(requestOptions.headers, clientOptions.headers);
     });
-    return createRateLimitAwareGithub(client, credentialSource(token));
+    return createRateLimitAwareGithub(client, source);
   };
 }
 
