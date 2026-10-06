@@ -484,6 +484,20 @@ func TestFindVersionBySHA_ReturnsVersionForKnownSHA(t *testing.T) {
 	}
 }
 
+func TestGetActionPinsByRepo_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	pins := GetActionPinsByRepo("actions/checkout")
+	require.NotEmpty(t, pins, "prerequisite: embedded pins must exist for actions/checkout")
+
+	original := pins[0]
+	pins[0] = ActionPin{Repo: "mutated/repo", Version: "mutated", SHA: "mutated"}
+
+	fresh := GetActionPinsByRepo("actions/checkout")
+	require.NotEmpty(t, fresh, "prerequisite: embedded pins must remain available")
+	assert.Equal(t, original, fresh[0], "mutating a returned slice must not change the cached pins")
+}
+
 func TestGetLatestActionPinReference_ReturnsFormattedReferenceOrEmpty(t *testing.T) {
 	t.Parallel()
 	t.Run("returns formatted reference for known repo", func(t *testing.T) {
