@@ -31,6 +31,7 @@ const (
 )
 
 type defaultsFile struct {
+	DefaultArtifactRetentionDays      *string `yaml:"default_artifact_retention_days"`
 	DefaultMaxAICredits               *string `yaml:"default_max_ai_credits"`
 	DefaultMaxTurnCacheMisses         *string `yaml:"default_max_turn_cache_misses"`
 	DefaultDetectionMaxAICredits      *string `yaml:"default_detection_max_ai_credits"`
@@ -101,6 +102,7 @@ func (e *defaultsGHError) Unwrap() error {
 }
 
 var defaultsBindings = []defaultsBinding{
+	{envName: compilerenv.DefaultArtifactRetentionDays, fieldName: "default_artifact_retention_days", get: func(f *defaultsFile) **string { return &f.DefaultArtifactRetentionDays }},
 	{envName: compilerenv.DefaultMaxAICredits, fieldName: "default_max_ai_credits", get: func(f *defaultsFile) **string { return &f.DefaultMaxAICredits }},
 	{envName: compilerenv.DefaultMaxTurnCacheMisses, fieldName: "default_max_turn_cache_misses", get: func(f *defaultsFile) **string { return &f.DefaultMaxTurnCacheMisses }},
 	{envName: compilerenv.DefaultDetectionMaxAICredits, fieldName: "default_detection_max_ai_credits", get: func(f *defaultsFile) **string { return &f.DefaultDetectionMaxAICredits }},
@@ -303,6 +305,9 @@ func defaultsParseFile(inputFile string, data []byte) (defaultsFile, error) {
 func defaultsValidateFile(file *defaultsFile) error {
 	var validationErrors []string
 
+	if err := validateDefaultArtifactRetentionDays(file.DefaultArtifactRetentionDays); err != nil {
+		validationErrors = append(validationErrors, err.Error())
+	}
 	validateNonZeroInt := func(field string, value *string) {
 		if value == nil {
 			return
@@ -356,6 +361,17 @@ func defaultsValidateFile(file *defaultsFile) error {
 
 	if len(validationErrors) > 0 {
 		return fmt.Errorf("invalid defaults file: %s", strings.Join(validationErrors, "; "))
+	}
+	return nil
+}
+
+func validateDefaultArtifactRetentionDays(value *string) error {
+	if value == nil {
+		return nil
+	}
+	days, err := strconv.Atoi(strings.TrimSpace(*value))
+	if err != nil || days < 1 || days > 400 {
+		return errors.New("default_artifact_retention_days must be an integer between 1 and 400 when set, for example: \"7\"")
 	}
 	return nil
 }

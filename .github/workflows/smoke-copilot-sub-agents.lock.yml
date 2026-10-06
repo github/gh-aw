@@ -172,7 +172,7 @@ jobs:
           name: smokecopilotsubagents-experiment
           path: /tmp/gh-aw/experiments
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -251,7 +251,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
@@ -400,6 +400,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -423,7 +424,7 @@ jobs:
             /tmp/gh-aw/.github/agents
             /tmp/gh-aw/.github/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -1172,6 +1173,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -1203,6 +1205,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
     needs:
@@ -1511,6 +1514,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -1545,6 +1549,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -1849,6 +1854,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Parse and conclude threat detection
         id: detection_conclusion
         if: always()
@@ -2169,6 +2175,7 @@ jobs:
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload evals accounting after failure
         if: always() && steps.redact_evals_results.outcome != 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -2178,6 +2185,7 @@ jobs:
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Restore actions folder
         if: always()
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2480,3 +2488,4 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}

@@ -223,7 +223,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
@@ -374,6 +374,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -397,7 +398,7 @@ jobs:
             /tmp/gh-aw/.pi/agents
             /tmp/gh-aw/.pi/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -539,7 +540,7 @@ jobs:
           path: |
             /tmp/gh-aw/python/*.py
             /tmp/gh-aw/python/data/*
-          retention-days: 30
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}
 
       - name: Configure Git credentials
         env:
@@ -1122,6 +1123,7 @@ jobs:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       # Upload safe-outputs assets for upload_assets job
       - name: Upload Safe Outputs Assets
         if: always()
@@ -1129,7 +1131,7 @@ jobs:
         with:
           name: safe-outputs-assets
           path: ${{ runner.temp }}/gh-aw/safeoutputs/assets/
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
@@ -1150,6 +1152,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -1184,6 +1187,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
     needs:
@@ -1472,6 +1476,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -1506,6 +1511,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -1792,6 +1798,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Conclude threat detection
         id: detection_conclusion
         if: always()
@@ -1928,6 +1935,7 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_cache_memory:
     needs:

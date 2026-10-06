@@ -156,6 +156,9 @@ type RepoConfig struct {
 	// self-hosted runner.
 	RequireSelfHostedRunners bool
 
+	// ArtifactRetentionDays overrides retention for all workflow artifacts.
+	ArtifactRetentionDays *TemplatableInt32
+
 	// UTC is the project's home UTC offset used for rendering local times in CLI output.
 	// The value must be a numeric UTC offset such as "+00:00" or "-08:00".
 	UTC string
@@ -237,6 +240,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 		Strict                   bool                          `json:"strict,omitempty"`
 		GHES                     bool                          `json:"ghes,omitempty"`
 		RequireSelfHostedRunners bool                          `json:"require_self_hosted_runners,omitempty"`
+		ArtifactRetentionDays    *TemplatableInt32             `json:"artifact_retention_days,omitempty"`
 		HelpCommand              *bool                         `json:"help_command,omitempty"` // nil = use default (enabled)
 		UTC                      string                        `json:"utc,omitempty"`
 		AutoUpgrade              json.RawMessage               `json:"auto_upgrade,omitempty"`
@@ -251,6 +255,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.Strict = raw.Strict
 	r.GHES = raw.GHES
 	r.RequireSelfHostedRunners = raw.RequireSelfHostedRunners
+	r.ArtifactRetentionDays = raw.ArtifactRetentionDays
 	r.HelpCommand = raw.HelpCommand
 	r.UTC = strings.TrimSpace(raw.UTC)
 	r.ActionPins = raw.ActionPins

@@ -37,6 +37,10 @@ func New(getenv EnvGetter) *Manager {
 var defaultManager = New(os.Getenv)
 
 const (
+	// DefaultArtifactRetentionDays is the runtime Actions variable used when
+	// artifact_retention_days is not configured in aw.json.
+	DefaultArtifactRetentionDays = "GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS"
+
 	// DefaultMaxDailyAICredits is the enterprise override for the top-level
 	// max-daily-ai-credits guardrail when it is not explicitly configured in
 	// workflow frontmatter.
