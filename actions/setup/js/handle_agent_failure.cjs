@@ -3843,7 +3843,7 @@ async function main() {
     const { aiCredits, maxAICredits, aiCreditsRateLimitError: detectedAICreditsRateLimitError, maxAICreditsExceeded } = resolveAICreditsFailureState();
     const aiCreditsRateLimitError = agentConclusion === "failure" && detectedAICreditsRateLimitError;
     const inferenceAccessError = process.env.GH_AW_INFERENCE_ACCESS_ERROR === "true";
-    const copilotOrgBillingError = detectCopilotOrgBillingErrorFromLog();
+    const copilotOrgBillingError = !maxAICreditsExceeded && detectCopilotOrgBillingErrorFromLog();
     const copilotAgentNotFound = detectCopilotAgentNotFoundFromLog();
     const mcpPolicyError = process.env.GH_AW_MCP_POLICY_ERROR === "true";
     const agenticEngineTimeout = process.env.GH_AW_AGENTIC_ENGINE_TIMEOUT === "true";
@@ -4559,7 +4559,7 @@ async function main() {
         const skillInstallFailureContext = buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallErrors);
 
         // Build credential auth error context (firewall audit.jsonl 401/403 from provider endpoints)
-        const credentialAuthErrorContext = copilotOrgBillingErrorContext ? "" : buildCredentialAuthErrorContext();
+        const credentialAuthErrorContext = copilotOrgBillingErrorContext || maxAICreditsExceeded ? "" : buildCredentialAuthErrorContext();
 
         // Create template context
         const templateContext = {
@@ -4801,7 +4801,7 @@ async function main() {
         const skillInstallFailureContext = buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallErrors);
 
         // Build credential auth error context (firewall audit.jsonl 401/403 from provider endpoints)
-        const credentialAuthErrorContext = copilotOrgBillingErrorContext ? "" : buildCredentialAuthErrorContext();
+        const credentialAuthErrorContext = copilotOrgBillingErrorContext || maxAICreditsExceeded ? "" : buildCredentialAuthErrorContext();
 
         // Build optimize token consumption context (shown when a guardrail was the failure root cause)
         const optimizeTokenConsumptionContext = buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, isTimedOut, runUrl });

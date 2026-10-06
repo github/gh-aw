@@ -334,6 +334,7 @@ describe("handle_agent_failure", () => {
     process.env.GH_AW_AGENT_CONCLUSION = "failure";
     process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR = "true";
     process.env.GH_AW_AIC = "1";
+    process.env.GH_AW_PROMPTS_DIR = runtimePromptsDir;
     const createIssueMock = vi.fn(async () => ({
       data: { number: 99, html_url: "https://github.com/owner/repo/issues/99", node_id: "I_99" },
     }));
@@ -360,6 +361,7 @@ describe("handle_agent_failure", () => {
       delete process.env.GH_AW_AGENT_CONCLUSION;
       delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
       delete process.env.GH_AW_AIC;
+      delete process.env.GH_AW_PROMPTS_DIR;
     }
   });
 
@@ -1496,6 +1498,60 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).toHaveBeenCalledOnce();
       const createCall = createIssueMock.mock.calls[0][0];
       expect(createCall.title).toBe("[aw] Test Workflow reported incomplete result");
+    });
+
+    it.each([
+      { used: 240.22396, budgetExceeded: true },
+      { used: 239.9, budgetExceeded: false },
+    ])("reports proxy HTTP 403 at usage $used with the correct budget or billing category", async ({ used, budgetExceeded }) => {
+      const createIssueMock = vi.fn(async () => ({
+        data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_123" },
+      }));
+      const tokenUsageDir = path.join(tmpDir, "sandbox", "firewall", "logs", "api-proxy-logs");
+      fs.mkdirSync(tokenUsageDir, { recursive: true });
+      fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), `${JSON.stringify({ status: 200, ai_credits_total: used })}\n`);
+      fs.writeFileSync(path.join(tmpDir, "awf-config.json"), JSON.stringify({ apiProxy: { enabled: true, maxAiCredits: 240 } }));
+      fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), "[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\nAuthentication failed with provider at http://172.30.0.30:10002 (HTTP 403).\n");
+      const agentOutputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(agentOutputPath, JSON.stringify({ items: [{ type: "create_issue", title: "Report", body: "Partial results" }] }));
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), "{ai_credits_rate_limit_error_context}{copilot_org_billing_error_context}{credential_auth_error_context}");
+      fs.copyFileSync(path.join(runtimePromptsDir, "ai_credits_rate_limit_error.md"), path.join(promptsDir, "ai_credits_rate_limit_error.md"));
+      fs.copyFileSync(path.join(runtimePromptsDir, "copilot_org_billing_error.md"), path.join(promptsDir, "copilot_org_billing_error.md"));
+      process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      process.env.GH_AW_FAILURE_REPORT_AS_ISSUE = "true";
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: createIssueMock, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+      } finally {
+        delete process.env.GH_AW_AGENT_OUTPUT;
+        delete process.env.GH_AW_ENGINE_ID;
+        delete process.env.GH_AW_FAILURE_REPORT_AS_ISSUE;
+      }
+
+      expect(global.core.setFailed).not.toHaveBeenCalled();
+      expect(createIssueMock).toHaveBeenCalledOnce();
+      const { title, body } = createIssueMock.mock.calls[0][0];
+      if (budgetExceeded) {
+        expect(title).toBe("[aw] Test Workflow exceeded max AI credits");
+        expect(body).toContain("AI Credits Budget Exceeded");
+        expect(body).toContain("failure_categories: max_ai_credits_exceeded");
+        expect(body).not.toContain("Copilot organization billing is unavailable");
+        expect(body).not.toContain("copilot_org_billing_error");
+      } else {
+        expect(title).toBe("[aw] Test Workflow hit Copilot organization billing error");
+        expect(body).toContain("Copilot organization billing is unavailable");
+        expect(body).not.toContain("max_ai_credits_exceeded");
+      }
     });
 
     it("continues searching later pages until it finds an exact metadata match", async () => {

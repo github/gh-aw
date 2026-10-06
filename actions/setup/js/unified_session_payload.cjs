@@ -82,6 +82,7 @@ const EVENT_FIELDS = {
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
   "user.message": { content: ["content"] },
   "assistant.message": { content: ["content"] },
+  "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
   "assistant.reasoning": { content: ["content"] },
   "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
