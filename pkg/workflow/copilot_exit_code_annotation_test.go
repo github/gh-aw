@@ -5,6 +5,7 @@ package workflow
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -12,6 +13,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAgentExecutionExitCodeTrap_Shellcheck(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		trap string
+	}{
+		{name: "shared", trap: buildAgentExecutionExitCodeTrap()},
+		{name: "Copilot cleanup", trap: buildCopilotSettingsCleanupAndExitCodeTrap()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.True(t, strings.HasPrefix(tt.trap, "gh_aw_exit_code=0\ntrap "),
+				"exit code must be declared before the trap:\n%s", tt.trap)
+
+			if _, err := exec.LookPath("shellcheck"); err != nil {
+				t.Skip("shellcheck is not installed")
+			}
+			cmd := exec.Command("shellcheck", "-s", "bash", "-")
+			cmd.Stdin = strings.NewReader(tt.trap)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "generated trap must pass ShellCheck:\n%s", output)
+		})
+	}
+}
 
 // TestAgentExecutionExitCodeTrap_EmitsErrorAnnotation pins the generated trap so the
 // failure annotation cannot be silently dropped.
@@ -156,6 +180,6 @@ func TestAllAgentExecutionSteps_ContainExitCodeAnnotation(t *testing.T) {
 func TestWrapAgentExecutionCommand_PlacesTrapAfterPipefail(t *testing.T) {
 	command := wrapAgentExecutionCommand("set -o pipefail\nfalse | cat")
 
-	assert.True(t, strings.HasPrefix(command, "set -o pipefail\ntrap "),
+	assert.True(t, strings.HasPrefix(command, "set -o pipefail\ngh_aw_exit_code=0\ntrap "),
 		"the trap must follow pipefail setup:\n%s", command)
 }

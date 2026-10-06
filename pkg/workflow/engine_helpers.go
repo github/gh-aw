@@ -405,7 +405,7 @@ func buildAgentExecutionExitCodeTrapWithCleanup(cleanup string) string {
 		cleanup += "; "
 	}
 	return fmt.Sprintf(
-		"trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf \"%%s\" \"$gh_aw_exit_code\" > %s || true; %sif [ \"$gh_aw_exit_code\" -ne 0 ]; then echo \"::error::Agent execution exited with code $gh_aw_exit_code\"; fi' EXIT\n",
+		"gh_aw_exit_code=0\ntrap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf \"%%s\" \"$gh_aw_exit_code\" > %s || true; %sif [ \"$gh_aw_exit_code\" -ne 0 ]; then echo \"::error::Agent execution exited with code $gh_aw_exit_code\"; fi' EXIT\n",
 		agentExecutionExitCodePath,
 		cleanup,
 	)
