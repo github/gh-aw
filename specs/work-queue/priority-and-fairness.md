@@ -1,6 +1,6 @@
 ---
 title: Work queue priority and fairness
-description: Mandatory fair scheduling, agentic dispatch, batched worker assignments, and independent Claim finalization.
+description: A fair work-queue DAG with cross-repository Issue/PR dependencies, batched assignments, and independent Claim finalization.
 ---
 
 # Priority and fairness for the gh-aw work queue
@@ -21,6 +21,8 @@ description: Mandatory fair scheduling, agentic dispatch, batched worker assignm
 
 **Required worker batching:** one worker dispatch MAY carry several scheduler-selected Claims. The inbound assignment is always a bounded array, even for one Claim. Each Claim has independent finish intent, terminal state, and effect authorization; completing one must not require completing the rest.
 
+**Required DAG support:** Work is a schedulable DAG node. Immutable typed predecessor edges and trusted result/Issue/PR observations determine the ready frontier before priority/fairness selection. Independent Work has an empty dependency list and retains queue-like defaults.
+
 ## 1. Recommendation
 
 Introduce a **mandatory, trusted, hierarchical grant scheduler for every queue**, rather than making priority and fairness additional agent-controlled sort keys:
@@ -29,7 +31,7 @@ Introduce a **mandatory, trusted, hierarchical grant scheduler for every queue**
 dependency/resource/capacity eligibility
     -> priority-class policy
     -> weighted fairness among trusted accounting keys
-    -> oldest eligible Work within the selected key
+    -> oldest ready DAG node within the selected key
     -> one committed Claim that grants, charges, and reserves capacity
     -> dispatch
     -> existing worker admission and final safe-output authorization
@@ -141,7 +143,10 @@ DAGMan also propagates accounting-group metadata into DAG jobs and sub-DAGs. Tha
 3. **Local ordering:** select an eligible Work within that entitlement.
 4. **Execution placement:** GitHub Actions allocates actual runners and applies its own concurrency rules.
 
-The current work queue is not a DAG dependency engine. Dependency readiness, if added, needs an explicit protocol design; do not infer it from timestamps, issue links, or an agent's statement that a task is ready.
+The examined runtime is not yet a DAG dependency engine. The replacement makes
+that layer first-class: immutable predecessor edges, verified results, and typed
+cross-repository Issue/PR gates define readiness. Do not infer readiness from
+timestamps, issue links, or an agent's statement that a task is ready.
 
 ### 4.2 Slurm: multifactor priority and hierarchical historical fair-share
 
@@ -201,7 +206,10 @@ HEFT ranks tasks using an upward-rank measure and chooses processor placement by
 
 A dispatcher that globally prioritizes whichever task lies on the longest critical path may optimize makespan while allowing a large workflow to dominate the ready pool. Conversely, shortest-workflow-first can postpone a long workflow when shorter work keeps arriving.
 
-**Translation to gh-aw:** preserve oldest-eligible Work within an accounting key in version 1. If trusted DAG metadata is later available, critical-path ranking can replace FIFO **inside a previously allocated share**, with separately specified ordering and starvation behavior. Do not let an agent invent a globally superior rank.
+**Translation to gh-aw:** select oldest-ready Work within an accounting key.
+Dependencies are first-class, but critical-path ranking remains a separate
+future local-order policy. Do not let an agent invent a globally superior rank
+or use a graph's width to increase its accounting entitlement.
 
 ### 4.6 Actual multi-workflow fairness literature
 
@@ -338,6 +346,9 @@ Define one new current `QueueCommit` transaction protocol with closed, typed ope
 | `pool` | Required configured scheduling/worker-capability domain |
 | `worker_profile` | Approved worker/recipe profile; omitted submissions use the pool's explicit default |
 | `payload` | Immutable validated task description, inputs, and optional agent-generated plan |
+| `graph_id`, `node_key` | Trusted graph namespace and stable local node identity; neither grants a separate fairness share |
+| `depends_on` | Required array of typed Work, Issue, or PR predecessor references; new independent submissions resolve it to `[]` |
+| `subject` | Optional typed Issue/PR that this Work operates on, distinct from its dependency conditions |
 | `enqueued` | Required immutable nonnegative safe-integer Unix-millisecond timestamp for age diagnostics, not selection order |
 
 When explicit fairness grouping is configured, the accounting key SHOULD correspond to a project, authenticated tenant, or administrator-approved workflow family. It MUST NOT be generated per Work or per retry. Without that configuration or explicit trusted submission metadata, use the single default key; do not infer a group from a producer's identity.
@@ -365,7 +376,8 @@ An eligible Work:
 - Satisfies any trusted retry delay and admission restrictions.
 - Has an accounting key below its outstanding-Claim limit and an available logical Work slot.
 - Can be packed into an approved dispatch group without exceeding profile or worker-dispatch limits.
-- Satisfies dependency readiness only if a separately specified dependency feature exists.
+- Has verified successful results for every Work predecessor.
+- Has a fresh trusted satisfying observation for every Issue/PR predecessor.
 
 Within a `(pool, priority, fairness_key)` bucket, choose the eligible Work with the least first-committed `(commit ordinal, operation index)` position. Distinct Work positions are unique. Idempotent submissions preserve the original position, and a cancelled Claim does not reset its Work's position. Claimed and terminal Work do not block another eligible Work.
 
@@ -394,7 +406,7 @@ weight[key]       positive policy weight
 active[key]       eligibility state at the preceding committed decision
 ```
 
-Use an exact integer tick scale for each sibling competition set. Compute `Q` as the least common multiple of the epoch's configured weights, including default weight 1; define `stride[key] = Q / weight[key]`. The bounded integer-weight profile makes the scale finite. Use `BigInt`/Go big integers, rendering diagnostic values as canonical decimal strings. No fractions, pass snapshots, or scheduler-state sidecars appear on the wire.
+Use an exact integer tick scale for each sibling competition set. Compute `Q` as the least common multiple of the epoch's configured weights, including default weight 1; define `stride[key] = Q / weight[key]`. The bounded integer-weight profile makes the scale finite. Use `BigInt`/Go big integers, rendering diagnostic values as canonical decimal strings. No fractions or duplicate pass-state records appear on the wire.
 
 The scale is computed once per policy epoch and immutable during it. Newly admitted authorized keys with default weight 1 need no scale change. Rational arithmetic remains useful as an independent reference model; the runtime MUST NOT use rounded floating-point reciprocals.
 
@@ -456,6 +468,8 @@ Use a small operation union:
 | `Work` | Admit immutable task metadata/payload; its first commit/operation position is its FIFO position |
 | `Claim` | Record selected Work, Claim, `dispatch_id`, and local assignment handle; charge/reserve a logical Work slot and create the group's native reservation on its first Claim |
 | `Completion` | Preserve effective-Claim-only terminal Work completion and final authorization prerequisites |
+| `Result` | Record a completed node's verified result/availability barrier after its scoped effect processing succeeds |
+| `Observation` | Record normalized trusted GitHub Issue/PR condition evidence, including identity and observation time |
 | `ClaimCancellation` | Remove this Claim's authority; optionally record trusted retry-not-before metadata |
 | `WorkCancellation` | Terminal cancellation; does not pretend the worker has stopped using capacity |
 | `Dispatch` | Record launch started, bound run, definitive rejection, or uncertainty for a `dispatch_id` and its immutable Claim array |
@@ -565,9 +579,18 @@ work-queue-policy:
   worker-profiles:
     analysis:
       max-claims-per-dispatch: 3
+  dependencies:
+    repositories: [example/design, example/library]
+    max-observation-age: 60s
 ```
 
-This is **not currently valid gh-aw frontmatter**. The example explicitly configures tenant weights and a smaller per-account cap; those are not implicit out-of-box grouping rules. Policy could ultimately be declared through compiler configuration or a trusted administrative operation; either way, its installed durable epoch must be authoritative and recorded in the same transaction log. Omitting this block gives the queue-like defaults in section 7.1; it does not disable scheduling.
+This is **not currently valid gh-aw frontmatter**. The example explicitly configures
+tenant weights, a smaller per-account cap, and allowed foreign dependency reads;
+these are not implicit defaults. The 60-second observation age is an example
+policy bound, not a measured SLA. Credentials must be bound separately by trusted
+compiler configuration. The installed policy epoch in the log is authoritative.
+Omitting the block gives queue-like defaults and no foreign-repository grant;
+it does not disable scheduling.
 
 Suggested behavior:
 
@@ -728,6 +751,9 @@ Use stable reason/status codes:
 | `weighted_class` / `weighted_key` | Integer virtual-pass comparison selected the class/key |
 | `no_work` | No nonterminal unclaimed backlog to consider |
 | `no_eligible_work` | Backlog exists but is delayed, incompatible, or otherwise ineligible |
+| `dependency_wait` / `dependency_failed` | A Work predecessor has no successful Result, or an ancestor was terminally cancelled |
+| `dependency_result_unavailable` | Completion exists but verified outputs/Result do not |
+| `external_wait` / `external_unavailable` | An Issue/PR condition is unsatisfied or cannot be read/validated freshly |
 | `capacity_blocked` | Outstanding limits prevent a grant |
 | `partial_batch` | Fewer Claims than requested committed; include the limiting reason |
 | `request_replayed` | Return an already committed request; no new charge or selection |
@@ -796,6 +822,7 @@ The current `logSpan` helper returns no span context. Version 1 therefore should
 | `policy_epoch`, pool, priority | Applied policy and domain |
 | `claim_ref`, `work_ref` | Opaque/redacted diagnostic references, not arbitrary submitted strings |
 | `dispatch_id`, local assignment handle | Shared worker launch versus individual Claim completion |
+| Graph/node/edge and observation/result references | The exact prerequisite evidence or blocking path used by the decision |
 | Dispatcher/worker run ID and attempt | Trusted provenance and native GitHub run navigation |
 | Existing trace ID, episode/hop context | Cross-job correlation when telemetry is enabled |
 | Attempt number, observed Git SHA, result code | Tentative conflicts/errors, separate from accepted decisions |
@@ -851,6 +878,251 @@ For assignment `[c1,c2,c3]`, completing c1, cancelling c2, and leaving c3 unfini
 
 The formal invariant is now **at most one Completion and one authorization pass per Claim**, not at most one Completion per worker run. Effect records are bound to `(actual worker run, Claim)`; completing c1 must never authorize c2's writes. Trace and receipt views expose both group-level launch/binding and per-Claim finish/effect state.
 
+### 7.15 Native Work DAGs and verified result barriers
+
+The queue is a DAG scheduler, not an agent-maintained checklist. It tracks Work
+ownership separately from readiness:
+
+```text
+admitted node -> waiting for predecessors -> ready frontier
+             -> fair Claim -> worker -> Completion
+             -> scoped effects verified -> Result -> release successors
+```
+
+The existing ownership states remain useful: a waiting node can be `available`
+but not `ready`. Reads MUST expose both state and readiness, unresolved edges,
+and a bounded blocking-path explanation. Waiting nodes consume neither a Claim
+charge nor a worker slot. Their age/position remains unchanged when they become
+ready; already claimed nodes do not block independent ready nodes.
+
+#### Atomic graph admission
+
+`work_queue_submit` MAY stage one node or a bounded array of graph nodes. Trusted
+processing resolves local node handles to deterministic Work IDs scoped by
+`(graph_id, node_key)`, validates all references, and commits the graph extension
+atomically. Resolve forward references within the same submission before checking
+the DAG; do not require clients to find a fragile submission order.
+
+All Work edges MUST reference an existing node in that graph or one included in
+the same admission commit. Reject missing nodes, self-edges, duplicate node keys,
+inconsistent idempotent resubmissions, and cycles with a concrete cycle path.
+Persist resolved immutable edges on each Work. Adding new nodes is allowed;
+rewiring an existing node, silently replacing its dependencies, or accepting a
+promise that a missing predecessor will be submitted later is not.
+
+Idempotency is scoped to the graph/node identity and its immutable definition,
+not a global payload-only hash: identical task payloads in distinct nodes may
+have different predecessors. Repeating the same node preserves its admission
+position and must not reset priority, dependencies, result, or accounting debt.
+
+One graph stays in one queue/pool in the first release. Different profiles can
+execute its ready nodes, but they share the graph's authorized accounting
+identity unless policy explicitly authorizes otherwise. Graph IDs, node counts,
+and fan-out do not create new entitlement. Queue-to-queue Work dependencies and
+an additional fairness level are outside scope; external GitHub references are
+supported as described below.
+
+#### Fork, join, and data flow
+
+For `prepare -> {analyze-a, analyze-b} -> summarize`, the root is initially ready,
+the two analyses become ready after `prepare` publishes its Result, and the join
+waits for **both** analysis Results. The analyses may share one worker assignment
+when profiles/limits permit. A parent and its not-yet-ready child cannot be
+speculatively claimed together merely to fill a batch.
+
+An agent can construct the DAG, choose plans/profiles within policy, and add
+new downstream nodes after examining results. It cannot waive predecessors,
+grant readiness, or substitute a snapshot's predicted node for the fresh winner.
+The trusted binder injects only the selected node's declared predecessor result
+references, alongside its immutable payload and assignment handle.
+
+Results use bounded, validated data or immutable artifact references with native
+run provenance and digests where available. Do not put secrets or large result
+blobs in the transaction log. Missing/deleted/unreadable artifacts are explicit
+input-resolution errors, not an empty successful result. A result descriptor is
+immutable; conflicting re-publication fails.
+
+#### Completion is not yet dependency success
+
+Completion protects ownership **before** ordinary safe-output effects execute.
+Therefore it cannot alone release a dependent. Trusted processing appends
+`Result` only after that Claim's scoped effects pass succeeds and its declared
+outputs are available. A successful no-write task still passes the verified
+result step; it may publish an empty result descriptor.
+
+If a worker crashes after Completion but before effects/result verification,
+the node remains completed but its successors report
+`dependency_result_unavailable`. They do not run on nonexistent outputs. If
+verified outputs were delivered but only the Result publication failed, trusted
+recovery MAY append the same Result after independently re-verifying its evidence;
+it must not infer delivery from Completion or replay external writes blindly.
+
+Within a multi-Claim worker, publish successful members' Results independently.
+One failed/unfinished member blocks only successors requiring that member, not
+an unrelated completed branch. The native worker slot remains reserved until
+its run terminates, even when its Results already unblock later dispatches.
+
+WorkCancellation causes dependent readiness to report `dependency_failed`,
+including the ancestor path; it does not pretend success or silently cancel all
+descendants. Retryable ClaimCancellation leaves the parent Work available.
+Permanent attempt exhaustion must use an explicit trusted WorkCancellation.
+Blocked descendants remain inspectable until explicitly cancelled or new
+replacement nodes are admitted; terminal histories/edges are never rewritten.
+
+### 7.16 First-class cross-repository Issue and PR dependencies
+
+The DAG has two vertex types: schedulable Work nodes and externally observed
+GitHub resource gates. An Issue/PR can also be a Work node's `subject`, but linking
+that subject does not mean “wait until it is closed.” Dependencies carry explicit
+conditions; subjects identify what the task operates on.
+
+If queued Work creates a new Issue/PR, its verified Result supplies the typed
+resource identity. An agentic dispatcher can then admit downstream nodes using
+that identity. Version 1 does not guess future numbers or accept an unresolved
+resource placeholder as an already-ready dependency.
+
+Typed example:
+
+```json
+{
+  "graph_id": "release-check",
+  "node_key": "publish",
+  "subject": {
+    "kind": "pull_request",
+    "host": "github.com",
+    "repository": "example/app",
+    "number": 42
+  },
+  "depends_on": [
+    {"kind": "work", "node_key": "build"},
+    {
+      "kind": "issue",
+      "host": "github.com",
+      "repository": "example/design",
+      "number": 7,
+      "condition": "completed"
+    },
+    {
+      "kind": "pull_request",
+      "host": "github.com",
+      "repository": "example/library",
+      "number": 81,
+      "condition": "merged"
+    }
+  ]
+}
+```
+
+These repositories/numbers are illustrative. Work edges resolve inside the
+graph; Issue/PR edges can target other explicitly allowed repositories. Normal
+UI views render fully qualified clickable resource links and preserve the
+Issue-versus-PR type even though GitHub shares their number namespace.
+
+#### Explicit condition semantics
+
+Version 1 supports a deliberately small condition set:
+
+| Vertex / condition | Satisfying trusted evidence |
+|---|---|
+| Work predecessor | Its effective Claim completed and its verified Result was published |
+| Issue / `completed` (default) | Exact Issue resource is closed with `state_reason: completed` |
+| Issue / `closed` (explicit) | Exact Issue resource is closed, regardless of closure reason |
+| PR / `merged` (default) | Exact Pull Request API resource reports `merged: true` with merge provenance |
+
+An Issue closed as not planned/duplicate does not satisfy `completed`; a PR
+closed without merging does not satisfy `merged`. Missing/null fields needed
+for the chosen predicate are `unknown`, not successful compatibility defaults.
+Comments, task-list checkmarks, labels, a commit message mentioning the number,
+or an agent saying “this is done” do not establish these predicates. GitHub's
+Issues endpoints can return PRs, so the resolver MUST validate resource type and
+use the Pull Request endpoint for merge status. [G2], [G3]
+
+External vertices are gates, not synthetic Claims: they incur no service charge
+or runner reservation. They are first-class in read/explain/trace views and have
+their own readiness, observation identity, and failure reason.
+
+Issue/PR dependency support is distinct from `storage: issues`. It does not move
+queue authority into resource bodies/comments: scheduling, edges, results, and
+observations still use the same canonical Git transaction log.
+
+#### Stable identity and permissions
+
+At admission, a trusted resolver validates the configured host/repository,
+positive number, resource type, immutable repository/resource IDs, and access
+scope. Store display coordinates alongside the resolved IDs. A rename/redirect
+may be followed only within approved host/repository scope and must preserve
+the expected identity. A transfer, mismatched type/ID, or newly unauthorized
+destination produces an explicit error; do not silently retarget the edge.
+
+Use opaque node IDs or lossless canonical strings for persistent identities,
+not JavaScript floating-point coercion of arbitrary API integer IDs. The gate's
+identity includes its predicate: `issue/completed` and `issue/closed` are distinct
+conditions even when one authenticated resource read can service both.
+
+The compiler's dependency-read allowlist and credential mapping govern cross-repo
+access. Prefer read-only, repository-scoped GitHub App installation credentials
+for foreign private repositories. The queue repository's `GITHUB_TOKEN` must not
+be assumed to grant access to other repositories. Keep Git queue publication
+credentials separate from foreign metadata-read credentials. Never give either
+to the agent's snapshot MCP process. [G4]
+
+A cross-repo reference grants neither foreign mutation permissions nor
+cross-repo worker dispatch rights. Existing approved-worker and safe-output
+permission boundaries remain in force. Unknown/deleted/inaccessible resources,
+401/403/404, rate limits, network failures, and host identity errors never imply
+“closed” or “merged.”
+
+#### Observations in the same transaction log
+
+Trusted readers normalize GitHub metadata into an `Observation` operation:
+resolved resource identity, condition, `ready`/`waiting`/`failed`/`unknown`,
+observation timestamp, source update time/version where available, and sanitized
+read-status/evidence fields. Store only fields needed for the predicate, not full
+bodies, comments, tokens, or an agent's reasoning.
+
+Readers deduplicate shared resource checks across nodes. Events may wake a
+dispatcher, but webhook/agent payloads are hints: re-read the exact authorized
+resource before recording authoritative readiness. Every accepted observation
+is in `work-queue.jsonl`; no label, webhook cache, or external poller's memory
+becomes a second authority.
+
+Before admitting Claims with external edges, trusted processing refreshes their
+conditions and binds the accepted observation IDs into the decision. It MAY
+reuse a trusted observation within the installed bounded
+`max-observation-age` policy only if there is no known invalidation; validate
+identity/condition/age on every use. On a failed required refresh, record
+`unknown`/a sanitized failure and block that node rather than reuse a success
+indefinitely. A CAS conflict regenerates the decision and rechecks the freshness
+budget; observations and their selected Claims can share one atomic commit.
+
+Offline replay recomputes readiness from those logged observations and the
+decision timestamp; it does not call GitHub. Explain views show exactly which
+Issue/PR observation each Claim used and which edge currently blocks a node.
+If dependencies are unreadable, unrelated ready nodes may still proceed, but
+receipts must surface `external_unavailable`, not claim the whole queue is empty.
+
+#### Mutable resources and guarantee boundary
+
+Issues can reopen and previously failed PR gates can later change. New trusted
+observations supersede earlier gate readiness for **future** admission; they do
+not rewrite past decisions or retroactively revoke an assigned Claim. A gate
+reported `failed` means its observed condition was not met, not that every
+dependent Work was automatically terminally cancelled.
+
+This is admission against bounded-age authoritative observations, not an atomic
+transaction spanning GitHub repositories and the queue branch. The resource
+can change immediately after it is read. Work that requires a stronger
+execution-time condition must revalidate that domain condition before its
+effects; queue assignment alone does not promise a remote Issue will remain
+closed. Trace the observation time and policy age rather than imply global
+real-time consistency.
+
+Cycle validation covers immutable Work edges. The queue cannot statically prove
+that an agent's future external effect will not create an indirect wait cycle,
+such as Work waiting for an Issue closure that only that same Work would cause.
+Use dependency subjects/blocking-path diagnostics to make such deadlocks visible;
+do not execute a blocked node to “resolve” its own prerequisite.
+
 ## 8. Validation and evaluation plan
 
 ### 8.1 Small design experiments performed for this report
@@ -877,12 +1149,26 @@ The causal/late-binding checks use a small disposable model, not a complete impl
 ### 8.2 Required automated acceptance cases
 
 The successor model is [`FairWorkQueue.tla`](FairWorkQueue.tla), integrated into
-[`check.sh`](check.sh). On 2026-10-05 its four positive configurations exhausted
-9,612 distinct states in total; five deliberate negative controls and two
+[`check.sh`](check.sh). Before the DAG extension, commit `f50550e8dc`'s four positive
+configurations exhausted 9,612 distinct states in total on 2026-10-05; five
+deliberate negative controls and two
 guarded witnesses returned exactly their expected results. In particular, one
 worker can hold several Claims and reach a state where one is completed while
-another is open, without authorizing that open Claim's effects. See the
+another is open, without authorizing that open Claim's effects. The updated suite
+adds ready-frontier, verified Result, cycle, and Issue/PR observation checks:
+eight positive configurations exhaust 157,130 distinct states; ten negative
+controls and three guarded reachability witnesses have named expected outcomes.
+The diamond witness uses a successful-action subset rather than exhaustive
+diamond failure interleavings. See the
 [verification scope and reproduction instructions](README.md#successor-mandatory-fair-scheduling-and-batched-workers).
+
+**The complete combined suite is not fully verified.** The additional
+`FairDAGGitHub` composition search and unchanged original `QueueOrdering`
+search were stopped before exhaustion after 588,795 and 109,949,148 distinct
+states respectively. Neither reported a violation, but that is not a pass.
+Their original bounds, configurations, logs, and checkpoints remain available.
+The exhausted cases and explicit negative/witness outcomes are the verified
+scope of this change.
 
 | Area | Acceptance criterion |
 |---|---|
@@ -921,8 +1207,21 @@ another is open, without authorizing that open Claim's effects. See the
 | No-grant semantics | No-op evaluations neither charge nor write empty commits; backlog/capacity/delay reasons are distinct |
 | Explain/trace parity | The stored prefix reproduces the receipt's winner and reason with or without OTLP; multi-Claim operation positions are unambiguous |
 | Trace trust/privacy | Agent trace/provenance overrides are rejected; payloads do not leak and IDs are not metric labels |
+| DAG admission | Atomic forward-reference resolution; missing/self/cyclic/conflicting edges reject with an actionable path |
+| Ready frontier | Only nodes whose complete predecessor set has verified Results receive Claims; blocked roots do not consume service |
+| Fork/join | A fork permits parallel sibling Claims; a join waits for every sibling, including after partial worker completion |
+| Result barrier | Completion without verified effect/output delivery never releases a dependent; verified recovery can publish the same result without rerunning effects |
+| Typed foreign resources | Issue versus PR/host/repository/immutable ID checks fail closed; reference alone gives no foreign write/dispatch privilege |
+| GitHub conditions | Completed Issue/merged PR can unblock; unplanned Issue, closed-unmerged PR, unknown/error/stale response cannot satisfy the default conditions |
+| Mutable observations | Reopening/invalidation blocks future admission without rewriting prior Claims; trace the exact observation IDs/times |
 
-The successor TLA+ model covers causal atomic admission, Claim-derived charge/logical capacity, shared native capacity, per-handle closure/effects, and conflict regeneration within its documented bounds. Further refinement must cover full request fingerprints, dynamic arrivals, multi-profile packing, policy changes, and parser/transport behavior. Model-check ownership/capacity/charge safety separately from scheduling liveness. Add temporal fairness assumptions only where they describe actual opportunities: fairness of scheduler actions cannot make an unavailable runner or a forever-running job finish.
+The successor TLA+ model covers bounded causal admission, ready-frontier Work
+dependencies, verified-delivery/Result barriers, normalized Issue/PR gates,
+logical/native capacity, per-handle closure/effects, and conflict regeneration.
+Further refinement must cover dynamic graph admission, full request fingerprints,
+multi-profile packing, observation freshness and actual GitHub credentials/APIs,
+policy changes, and parser/transport behavior. Model-check safety separately from
+liveness; fairness of scheduling cannot make a failed prerequisite succeed.
 
 Bounded checks do not imply an unbounded proof or runtime refinement. The current model documentation already makes that distinction. [R14], [R16]
 
@@ -954,9 +1253,9 @@ This research intentionally changes no repository implementation. A follow-up im
 
 | Surface | Expected work |
 |---|---|
-| `specs/work-queue/transactions.tsp` and emitted schemas | One current-only QueueCommit envelope/operation contract shared by runtime and operators; required metadata and stable request semantics |
+| `specs/work-queue/transactions.tsp` and emitted schemas | One current-only QueueCommit contract with Work edges, typed subjects, Result/Observation evidence, and stable request semantics |
 | `work_queue_codemods.cjs` and protocol-upgrade documentation | Remove old-record loading/automatic upgrades from operational paths; document explicit unsupported-protocol failures |
-| `work_queue_replay.cjs` | One causal-prefix replayer and pure planNext/explanation function; Claim-derived accounting and exact integer ticks |
+| `work_queue_replay.cjs` | Causal-prefix replay, cycle/reference checks, ready-frontier/result/observation predicates, one selector/explanation engine, exact ticks |
 | `work_queue_store.cjs` | One checked QueueCommit publication path, regenerated atomic batches, stable request recovery |
 | `dispatch_workflow.cjs` or new trusted queue-dispatch handler | Policy-selected Work/target, reserved dispatch, binding/reconciliation |
 | `work_queue_issues_store.cjs` | Reject queue operation until the backend can enforce equivalent mandatory scheduling serialization |
@@ -966,15 +1265,21 @@ This research intentionally changes no repository implementation. A follow-up im
 | `pkg/workqueue/` and `pkg/cli/work_command.go` | Shared envelope/selection fixtures, current-only records, explain/trace views, no direct-claim bypass; preserve configured authority boundaries |
 | `pkg/cli/logs_work_queue*.go` and summaries | Bounded request/Claim receipts, stable statuses, current-protocol validation, escaped diagnostics |
 | `otlp.cjs`, `aw_context.cjs`, and trusted worker binder | Reuse phase spans/context; correlate request/commit/Claim/run without promising unsupported span-parent behavior |
+| Trusted dependency resolver and credential mapping | Deduplicated allowlisted cross-repo metadata reads, normalized observations, bounded freshness, explicit failures |
 | ADR, TLA+, fixtures, tests, `.github/aw/work-queue.md` | Guarantee boundaries, negative controls, restart/concurrency/compaction coverage |
 
-Development can be staged internally, but the release gate MUST include mandatory scheduling, current-only validation, restart/concurrency correctness, reservation recovery, and capacity limits together. No operational advisory-only or unscheduled intermediate queue is supported. Historical usage accounting, dependency scheduling, DRF, runtime-aware reservations/backfilling, and safe preemption are separate later capabilities.
+The release gate includes mandatory DAG scheduling, current-only validation,
+ready-frontier/result/observation correctness, batched closure/effect isolation,
+restart/concurrency correctness, recovery, and capacity limits. There is no
+advisory-only or unscheduled intermediate queue. Historical usage accounting,
+critical-path optimization, DRF, runtime-aware backfilling, and preemption remain
+separate later capabilities.
 
 ## 10. Research limits and unresolved engineering questions
 
 The recommendation is concrete, but several items require implementation-specific decisions and proof:
 
-1. The wire schema/runtime are proposals. The successor checks a bounded abstract causal-prefix and batched-closure model, not complete JSON validation, dynamic arrivals, multi-profile packing, transport idempotency, or compaction equivalence.
+1. The wire schema/runtime are proposals. The successor checks abstract causal-prefix, DAG/readiness, normalized external gates, and batched closure; dynamic graph admission, JSON validation, actual cross-repo identity/permissions/freshness, packing, transport, and compaction refinement remain obligations.
 2. The current Git backend's freshness/ref semantics must be validated under actual concurrent publication, including ambiguous responses.
 3. Run correlation and recovery after “launch accepted, binding not persisted” need a supported GitHub Actions mechanism. Older dispatch APIs may not return run details.
 4. The proposed dynamic-key, integer-tick hierarchy, and eligibility rules need conformance checks and are not covered wholesale by the original stride algorithm's theorems; live weight rebasing is outside version 1.
@@ -982,6 +1287,7 @@ The recommendation is concrete, but several items require implementation-specifi
 6. There is no evidence here that the suggested class weights or outstanding defaults are optimal for gh-aw workloads.
 7. Staged intents cannot return durable grants to the agent in the same turn under the current job topology; a live acquire-response design would be a different execution boundary.
 8. Existing OTLP plumbing supplies correlation but not the exact grant-span context; causal span links may need a small separate helper extension if later required.
+9. Cross-repository dependency reads are not atomic with queue publication; the stated freshness/admission semantics must not be marketed as global live consistency.
 
 Primary manuals and open author/institutional papers were preferred. Publisher metadata was checked for key bibliographic identities. Several initial search results contained incorrect DOI/arXiv associations; these were corrected before inclusion. Some publisher full text was inaccessible. HEFT, EASY, and the Mu'alem/Feitelson article are used through verified bibliographic identities and corroborating system/survey material; the report does not claim to have rerun their published experiments.
 
@@ -1037,6 +1343,9 @@ All file sources use commit `81891f23dfb58b88bd90c9736887880234bffbe5`.
 | H11 | [Slurm: Job Array Support][H11]. Per-array simultaneous-task limits and ordinary job limits. |
 | G1 | [GitHub Actions: Control workflow and job concurrency][G1]. Concurrency groups and pending queues are an additional execution-layer mechanism, not this queue's accounting policy. |
 | O1 | [OpenTelemetry: Traces][O1]. Context propagation, parent spans, attributes, events, and asynchronous span links; retrieved 2026-10-05. |
+| G2 | [GitHub REST Issues][G2]. Issue `state_reason`, resource identity, and PR records returned by Issues endpoints. |
+| G3 | [GitHub REST Pull Requests][G3]. Exact PR identity/merge state; do not infer merge from issue closure. |
+| G4 | [GitHub Actions token authentication][G4]. Least-privilege tokens and GitHub App credentials for permissions unavailable to the workflow token. |
 
 ### Research literature
 
@@ -1090,6 +1399,9 @@ All file sources use commit `81891f23dfb58b88bd90c9736887880234bffbe5`.
 [H11]: https://slurm.schedmd.com/job_array.html
 [G1]: https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
 [O1]: https://opentelemetry.io/docs/concepts/signals/traces/
+[G2]: https://docs.github.com/en/rest/issues/issues#get-an-issue
+[G3]: https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+[G4]: https://docs.github.com/en/actions/tutorials/authenticate-with-github_token
 [L1]: https://doi.org/10.1007/3-540-60153-8_35
 [L2]: https://doi.org/10.1109/71.932708
 [L3]: https://doi.org/10.1109/IPDPS.2006.1639387

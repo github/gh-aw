@@ -26,6 +26,7 @@ run_model() {
     local kind="${3:-Invariant}"
     local expected_status="${4:-12}"
     local module="${5:-WorkQueue}"
+    local expected_message="${6:-$kind $violation is violated}"
     if [ -n "${TLC_MODEL_FILTER:-}" ] && [ "$module" != "$TLC_MODEL_FILTER" ]; then
         return
     fi
@@ -44,7 +45,7 @@ run_model() {
             cat "$output" >&2
             return 1
         fi
-    elif [ "$status" -ne "$expected_status" ] || ! grep -q "$kind $violation is violated" "$output"; then
+    elif [ "$status" -ne "$expected_status" ] || ! grep -Fq "$expected_message" "$output"; then
         cat "$output" >&2
         echo "Expected a $violation counterexample, not success or a tooling failure." >&2
         return 1
@@ -64,13 +65,25 @@ run_model FairBatch "" Invariant 0 FairWorkQueue
 run_model FairThreeClaim "" Invariant 0 FairWorkQueue
 run_model FairPriority "" Invariant 0 FairWorkQueue
 run_model FairStrict "" Invariant 0 FairWorkQueue
+run_model FairDAGChain "" Invariant 0 FairWorkQueue
+run_model FairDAGForward "" Invariant 0 FairWorkQueue
+run_model FairDAGFork "" Invariant 0 FairWorkQueue
+run_model FairDAGGitHub "" Invariant 0 FairWorkQueue
+run_model FairGitHubDependencies "" Invariant 0 FairWorkQueue
 run_model BrokenBatchSelection DecisionValidity Invariant 12 FairWorkQueue
 run_model BrokenClaimEffects EffectAuthorization Invariant 12 FairWorkQueue
 run_model BrokenAssignmentHandle ClaimClosureAuthority Invariant 12 FairWorkQueue
 run_model BrokenBatchCAS TerminalPersistence Invariant 12 FairWorkQueue
 run_model BrokenBatchRelease RunReleaseAuthority Invariant 12 FairWorkQueue
+run_model BrokenDAGDependency DependencyAuthorization Invariant 12 FairWorkQueue
+run_model BrokenDAGResult ResultEffectSoundness Invariant 12 FairWorkQueue
+run_model BrokenDAGCycle DAGValidity Invariant 151 FairWorkQueue \
+    "The invariant of DAGValidity is equal to FALSE"
+run_model BrokenExternalDependency ExternalAuthorization Invariant 12 FairWorkQueue
+run_model BrokenPRClosedAsMerged ExternalTruth Invariant 12 FairWorkQueue
 run_model BatchedAssignmentWitness NoBatchedAssignment Invariant 12 FairWorkQueue
 run_model PartialCompletionWitness NoPartialCompletion Invariant 12 FairWorkQueue
+run_model DAGJoinWitness NoJoinClaim Invariant 12 FairWorkQueue
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1

@@ -2,13 +2,51 @@
 EXTENDS Naturals, Integers, FiniteSets, Sequences, TLC
 
 CONSTANTS WorkCount, DispatcherCount, MaxBatch, ClaimLimit, RunLimit,
-          KeyLimit, RetryLimit, MaxLog, Mode
+          KeyLimit, RetryLimit, MaxLog, Mode, Dependencies, ExternalDependencies
 ASSUME /\ WorkCount \in Nat \ {0} /\ DispatcherCount \in Nat \ {0}
        /\ MaxBatch \in Nat \ {0} /\ ClaimLimit \in Nat \ {0}
        /\ RunLimit \in Nat \ {0} /\ KeyLimit \in Nat \ {0}
        /\ RetryLimit \in Nat /\ MaxLog \in Nat \ {0}
        /\ Mode \in {"default", "weighted", "strict"}
 Works == 1..WorkCount
+IndependentDependencies == [w \in Works |-> {}]
+ChainDependencies == [w \in Works |-> IF w = 1 THEN {} ELSE {w - 1}]
+ForwardDependencies == [w \in Works |-> IF w = 1 THEN {2} ELSE {}]
+ForkDependencies == [w \in Works |-> IF w = 1 THEN {} ELSE {1}]
+DiamondDependencies ==
+    [w \in Works |-> IF w = 1 THEN {} ELSE IF w = 4 THEN {2, 3} ELSE {1}]
+CyclicDependencies == [w \in Works |-> IF w = 1 THEN {2} ELSE {1}]
+NoExternalDependencies == [w \in Works |-> {}]
+GitHubDependencies == [w \in Works |-> {1, 2}]
+GitHubChildDependencies == [w \in Works |-> IF w = WorkCount THEN {1, 2} ELSE {}]
+Resources == UNION {ExternalDependencies[w] : w \in Works}
+WorkVertex(w) == [kind |-> "work", node |-> w]
+ResourceRef(e) ==
+    [kind |-> IF e = 1 THEN "issue" ELSE "pull_request",
+     host |-> "github.example", repository |-> IF e = 1 THEN "design" ELSE "library",
+     number |-> e, identity |-> e]
+DependencyVertices(w) ==
+    {WorkVertex(v) : v \in Dependencies[w]}
+    \cup {ResourceRef(e) : e \in ExternalDependencies[w]}
+ResourceStatuses(e) ==
+    IF ResourceRef(e).kind = "issue" THEN {"open", "closed_completed", "closed_unplanned", "unavailable"}
+    ELSE {"open", "merged", "closed_unmerged", "unavailable"}
+NormalizeResource(e, status) ==
+    IF (ResourceRef(e).kind = "issue" /\ status = "closed_completed")
+       \/ (ResourceRef(e).kind = "pull_request" /\ status = "merged")
+    THEN "ready" ELSE IF status = "unavailable" THEN "unknown"
+    ELSE IF status = "open" THEN "waiting" ELSE "failed"
+Edges == {e \in Works \X Works : e[1] \in Dependencies[e[2]]}
+RECURSIVE Reach(_)
+Reach(n) ==
+    IF n = 0 THEN Edges
+    ELSE Reach(n - 1) \cup
+         {e \in Works \X Works : \E v \in Works :
+             <<e[1], v>> \in Reach(n - 1) /\ <<v, e[2]>> \in Edges}
+DAGValidity ==
+    /\ Dependencies \in [Works -> SUBSET Works]
+    /\ ExternalDependencies \in [Works -> SUBSET (1..2)]
+    /\ \A w \in Works : w \notin Dependencies[w] /\ <<w, w>> \notin Reach(WorkCount)
 Groups == 1..DispatcherCount
 Claims == 1..(WorkCount * DispatcherCount)
 Class(w) == IF Mode = "default" THEN 1 ELSE IF w = 1 THEN 1 ELSE 2
@@ -27,6 +65,8 @@ OpenRuns(s) == {g \in Groups : s.run[g] \in {"reserved", "started", "bound", "te
 KeyOpen(s, k) == {c \in OpenClaims(s) : Key(WorkOf(c)) = k}
 Eligible(s) ==
     {w \in Works : s.ws[w] = "available"
+        /\ Dependencies[w] \subseteq s.results
+        /\ (\A e \in ExternalDependencies[w] : s.external[e] = "ready")
         /\ Cardinality(OpenClaims(s)) < ClaimLimit
         /\ Cardinality(KeyOpen(s, Key(w))) < KeyLimit}
 Classes(s) == {Class(w) : w \in Eligible(s)}
@@ -61,7 +101,9 @@ Empty ==
      members |-> [g \in Groups |-> <<>>], run |-> [g \in Groups |-> "absent"],
      cp |-> [p \in 1..2 |-> 0], kp |-> [p \in 1..2 |-> [k \in 1..2 |-> 0]],
      cv |-> 0, kv |-> [p \in 1..2 |-> 0], ca |-> {},
-     ka |-> [p \in 1..2 |-> {}], charges |-> [k \in 1..2 |-> 0]]
+     ka |-> [p \in 1..2 |-> {}], charges |-> [k \in 1..2 |-> 0],
+     results |-> {}, external |-> [e \in 1..2 |-> "unknown"],
+     raw |-> [e \in 1..2 |-> "unavailable"], reads |-> [e \in 1..2 |-> 0]]
 ApplyOp(s, t, position) ==
     LET c == t.claim
         g == t.group
@@ -83,6 +125,10 @@ ApplyOp(s, t, position) ==
        [] t.kind = "Bound" -> [s EXCEPT !.run[g] = "bound"]
        [] t.kind = "Terminated" -> [s EXCEPT !.run[g] = "terminal"]
        [] t.kind = "Release" -> [s EXCEPT !.run[g] = "released"]
+       [] t.kind = "Result" -> [s EXCEPT !.results = @ \cup {w}]
+       [] t.kind = "Observe" ->
+            [s EXCEPT !.external[c] = IF g = 1 THEN "ready" ELSE NormalizeResource(c, t.value),
+                      !.raw[c] = t.value, !.reads[c] = @ + 1]
        [] OTHER -> s
 RECURSIVE ApplyOps(_, _, _), Replay(_), Plan(_, _, _), ValidOps(_, _)
 ApplyOps(s, ops, position) ==
@@ -107,7 +153,9 @@ ValidOps(s, ops) ==
                     /\ s.cs[t.claim] = "absent")
             /\ ValidOps(ApplyOp(s, t, 0), Tail(ops))
 
+\* Work edges and foreign Issue/PR references are immutable within this model.
 \* Policy is a fixed epoch. Close abstracts Completion or ClaimCancellation.
+\* Observe abstracts a trusted exact-resource GitHub metadata read.
 \* One group abstracts one approved worker profile and its actual bound run.
 \* Claims are individually charged; a group's native run slot survives closure.
 VARIABLES log, head, pending, worker, intents, handled, authorized, effects, completed
@@ -171,8 +219,28 @@ Finalize(g, c) ==
 Effect(g, c) ==
     /\ worker[g] = "finalizing" /\ c \in Members(State, g) /\ c \in authorized
     /\ \A i \in 1..Len(effects) : effects[i][2] # c
-    /\ effects' = Append(effects, <<g, c>>)
+    /\ effects' = Append(effects, <<g, c, "pending">>)
     /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, completed>>
+VerifyDelivery(g, c) ==
+    /\ worker[g] = "finalizing" /\ State.run[g] = "bound" /\ c \in authorized
+    /\ \E i \in 1..Len(effects) :
+         /\ effects[i] = <<g, c, "pending">>
+         /\ effects' = [effects EXCEPT ![i] = <<g, c, "verified">>]
+    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, completed>>
+PublishResult(g, c) ==
+    /\ worker[g] = "finalizing" /\ State.run[g] = "bound"
+    /\ c \in Members(State, g) /\ State.cs[c] = "completed"
+    /\ WorkOf(c) \notin State.results
+    /\ \E i \in 1..Len(effects) : effects[i] = <<g, c, "verified">>
+    /\ AppendOps(<<Op("Result", g, c, 0)>>)
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
+RepairResult(g, c) ==
+    /\ worker[g] = "terminal" /\ State.run[g] \in {"terminal", "released"}
+    /\ c \in Members(State, g) /\ State.cs[c] = "completed"
+    /\ WorkOf(c) \notin State.results
+    /\ \E i \in 1..Len(effects) : effects[i] = <<g, c, "verified">>
+    /\ AppendOps(<<Op("Result", g, c, 0)>>)
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
 Terminate(g) ==
     /\ worker[g] = "finalizing" /\ Members(State, g) \subseteq handled
     /\ AppendOps(<<Op("Terminated", g, 0, 0)>>)
@@ -192,14 +260,21 @@ Release(g) ==
     /\ State.run[g] = "terminal" /\ Members(State, g) \cap OpenClaims(State) = {}
     /\ AppendOps(<<Op("Release", g, 0, 0)>>)
     /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
+Observe(e, status) ==
+    /\ e \in Resources /\ status \in ResourceStatuses(e) /\ State.reads[e] < 2
+    /\ AppendOps(<<Op("Observe", 0, e, status)>>)
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
 Next ==
     \/ \E g \in Groups : Prepare(g) \/ Push(g) \/ Retry(g) \/ Launch(g) \/ Bind(g)
                          \/ BeginFinalize(g) \/ Terminate(g) \/ Crash(g) \/ Release(g)
     \/ \E g \in Groups, c \in Claims :
-         Finalize(g, c) \/ Effect(g, c) \/ Recover(g, c)
+         Finalize(g, c) \/ Effect(g, c) \/ VerifyDelivery(g, c)
+         \/ PublishResult(g, c) \/ RepairResult(g, c) \/ Recover(g, c)
          \/ \E outcome \in {"completed", "cancelled"} : FinishIntent(g, c, outcome)
+    \/ \E e \in Resources : \E status \in ResourceStatuses(e) : Observe(e, status)
 Spec == Init /\ [][Next]_vars
 Bound == Len(log) <= MaxLog
+OneObservationPerResource == \A e \in Resources : State.reads[e] <= 1
 CausalChain ==
     /\ head = Last(log).id
     /\ \A i \in 2..Len(log) : log[i].previous = log[i - 1].id
@@ -240,6 +315,36 @@ RunReleaseAuthority ==
       IN t.kind = "Release" =>
          /\ before.run[t.group] = "terminal"
          /\ Members(before, t.group) \cap OpenClaims(before) = {}
+DependencyAuthorization ==
+    \A i \in 1..Len(log) : \A j \in 1..Len(log[i].ops) :
+      LET t == log[i].ops[j]
+          before == ApplyOps(Replay(SubSeq(log, 1, i - 1)),
+                             SubSeq(log[i].ops, 1, j - 1), i * (WorkCount + 1))
+      IN t.kind = "Claim" => Dependencies[WorkOf(t.claim)] \subseteq before.results
+ResultAuthority ==
+    \A i \in 1..Len(log) : \A j \in 1..Len(log[i].ops) :
+      LET t == log[i].ops[j]
+          before == ApplyOps(Replay(SubSeq(log, 1, i - 1)),
+                             SubSeq(log[i].ops, 1, j - 1), i * (WorkCount + 1))
+      IN t.kind = "Result" =>
+         /\ t.group = GroupOf(t.claim) /\ t.claim \in Members(before, t.group)
+         /\ before.cs[t.claim] = "completed"
+         /\ before.run[t.group] \in {"bound", "terminal", "released"}
+         /\ WorkOf(t.claim) \notin before.results
+ResultEffectSoundness ==
+    \A w \in State.results :
+       /\ State.ws[w] = "completed" /\ State.cs[State.owner[w]] = "completed"
+       /\ \E i \in 1..Len(effects) :
+            effects[i] = <<GroupOf(State.owner[w]), State.owner[w], "verified">>
+ExternalAuthorization ==
+    \A i \in 1..Len(log) : \A j \in 1..Len(log[i].ops) :
+      LET t == log[i].ops[j]
+          before == ApplyOps(Replay(SubSeq(log, 1, i - 1)),
+                             SubSeq(log[i].ops, 1, j - 1), i * (WorkCount + 1))
+      IN t.kind = "Claim" =>
+         \A e \in ExternalDependencies[WorkOf(t.claim)] : before.external[e] = "ready"
+ExternalTruth ==
+    \A e \in Resources : State.external[e] = NormalizeResource(e, State.raw[e])
 TypeOK ==
     /\ head \in Nat \ {0} /\ log # <<>>
     /\ State.ws \in [Works -> {"absent", "available", "claimed", "completed"}]
@@ -253,6 +358,9 @@ TypeOK ==
     /\ intents \in [Claims -> {"none", "completed", "cancelled"}]
     /\ handled \subseteq Claims /\ authorized \subseteq completed
     /\ completed \subseteq Claims
+    /\ State.results \subseteq Works
+    /\ State.external \in [1..2 -> {"unknown", "waiting", "ready", "failed"}]
+    /\ State.reads \in [1..2 -> 0..2]
 Ownership ==
     /\ \A w \in Works :
          Cardinality({c \in OpenClaims(State) : WorkOf(c) = w}) <= 1
@@ -279,16 +387,39 @@ EffectAuthorization ==
        LET g == effects[i][1] c == effects[i][2]
        IN /\ g = GroupOf(c) /\ c \in authorized /\ State.cs[c] = "completed"
 TerminalPersistence == \A c \in completed : State.cs[c] = "completed"
-Safety == TypeOK /\ CausalChain /\ DecisionValidity /\ Capacity /\ ClaimChargeCount /\ RequestOnce
+Safety == TypeOK /\ DAGValidity /\ CausalChain /\ DecisionValidity /\ Capacity /\ ClaimChargeCount /\ RequestOnce
           /\ AssignmentIntegrity /\ NoDuplicateEffects
           /\ ClaimClosureAuthority
           /\ RunReleaseAuthority
+          /\ DependencyAuthorization /\ ResultAuthority /\ ResultEffectSoundness
+          /\ ExternalAuthorization /\ ExternalTruth
           /\ EffectAuthorization /\ TerminalPersistence /\ Ownership
           /\ DefaultFIFO /\ StrictPriority
 NoBatchedAssignment == \A g \in Groups : Len(State.members[g]) <= 1
 NoPartialCompletion ==
     ~(\E g \in Groups : \E a, b \in Members(State, g) :
          State.cs[a] = "completed" /\ State.cs[b] = "open")
+NoJoinClaim == State.ws[WorkCount] # "claimed"
+JoinPrepare(g) ==
+    /\ Prepare(g)
+    /\ CASE g = 1 -> State.ws[1] = "available"
+         [] g = 2 -> 1 \in State.results
+         [] OTHER -> {2, 3} \subseteq State.results
+JoinFinalize(g) ==
+    /\ BeginFinalize(g)
+    /\ \A c \in Members(State, g) : intents[c] = "completed"
+JoinTerminate(g) ==
+    /\ Terminate(g)
+    /\ \A c \in Members(State, g) : WorkOf(c) \in State.results
+JoinNext ==
+    \/ \E g \in Groups :
+         JoinPrepare(g) \/ Push(g) \/ Retry(g) \/ Launch(g) \/ Bind(g)
+         \/ JoinFinalize(g) \/ JoinTerminate(g) \/ Release(g)
+    \/ \E g \in Groups, c \in Claims :
+         FinishIntent(g, c, "completed") \/ Finalize(g, c) \/ Effect(g, c)
+         \/ VerifyDelivery(g, c) \/ PublishResult(g, c)
+\* A guarded success-path subset witnesses reachability, not full coverage.
+JoinWitnessSpec == Init /\ [][JoinNext]_vars
 BrokenSelect(g) ==
     /\ pending[g].phase = "idle" /\ Eligible(State) # {}
     /\ LET w == CHOOSE w \in Eligible(State) : \A v \in Eligible(State) : w >= v
@@ -298,7 +429,7 @@ BrokenSelect(g) ==
 BrokenEffect(g, c) ==
     /\ worker[g] = "finalizing" /\ c \in Members(State, g) /\ c \notin authorized
     /\ Members(State, g) \cap authorized # {}
-    /\ effects' = Append(effects, <<g, c>>)
+    /\ effects' = Append(effects, <<g, c, "pending">>)
     /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, completed>>
 BrokenHandle(g, c) ==
     /\ worker[g] = "finalizing" /\ c \notin Members(State, g) /\ State.cs[c] = "open"
@@ -317,9 +448,35 @@ BrokenRelease(g) ==
     /\ Members(State, g) \cap OpenClaims(State) # {}
     /\ AppendOps(<<Op("Release", g, 0, 0)>>)
     /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
+BrokenDependency(g, w) ==
+    /\ pending[g].phase = "idle" /\ State.ws[w] = "available"
+    /\ ~(Dependencies[w] \subseteq State.results)
+    /\ pending' = [pending EXCEPT ![g].phase = "prepared", ![g].base = head,
+             ![g].source = log, ![g].ops = <<Op("Claim", g, ClaimOf(g, w), 0)>>]
+    /\ UNCHANGED <<log, head, worker, intents, handled, authorized, effects, completed>>
+BrokenResult(g, c) ==
+    /\ worker[g] = "finalizing" /\ State.cs[c] = "completed"
+    /\ c \in Members(State, g) /\ WorkOf(c) \notin State.results
+    /\ \A i \in 1..Len(effects) : effects[i] # <<g, c, "verified">>
+    /\ AppendOps(<<Op("Result", g, c, 0)>>)
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
+BrokenExternal(g, w) ==
+    /\ pending[g].phase = "idle" /\ State.ws[w] = "available"
+    /\ \E e \in ExternalDependencies[w] : State.external[e] # "ready"
+    /\ pending' = [pending EXCEPT ![g].phase = "prepared", ![g].base = head,
+             ![g].source = log, ![g].ops = <<Op("Claim", g, ClaimOf(g, w), 0)>>]
+    /\ UNCHANGED <<log, head, worker, intents, handled, authorized, effects, completed>>
+BrokenPRObservation ==
+    /\ 2 \in Resources /\ State.reads[2] < 2
+    /\ AppendOps(<<Op("Observe", 1, 2, "closed_unmerged")>>)
+    /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
 BrokenSelectionSpec == Init /\ [][Next \/ \E g \in Groups : BrokenSelect(g)]_vars
 BrokenEffectsSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenEffect(g, c)]_vars
 BrokenHandleSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenHandle(g, c)]_vars
 BrokenCASSpec == Init /\ [][Next \/ \E g \in Groups : BrokenPush(g)]_vars
 BrokenReleaseSpec == Init /\ [][Next \/ \E g \in Groups : BrokenRelease(g)]_vars
+BrokenDependencySpec == Init /\ [][Next \/ \E g \in Groups, w \in Works : BrokenDependency(g, w)]_vars
+BrokenResultSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenResult(g, c)]_vars
+BrokenExternalSpec == Init /\ [][Next \/ \E g \in Groups, w \in Works : BrokenExternal(g, w)]_vars
+BrokenPRSpec == Init /\ [][Next \/ BrokenPRObservation]_vars
 =================================================================

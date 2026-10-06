@@ -286,13 +286,27 @@ release that slot. Missing finish intent cancels only that member. Published
 Completions survive recovery, and effects require the same assigned Claim's
 authorization.
 
-The model abstracts a fixed installed policy epoch, one compatible worker profile,
-one dispatch request/group per dispatcher, native run identity as its group
-identity, and canonical causal log order. Work is seeded in the first commit.
-It does not model new arrivals, multi-profile packing, policy edits, idempotency
-fingerprints or replayed transport responses, cryptographic provenance, JSON
-codecs, OTLP delivery, real APIs, or unbounded fairness/liveness. Its Work seed
-positions are causal FIFO positions, not timestamps. The preceding `WorkQueue.tla` checks
+The model has first-class immutable Work dependency sets and normalized external
+Issue/PR gates. Only a verified-delivery `Result` releases a Work successor;
+Completion alone does not. Unknown/unavailable external observations block
+admission, and a closed-unmerged PR does not satisfy its merged predicate.
+
+It abstracts a fixed policy epoch, one compatible worker profile, one request/group
+per dispatcher, native run identity as its group identity, and canonical causal
+log order. Work is seeded in the first commit; immutable graph edges and resolved
+resource identities are model parameters representing its admitted metadata.
+External resources abstract
+an authorized foreign Issue and PR as typed host/repository/number/identity
+references, with at most two observations each. Weighted cases abstract two
+classes and two accounting keys with 2:1 shares; default mode collapses both.
+Effect
+entry and trusted delivery verification are separate observer steps.
+
+It does not model dynamic graph admission, multi-profile packing, policy edits,
+idempotency fingerprints/replayed transport responses, actual GitHub credentials,
+resource IDs, observation freshness, artifact delivery, JSON codecs, OTLP delivery,
+or unbounded fairness/liveness. Work positions are causal FIFO positions.
+The preceding `WorkQueue.tla` checks
 remain regression evidence for the existing implementation, not an operational
 legacy mode in the replacement.
 
@@ -309,15 +323,27 @@ The same `check.sh` additionally runs:
 | `FairThreeClaim.cfg` | One worker receives three Claims and independently completes, cancels, or omits members across crash/recovery interleavings |
 | `FairPriority.cfg` | Weighted class/key decisions and Claim limits hold |
 | `FairStrict.cfg` | Strict class selection with weighted keys holds |
+| `FairDAGChain.cfg` | A dependent is admitted only after its predecessor's verified Result |
+| `FairDAGForward.cfg` | An older child referencing a later-numbered parent waits while that ready parent runs |
+| `FairDAGFork.cfg` | Siblings become independently schedulable after their common predecessor succeeds |
+| `FairDAGGitHub.cfg` | A child needs its Work predecessor and both foreign Issue/PR conditions; bounded to one observation/resource plus checked boundary successors |
+| `FairGitHubDependencies.cfg` | Both Issue-completed and PR-merged observations must satisfy the external gate |
 | `BrokenBatchSelection.cfg` | Deliberately bypass selection; `DecisionValidity` must fail |
 | `BrokenClaimEffects.cfg` | Use another unfinished Claim's effects after one Claim completes; `EffectAuthorization` must fail |
 | `BrokenAssignmentHandle.cfg` | Finish another worker's Claim; `ClaimClosureAuthority` must fail |
 | `BrokenBatchCAS.cfg` | Overwrite from a stale batch snapshot after Completion; `TerminalPersistence` must fail |
 | `BrokenBatchRelease.cfg` | Release a live group's native slot after only some Claims finish; `RunReleaseAuthority` must fail |
+| `BrokenDAGDependency.cfg` | Claim a not-ready successor; `DependencyAuthorization` must fail |
+| `BrokenDAGResult.cfg` | Publish a Result before delivery verification; `ResultEffectSoundness` must fail |
+| `BrokenDAGCycle.cfg` | Cyclic constant graph is rejected during setup with exit 151 and the exact `DAGValidity`-is-FALSE diagnostic, not a parser failure |
+| `BrokenExternalDependency.cfg` | Admit Work with unknown/unsatisfied external gates; `ExternalAuthorization` must fail |
+| `BrokenPRClosedAsMerged.cfg` | Treat a closed-unmerged PR as ready; `ExternalTruth` must fail |
 | `BatchedAssignmentWitness.cfg` | Guarded model reaches a multi-Claim assignment; the deliberately false `NoBatchedAssignment` fails |
 | `PartialCompletionWitness.cfg` | Guarded model reaches one completed and one open member; the deliberately false `NoPartialCompletion` fails |
+| `DAGJoinWitness.cfg` | A success-path subset of guarded actions, with fixed root/sibling/join dispatcher roles, reaches the join after both Results; false `NoJoinClaim` fails |
 
-Successor checks completed on 2026-10-05 with the pinned TLC 2.19/Java 21:
+Before the DAG extension, successor checks completed on 2026-10-05 at commit
+`f50550e8dc` with the pinned TLC 2.19/Java 21:
 `FairBatch` exhausted 4,902 distinct states at depth 17; `FairThreeClaim` exhausted
 4,144 at depth 17; `FairPriority` and `FairStrict` each exhausted 283 at depth 14.
 All five negative controls produced
@@ -325,11 +351,52 @@ their named violations; the guarded batching and partial-completion witnesses
 produced their expected counterexamples without a safety failure. These are
 bounded model checks, not an unbounded proof or runtime conformance result.
 
+The current DAG/result/Issue/PR cases exhaust the following positive state spaces:
+
+| Configuration | Distinct states | Graph depth |
+|---|---:|---:|
+| `FairBatch` | 13,662 | 20 |
+| `FairThreeClaim` | 34,075 | 23 |
+| `FairPriority` | 675 | 17 |
+| `FairStrict` | 675 | 17 |
+| `FairDAGChain` | 13,846 | 24 |
+| `FairDAGForward` | 13,846 | 24 |
+| `FairDAGFork` | 70,602 | 28 |
+| `FairGitHubDependencies` | 9,749 | 14 |
+
+Total exhausted: 157,130 distinct positive states. The ten negative controls require nine
+named invariant violations and one exact constant-cycle setup rejection. The
+three reachability witnesses demonstrate batching, partial completion, and a
+guarded diamond join. `JoinWitnessSpec` restricts to successful root/sibling/join
+roles while using only guarded actions; it proves reachability, not exhaustive
+coverage of all diamond failure/retry interleavings.
+
+**Full-suite verification is incomplete.** Two additional exhaustive searches
+were stopped without reaching exhaustion on 2026-10-05:
+
+| Configuration | Distinct states explored | Last depth | Result |
+|---|---:|---:|---|
+| `FairDAGGitHub` | 588,795 | 14 | No violation observed; not a passed/exhausted check |
+| Existing `QueueOrdering` | 109,949,148 | 18 | No violation observed; not a passed/exhausted check |
+
+These state-space-heavy cases remain in `check.sh`; their bounds were not reduced
+to manufacture a pass. Checkpoints/logs are retained in the session artifacts.
+The other original checks completed, including `WorkQueue` (59,444,361 distinct
+states, depth 35, resumed from its checkpoint), `Recovery` (147,542, depth 20),
+the original negative controls/witness, and `traces.sh`. Passing successor
+checks do not substitute for the two incomplete searches.
+
+Re-run a named case with `TLC_CONFIG_FILTER`. To resume a retained TLC checkpoint,
+use the same jar/model/configuration and worker count with
+`-recover /path/to/checkpoint-directory`; the checks here used two workers.
+
 `Safety` includes state types, single open owner per Work, causal history,
 recomputed selection, logical/native capacities, exact Claim charge counts,
 one dispatch request per group, assignment integrity, one effect authorization
 per Claim, per-handle closure and run-release authority, terminal persistence, and independent
-FIFO/strict-priority assertions. Positive cases must exhaust their bounded state
+FIFO/strict-priority assertions. The DAG extension additionally checks graph
+acyclicity, readiness at each Claim's causal prefix, Result authority/verified
+delivery, and external condition truth/admission. Positive cases exhaust their bounded state
 space; a trace showing partial completion is reachability evidence, not a proof
 that arbitrary partial completions eventually happen.
 
