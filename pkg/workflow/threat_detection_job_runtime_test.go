@@ -10,6 +10,36 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+func TestDockerImagePullPolicySteps(t *testing.T) {
+	var step strings.Builder
+	generateDownloadDockerImagesStep(&step, []string{"registry.example.com/app:v1"}, true)
+	if !strings.Contains(step.String(), "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("agent download step missing local-only policy: %s", step.String())
+	}
+	step.Reset()
+	generateDownloadDockerImagesStep(&step, []string{"registry.example.com/app:v1"}, false)
+	if strings.Contains(step.String(), "GH_AW_DOCKER_IMAGE_PULL_POLICY") {
+		t.Fatalf("default download step must not override policy: %s", step.String())
+	}
+
+	data := &WorkflowData{
+		AI:             "codex",
+		RawFrontmatter: map[string]any{"docker-image-pull-policy": "never"},
+		SafeOutputs:    &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+		Features:       map[string]any{string(constants.GHAWDetectionFeatureFlag): true},
+		SandboxConfig:  &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}},
+	}
+	steps := strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
+	if !strings.Contains(steps, "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("detection download step missing local-only policy: %s", steps)
+	}
+	data.Features[string(constants.GHAWDetectionFeatureFlag)] = false
+	steps = strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
+	if !strings.Contains(steps, "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("inline detection download step missing local-only policy: %s", steps)
+	}
+}
+
 func TestBuildDetectionJobStepsCodexAvoidsDuplicateContainerPullStep(t *testing.T) {
 	compiler := NewCompiler()
 

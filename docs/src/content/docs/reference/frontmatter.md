@@ -123,6 +123,18 @@ Add deterministic steps before or after agentic execution, or define full custom
 
 The `jobs:` map can also target compiler-generated built-in jobs such as `agent`, `activation`, and `safe_outputs` for additive customization. In particular, `jobs.agent.needs` and `jobs.agent.if` let you gate the generated agent job on a custom setup job while preserving compiler-managed dependencies.
 
+### Pre-start Docker Image Pull Policy (`docker-image-pull-policy:`)
+
+By default, the generated agent and detection jobs pre-pull their Docker images (`docker-image-pull-policy: always`). Set `docker-image-pull-policy: never` to require those images to be present locally instead:
+
+```yaml
+docker-image-pull-policy: never
+```
+
+In `never` mode, every pre-start image must be a registry-qualified `repository[:tag]@sha256:<64 lowercase hex>` reference. The download helper checks that Docker can inspect each exact reference and that its `RepoDigests` contains the exact `repository@sha256:...` entry. It validates **all** images before tagging their requested local aliases and never falls back to a pull. A versioned reference creates only its versioned alias, not `:latest`; ensure downstream consumers use that alias. Missing metadata, unpinned images, conflicting aliases, or failed inspections stop the job.
+
+Use `jobs.agent.pre-steps` and `jobs.detection.pre-steps` to restore independently verified image content on each isolated consumer runner **before** its download step; if a job depends on a separate acquisition job, configure its `needs` accordingly. Preloading with `docker save/load` is not necessarily sufficient: that transport may discard registry `RepoDigests`, which this mode refuses to fabricate. This setting only checks local Docker metadata; it does not independently verify image bytes, provenance, or scanner policy, or prevent other startup components from contacting registries. Use an isolated disposable Docker daemon and verify the full handoff and startup path separately.
+
 ### Cache Configuration (`cache:`)
 
 Cache configuration using standard GitHub Actions `actions/cache` syntax:

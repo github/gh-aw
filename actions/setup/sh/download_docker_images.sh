@@ -25,6 +25,79 @@ set +o histexpand
 
 set -euo pipefail
 
+case "${GH_AW_DOCKER_IMAGE_PULL_POLICY-always}" in
+  always) ;;
+  never)
+    if (( $# == 0 )); then
+      echo "Local-only image validation requires at least one image" >&2
+      exit 1
+    fi
+
+    declare -A alias_digests=()
+    declare -a aliases=()
+    declare -a expected_digests=()
+    for image in "$@"; do
+      if [[ ! "$image" =~ ^([a-z0-9][a-z0-9.-]*(:[0-9]+)?/([a-z0-9]+([._-][a-z0-9]+)*/)*[a-z0-9]+([._-][a-z0-9]+)*)(:([A-Za-z0-9_][A-Za-z0-9_.-]*))?@sha256:([a-f0-9]{64})$ ]]; then
+        echo "Local-only mode requires a fully qualified repository[:tag]@sha256:<64 lowercase hex> reference: $image" >&2
+        exit 1
+      fi
+      repository="${BASH_REMATCH[1]}"
+      tag="${BASH_REMATCH[7]:-latest}"
+      digest="${BASH_REMATCH[8]}"
+      registry="${repository%%/*}"
+      if [[ "$registry" != *.* && "$registry" != *:* && "$registry" != localhost ]]; then
+        echo "Local-only mode requires a registry-qualified image: $image" >&2
+        exit 1
+      fi
+      alias="${repository}:${tag}"
+      if [[ -v alias_digests["$alias"] && "${alias_digests[$alias]}" != "$digest" ]]; then
+        echo "Conflicting digests requested for alias $alias" >&2
+        exit 1
+      fi
+      alias_digests["$alias"]="$digest"
+      aliases+=("$alias")
+      expected_digests+=("${repository}@sha256:${digest}")
+    done
+
+    # Validate every exact repository digest before modifying any local tag.
+    index=0
+    for image in "$@"; do
+      expected="${expected_digests[$index]}"
+      if ! digests=$(timeout 30s docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image"); then
+        echo "Local-only image inspection failed: $image" >&2
+        exit 1
+      fi
+      found=false
+      while IFS= read -r entry; do
+        if [[ "$entry" == "$expected" ]]; then
+          found=true
+          break
+        fi
+      done <<< "$digests"
+      if [[ "$found" != true ]]; then
+        echo "Local-only image is missing exact RepoDigest $expected" >&2
+        exit 1
+      fi
+      index=$((index + 1))
+    done
+
+    index=0
+    for image in "$@"; do
+      if ! timeout 30s docker tag "$image" "${aliases[$index]}"; then
+        echo "Local-only image tagging failed: $image" >&2
+        exit 1
+      fi
+      index=$((index + 1))
+    done
+    echo "All local images validated and tagged successfully"
+    exit 0
+    ;;
+  *)
+    echo "Invalid GH_AW_DOCKER_IMAGE_PULL_POLICY (expected always or never)" >&2
+    exit 1
+    ;;
+esac
+
 # Helper function to pull Docker images with retry logic
 docker_pull_with_retry() {
   local image="$1"

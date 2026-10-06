@@ -50,6 +50,26 @@ func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
 	}
 }
 
+func TestValidateMainWorkflowFrontmatter_DockerImagePullPolicy(t *testing.T) {
+	for _, tt := range []struct {
+		policy  any
+		wantErr bool
+	}{
+		{policy: "always"},
+		{policy: "never"},
+		{policy: "", wantErr: true},
+		{policy: "sometimes", wantErr: true},
+		{policy: true, wantErr: true},
+	} {
+		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+			"on": "workflow_dispatch", "docker-image-pull-policy": tt.policy,
+		}, "workflow.md")
+		if (err != nil) != tt.wantErr {
+			t.Errorf("policy %v: error = %v, want error %v", tt.policy, err, tt.wantErr)
+		}
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_RejectsUnsupportedTopLevelFields(t *testing.T) {
 	t.Parallel()
 

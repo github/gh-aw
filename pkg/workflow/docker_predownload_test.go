@@ -24,7 +24,23 @@ func TestDockerImagePredownload(t *testing.T) {
 		expectedImages []string
 		manifestImages []string
 		expectStep     bool
+		localOnly      bool
 	}{
+		{
+			name: "Local-only policy reaches agent download step",
+			frontmatter: `---
+on: issues
+engine: claude
+docker-image-pull-policy: never
+tools:
+  github:
+---
+
+# Test
+Test workflow.`,
+			expectStep: true,
+			localOnly:  true,
+		},
 		{
 			name: "GitHub tool generates image download step",
 			frontmatter: `---
@@ -135,6 +151,9 @@ Test workflow - safe outputs MCP server without GitHub tool.`,
 
 			// If we expect a step, verify the images are present
 			if tt.expectStep {
+				if got := strings.Contains(string(yaml), "GH_AW_DOCKER_IMAGE_PULL_POLICY: never"); got != tt.localOnly {
+					t.Errorf("local-only download policy present = %v, want %v", got, tt.localOnly)
+				}
 				// Verify the script call is present
 				if !strings.Contains(string(yaml), "bash \"${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh\"") {
 					t.Error("Expected to find 'bash \"${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh\"' script call in generated YAML")
