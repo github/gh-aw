@@ -4,9 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary, generateConversationMarkdown, formatToolUse, formatInitializationSummary, MAX_STEP_SUMMARY_SIZE } from "./log_parser_shared.cjs";
 import { publishUnifiedSessionSummary, validateSessionFileHeader } from "./unified_session_render.cjs";
-import { main } from "./unified_session.cjs";
+import { main, mergeSessionSources } from "./unified_session.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
-import { mergeSessionSources } from "./unified_session.cjs";
 import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 
 function event(type, data, component, index, timestampMs, sourcePath = `${component}.jsonl`) {
