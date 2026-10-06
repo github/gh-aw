@@ -382,6 +382,16 @@ Process the issue using the rotated token from the imported step.
 
 Steps from imports run **before** steps defined in the main workflow. Imported prerequisites run before the files that depend on them, while unrelated sibling imports retain declaration order.
 
+### Importing Secret Masking Steps
+
+`secret-masking.steps` defines custom redaction hooks that run after built-in secret redaction and before artifact upload. Imported hooks are appended to the workflow's hooks.
+
+Built-in redaction scans supported text files under `/tmp/gh-aw` and `${RUNNER_TEMP}/gh-aw`. It prepares discovered files for custom redactors even when no secrets match. If a readable file is not writable, such as a container-owned log, it is atomically replaced with a runner-owned copy with owner-only read/write permissions. This requires a writable parent directory; it does not bypass file locks or inaccessible directories.
+
+Custom hooks must tolerate absent optional files and files that disappear between discovery and reading (`ENOENT`). Earlier cleanup or redaction can remove files, including symbolic links and artifacts that could not be sanitized. Do not create empty placeholders for missing logs or outputs.
+
+Permission errors and other redaction failures are not equivalent to missing files. Report them explicitly and remove any unsanitized artifact source before upload; do not silently skip it or use `continue-on-error` as a workaround. For files outside the built-in scan, custom hooks are responsible for preparing writable files and avoiding symbolic links. Stop log writers before redaction so they cannot append sensitive content after sanitization.
+
 ### Importing MCP Servers
 
 Define an MCP server configuration once and import it wherever needed:
