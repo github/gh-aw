@@ -473,9 +473,6 @@ func (c *Compiler) buildAgentFailureStep(data *WorkflowData, mainJobName, messag
 	if err != nil {
 		return nil, err
 	}
-	if isArcDindTopology(data) {
-		envVars = append(envVars, "          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
-	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: %q\n", strconv.FormatBool(c.defaultCheckoutUsesTriggerRef(data))))
 	envVars = append(envVars, buildAgentFailureEngineDetectionVars(engine, data, mainJobName)...)
 	envVars = append(envVars, buildAgentFailureActivationStatusVars(data)...)

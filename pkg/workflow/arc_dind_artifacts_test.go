@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRewriteTmpGhAwPathsForArcDind(t *testing.T) {
@@ -57,6 +58,17 @@ func TestArcDindPostAgentStepsUseRunnerTempPaths(t *testing.T) {
 
 	output.Reset()
 	compiler.generateAgentOutputPlaceholderStep(&output, data)
-	assert.Contains(t, output.String(), "${RUNNER_TEMP}/gh-aw/agent_output.json")
-	assert.NotContains(t, output.String(), "/tmp/gh-aw/agent_output.json")
+	assert.Contains(t, output.String(), "/tmp/gh-aw/agent_output.json")
+	assert.NotContains(t, output.String(), "${RUNNER_TEMP}/gh-aw/agent_output.json")
+}
+
+func TestArcDindFailureHandlerUsesDownloadedArtifactPaths(t *testing.T) {
+	data := &WorkflowData{
+		AI:           "copilot",
+		SafeOutputs:  &SafeOutputsConfig{},
+		RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+	}
+	steps, err := NewCompiler().buildAgentFailureStep(data, "agent", "", "")
+	require.NoError(t, err)
+	assert.NotContains(t, strings.Join(steps, ""), "GH_AW_TMP_DIR:")
 }

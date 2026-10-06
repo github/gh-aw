@@ -294,9 +294,6 @@ func (c *Compiler) generateAgentOutputPlaceholderStep(yaml *strings.Builder, dat
 	compilerYamlLog.Print("Generating agent output placeholder step")
 
 	outputPath := constants.TmpGhAwDir + "/agent_output.json"
-	if isArcDindTopology(data) {
-		outputPath = rewriteArcDindPath(outputPath)
-	}
 	yaml.WriteString("      - name: Write agent output placeholder if missing\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        run: |\n")
