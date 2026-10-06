@@ -152,22 +152,48 @@ func buildByRepoIndex(pins []ActionPin) map[string][]ActionPin {
 	return byRepo
 }
 
-// GetActionPinsByRepo returns the sorted (version-descending) list of action pins
-// for the given repository. Returns nil if the repo has no pins.
+// GetActionPinsByRepo returns a copy of the sorted (version-descending) list of
+// action pins for the given repository. Returns nil if the repo has no pins.
 func GetActionPinsByRepo(repo string) []ActionPin {
 	pins := getCachedActionPins().byRepo[repo]
 	actionPinsLog.Printf("Looked up action pins for repo=%s: %d found", repo, len(pins))
-	return pins
+	copiedPins := slices.Clone(pins)
+	for i := range copiedPins {
+		copiedPins[i] = cloneActionPin(copiedPins[i])
+	}
+	return copiedPins
+}
+
+func cloneActionPin(pin ActionPin) ActionPin {
+	if pin.Inputs == nil {
+		return pin
+	}
+
+	inputs := make(map[string]*ActionYAMLInput, len(pin.Inputs))
+	for name, input := range pin.Inputs {
+		if input == nil {
+			inputs[name] = nil
+			continue
+		}
+		inputCopy := *input
+		inputs[name] = &inputCopy
+	}
+	pin.Inputs = inputs
+	return pin
 }
 
 // GetLatestActionPinByRepo returns the latest ActionPin for a given repository, if any.
 func GetLatestActionPinByRepo(repo string) (ActionPin, bool) {
-	pins := GetActionPinsByRepo(repo)
+	pins := getCachedActionPins().byRepo[repo]
+	actionPinsLog.Printf("Looked up action pins for repo=%s: %d found", repo, len(pins))
 	if len(pins) == 0 {
 		actionPinsLog.Printf("No action pins found for repo=%s", repo)
 		return ActionPin{}, false
 	}
-	return pins[0], true
+	for _, pin := range pins {
+		return cloneActionPin(pin), true
+	}
+	return ActionPin{}, false
 }
 
 // GetContainerPin returns a pinned container image by its original image reference.
