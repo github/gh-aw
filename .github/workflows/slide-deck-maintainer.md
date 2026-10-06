@@ -84,7 +84,7 @@ steps:
       done
 
   - name: Setup Node.js
-    uses: actions/setup-node@v7.0.0
+    uses: actions/setup-node@v7
     with:
       node-version: "24"
       cache: npm
