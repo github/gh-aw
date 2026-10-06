@@ -80,6 +80,8 @@ function eventDetail(event) {
     case "assistant.message":
     case "assistant.reasoning":
       return inline(data.content);
+    case "assistant.refusal":
+      return `[Policy refusal: ${inline(data.reason)}] ${fields(data, ["policyCategory", "partial", "content", "explanation"])}`;
     case "tool.execution_start":
       return fields(data, ["toolName", "mcpServerName", "toolCallId"]) + " [started]";
     case "tool.execution_complete": {

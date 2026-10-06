@@ -46,6 +46,8 @@ permissions:
 
 See [Engines](/gh-aw/reference/engines/) for a full list of engines and their authentication requirements, and [Authentication](/gh-aw/reference/auth/) for configuration details. For Copilot model pricing and AIC rates, see [GitHub Copilot models and pricing](https://docs.github.com/copilot/reference/copilot-billing/models-and-pricing).
 
+An `Authentication failed with provider ... (HTTP 403)` message from the local API proxy does not necessarily indicate a billing or credential problem. Copilot CLI can emit the same message when the proxy enforces `max-ai-credits`. gh-aw compares the proxy's token-usage total with the configured cap to identify budget exhaustion and avoid retrying against an exhausted budget. Failure reports use the budget category instead of organization billing guidance when that evidence is present.
+
 ### Anthropic (Claude)
 
 When using [`engine: claude`](/gh-aw/reference/engines/) or passing `ANTHROPIC_API_KEY`, inference is billed directly to your [Anthropic account](https://console.anthropic.com/settings/billing).

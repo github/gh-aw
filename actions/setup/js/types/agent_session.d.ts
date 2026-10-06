@@ -51,6 +51,16 @@ export interface MessageData {
   [key: string]: unknown;
 }
 
+export interface AssistantRefusalData {
+  reason: "refusal" | "content_filter";
+  content?: JsonValue;
+  policyCategory?: string | null;
+  explanation?: string | null;
+  /** True for an observed streaming fragment, not a finalized refusal. */
+  partial?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ToolExecutionStartData {
   toolCallId?: string;
   toolName?: string;
@@ -122,6 +132,11 @@ export interface AssistantMessageEvent extends EventMetadata {
   data: MessageData;
 }
 
+export interface AssistantRefusalEvent extends EventMetadata {
+  type: "assistant.refusal";
+  data: AssistantRefusalData;
+}
+
 export interface AssistantReasoningEvent extends EventMetadata {
   type: "assistant.reasoning";
   data: MessageData;
@@ -185,7 +200,17 @@ export interface DetectionResultEvent extends EventMetadata {
 }
 
 export type CoreSessionEvent =
-  SessionInitEvent | UserMessageEvent | AssistantMessageEvent | AssistantReasoningEvent | ToolExecutionStartEvent | ToolExecutionCompleteEvent | SessionResultEvent | SessionFileFormatEvent | DetectionResultEvent | AgentExecutionEvent;
+  | SessionInitEvent
+  | UserMessageEvent
+  | AssistantMessageEvent
+  | AssistantRefusalEvent
+  | AssistantReasoningEvent
+  | ToolExecutionStartEvent
+  | ToolExecutionCompleteEvent
+  | SessionResultEvent
+  | SessionFileFormatEvent
+  | DetectionResultEvent
+  | AgentExecutionEvent;
 
 export interface SessionEventDataMap {
   "agent.execution": AgentExecutionData;
@@ -194,6 +219,7 @@ export interface SessionEventDataMap {
   "session.init": SessionInitData;
   "user.message": MessageData;
   "assistant.message": MessageData;
+  "assistant.refusal": AssistantRefusalData;
   "assistant.reasoning": MessageData;
   "tool.execution_start": ToolExecutionStartData;
   "tool.execution_complete": ToolExecutionCompleteData;
