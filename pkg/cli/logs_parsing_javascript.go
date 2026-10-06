@@ -37,6 +37,9 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No engine detected in %s, skipping log parsing", filepath.Base(runDir))))
 		return nil
 	}
+	if rendered, err := parseUnifiedAgentLog(runDir, engine.GetID()); rendered || err != nil {
+		return err
+	}
 
 	// Find the agent log file - use engine.GetLogFileForParsing() to determine location
 	agentLogPath, found := findAgentLogFile(runDir, engine)

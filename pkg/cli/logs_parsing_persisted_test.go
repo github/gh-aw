@@ -23,6 +23,24 @@ func TestSessionParserUnsupportedSessionSentinel(t *testing.T) {
 	require.NotErrorIs(t, err, errNoRecognizableAgentSession)
 }
 
+func TestNamedCustomEngineReportUsesUnifiedConversation(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	engine, err := loadLocalLogParserEngine("crush")
+	require.NoError(t, err)
+	require.NotNil(t, engine)
+	root := t.TempDir()
+	writeSessionTestFile(t, root, "agent-stdio.log", "Observed Crush assistant answer\n"+`{"type":"result","num_turns":1,"usage":{}}`+"\n")
+	writeSessionTestFile(t, root, "mcp-logs/rpc-messages.jsonl", `{"event":"rpc_request","method":"tools/list","payload":{"id":1,"params":{}}}`+"\n")
+	require.NoError(t, parseAgentLog(root, engine, true))
+	report, err := os.ReadFile(filepath.Join(root, "log.md"))
+	require.NoError(t, err)
+	require.Contains(t, string(report), "Observed Crush assistant answer")
+	require.Contains(t, string(report), "Agent conversation")
+	require.Contains(t, string(report), "Chronological trace")
+	require.Contains(t, string(report), "tools/list")
+}
+
 func TestPersistedImportedEngineReportWithoutDefinitions(t *testing.T) {
 	requireSessionTestNode(t)
 	root := t.TempDir()
