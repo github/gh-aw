@@ -1,4 +1,4 @@
-# Extension to ADR-64955: Versioned Work Queue Messages
+# Extension to ADR-64955: Current-Only Work Queue Commits
 
 **Date**: 2026-10-02
 **Status**: Draft
@@ -8,46 +8,78 @@
 
 ### Context
 
-The [work queue ledger](64955-git-backed-work-queue-coordination.md) is durable. Its messages can outlive the version of gh-aw that wrote them, so protocol changes need safe, portable upgrades without changing replay authority.
+The [work queue ledger](64955-git-backed-work-queue-coordination.md) is durable.
+The original workflow fact format and operator payload/provenance format cannot
+express mandatory scheduling, shared native reservations, DAG barriers, or
+authenticated per-Claim delivery. Fabricating these facts during a read would
+invent policy, causal positions, accounting debt, and launch authority.
 
 ### Decision
 
-Every workflow ledger message has an integer version. Define declarative codemods for successive protocol versions in `actions/setup/js/work_queue_codemods.cjs`. On load, check older messages against their closed historical field sets, apply the codemods in version order, then compact and validate the resulting ledger before writing it back through the queue's version-checked publication path. Reject unknown versions or messages that cannot be upgraded or validated; do not publish a partial upgrade.
+Replace upgrade-on-load with one closed version-3 `QueueCommit` contract in
+[`transactions.tsp`](../../specs/work-queue/transactions.tsp). Every authoritative
+mutation uses the same causal `work-queue.jsonl` chain. Both native engines
+validate the contract before replay/publication; neither accepts policy-less
+facts, unversioned records, unknown versions, or automatic codemods.
 
-The original unversioned messages (and explicit version 0 messages) upgrade to version 1, which retains the existing transaction fields and adds `version: 1`. Version 1 remains exactly `version`, `kind`, `work`, `claim`, and `attempt`; it does not permit `enqueued` or other extra fields.
+The old unversioned/version-0/version-1/version-2 records remain unsupported
+operational inputs. Rejection leaves the existing queue unchanged. Historical
+logs/audit artifacts may be decoded as historical evidence, but that decoder
+cannot grant authority, participate in current scheduling, or rewrite history.
 
-Version 2 adds optional immutable `enqueued` metadata on Work only: Unix milliseconds in the integer range `0..9007199254740991`. The deterministic 1-to-2 codemod changes only `version` to 2. Historical Work keeps absent enqueue metadata and age zero; migration never derives timestamps from the clock or log position. New intents and serialized logs use version 2. Trusted write-capable readers publish the canonical upgraded log using the same fast-forward-only, retrying path as other queue writes. Read-only activation loads upgrade and validate in memory for their immutable snapshots, deferring publication until a trusted write-capable reader accesses the log.
+Work FIFO positions come from the validated causal commit/operation order, not
+client timestamps or physical line order. A mandatory Policy defines the epoch.
+Stable logical requests bind meaning across CAS retries; retries regenerate
+selection and packing rather than preserve a stale winner.
 
-The canonical workflow record is the `WorkQueueTransaction` union in
-[`transactions.tsp`](../../specs/work-queue/transactions.tsp), with required
-`version: 2`, `kind`, `work`, `claim`, and `attempt`, plus optional `enqueued` on
-Work. The activation snapshot envelope's separate version remains 2; it is not
-the transaction protocol version. This decision covers the workflow
-ledger on `work-queue`, not the separate operator `Transaction` format on
-`gh-aw-work-queue`.
+The compiler-managed input is `work_queue_assignment`: an immutable bounded
+Claim array and shared dispatch/request provenance. Scalar `work_queue_claim`
+and legacy context aliases are rejected. The actual run is authenticated and
+bound independently; an assignment input is not proof of run authority.
+
+```mermaid
+flowchart TD
+    Existing["Existing older ledger"] --> Reject["Reject unchanged; no fabricated authority"]
+    Quiesce["Operator quiesces old writers and workflows"] --> Preserve["Preserve old evidence"]
+    Preserve --> Initialize["Explicit current-protocol initialization"]
+    Initialize --> Policy["Mandatory Policy genesis"]
+    Policy --> Current["Current-only commits and recompiled array workers"]
+    Current --> Replay["Native Go / JavaScript replay conformance"]
+```
+
+This is a breaking deployment. Operators must quiesce old writers, resolve
+in-flight work and native/delivery uncertainty, preserve old evidence, and
+explicitly provision the new authority before resuming recompiled workflows.
+No reader renames, copies, resets, or silently merges old branches.
 
 ### Alternatives Considered
 
-#### Imperative migrations
+#### Automatic fact upgrades
 
-Handwritten migration scripts offer more flexibility but make transformations harder to inspect and reproduce across readers. Declarative, ordered codemods keep the upgrade path explicit.
+Rejected because old facts contain insufficient information to reconstruct
+authoritative policy, fairness charges, verified Results, or native run binding.
+An apparently successful upgrade could authorize effects without evidence.
 
-#### Ledger-wide replacement on each protocol change
+#### A compatibility scheduling mode
 
-Rewriting every ledger immediately would require coordinated deployment and risk leaving older readers unable to interpret the data. Upgrading on load allows existing durable ledgers to transition when accessed.
+Rejected because direct Claims or advisory FIFO would bypass mandatory
+queue-wide fairness. Compatibility readers are limited to historical reporting.
 
 ### Consequences
 
 #### Positive
 
-- Older messages have a defined path to the current protocol without replacing the ledger as a separate operation.
-- Compaction and validation precede publication, preserving a single checked replay input.
+- Queue readers never invent authority missing from older records.
+- Runtime and operator tools use one wire contract and explicit causal evidence.
 
 #### Negative
 
-- Codemods must remain available and deterministic for every supported historical version.
-- Loading an older ledger costs additional work, and a failed upgrade blocks publication until the incompatibility is resolved.
+- Deployment requires explicit quiescence and operator handling of old history.
+- Existing workflows, assignments and operator scripts must be updated together.
 
 #### Neutral
 
-- This extends the queue's replay and version-checked publication commitments without changing the authority model.
+- Native Go and JavaScript implementations remain separate, with generated
+  schemas and strict independent conformance tests.
+- Automated queue-writer restriction verification/provisioning is deferred by
+  user direction. This ADR does not claim that deployment boundary is enforced.

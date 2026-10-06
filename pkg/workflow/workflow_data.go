@@ -35,6 +35,7 @@ type SkipIfCheckFailingConfig struct {
 	AllowPending bool     // if true, pending/in-progress checks are not treated as failing (default: treat pending as failing)
 }
 type WorkflowData struct {
+	WorkQueuePolicy                *WorkQueuePolicyConfig
 	Name                           string
 	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)
 	CompiledVersion                string           // gh-aw compiler version emitted to generated install steps as GH_AW_COMPILED_VERSION (release tag for releases, "dev" for non-release builds) so the install script can resolve a compat.json window at runtime without churn

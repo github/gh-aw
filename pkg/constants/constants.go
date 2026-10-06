@@ -542,6 +542,10 @@ const TmpGhAwDir = "/tmp/gh-aw"
 // WorkQueueSnapshotPath is the activation artifact mounted into the queue MCP server.
 const WorkQueueSnapshotPath = TmpGhAwDir + "/work-queue.snapshot.json"
 const WorkQueueFinishIntentPath = TmpGhAwDir + "/work-queue.finish.jsonl"
+const WorkQueueAuthorizationPath = TmpGhAwDir + "/work-queue.authorizations.json"
+const WorkQueueDeliveryReceiptPath = TmpGhAwDir + "/work-queue.deliveries.json"
+const WorkQueueIntentPath = TmpGhAwDir + "/work-queue.intents.jsonl"
+const WorkQueueClaimArtifactsPath = TmpGhAwDir + "/claims"
 const WorkQueueFinishIntentDir = GhAwRootDirShell + "/safeoutputs/work-queue"
 const WorkQueueFinishIntentMount = WorkQueueFinishIntentDir + ":" + WorkQueueFinishIntentDir + ":rw"
 

@@ -39,7 +39,7 @@ func TestConclusionWorkQueueSummary(t *testing.T) {
 	}
 }
 
-func TestConclusionWorkQueueSummaryPreservesWritePermissions(t *testing.T) {
+func TestConclusionWorkQueueSummaryDoesNotBorrowWriterPermissions(t *testing.T) {
 	data := &WorkflowData{
 		Tools: map[string]any{"work-queue": true},
 		SafeOutputs: &SafeOutputsConfig{
@@ -47,6 +47,17 @@ func TestConclusionWorkQueueSummaryPreservesWritePermissions(t *testing.T) {
 		},
 	}
 	level, ok := computeConclusionJobPermissions(data).Get(PermissionContents)
+	require.True(t, ok)
+	require.Equal(t, PermissionRead, level)
+	actions, ok := computeConclusionJobPermissions(data).Get(PermissionActions)
+	require.True(t, ok)
+	require.Equal(t, PermissionRead, actions)
+	data.RawFrontmatter = map[string]any{"observability": map[string]any{"otlp": map[string]any{"github-app": map[string]any{"audience": "https://otel.example.com"}}}}
+	oidc, ok := computeConclusionJobPermissions(data).Get(PermissionIdToken)
+	require.True(t, ok)
+	require.Equal(t, PermissionWrite, oidc)
+	delete(data.Tools, "work-queue")
+	level, ok = computeConclusionJobPermissions(data).Get(PermissionContents)
 	require.True(t, ok)
 	require.Equal(t, PermissionWrite, level)
 }

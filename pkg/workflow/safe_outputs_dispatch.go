@@ -195,12 +195,12 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	// These values are compiler-managed and must never be agent-selected inputs.
 	delete(properties, AwContextInputName)
 	delete(properties, WorkQueueClaimInputName)
+	delete(properties, "work_queue_claim")
 	if required, ok := inputSchema["required"].([]string); ok {
 		inputSchema["required"] = slices.DeleteFunc(required, func(name string) bool {
-			return name == AwContextInputName || name == WorkQueueClaimInputName
+			return name == AwContextInputName || name == WorkQueueAssignmentInputName || name == "work_queue_claim"
 		})
 	}
-	addWorkQueueDispatchProperty(properties, workflowInputs, workQueueEnabled)
 
 	// When allowed-refs is configured, inject a 'ref' property so the agent can
 	// specify the target branch/tag/SHA. The runtime handler validates the value
@@ -225,19 +225,4 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	}
 	safeOutputsDispatchWorkflowLog.Printf("Generated dispatch-workflow tool: name=%s, properties=%d, required=%d", tool["name"], len(properties), requiredCount)
 	return tool
-}
-
-func addWorkQueueDispatchProperty(properties, workflowInputs map[string]any, workQueueEnabled bool) {
-	if _, acceptsQueueClaim := workflowInputs[WorkQueueClaimInputName]; !workQueueEnabled || !acceptsQueueClaim {
-		return
-	}
-	properties["work_queue"] = map[string]any{
-		"type":        "object",
-		"description": "Optional queue Work to claim before dispatching this worker. Use a work_id returned by work_queue_read.",
-		"properties": map[string]any{
-			"work_id": map[string]any{"type": "string", "minLength": 1},
-		},
-		"required":             []string{"work_id"},
-		"additionalProperties": false,
-	}
 }

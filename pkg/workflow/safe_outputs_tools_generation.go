@@ -86,6 +86,11 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 	}
 
 	// Add custom job tools from SafeOutputs.Jobs
+	if isWorkQueueEnabled(data) && len(data.SafeOutputs.Steps) > 0 {
+		dynamicTools = append(dynamicTools, generateCustomJobToolDefinition("raw_steps", &SafeJobConfig{
+			Description: "Prepare the configured trusted custom steps for one immutable Claim; effects require independent declared delivery verification.",
+		}))
+	}
 	if len(data.SafeOutputs.Jobs) > 0 {
 		safeOutputsConfigLog.Printf("Adding %d custom job tools", len(data.SafeOutputs.Jobs))
 
@@ -180,6 +185,11 @@ func generateDynamicTools(data *WorkflowData, markdownPath string) ([]map[string
 			}
 
 			queueWorker := slices.Contains(data.SafeOutputs.DispatchWorkflow.WorkQueueWorkflows, workflowName)
+			if queueWorker {
+				// Queue targets are selected by the installed pool Policy, never an agent's
+				// target-specific dispatch tool. The queue MCP exposes dispatch_next.
+				continue
+			}
 			dynamicTools = append(dynamicTools, generateDispatchWorkflowTool(workflowName, workflowInputs, data.SafeOutputs.DispatchWorkflow.AllowedRefs, queueWorker))
 		}
 	}
@@ -330,7 +340,8 @@ type ToolsMeta struct {
 	// DynamicTools contains tool definitions for custom safe-jobs, dispatch_workflow
 	// targets, and call_workflow targets. These are workflow-specific and cannot be
 	// derived from the static safe_outputs_tools.json at runtime.
-	DynamicTools []map[string]any `json:"dynamic_tools"`
+	DynamicTools    []map[string]any `json:"dynamic_tools"`
+	WorkQueueScoped bool             `json:"work_queue_scoped,omitempty"`
 	// RequiredFieldRemovals maps tool name → list of field names to remove from the
 	// inputSchema.required array. Used when a field that is required in the static
 	// safe_outputs_tools.json should be optional for this specific workflow (e.g. when
@@ -578,6 +589,7 @@ func generateToolsMetaJSON(data *WorkflowData, markdownPath string) (string, err
 	}
 
 	meta := ToolsMeta{
+		WorkQueueScoped:        isWorkQueueWorker(data),
 		DescriptionSuffixes:    descriptionSuffixes,
 		RepoParams:             repoParams,
 		DynamicTools:           dynamicTools,

@@ -62,17 +62,17 @@ func TestDispatchWorkflowWorkQueueSelector(t *testing.T) {
 	assert.NotContains(t, withoutContext["inputSchema"].(map[string]any)["properties"].(map[string]any), "work_queue")
 
 	queue := generateDispatchWorkflowTool("worker", map[string]any{
-		"aw_context":       map[string]any{"type": "string", "required": true},
-		"work_queue_claim": map[string]any{"type": "string", "required": true},
+		"aw_context":            map[string]any{"type": "string", "required": true},
+		"work_queue_claim":      map[string]any{"type": "string", "required": true},
+		"work_queue_assignment": map[string]any{"type": "string", "required": true},
 	}, nil, true)
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["properties"].(map[string]any), "aw_context")
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["required"], "aw_context")
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["properties"].(map[string]any), "work_queue_claim")
 	assert.NotContains(t, queue["inputSchema"].(map[string]any)["required"], "work_queue_claim")
 	props := queue["inputSchema"].(map[string]any)["properties"].(map[string]any)
-	selector := props["work_queue"].(map[string]any)
-	assert.Equal(t, false, selector["additionalProperties"])
-	assert.Equal(t, []string{"work_id"}, selector["required"])
+	assert.NotContains(t, props, "work_queue_assignment")
+	assert.NotContains(t, props, "work_queue", "agent-specific Work selectors cannot bypass the installed scheduler")
 }
 
 // TestGenerateCustomJobToolDefinitionDefaultDescription tests that a default description is used when none provided.

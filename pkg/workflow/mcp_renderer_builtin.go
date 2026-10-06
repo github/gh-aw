@@ -33,7 +33,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 	yaml.WriteString("              \"" + serverName + "\": {\n")
 	if r.options.IncludeCopilotFields {
 		yaml.WriteString("                \"type\": \"stdio\",\n")
-		yaml.WriteString("                \"tools\": [\"work_queue_read\", \"work_queue_claim_finish\"],\n")
+		yaml.WriteString("                \"tools\": [\"work_queue_read\", \"work_queue_explain\", \"work_queue_submit\", \"work_queue_dispatch_next\", \"work_queue_claim_finish\"],\n")
 	}
 	yaml.WriteString("                \"container\": \"" + image + "\",\n")
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
@@ -133,7 +133,12 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers." + constants.SafeOutputsMCPServerID.String() + "]\n")
 	yaml.WriteString("          container = \"" + containerImage + "\"\n")
-	yaml.WriteString("          mounts = [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultSafeOutputsMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
+	mounts := []string{constants.DefaultWorkspaceMount, constants.DefaultSafeOutputsMount, constants.DefaultTmpGhAwMount}
+	if isWorkQueueEnabled(workflowData) {
+		mounts = append(mounts, constants.WorkQueueSnapshotMount)
+		yaml.WriteString("          env = { GH_AW_WORK_QUEUE_ENABLED = \"true\" }\n")
+	}
+	yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 	yaml.WriteString("          args = [\"-w\", \"$GITHUB_WORKSPACE\"]\n")
 	yaml.WriteString("          entrypoint = \"sh\"\n")
 	yaml.WriteString("          entrypointArgs = [\"-c\", \"sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh\"]\n")
@@ -305,7 +310,11 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 		yaml.WriteString("                \"type\": \"stdio\",\n")
 	}
 	yaml.WriteString("                \"container\": \"" + containerImage + "\",\n")
-	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultSafeOutputsMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
+	mounts := []string{constants.DefaultWorkspaceMount, constants.DefaultSafeOutputsMount, constants.DefaultTmpGhAwMount}
+	if isWorkQueueEnabled(workflowData) {
+		mounts = append(mounts, constants.WorkQueueSnapshotMount)
+	}
+	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
 	yaml.WriteString("                \"args\": [\"-w\", \"\\${GITHUB_WORKSPACE}\"],\n")
 	yaml.WriteString("                \"entrypoint\": \"sh\",\n")
 	yaml.WriteString("                \"entrypointArgs\": [\"-c\", \"sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh\"],\n")
@@ -339,6 +348,13 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},
 		{"GITHUB_WORKSPACE", "GITHUB_WORKSPACE", false},
 		{"RUNNER_TEMP", "RUNNER_TEMP", false},
+	}
+	if isWorkQueueEnabled(workflowData) {
+		envVars = append(envVars, struct {
+			name      string
+			value     string
+			isLiteral bool
+		}{"GH_AW_WORK_QUEUE_ENABLED", "true", true})
 	}
 
 	// Append GH_AW_INPUT_* vars referenced by the safe-outputs config so the nested

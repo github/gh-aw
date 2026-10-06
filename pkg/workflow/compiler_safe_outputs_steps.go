@@ -245,6 +245,10 @@ func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string
 		"            /tmp/gh-aw/safe-output-items.jsonl\n",
 		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
 		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
+		"            /tmp/gh-aw/claims/*/safe-output-items.jsonl\n",
+		"            /tmp/gh-aw/claims/*/temporary-id-map.json\n",
+		"            /tmp/gh-aw/claims/*/safe-output-errors.json\n",
+		"            /tmp/gh-aw/claims/*/delivery-receipt.json\n",
 		"          if-no-files-found: ignore\n",
 	}
 }

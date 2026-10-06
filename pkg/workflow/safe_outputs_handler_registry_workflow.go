@@ -29,6 +29,7 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("driver", c.Driver).
+			AddIfNotEmpty("target-ref", c.TargetRef).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "create-code-scanning-alert", c.GitHubToken)).
@@ -144,6 +145,8 @@ var workflowHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.UploadCodeCoverage
 		return newHandlerConfigBuilder().
 			AddTemplatableInt("max", c.Max).
+			AddIfNotEmpty("target-ref", c.TargetRef).
+			AddDefault("wait-for-processing-timeout", c.WaitForProcessingTimeout).
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "upload-code-coverage", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).
 			Build()

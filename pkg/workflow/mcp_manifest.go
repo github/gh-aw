@@ -43,7 +43,7 @@ func collectMCPServersForManifest(data *WorkflowData) []GHAWManifestMCPServer {
 		case "ledger":
 			add("ledger", []string{"ledger_append", "ledger_get", "ledger_query", "ledger_status"})
 		case "work-queue":
-			add(toolName, []string{"work_queue_read", "work_queue_claim_finish"})
+			add(toolName, []string{"work_queue_read", "work_queue_explain", "work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"})
 		case "mcp-scripts":
 			add(constants.MCPScriptsMCPServerID.String(), sliceutil.SortedKeys(data.MCPScripts.Tools))
 		case enclaveMCPServerName:

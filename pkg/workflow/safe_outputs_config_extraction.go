@@ -53,6 +53,9 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 		if outputMap, ok := output.(map[string]any); ok {
 			safeOutputsConfigLog.Printf("Processing safe-outputs configuration with %d top-level keys", len(outputMap))
 			config = &SafeOutputsConfig{}
+			if adapters, ok := outputMap["claim-adapters"].(map[string]any); ok {
+				config.ClaimAdapters = parseWorkQueueClaimAdapters(adapters)
+			}
 
 			config.CreateWorkItems = c.parseCreateWorkItemConfig(outputMap)
 			config.UpdateWorkItems = c.parseUpdateWorkItemConfig(outputMap)

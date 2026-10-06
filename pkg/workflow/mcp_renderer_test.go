@@ -176,8 +176,8 @@ func TestWorkQueueMCPIsRegisteredInManifest(t *testing.T) {
 	if len(servers) != 1 || servers[0].Name != "work-queue" {
 		t.Fatalf("expected queue server in manifest, got %#v", servers)
 	}
-	if len(servers[0].Tools) != 2 || servers[0].Tools[0] != "work_queue_claim_finish" || servers[0].Tools[1] != "work_queue_read" {
-		t.Fatalf("expected read and finish tools in the manifest, got %#v", servers[0].Tools)
+	if len(servers[0].Tools) != 5 {
+		t.Fatalf("expected the closed read/explain/submit/dispatch/finish intent surface, got %#v", servers[0].Tools)
 	}
 }
 

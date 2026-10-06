@@ -12,43 +12,65 @@ The [Work Queue proposal in issue #64852](https://github.com/github/gh-aw/issues
 
 ### Decision
 
-Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one log of immutable transactions, `work-queue.jsonl`, on a dedicated queue branch. Operators inspect and update it with `gh aw work-queue`. Derive authority through one shared deterministic replay implementation, using the issue's protocol and its [TLA+ specification](../../specs/work-queue/WorkQueue.tla) as the design baseline. The activation job snapshots the current log and branch version into the activation artifact; the work-queue MCP server mounts that snapshot read-only and never reads Git. The current MCP surface is a read-only snapshot query; mutation publication and final worker authorization remain trusted `safe_outputs` responsibilities. Preserve the existing `activation -> agent -> detection -> safe_outputs -> conclusion` topology without an additional worker job.
+Implement `tools.work-queue` as a first-class, compiler-aware tool backed by one
+causal log, `work-queue.jsonl`, on a dedicated queue branch. Operators inspect and
+update it with `gh aw work-queue`. The
+[mandatory fair DAG protocol](../../specs/work-queue/priority-and-fairness.md)
+replaces best-effort local selection and set-of-facts arbitration. Native Go and
+JavaScript engines use one closed contract, the exact scheduling algorithm and
+independent conformance fixtures. Each language reuses its engine across its
+consumers.
+
+Activation captures a disposable immutable snapshot; the MCP server reads it
+without Git credentials and stages bounded intents. Trusted processing refreshes
+the queue before publication, run binding or effects. Staging is never a durable
+Claim, and a snapshot prediction never selects the authoritative Work.
 
 #### Protocol commitments
 
 | Boundary | Commitment |
 |---|---|
-| Replay | The same valid transaction set produces the same projection regardless of record order, commit order, or timing. The model selects the smallest uncancelled Claim identity in a stable ordering on nonterminal Work; all consumers share arbitration. |
-| Queue ordering | Prefer the oldest available Work in the dispatcher's local view using immutable enqueue-time metadata and stable Work identity as the tie-breaker. Claimed Work does not block newer available Work. Publication revalidates safety, not global FIFO; delayed visibility, concurrent dispatchers, and worker completion can reorder processing. No global sequence allocator or completion barrier is required. |
-| Dispatcher | Activation reads the queue branch and packages its log and version in the activation artifact. The MCP server reads only this immutable snapshot, never Git; its view may become stale during agent execution. Session-local pending-intent support and publication remain subject to trusted `safe_outputs` processing. Pending Claims do not establish durable authority. |
-| Worker | The compiler-managed `work_queue_claim` input supplies one immutable inbound Claim with `work_id`, `claim_id`, and a `work` payload object; `aw_context` carries caller metadata. Activation is an early admission check, not final authority. `work_queue_claim_finish(outcome?)` records intent without accepting authority fields; each worker records at most one Completion and has one pass through safe-output processing. |
-| External effects | Before ordinary safe outputs, refresh and replay, verify ownership, persist Completion, and confirm the terminal result. Missing finalize cancels an effective Claim; losing workers stage intents and stop without external effects. Uncertain reconciliation fails closed. |
-| Publication | Publish only if the branch still matches the version originally read. Otherwise fetch the latest log, replay it, and regenerate the proposed changes. Apply this rule to dispatchers, workers, orphan recovery, compaction, and concurrent branch initialization, with bounded retries and diagnostics. |
-| Terminal Work | Reject new state-changing transactions after Work becomes completed or cancelled. Freeze its complete fact set so late competing Claims cannot reopen the decision. |
-| Recovery and compaction | Recover unresolved Claims using trusted terminal workflow-run provenance. Generate the existing maintenance system's queue compaction job, rewrite the same canonical file, and preserve current replay and future protocol semantics. The initial model only removes duplicate records and canonicalizes order. |
+| Replay | Reconstruct the unique QueueCommit chain and every operation prefix; reject malformed/forked/unauthorized history and nonconforming selection or packing. Physical record permutation/duplicate removal preserves that same chain. |
+| Queue ordering | Mandatory priority/account fairness; causal-position FIFO within eligible buckets. Defaults are one class/key and FIFO. Charge one durable Claim, including each batched member and failed launch. |
+| Dispatcher | Stage pool/budget intents, never select a preferred Work or invent Claim authority. Trusted CAS publication regenerates the complete fair packable prefix on a conflict. |
+| Worker | Receive one immutable bounded `work_queue_assignment` array; default size one, larger compatible groups explicit. Authenticate the actual run and attempt independently. |
+| External effects | Every safe output resolves to one Claim; only the original single-Claim assignment permits omitted selectors. Check binding, ownership, same-Claim Completion and resource scope before effects. Mixed outcomes settle independently. |
+| Publication | Stable requests bind semantic meaning, not tentative winners or branch SHA. Checked Git publication and request recovery prevent duplicate charges after ambiguous acknowledgments. |
+| DAG | Work predecessors require verified Results; typed Issue/PR vertices require fresh satisfying Observations. Completion or overall native success alone is insufficient. |
+| Recovery | Fence one sender before dispatch. Retain uncertain reservations; release only on definitive nonlaunch or exact terminal evidence. Result/DeliveryFailure closes delivery without replaying completed effects. |
+| Compaction | Canonicalize/deduplicate complete commits without changing causal positions, requests, charges, Results or history. No authoritative sidecar. |
 
 The [formal verification notes and reproducible checker](../../specs/work-queue/README.md) document the invariants and assumptions. The bounded model checks support a parameterized inductive proof argument, not a mechanically checked unbounded proof or proof that a future runtime implementation refines the model.
 
 Use `work-queue` for public names, branches, and artifact filenames, and
 `work_queue` for AW context fields and MCP tool prefixes. The
-[`transactions.tsp`](../../specs/work-queue/transactions.tsp) contract distinguishes
-the workflow runtime's versioned facts on `work-queue` from the operator CLI's
-payload/provenance records on `gh-aw-work-queue`; both use `work-queue.jsonl`,
-but the formats are not interchangeable.
+[`transactions.tsp`](../../specs/work-queue/transactions.tsp) defines one current
+contract for both surfaces. An explicitly configured branch remains a separate
+authority; no reader silently combines queues.
 
-Compatibility reads preserve in-flight `aw_context.work_claim` assignments and
-normalize them to `work_queue`; malformed or dual assignments fail closed.
-Existing workflow storage on `dispatch-coordinator` remains authoritative, with
-checked writes to its existing log, until an explicit migration. Migration must
-quiesce all writers, drain or stop old workflows, rename the existing branch and
-log without retaining parallel copies, and deploy recompiled workflows before
-resuming. If both branch names or both log filenames exist, refuse reads and
-writes rather than choose an authority. Historical logs/audit readers retain the
-previous artifact filenames and trusted step/message patterns.
+The [current-only protocol decision](work-queue-protocol-upgrades.md) replaces
+automatic upgrades and scalar-assignment compatibility. Existing old ledgers
+fail unchanged; explicit deployment requires quiescence and preservation of old
+evidence. Historical logs/audit decoding is diagnostic only.
+
+```mermaid
+flowchart LR
+    Intent["Agent plans and scoped intents"] --> Trusted["Trusted publication / binding / effect gates"]
+    Trusted --> Log[("work-queue.jsonl")]
+    Log --> Snapshot["Disposable snapshot and explanations"]
+    Snapshot --> Intent
+    Log --> Results["Verified Work Results and external Observations"]
+    Results --> Ready["DAG ready frontier"]
+    Ready --> Trusted
+```
 
 The conclusion job writes a work queue activity step summary for workflows using `tools.work-queue`. It compares the activation snapshot with a read-only refresh of the durable queue, showing work and claim state counts, new transaction counts by kind, and the assigned worker's current state in a collapsed details section. These are shared-queue observations since activation, not activity attributed exclusively to the current run. Work, claim, and attempt identifiers are omitted. An unreadable snapshot or queue is reported as unavailable, not as an empty queue.
 
-For review, the [trace walkthrough](../../specs/work-queue/README.md#inspect-execution-traces) generates bounded textual TLC executions and counterexamples to deliberately false reachability witnesses. These expose competing Claims, orphan recovery, best-effort queue reordering, and the finalization-to-effect sequence under the guarded protocol; they are evidence of modeled possibilities, not runtime conformance or liveness guarantees. JavaScript and Go replay now expose oldest-available selection using immutable Unix-millisecond enqueue metadata. The operator CLI selects once by default, and the read-only MCP snapshot recommends the next Work without granting authority. Historical Work has age zero; duplicate submissions never reset it. Broader dispatcher mutation integration remains separate. The model does not quantify how rare reordering is.
+The [formal evidence](../../specs/work-queue/README.md) distinguishes bounded
+models, witnesses, independent service properties and runtime conformance.
+Unfinished searches are not passes. The
+[implementation coverage table](../../specs/work-queue/priority-and-fairness.md#91-implementation-coverage-and-remaining-requirements)
+tracks deferred writer-restriction enforcement and other unverified obligations.
 
 ### Alternatives Considered
 
@@ -72,11 +94,15 @@ A single projected-state file with version-checked updates would reduce read and
 
 - Full-log reads and replay add latency; competing writers contend on one branch and may exhaust bounded retries.
 - Duplicate-only compaction does not bound unique transaction growth or Git history size. More aggressive retention requires another equivalence proof.
-- A crash after Completion but before external effects can leave completed Work without outputs. Reliable effect delivery would require an additional idempotent delivery protocol.
+- A crash after Completion can leave delivery uncertain. Conservative Result or
+  DeliveryFailure recovery does not provide atomic or exactly-once external writes.
+- Automated deployment enforcement of trusted queue-branch writers is deferred;
+  operators must independently establish that security precondition.
 
 #### Neutral
 
-- Runtime implementation still needs broader safe-output mutation, worker-context, recovery, and maintenance integration; the read-only activation snapshot and MCP query do not imply those surfaces already exist.
+- Batching reduces reusable setup overhead, not Claim charges, and isolates
+  authorization rather than agent memory/filesystem visibility.
 - The guarantee is a single externally effective winner, not exactly-once agent execution or atomic external operation batches. Eventual progress also requires available workflows and successful retries.
 
 ---

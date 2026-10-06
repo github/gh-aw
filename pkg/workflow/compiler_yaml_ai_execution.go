@@ -661,9 +661,19 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// The MCP gateway is always enabled, even when agent sandbox is disabled
 	c.generateStopMCPGateway(yaml, data)
 
+	if isWorkQueueEnabled(data) {
+		yaml.WriteString("      - name: Collect work queue intents\n")
+		yaml.WriteString("        if: always()\n")
+		fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script"))
+		yaml.WriteString("        with:\n")
+		yaml.WriteString("          script: |\n")
+		yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/collect_work_queue_intents.cjs');\n")
+		yaml.WriteString("            main({ core });\n")
+	}
+
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
-	if hasSafeJobArtifactPaths(data) {
+	if hasSafeJobArtifactPaths(data) || isWorkQueueEnabled(data) {
 		c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
 	} else {
 		c.generateSecretRedactionStep(yaml, yaml.String(), data)

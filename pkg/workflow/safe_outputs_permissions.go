@@ -138,6 +138,22 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 	}
 
 	permissions := NewPermissions()
+	if len(safeOutputs.ClaimAdapters) > 0 && !templatableBoolIsTrue(safeOutputs.Staged) {
+		for _, adapter := range safeOutputs.ClaimAdapters {
+			if adapter != nil && adapter.EffectType == "github_rest" && adapter.Request != nil {
+				permissions.Set(PermissionScope(adapter.Request.Permission), PermissionWrite)
+			} else if adapter != nil && adapter.EffectType == "github_graphql" && adapter.GraphQL != nil {
+				permissions.Set(PermissionScope(adapter.GraphQL.Permission), PermissionWrite)
+			} else if adapter != nil && adapter.EffectType == "git_tree" && adapter.GitTree != nil {
+				permissions.Set(PermissionContents, PermissionWrite)
+				if adapter.GitTree.PullRequest {
+					permissions.Set(PermissionPullRequests, PermissionWrite)
+				}
+			} else {
+				permissions.Set(PermissionIssues, PermissionWrite)
+			}
+		}
+	}
 
 	for _, handler := range safeOutputHandlers {
 		if handler.PermissionBuilder == nil {

@@ -46,6 +46,8 @@ func TestValidateReservedWorkflowInputs(t *testing.T) {
 		{"call aw_context", "workflow_call", AwContextInputName},
 		{"dispatch work queue claim", "workflow_dispatch", WorkQueueClaimInputName},
 		{"call work queue claim", "workflow_call", WorkQueueClaimInputName},
+		{"legacy scalar dispatch", "workflow_dispatch", "work_queue_claim"},
+		{"legacy scalar call", "workflow_call", "work_queue_claim"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data := &WorkflowData{
@@ -80,5 +82,6 @@ func TestInjectAwContextAndQueueClaimInputs(t *testing.T) {
 
 	assert.Contains(t, on, "workflow_dispatch:")
 	assert.Contains(t, on, "aw_context:")
-	assert.Contains(t, on, "work_queue_claim:")
+	assert.Contains(t, on, "work_queue_assignment:")
+	assert.NotContains(t, on, "work_queue_claim:")
 }

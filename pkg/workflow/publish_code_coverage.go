@@ -36,8 +36,9 @@ const SafeOutputsUploadCodeCoverageStagingArtifactName = "safe-outputs-upload-co
 // actions/upload-code-coverage from agent output.
 type UploadCodeCoverageConfig struct {
 	BaseSafeOutputConfig     `yaml:",inline"`
-	FailOnError              *bool `yaml:"fail-on-error,omitempty"`               // Fixed fail-on-error input for actions/upload-code-coverage (default: true); agent cannot override
-	WaitForProcessingTimeout int   `yaml:"wait-for-processing-timeout,omitempty"` // Fixed wait-for-processing-timeout in seconds (default: 160); agent cannot override
+	FailOnError              *bool  `yaml:"fail-on-error,omitempty"`               // Fixed fail-on-error input for actions/upload-code-coverage (default: true); agent cannot override
+	WaitForProcessingTimeout int    `yaml:"wait-for-processing-timeout,omitempty"` // Fixed wait-for-processing-timeout in seconds (default: 160); agent cannot override
+	TargetRef                string `yaml:"target-ref,omitempty"`
 }
 
 // parseUploadCodeCoverageConfig handles upload-code-coverage configuration
@@ -61,6 +62,7 @@ func (c *Compiler) parseUploadCodeCoverageConfig(outputMap map[string]any) *Uplo
 	}
 
 	if configMap, ok := configData.(map[string]any); ok {
+		config.TargetRef, _ = configMap["target-ref"].(string)
 		if failOnError, exists := configMap["fail-on-error"]; exists {
 			if b, ok := failOnError.(bool); ok {
 				config.FailOnError = &b

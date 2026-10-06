@@ -14,6 +14,10 @@ var consolidatedSafeOutputsEnvvarsLog = logger.New("workflow:compiler_safe_outpu
 // for the consolidated safe_outputs job. These are variables that are common to all safe output steps.
 func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID string) map[string]string {
 	envVars := make(map[string]string)
+	if isWorkQueueEnabled(data) {
+		envVars["GH_AW_WORK_QUEUE_ENABLED"] = `"true"`
+		envVars["GH_AW_WORK_QUEUE_SNAPSHOT"] = fmt.Sprintf("%q", constants.WorkQueueSnapshotPath)
+	}
 
 	// Set GH_AW_WORKFLOW_ID to the workflow ID (filename without extension)
 	// This is used for branch naming in create_pull_request and other operations

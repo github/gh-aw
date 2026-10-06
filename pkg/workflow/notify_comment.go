@@ -67,6 +67,11 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName string, safeOutputJobNames []string) ([]string, error) {
 	steps := c.buildConclusionSetupSteps(data)
 	steps = append(steps, c.buildConclusionWorkQueueSummaryStep(data)...)
+	if isWorkQueueEnabled(data) {
+		// Queue outputs and failure reports are settled only in their trusted Claim pass.
+		// Native job failure is diagnostic, not authority for anonymous follow-up writes.
+		return append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...), nil
+	}
 	steps = append(steps, c.buildConclusionNoOpStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
@@ -111,13 +116,13 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 	conclusionPerms := ComputePermissionsForSafeOutputs(data.SafeOutputs)
 	if isWorkQueueEnabled(data) {
-		scope := PermissionContents
-		if workQueueStorage(data) == "issues" {
-			scope = PermissionIssues
+		conclusionPerms = NewPermissions()
+		conclusionPerms.Set(PermissionContents, PermissionRead)
+		conclusionPerms.Set(PermissionActions, PermissionRead)
+		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
+			conclusionPerms.Set(PermissionIdToken, PermissionWrite)
 		}
-		if level, ok := conclusionPerms.Get(scope); !ok || level == PermissionNone {
-			conclusionPerms.Set(scope, PermissionRead)
-		}
+		return conclusionPerms
 	}
 	// When observability.otlp.github-app is configured without app-id/private-key
 	// credentials, id-token: write is needed so the conclusion job can mint the OTLP

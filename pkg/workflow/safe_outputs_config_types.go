@@ -106,6 +106,7 @@ type SafeOutputsConfig struct {
 	ThreatDetection                        *ThreatDetectionConfig                 `yaml:"threat-detection,omitempty"`             // Threat detection configuration
 	Jobs                                   map[string]*SafeJobConfig              `yaml:"jobs,omitempty"`                         // Safe-jobs configuration (moved from top-level)
 	Scripts                                map[string]*SafeScriptConfig           `yaml:"scripts,omitempty"`                      // Custom inline handlers that run in the safe-output handler loop
+	ClaimAdapters                          map[string]*WorkQueueClaimAdapter      `yaml:"claim-adapters,omitempty"`               // Trusted queue-only custom preparation and independent effect verification
 	GitHubApp                              *GitHubAppConfig                       `yaml:"github-app,omitempty"`                   // GitHub App credentials for token minting
 	URLs                                   SafeOutputsURLsPolicy                  `yaml:"urls,omitempty"`                         // URL sanitization policy: SafeOutputsURLsPolicyAllowedOnly (default) or SafeOutputsURLsPolicyAllowedOrCodeRegion
 	Data                                   any                                    `yaml:"data,omitempty"`                         // Structured data mode for body-based safe outputs: false/omitted (disabled), true (allow any object), object (inline schema), or GitHub Actions expression string

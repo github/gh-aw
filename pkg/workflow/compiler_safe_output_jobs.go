@@ -46,6 +46,15 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 
 	// Track safe output job names to establish dependencies for conclusion job
 	var safeOutputJobNames []string
+	var preparedJobs []string
+	if isWorkQueueEnabled(data) {
+		c.resolveAllActions(data, markdownPath)
+		var err error
+		preparedJobs, err = c.buildWorkQueuePreparedAdapterJobs(data, threatDetectionEnabled)
+		if err != nil {
+			return fmt.Errorf("failed to build trusted Claim adapter preparation: %w", err)
+		}
+	}
 
 	// Build consolidated safe outputs job containing all safe output operations as steps
 	consolidatedJob, consolidatedStepNames, err := c.buildConsolidatedSafeOutputsJob(data, jobName, markdownPath)
@@ -53,6 +62,7 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 		return fmt.Errorf("failed to build consolidated safe outputs job: %w", err)
 	}
 	if consolidatedJob != nil {
+		addWorkQueuePreparedAdapterNeeds(consolidatedJob, preparedJobs)
 		if err := c.jobManager.AddJob(consolidatedJob); err != nil {
 			return fmt.Errorf("failed to add consolidated safe outputs job: %w", err)
 		}
@@ -63,9 +73,12 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	// Build safe-jobs if configured
 	// Safe-jobs should depend on agent job (always) AND detection job (if threat detection is enabled)
 	// These custom safe-jobs should also be included in the conclusion job's dependencies
-	safeJobNames, err := c.buildSafeJobs(data, threatDetectionEnabled)
-	if err != nil {
-		return fmt.Errorf("failed to build safe-jobs: %w", err)
+	safeJobNames := preparedJobs
+	if !isWorkQueueEnabled(data) {
+		safeJobNames, err = c.buildSafeJobs(data, threatDetectionEnabled)
+		if err != nil {
+			return fmt.Errorf("failed to build safe-jobs: %w", err)
+		}
 	}
 	// Add custom safe-job names to the list of safe output jobs
 	safeOutputJobNames = append(safeOutputJobNames, safeJobNames...)
@@ -76,7 +89,7 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	// 1. Git configuration for pushing to orphaned branches
 	// 2. Checkout with proper credentials
 	// 3. Different permissions (contents: write)
-	if data.SafeOutputs != nil && data.SafeOutputs.UploadAssets != nil {
+	if data.SafeOutputs != nil && data.SafeOutputs.UploadAssets != nil && !isWorkQueueEnabled(data) {
 		compilerSafeOutputJobsLog.Print("Building separate upload_assets job")
 		uploadAssetsJob, err := c.buildUploadAssetsJob(data, jobName, threatDetectionEnabled)
 		if err != nil {
@@ -94,6 +107,7 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	// It is separate to avoid the checkout step (needed to restore HEAD to github.sha) from
 	// interfering with other safe-output operations in the consolidated safe_outputs job.
 	if data.SafeOutputs != nil && data.SafeOutputs.CreateCodeScanningAlerts != nil &&
+		!isWorkQueueEnabled(data) &&
 		!isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.CreateCodeScanningAlerts.Staged) {
 		compilerSafeOutputJobsLog.Print("Building separate upload_code_scanning_sarif job")
 		codeScanningJob, err := c.buildCodeScanningUploadJob(data)
@@ -113,6 +127,7 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	// its own dedicated permissions (code-quality: write) without affecting other safe-output
 	// operations in the consolidated safe_outputs job.
 	if data.SafeOutputs != nil && data.SafeOutputs.UploadCodeCoverage != nil &&
+		!isWorkQueueEnabled(data) &&
 		!isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), data.SafeOutputs.UploadCodeCoverage.Staged) {
 		compilerSafeOutputJobsLog.Print("Building separate upload_code_coverage job")
 		codeCoverageJob, err := c.buildUploadCodeCoverageJob(data, jobName)

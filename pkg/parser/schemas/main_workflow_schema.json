@@ -7,6 +7,123 @@
   "type": "object",
   "required": ["on"],
   "properties": {
+    "work-queue-policy": {
+      "description": "Version-3 scheduling policy proposal. The installed ledger Policy remains authoritative; scheduling cannot be disabled.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["weighted-priority", "strict-priority"] },
+        "class-weights": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        },
+        "accounting-weights": {
+          "type": "object",
+          "maxProperties": 1024,
+          "propertyNames": { "maxLength": 128 },
+          "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        },
+        "outstanding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "claims": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "dispatches": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "per-account-claims": { "type": "integer", "minimum": 1, "maximum": 4096 }
+          }
+        },
+        "worker-profiles": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 256,
+          "additionalProperties": { "$ref": "#/$defs/work_queue_worker_profile" }
+        },
+        "pools": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["default-profile", "profiles", "logical-limit", "native-limit"],
+            "properties": {
+              "default-profile": { "type": "string", "minLength": 1, "maxLength": 256 },
+              "profiles": {
+                "type": "object",
+                "minProperties": 1,
+                "maxProperties": 256,
+                "additionalProperties": { "$ref": "#/$defs/work_queue_worker_profile" }
+              },
+              "logical-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+              "native-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+              "per-account-limit": { "type": "integer", "minimum": 1, "maximum": 4096 },
+              "allowed-repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+              "max-observation-age-ms": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+              "retry": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["max-attempts", "backoff-ms"],
+                "properties": {
+                  "max-attempts": { "type": "integer", "minimum": 1, "maximum": 16 },
+                  "backoff-ms": { "type": "integer", "minimum": 1, "maximum": 3600000 }
+                }
+              },
+              "reconciliation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["max-attempts", "deadline-ms"],
+                "properties": {
+                  "max-attempts": { "type": "integer", "minimum": 1, "maximum": 64 },
+                  "deadline-ms": { "type": "integer", "minimum": 1, "maximum": 3600000 }
+                }
+              }
+            }
+          }
+        },
+        "producers": {
+          "type": "object",
+          "maxProperties": 1024,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pools", "priorities", "fairness-keys"],
+            "properties": {
+              "pools": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
+              "priorities": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "type": "integer", "minimum": 1, "maximum": 5 } },
+              "fairness-keys": { "type": "array", "minItems": 1, "maxItems": 1024, "items": { "type": "string", "maxLength": 128 } }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repositories": { "type": "array", "maxItems": 64, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" } },
+            "max-observation-age": { "type": "string", "pattern": "^[1-9][0-9]*(ms|s|m)$" },
+            "read-credentials": { "type": "object", "maxProperties": 64, "additionalProperties": { "type": "string", "pattern": "^\\$\\{\\{ secrets\\.[A-Za-z_][A-Za-z0-9_]* \\}\\}$" } }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ledger-bytes": { "type": "integer", "minimum": 1, "maximum": 67108864 },
+            "recovery-bytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+            "payload-bytes": { "type": "integer", "minimum": 1, "maximum": 16384 },
+            "graph-nodes": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "predecessors": { "type": "integer", "minimum": 1, "maximum": 64 },
+            "pending-nodes": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "operations": { "type": "integer", "minimum": 1, "maximum": 256 },
+            "assignment-bytes": { "type": "integer", "minimum": 1, "maximum": 49152 },
+            "result-bytes": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "evidence-bytes": { "type": "integer", "minimum": 1, "maximum": 1024 },
+            "observation-writes": { "type": "integer", "minimum": 1, "maximum": 4096 }
+          }
+        }
+      }
+    },
     "name": {
       "type": "string",
       "minLength": 1,
@@ -5053,11 +5170,11 @@
           "examples": [true, null]
         },
         "work-queue": {
-          "description": "Read work queue and claim state from the immutable activation snapshot. The snapshot can become stale while the agent runs. Issue storage requires the repository secret GH_AW_WORK_QUEUE_HMAC_SECRET; all accepted issue bodies and comments are signed.",
+          "description": "Read the immutable version-3 activation snapshot and stage queue intents. The installed ledger Policy is authoritative. Only Git storage is supported.",
           "oneOf": [
             {
-              "type": "boolean",
-              "description": "Enable or disable the work-queue MCP server."
+              "const": true,
+              "description": "Enable the mandatory scheduled work queue."
             },
             {
               "type": "null",
@@ -5066,12 +5183,11 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["storage"],
               "properties": {
                 "storage": {
                   "type": "string",
-                  "enum": ["git", "issues"],
-                  "description": "Queue storage backend; defaults to git. Choose issues to store queue records on GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret."
+                  "enum": ["git"],
+                  "description": "Version-3 Git queue backend."
                 },
                 "require-assignment": {
                   "type": "boolean",
@@ -5084,7 +5200,7 @@
               }
             }
           ],
-          "examples": [true, null, { "storage": "issues" }, { "storage": "git", "worker": true, "require-assignment": true }]
+          "examples": [true, null, { "storage": "git", "worker": true }]
         },
         "cache-memory": {
           "description": "Cache memory MCP configuration for persistent memory storage",
@@ -9028,6 +9144,11 @@
                   "type": "string",
                   "description": "Driver name for SARIF tool.driver.name field (default: 'GitHub Agentic Workflows Security Scanner')"
                 },
+                "target-ref": {
+                  "type": "string",
+                  "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$",
+                  "description": "Trusted queue SARIF destination ref. It must independently resolve to the immutable worker revision before upload."
+                },
                 "github-token": {
                   "$ref": "#/$defs/github_token_same_job",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
@@ -11797,6 +11918,11 @@
               "type": "object",
               "description": "⚠️ Experimental. Configuration for uploading a code coverage report via actions/upload-code-coverage",
               "properties": {
+                "target-ref": {
+                  "type": "string",
+                  "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$",
+                  "description": "Trusted queue coverage target; independently resolved to the immutable worker revision before upload."
+                },
                 "fail-on-error": {
                   "type": "boolean",
                   "description": "Fixed fail-on-error input passed to actions/upload-code-coverage (fixed; the agent cannot override this value). When true (default), the upload job fails if the upload or processing fails.",
@@ -12238,6 +12364,139 @@
                   "description": "GitHub App authentication. Mints a short-lived installation access token via actions/create-github-app-token. Mutually exclusive with github-token."
                 }
               },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "claim-adapters": {
+          "type": "object",
+          "description": "Queue-worker custom delivery adapters. Prepared jobs/actions/steps receive isolated Claim inputs without write credentials; effects are applied by the trusted handler and independently verified, never inferred from job success.",
+          "patternProperties": {
+            "^[a-zA-Z_][a-zA-Z0-9_-]*$": {
+              "type": "object",
+              "properties": {
+                "mode": { "enum": ["prepared", "script"] },
+                "effect-type": { "enum": ["create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"] },
+                "target-repo": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9._-]+$" },
+                "field-map": {
+                  "type": "object",
+                  "maxProperties": 64,
+                  "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" },
+                  "additionalProperties": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" }
+                },
+                "expected": {
+                  "type": "object",
+                  "maxProperties": 64,
+                  "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" }
+                },
+                "graphql": {
+                  "type": "object",
+                  "properties": {
+                    "mutation": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z][A-Za-z_0-9]*$" },
+                    "input-type": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z][A-Za-z_0-9]*$" },
+                    "response-field": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z][A-Za-z_0-9]*$" },
+                    "resource-type": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z][A-Za-z_0-9]*$" },
+                    "resource-kind": { "enum": ["unknown", "issue", "pull_request", "comment", "discussion", "repository"] },
+                    "repository-input": { "enum": ["none", "repositoryId", "repositoryNameWithOwner"] },
+                    "repository-field": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z][A-Za-z_0-9]*(\\.[A-Za-z][A-Za-z_0-9]*){0,7}$" },
+                    "number-field": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z][A-Za-z_0-9]*(\\.[A-Za-z][A-Za-z_0-9]*){0,7}$" },
+                    "permission": { "enum": ["checks", "contents", "issues", "pull-requests", "deployments", "discussions"] },
+                    "fields": {
+                      "type": "object",
+                      "minProperties": 1,
+                      "maxProperties": 64,
+                      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z_0-9]*$" },
+                      "additionalProperties": { "type": "string", "maxLength": 256, "pattern": "^[A-Za-z][A-Za-z_0-9]*(\\.[A-Za-z][A-Za-z_0-9]*){0,7}$" }
+                    }
+                  },
+                  "required": ["mutation", "input-type", "response-field", "resource-type", "resource-kind", "repository-input", "repository-field", "permission", "fields"],
+                  "additionalProperties": false
+                },
+                "git-tree": {
+                  "type": "object",
+                  "properties": {
+                    "base-revision": { "type": "string", "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$" },
+                    "branch-prefix": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$" },
+                    "pull-request": { "type": "boolean" },
+                    "base-branch": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$" }
+                  },
+                  "required": ["base-revision", "branch-prefix"],
+                  "allOf": [
+                    {
+                      "if": { "properties": { "pull-request": { "const": true } }, "required": ["pull-request"] },
+                      "then": { "required": ["base-branch"] }
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "request": {
+                  "type": "object",
+                  "properties": {
+                    "method": { "enum": ["POST", "PUT", "PATCH"] },
+                    "permission": { "enum": ["checks", "contents", "issues", "pull-requests", "deployments", "discussions"] },
+                    "route": { "type": "string", "pattern": "^/repos/\\{owner\\}/\\{repo\\}/[A-Za-z0-9_{}./-]+$" }
+                  },
+                  "required": ["method", "route", "permission"],
+                  "additionalProperties": false
+                },
+                "verifier": {
+                  "type": "object",
+                  "properties": {
+                    "route": { "type": "string", "pattern": "^/repos/\\{owner\\}/\\{repo\\}/[A-Za-z0-9_{}./-]+$" },
+                    "resource-kind": { "enum": ["unknown", "issue", "pull_request", "comment", "release", "check_run", "deployment", "repository"] },
+                    "number-field": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" },
+                    "fields": {
+                      "type": "object",
+                      "minProperties": 1,
+                      "maxProperties": 64,
+                      "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" },
+                      "additionalProperties": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z_0-9]*$" }
+                    }
+                  },
+                  "required": ["route", "resource-kind", "fields"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["mode", "effect-type", "target-repo"],
+              "allOf": [
+                {
+                  "if": { "properties": { "effect-type": { "const": "github_rest" } }, "required": ["effect-type"] },
+                  "then": { "required": ["request", "verifier"] },
+                  "else": {
+                    "not": { "anyOf": [{ "required": ["request"] }, { "required": ["verifier"] }] }
+                  }
+                },
+                {
+                  "if": { "properties": { "effect-type": { "const": "git_tree" } }, "required": ["effect-type"] },
+                  "then": {
+                    "required": ["git-tree"],
+                    "properties": {
+                      "field-map": { "propertyNames": { "enum": ["files", "title", "body"] } },
+                      "expected": { "propertyNames": { "enum": ["files", "title", "body"] } }
+                    }
+                  },
+                  "else": { "not": { "required": ["git-tree"] } }
+                },
+                {
+                  "if": { "properties": { "effect-type": { "const": "github_graphql" } }, "required": ["effect-type"] },
+                  "then": { "required": ["graphql"] },
+                  "else": { "not": { "required": ["graphql"] } }
+                },
+                {
+                  "if": { "properties": { "effect-type": { "enum": ["github_rest", "git_tree", "github_graphql"] } }, "required": ["effect-type"] },
+                  "else": {
+                    "properties": {
+                      "field-map": {
+                        "propertyNames": { "enum": ["title", "body", "labels", "assignees", "milestone", "state", "status", "state_reason", "item_number", "issue_number", "pull_request_number", "label_to_add", "label_to_remove"] }
+                      },
+                      "expected": {
+                        "propertyNames": { "enum": ["title", "body", "labels", "assignees", "milestone", "state", "status", "state_reason", "item_number", "issue_number", "pull_request_number", "label_to_add", "label_to_remove"] }
+                      }
+                    }
+                  }
+                }
+              ],
               "additionalProperties": false
             }
           },
@@ -13829,6 +14088,21 @@
     }
   ],
   "$defs": {
+    "work_queue_worker_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow", "ref", "principal", "trust-domain", "credential-scope", "effect-scope"],
+      "properties": {
+        "workflow": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.(lock\\.yml|yml|yaml)$" },
+        "ref": { "type": "string", "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$" },
+        "principal": { "type": "string", "pattern": "^[1-9][0-9]{0,255}$" },
+        "trust-domain": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "credential-scope": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "effect-scope": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "max-claims-per-dispatch": { "type": "integer", "minimum": 1, "maximum": 16, "default": 1 },
+        "share-keys": { "type": "boolean", "default": false }
+      }
+    },
     "ledgerScriptRestrictions": {
       "type": "object",
       "properties": {
