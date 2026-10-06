@@ -152,7 +152,10 @@ func TestSpec_PublicAPI_IsAuthError(t *testing.T) {
 	}{
 		{name: "GH_TOKEN reference", output: "GH_TOKEN is invalid or expired", want: true},
 		{name: "GITHUB_TOKEN reference", output: "GITHUB_TOKEN: authentication failed", want: true},
+		{name: "authentication marker", output: "authentication required", want: true},
+		{name: "not logged into marker", output: "you are not logged into any GitHub hosts", want: true},
 		{name: "unauthorized", output: "401: unauthorized", want: true},
+		{name: "permission denied marker", output: "permission denied for this resource", want: true},
 		{name: "forbidden is not inherently an auth failure", output: "403: forbidden", want: false},
 		{name: "saml enforcement", output: "Resource protected by organization SAML enforcement", want: true},
 		{name: "non-auth output", output: "404: not found", want: false},
