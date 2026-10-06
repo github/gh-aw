@@ -4,7 +4,7 @@
  * @typedef {import("./types/agent_session").SessionEvent} SessionEvent
  */
 
-const { getMessageRefusal, getProviderRefusals } = require("./provider_refusal.cjs");
+const { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage } = require("./provider_refusal.cjs");
 
 const USAGE_ALIASES = {
   input_tokens: "inputTokens",
@@ -135,29 +135,135 @@ function normalizeAgentSession(entries, { sourceEngine } = {}) {
   const events = [];
   const toolUses = new Map();
   const anonymousStarts = [];
+  /** @type {Map<string, string>} */
+  const chatStreamText = new Map();
+  /** @type {Map<string, any>} */
+  const responseRefusals = new Map();
   for (const entry of entries) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-    const emit = (type, data, block = {}) => events.push(createSessionEvent(entry, type, { ...block, ...data }));
+    const emit = (type, data, block = {}) => {
+      const event = createSessionEvent(entry, type, { ...block, ...data });
+      events.push(event);
+      return event;
+    };
     if (isSessionEvent(entry)) {
       const refusal = entry.type === "assistant.message" ? getMessageRefusal(entry.data) : undefined;
       events.push(refusal ? createSessionEvent(entry, "assistant.refusal", refusal) : structuredClone(entry));
       if (entry.type === "tool.execution_start" && entry.data.toolCallId !== undefined) toolUses.set(entry.data.toolCallId, entry.data);
       continue;
     }
+    if (Array.isArray(entry.choices)) {
+      const streaming = entry.object === "chat.completion.chunk";
+      for (const [choiceIndex, choice] of entry.choices.entries()) {
+        if (!choice || typeof choice !== "object") continue;
+        const message = choice.message ?? choice.delta;
+        const streamKey = JSON.stringify([entry.id ?? entry.request_id ?? entry.requestId ?? "chat", choice.index ?? choiceIndex]);
+        if (streaming && typeof message?.content === "string") chatStreamText.set(streamKey, (chatStreamText.get(streamKey) ?? "") + message.content);
+        const refusal = getMessageRefusal(message ?? {}, choice.finish_reason);
+        if (refusal) {
+          if (streaming && refusal.reason === "content_filter" && chatStreamText.has(streamKey)) refusal.content = chatStreamText.get(streamKey);
+          emit("assistant.refusal", refusal, { choiceIndex: choice.index ?? choiceIndex });
+        } else if (!streaming && message && (message.role === undefined || message.role === "assistant")) {
+          if (typeof message.reasoning_text === "string") emit("assistant.reasoning", { content: message.reasoning_text });
+          if (typeof message.content === "string") emit("assistant.message", { content: message.content }, { choiceIndex: choice.index ?? choiceIndex });
+        }
+        for (const tool of Array.isArray(message?.tool_calls) ? message.tool_calls : []) {
+          if (!tool?.function) continue;
+          let input = tool.function.arguments;
+          if (typeof input === "string") {
+            try {
+              input = JSON.parse(input);
+            } catch {
+              // Preserve malformed provider arguments verbatim.
+            }
+          }
+          emit("tool.execution_start", { ...tool, toolCallId: tool.id, toolName: tool.function.name, input });
+        }
+        if (streaming && choice.finish_reason != null) chatStreamText.delete(streamKey);
+      }
+      const usage = normalizeSessionUsage(normalizeOpenAIChatUsage(entry.usage));
+      if (usage) emit("session.result", { usage });
+      continue;
+    }
+    const response = entry.response ?? entry;
+    if (response?.object === "response" && Array.isArray(response.output)) {
+      let emittedFilter = false;
+      const filtered = response.incomplete_details?.reason === "content_filter";
+      for (const [outputIndex, item] of response.output.entries()) {
+        if (!item || typeof item !== "object") continue;
+        if (item.type === "function_call") {
+          let input = item.arguments;
+          if (typeof input === "string") {
+            try {
+              input = JSON.parse(input);
+            } catch {
+              // Preserve malformed provider arguments verbatim.
+            }
+          }
+          emit("tool.execution_start", { toolCallId: item.call_id ?? item.id, toolName: item.name, input }, { outputIndex, itemId: item.id });
+          continue;
+        }
+        if (item.type !== "message" || item.role !== "assistant") continue;
+        const text = [];
+        const refusalParts = [];
+        for (const [contentIndex, part] of (Array.isArray(item.content) ? item.content : []).entries()) {
+          if (part?.type === "refusal" && typeof part.refusal === "string") refusalParts.push({ content: part.refusal, contentIndex });
+          else if (part?.type === "output_text" && typeof part.text === "string") text.push(part.text);
+        }
+        const fields = { outputIndex, itemId: item.id };
+        if (refusalParts.length) {
+          for (const part of refusalParts) {
+            const refusal = { reason: filtered ? "content_filter" : "refusal", content: part.content };
+            const key = JSON.stringify([response.id ?? entry.response_id ?? entry.id, item.id ?? outputIndex, part.contentIndex]);
+            const previous = responseRefusals.get(key);
+            if (previous) {
+              Object.assign(previous.data, refusal);
+              delete previous.data.partial;
+            } else responseRefusals.set(key, emit("assistant.refusal", refusal, { ...fields, contentIndex: part.contentIndex }));
+          }
+          emittedFilter ||= filtered;
+        } else if (filtered && text.length) {
+          const key = JSON.stringify([response.id ?? entry.response_id ?? entry.id, item.id ?? outputIndex, 0]);
+          const previous = responseRefusals.get(key);
+          if (previous) {
+            Object.assign(previous.data, { reason: "content_filter", content: text.join("") });
+            delete previous.data.partial;
+          } else responseRefusals.set(key, emit("assistant.refusal", { reason: "content_filter", content: text.join("") }, fields));
+          emittedFilter = true;
+        } else if (!filtered) {
+          for (const content of text) emit("assistant.message", { content }, fields);
+        }
+      }
+      if (filtered && !emittedFilter) emit("assistant.refusal", { reason: "content_filter" });
+      const usage = normalizeSessionUsage(response.usage);
+      if (usage) emit("session.result", { usage });
+      continue;
+    }
     const refusals = getProviderRefusals(entry);
     if (refusals.length) {
-      for (const refusal of refusals) emit("assistant.refusal", refusal);
-      const response = entry.response ?? entry;
-      const usage = normalizeSessionUsage(
-        response.usage && Array.isArray(response.choices)
-          ? {
-              input_tokens: response.usage.prompt_tokens,
-              output_tokens: response.usage.completion_tokens,
-              cache_read_input_tokens: response.usage.prompt_tokens_details?.cached_tokens,
-            }
-          : response.usage
-      );
-      if (usage) emit("session.result", { usage: entry.type === "message" ? { ...usage, input_tokens_include_cache: false } : usage });
+      const isResponsesStream = typeof entry.type === "string" && entry.type.startsWith("response.");
+      for (const [index, refusal] of refusals.entries()) {
+        if (!isResponsesStream) {
+          emit("assistant.refusal", refusal);
+          continue;
+        }
+        const responseId = entry.response_id ?? entry.response?.id ?? entry.id;
+        const itemId = entry.item_id ?? entry.item?.id ?? entry.output_index;
+        const contentIndex = entry.content_index ?? index;
+        const key = JSON.stringify([responseId, itemId, contentIndex]);
+        const previous = responseRefusals.get(key);
+        if (!previous) {
+          responseRefusals.set(key, emit("assistant.refusal", refusal));
+        } else if (entry.type === "response.refusal.delta") {
+          if (typeof refusal.content === "string") previous.data.content = (previous.data.content ?? "") + refusal.content;
+        } else {
+          if (entry.type.endsWith(".added") && refusal.content === "" && typeof previous.data.content === "string" && previous.data.content.length) continue;
+          Object.assign(previous.data, refusal);
+          if (!refusal.partial) delete previous.data.partial;
+        }
+      }
+      const usage = normalizeSessionUsage(entry.type === "message" ? entry.usage : undefined);
+      if (usage) emit("session.result", { usage: { ...usage, input_tokens_include_cache: false } });
       continue;
     }
     if (entry.type === "system" && entry.subtype === "init") {

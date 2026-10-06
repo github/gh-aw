@@ -6,7 +6,7 @@
 const { createEngineLogParser, generateConversationMarkdown, generateInformationSection, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, AWF_INFRA_LINE_RE } = require("./log_parser_shared.cjs");
 const { projectSessionResult, createSessionEvent, accumulateSessionUsage, isTokenCount, normalizeAgentSession, normalizeSessionUsage } = require("./agent_session.cjs");
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
-const { getMessageRefusal } = require("./provider_refusal.cjs");
+const { getMessageRefusal, normalizeOpenAIChatUsage } = require("./provider_refusal.cjs");
 
 const main = createEngineLogParser({
   parserName: "Copilot",
@@ -293,17 +293,7 @@ function parseDebugLogFormat(logContent) {
     const duplicate = identity !== undefined && responses.has(identity);
     if (identity !== undefined) responses.add(identity);
     if (!duplicate && value.usage) {
-      /** @type {Record<string, any>} */
-      const contribution = {};
-      for (const [nativeKey, key] of [
-        ["prompt_tokens", "input_tokens"],
-        ["completion_tokens", "output_tokens"],
-      ]) {
-        if (isTokenCount(value.usage[nativeKey])) contribution[key] = value.usage[nativeKey];
-      }
-      const cached = value.usage.prompt_tokens_details?.cached_tokens;
-      if (isTokenCount(cached)) contribution.cache_read_input_tokens = cached;
-      accumulateSessionUsage(usage, contribution);
+      accumulateSessionUsage(usage, normalizeOpenAIChatUsage(value.usage) ?? {});
       if (Object.keys(usage).length) entries.push(createSessionEvent(source, "session.result", { usage: { ...usage } }));
     }
     if (!duplicate && value.error !== undefined) entries.push(createSessionEvent(source, "session.result", { errors: [value.error] }));

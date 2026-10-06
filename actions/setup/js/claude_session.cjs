@@ -105,7 +105,7 @@ function normalizeClaudeSession(records) {
       const raw = source.event;
       const channel = channelKey(source);
       if (raw.type === "message_start") {
-        const state = { id: raw.message?.id, blocks: new Map(), refusalEvent: undefined };
+        const state = { id: raw.message?.id, blocks: new Map(), textEvents: [], refusalEvent: undefined };
         streams.set(channel, state);
         if (state.id !== undefined) streamedMessages.set(messageKey(source, state.id), state);
         reportUsage(source, state.id, raw.message?.usage);
@@ -114,7 +114,7 @@ function normalizeClaudeSession(records) {
       } else {
         let state = streams.get(channel);
         if (!state) {
-          state = { id: undefined, blocks: new Map() };
+          state = { id: undefined, blocks: new Map(), textEvents: [], refusalEvent: undefined };
           streams.set(channel, state);
         }
         if (raw.type === "message_delta") {
@@ -123,10 +123,16 @@ function normalizeClaudeSession(records) {
           if (refusal) {
             const texts = [...state.blocks.values()].filter(block => block.type === "text").map(block => block.text);
             state.refusalEvent = emit(source, "assistant.refusal", { ...sourceFields(source), ...refusal, ...(texts.length ? { content: texts.join("") } : {}) });
+            for (const textEvent of state.textEvents) {
+              const index = events.indexOf(textEvent);
+              if (index !== -1) events.splice(index, 1);
+            }
+            state.textEvents = [];
           }
         } else if (raw.type === "content_block_start" && raw.content_block) {
           const block = raw.content_block;
           const event = emitBlock(source, block);
+          if (event?.type === "assistant.message") state.textEvents.push(event);
           state.blocks.set(raw.index, {
             type: block.type,
             text: block.type === "thinking" ? (block.thinking ?? "") : (block.text ?? ""),
@@ -144,7 +150,13 @@ function normalizeClaudeSession(records) {
           if (!block) continue;
           if (delta.type === "text_delta" && typeof delta.text === "string") {
             block.text += delta.text;
-            emitBlock(source, { type: "text", text: delta.text });
+            if (state.refusalEvent) {
+              const texts = [...state.blocks.values()].filter(value => value.type === "text").map(value => value.text);
+              if (texts.length) state.refusalEvent.data.content = texts.join("");
+            } else {
+              const event = emitBlock(source, { type: "text", text: delta.text });
+              if (event?.type === "assistant.message") state.textEvents.push(event);
+            }
           } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
             block.text += delta.thinking;
             emitBlock(source, { type: "thinking", thinking: delta.thinking });

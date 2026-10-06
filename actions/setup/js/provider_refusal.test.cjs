@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-const { getMessageRefusal, getProviderRefusals } = require("./provider_refusal.cjs");
+const { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage } = require("./provider_refusal.cjs");
 const { normalizeAgentSession, projectSessionResult } = require("./agent_session.cjs");
 const { normalizeClaudeSession } = require("./claude_session.cjs");
 const { parseCopilotLog } = require("./parse_copilot_log.cjs");
@@ -53,6 +53,55 @@ describe("Structured policy refusals", () => {
     expect(getMessageRefusal({ content: [{ type: "refusal", refusal: "exact\n" }] })).toEqual({ reason: "refusal", content: "exact\n" });
   });
 
+  it("shares Chat Completions usage mapping and preserves siblings of refused choices and items", () => {
+    expect(normalizeOpenAIChatUsage({ prompt_tokens: 11, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 7 } })).toEqual({
+      input_tokens: 11,
+      output_tokens: 3,
+      cache_read_input_tokens: 7,
+    });
+    const chat = normalizeAgentSession([
+      {
+        id: "mixed-chat",
+        object: "chat.completion",
+        choices: [
+          { index: 0, message: { role: "assistant", refusal: "blocked" }, finish_reason: "stop" },
+          {
+            index: 1,
+            message: {
+              role: "assistant",
+              content: "sibling answer",
+              tool_calls: [{ id: "call-1", function: { name: "lookup", arguments: '{"q":"x"}' } }],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+        usage: { prompt_tokens: 11, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 7 } },
+      },
+    ]);
+    expect(refusals(chat)).toMatchObject([{ data: { reason: "refusal", content: "blocked" } }]);
+    expect(chat.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "sibling answer" } }]);
+    expect(chat.filter(event => event.type === "tool.execution_start")).toMatchObject([{ data: { toolCallId: "call-1", toolName: "lookup", input: { q: "x" } } }]);
+    expect(chat.filter(event => event.type === "session.result")).toHaveLength(1);
+    expect(projectSessionResult(chat).usage).toMatchObject({ input_tokens: 11, output_tokens: 3, cache_read_input_tokens: 7 });
+
+    const responses = normalizeAgentSession([
+      {
+        id: "mixed-response",
+        object: "response",
+        output: [
+          { id: "item-refusal", type: "message", role: "assistant", content: [{ type: "refusal", refusal: "blocked" }] },
+          { id: "item-text", type: "message", role: "assistant", content: [{ type: "output_text", text: "sibling answer" }] },
+          { id: "item-call", type: "function_call", call_id: "call-2", name: "lookup", arguments: '{"q":"y"}' },
+        ],
+        usage: { input_tokens: 13, output_tokens: 4 },
+      },
+    ]);
+    expect(refusals(responses)).toMatchObject([{ data: { reason: "refusal", content: "blocked" } }]);
+    expect(responses.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "sibling answer" } }]);
+    expect(responses.filter(event => event.type === "tool.execution_start")).toMatchObject([{ data: { toolCallId: "call-2", toolName: "lookup", input: { q: "y" } } }]);
+    expect(responses.filter(event => event.type === "session.result")).toHaveLength(1);
+  });
+
   it.each([
     ["response.refusal.delta", { delta: " part " }, { reason: "refusal", content: " part ", partial: true }],
     ["response.refusal.done", { refusal: " full\n" }, { reason: "refusal", content: " full\n" }],
@@ -81,6 +130,45 @@ describe("Structured policy refusals", () => {
     expect(getProviderRefusals({ ...response, incomplete_details: { reason: "max_output_tokens" } })).toEqual([]);
   });
 
+  it("attaches accumulated Chat stream text to its terminal content-filter refusal", () => {
+    const events = normalizeAgentSession([
+      { id: "chat-stream", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " partial" }, finish_reason: null }] },
+      {
+        id: "chat-stream",
+        object: "chat.completion.chunk",
+        choices: [{ index: 0, delta: { content: "\n" }, finish_reason: "content_filter" }],
+        usage: { prompt_tokens: 5, completion_tokens: 2 },
+      },
+    ]);
+    expect(refusals(events)).toMatchObject([{ data: { reason: "content_filter", content: " partial\n" } }]);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual([]);
+    expect(events.filter(event => event.type === "session.result")).toHaveLength(1);
+  });
+
+  it("deduplicates a complete OpenAI Responses refusal stream while retaining sibling output", () => {
+    const records = [
+      { type: "response.refusal.delta", response_id: "streamed-response", item_id: "refusal-item", output_index: 0, content_index: 0, delta: "partial " },
+      { type: "response.content_part.added", response_id: "streamed-response", item_id: "refusal-item", output_index: 0, content_index: 0, part: { type: "refusal", refusal: "" } },
+      { type: "response.content_part.done", response_id: "streamed-response", item_id: "refusal-item", output_index: 0, content_index: 0, part: { type: "refusal", refusal: "complete refusal" } },
+      {
+        type: "response.completed",
+        response: {
+          id: "streamed-response",
+          object: "response",
+          output: [
+            { id: "refusal-item", type: "message", role: "assistant", content: [{ type: "refusal", refusal: "complete refusal" }] },
+            { id: "text-item", type: "message", role: "assistant", content: [{ type: "output_text", text: "sibling answer" }] },
+          ],
+        },
+      },
+    ];
+    const events = parseCopilotLog(jsonl(records)).logEntries;
+    expect(refusals(events)).toHaveLength(1);
+    expect(refusals(events)[0].data).toMatchObject({ reason: "refusal", content: "complete refusal" });
+    expect(refusals(events)[0].data.partial).toBeUndefined();
+    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "sibling answer" } }]);
+  });
+
   it("maps Anthropic Messages API and Claude SDK refusals without inventing empty content", () => {
     for (const record of [anthropicRefusal, { type: "assistant", uuid: "sdk-refusal", session_id: "session", message: anthropicRefusal }]) {
       const parsed = parseClaudeLog(jsonl([record]));
@@ -107,6 +195,7 @@ describe("Structured policy refusals", () => {
     const original = structuredClone(records);
     const events = normalizeClaudeSession(records);
     expect(refusals(events)).toMatchObject([{ data: { reason: "refusal", content: " partial\n", policyCategory: "general_harms" } }]);
+    expect(events.filter(event => event.type === "assistant.message")).toEqual([]);
     expect(events.filter(event => event.type === "claude.assistant_snapshot")).toHaveLength(1);
     expect(projectSessionResult(events).usage.output_tokens).toBe(0);
     expect(records).toEqual(original);

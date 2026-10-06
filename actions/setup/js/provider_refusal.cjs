@@ -2,6 +2,30 @@
 
 /** @typedef {import("./types/agent_session").AssistantRefusalData} AssistantRefusalData */
 
+const isOpenAIRefusal = message => typeof message?.refusal === "string";
+const isResponsesRefusal = message => Array.isArray(message?.content) && message.content.some(part => part?.type === "refusal" && typeof part.refusal === "string");
+const isAnthropicRefusal = message => message?.stop_reason === "refusal";
+
+/**
+ * Map Chat Completions usage to canonical token fields.
+ * @param {any} usage
+ * @returns {Record<string, number>|undefined}
+ */
+function normalizeOpenAIChatUsage(usage) {
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) return undefined;
+  /** @type {Record<string, number>} */
+  const normalized = {};
+  for (const [nativeKey, key] of [
+    ["prompt_tokens", "input_tokens"],
+    ["completion_tokens", "output_tokens"],
+  ]) {
+    if (Number.isSafeInteger(usage[nativeKey]) && usage[nativeKey] >= 0) normalized[key] = usage[nativeKey];
+  }
+  const cached = usage.prompt_tokens_details?.cached_tokens;
+  if (Number.isSafeInteger(cached) && cached >= 0) normalized.cache_read_input_tokens = cached;
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
 /**
  * Classify only structured provider signals, never natural-language disclaimers.
  * @param {any} message
@@ -10,13 +34,13 @@
  */
 function getMessageRefusal(message, finishReason) {
   if (!message || (message.role !== undefined && message.role !== "assistant")) return undefined;
-  const block = Array.isArray(message.content) ? message.content.find(part => part?.type === "refusal" && typeof part.refusal === "string") : undefined;
-  const reason = finishReason === "content_filter" || message.finish_reason === "content_filter" ? "content_filter" : message.stop_reason === "refusal" || typeof message.refusal === "string" || block ? "refusal" : undefined;
+  const refusalPart = Array.isArray(message.content) ? message.content.find(part => part?.type === "refusal" && typeof part.refusal === "string") : undefined;
+  const reason = finishReason === "content_filter" || message.finish_reason === "content_filter" ? "content_filter" : isAnthropicRefusal(message) || isOpenAIRefusal(message) || isResponsesRefusal(message) ? "refusal" : undefined;
   if (!reason) return undefined;
   /** @type {AssistantRefusalData} */
   const data = { reason };
   if (typeof message.refusal === "string") data.content = message.refusal;
-  else if (block) data.content = block.refusal;
+  else if (refusalPart) data.content = refusalPart.refusal;
   else if (typeof message.content === "string") data.content = message.content;
   else if (Array.isArray(message.content)) {
     const texts = message.content.filter(block => block?.type === "text" && typeof block.text === "string").map(block => block.text);
@@ -77,4 +101,4 @@ function getProviderRefusals(record) {
   return refusals;
 }
 
-module.exports = { getMessageRefusal, getProviderRefusals };
+module.exports = { getMessageRefusal, getProviderRefusals, normalizeOpenAIChatUsage };
