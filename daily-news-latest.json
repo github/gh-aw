@@ -1,15 +1,24 @@
 {
-  "date": "2026-09-29",
-  "title": "Daily Status - 2026-09-29",
-  "date_start": "2026-08-31",
-  "date_end": "2026-09-29",
-  "issues_analyzed": 200,
-  "prs_analyzed": 103,
-  "commits_analyzed": 17986,
-  "discussions_analyzed": 50,
-  "releases_analyzed": 30,
-  "charts": [
-    "issues_prs_trends.png",
-    "commit_trends.png"
+  "date": "2026-10-06",
+  "open_issues_sample": 100,
+  "closed_issues_sample": 100,
+  "open_prs": 10,
+  "merged_prs_sample": 50,
+  "closed_prs_sample": 30,
+  "commits_30d": 701,
+  "commits_today": 13,
+  "discussions_sample": 50,
+  "releases_total": 30,
+  "latest_release": "v0.91.1",
+  "top_commit_authors_30d": {
+    "Copilot": 429,
+    "github-actions[bot]": 163,
+    "dependabot[bot]": 51,
+    "Peli de Halleux": 47
+  },
+  "highlights": [
+    "Shipped v0.91.1 with artifact retention policy",
+    "Heavy merge day: security scanning, safe-outputs, agent sessions",
+    "Community issues on AIC estimates, Node pin, wildcard app repos, secret redaction"
   ]
 }
