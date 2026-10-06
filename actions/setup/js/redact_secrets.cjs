@@ -12,6 +12,16 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAddMaskedValues, redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
 const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
+
+/**
+ * @param {unknown} error
+ * @param {...string} codes
+ * @returns {boolean}
+ */
+function isErrnoCode(error, ...codes) {
+  return error !== null && typeof error === "object" && "code" in error && typeof error.code === "string" && codes.includes(error.code);
+}
+
 /**
  * Recursively finds all files matching the specified extensions
  * @param {string} dir - Directory to search
@@ -33,11 +43,11 @@ function findFiles(dir, extensions) {
         try {
           entries = fs.readdirSync(currentDir, { withFileTypes: true });
         } catch (error) {
-          if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+          if (isErrnoCode(error, "ENOENT")) {
             core.warning(`Skipping directory that disappeared during secret redaction: ${currentDir}`);
             continue;
           }
-          if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+          if (isErrnoCode(error, "EACCES", "EPERM")) {
             core.warning(`Skipping inaccessible directory during secret redaction: ${currentDir}`);
             continue;
           }
@@ -46,7 +56,15 @@ function findFiles(dir, extensions) {
         for (const entry of entries) {
           const fullPath = path.join(currentDir, entry.name);
           if (entry.isSymbolicLink()) {
-            fs.unlinkSync(fullPath);
+            try {
+              fs.unlinkSync(fullPath);
+            } catch (error) {
+              if (isErrnoCode(error, "ENOENT")) {
+                core.warning(`Skipping symbolic link that disappeared during secret redaction: ${fullPath}`);
+                continue;
+              }
+              throw error;
+            }
             core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
           } else if (entry.isDirectory()) {
             pending.push(fullPath);
@@ -287,7 +305,7 @@ function writeProcessedFile(filePath, content, changed) {
     }
     return;
   } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM"))) {
+    if (!isErrnoCode(error, "EACCES", "EPERM")) {
       throw error;
     }
   }
@@ -341,7 +359,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
     }
     return totalRedactions;
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT" && !fs.existsSync(filePath)) {
+    if (isErrnoCode(error, "ENOENT") && !fs.existsSync(filePath)) {
       core.warning(`Skipping file that disappeared during secret redaction: ${filePath}`);
       return 0;
     }
@@ -349,7 +367,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
     try {
       fs.unlinkSync(filePath);
     } catch (cleanupError) {
-      if (!(cleanupError && typeof cleanupError === "object" && "code" in cleanupError && cleanupError.code === "ENOENT")) {
+      if (!isErrnoCode(cleanupError, "ENOENT")) {
         throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed`);
       }
     }
@@ -416,15 +434,11 @@ async function main() {
       try {
         for (const value of collectAddMaskedValues(fs.readFileSync(file, "utf8"))) masks.add(value);
       } catch (error) {
-        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-          core.warning(`Skipping file that disappeared during runtime mask collection: ${file}`);
-          continue;
-        }
         for (const source of files) {
           try {
             fs.unlinkSync(source);
           } catch (cleanupError) {
-            if (!(cleanupError && typeof cleanupError === "object" && "code" in cleanupError && cleanupError.code === "ENOENT")) {
+            if (!isErrnoCode(cleanupError, "ENOENT")) {
               throw cleanupError;
             }
           }

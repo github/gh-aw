@@ -201,7 +201,26 @@ describe("redact_secrets.cjs", () => {
           spy.mockRestore();
         }
       });
-      it("continues redaction when agent stdio disappears before mask collection", async () => {
+      it("continues scanning when a symbolic link disappears before removal", () => {
+        const { findFiles } = require("./redact_secrets.cjs");
+        const link = path.join(tempDir, "linked.log");
+        fs.symlinkSync(path.join(tempDir, "missing-target"), link);
+        const unlink = fs.unlinkSync;
+        const spy = vi.spyOn(fs, "unlinkSync").mockImplementation(target => {
+          if (target === link) {
+            unlink(target);
+            throw Object.assign(new Error("symbolic link disappeared"), { code: "ENOENT" });
+          }
+          return unlink(target);
+        });
+        try {
+          expect(findFiles(tempDir, [".log"])).toEqual([]);
+          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Skipping symbolic link that disappeared"));
+        } finally {
+          spy.mockRestore();
+        }
+      });
+      it("fails closed when agent stdio disappears before mask collection", async () => {
         const stdio = path.join(tempDir, "agent-stdio.log");
         const artifact = path.join(tempDir, "server.log");
         fs.writeFileSync(stdio, "no runtime masks");
@@ -216,9 +235,8 @@ describe("redact_secrets.cjs", () => {
         try {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
-          expect(fs.readFileSync(artifact, "utf8")).toBe("***REDACTED***");
-          expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("disappeared during runtime mask collection"));
-          expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(fs.existsSync(artifact)).toBe(false);
+          expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact sources after runtime mask collection failed"));
         } finally {
           spy.mockRestore();
         }
