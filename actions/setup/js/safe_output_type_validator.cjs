@@ -231,6 +231,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
  * @property {string} [customValidation] - Custom validation rule identifier
  * @property {boolean} [dataEnabled] - Whether structured data is enabled for this type
  * @property {any} [dataSchema] - Optional schema used to validate structured data
+ * @property {boolean} [collapseData] - Whether to render structured data in a collapsed details section
  */
 
 /** @type {Object.<string, TypeValidationConfig>|null} */
@@ -871,7 +872,7 @@ function validateItem(item, itemType, lineNum, options) {
     // as fenced JSON so it survives body sanitization.
     if (Object.prototype.hasOwnProperty.call(typeConfig.fields, "body")) {
       const fencedData = `\`\`\`json\n${dataJSON}\n\`\`\``;
-      const dataBlock = itemType === "create_issue" ? `<details>\n<summary>Structured data</summary>\n\n${fencedData}\n\n</details>` : `${STRUCTURED_DATA_LABEL}\n${fencedData}`;
+      const dataBlock = typeConfig.collapseData === true ? `<details>\n<summary>Structured data</summary>\n\n${fencedData}\n\n</details>` : `${STRUCTURED_DATA_LABEL}\n${fencedData}`;
       if (typeof normalizedItem.body === "string" && normalizedItem.body.length > 0) {
         normalizedItem.body = `${normalizedItem.body}\n\n${dataBlock}`;
       } else {

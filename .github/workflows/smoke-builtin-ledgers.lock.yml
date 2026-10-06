@@ -812,7 +812,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "ledger_append": {
                 "defaultMax": 100,

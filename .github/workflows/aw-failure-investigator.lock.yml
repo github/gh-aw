@@ -795,7 +795,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "link_sub_issue": {
                 "defaultMax": 5,

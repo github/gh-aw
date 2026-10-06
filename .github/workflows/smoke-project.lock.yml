@@ -826,7 +826,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "create_project_status_update": {
                 "defaultMax": 10,

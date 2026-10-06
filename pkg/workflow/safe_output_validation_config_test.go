@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -353,6 +354,36 @@ func TestGetValidationConfigJSONWithDataSchema(t *testing.T) {
 	}
 	if parsed["close_issue"].DataEnabled {
 		t.Fatal("did not expect close_issue dataEnabled to be true")
+	}
+}
+
+func TestValidationConfigCollapseData(t *testing.T) {
+	for typeName, config := range ValidationConfig {
+		if want := typeName == "create_issue"; config.CollapseData != want {
+			t.Errorf("%s CollapseData = %t, want %t", typeName, config.CollapseData, want)
+		}
+	}
+
+	for _, dataEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dataEnabled=%t", dataEnabled), func(t *testing.T) {
+			jsonStr, err := GetValidationConfigJSONWithDataSchema(dataSchemaBodyTypes, nil, dataEnabled, nil)
+			if err != nil {
+				t.Fatalf("GetValidationConfigJSONWithDataSchema() error = %v", err)
+			}
+			var parsed map[string]map[string]any
+			if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
+				t.Fatalf("Failed to parse validation config JSON: %v", err)
+			}
+			for _, typeName := range dataSchemaBodyTypes {
+				if typeName == "create_issue" {
+					if parsed[typeName]["collapseData"] != true {
+						t.Error("expected create_issue collapseData to be true")
+					}
+				} else if _, ok := parsed[typeName]["collapseData"]; ok {
+					t.Errorf("did not expect %s collapseData to be present", typeName)
+				}
+			}
+		})
 	}
 }
 

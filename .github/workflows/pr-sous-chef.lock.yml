@@ -1293,7 +1293,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "create_project": {
                 "defaultMax": 1,
