@@ -212,7 +212,9 @@ func TestClaudeEngineLLMProviderGitHubUsesCopilotCredentials(t *testing.T) {
 	stepContent := strings.Join([]string(steps[0]), "\n")
 
 	assert.Contains(t, stepContent, "GH_AW_LLM_PROVIDER: github")
-	assert.Contains(t, stepContent, "ANTHROPIC_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
+	assert.Contains(t, stepContent, "COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
+	assert.NotContains(t, stepContent, "ANTHROPIC_API_KEY:")
+	assert.Contains(t, stepContent, `export ANTHROPIC_API_KEY="$COPILOT_DUMMY_BYOK"`)
 	assert.Contains(t, stepContent, fmt.Sprintf("ANTHROPIC_BASE_URL: http://host.docker.internal:%d", constants.CopilotLLMGatewayPort))
 }
 

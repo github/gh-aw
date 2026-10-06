@@ -101,14 +101,22 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 		}
 		sandboxValidationLog.Printf("sandbox.agent: false permitted by features.%s: true", flag)
 
-		if workflowData.EngineConfig != nil &&
-			workflowData.EngineConfig.ID == string(constants.CodexEngine) &&
+		if ResolveEngineID(workflowData) == string(constants.CodexEngine) &&
 			NewCodexEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
 			return NewValidationError(
 				"sandbox.agent",
 				"false",
 				"Codex with a copilot/* model requires the agent sandbox for BYOK inference routing",
 				"Enable the agent sandbox or select a non-Copilot model.",
+			)
+		}
+		if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) &&
+			NewClaudeEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+			return NewValidationError(
+				"sandbox.agent",
+				"false",
+				"Claude with GitHub Copilot inference requires the agent sandbox for credential-isolated routing",
+				"Enable the agent sandbox or select an Anthropic-hosted model.",
 			)
 		}
 	}
