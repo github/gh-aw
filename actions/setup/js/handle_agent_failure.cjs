@@ -3,6 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { getDetectionCautionAlert, getFooterAgentFailureIssueMessage, getFooterAgentFailureCommentMessage, generateXMLMarker } = require("./messages.cjs");
 const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
@@ -1708,13 +1709,8 @@ function buildReportIncompleteContext(items) {
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The agent reported that the task could not be performed due to an infrastructure or tool failure.") + "\n**Reasons:**\n";
-  for (const msg of messages) {
-    context += `- ${msg.reason}\n`;
-    if (msg.details) {
-      context += `  \n  ${msg.details}\n`;
-    }
-  }
+  let context = buildWarningAlertLine("Task Could Not Be Completed", "The agent reported that the task could not be performed due to an infrastructure or tool failure.");
+  context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
   context +=
     "\nThis is a structured incompletion signal (`report_incomplete`), not a real task outcome. Any other safe outputs emitted alongside this signal (e.g., comments) describe the failure state, not a completed review or action.\n\n";
 
@@ -1928,6 +1924,18 @@ function renderPluginDiagnosticsDetails(diagnosticsLog) {
   const sanitizedDiagnostics = sanitizeContent(diagnosticsLog, { maxLength: PLUGIN_DIAGNOSTICS_MAX_LENGTH });
   const fence = safeMarkdownCodeFence([sanitizedDiagnostics]);
   return `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n${fence}\n${sanitizedDiagnostics}\n${fence}\n\n</details>\n`;
+}
+
+/**
+ * Render error diagnostics as literal text with progressive disclosure.
+ * @param {string} diagnostics
+ * @param {string[]} [maskedValues]
+ * @returns {string}
+ */
+function renderErrorDetails(diagnostics, maskedValues = []) {
+  const sanitized = redactAndBoundDiagnostics(diagnostics, { maskedValues });
+  const fence = safeMarkdownCodeFence([sanitized]);
+  return `\n\n<details>\n<summary>Error details:</summary>\n\n${fence}text\n${sanitized}\n${fence}\n\n</details>\n\n`;
 }
 
 /**
@@ -3058,8 +3066,7 @@ function detectEngineRateLimit429Failure() {
 /**
  * Extract terminal error messages from agent-stdio.log to surface engine failures.
  * First tries to match known error patterns (ERROR:, Error:, Fatal:, panic:, Reconnecting...).
- * Falls back to the last non-empty lines of the log when no patterns match, so that
- * even timeout or unexpected-termination failures include the final agent output.
+ * Never copies arbitrary log tails into reports, since they can contain secrets.
  * The log file is available in the conclusion job after the agent artifact is downloaded.
  * @returns {string} Formatted context string, or empty string if no engine failure found
  */
@@ -3079,7 +3086,7 @@ function buildEngineFailureContext(options = {}) {
 
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
-    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? `**Driver exit code:** ${exitCodeText}\n\n` : "";
+    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
         core.info("agent-stdio.log not found, but shell expansion guard rejection was detected — using dedicated context message");
@@ -3272,25 +3279,17 @@ function buildEngineFailureContext(options = {}) {
             : "**Diagnosis:** The DIFC proxy (`awmg-cli-proxy`) failed to respond (`diagnosis=unknown`). The probe exhausted its retry budget before the service became reachable.\n\n";
           context += dnsDiagnosis;
         }
-        context += "\n<details>\n<summary>Error details</summary>\n\n";
-        for (const message of errorMessages) {
-          context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
-        }
-        context += `\n</details>\n\nSee [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
+        context += renderErrorDetails([...errorMessages].join("\n"), maskedValues);
+        context += `See [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
         return context;
       }
 
-      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails + "**Error details:**\n";
-      for (const message of errorMessages) {
-        context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
-      }
-      context += "\n";
-      return context;
+      const diagnostics = [...(exitDetails ? [`Driver exit code: ${exitCodeText}`] : []), ...errorMessages].join("\n");
+      return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + renderErrorDetails(diagnostics, maskedValues);
     }
 
     // AWF infrastructure lines written by the firewall/container wrapper — not produced by
-    // the engine itself. They must be filtered out of the fallback tail so the failure
-    // context surfaces actual agent output rather than container lifecycle noise
+    // the engine itself. Filter them out when checking whether the engine produced output
     // (e.g. "Container awf-squid  Removed", "[WARN] Command completed with exit code: 1",
     // "Process exiting with code: 1"). Shared constant from log_parser_shared.cjs keeps the
     // pattern in sync with parse_copilot_log.cjs.
@@ -3300,7 +3299,7 @@ function buildEngineFailureContext(options = {}) {
     //   [WARN] --pids-limit/container.pidsLimit is not supported by this microVM runtime …
     //      The Docker agent cgroup cannot be passed through, so pids.max/pids.current are unavailable.
     // Those continuations belong to the infrastructure line above them, so they must be
-    // filtered out as well — otherwise they can be reported as the "last agent output".
+    // filtered out as well to avoid misclassifying a startup failure.
     const infraContinuationLines = new Set();
     {
       let previousWasInfra = false;
@@ -3321,17 +3320,15 @@ function buildEngineFailureContext(options = {}) {
       }
     }
 
-    // Fallback: no known error patterns found — include the last non-empty lines so that
-    // failures caused by timeouts or unexpected terminations still surface useful context.
-    const TAIL_LINES = 10;
+    // Classify startup failures without publishing arbitrary engine output.
     const nonEmptyLines = lines.map((line, index) => ({ line, index })).filter(entry => entry.line.trim());
     if (nonEmptyLines.length === 0) {
       return "";
     }
 
-    // Exclude AWF infrastructure lines so the fallback displays only actual engine output.
+    // Exclude AWF infrastructure lines when checking for actual engine output.
     // `::add-mask::` command lines are runner directives, not agent output: drop them so the
-    // rendered tail neither leaks the masked value nor wastes a tail slot.
+    // directives do not count as engine output.
     const agentLines = nonEmptyLines
       .filter(entry => !INFRA_LINE_RE.test(entry.line) && !infraContinuationLines.has(entry.index) && !isAddMaskCommandLine(entry.line) && !isRecoveredNoDeferredMarkerLine(entry.index))
       .map(entry => entry.line);
@@ -3365,13 +3362,8 @@ function buildEngineFailureContext(options = {}) {
       return context;
     }
 
-    const tailLines = agentLines.slice(-TAIL_LINES);
-    core.info(`No specific error patterns found; including last ${tailLines.length} line(s) of agent-stdio.log as fallback`);
-
-    let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "**Last agent output:**\n\`\`\`\n";
-    context += applyAddMaskRedaction(tailLines.join("\n"), maskedValues);
-    context += "\n```\n\n";
-    return context;
+    core.info("No specific error patterns found; omitting raw agent output from the failure report");
+    return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "Review the workflow run logs for diagnostics. Raw agent output is omitted because it may contain secrets.\n\n";
   } catch (error) {
     core.info(`Failed to read agent-stdio.log for engine failure context: ${getErrorMessage(error)}`);
     return "";

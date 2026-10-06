@@ -322,6 +322,9 @@ const DefaultMCPGatewayPayloadSizeThreshold = 524288
 // DefaultFirewallRegistry is the container image registry for AWF (gh-aw-firewall) Docker images
 const DefaultFirewallRegistry = "ghcr.io/github/gh-aw-firewall"
 
+// DefaultRouterRegistry is the container image registry for the gh-aw model router.
+const DefaultRouterRegistry = "ghcr.io/githubnext/gh-aw-router"
+
 // DefaultNodeAlpineLTSImage is the default Node.js Alpine LTS container image for MCP servers
 // Using node:lts-alpine provides the latest LTS version with minimal footprint
 const DefaultNodeAlpineLTSImage = "node:lts-alpine"
@@ -576,6 +579,12 @@ const AwPromptsFileExpr = GhAwRootDir + "/aw-prompts/prompt.txt"
 
 // AwPromptsFileShell is the runtime prompt file path in shell env-var form for host-side paths.
 const AwPromptsFileShell = GhAwRootDirShell + "/aw-prompts/prompt.txt"
+
+// AwPromptsUserFile is the runtime task-only prompt file path.
+const AwPromptsUserFile = TmpGhAwDir + "/aw-prompts/user.txt"
+
+// AwPromptsUserFileExpr is the host-side task-only prompt path in GitHub Actions expression form.
+const AwPromptsUserFileExpr = GhAwRootDir + "/aw-prompts/user.txt"
 
 // TmpMcpConfigDir is the mcp-config directory in the /tmp/gh-aw tree.
 // Engines that require a writable MCP config directory (e.g. Codex) use this path.

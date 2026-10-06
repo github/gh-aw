@@ -78,13 +78,7 @@ func (e *CodexEngine) GetModelEnvVarName() string {
 // A copilot/ model prefix selects GitHub-hosted inference. An explicit
 // engine.provider (or engine.model-provider) override always takes precedence.
 func (e *CodexEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider {
-	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.LLMProvider != "" {
-		return resolveEngineLLMProvider(workflowData, LLMProviderOpenAI)
-	}
-	if workflowData != nil && strings.HasPrefix(strings.ToLower(strings.TrimSpace(workflowData.Model)), "copilot/") {
-		return LLMProviderGitHub
-	}
-	return resolveEngineLLMProvider(workflowData, LLMProviderOpenAI)
+	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderOpenAI)
 }
 
 // codexModelID strips the provider prefix from a model identifier because the Codex

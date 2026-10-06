@@ -314,6 +314,9 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 			"api.individual.githubcopilot.com",
 		}
 	case *ClaudeEngine:
+		if NewClaudeEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
+			return getEngineAPIHosts(data, NewCopilotEngine())
+		}
 		return []string{"api.anthropic.com"}
 	case *CodexEngine:
 		if NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
