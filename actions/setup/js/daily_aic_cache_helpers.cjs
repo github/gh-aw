@@ -41,6 +41,7 @@ function readScanCache(content, repository, workflowId, now = Date.now()) {
       entry.run_attempt <= 0 ||
       !Number.isFinite(entry.aic) ||
       entry.aic < 0 ||
+      (entry.source !== undefined && entry.source !== "recorded" && entry.source !== "estimated") ||
       !Number.isFinite(Date.parse(entry.created_at)) ||
       !Number.isFinite(Date.parse(entry.updated_at)) ||
       !Number.isFinite(Date.parse(entry.observed_at)) ||
@@ -50,10 +51,11 @@ function readScanCache(content, repository, workflowId, now = Date.now()) {
       continue;
     }
     const prior = entries.get(entry.run_id);
-    if (prior && prior.run_attempt === entry.run_attempt && prior.updated_at === entry.updated_at && prior.aic !== entry.aic) {
+    const sameAttempt = prior && prior.run_attempt === entry.run_attempt && prior.created_at === entry.created_at && prior.updated_at === entry.updated_at;
+    if (prior && prior.run_attempt === entry.run_attempt && prior.updated_at === entry.updated_at && prior.aic !== entry.aic && prior.source === "recorded" && entry.source === "recorded") {
       throw new Error("Conflicting daily AIC observations for a completed run attempt");
     }
-    if (!prior || Date.parse(entry.observed_at) >= Date.parse(prior.observed_at)) {
+    if (!prior || (Date.parse(entry.observed_at) >= Date.parse(prior.observed_at) && (!sameAttempt || prior.source !== "recorded" || entry.source === "recorded"))) {
       entries.set(entry.run_id, entry);
     }
   }
@@ -64,7 +66,7 @@ function matchesCompletedRun(entry, run) {
   return entry?.run_attempt === run.run_attempt && entry.created_at === run.created_at && entry.updated_at === run.updated_at;
 }
 
-function scanCacheEntry(run, aic, repository, workflowId, now = Date.now()) {
+function scanCacheEntry(run, aic, repository, workflowId, now = Date.now(), source = "recorded") {
   if (!Number.isFinite(aic) || aic < 0) {
     throw new Error("Daily AIC observation is not a finite non-negative value");
   }
@@ -78,6 +80,7 @@ function scanCacheEntry(run, aic, repository, workflowId, now = Date.now()) {
     created_at: run.created_at,
     updated_at: run.updated_at,
     aic,
+    source,
     observed_at: new Date(now).toISOString(),
   };
 }
