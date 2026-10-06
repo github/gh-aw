@@ -427,7 +427,7 @@ func TestCanRestoreAgentConfigFolders(t *testing.T) {
 }
 
 func TestEngineConfigRestorePrecedesAgentSteps(t *testing.T) {
-	disabled := false
+	enabled, disabled := true, false
 	for _, engineID := range []string{"claude", "copilot"} {
 		for _, tt := range []struct {
 			name            string
@@ -437,8 +437,10 @@ func TestEngineConfigRestorePrecedesAgentSteps(t *testing.T) {
 		}{
 			{name: "default", data: &WorkflowData{Permissions: "contents: read"}, want: true, afterPRCheckout: true},
 			{name: "PR checkout with no activation checkout", data: &WorkflowData{Permissions: "contents: read", Features: map[string]any{"action-tag": "v1.0.0"}}, want: true, afterPRCheckout: true},
-			{name: "PR checkout disabled", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}}, want: true},
-			{name: "checkout disabled", data: &WorkflowData{CheckoutDisabled: true}, want: true},
+			{name: "PR checkout disabled", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}}},
+			{name: "checkout disabled", data: &WorkflowData{CheckoutDisabled: true}},
+			{name: "opt-in with PR checkout disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &enabled}, CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}}}, want: true},
+			{name: "opt-in with checkout disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &enabled}, CheckoutDisabled: true}, want: true},
 			{name: "dynamic workflows disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &disabled}}},
 			{name: "PR checkout still restores without dynamic workflows", data: &WorkflowData{Permissions: "contents: read", EngineConfig: &EngineConfig{DynamicWorkflows: &disabled}}, want: true, afterPRCheckout: true},
 			{name: "other repository at root", data: &WorkflowData{CheckoutConfigs: []*CheckoutConfig{{Repository: "example/other"}}}},
@@ -478,13 +480,14 @@ func TestEngineConfigRestorePrecedesAgentSteps(t *testing.T) {
 }
 
 func TestEngineConfigRestoreUsesRegisteredEngineManifestFolders(t *testing.T) {
+	enabled := true
 	engine := NewClaudeEngine()
 	engine.id = "dynamic-manifest-test"
 	compiler := NewCompiler()
 	require.NoError(t, compiler.engineRegistry.Register(engine))
 	data := &WorkflowData{
 		AI:           engine.GetID(),
-		EngineConfig: &EngineConfig{ID: engine.GetID()},
+		EngineConfig: &EngineConfig{ID: engine.GetID(), DynamicWorkflows: &enabled},
 	}
 	var yaml strings.Builder
 	_, err := compiler.generateEngineInstallAndPreAgentSteps(&yaml, data, false)

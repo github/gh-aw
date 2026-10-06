@@ -51,7 +51,7 @@ const copilotSettingsPath = "$HOME/.copilot/settings.json"
 
 // copilotSettingsDefaultContent is the default JSON content written to the Copilot CLI
 // settings file when no additional settings are configured.
-const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}`
+const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":false}}`
 
 type copilotSettings struct {
 	BuiltInAgents       map[string]bool            `json:"builtInAgents"`
@@ -63,7 +63,7 @@ func buildCopilotSettingsContent(workflowData *WorkflowData) string {
 	settings := copilotSettings{
 		BuiltInAgents: map[string]bool{"rubberDuck": false},
 		EnabledFeatureFlags: map[string]bool{
-			"EXTENSIONS": workflowData == nil || workflowData.EngineConfig.DynamicWorkflowsEnabled(),
+			"EXTENSIONS": workflowData != nil && workflowData.EngineConfig.DynamicWorkflowsEnabled(),
 		},
 	}
 	if workflowData != nil {

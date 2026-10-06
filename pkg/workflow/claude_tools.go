@@ -112,7 +112,7 @@ func isExplicitlyDisabledTool(tool any) bool {
 // allowlist (unlike bypassPermissions which silently ignores it).
 // Panics if callers pass a Claude-specific tools section instead of neutral tools.
 func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig) string {
-	return e.computeAllowedClaudeToolsStringWithDynamicWorkflows(tools, safeOutputs, cacheMemoryConfig, driveMemoryConfig, mcpScripts, sandboxConfig, true)
+	return e.computeAllowedClaudeToolsStringWithDynamicWorkflows(tools, safeOutputs, cacheMemoryConfig, driveMemoryConfig, mcpScripts, sandboxConfig, false)
 }
 
 func (e *ClaudeEngine) computeAllowedClaudeToolsStringWithDynamicWorkflows(tools map[string]any, safeOutputs *SafeOutputsConfig, cacheMemoryConfig *CacheMemoryConfig, driveMemoryConfig *DriveMemoryConfig, mcpScripts *MCPScriptsConfig, sandboxConfig *SandboxConfig, dynamicWorkflows bool) string {

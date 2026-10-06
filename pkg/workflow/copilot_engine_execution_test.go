@@ -248,8 +248,8 @@ func TestCopilotDynamicWorkflowsSettings(t *testing.T) {
 		data *WorkflowData
 		want bool
 	}{
-		{name: "nil workflow", want: true},
-		{name: "default", data: &WorkflowData{}, want: true},
+		{name: "nil workflow"},
+		{name: "default", data: &WorkflowData{}},
 		{name: "enabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &enabled}}, want: true},
 		{name: "disabled", data: &WorkflowData{EngineConfig: &EngineConfig{DynamicWorkflows: &disabled}}},
 	} {
@@ -278,7 +278,7 @@ func TestCopilotDynamicWorkflowsExecution(t *testing.T) {
 			value *bool
 			want  bool
 		}{
-			{name: "default", want: true},
+			{name: "default"},
 			{name: "enabled", value: &enabled, want: true},
 			{name: "disabled", value: &disabled},
 		} {
