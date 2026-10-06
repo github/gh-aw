@@ -41,6 +41,7 @@ Suggested response:
 - Keep the main agent job read-only.
 - Do not add GitHub write permissions to the agent job.
 - Route GitHub writes through `safe-outputs:`.
+- Use `post-steps:` only for deterministic cleanup. Never read, parse, print, upload, or publish the safeoutputs MCP output file from a post-step; configure `safe-outputs:` for agent-driven outputs instead.
 - Prefer `tools.github.mode: gh-proxy` with `gh` for GitHub reads.
 - Prefer `tools.cli-proxy: true` with mounted `mcp-clis` commands for non-GitHub MCP tools.
 - Constrain `network.allowed:` to the minimum required ecosystems or domains.

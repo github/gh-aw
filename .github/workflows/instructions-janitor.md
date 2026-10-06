@@ -140,6 +140,10 @@ Review at least:
 
 Update the instruction files if behavior changed even when docs commits did not mention it.
 
+### 5. Safe-output boundary audit
+
+Scan every `.github/aw/*.md` instruction file for guidance that suggests reading the safeoutputs MCP output file (including `GH_AW_SAFE_OUTPUTS` or `safeoutputs/outputs.jsonl`) directly from `post-steps:`. Remove or correct any such guidance: post-steps must be used only for deterministic cleanup, never to read, parse, print, upload, or publish agent-produced safe-output data. Route agent-driven outputs through configured `safe-outputs:` jobs instead. Run this audit even if the release/change and size audits find nothing to update.
+
 ## Editing Principles
 
 - make surgical edits
@@ -165,7 +169,7 @@ Include:
 
 ## Edge Cases
 
-- if the Release/Change audit finds no relevant docs or `.github/aw/` changes **and** the Size audit confirms all files are under their limits, exit immediately without running the Duplication or Accuracy audits
+- if the Release/Change audit finds no relevant docs or `.github/aw/` changes **and** the Size audit confirms all files are under their limits, run the Safe-output boundary audit before exiting without the Duplication or Accuracy audits
 - if no documentation changed, still run the size, duplication, and safe-output accuracy audits
 - if instructions are already current, exit without edits
 - if a file needs more than one new topic section to stay compact, create more than one focused sub-file instead of keeping one large catch-all file
