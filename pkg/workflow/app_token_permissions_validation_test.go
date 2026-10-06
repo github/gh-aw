@@ -83,6 +83,83 @@ func TestAppTokenPermissionsCheckAllCompiledJobs(t *testing.T) {
 	}
 }
 
+func TestAppTokenPermissionsGeneratedWildcardRepositories(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config string
+		stepID string
+	}{
+		{
+			name:   "github tool",
+			config: "tools:\n  github:\n    toolsets: [repos]\n    github-app:\n      app-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_KEY }}\n      repositories: [\"*\"]\n",
+			stepID: "github-mcp-app-token",
+		},
+		{
+			name:   "safe outputs",
+			config: "safe-outputs:\n  github-app:\n    app-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n    repositories: [\"*\"]\n  create-issue:\n",
+			stepID: "safe-outputs-app-token",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "wildcard.md")
+			content := "---\non: workflow_dispatch\nstrict: true\nengine: copilot\npermissions:\n  contents: read\nnetwork:\n  allowed: [defaults]\n" +
+				tc.config + "---\n\nTest wildcard token.\n"
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			compiler := NewCompiler()
+			compiler.approve = true
+			if err := compiler.CompileWorkflow(path); err != nil {
+				t.Fatalf("explicit wildcard should compile in strict mode: %v", err)
+			}
+			if compiler.warningCount != 0 {
+				t.Fatalf("explicit wildcard should not produce scope warnings, got %d", compiler.warningCount)
+			}
+			lock, err := os.ReadFile(filepath.Join(dir, "wildcard.lock.yml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			step := strings.SplitN(string(lock), "id: "+tc.stepID, 2)
+			if len(step) != 2 {
+				t.Fatalf("missing generated token step %s", tc.stepID)
+			}
+			tokenInputs := strings.SplitN(step[1], "\n      - name:", 2)[0]
+			if strings.Contains(tokenInputs, "repositories:") || !strings.Contains(tokenInputs, "permission-") {
+				t.Fatalf("wildcard token must omit repositories and retain explicit permissions:\n%s", tokenInputs)
+			}
+		})
+	}
+}
+
+func TestAppTokenPermissionsWildcardStillChecksPermissionsAndOtherSteps(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.buildGitHubAppTokenMintStepWithMeta(
+		&GitHubAppConfig{AppID: "app-id", PrivateKey: "private-key", Repositories: []string{"*"}},
+		nil, "", "", "Mint token", "generated-token",
+	)
+	generated := map[string]any{
+		"id": "generated-token", "uses": "actions/create-github-app-token@sha",
+		"with": map[string]any{"client-id": "app-id", "private-key": "private-key"},
+	}
+	workflow := map[string]any{"jobs": map[string]any{"agent": map[string]any{"steps": []any{generated}}}}
+	if err := compiler.validateAppTokenPermissions(workflow, true); err == nil || !strings.Contains(err.Error(), "permission-*") {
+		t.Fatalf("wildcard must not bypass permission checks, got %v", err)
+	}
+	generated["with"].(map[string]any)["permission-contents"] = "read"
+	if err := compiler.validateAppTokenPermissions(workflow, true); err != nil {
+		t.Fatalf("generated wildcard should pass with explicit permissions: %v", err)
+	}
+	workflow["jobs"].(map[string]any)["custom"] = map[string]any{"steps": []any{
+		map[string]any{"uses": "actions/create-github-app-token@sha", "with": map[string]any{
+			"client-id": "other-app", "private-key": "private-key", "permission-contents": "read",
+		}},
+	}}
+	if err := compiler.validateAppTokenPermissions(workflow, true); err == nil || !strings.Contains(err.Error(), "repositories input") {
+		t.Fatalf("other steps must still require repository scoping, got %v", err)
+	}
+}
+
 func TestAppTokenPermissionsGeneratedPreActivationStep(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app-token.md")

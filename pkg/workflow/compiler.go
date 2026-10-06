@@ -494,6 +494,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 
 	// Reset the step order tracker for this compilation
 	c.stepOrderTracker = NewStepOrderTracker()
+	c.wildcardAppTokenSteps = nil
 
 	// Reset schedule friendly formats for this compilation
 	c.scheduleFriendlyFormats = nil

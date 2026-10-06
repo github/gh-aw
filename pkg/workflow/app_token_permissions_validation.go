@@ -8,6 +8,27 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
+type appTokenStepKey struct {
+	id, clientID, privateKey string
+}
+
+func (c *Compiler) hasGeneratedWildcardAppTokenStep(step, with map[string]any) bool {
+	id, ok := step["id"].(string)
+	if !ok {
+		return false
+	}
+	clientID, ok := with["client-id"].(string)
+	if !ok {
+		return false
+	}
+	privateKey, ok := with["private-key"].(string)
+	if !ok {
+		return false
+	}
+	return id != "" && clientID != "" && privateKey != "" &&
+		c.wildcardAppTokenSteps[appTokenStepKey{id, clientID, privateKey}]
+}
+
 func hasExplicitAppTokenPermission(with map[string]any) bool {
 	for key, value := range with {
 		if !strings.HasPrefix(strings.ToLower(key), "permission-") {
@@ -68,7 +89,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 			if !ok {
 				with = nil
 			}
-			if !hasExplicitAppTokenRepositories(with) {
+			if !hasExplicitAppTokenRepositories(with) && !c.hasGeneratedWildcardAppTokenStep(step, with) {
 				msg := fmt.Sprintf("actions/create-github-app-token in job %q has no explicit repositories input; add repositories: ${{ github.repository }} to scope the token to the current repository", jobName)
 				if strict {
 					return fmt.Errorf("strict mode: %s", msg)

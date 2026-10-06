@@ -426,6 +426,16 @@ func appendGitHubAppTokenRepositoryInput(steps []string, app *GitHubAppConfig, f
 
 func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
 	safeOutputsAppLog.Printf("Building GitHub App token mint step: owner=%s, repos=%d", app.Owner, len(app.Repositories))
+	if len(app.Repositories) == 1 {
+		for _, repository := range app.Repositories {
+			if repository == "*" {
+				if c.wildcardAppTokenSteps == nil {
+					c.wildcardAppTokenSteps = make(map[appTokenStepKey]bool)
+				}
+				c.wildcardAppTokenSteps[appTokenStepKey{stepID, app.AppID, app.PrivateKey}] = true
+			}
+		}
+	}
 	var steps []string
 
 	owner, ownerSteps := resolveGitHubAppOwner(app, ownerSourceRepository, stepName, stepID)
