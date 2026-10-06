@@ -1,7 +1,7 @@
 ---
 mcp-servers:
   grafana:
-    container: "grafana/mcp-grafana:1.1.0-alpine"
+    container: "grafana/mcp-grafana:2.0.1-alpine"
     entrypointArgs:
       - "-t"
       - "stdio"
@@ -36,10 +36,10 @@ packages (perl-base, libc-bin, util-linux, ...) that carry unpatched CVEs and
 GPL/LGPL licenses rejected by the repository license policy.
 
 The image tag is pinned to an explicit upstream release so container scans
-report against a known reference. Vulnerabilities in the Go modules linked into
-the upstream binary (for example GO-2026-5970 in `golang.org/x/text`) can only
-be fixed by a new `grafana/mcp-grafana` release; bump the tag here once
-upstream ships the updated dependency.
+report against a known reference. Version 2.0.1 updates OpenSSL, gRPC, and
+`golang.org/x/text` beyond the fixed versions reported in the October 5 scan.
+The reported zlib finding has no fixed version listed and remains tracked
+upstream; it is not accepted as a risk.
 
 Allowed tools:
 - list_datasources

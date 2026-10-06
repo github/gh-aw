@@ -58,7 +58,7 @@ const DefaultGeminiVersion Version = "0.62.0"
 const DefaultPiVersion Version = "1.0.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v1.12.2"
+const DefaultGitHubMCPServerVersion Version = "v1.14.0"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -68,7 +68,7 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.31"
+const DefaultFirewallVersion Version = "v0.28.37"
 
 // AWFModelRoutingMinVersion is the first AWF version that exposes task routing
 // selections through /reflect and accepts apiProxy.routing.
