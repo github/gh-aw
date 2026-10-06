@@ -13,7 +13,7 @@ import (
 )
 
 // TestStrictModeStepEnvSecretsAllowed tests full compilation of workflows
-// that use secrets in step-level env: bindings under strict mode.
+// that use secrets in steps and pre-steps env: bindings under strict mode.
 // These should compile successfully because env: bindings are controlled,
 // masked surfaces in GitHub Actions.
 func TestStrictModeStepEnvSecretsAllowed(t *testing.T) {
@@ -118,27 +118,6 @@ Pre-steps with secrets in env bindings.
 `,
 		},
 		{
-			name: "post-steps with secrets in env compile in strict mode",
-			content: `---
-on: workflow_dispatch
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
-engine: copilot
-post-steps:
-  - name: Send notification
-    env:
-      SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-    run: send-notification
----
-
-# Post-Steps Env Secret Test
-
-Post-steps with secrets in env bindings.
-`,
-		},
-		{
 			name: "secrets in with for uses action step compile in strict mode",
 			content: `---
 on: workflow_dispatch
@@ -210,6 +189,7 @@ Both env: and with: secrets in a uses: action step should compile.
 
 // TestStrictModeStepUnsafeSecretsBlocked tests that secrets in non-env step
 // fields (run, etc.) are still blocked in strict mode during full compilation.
+// Post-steps cannot expose secrets, even through env: bindings.
 // Note: secrets in with: for uses: action steps are now allowed (safe binding).
 func TestStrictModeStepUnsafeSecretsBlocked(t *testing.T) {
 	tests := []struct {
@@ -217,6 +197,28 @@ func TestStrictModeStepUnsafeSecretsBlocked(t *testing.T) {
 		content  string
 		errorMsg string
 	}{
+		{
+			name: "post-steps with secrets in env are blocked",
+			content: `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+engine: copilot
+post-steps:
+  - name: Send notification
+    env:
+      SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+    run: send-notification
+---
+
+# Post-Steps Env Secret Test
+
+Post-steps must not expose secrets through env bindings.
+`,
+			errorMsg: "secrets are not allowed in post-steps",
+		},
 		{
 			name: "secret in run field is blocked in strict mode",
 			content: `---
@@ -299,6 +301,9 @@ Should fail because run field contains a secret even though env is safe.
 				t.Error("Expected compilation to fail with secrets in non-env step fields, but it succeeded")
 			} else if !strings.Contains(err.Error(), tt.errorMsg) {
 				t.Errorf("Expected error containing %q, got %q", tt.errorMsg, err.Error())
+			}
+			if _, err := os.Stat(stringutil.MarkdownToLockFile(testFile)); !os.IsNotExist(err) {
+				t.Errorf("Expected no lock file after rejected compilation, got stat error: %v", err)
 			}
 		})
 	}
