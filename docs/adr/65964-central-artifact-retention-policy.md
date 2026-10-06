@@ -1,8 +1,8 @@
-# ADR-65964: Centralize Artifact Retention as a Repository/Enterprise Policy Resolved at Compile Time
+# ADR-65964: Centralize Artifact Retention with Repository Policy and Runtime Enterprise Defaults
 
-**Date**: 2026-02-06
-**Status**: Draft
-**Deciders**: Unknown (PR author: pelikhan)
+**Date**: 2026-10-06
+**Status**: Proposed
+**Deciders**: gh-aw maintainers (pending review; PR author: pelikhan)
 
 ---
 
@@ -12,7 +12,7 @@ Every generated gh-aw workflow uploads artifacts (agent logs, safe-output payloa
 
 ### Decision
 
-We will introduce a single `artifact_retention_days` setting in `.github/workflows/aw.json` (accepting an integer 1–400 or a single-line GitHub Actions expression) and resolve it in a fixed precedence order: repository config setting, then the runtime Actions variable `vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS`, then the pre-existing per-artifact `retention-days` value. Resolution happens in the compiler (`pkg/workflow/artifact_retention.go`) as a post-generation pass that rewrites only the `with:` inputs of recognized `actions/upload-artifact` steps — including mirrored/GHES pins declared via `action_pins` — leaving all other YAML byte-for-byte intact. The precedence is encoded directly into the emitted expression `${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || <fallback> }}`, so an unset repository policy preserves today's behavior exactly, and `gh aw env` gains `default_artifact_retention_days` for repository, organization, and enterprise management. The primary driver is making retention an administrable policy with zero behavior change when no policy is configured.
+We will introduce a single `artifact_retention_days` setting in `.github/workflows/aw.json` (accepting an integer 1–400 or a single-line GitHub Actions expression) with a fixed precedence order: repository config setting, then the runtime Actions variable `vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS`, then the pre-existing per-artifact `retention-days` value. The compiler (`pkg/workflow/artifact_retention.go`) selects the literal or expression through a post-generation pass that rewrites only the `with:` inputs of recognized `actions/upload-artifact` steps, including exact resolved mirror pins declared via `action_pins` and GHES pins, leaving other YAML intact. Expressions and enterprise defaults are evaluated by GitHub Actions at runtime, not by the compiler. When the repository setting is absent, the compiler emits `${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || <fallback> }}`; existing behavior is preserved when both policy tiers are unset. `gh aw env` gains `default_artifact_retention_days` for repository, organization, and enterprise management. Safe-output rendering uses a local configuration copy rather than temporarily mutating the workflow's upload configuration.
 
 ### Alternatives Considered
 
@@ -22,7 +22,7 @@ Each place that emits an upload step could read the config and pass `retention-d
 
 #### Alternative 2: Resolve retention purely at runtime via an Actions variable
 
-Emit only `${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS }}` everywhere and let administrators set the variable at the org/enterprise level, with no compile-time repository setting and no lock-file churn. This was attractive because it would have avoided regenerating 321 lock files. It was rejected because the value would then be invisible in the committed workflow, undiscoverable during review, and unvalidatable at compile time — an out-of-range or malformed variable would only surface as a failing Actions run. The chosen design keeps the runtime variable as the middle precedence tier while still validating the checked-in value and rejecting invalid runtime values in the safe-output handler.
+Emit only `${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS }}` everywhere and let administrators set the variable at the org/enterprise level, without a checked-in repository setting. This would still require regenerating workflow lock files. It was rejected because it provides neither a reviewable repository override nor a fallback to each artifact's existing retention. The chosen design keeps the runtime variable as the middle precedence tier while validating checked-in literals and rejecting invalid runtime values in the safe-output handler.
 
 #### Alternative 3: Rely on the GitHub repository-level default retention setting alone
 
@@ -39,14 +39,14 @@ GitHub already exposes a repository/org artifact retention default, and `actions
 #### Negative
 - The post-generation pass parses and rewrites generated YAML with hand-rolled indentation and line-range logic (six-space step indentation, `leadingSpaces` checks). This is coupled to the compiler's current emission style and will break or silently no-op if that formatting changes.
 - Recognizing upload steps depends on matching `actions/upload-artifact` or a configured `action_pins` mirror; an unrecognized mirror or a dynamically constructed `uses:` value will be skipped without the policy applying, and that gap is not self-announcing.
-- Every upload step now carries a `${{ vars.… || … }}` expression instead of a literal, making generated lock files slightly noisier and retention harder to read at a glance.
+- Uploads without a repository override carry a `${{ vars.… || … }}` expression instead of a literal, making generated lock files slightly noisier and retention harder to read at a glance.
 - A large one-time diff (321 regenerated lock files plus golden fixtures) makes the substantive change harder to review and will conflict with any concurrently open workflow PR.
 
 #### Neutral
 - GitHub's own retention limits still apply; this does not change Actions cache eviction or git-backed storage.
 - The `/etc/hosts` upload test was made portable to macOS as part of this change, without altering upload protections.
-- The PR reports that the full repository gate is not green: pre-existing custom-linter violations and unrelated macOS path/architecture/toolchain failures remain. [TODO: verify these are unrelated to this change before moving status to Accepted.]
+- Targeted retention, artifact, configuration, and compiler golden tests pass, as do the upload-handler tests and generated workflow drift check. The full repository gate still reports pre-existing custom-linter findings and macOS path/architecture/toolchain failures; these remain explicit merge-readiness limitations, not waived checks.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Acceptance remains subject to maintainer review.*

@@ -99,18 +99,6 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
-	if data.SafeOutputs != nil && data.SafeOutputs.UploadArtifact != nil {
-		upload := data.SafeOutputs.UploadArtifact
-		originalRetention := upload.RetentionDays
-		defer func() { upload.RetentionDays = originalRetention }()
-		fallback := "30"
-		if upload.RetentionDays != nil {
-			fallback = *upload.RetentionDays
-		}
-		retention := artifactRetentionDays(repoConfig, fallback)
-		upload.RetentionDays = &retention
-	}
-
 	// Compute frontmatter hash BEFORE building jobs so that the stable hash is
 	// available to heredoc-delimiter generation throughout job construction.
 	// Using the hex-encoded SHA-256 frontmatter hash string as an HMAC key keeps
@@ -170,10 +158,15 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// step generators, etc.) can derive stable heredoc delimiters from it.
 	data.FrontmatterHash = frontmatterHash
 	data.BodyHash = bodyHash
+	data = workflowDataWithArtifactRetention(data, repoConfig)
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow compilation requires valid jobs and dependencies; check job definitions and needs references: %w", err)
+	}
+	repoConfig, err = resolvedArtifactRetentionConfig(repoConfig, data)
+	if err != nil {
+		return "", nil, nil, err
 	}
 
 	// Pre-allocate builder capacity based on estimated workflow size.

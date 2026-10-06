@@ -3,6 +3,7 @@ package workflow
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,6 +22,45 @@ func artifactRetentionDays(config *RepoConfig, fallback string) string {
 		fallback = "'" + strings.ReplaceAll(fallback, "'", "''") + "'"
 	}
 	return fmt.Sprintf("${{ vars.%s || %s }}", compilerenv.DefaultArtifactRetentionDays, fallback)
+}
+
+func workflowDataWithArtifactRetention(data *WorkflowData, config *RepoConfig) *WorkflowData {
+	if data.SafeOutputs == nil || data.SafeOutputs.UploadArtifact == nil {
+		return data
+	}
+	renderData := *data
+	safeOutputs := *data.SafeOutputs
+	upload := *safeOutputs.UploadArtifact
+	fallback := "30"
+	if upload.RetentionDays != nil {
+		fallback = *upload.RetentionDays
+	}
+	upload.RetentionDays = new(artifactRetentionDays(config, fallback))
+	safeOutputs.UploadArtifact = &upload
+	renderData.SafeOutputs = &safeOutputs
+	return &renderData
+}
+
+func resolvedArtifactRetentionConfig(config *RepoConfig, data *WorkflowData) (*RepoConfig, error) {
+	if config == nil || len(config.ActionPins) == 0 {
+		return config, nil
+	}
+	resolved := *config
+	resolved.ActionPins = maps.Clone(config.ActionPins)
+	for source := range config.ActionPins {
+		if !strings.EqualFold(extractActionRepo(source), "actions/upload-artifact") {
+			continue
+		}
+		pin, err := getActionPinWithData(extractActionRepo(source), extractActionVersion(source), data)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve artifact retention action mapping for %s: %w", source, err)
+		}
+		if pin != "" {
+			ref, _, _ := strings.Cut(pin, " #")
+			resolved.ActionPins[source] = ref
+		}
+	}
+	return &resolved, nil
 }
 
 // applyArtifactRetention edits only upload inputs, leaving scripts and other YAML
@@ -106,7 +146,8 @@ func isRetentionUploadAction(uses string, config *RepoConfig) bool {
 	}
 	if config != nil {
 		for source, target := range config.ActionPins {
-			if strings.EqualFold(extractActionRepo(source), "actions/upload-artifact") && strings.EqualFold(repo, extractActionRepo(target)) {
+			if strings.EqualFold(extractActionRepo(source), "actions/upload-artifact") &&
+				strings.EqualFold(repo, extractActionRepo(target)) && extractActionVersion(uses) == extractActionVersion(target) {
 				return true
 			}
 		}

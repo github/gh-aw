@@ -58,7 +58,7 @@ jobs:
             one
             two
           retention-days: 1
-      - uses: internal/artifacts@sha # mirror
+      - uses: internal/artifacts@v4 # mirror
         with: {name: logs, path: log.txt}
       - uses: actions/upload-artifact@v7
       - uses: actions/download-artifact@v4
@@ -93,6 +93,37 @@ func TestArtifactRetentionPreservesExpressionFallback(t *testing.T) {
 	t.Setenv(compilerenv.DefaultArtifactRetentionDays, "5")
 	assert.Equal(t, "${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}", artifactRetentionDays(nil, "30"),
 		"enterprise default must be resolved at runtime, not from the compiler environment")
+}
+
+func TestArtifactRetentionMatchesOnlyMappedMirrorRef(t *testing.T) {
+	const sha = "0123456789012345678901234567890123456789"
+	config := &RepoConfig{ActionPins: map[string]string{"actions/upload-artifact@v4": "internal/actions@upload"}}
+	cache := NewActionCache(t.TempDir())
+	cache.Set("internal/actions", "upload", sha)
+	data := &WorkflowData{
+		ActionPinMappings: config.ActionPins,
+		ActionCache:       cache,
+		ActionResolver:    NewActionResolver(cache),
+	}
+	resolved, err := resolvedArtifactRetentionConfig(config, data)
+	require.NoError(t, err)
+	assert.Equal(t, "internal/actions@upload", config.ActionPins["actions/upload-artifact@v4"], "do not mutate repository config")
+	assert.Equal(t, "internal/actions@"+sha, resolved.ActionPins["actions/upload-artifact@v4"])
+	source := `jobs:
+  test:
+    steps:
+      - uses: internal/actions@` + sha + `
+        with:
+          path: report.txt
+      - uses: internal/actions@download
+        with:
+          name: report
+`
+	output, err := applyArtifactRetention(source, resolved)
+	require.NoError(t, err)
+	steps := retentionTestSteps(t, output)
+	assert.Contains(t, steps[0]["with"], "retention-days")
+	assert.NotContains(t, steps[1]["with"], "retention-days", "a different action ref in the same mirror repository must not be rewritten")
 }
 
 func TestArtifactRetentionPreservesCommentsAndMultilineNames(t *testing.T) {
@@ -152,6 +183,85 @@ func TestArtifactRetentionDoesNotParseUnrelatedSteps(t *testing.T) {
 	assert.Contains(t, output, "          LEGACY_NAME: a workflow: with a colon\n")
 	assert.Contains(t, output, "retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}")
 }
+
+func TestArtifactRetentionPreservesEmbeddedWorkflowYAML(t *testing.T) {
+	for _, scalar := range []string{"|", "|-", "|+", ">", ">-", ">+", "|2", ">2-"} {
+		t.Run(scalar, func(t *testing.T) {
+			const embedded = `          cat <<'DOC'
+          jobs:
+            example:
+              steps:
+                - uses: actions/upload-artifact@v4
+                  with:
+                    path: embedded.txt
+                    retention-days: 13
+          DOC
+`
+			source := "jobs:\n  test:\n    steps:\n      - name: Print embedded YAML\n        run: " + scalar + "\n" + embedded + `      - uses: actions/github-script@v9
+        with:
+          script: |
+            const example = ` + "`" + `
+                steps:
+                  - uses: actions/upload-artifact@v4
+            ` + "`" + `;
+            core.info(example);
+      - uses: actions/upload-artifact@v4
+        with:
+          path: real.txt
+`
+			original := retentionTestSteps(t, source)
+			output, err := applyArtifactRetention(source, &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32("7"))})
+			require.NoError(t, err)
+			steps := retentionTestSteps(t, output)
+			require.Len(t, steps, 3)
+			assert.Equal(t, original[0], steps[0], "run scalar must remain unchanged")
+			assert.Equal(t, original[1], steps[1], "script scalar must remain unchanged")
+			assert.Contains(t, output, embedded, "heredoc text must remain byte-for-byte intact")
+			assert.EqualValues(t, 7, steps[2]["with"].(map[string]any)["retention-days"])
+			assert.Equal(t, 1, strings.Count(output, "retention-days: 7\n"))
+		})
+	}
+}
+
+func TestArtifactRetentionReviewReproductionIsInvalidYAML(t *testing.T) {
+	const source = `jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print some embedded yaml
+        run: |
+          cat <<'DOC'
+    steps:
+      - uses: actions/upload-artifact@v4
+          DOC
+`
+	var workflow map[string]any
+	require.Error(t, yaml.Unmarshal([]byte(source), &workflow), "dedenting steps ends the run scalar and introduces a duplicate mapping key")
+}
+
+func TestWorkflowDataWithArtifactRetention(t *testing.T) {
+	for _, retention := range []*string{nil, new("14"), new("${{ inputs.retention }}")} {
+		upload := &UploadArtifactConfig{RetentionDays: retention, MaxUploads: 3}
+		data := &WorkflowData{Name: "test", SafeOutputs: &SafeOutputsConfig{UploadArtifact: upload}}
+		for _, days := range []string{"7", "30", "${{ vars.RETENTION }}"} {
+			t.Run(days, func(t *testing.T) {
+				t.Parallel()
+				renderData := workflowDataWithArtifactRetention(data, &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32(days))})
+				assert.NotSame(t, data, renderData)
+				assert.NotSame(t, data.SafeOutputs, renderData.SafeOutputs)
+				assert.NotSame(t, upload, renderData.SafeOutputs.UploadArtifact)
+				assert.Equal(t, days, *renderData.SafeOutputs.UploadArtifact.RetentionDays)
+				assert.Equal(t, upload.MaxUploads, renderData.SafeOutputs.UploadArtifact.MaxUploads)
+				assert.Same(t, upload, data.SafeOutputs.UploadArtifact)
+				assert.Equal(t, retention, data.SafeOutputs.UploadArtifact.RetentionDays)
+			})
+		}
+	}
+	for _, data := range []*WorkflowData{{}, {SafeOutputs: &SafeOutputsConfig{}}} {
+		assert.Same(t, data, workflowDataWithArtifactRetention(data, nil), "do not copy workflows without artifact safe outputs")
+	}
+}
+
 func TestCompileArtifactRetention(t *testing.T) {
 	for _, value := range []string{"7", `"${{ vars.RETENTION || '14' }}"`, ""} {
 		t.Run(value, func(t *testing.T) {
