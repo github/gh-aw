@@ -5,3 +5,4 @@
 2026-10-03: reviewed github-star-organizer (6), workflowVisualEditor (5); no blog; backlog 0 (discovery not run).
 2026-10-04: discovery run; reviewed gh-aw-firewall (7), gh-aw-mcpg (7), gh-aw-actions (5); no blog; backlog 0.
 2026-10-05: discovery run; reviewed awesome-agentic-workflows (5), gh-aw-demo-lab (5); no blog; backlog 3.
+2026-10-06: reviewed book (5), focoit-ai-digest (4), care_fe_aw_v2 (4); no blog; backlog 0.

@@ -216,5 +216,37 @@
    "copilot-requests: write instead of PAT"
   ],
   "blogged": false
+ },
+ "webmaxru/github-agentic-workflows-book": {
+  "kind": "other",
+  "reviewed": "2026-10-06",
+  "score": 5,
+  "summary": "Interactive multi-page HTML book teaching gh-aw; 1 star, updated Sep 2026 (metadata-level review).",
+  "highlights": [
+   "Topics: agentic-sdlc, github-agentic-workflows",
+   "Educational, not a novel tool"
+  ],
+  "blogged": false
+ },
+ "lculjak/focoit-ai-digest": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-06",
+  "score": 4,
+  "summary": "Personal weekly AI/cloud digest published to GitHub Pages by a gh-aw workflow (engine: copilot); 0 stars (metadata-level review).",
+  "highlights": [
+   "Self-updating static site via gh-aw",
+   "Active Oct 2026"
+  ],
+  "blogged": false
+ },
+ "amjithtitus09/care_fe_aw_v2": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-06",
+  "score": 4,
+  "summary": "Project-specific Jira-to-mergeable-PR gh-aw workflows for care_fe; 0 stars, no activity since Jul 2026 (metadata-level review).",
+  "highlights": [
+   "Jira to PR pipeline concept"
+  ],
+  "blogged": false
  }
 }
