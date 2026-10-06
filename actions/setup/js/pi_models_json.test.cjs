@@ -174,7 +174,7 @@ describe("pi_models_json.cjs", () => {
       expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "claude-sonnet-5", contextWindow: 1000000 }]);
     });
 
-    it("disables unsupported reasoning effort for GitHub Copilot Claude Haiku", () => {
+    it("preserves configured reasoning instead of hardcoding Claude Haiku capabilities", () => {
       const options = {
         baseUrl: "http://api-proxy:10002",
         apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
@@ -182,7 +182,7 @@ describe("pi_models_json.cjs", () => {
         metadata: { reasoning: true },
       };
       const github = JSON.parse(piModelsJson.buildModelsJSON({ ...options, provider: "github" }));
-      expect(github.providers["aw-gateway"].models).toEqual([{ id: "claude-haiku-4.5", reasoning: false }]);
+      expect(github.providers["aw-gateway"].models).toEqual([{ id: "claude-haiku-4.5", reasoning: true }]);
 
       const anthropic = JSON.parse(piModelsJson.buildModelsJSON({ ...options, provider: "anthropic" }));
       expect(anthropic.providers["aw-gateway"].models).toEqual([{ id: "claude-haiku-4.5", reasoning: true }]);
@@ -271,6 +271,68 @@ describe("pi_models_json.cjs", () => {
     });
   });
 
+  describe("resolvePiReasoningForModel", () => {
+    it.each([
+      [[], false],
+      [["none"], false],
+      [["low", "high"], true],
+      [["none", "high"], true],
+      [null, undefined],
+    ])("uses reflected routing efforts %j to resolve reasoning=%s", (efforts, reasoning) => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "Claude-Haiku-4.5?effort=high",
+          reflectData: { endpoints: [{ provider: "copilot", configured: true, routing_models: [{ model_id: "claude-haiku-4.5", supported_reasoning_efforts: efforts }] }] },
+        })
+      ).toBe(reasoning);
+    });
+
+    it.each([
+      [{ supportedReasoningEfforts: ["high"] }, true],
+      [{ capabilities: { supports: { reasoning_effort: [] } } }, false],
+      [{ capabilities: { supports: { reasoning_effort: ["medium"] } } }, true],
+      [{ capabilities: { supports: { reasoningEffort: false } } }, false],
+      [{ capabilities: { supports: { streaming: true } } }, false],
+      [{ capabilities: { supports: { reasoning_effort: null } } }, undefined],
+      [{}, undefined],
+    ])("uses reflected provider capabilities %j", (metadata, reasoning) => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "custom-model",
+          reflectData: { endpoints: [{ provider: "copilot", configured: true, model_metadata: [{ id: "custom-model", ...metadata }] }] },
+        })
+      ).toBe(reasoning);
+    });
+
+    it("does not use metadata for other models, providers, or unconfigured endpoints", () => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "custom-model",
+          reflectData: {
+            endpoints: [
+              { provider: "openai", configured: true, routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: ["high"] }] },
+              { provider: "copilot", configured: false, routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: ["high"] }] },
+              { provider: "copilot", configured: true, routing_models: [{ model_id: "another-model", supported_reasoning_efforts: ["high"] }] },
+            ],
+          },
+        })
+      ).toBeUndefined();
+    });
+
+    it("does not infer missing effort control for non-Copilot models", () => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "anthropic",
+          modelId: "custom-model",
+          reflectData: { endpoints: [{ provider: "anthropic", configured: true, model_metadata: [{ id: "custom-model", capabilities: { supports: { streaming: true } } }] }] },
+        })
+      ).toBeUndefined();
+    });
+  });
+
   describe("validatePiModelAvailability", () => {
     it("rejects a model absent from a completed reflected endpoint inventory", () => {
       const logs = [];
@@ -306,6 +368,32 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
+    it.each([
+      [[], false],
+      [["high"], true],
+    ])("writes reflected reasoning support for arbitrary models with efforts %j", async (efforts, reasoning) => {
+      process.env.GH_AW_PI_MODEL_ID = "custom-model";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      process.env.GH_AW_PI_CONFIG = JSON.stringify({ model: { reasoning: !reasoning } });
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["custom-model"], routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: efforts }] }] }),
+        })
+      );
+      await piModelsJson.main({ loadSDK, loadModelsJson: () => ({ providers: {} }) });
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"].models[0].reasoning).toBe(reasoning);
+      expect(stderrOutput.join("")).toContain(`resolved reasoning=${reasoning} from AWF /reflect`);
+    });
+
     it("preserves native thinking, vision, token limits, pricing, and cache metadata", async () => {
       process.env.GH_AW_PI_MODEL_ID = "gpt-5.4";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "CODEX_API_KEY";

@@ -104,7 +104,6 @@ function buildModelsJSON(options) {
             ...metadata,
             id: modelId,
             ...(contextWindow ? { contextWindow } : {}),
-            ...(provider === "github" && modelId === "claude-haiku-4.5" ? { reasoning: false } : {}),
             // Copilot's Responses adapter only supports apply_patch custom tools.
             ...(provider === "github" && api === "openai-responses" ? { compat: { ...metadata.compat, supportsOpenAIGrammarTools: false } } : {}),
           },
@@ -229,6 +228,33 @@ function resolvePiApiForModel(options) {
   return api;
 }
 
+/**
+ * Resolve reasoning support from the selected provider's reflected model metadata.
+ *
+ * @param {{ provider: string, modelId: string, reflectData?: any }} options
+ * @returns {boolean|undefined}
+ */
+function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
+  const normalizedProvider = normalizeReflectProviderName(provider);
+  const aliases = REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
+  const endpoint = reflectData?.endpoints?.find(endpoint => endpoint?.configured === true && aliases.has(normalizeReflectProviderName(endpoint.provider)));
+  if (!endpoint) return undefined;
+  const normalizedModelId = modelId.split("?")[0].toLowerCase();
+  const routingModel = endpoint.routing_models?.find(model => typeof model?.model_id === "string" && model.model_id.toLowerCase() === normalizedModelId);
+  const model = endpoint.model_metadata?.find(model => typeof model?.id === "string" && model.id.toLowerCase() === normalizedModelId);
+  const supports = model?.capabilities?.supports;
+  const efforts = routingModel?.supported_reasoning_efforts ?? model?.supportedReasoningEfforts ?? supports?.reasoning_effort;
+  if (Array.isArray(efforts) && efforts.every(effort => typeof effort === "string")) {
+    return efforts.some(effort => effort !== "none");
+  }
+  if (supports?.reasoningEffort === false) return false;
+  // Copilot omits reasoning_effort for models without effort control.
+  if (normalizedProvider === "github" && supports && typeof supports === "object" && !Array.isArray(supports) && !Object.hasOwn(supports, "reasoning_effort") && !Object.hasOwn(supports, "reasoningEffort")) {
+    return false;
+  }
+  return undefined;
+}
+
 /** @param {{ loadSDK?: typeof loadPiSDK, loadModelsJson?: typeof loadModelsJson }} [options] */
 async function main(options = {}) {
   const logger = DEFAULT_LOGGER;
@@ -294,6 +320,13 @@ async function main(options = {}) {
     api = overrides.api;
   }
   Object.assign(metadata, overrides);
+  const reasoning = resolvePiReasoningForModel({ provider, modelId, reflectData });
+  if (reasoning !== undefined) {
+    metadata.reasoning = reasoning;
+    logger(`resolved reasoning=${reasoning} from AWF /reflect (provider=${provider}, model=${modelId})`);
+  } else {
+    logger(`awf-reflect: reasoning metadata unavailable; retaining Pi model configuration (provider=${provider}, model=${modelId})`);
+  }
   const modelsJSON = buildModelsJSON({ baseUrl, apiKeyEnvVar, modelId, api, provider, nativeProvider, contextWindow, metadata, logger });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, modelsJSON, { encoding: "utf8", mode: 0o600 });
@@ -307,4 +340,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, resolvePiApiForModel, validatePiModelAvailability, DEFAULT_PI_CODING_AGENT_DIR };
+module.exports = { main, resolveGatewayBaseUrl, buildModelsJSON, resolvePiApiForProvider, resolvePiApiForModel, resolvePiReasoningForModel, validatePiModelAvailability, DEFAULT_PI_CODING_AGENT_DIR };

@@ -113,6 +113,8 @@ For Copilot models using the Responses API, gh-aw disables grammar-based custom 
 
 Project-local executable resources remain untrusted by default. Workflow-installed packages and activation-installed skills use the managed agent directory. Model catalog metadata preserves thinking, vision, token limits, pricing, and cache lifetimes through gateway routing. Workflow system instructions remain separate from user instructions so compaction does not summarize them away.
 
+When AWF `/reflect` reports reasoning-effort support for the selected provider and model, Pi uses that capability information instead of model-name exceptions. If reflection does not report it, Pi retains the model catalog or `engine.config.model` reasoning setting.
+
 Custom executables without the npm SDK must supply complete model metadata (`reasoning`, `input`, `contextWindow`, and `maxTokens`) in `engine.config.model`.
 
 The built-in `tools.playwright` integration uses `playwright-cli`; omit its `mode` field. Native `tools.web-search`, `max-continuations`, native `engine.agent` selection, and custom `engine.harness` scripts remain unsupported. Custom drivers must implement their own policies and cannot opt into the built-in aggregate tool budgets.
