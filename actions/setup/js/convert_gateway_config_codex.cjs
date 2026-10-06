@@ -23,8 +23,9 @@ require("./shim.cjs");
  */
 
 const path = require("path");
+const fs = require("fs");
 const { runGatewayConversion, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
-const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable } = require("./codex_config.cjs");
+const { buildConfig, serializeConfig, tomlValue, loadCompiledConfig, mergeConfig, expandConfigEnv, isTable, directToolCatalog } = require("./codex_config.cjs");
 
 /**
  * @param {string} name
@@ -46,6 +47,14 @@ function toCodexTomlSection(name, value, urlPrefix) {
 }
 
 function main() {
+  if (process.argv.includes("--direct-tools")) {
+    const home = process.env.CODEX_HOME;
+    if (!home) throw new Error("CODEX_HOME is required to configure Codex direct tools");
+    const catalog = directToolCatalog(JSON.parse(fs.readFileSync(0, "utf8")));
+    const output = JSON.stringify(catalog);
+    writeSecureOutput(path.join(home, "models.json"), output);
+    return output;
+  }
   const outputPath = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw/mcp-config/config.toml");
   if (process.argv.includes("--bootstrap")) {
     const compiled = loadCompiledConfig();

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -93,6 +94,9 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 	features := map[string]any{"plugins": !config.DisablePlugins}
 	if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
 		features["shell_tool"] = false
+		features["code_mode"] = false
+		features["code_mode_only"] = false
+		config.Defaults["model_catalog_json"] = path.Join(codexHome(workflowData), "models.json")
 	}
 	config.Defaults["features"] = features
 	if isFirewallEnabled(workflowData) {
@@ -171,9 +175,14 @@ func codexNativeServerDefaults(workflowData *WorkflowData, mcpTools []string) ma
 
 func validateCodexManagedConfig(config *codexNativeConfig, firewallEnabled, githubProvider bool) error {
 	if githubProvider {
+		if _, exists := config.Overrides["model_catalog_json"]; exists {
+			return errors.New("engine.config: model_catalog_json is managed for GitHub inference to disable the unsupported Codex exec custom tool")
+		}
 		if features, ok := config.Overrides["features"].(map[string]any); ok {
-			if shellTool, exists := features["shell_tool"]; exists && shellTool != false {
-				return errors.New("engine.config: features.shell_tool is disabled for GitHub inference because the Copilot compatibility adapter does not support the Codex exec custom tool")
+			for _, name := range []string{"shell_tool", "code_mode", "code_mode_only"} {
+				if value, exists := features[name]; exists && value != false {
+					return fmt.Errorf("engine.config: features.%s is disabled for GitHub inference because the Copilot compatibility adapter does not support the Codex exec custom tool", name)
+				}
 			}
 		}
 	}
@@ -289,6 +298,10 @@ func (e *CodexEngine) renderConfigurationStep(workflowData *WorkflowData, mcpToo
 	command := `"$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --bootstrap`
 	if configOnly {
 		command += "\n" + `"$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --config-only`
+	}
+	if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+		// Model metadata can force code mode even when its feature flags are off.
+		command = "set -o pipefail\n" + e.codexCommandName(workflowData) + ` debug models --bundled | "$(command -v node)" "${RUNNER_TEMP}/gh-aw/actions/convert_gateway_config_codex.cjs" --direct-tools` + "\n" + command
 	}
 	return FormatStepWithCommandAndEnv([]string{"      - name: Configure Codex"}, command, env), nil
 }
