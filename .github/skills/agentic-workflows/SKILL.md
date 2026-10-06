@@ -48,7 +48,6 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/jobs.md`
 - `.github/aw/linter-workflows.md`
 - `.github/aw/llms.md`
-- `.github/aw/local-debug.md`
 - `.github/aw/loop.md`
 - `.github/aw/lsp.md`
 - `.github/aw/maintainer.md`
