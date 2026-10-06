@@ -1,9 +1,9 @@
 {
-  "run_date": "2026-10-05T18:32:56Z",
-  "run_id": 37356482871,
+  "run_date": "2026-10-06T01:01:08Z",
+  "run_id": 37396829054,
   "source": "github-mcp-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 3,
+  "cooldown_skipped": 2,
   "category_counts": {"bug": 1},
   "risk_counts": {"high": 1},
   "priority_counts": {"medium": 1},
@@ -21,7 +21,7 @@
       "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
       "action": "batch_review",
       "batch": null,
-      "notes": "High-risk conflict-resolution fix with an active request-for-changes review; keep it in a focused batch instead of fast-tracking."
+      "notes": "High-risk signed-commit fallback fix with explicit request-for-changes feedback and no CI run signal; keep it in a focused review batch."
     }
   ]
 }
