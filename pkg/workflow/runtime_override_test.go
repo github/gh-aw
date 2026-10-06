@@ -76,6 +76,26 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 			},
 		},
 		{
+			name: "override existing runtime version with whole-number float",
+			runtimes: map[string]any{
+				"node": map[string]any{
+					"version": float64(24),
+				},
+			},
+			requirements: map[string]*RuntimeRequirement{
+				"node": {
+					Runtime: &Runtime{
+						ID:             "node",
+						DefaultVersion: "20",
+					},
+					Version: "20",
+				},
+			},
+			expected: map[string]string{
+				"node": "24",
+			},
+		},
+		{
 			name: "add new runtime from override",
 			runtimes: map[string]any{
 				"ruby": map[string]any{

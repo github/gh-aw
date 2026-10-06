@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -65,9 +66,8 @@ func resolveNodeSetupVersion(data *WorkflowData) string {
 		return ""
 	}
 	if nodeConfig, ok := data.Runtimes["node"].(map[string]any); ok {
-		switch version := nodeConfig["version"].(type) {
-		case string, int, float64:
-			return fmt.Sprint(version)
+		if version, ok := runtimeVersionToString(nodeConfig["version"]); ok {
+			return version
 		}
 		return ""
 	}
@@ -110,6 +110,14 @@ func generateNodeJsSetupStepForWorkflow(data *WorkflowData) GitHubActionStep {
 
 // rewriteNodeSetupStep returns a copy of step with its action and version overrides.
 func rewriteNodeSetupStep(step GitHubActionStep, actionRef, version string) GitHubActionStep {
+	quotedVersion := ""
+	if version != "" {
+		var ok bool
+		quotedVersion, ok = quoteYAMLSingleQuotedString(version)
+		if !ok {
+			version = ""
+		}
+	}
 	if actionRef == "" && version == "" {
 		return step
 	}
@@ -120,11 +128,18 @@ func rewriteNodeSetupStep(step GitHubActionStep, actionRef, version string) GitH
 			line = indent + "uses: " + actionRef
 		} else if version != "" && strings.HasPrefix(strings.TrimSpace(line), "node-version:") {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
-			line = fmt.Sprintf("%snode-version: '%s'", indent, version)
+			line = fmt.Sprintf("%snode-version: %s", indent, quotedVersion)
 		}
 		rewritten = append(rewritten, line)
 	}
 	return rewritten
+}
+
+func quoteYAMLSingleQuotedString(value string) (string, bool) {
+	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return "", false
+	}
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'", true
 }
 
 // applyNodeSetupOverrides rewrites the action and version of any "Setup Node.js"
@@ -135,6 +150,7 @@ func applyNodeSetupOverrides(steps []GitHubActionStep, data *WorkflowData) []Git
 	if actionRef == "" && version == "" {
 		return steps
 	}
+	nodejsLog.Printf("Applying runtimes.node overrides to Setup Node.js step: action=%s version=%q", actionRef, version)
 	result := make([]GitHubActionStep, 0, len(steps))
 	for _, step := range steps {
 		if extractStepName(strings.Join(step, "\n")) == "Setup Node.js" {

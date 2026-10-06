@@ -27,6 +27,22 @@ func cloneRuntimeWithActionOverrides(base *Runtime, actionRepo, actionVersion st
 	return &customRuntime
 }
 
+func runtimeVersionToString(version any) (string, bool) {
+	switch v := version.(type) {
+	case string:
+		return v, true
+	case int:
+		return strconv.Itoa(v), true
+	case float64:
+		if v == float64(int(v)) {
+			return strconv.Itoa(int(v)), true
+		}
+		return fmt.Sprintf("%g", v), true
+	default:
+		return "", false
+	}
+}
+
 // applyRuntimeOverrides applies runtime version overrides from frontmatter
 func applyRuntimeOverrides(runtimes map[string]any, requirements map[string]*RuntimeRequirement) {
 	runtimeSetupLog.Printf("Applying runtime overrides for %d configured runtimes", len(runtimes))
@@ -41,20 +57,9 @@ func applyRuntimeOverrides(runtimes map[string]any, requirements map[string]*Run
 		versionAny, hasVersion := configMap["version"]
 		var version string
 		if hasVersion {
-			// Convert version to string (handle both string and numeric types)
-			switch v := versionAny.(type) {
-			case string:
-				version = v
-			case int:
-				version = strconv.Itoa(v)
-			case float64:
-				// Check if it's a whole number
-				if v == float64(int(v)) {
-					version = strconv.Itoa(int(v))
-				} else {
-					version = fmt.Sprintf("%g", v)
-				}
-			default:
+			var supported bool
+			version, supported = runtimeVersionToString(versionAny)
+			if !supported {
 				continue
 			}
 		}

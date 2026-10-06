@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	yamlv3 "gopkg.in/yaml.v3"
 )
 
 // TestBuildDetectionEngineExecutionStepPropagatesAPITarget verifies that when engine.api-target
@@ -372,6 +373,30 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			expectedUses: "uses: " + getActionPin("actions/setup-node"),
 			version:      "22",
 		},
+		{
+			name: "whole-number float version from merged runtimes",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": float64(24)},
+			}},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      "24",
+		},
+		{
+			name: "boolean version uses default",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": true},
+			}},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      string(constants.DefaultNodeVersion),
+		},
+		{
+			name: "null version uses default",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": nil},
+			}},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      string(constants.DefaultNodeVersion),
+		},
 	}
 
 	for _, tt := range tests {
@@ -385,6 +410,56 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			}
 			if tt.data == nil && step != defaultStep {
 				t.Errorf("expected default step, got:\n%s", step)
+			}
+		})
+	}
+}
+
+func TestRewriteNodeSetupStepSafelySerializesNodeVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{
+			name:    "embedded quote stays in scalar",
+			version: "24' }} evil: true #",
+			want:    "24' }} evil: true #",
+		},
+		{
+			name:    "control character is ignored",
+			version: "24\n  evil: true #",
+			want:    string(constants.DefaultNodeVersion),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := rewriteNodeSetupStep(GenerateNodeJsSetupStep(), "", tt.version)
+			var workflow struct {
+				Steps []struct {
+					Name string         `yaml:"name"`
+					Uses string         `yaml:"uses"`
+					With map[string]any `yaml:"with"`
+				} `yaml:"steps"`
+			}
+			var document strings.Builder
+			document.WriteString("steps:\n")
+			for _, line := range step {
+				document.WriteString("  ")
+				document.WriteString(strings.TrimPrefix(line, "      "))
+				document.WriteByte('\n')
+			}
+			decoder := yamlv3.NewDecoder(strings.NewReader(document.String()))
+			decoder.KnownFields(true)
+			if err := decoder.Decode(&workflow); err != nil {
+				t.Fatalf("generated setup step is not valid YAML: %v\n%s", err, document.String())
+			}
+			if len(workflow.Steps) != 1 {
+				t.Fatalf("expected one Setup Node.js step, got %d", len(workflow.Steps))
+			}
+			if got := workflow.Steps[0].With["node-version"]; got != tt.want {
+				t.Errorf("node-version = %#v, want %q", got, tt.want)
 			}
 		})
 	}
