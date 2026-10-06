@@ -101,7 +101,7 @@ Compile each work-queue workflow phase.
 	require.Contains(t, conclusion, "Download activation artifact for work queue summary")
 	require.Contains(t, conclusion, "Summarize work queue activity\n        if: always()")
 	require.Contains(t, conclusion, "work_queue_summary.cjs")
-	require.Contains(t, conclusion, "await main({ core, githubClient: github, context });")
+	require.Contains(t, conclusion, "snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json'")
 }
 
 func TestIssueWorkQueueCompilationPhases(t *testing.T) {
