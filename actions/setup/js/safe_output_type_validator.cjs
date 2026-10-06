@@ -870,7 +870,8 @@ function validateItem(item, itemType, lineNum, options) {
     // If this safe-output type supports a body field, append structured data
     // as fenced JSON so it survives body sanitization.
     if (Object.prototype.hasOwnProperty.call(typeConfig.fields, "body")) {
-      const dataBlock = `${STRUCTURED_DATA_LABEL}\n\`\`\`json\n${dataJSON}\n\`\`\``;
+      const fencedData = `\`\`\`json\n${dataJSON}\n\`\`\``;
+      const dataBlock = itemType === "create_issue" ? `<details>\n<summary>Structured data</summary>\n\n${fencedData}\n\n</details>` : `${STRUCTURED_DATA_LABEL}\n${fencedData}`;
       if (typeof normalizedItem.body === "string" && normalizedItem.body.length > 0) {
         normalizedItem.body = `${normalizedItem.body}\n\n${dataBlock}`;
       } else {

@@ -479,11 +479,37 @@ describe("safe_output_type_validator", () => {
       expect(result.normalizedItem.body).toContain("```json");
       expect(result.normalizedItem.body).toContain('"verdict": "APPROVE"');
       expect(result.normalizedItem.body).toContain('"marker": "<!-- [PIPELINE-VERDICT] APPROVE -->"');
+      expect(result.normalizedItem.body).not.toContain("<details>");
       expect(result.normalizedItem.data).toEqual({
         verdict: "APPROVE",
         marker: "<!-- [PIPELINE-VERDICT] APPROVE -->",
         criteria_passed: 5,
       });
+    });
+
+    it.each([{}, { status: "DEFECT_FOUND", totals: { defect: 1 }, rows: [{ number: 5 }] }])("should collapse create-issue structured data %j", async data => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const { sanitizeContent } = await import("./sanitize_content.cjs");
+      const body = "Detailed issue body text.";
+
+      const result = validateItem({ type: "create_issue", title: "Report", body, data }, "create_issue", 1);
+
+      expect(result.isValid).toBe(true);
+      const expectedBody = `${body}\n\n<details>\n<summary>Structured data</summary>\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n\n</details>`;
+      expect(result.normalizedItem.body).toBe(expectedBody);
+      expect(result.normalizedItem.data).toEqual(data);
+      expect(sanitizeContent(result.normalizedItem.body)).toBe(expectedBody);
+    });
+
+    it("should leave create-issue bodies without structured data unchanged", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const body = "Detailed issue body text.";
+
+      const result = validateItem({ type: "create_issue", title: "Report", body }, "create_issue", 1);
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.body).toBe(body);
+      expect(result.normalizedItem.data).toBeUndefined();
     });
 
     it("should reject data values that are not objects", async () => {
