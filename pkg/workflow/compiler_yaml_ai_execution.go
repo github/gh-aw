@@ -459,6 +459,18 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		}
 
 		pluginInstallSteps := pluginInstaller.GetPluginInstallationSteps(data)
+		for i, ref := range data.PluginReferences {
+			if ref.GitHubApp == nil {
+				continue
+			}
+			stepID := pluginAppTokenStepID(i)
+			for _, step := range pluginInstallSteps {
+				if strings.Contains(strings.Join(step, "\n"), "id: "+stepID+"\n") {
+					c.recordGeneratedWildcardAppTokenStep("agent", ref.GitHubApp, stepID)
+					break
+				}
+			}
+		}
 		compilerYamlLog.Printf("Adding %d plugin installation steps for %s", len(pluginInstallSteps), engine.GetID())
 		for _, step := range pluginInstallSteps {
 			for _, line := range step {

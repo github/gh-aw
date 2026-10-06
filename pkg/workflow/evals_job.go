@@ -38,7 +38,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 		// Reuse the activation job trace ID so all jobs share one OTLP trace.
 		evalsTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		evalsParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, evalsTraceID, evalsParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("evals", data, setupActionRef, SetupActionDestination, false, evalsTraceID, evalsParentSpanID, "")...)
 	}
 
 	// Download agent output artifact to access output files (prompt.txt, agent_output.json).
@@ -126,7 +126,7 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 		traceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		parentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, traceID, parentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("push_evals_state", data, setupActionRef, SetupActionDestination, false, traceID, parentSpanID, "")...)
 	}
 
 	steps = append(steps,

@@ -375,8 +375,8 @@ func (c *Compiler) buildGitHubAppTokenMintStep(app *GitHubAppConfig, permissions
 	return c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, "", "Generate GitHub App token", "safe-outputs-app-token")
 }
 
-func (c *Compiler) buildGitHubAppTokenMintStepForRepository(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string) []string {
-	return c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, "Generate GitHub App token", "safe-outputs-app-token")
+func (c *Compiler) buildGitHubAppTokenMintStepForRepository(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string) []string {
+	return c.buildGitHubAppTokenMintStepForJob(jobName, app, permissions, fallbackRepoExpr, ownerSourceRepository, "Generate GitHub App token", "safe-outputs-app-token")
 }
 
 func appTokenPermissionFields(app *GitHubAppConfig, permissions *Permissions) map[string]string {
@@ -426,16 +426,6 @@ func appendGitHubAppTokenRepositoryInput(steps []string, app *GitHubAppConfig, f
 
 func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
 	safeOutputsAppLog.Printf("Building GitHub App token mint step: owner=%s, repos=%d", app.Owner, len(app.Repositories))
-	if len(app.Repositories) == 1 {
-		for _, repository := range app.Repositories {
-			if repository == "*" {
-				if c.wildcardAppTokenSteps == nil {
-					c.wildcardAppTokenSteps = make(map[appTokenStepKey]bool)
-				}
-				c.wildcardAppTokenSteps[appTokenStepKey{stepID, app.AppID, app.PrivateKey}] = true
-			}
-		}
-	}
 	var steps []string
 
 	owner, ownerSteps := resolveGitHubAppOwner(app, ownerSourceRepository, stepName, stepID)

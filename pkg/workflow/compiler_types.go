@@ -76,7 +76,7 @@ type Compiler struct {
 	featureUsage            map[string]int           // Counts experimental feature usage across workflows in batch mode
 	permissionWarningShown  map[string]string        // Tracks markdown paths and last warning fingerprint (frontmatter hash when available, otherwise formatted warning text)
 	allowedDomainsCache     map[string]allowedDomain // Cached allowed-domains per markdown path with the frontmatter hash that produced it
-	wildcardAppTokenSteps   map[appTokenStepKey]bool // Compiler-generated token steps with an explicit repositories: ["*"] configuration
+	wildcardAppTokenSteps   map[appTokenStepKey]bool // Job-scoped compiler-generated token steps with explicit repositories: ["*"].
 	// modelPricingResolver is an optional callback for resolving per-token pricing of models that
 	// are absent from the embedded models.json catalog. When non-nil it is called during
 	// buildInitialWorkflowData for the workflow's configured model; any returned pricing is merged

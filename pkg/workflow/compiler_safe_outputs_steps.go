@@ -182,7 +182,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 		}
 		stepID := handler.Key + "-app-token"
 		consolidatedSafeOutputsStepsLog.Printf("Adding per-handler GitHub App token minting step for %s", handler.Key)
-		steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			handlerApp,
 			handlerPermissions,
 			"",
@@ -193,7 +194,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 	}
 	if commentMemory := data.CommentMemoryConfig; commentMemory != nil && commentMemory.GitHubApp != nil &&
 		!isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), commentMemory.Staged) {
-		steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			commentMemory.GitHubApp,
 			NewPermissionsIssuesWrite(),
 			"",
@@ -218,7 +220,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 			}
 			stepID := dispatchRepositoryToolAppTokenStepID(toolKey)
 			consolidatedSafeOutputsStepsLog.Printf("Adding dispatch-repository GitHub App token minting step for %s", toolKey)
-			steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+			steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+				"safe_outputs",
 				tool.GitHubApp,
 				NewPermissionsContentsWrite(),
 				"",
