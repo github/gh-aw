@@ -131,6 +131,26 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("[copilot-harness]");
   });
 
+  it.each([
+    ["Error: Authentication failed with private-token", "Authentication failed"],
+    ["Access denied by policy settings: private-policy", "Inference access denied"],
+    ["CAPIError: 429 Too Many Requests private-provider", "Provider quota or rate limit exceeded"],
+    [JSON.stringify({ type: "session.error", data: { message: "Authentication failed", raw: "private-native-payload" } }), "Authentication failed"],
+  ])("preserves classified errors without copying raw diagnostics: %s", (log, summary) => {
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), log);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.details).toContain(summary);
+    expect(outcome.details).not.toContain("private-");
+  });
+
+  it("redacts overlapping runtime masks before pattern matching in validation details", () => {
+    const secret = `sk-proj-${"a".repeat(64)}${"b".repeat(16)}`;
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `::add-mask::${secret}\n`);
+    const outcome = buildEmptyOutputOutcome([`Invalid output: ${secret}`], rootDir);
+    expect(outcome.details).not.toContain("b".repeat(16));
+    expect(outcome.details).toContain("Invalid output: ***");
+  });
+
   it("reads native Copilot events before the canonical session artifact is published", () => {
     const sessionDir = path.join(rootDir, "sandbox/agent/logs/copilot-session-state/session");
     fs.mkdirSync(sessionDir, { recursive: true });

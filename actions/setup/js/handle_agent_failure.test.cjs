@@ -850,6 +850,43 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).not.toHaveBeenCalled();
     });
 
+    it.each(["&amp;#38;#96;", "&\x00#96;", "&<!-- hidden -->#96;"])("keeps encoded diagnostics fenced in the final posted failure comment: %s", async entity => {
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_comment.md"), "{report_incomplete_context}");
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      const payload = `${entity.repeat(3)}\n# untrusted heading\n${entity.repeat(3)}`;
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason: "infrastructure_error", details: payload }] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      const createCommentMock = vi.fn(async () => ({ data: { id: 1001 } }));
+      global.github = {
+        rest: {
+          search: {
+            issuesAndPullRequests: vi.fn(async ({ q }) => ({
+              data: {
+                total_count: q.includes("is:pr") ? 0 : 1,
+                items: q.includes("is:pr") ? [] : [{ number: 42, body: buildExistingIssueBody({ branch: "feature/current", categories: ["report_incomplete"] }) }],
+              },
+            })),
+          },
+          issues: { create: vi.fn(), createComment: createCommentMock },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        expect(createCommentMock).toHaveBeenCalledOnce();
+        const body = createCommentMock.mock.calls[0][0].body;
+        const detail = body.match(/<details>\n<summary>Error details:<\/summary>\n\n(`+)text\n([\s\S]*?)\n\1\n\n<\/details>/);
+        expect(detail).not.toBeNull();
+        expect(detail[1].length).toBeGreaterThan(3);
+        expect(detail[2]).toContain("```");
+        expect(detail[2]).toContain("# untrusted heading");
+        expect(detail[2]).not.toContain(detail[1]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("reuses the steering issue instead of searching for or creating a failure issue", async () => {
       process.env.GH_AW_FAILURE_ISSUE_NUMBER = "42";
       const updateIssueMock = vi.fn(async options => ({
@@ -3209,6 +3246,14 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("Error details:");
       expect(result).toContain("authentication failed with token ***");
       expect(result).not.toContain("sup3rs3cr3t");
+    });
+
+    it("redacts an entire runtime mask when built-in patterns match only its prefix", () => {
+      const secret = `sk-proj-${"a".repeat(64)}${"b".repeat(16)}`;
+      fs.writeFileSync(stdioLogPath, `::add-mask::${secret}\nError: authentication failed with ${secret}\n`);
+      const result = buildEngineFailureContext();
+      expect(result).toContain("authentication failed with ***");
+      expect(result).not.toContain("b".repeat(16));
     });
 
     it("cannot close the error code fence with embedded Markdown", () => {

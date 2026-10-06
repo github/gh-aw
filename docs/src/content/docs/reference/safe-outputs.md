@@ -1740,6 +1740,8 @@ Controls whether workflow failures are reported as GitHub issues (default: `true
 
 Failure reports keep error diagnostics in fenced code blocks inside collapsed details sections. Raw engine logs and arbitrary log tails are not included because they may contain secrets; inspect the linked workflow run for full logs.
 
+Empty-output reports preserve recognized engine failure categories as concise summaries, without copying raw error payloads. Unrecognized failure formats require inspecting the workflow run logs; reports do not publish a fallback log preview.
+
 #### Simple Boolean (Opt-Out All Failures)
 
 Set to `false` to suppress automatic failure issue creation for a specific workflow:

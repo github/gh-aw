@@ -3,7 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
+const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { getDetectionCautionAlert, getFooterAgentFailureIssueMessage, getFooterAgentFailureCommentMessage, generateXMLMarker } = require("./messages.cjs");
 const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
@@ -1926,8 +1926,7 @@ function renderPluginDiagnosticsDetails(diagnosticsLog) {
  * @returns {string}
  */
 function renderErrorDetails(diagnostics, maskedValues = []) {
-  const redacted = applyAddMaskRedaction(String(redactManifestValue(diagnostics, collectArtifactSecretValues())), maskedValues);
-  const sanitized = sanitizeContent(redacted, { maxLength: 8000 });
+  const sanitized = redactAndBoundDiagnostics(diagnostics, { maskedValues });
   const fence = safeMarkdownCodeFence([sanitized]);
   return `\n\n<details>\n<summary>Error details:</summary>\n\n${fence}text\n${sanitized}\n${fence}\n\n</details>\n\n`;
 }
