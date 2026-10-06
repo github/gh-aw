@@ -126,7 +126,7 @@ func staticEnclaveGitHubGuardPolicies(workflowData *WorkflowData) map[string]any
 		return nil
 	}
 	allowOnly := enclaveGitHubMCPAgentPolicy(workflowData).AllowOnly
-	repos, _ := allowOnly["repos"].([]string)
+	repos, _ := allowOnly["repos"].([]string) //nolint:typeassertionokdiscarded // A missing repos list is handled below.
 	if len(repos) == 0 {
 		return nil
 	}
@@ -498,9 +498,9 @@ func getGitHubGuardPolicies(githubTool map[string]any) map[string]any {
 		// parse-guard-vars step. The step outputs proper JSON arrays (split on comma/newline,
 		// validated, jq-encoded) from both the compile-time static values and the
 		// GH_AW_GITHUB_* org/repo variables.
-		policy["blocked-users"] = guardExprSentinel + "${{ steps.parse-guard-vars.outputs.blocked_users }}"
-		policy["trusted-users"] = guardExprSentinel + "${{ steps.parse-guard-vars.outputs.trusted_users }}"
-		policy["approval-labels"] = guardExprSentinel + "${{ steps.parse-guard-vars.outputs.approval_labels }}"
+		policy["blocked-users"] = guardExprSentinel + "${GH_AW_GUARD_BLOCKED_USERS}"
+		policy["trusted-users"] = guardExprSentinel + "${GH_AW_GUARD_TRUSTED_USERS}"
+		policy["approval-labels"] = guardExprSentinel + "${GH_AW_GUARD_APPROVAL_LABELS}"
 		return map[string]any{
 			"allow-only": policy,
 		}
@@ -712,7 +712,7 @@ func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[stri
 		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
 	}
 
-	toolConfig, _ := rawGithubTool.(map[string]any)
+	toolConfig, _ := rawGithubTool.(map[string]any) //nolint:typeassertionokdiscarded // A non-map tool has no explicit guard policy.
 
 	// Detect blanket opt-out: private-to-public-flows: allow.
 	// Per Section 10.9.3, allow disables sink-visibility enforcement in addition to forcePublicRepos.

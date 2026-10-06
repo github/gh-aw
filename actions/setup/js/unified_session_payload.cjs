@@ -75,6 +75,19 @@ const SAFE_OUTPUT_FIELDS = {
   errorCode: ["errorCode", "error_code"],
 };
 
+/** @type {Fields} */
+const MESSAGE_FIELDS = {
+  content: ["content"],
+  delta: ["delta"],
+  partial: ["partial"],
+  messageId: ["messageId", "message_id"],
+  contentIndex: ["contentIndex"],
+  channel: ["channel"],
+  sessionId: ["sessionId", "session_id"],
+  agentId: ["agentId"],
+  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+};
+
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
   "session.format": { version: ["version"] },
@@ -83,9 +96,9 @@ const EVENT_FIELDS = {
   "user.message": { content: ["content"] },
   "prompt.system": { content: ["content"] },
   "prompt.user": { content: ["content"] },
-  "assistant.message": { content: ["content"] },
+  "assistant.message": MESSAGE_FIELDS,
   "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
-  "assistant.reasoning": { content: ["content"] },
+  "assistant.reasoning": MESSAGE_FIELDS,
   "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
     ...TOOL_FIELDS,
@@ -139,6 +152,19 @@ const EVENT_FIELDS = {
   "grader.manifest": {},
   "grader.result": GRADER_FIELDS,
   "eval.result": { id: ["id"], answer: ["answer"], model: ["model"], error: ["error"] },
+  "github_api.rate_limit": {
+    source: ["source"],
+    credentialSource: ["credentialSource", "credential_source"],
+    operation: ["operation"],
+    resource: ["resource"],
+    limit: ["limit"],
+    remaining: ["remaining"],
+    used: ["used"],
+    reset: ["reset"],
+    attempt: ["attempt"],
+    delayMs: ["delayMs", "delay_ms"],
+    status: ["status"],
+  },
   "execution.result": { outcome: ["outcome"], conclusion: ["conclusion"], exitCode: ["exitCode", "exit_code"], durationMs: ["durationMs", "duration_ms"], startedAt: ["startedAt", "started_at"], finishedAt: ["finishedAt", "finished_at"] },
   "detection.result": {
     jobResult: ["jobResult", "job_result"],
@@ -212,6 +238,14 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
+    const metadata = selectFields(event, MESSAGE_FIELDS);
+    delete metadata.content;
+    for (const [key, value] of Object.entries(metadata)) if (!Object.hasOwn(data, key)) data[key] = value;
+    const message = event.message;
+    if (!Object.hasOwn(data, "messageId") && message && typeof message === "object" && !Array.isArray(message) && "id" in message && message.id !== undefined) data.messageId = structuredClone(message.id);
+    if (event.copilotProjection === "assistant.message_delta") data.delta = true;
+  }
   if (known && event.type.startsWith("mcp.") && event.type !== "mcp.event") {
     const rpc = source.payload;
     for (const [key, value] of Object.entries({ rpcId: rpc?.id, method: rpc?.method, toolName: rpc?.params?.name, error: rpc?.error })) {

@@ -205,7 +205,7 @@ func TestApplyActionPinToStep(t *testing.T) {
 				"name": "Setup Node",
 				"uses": "actions/setup-node@v6",
 				"with": map[string]any{
-					"node-version": "20",
+					"node-version": "24",
 				},
 			},
 			expectPinned: true,
@@ -398,7 +398,7 @@ func TestApplyActionPinToTypedStep(t *testing.T) {
 				Name: "Setup Node",
 				Uses: "actions/setup-node@v6",
 				With: map[string]any{
-					"node-version": "20",
+					"node-version": "24",
 				},
 			},
 			expectPinned: true,
@@ -1365,7 +1365,7 @@ func TestMapToStepWithActionPinning(t *testing.T) {
 				"name": "Setup Node",
 				"uses": "actions/setup-node@v6",
 				"with": map[string]any{
-					"node-version": "20",
+					"node-version": "24",
 					"cache":        "npm",
 				},
 				"env": map[string]string{

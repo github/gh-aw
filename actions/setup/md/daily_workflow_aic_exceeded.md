@@ -1,12 +1,14 @@
 > [!WARNING]
-> **Daily Workflow AIC Guardrail Exceeded**: The agent was not started because this workflow has already consumed the configured 24-hour AI Credits budget.
+> **Daily Workflow AIC Guardrail Exceeded**: The agent was not started because the 24-hour guardrail total reached the configured AI Credits threshold.
 
-- **24h AIC usage:** `{total_aic}` AI Credits
+- **24h AIC guardrail total:** `{total_aic}` AI Credits
+- **Recorded AIC:** `{recorded_aic}` AI Credits
+- **Estimated AIC (unresolved accounting):** `{estimated_aic}` AI Credits
 - **Configured threshold:** `{threshold}` AI Credits
 
-The agent will resume automatically once the 24-hour rolling window resets. No action is required if the current limit is appropriate for your usage.
+{estimate_guidance}
 
-<sub>AIC values are approximate. Consult the billing dashboards for accurate usage and charges.</sub>
+<sub>Recorded AIC values are approximate; estimates are not measured consumption. Consult the billing dashboards for accurate usage and charges.</sub>
 
 <details>
 <summary>How to raise the daily limit</summary>
@@ -40,7 +42,7 @@ Commit and push the updated `.lock.yml` file.
 
 The `max-daily-ai-credits` frontmatter option sets a per-workflow spending cap measured in *AI Credits* across the 24-hour window before the current run. The cap is scoped to the repository and workflow — it aggregates usage across all runs of this workflow regardless of who triggered them.
 
-When the aggregated AI Credits usage across all completed runs of this workflow in the last 24 hours exceeds the threshold, the activation job sets the `daily_ai_credits_exceeded` output to `true` and the agent job is skipped for that run. The conclusion job still runs and creates this report.
+When the total of recorded AI Credits and unresolved conservative estimates across all completed runs of this workflow in the last 24 hours reaches the threshold, the activation job sets the `daily_ai_credits_exceeded` output to `true` and the agent job is skipped for that run. The conclusion job still runs and creates this report.
 
 The guardrail is evaluated at activation time, not retrospectively, so a single very large run that pushes usage over the threshold only blocks *subsequent* runs in the same window — it does not cancel a run that is already in progress.
 

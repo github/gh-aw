@@ -3,10 +3,14 @@
 package envutil
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -193,13 +197,32 @@ func TestSpec_PublicAPI_GetBoolFromEnv_ReturnsDefault_WhenInvalid(t *testing.T) 
 }
 
 func TestSpec_PublicAPI_GetBoolFromEnv_ReturnsParsedValue(t *testing.T) {
-	const envVar = "GH_AW_SPEC_TEST_BOOL_VALID"
-	os.Setenv(envVar, "false")
-	defer os.Unsetenv(envVar)
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "lowercase true", value: "true", want: true},
+		{name: "uppercase true", value: "TRUE", want: true},
+		{name: "numeric true", value: "1", want: true},
+		{name: "lowercase false", value: "false", want: false},
+		{name: "uppercase false", value: "FALSE", want: false},
+		{name: "numeric false", value: "0", want: false},
+	}
 
-	result := GetBoolFromEnv(envVar, true, nil)
-	assert.False(t, result,
-		"GetBoolFromEnv should return the parsed boolean value")
+	for index, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			envVar := fmt.Sprintf("GH_AW_SPEC_TEST_BOOL_VALID_%d", index)
+			require.NoError(t, os.Setenv(envVar, tt.value), "setting the test environment variable should succeed")
+			t.Cleanup(func() {
+				assert.NoError(t, os.Unsetenv(envVar), "unsetting the test environment variable should succeed")
+			})
+
+			result := GetBoolFromEnv(envVar, !tt.want, nil)
+			assert.Equal(t, tt.want, result,
+				"GetBoolFromEnv should follow strconv.ParseBool rules for %q", tt.value)
+		})
+	}
 }
 
 func TestSpec_PublicAPI_GetBoolFromEnv_AcceptsNonNilLogger(t *testing.T) {
@@ -256,4 +279,52 @@ func TestSpec_PublicAPI_GetStringFromEnv_AcceptsNonNilLogger(t *testing.T) {
 	assert.NotPanics(t, func() {
 		assert.Equal(t, "token", GetStringFromEnv(envVar, "", log))
 	}, "GetStringFromEnv should not panic when a non-nil logger is passed")
+}
+
+// TestSpec_ThreadSafety_ConcurrentUse validates the README guarantee that all
+// three helpers are safe for concurrent use and hold no shared mutable state.
+func TestSpec_ThreadSafety_ConcurrentUse(t *testing.T) {
+	const workers = 24
+
+	type result struct {
+		name string
+		got  any
+		want any
+	}
+
+	results := make(chan result, workers*3)
+	var wg sync.WaitGroup
+	for index := range workers {
+		intVar := fmt.Sprintf("GH_AW_SPEC_TEST_CONCURRENT_INT_%d", index)
+		boolVar := fmt.Sprintf("GH_AW_SPEC_TEST_CONCURRENT_BOOL_%d", index)
+		stringVar := fmt.Sprintf("GH_AW_SPEC_TEST_CONCURRENT_STRING_%d", index)
+		require.NoError(t, os.Setenv(intVar, strconv.Itoa(index)), "setting integer environment variable should succeed")
+		require.NoError(t, os.Setenv(boolVar, "true"), "setting boolean environment variable should succeed")
+		require.NoError(t, os.Setenv(stringVar, fmt.Sprintf("value-%d", index)), "setting string environment variable should succeed")
+		t.Cleanup(func() {
+			assert.NoError(t, os.Unsetenv(intVar), "unsetting integer environment variable should succeed")
+			assert.NoError(t, os.Unsetenv(boolVar), "unsetting boolean environment variable should succeed")
+			assert.NoError(t, os.Unsetenv(stringVar), "unsetting string environment variable should succeed")
+		})
+
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			results <- result{name: intVar, got: GetIntFromEnv(intVar, -1, 0, workers, nil), want: index}
+		}()
+		go func() {
+			defer wg.Done()
+			results <- result{name: boolVar, got: GetBoolFromEnv(boolVar, false, nil), want: true}
+		}()
+		go func() {
+			defer wg.Done()
+			results <- result{name: stringVar, got: GetStringFromEnv(stringVar, "fallback", nil), want: fmt.Sprintf("value-%d", index)}
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+	for result := range results {
+		assert.Equal(t, result.want, result.got, "%s should be read correctly during concurrent use", result.name)
+	}
 }

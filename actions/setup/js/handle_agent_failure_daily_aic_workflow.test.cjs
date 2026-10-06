@@ -27,9 +27,11 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
   });
 
   it("renders the daily workflow AI Credits guardrail context when exceeded", () => {
-    const rendered = buildDailyAICExceededContext(true, "17.329230000000003", "10");
+    const rendered = buildDailyAICExceededContext(true, "17.329230000000003", "10", "0");
     expect(rendered).toContain("Daily Workflow AIC Guardrail Exceeded");
-    expect(rendered).toContain("**24h AIC usage:** `18` AI Credits");
+    expect(rendered).toContain("**24h AIC guardrail total:** `18` AI Credits");
+    expect(rendered).toContain("**Recorded AIC:** `18` AI Credits");
+    expect(rendered).toContain("**Estimated AIC (unresolved accounting):** `0` AI Credits");
     expect(rendered).toContain("**Configured threshold:** `10` AI Credits");
     expect(rendered).not.toContain("Activation Issue:");
     // Progressive disclosure sections
@@ -39,6 +41,15 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     expect(rendered).toContain("What is the daily AI Credits guardrail");
     expect(rendered).toContain("How to disable this guardrail");
     expect(rendered).toContain("Consult the billing dashboards for accurate usage and charges.");
+  });
+
+  it("does not claim estimated usage was consumed and explains reconciliation", () => {
+    const rendered = buildDailyAICExceededContext(true, "5809.28", "5000", "5000");
+    expect(rendered).toContain("**Recorded AIC:** `810` AI Credits");
+    expect(rendered).toContain("**Estimated AIC (unresolved accounting):** `5K` AI Credits");
+    expect(rendered).toContain("replace estimates if recorded usage becomes available");
+    expect(rendered).toContain("leave the rolling 24-hour window");
+    expect(rendered).not.toContain("already consumed");
   });
 
   it("returns empty string when the guardrail did not trigger", () => {

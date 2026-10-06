@@ -285,6 +285,30 @@ func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, da
 	*steps = append(*steps, fmt.Sprintf("          github-token: %s\n", resolvedToken))
 }
 
+func (c *Compiler) safeOutputGitHubTokenSource(data *WorkflowData) string {
+	if data.SafeOutputs == nil {
+		return `"github_actions"`
+	}
+
+	safeOutputs := data.SafeOutputs
+	if safeOutputs.GitHubApp == nil {
+		if safeOutputs.GitHubToken != "" {
+			return `"unknown"`
+		}
+		return "${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}"
+	}
+
+	if !safeOutputs.GitHubApp.shouldIgnoreMissingKey() && safeOutputsGlobalAppTokenMinted(safeOutputs) {
+		return `"app"`
+	}
+
+	fallbackSource := "secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions'"
+	if safeOutputs.GitHubToken != "" {
+		fallbackSource = "'unknown'"
+	}
+	return fmt.Sprintf("${{ steps.safe-outputs-app-token.outputs.token != '' && 'app' || %s }}", fallbackSource)
+}
+
 // addSafeOutputGitHubTokenForConfig adds github-token to the with section for standard safe-output operations.
 // Uses precedence:
 //   - when safe-outputs.github-app is configured, the app installation token is used

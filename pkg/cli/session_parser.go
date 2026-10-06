@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"os/exec"
@@ -15,7 +16,10 @@ import (
 
 	"github.com/github/gh-aw/actions/setup"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var errNoRecognizableAgentSession = errors.New("no recognizable agent session")
 
 type agentExecutionData struct {
 	Categories []string          `json:"categories"`
@@ -82,6 +86,10 @@ func runSessionParser(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func runSessionParserWithSources(ctx context.Context, additionalSources map[string][]byte, args ...string) ([]byte, error) {
+	additionalSources, err := sessionParserEngineSources(additionalSources, args)
+	if err != nil {
+		return nil, err
+	}
 	tempDir, err := os.MkdirTemp("", "gh-aw-session-parser-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session parser directory: %w", err)
@@ -123,7 +131,44 @@ func runSessionParserWithSources(ctx context.Context, additionalSources map[stri
 		}
 	}
 	if err != nil {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) && exitError.ExitCode() == 2 {
+			return nil, fmt.Errorf("%w: %s", errNoRecognizableAgentSession, diagnostics.String())
+		}
 		return nil, fmt.Errorf("failed to execute session parser (Node.js is required): %w: %s", err, diagnostics.String())
 	}
+
 	return output, nil
+}
+
+func sessionParserEngineSources(additionalSources map[string][]byte, args []string) (map[string][]byte, error) {
+	engineID := ""
+	for index, value := range args {
+		if index == 2 {
+			engineID = value
+			break
+		}
+	}
+	if engineID == "" {
+		return additionalSources, nil
+	}
+	var engine *workflow.BehaviorDefinedEngine
+	if registered, err := workflow.GetGlobalEngineRegistry().GetEngine(engineID); err == nil {
+		if behavior, ok := registered.(*workflow.BehaviorDefinedEngine); ok {
+			engine = behavior
+		}
+	} else {
+		var loadErr error
+		engine, loadErr = loadLocalLogParserEngine(engineID)
+		if loadErr != nil {
+			return nil, fmt.Errorf("failed to load engine log parser: %w", loadErr)
+		}
+	}
+	if engine == nil {
+		return additionalSources, nil
+	}
+	sources := make(map[string][]byte, len(additionalSources)+1)
+	maps.Copy(sources, additionalSources)
+	sources[engine.GetID()+"_log_parser.cjs"] = []byte(engine.GetLogParserScriptSource())
+	return sources, nil
 }

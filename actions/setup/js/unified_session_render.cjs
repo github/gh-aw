@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const { sessionOutputText } = require("./agent_session.cjs");
-const { boundSummaryLines, escapeSummaryText, redactSessionForPublication } = require("./agent_session_render.cjs");
+const { collapseStreamedMessages, boundSummaryLines, escapeSummaryText, redactSessionForPublication } = require("./agent_session_render.cjs");
 const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -171,21 +171,25 @@ function scopedAgentSessions(events) {
 /** @param {Array<any>} events @returns {Array<{label: string, events: Array<any>}>} */
 function publicationAgentSessions(events) {
   const secrets = collectArtifactSecretValues();
-  const privateCopy = redactSessionForPublication(events, value => {
+  /** @param {string} value @returns {string} */
+  const redact = value => {
     const redacted = redactManifestValue(value, secrets);
     if (typeof redacted !== "string") throw new Error(`${ERR_VALIDATION}: Expected redacted session string`);
     return redacted;
-  });
-  return scopedAgentSessions(privateCopy);
+  };
+  return scopedAgentSessions(events).map(group => ({
+    label: redact(group.label),
+    events: redactSessionForPublication(group.events, redact),
+  }));
 }
 
 /**
  * Known runtime fields are display projections, never raw request/response dumps.
  * @param {Array<any>} events
- * @param {{markdown: boolean, maxBytes: number, maxLineBytes: number, agentStatistics: (events: Array<any>) => string[]}} options
+ * @param {{markdown: boolean, maxBytes: number, maxLineBytes: number, agentStatistics: (events: Array<any>) => string[], agentConversation: (events: Array<any>) => string[]}} options
  * @returns {string}
  */
-function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentStatistics }) {
+function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentStatistics, agentConversation }) {
   const headers = events.filter(event => event?.type === "session.format" && event.provenance?.component === "collector");
   if (headers.length) validateSessionFileHeader(events);
   if (headers.length > 1) throw new Error(`${ERR_VALIDATION}: Unified session file contains multiple collector format headers`);
@@ -199,11 +203,17 @@ function renderUnifiedSession(events, { markdown, maxBytes, maxLineBytes, agentS
     counts.set(component, (counts.get(component) ?? 0) + 1);
   }
   lines.push(`Records: ${redacted.length} (${[...counts].map(([name, count]) => `${inline(name)}=${count}`).join(", ")})`);
-  for (const group of publicationAgentSessions(events)) {
+  const agentSessions = publicationAgentSessions(events);
+  for (const group of agentSessions) {
     lines.push("", `Agent source: ${inline(group.label)}`, ...agentStatistics(group.events));
   }
+  for (const group of agentSessions) {
+    lines.push("", `Agent conversation: ${inline(group.label)}`, "", ...agentConversation(group.events));
+  }
   lines.push("", "Chronological trace (user prompts omitted; untimed observations follow):");
-  for (const [index, event] of redacted.entries()) {
+  const trace = redactManifestValue(collapseStreamedMessages(events), collectArtifactSecretValues());
+  if (!Array.isArray(trace)) throw new Error(`${ERR_VALIDATION}: Expected unified session display events`);
+  for (const [index, event] of trace.entries()) {
     const detail = eventDetail(event);
     if (detail === undefined) continue;
     const source = event.provenance;

@@ -162,7 +162,7 @@ jobs:
       - name: Report TruffleHog secret scan failure
         if: always() && needs.trufflehog_scan.result == 'failure' && needs.trufflehog_scan.outputs.secrets_found == 'true'
         continue-on-error: true
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         env:
           GH_AW_TRUFFLEHOG_SECRETS_LOCATIONS: ${{ needs.trufflehog_scan.outputs.secrets_locations }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

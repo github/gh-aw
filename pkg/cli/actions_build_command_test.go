@@ -153,11 +153,11 @@ func TestValidateActionYml(t *testing.T) {
 		errorContains    string
 	}{
 		{
-			name: "valid node20 action",
+			name: "valid node24 action with double quotes",
 			actionYmlContent: `name: Test Action
 description: A test action
 runs:
-  using: 'node20'
+  using: "node24"
   main: 'index.js'`,
 			expectError: false,
 		},
@@ -180,7 +180,7 @@ runs:
 			name: "missing name field",
 			actionYmlContent: `description: A test action
 runs:
-  using: 'node20'`,
+  using: 'node24'`,
 			expectError:   true,
 			errorContains: "missing required field 'name'",
 		},
@@ -188,7 +188,7 @@ runs:
 			name: "missing description field",
 			actionYmlContent: `name: Test Action
 runs:
-  using: 'node20'`,
+  using: 'node24'`,
 			expectError:   true,
 			errorContains: "missing required field 'description'",
 		},
@@ -363,11 +363,11 @@ runs:
 			expectError:     false,
 		},
 		{
-			name: "node20 action",
+			name: "node24 action",
 			actionYmlContent: `name: Test Action
 description: A test action
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'index.js'`,
 			expectComposite: false,
 			expectError:     false,

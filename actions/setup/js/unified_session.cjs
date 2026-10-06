@@ -9,11 +9,15 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { normalizeEngineLogEntries } = require("./engine_log_parser.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], timestampUnit?: "seconds" | "milliseconds"}} SessionSource */
+
+/** @param {unknown} value @returns {boolean} */
+const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/logs\/copilot-session-state\/[A-Za-z0-9_-]+\/events\.jsonl$/.test(value);
 
 /**
  * Timestamp units come from the source schema, never from the value's magnitude.
@@ -44,6 +48,21 @@ function mergeSessionSources(sources) {
     source.events.map((event, index) => {
       const timestampMs = sessionTimestamp(event, source.timestampUnit);
       const normalized = normalizeUnifiedSessionEvent(event, source.phase);
+      const native = event.provenance;
+      const sourceIndex =
+        source.component === "agent" &&
+        isNativePath(source.path) &&
+        native &&
+        typeof native === "object" &&
+        "path" in native &&
+        native.path === source.path &&
+        (!("phase" in native) || native.phase === source.phase) &&
+        "index" in native &&
+        typeof native.index === "number" &&
+        Number.isSafeInteger(native.index) &&
+        native.index >= 0
+          ? native.index
+          : index;
       if (event.type === "detection.result" && source.path !== "usage/detection/detection_result.json") {
         delete normalized.data.reason;
       }
@@ -53,7 +72,7 @@ function mergeSessionSources(sources) {
           component: source.component,
           phase: source.phase,
           path: source.path,
-          index,
+          index: sourceIndex,
           ...(timestampMs !== undefined ? { timestampMs } : {}),
           ...(Object.hasOwn(event, "provenance") ? { native: structuredClone(event.provenance) } : {}),
         },
@@ -113,13 +132,18 @@ function parseEngineSession(content, engine) {
     codex: ["parse_codex_log.cjs", "parseCodexLog"],
     gemini: ["parse_gemini_log.cjs", "parseGeminiLog"],
     pi: ["parse_pi_log.cjs", "parsePiLog"],
+    kiro: ["parse_kiro_log.cjs", "parseKiroLog"],
+    "deepseek-harness": ["parse_deepseek_log.cjs", "parseDeepSeekLog"],
+    "pydantic-ai": ["parse_pydantic_log.cjs", "parsePydanticLog"],
     opencode: ["parse_opencode_log.cjs", "parseOpenCodeLog"],
     goose: ["parse_goose_log.cjs", "parseGooseLog"],
     custom: ["parse_custom_log.cjs", "parseCustomLog"],
   };
   const [moduleName, functionName] = Object.hasOwn(parsers, engine) ? parsers[engine] : parsers.custom;
-  const events = require(`./${moduleName}`)[functionName](content).logEntries ?? [];
+  const parsed = Object.hasOwn(parsers, engine) ? require(`./${moduleName}`)[functionName](content) : require(`./${moduleName}`)[functionName](content, engine);
+  const events = parsed.logEntries ?? [];
   const observations = events.filter(isAgentExecutionEvent).map(event => event.data);
+  if (observations.length) return events;
   const execution = collectAgentExecution({ content, events, observations });
   return [...events.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
 }
@@ -196,7 +220,10 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const add = (file, component, phase, type, timestampUnit = "milliseconds") => {
     if (!exists(file)) return 0;
     const events = [];
-    for (const record of records(file)) {
+    const input = records(file);
+    const normalized = component === "agent" ? normalizeEngineLogEntries(input, engine ?? "custom") : [];
+    const hasLegacyContent = normalized.some(event => ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"].includes(event.type));
+    for (const record of input) {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
         incompleteSources.add(file);
         report(file, "non_object_record", undefined);
@@ -204,7 +231,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       }
       if (component === "agent") {
         if (isSessionEvent(record)) events.push(record);
-        else {
+        else if (!hasLegacyContent || normalizeEngineLogEntries([record], engine ?? "custom").length === 0) {
           incompleteSources.add(file);
           report(file, "non_canonical_agent_event", undefined);
         }
@@ -213,8 +240,17 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
       else throw new Error(`${ERR_VALIDATION}: Missing event mapping for ${component}`);
     }
+    if (component === "agent" && hasLegacyContent) {
+      const canonicalKeys = new Set(events.map(event => JSON.stringify([event.type, event.id, event.timestamp, event.data.content, event.data.toolCallId, event.data.input, event.data.output])));
+      const canonicalRecords = new Set(input.filter(isSessionEvent).map(record => JSON.stringify(record)));
+      events.length = 0;
+      for (const event of normalized) {
+        const key = JSON.stringify([event.type, event.id, event.timestamp, event.data.content, event.data.toolCallId, event.data.input, event.data.output]);
+        if (canonicalRecords.has(JSON.stringify(event)) || !canonicalKeys.has(key)) events.push(event);
+      }
+    }
     sources.push({ component, phase, path: path.relative(rootDir, file), events, timestampUnit });
-    return events.length;
+    return events.filter(event => event.type !== "agent.execution").length;
   };
   const walk = (directory, depth = 0) => {
     if (!fs.existsSync(directory)) return [];
@@ -267,8 +303,97 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const canonical = path.join(rootDir, "agent-session.jsonl");
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
-  if (!agentEvents) {
+  const canonicalSource = sources.find(source => source.component === "agent" && source.path === "agent-session.jsonl");
+  const sessionId = event => (["session.start", "session.init"].includes(event?.type) && typeof event.data?.sessionId === "string" && event.data.sessionId ? event.data.sessionId : undefined);
+  /** @param {SessionEvent} event @returns {Record<string, unknown>} */
+  const nativeProvenance = event => (event.provenance && typeof event.provenance === "object" && !Array.isArray(event.provenance) ? Object.fromEntries(Object.entries(event.provenance)) : {});
+  const canonicalCopilot = engine === "copilot" || canonicalSource?.events.some(event => event.data.sourceEngine === "copilot" || isNativePath(nativeProvenance(event).path));
+  const representedIds = new Set(canonicalCopilot ? canonicalSource?.events.map(sessionId).filter(Boolean) : []);
+  /** @type {Map<string, {file: string, records: any[], start?: number}>} */
+  const snapshots = new Map();
+  const nativePaths = new Map();
+  if (!agentEvents || (canonicalCopilot && (representedIds.size || canonicalSource?.events.some(event => isNativePath(nativeProvenance(event).path))))) {
     for (const file of native) {
+      const input = records(file);
+      const start = input.find(event => event?.type === "session.start" && sessionId(event));
+      const id = sessionId(start);
+      if (!id) continue;
+      nativePaths.set(path.relative(rootDir, file), id);
+      const previous = snapshots.get(id);
+      if (!previous || input.length > previous.records.length) {
+        snapshots.set(id, { file, records: input, start: sessionTimestamp({ timestamp: start.data.startTime ?? start.timestamp }) });
+      }
+    }
+  }
+  const canonicalPaths = new Map();
+  const canonicalStarts = new Map();
+  if (canonicalCopilot) {
+    let activeId;
+    for (const event of canonicalSource?.events ?? []) {
+      const id = sessionId(event);
+      if (id) {
+        activeId = id;
+        const start = sessionTimestamp({ timestamp: event.data.startTime ?? event.timestamp });
+        if (start !== undefined) canonicalStarts.set(id, start);
+      }
+      const nativePath = nativeProvenance(event).path;
+      if (isNativePath(nativePath)) {
+        const observedId = nativePaths.get(nativePath) ?? activeId;
+        if (observedId) {
+          canonicalPaths.set(observedId, nativePath);
+          representedIds.add(observedId);
+        }
+      }
+    }
+  }
+  /** @type {Map<SessionSource, {id: string, start?: number}>} */
+  const copilotSources = new Map();
+  if (canonicalSource && canonicalCopilot) {
+    const groups = new Map();
+    let activeId;
+    for (const event of canonicalSource.events) {
+      const id = sessionId(event);
+      if (id) activeId = id;
+      const nativePath = nativeProvenance(event).path;
+      const observedId = nativePaths.get(nativePath) ?? activeId;
+      const snapshot = snapshots.get(observedId);
+      const sourcePath = isNativePath(nativePath) ? nativePath : (canonicalPaths.get(observedId) ?? (snapshot ? path.relative(rootDir, snapshot.file) : canonicalSource.path));
+      const groupKey = JSON.stringify([sourcePath, observedId]);
+      let group = groups.get(groupKey);
+      if (!group) {
+        group = { ...canonicalSource, path: sourcePath, events: [] };
+        groups.set(groupKey, group);
+        if (isNativePath(sourcePath) || typeof observedId === "string") copilotSources.set(group, { id: observedId ?? sourcePath, start: canonicalStarts.get(observedId) ?? snapshot?.start });
+      }
+      group.events.push(isNativePath(sourcePath) ? { ...event, provenance: { ...nativeProvenance(event), path: sourcePath, persistedPath: canonicalSource.path } } : event);
+    }
+    for (const group of groups.values()) {
+      if (copilotSources.has(group)) group.events = require("./copilot_session.cjs").normalizeCopilotSession(group.events);
+    }
+    sources.splice(sources.indexOf(canonicalSource), 1, ...groups.values());
+  }
+  // A canonical final attempt must not hide distinct earlier native sessions.
+  // Represented IDs remain authoritative, even when raw copies are fuller.
+  for (const [id, snapshot] of snapshots) {
+    if (representedIds.has(id)) continue;
+    const events = normalizeCopilotSession(snapshot.records);
+    const source = { component: "agent", phase: "agent", path: path.relative(rootDir, snapshot.file), events };
+    sources.push(source);
+    if (incompleteSources.has(snapshot.file) || !hasCopilotConversation(events)) {
+      if (!incompleteSources.has(snapshot.file)) report(snapshot.file, "native_session_unusable", undefined);
+      source.events = [];
+      continue;
+    }
+    copilotSources.set(source, { id, start: snapshot.start });
+    agentEvents += events.filter(event => event.type !== "agent.execution").length;
+  }
+  if (copilotSources.size) {
+    const ordered = [...copilotSources].sort(([, left], [, right]) => (left.start ?? Infinity) - (right.start ?? Infinity));
+    const positions = sources.map((source, index) => (copilotSources.has(source) ? index : -1)).filter(index => index >= 0);
+    for (const [index, [source]] of ordered.entries()) sources[positions[index]] = source;
+  } else if (!agentEvents) {
+    for (const file of native) {
+      if ([...snapshots.values()].some(snapshot => snapshot.file === file)) continue;
       add(file, "agent", "agent", undefined);
       const source = sources.at(-1);
       if (source?.path === path.relative(rootDir, file)) {
@@ -320,6 +445,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     [["agent/graders/grader_results.json", "usage/graders/grader_results.json"], "grader", "agent", "grader.result"],
     [["evals/evals.jsonl", "usage/evals.jsonl"], "eval", "evals", "eval.result"],
     [["agent_usage.jsonl", "usage/agent_usage.jsonl"], "usage", "agent", "usage.report"],
+    [["github_rate_limits.jsonl", "usage/github_rate_limits.jsonl"], "github_api", "workflow", "github_api.rate_limit"],
     [["threat-detection/detection_usage.jsonl", "detection_usage.jsonl", "usage/detection_usage.jsonl"], "usage", "detection", "usage.report"],
     [["evals/evals_token_usage.jsonl", "usage/evals/token_usage.jsonl"], "usage", "evals", "usage.report"],
     [["agent_execution.json", "usage/agent/execution.json"], "execution", "agent", "execution.result"],
@@ -335,21 +461,36 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
   add(executionFile, "agent", "agent", undefined);
   const agentSources = sources.filter(source => source.component === "agent");
-  const diagnosticSources = [...agentSources.filter(source => source.path === "agent-errors.jsonl"), ...agentSources.filter(source => source.path !== "agent-errors.jsonl")];
+  const finalCopilotSource = agentSources.filter(source => copilotSources.has(source)).at(-1);
+  const executionAgentSources = finalCopilotSource ? agentSources.filter(source => !copilotSources.has(source) || source === finalCopilotSource) : agentSources;
+  const diagnosticSources = [...executionAgentSources.filter(source => source.path === "agent-errors.jsonl"), ...executionAgentSources.filter(source => source.path !== "agent-errors.jsonl")];
   const executionObservations = diagnosticSources.flatMap(source => source.events.filter(isAgentExecutionEvent).map(event => event.data));
   const exitFile = path.join(rootDir, "agent_execution_exit_code.txt");
   const executionSource = sources.find(source => source.component === "execution" && source.phase === "agent");
   const executionEvidence = executionSource?.events[0]?.data;
   const observedExit = executionEvidence?.exitCode ?? executionEvidence?.exit_code;
+  const nativeExit = diagnosticSources
+    .map(source =>
+      source.events
+        .filter(isAgentExecutionEvent)
+        .reverse()
+        .find(event => event.data.exitCode != null || event.data.exit_code != null)
+    )
+    .find(Boolean)?.data;
+  const exitCode = observedExit ?? nativeExit?.exitCode ?? nativeExit?.exit_code;
   const execution = collectAgentExecution({
     content: stdioContent,
-    events: agentSources.flatMap(source => source.events),
+    events: executionAgentSources.flatMap(source => source.events),
     observations: executionObservations,
-    ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : observedExit !== undefined ? { exitCode: validateAgentExitCode(observedExit) } : {}),
+    ...(exists(exitFile) ? { exitCode: parseAgentExitCode(read(exitFile)) } : exitCode !== undefined ? { exitCode: validateAgentExitCode(exitCode) } : {}),
   });
   for (const source of agentSources) source.events = source.events.filter(event => event.type !== "agent.execution");
   if (execution) {
-    const primary = executionObservations.length ? (agentSources.find(source => source.path === "agent-errors.jsonl")?.path ?? agentSources[0]?.path) : stdioContent ? "agent-stdio.log" : agentSources[0]?.path;
+    const primary = executionObservations.length
+      ? (agentSources.find(source => source.path === "agent-errors.jsonl")?.path ?? finalCopilotSource?.path ?? agentSources[0]?.path)
+      : stdioContent
+        ? "agent-stdio.log"
+        : (finalCopilotSource?.path ?? agentSources[0]?.path);
     sources.push({ component: "execution", phase: "agent", path: primary ?? executionSource?.path ?? path.relative(rootDir, exitFile), events: [execution] });
   }
   /** @type {SessionEvent} */

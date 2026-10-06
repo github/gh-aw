@@ -351,7 +351,7 @@ func generateActionYml(actionDir string, metadata *ActionMetadata) error {
 
 	// Add runs section
 	content.WriteString("runs:\n")
-	content.WriteString("  using: 'node20'\n")
+	content.WriteString("  using: 'node24'\n")
 	content.WriteString("  main: 'index.js'\n\n")
 
 	// Add branding

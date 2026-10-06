@@ -634,8 +634,8 @@ check-node-version:
 	@if ! command -v node >/dev/null 2>&1; then \
 		echo "Error: Node.js is not installed."; \
 		echo ""; \
-		echo "This project requires Node.js 20 or higher."; \
-		echo "Please install Node.js 20+ and try again."; \
+		echo "This project requires Node.js 24 or higher."; \
+		echo "Please install Node.js 24+ and try again."; \
 		echo ""; \
 		echo "For installation instructions, see:"; \
 		echo "  https://github.com/github/gh-aw/blob/main/CONTRIBUTING.md#prerequisites"; \
@@ -644,10 +644,10 @@ check-node-version:
 	NODE_VERSION=$$(node --version); \
 	NODE_VERSION_NUM=$$(echo "$$NODE_VERSION" | sed 's/v//'); \
 	NODE_MAJOR=$$(echo "$$NODE_VERSION_NUM" | cut -d. -f1); \
-	if [ "$$NODE_MAJOR" -lt 20 ]; then \
+	if [ "$$NODE_MAJOR" -lt 24 ]; then \
 		echo "Error: Node.js version $$NODE_VERSION is not supported."; \
 		echo ""; \
-		echo "This project requires Node.js 20 or higher."; \
+		echo "This project requires Node.js 24 or higher."; \
 		echo "Your current version: $$NODE_VERSION"; \
 		echo ""; \
 		echo "Please upgrade Node.js and try again."; \
@@ -1459,7 +1459,7 @@ help:
 	@echo "  deps             - Install dependencies"
 	@echo "  deps-dev         - Install development dependencies (includes tools)"
 	@echo "  install-shellcheck - Install pinned shellcheck binary"
-	@echo "  check-node-version - Check Node.js version (20 or higher required)"
+	@echo "  check-node-version - Check Node.js version (24 or higher required)"
 	@echo "  golint           - Run golangci-lint (full repository scan)"
 	@echo "  golint-incremental - Run golangci-lint incrementally (only changed files, requires BASE_REF)"
 	@echo "  lint             - Run linter"

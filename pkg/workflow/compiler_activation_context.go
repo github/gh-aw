@@ -141,7 +141,8 @@ func (c *Compiler) addActivationSetupAndWorkflowCallSteps(ctx *activationJobBuil
 	if enableArtifactClient {
 		artifactClientCondition = maxDailyAICreditsConfiguredIfExpr
 	}
-	ctx.steps = append(ctx.steps, c.generateSetupStepWithArtifactClientCondition(
+	ctx.steps = append(ctx.steps, c.generateSetupStepForJob(
+		"activation",
 		ctx.data,
 		setupActionRef,
 		SetupActionDestination,

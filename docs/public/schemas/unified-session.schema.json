@@ -26,6 +26,7 @@
       { "if": { "properties": { "type": { "const": "firewall.http_access" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallAccessData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
+      { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
@@ -168,6 +169,23 @@
         "decision": { "$ref": "#/definitions/JsonValue" },
         "bytes": { "$ref": "#/definitions/JsonValue" },
         "durationMs": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "GitHubApiRateLimitData": {
+      "type": "object",
+      "properties": {
+        "source": { "$ref": "#/definitions/JsonValue" },
+        "credentialSource": { "$ref": "#/definitions/JsonValue" },
+        "operation": { "$ref": "#/definitions/JsonValue" },
+        "resource": { "$ref": "#/definitions/JsonValue" },
+        "limit": { "$ref": "#/definitions/JsonValue" },
+        "remaining": { "$ref": "#/definitions/JsonValue" },
+        "used": { "$ref": "#/definitions/JsonValue" },
+        "reset": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "$ref": "#/definitions/JsonValue" },
+        "delayMs": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
     },

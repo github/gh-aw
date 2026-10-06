@@ -98,17 +98,25 @@ on:
     outputs:
       operation_completed:
         description: 'The maintenance operation that was completed (empty when none ran or a scheduled job ran)'
-        value: ${{ jobs.run_operation.outputs.operation || inputs.operation }}
+        value: ${{ jobs.run_operation.outputs.operation || (inputs.operation == 'safe_outputs' || inputs.operation == 'create_labels' || inputs.operation == 'activity_report' || inputs.operation == 'close_agentic_workflows_issues' || inputs.operation == 'update_pull_request_branches' || inputs.operation == 'validate' || inputs.operation == 'forecast' || inputs.operation == 'clean_cache_memories' || inputs.operation == 'compact_ledger') && inputs.operation || '' }}
       applied_run_url:
         description: 'The run URL that safe outputs were applied from'
         value: ${{ jobs.apply_safe_outputs.outputs.run_url }}
 
+# Jobs request only the permissions needed for their individual maintenance operations.
 permissions: {}
+
+# Serialize maintenance runs to avoid overlapping writes to repository resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   close-expired-discussions:
+    name: Close expired discussions
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       discussions: write
     steps:
@@ -126,7 +134,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Close expired discussions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -136,8 +144,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'close_expired_discussions.cjs'));
             await main();
   close-expired-issues:
+    name: Close expired issues
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       issues: write
     steps:
@@ -155,7 +165,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Close expired issues
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -165,8 +175,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'close_expired_issues.cjs'));
             await main();
   close-expired-pull-requests:
+    name: Close expired pull requests
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       pull-requests: write
     steps:
@@ -184,7 +196,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Close expired pull requests
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -195,8 +207,10 @@ jobs:
             await main();
 
   cleanup-cache-memory:
+    name: Cleanup cache memory
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'clean_cache_memories') }}
     runs-on: ubuntu-slim
+    # Removing obsolete Actions caches requires actions: write.
     permissions:
       actions: write
     steps:
@@ -214,7 +228,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Cleanup outdated cache-memory entries
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -225,8 +239,10 @@ jobs:
             await main();
 
   run_operation:
+    name: Run maintenance operation
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation != '' && inputs.operation != 'none' && inputs.operation != 'safe_outputs' && inputs.operation != 'create_labels' && inputs.operation != 'activity_report' && inputs.operation != 'close_agentic_workflows_issues' && inputs.operation != 'clean_cache_memories' && inputs.operation != 'update_pull_request_branches' && inputs.operation != 'validate' && inputs.operation != 'forecast' && inputs.operation != 'compact_ledger' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Updates, upgrades, and workflow enable/disable operations need repository write access.
     permissions:
       actions: write
       contents: write
@@ -245,7 +261,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -257,7 +273,7 @@ jobs:
             await main();
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -266,7 +282,7 @@ jobs:
         run: make build
 
       - name: Run operation
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_OPERATION: ${{ inputs.operation }}
@@ -288,8 +304,10 @@ jobs:
         run: echo "operation=$GH_AW_OPERATION" >> "$GITHUB_OUTPUT"
 
   update_pull_request_branches:
+    name: Update pull request branches
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'update_pull_request_branches' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Branch updates may write commits and update pull requests.
     permissions:
       contents: write
       pull-requests: write
@@ -308,7 +326,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -320,7 +338,7 @@ jobs:
             await main();
 
       - name: Update pull request branches
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -334,8 +352,10 @@ jobs:
             await main();
 
   apply_safe_outputs:
+    name: Apply safe outputs
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'safe_outputs' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Replay can create or update any supported safe-output resource.
     permissions:
       actions: read
       contents: write
@@ -359,7 +379,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -371,7 +391,7 @@ jobs:
             await main();
 
       - name: Apply Safe Outputs
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_RUN_URL: ${{ inputs.run_url }}
@@ -392,8 +412,10 @@ jobs:
         run: echo "run_url=$GH_AW_RUN_URL" >> "$GITHUB_OUTPUT"
 
   create_labels:
+    name: Create labels
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'create_labels' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Creating repository labels uses the issues API.
     permissions:
       contents: read
       issues: write
@@ -409,7 +431,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -421,7 +443,7 @@ jobs:
             await main();
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -430,7 +452,7 @@ jobs:
         run: make build
 
       - name: Create missing labels
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_CMD_PREFIX: ./gh-aw
         with:
@@ -444,9 +466,11 @@ jobs:
             await main();
 
   activity_report:
+    name: activity report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'activity_report' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     timeout-minutes: 120
+    # Read workflow logs and create the resulting report issue.
     permissions:
       actions: read
       contents: read
@@ -463,7 +487,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -475,7 +499,7 @@ jobs:
             await main();
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -515,7 +539,7 @@ jobs:
           key: ${{ steps.activity_report_logs_cache.outputs.cache-primary-key }}
 
       - name: Generate activity report issue
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -555,9 +579,11 @@ jobs:
             core.info('Created issue #' + createdIssue.data.number + ': ' + createdIssue.data.html_url);
 
   forecast_report:
+    name: forecast report
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'forecast' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
     timeout-minutes: 60
+    # Read workflow logs and create the resulting report issue.
     permissions:
       actions: read
       contents: read
@@ -574,7 +600,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -586,7 +612,7 @@ jobs:
             await main();
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -649,7 +675,7 @@ jobs:
 
       - name: Generate forecast issue
         if: ${{ always() }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           FORECAST_STEP_OUTCOME: ${{ steps.generate_forecast_report.outcome }}
         with:
@@ -663,8 +689,10 @@ jobs:
             await main();
 
   close_agentic_workflows_issues:
+    name: Close agentic workflows issues
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'close_agentic_workflows_issues' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-slim
+    # Closing no-repro issues requires issues: write.
     permissions:
       issues: write
     steps:
@@ -682,7 +710,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -694,7 +722,7 @@ jobs:
             await main();
 
       - name: Close no-repro agentic-workflows issues
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -706,8 +734,10 @@ jobs:
             await main();
 
   validate_workflows:
+    name: Validate workflows
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'validate' && (!(github.event.repository.fork)) }}
     runs-on: ubuntu-latest
+    # Read workflow sources and file issues for validation findings.
     permissions:
       contents: read
       issues: write
@@ -723,7 +753,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check admin/maintainer permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -735,7 +765,7 @@ jobs:
             await main();
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -744,7 +774,7 @@ jobs:
         run: make build
 
       - name: Validate workflows and file issue on findings
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_CMD_PREFIX: ./gh-aw
         with:
@@ -758,8 +788,10 @@ jobs:
             await main();
 
   label_disable_agentic_workflow:
+    name: Disable agentic workflow by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:disable' }}
     runs-on: ubuntu-slim
+    # Label requests disable workflow runs and update the requesting issue.
     permissions:
       actions: write
       contents: read
@@ -780,7 +812,7 @@ jobs:
 
       - name: Check admin/maintainer permissions
         id: check_permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -793,7 +825,7 @@ jobs:
 
       - name: Disable agentic workflow
         if: ${{ steps.check_permissions.outcome == 'success' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -805,8 +837,10 @@ jobs:
             await main();
 
   label_apply_safe_outputs:
+    name: Apply safe outputs by label
     if: ${{ (!(github.event.repository.fork)) && github.event_name == 'issues' && github.event.label.name == 'agentic-workflows:apply-safe-outputs' }}
     runs-on: ubuntu-slim
+    # Applying safe outputs can update each supported repository resource.
     permissions:
       actions: read
       contents: write
@@ -829,7 +863,7 @@ jobs:
 
       - name: Check admin/maintainer permissions
         id: check_permissions
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -842,7 +876,7 @@ jobs:
 
       - name: Apply safe outputs from referenced run
         if: ${{ steps.check_permissions.outcome == 'success' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -856,11 +890,13 @@ jobs:
             await main();
 
   compile-workflows:
+    name: Compile workflows
     if: ${{ (!(github.event.repository.fork)) && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
     concurrency:
       group: ${{ github.workflow }}-compile-workflows-${{ github.repository }}
       cancel-in-progress: true
+    # Detect drift by reading sources and open a tracking issue when necessary.
     permissions:
       contents: read
       issues: write
@@ -871,7 +907,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -895,7 +931,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Check for out-of-sync workflows and create issue or pull request if needed
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -906,8 +942,10 @@ jobs:
             await main();
 
   secret-validation:
+    name: Validate secrets
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none') }}
     runs-on: ubuntu-slim
+    # Read repository scripts to check configured integration secrets without write access.
     permissions:
       contents: read
     steps:
@@ -930,7 +968,7 @@ jobs:
           destination: ${{ runner.temp }}/gh-aw/actions
 
       - name: Validate Secrets
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           # GitHub tokens
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
@@ -962,8 +1000,10 @@ jobs:
           if-no-files-found: warn
 
   ledger_compaction_plan:
+    name: Plan ledger compaction
     if: ${{ (!(github.event.repository.fork)) && github.event_name != 'push' && (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'compact_ledger') }}
     runs-on: ubuntu-slim
+    # Planning treats ledger content as untrusted and must remain read-only.
     permissions:
       contents: read
     outputs:
@@ -994,7 +1034,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_0
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1107,7 +1147,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_1
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1139,7 +1179,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_2
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1212,7 +1252,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_3
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1360,7 +1400,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_4
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1392,7 +1432,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 15
         id: plan_5
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1459,9 +1499,11 @@ jobs:
         run: exit 1
 
   ledger_compaction_apply:
+    name: Apply ledger compaction
     needs: ledger_compaction_plan
     if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ubuntu-slim
+    # Applying a validated plan commits updated ledger content.
     permissions:
       contents: write
     steps:
@@ -1488,7 +1530,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_0_created == 'true' }}
         id: apply_0
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1601,7 +1643,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_1_created == 'true' }}
         id: apply_1
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1633,7 +1675,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_2_created == 'true' }}
         id: apply_2
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1706,7 +1748,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
         id: apply_3
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1854,7 +1896,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
         id: apply_4
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-
@@ -1886,7 +1928,7 @@ jobs:
         if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
         id: apply_5
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LEDGER_COMPACTION_CONFIG: |-

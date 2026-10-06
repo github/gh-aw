@@ -8,6 +8,52 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
+type appTokenStepKey struct {
+	jobName, id, clientID, privateKey string
+}
+
+func (c *Compiler) hasGeneratedWildcardAppTokenStep(jobName string, step, with map[string]any, seen map[appTokenStepKey]bool) bool {
+	id, ok := step["id"].(string)
+	if !ok {
+		return false
+	}
+	clientID, ok := with["client-id"].(string)
+	if !ok {
+		return false
+	}
+	privateKey, ok := with["private-key"].(string)
+	if !ok {
+		return false
+	}
+	key := appTokenStepKey{jobName: jobName, id: id, clientID: clientID, privateKey: privateKey}
+	if id == "" || clientID == "" || privateKey == "" || !c.wildcardAppTokenSteps[key] || seen[key] {
+		return false
+	}
+	seen[key] = true
+	return true
+}
+
+func (c *Compiler) recordGeneratedWildcardAppTokenStep(jobName string, app *GitHubAppConfig, stepID string) {
+	if jobName == "" || app == nil || len(app.Repositories) != 1 {
+		return
+	}
+	for _, repository := range app.Repositories {
+		if repository != "*" {
+			return
+		}
+	}
+	if c.wildcardAppTokenSteps == nil {
+		c.wildcardAppTokenSteps = make(map[appTokenStepKey]bool)
+	}
+	c.wildcardAppTokenSteps[appTokenStepKey{jobName: jobName, id: stepID, clientID: app.AppID, privateKey: app.PrivateKey}] = true
+}
+
+func (c *Compiler) buildGitHubAppTokenMintStepForJob(jobName string, app *GitHubAppConfig, permissions *Permissions, fallbackRepoExpr string, ownerSourceRepository string, stepName string, stepID string) []string {
+	steps := c.buildGitHubAppTokenMintStepWithMeta(app, permissions, fallbackRepoExpr, ownerSourceRepository, stepName, stepID)
+	c.recordGeneratedWildcardAppTokenStep(jobName, app, stepID)
+	return steps
+}
+
 func hasExplicitAppTokenPermission(with map[string]any) bool {
 	for key, value := range with {
 		if !strings.HasPrefix(strings.ToLower(key), "permission-") {
@@ -43,6 +89,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 	if !ok {
 		return nil
 	}
+	seenGeneratedWildcardSteps := make(map[appTokenStepKey]bool)
 	for jobName, jobValue := range jobs {
 		job, ok := jobValue.(map[string]any)
 		if !ok {
@@ -68,7 +115,7 @@ func (c *Compiler) validateAppTokenPermissions(workflow map[string]any, strict b
 			if !ok {
 				with = nil
 			}
-			if !hasExplicitAppTokenRepositories(with) {
+			if !hasExplicitAppTokenRepositories(with) && !c.hasGeneratedWildcardAppTokenStep(jobName, step, with, seenGeneratedWildcardSteps) {
 				msg := fmt.Sprintf("actions/create-github-app-token in job %q has no explicit repositories input; add repositories: ${{ github.repository }} to scope the token to the current repository", jobName)
 				if strict {
 					return fmt.Errorf("strict mode: %s", msg)
