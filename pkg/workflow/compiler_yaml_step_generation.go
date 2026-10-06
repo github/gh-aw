@@ -218,6 +218,14 @@ func (c *Compiler) generateSetupStep(data *WorkflowData, setupActionRef string, 
 	return c.generateSetupStepWithArtifactClientCondition(data, setupActionRef, destination, enableArtifactClient, traceID, parentSpanID, "")
 }
 
+func (c *Compiler) generateSetupStepForJob(jobName string, data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string {
+	steps := c.generateSetupStepWithArtifactClientCondition(data, setupActionRef, destination, enableArtifactClient, traceID, parentSpanID, artifactClientCondition)
+	if data != nil && strings.Contains(strings.Join(steps, ""), "id: "+otlpOIDCMintStepID+"\n") {
+		c.recordGeneratedWildcardAppTokenStep(jobName, getOTLPGitHubAppTokenConfig(data.RawFrontmatter), otlpOIDCMintStepID)
+	}
+	return steps
+}
+
 func (c *Compiler) generateSetupStepWithArtifactClientCondition(data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string { //nolint:largefunc // Existing setup-step emission is intentionally centralized.
 	lines := c.generateOTLPOIDCMintStep(data)
 	hasOTLPOIDC := len(lines) > 0

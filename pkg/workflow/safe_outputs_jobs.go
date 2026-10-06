@@ -71,6 +71,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
+			config.JobName,
 			data.SafeOutputs.GitHubApp,
 			config.Permissions,
 			appTokenFallbackRepo,

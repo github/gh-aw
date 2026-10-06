@@ -228,7 +228,7 @@ func (c *Compiler) buildSafeOutputsSetupSteps(data *WorkflowData) []string {
 		// Safe outputs job depends on agent job; reuse the agent's trace ID so all jobs share one OTLP trace
 		safeOutputsTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		safeOutputsParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, enableArtifactClient, safeOutputsTraceID, safeOutputsParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("safe_outputs", data, setupActionRef, SetupActionDestination, enableArtifactClient, safeOutputsTraceID, safeOutputsParentSpanID, "")...)
 	}
 
 	// Mask OTLP telemetry headers immediately after setup so authentication tokens cannot
@@ -756,6 +756,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 				appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
 			}
 			preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForRepository(
+				"safe_outputs",
 				data.SafeOutputs.GitHubApp,
 				appPermissions,
 				appTokenFallbackRepo,
@@ -765,7 +766,8 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 	}
 	if headApp := getSafeOutputsHeadApp(data.SafeOutputs); headApp != nil {
 		headRepoSlug := getSafeOutputsHeadRepoSlug(data.SafeOutputs)
-		preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepWithMeta(
+		preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			headApp,
 			NewPermissionsContentsWritePRWrite(),
 			headRepoNameFromSlug(headRepoSlug),

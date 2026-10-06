@@ -28,7 +28,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 		// Conclusion/notify job depends on activation, reuse its trace ID
 		notifyTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		notifyParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, notifyTraceID, notifyParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("conclusion", data, setupActionRef, SetupActionDestination, false, notifyTraceID, notifyParentSpanID, "")...)
 	}
 
 	// Add GitHub App token minting step if app is configured
@@ -39,6 +39,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
+			"conclusion",
 			data.SafeOutputs.GitHubApp,
 			permissions,
 			appTokenFallbackRepo,

@@ -1086,7 +1086,7 @@ func (c *Compiler) buildPushExperimentsStateSetupSteps(data *WorkflowData) []str
 	traceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 	parentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
 	steps := c.generateCheckoutActionsFolder(data)
-	return append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, traceID, parentSpanID)...)
+	return append(steps, c.generateSetupStepForJob(pushExperimentsStateJobName, data, setupActionRef, SetupActionDestination, false, traceID, parentSpanID, "")...)
 }
 
 func buildPushExperimentsStateCheckoutStep() string {
