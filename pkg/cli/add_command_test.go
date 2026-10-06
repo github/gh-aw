@@ -1129,25 +1129,28 @@ func TestValidateWorkflowSecurity_PackageResourceContent(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
-		content     string
+		content     []byte
 		isResource  bool
 		wantFinding bool
 	}{
-		{"javascript template", ".github/workflows/shared/page.mjs", "const page = `<form><script>alert(1)</script></form>`;", true, false},
-		{"unicode in javascript", ".github/workflows/shared/page.mjs", "const value = 'safe\u202Eunsafe';", true, true},
-		{"markdown resource", ".github/aw/instructions.md", "<script>alert(1)</script>", true, true},
-		{"workflow markdown", ".github/workflows/unsafe.md", "<script>alert(1)</script>", false, true},
+		{"javascript template", ".github/workflows/shared/page.mjs", []byte("const page = `<form><script>alert(1)</script></form>`;"), true, false},
+		{"unicode in javascript", ".github/workflows/shared/page.mjs", []byte("const value = 'safe\u202Eunsafe';"), true, true},
+		{"binary resource", ".github/aw/assets/image.png", []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, true, false},
+		{"markdown resource", ".github/aw/instructions.md", []byte("<script>alert(1)</script>"), true, true},
+		{"workflow markdown", ".github/workflows/unsafe.md", []byte("<script>alert(1)</script>"), false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resolved := &ResolvedWorkflow{
 				Spec:                  &WorkflowSpec{WorkflowPath: tt.path, DestinationPath: tt.path},
-				Content:               []byte(tt.content),
+				Content:               tt.content,
 				IsPackageResourceFile: tt.isResource,
 			}
 			err := validateWorkflowSecurity(resolved, AddOptions{})
 			if tt.wantFinding {
 				require.ErrorContains(t, err, "failed security scan")
+				require.ErrorContains(t, err, "file '")
+				assert.NotContains(t, err.Error(), "workflow '")
 			} else {
 				require.NoError(t, err)
 			}

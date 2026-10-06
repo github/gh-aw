@@ -88,16 +88,21 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error {
 	if !opts.DisableSecurityScanner {
 		var findings []workflow.SecurityFinding
-		if resolved.IsPackageResourceFile && !strings.EqualFold(filepath.Ext(resolved.Spec.DestinationPath), ".md") {
-			findings = workflow.ScanResourceSecurity(string(resolved.Content))
+		isResource := resolved.IsPackageResourceFile && !strings.EqualFold(filepath.Ext(resolved.Spec.DestinationPath), ".md")
+		if isResource {
+			findings = workflow.ScanResourceSecurity(resolved.Content)
 		} else {
 			findings = workflow.ScanMarkdownSecurity(string(resolved.Content))
 		}
 		if len(findings) > 0 {
-			addLog.Printf("Security scan failed for %s: %d finding(s)", resolved.Spec.WorkflowPath, len(findings))
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for workflow"))
-			fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings, resolved.Spec.WorkflowPath))
-			return fmt.Errorf("workflow '%s' failed security scan: %d issue(s) detected", resolved.Spec.WorkflowPath, len(findings))
+			addLog.Printf("Security scan failed for file %s: %d finding(s)", resolved.Spec.WorkflowPath, len(findings))
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for file"))
+			if isResource {
+				fmt.Fprintln(os.Stderr, workflow.FormatResourceSecurityFindings(findings, resolved.Spec.WorkflowPath))
+			} else {
+				fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings, resolved.Spec.WorkflowPath))
+			}
+			return fmt.Errorf("file '%s' failed security scan: %d issue(s) detected", resolved.Spec.WorkflowPath, len(findings))
 		}
 		if opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
