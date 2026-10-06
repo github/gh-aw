@@ -57,13 +57,14 @@ type compileWorkflowFileResult struct {
 
 // compileWorkflowFileOptions holds flags for compileWorkflowFile.
 type compileWorkflowFileOptions struct {
-	verbose    bool
-	jsonOutput bool
-	noEmit     bool
-	zizmor     bool
-	poutine    bool
-	strict     bool
-	validate   bool
+	verbose        bool
+	jsonOutput     bool
+	noEmit         bool
+	zizmor         bool
+	poutine        bool
+	strict         bool
+	validate       bool
+	failOnWarnings bool
 }
 
 // compileWorkflowFile compiles a single workflow file (not a campaign spec)
@@ -169,6 +170,7 @@ func compileWorkflowFile(
 		RunPoutinePerFile:  opts.poutine && !opts.noEmit,
 		Strict:             opts.strict,
 		ValidateActionSHAs: opts.validate && !opts.noEmit,
+		FailOnWarnings:     opts.failOnWarnings,
 	}); err != nil {
 		// Don't print error here - it will be displayed in the compilation summary
 		// The error is stored in ValidationResult for JSON output and summary display

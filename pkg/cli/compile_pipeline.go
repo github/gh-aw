@@ -140,11 +140,12 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 		// Compile regular workflow file (disable per-file security tools)
 		fileResult := compileWorkflowFile(
 			ctx, compiler, resolvedFile, compileWorkflowFileOptions{
-				verbose:    config.Verbose,
-				jsonOutput: config.JSONOutput,
-				noEmit:     config.NoEmit,
-				strict:     config.Strict,
-				validate:   shouldValidate,
+				verbose:        config.Verbose,
+				jsonOutput:     config.JSONOutput,
+				noEmit:         config.NoEmit,
+				strict:         config.Strict,
+				validate:       shouldValidate,
+				failOnWarnings: config.Dev,
 				// zizmor, poutine, actionlint disabled per-file (batched instead)
 			},
 		)
@@ -237,6 +238,8 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 		return workflowDataList, err
 	}
 
+	developmentErr := enforceDevelopmentDiagnostics(config, compiler, stats, validationResults, strictGrantErr, batchToolErr)
+
 	// Output results
 	if err := outputResults(stats, validationResults, config); err != nil {
 		return workflowDataList, err
@@ -255,7 +258,7 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 		return workflowDataList, errors.New("compilation failed")
 	}
 
-	return workflowDataList, nil
+	return workflowDataList, developmentErr
 }
 
 // compileAllFilesInDirectory compiles all workflow files in a directory
@@ -354,11 +357,12 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		// Compile regular workflow file (disable per-file security tools)
 		fileResult := compileWorkflowFile(
 			ctx, compiler, file, compileWorkflowFileOptions{
-				verbose:    config.Verbose,
-				jsonOutput: config.JSONOutput,
-				noEmit:     config.NoEmit,
-				strict:     config.Strict,
-				validate:   shouldValidate,
+				verbose:        config.Verbose,
+				jsonOutput:     config.JSONOutput,
+				noEmit:         config.NoEmit,
+				strict:         config.Strict,
+				validate:       shouldValidate,
+				failOnWarnings: config.Dev,
 				// zizmor, poutine, actionlint disabled per-file (batched instead)
 			},
 		)
@@ -473,6 +477,8 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		return workflowDataList, err
 	}
 
+	developmentErr := enforceDevelopmentDiagnostics(config, compiler, stats, validationResults, strictGrantErr, batchToolErr)
+
 	// Output results.
 	// Populate MarkdownFiles so that outputResults can collect per-workflow stats
 	// (e.g. schedule heatmap) even when the caller did not specify explicit files.
@@ -494,7 +500,7 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		return workflowDataList, errors.New("compilation failed")
 	}
 
-	return workflowDataList, nil
+	return workflowDataList, developmentErr
 }
 
 type batchToolsOptions struct {

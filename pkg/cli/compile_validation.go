@@ -25,6 +25,7 @@ type CompileValidationOptions struct {
 	RunActionlintPerFile bool
 	Strict               bool
 	ValidateActionSHAs   bool
+	FailOnWarnings       bool
 }
 
 // CompileWorkflowWithValidation compiles a workflow with always-on YAML validation for CLI usage
@@ -87,6 +88,9 @@ func CompileWorkflowWithValidation(ctx context.Context, compiler *workflow.Compi
 		// Use the compiler's shared action cache to benefit from cached resolutions
 		actionCache := compiler.GetSharedActionCache()
 		if err := workflow.ValidateActionSHAsInLockFile(ctx, lockFile, actionCache, opts.Verbose); err != nil {
+			if opts.FailOnWarnings {
+				return fmt.Errorf("action SHA validation failed: %w", err)
+			}
 			// Action SHA validation warnings are non-fatal
 			compileValidationLog.Printf("Action SHA validation completed with warnings: %v", err)
 		}
@@ -157,6 +161,9 @@ func CompileWorkflowDataWithValidation(ctx context.Context, compiler *workflow.C
 		// Use the compiler's shared action cache to benefit from cached resolutions
 		actionCache := compiler.GetSharedActionCache()
 		if err := workflow.ValidateActionSHAsInLockFile(ctx, lockFile, actionCache, opts.Verbose); err != nil {
+			if opts.FailOnWarnings {
+				return fmt.Errorf("action SHA validation failed: %w", err)
+			}
 			// Action SHA validation warnings are non-fatal
 			compileValidationLog.Printf("Action SHA validation completed with warnings: %v", err)
 		}
@@ -191,6 +198,13 @@ func CompileWorkflowDataWithValidation(ctx context.Context, compiler *workflow.C
 // This is extracted for faster testing without full compilation
 func validateCompileConfig(config CompileConfig) error {
 	compileValidationLog.Printf("Validating compile config: files=%d, dependabot=%v, purge=%v, workflowDir=%s", len(config.MarkdownFiles), config.Dependabot, config.Purge, config.WorkflowDir)
+
+	if err := validateDevelopmentCompileMode(config); err != nil {
+		return err
+	}
+	if err := workflow.ValidateEnvironmentOverride(config.EnvironmentOverride); err != nil {
+		return err
+	}
 
 	// Validate dependabot flag usage
 	if config.Dependabot {

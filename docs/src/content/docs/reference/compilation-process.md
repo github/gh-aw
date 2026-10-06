@@ -227,6 +227,8 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 | `gh aw compile my-workflow` | Compile specific workflow |
 | `gh aw compile --verbose` | Enable verbose output |
 | `gh aw compile --strict` | Enhanced security validation |
+| `gh aw compile my-workflow --dev` | Compile for development testing with staging, all analysis tools, and warnings as errors |
+| `gh aw compile my-workflow --environment gh-aw-debug` | Replace the environment on every generated job |
 | `gh aw compile --no-emit` | Validate without generating files |
 | `gh aw compile --actionlint --zizmor --poutine --grant` | Run security scanners |
 | `gh aw compile --actionlint --zizmor --poutine --yamllint` | Run security scanners |
@@ -245,6 +247,70 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 > [!NOTE]
 > The `--actions-repo` flag overrides the default `github/gh-aw-actions` repository used when `--action-mode action` is set. Use it together with `--action-tag` to compile against a branch or fork during development.
+
+### Development Testing Mode
+
+`--dev` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
+`--actionlint`, `--zizmor`, `--poutine`, `--runner-guard`, `--syft`, `--grype`,
+`--grant`, `--yamllint`, `--shellcheck`, and `--models`. These settings are
+forced even when individual flags or frontmatter disable them. Compiler warnings,
+including safe-update warnings, and scanner failures cause a nonzero exit status
+and invalid JSON validation results. Missing required tools block compilation
+rather than silently skipping checks. Model checking uses the observed active
+model inventory; development compilation fails if that inventory is unavailable
+and the workflow declares `models` policies or `engine.models`. It does not prove
+live model availability.
+
+```bash
+gh aw compile my-workflow --dev --environment gh-aw-debug
+```
+
+The optional `--environment NAME` replaces every job's environment in compiled
+`.lock.yml` files, including
+existing name/URL objects, manual-approval environments, custom jobs, and framework
+jobs. It accepts a literal, non-blank name of at most 255 characters. Expressions
+and control characters are rejected. GitHub Actions does not allow an environment
+on reusable-workflow caller jobs, so compilation fails if such a job is present
+instead of silently leaving it outside the override. Configure the environment in
+the called workflow and compile the caller without the override when using
+reusable workflows.
+
+A protected test environment with rotated, restricted development credentials
+is recommended, not required. Replacing an approval environment also replaces
+its protection rules: configure and review the test environment's protections.
+Authorized repository, organization, and enterprise-provided shared secrets
+remain in the job's applicable secret scope; an environment name is not secret
+isolation and does not automatically export secrets into process environment
+variables.
+
+`--dev` cannot be combined with `--no-emit`, `--watch`, `--approve`, or
+`--allow-action-refs`, because those options bypass required checks or the trusted
+safe-update baseline. It is distinct from `--action-mode dev`, does not change
+action reference mode, and does not upload, push, dispatch, or run workflows.
+Generated files remain available for inspection after failed checks and must not
+be treated as approved artifacts.
+
+Diagnosing and patching means reading existing evidence, testing components,
+editing, and compiling without live runs. Debugging is the active
+edit/test/compile/review/upload-run/audit loop where execution is permitted.
+If starting a workflow returns `403 Forbidden`, stop the live loop, preserve the
+denial, and return to diagnosis/patching; do not retry unchanged or arrange a
+credential, API, manual-dispatch, or push-trigger workaround. Explicit no-dispatch
+contexts, including Copilot cloud, remain restricted. `--dev` can be used in
+either mode and grants neither run access nor approval.
+
+Codespaces can also encounter organization SAML authorization failures.
+`GH_TOKEN`, then `GITHUB_TOKEN`, take precedence over stored CLI credentials;
+being logged in does not prove that the active token is SSO-authorized.
+Classify the denial before proposing an authorized authentication repair.
+
+For an active debug loop, each live-test revision must pass development compilation
+and receive human validation of the source, generated lock, credentials,
+permissions, and bounds before upload. Bind any later Actions dispatch to the
+reviewed remote commit; a successful compile is not authorization to dispatch.
+Repeat that review after each change, then use run logs, audits, and native
+`gh aw mcp inspect` to guide the next local iteration. Staging protects built-in
+safe outputs, not arbitrary scripts, custom jobs, or external MCP side effects.
 
 ## Debugging Compilation
 

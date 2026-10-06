@@ -52,8 +52,10 @@ Compile workflow `.md` files into GitHub Actions `.lock.yml` files.
 ```bash
 gh aw compile                     # Compile all workflows
 gh aw compile <workflow-name>     # Compile a specific workflow
+gh aw compile <workflow-name> --dev  # Strict/staged debugging checks; warnings are errors
+gh aw compile <workflow-name> --dev --environment gh-aw-debug  # Optional all-job environment override
 gh aw compile --strict            # Compile with strict mode validation
-gh aw compile --validate          # Validate without emitting lock files
+gh aw compile --validate          # Enable workflow, image, and action SHA validation
 gh aw compile --fail-fast         # Stop at first error
 gh aw compile --purge             # Remove orphaned .lock.yml files
 gh aw compile --approve           # Approve new secrets / action changes
@@ -70,6 +72,18 @@ gh aw compile --approve           # Approve new secrets / action changes
 
 Trigger a workflow on demand using `workflow_dispatch`.
 
+For troubleshooting, first follow the shared [strategy](local-debug.md):
+respect explicit no-dispatch contexts, and handle `403 Forbidden` from a
+permitted run attempt by stopping live debugging and returning to diagnosis/
+patching. Do not retry unchanged or bypass the denial. `--dev` is a compilation
+profile, not run access or authorization; each live-test revision requires
+human validation.
+
+Codespaces may still return SAML-related 403 responses. Check the active token
+source and SSO authorization using the shared credential triage; environment
+tokens override stored CLI credentials. Do not automatically replace tokens or
+retry a denied run.
+
 ```bash
 gh aw run                           # Interactive mode — pick workflow and fill inputs
 gh aw run <workflow-name>           # Run by short name
@@ -79,7 +93,8 @@ gh aw run <workflow-name> --repeat 3              # Run 4 times total (1 + 3 rep
 gh aw run <workflow-name> --raw-field key=value   # Pass a specific input
 ```
 
-**MCP equivalent**: Not available. Fallback: use the GitHub MCP server's `create_workflow_dispatch` with `workflow_id: <workflow-name>.lock.yml`.
+**MCP equivalent**: Not available. Copilot cloud agents must not substitute an
+API/MCP dispatch or request manual dispatch as a workaround.
 
 ---
 

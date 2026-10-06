@@ -71,6 +71,8 @@ Returns a JSON array where each element has the following structure:
 // compileArgs holds the input parameters for the compile tool.
 type compileArgs struct {
 	Workflows   []string `json:"workflows,omitempty" jsonschema:"Workflow files to compile as an array (e.g., [\"workflow.md\"]) (empty for all)"`
+	Dev         bool     `json:"dev,omitempty" jsonschema:"Enable strict validation, staging, all static analysis tools, image and model checks, and warnings as errors for development testing; does not upload or dispatch workflows"`
+	Environment string   `json:"environment,omitempty" jsonschema:"Override the environment on every generated job; reusable-workflow caller jobs are rejected"`
 	Strict      bool     `json:"strict,omitempty" jsonschema:"Override frontmatter to enforce strict mode validation for all workflows. Note: Workflows default to strict mode unless frontmatter sets strict: false"`
 	Zizmor      bool     `json:"zizmor,omitempty" jsonschema:"Run zizmor security scanner on generated .lock.yml files"`
 	Poutine     bool     `json:"poutine,omitempty" jsonschema:"Run poutine security scanner on generated .lock.yml files"`
@@ -141,7 +143,8 @@ Returns JSON array with validation results for each workflow:
 		var dockerUnavailableWarning string
 
 		// Check if any static analysis tools are requested that require Docker images
-		if args.Zizmor || args.Poutine || args.Actionlint || args.RunnerGuard || args.Syft || args.Grype || args.Grant || args.Yamllint {
+		// Development mode delegates all checks to the CLI and must never downgrade them.
+		if !args.Dev && (args.Zizmor || args.Poutine || args.Actionlint || args.RunnerGuard || args.Syft || args.Grype || args.Grant || args.Yamllint) {
 			// Check if Docker images are available; if not, start downloading and return retry message
 			if err := CheckAndPrepareDockerImages(ctx, DockerImagesOptions{
 				Zizmor:      args.Zizmor,
@@ -202,6 +205,12 @@ Returns JSON array with validation results for each workflow:
 		// Add strict flag if requested
 		if args.Strict {
 			cmdArgs = append(cmdArgs, "--strict")
+		}
+		if args.Dev {
+			cmdArgs = append(cmdArgs, "--dev")
+		}
+		if args.Environment != "" {
+			cmdArgs = append(cmdArgs, "--environment", args.Environment)
 		}
 
 		// Add static analysis flags if requested

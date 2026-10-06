@@ -21,7 +21,7 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 
 - **Creating new workflows**: Routes to `create` prompt
 - **Updating existing workflows**: Routes to `update` prompt
-- **Debugging workflows**: Routes to `debug` prompt
+- **Diagnosis, patching, and active debugging**: Routes to `local-debug`, which selects the execution mode by session capabilities; `debug-agentic-workflow` is the evidence companion
 - **Upgrading workflows**: Routes to `upgrade-agentic-workflows` prompt
 - **Creating report-generating workflows**: Routes to `report` prompt — consult this whenever the workflow posts status updates, audits, analyses, or any structured output as issues, discussions, or comments
 - **Creating shared components**: Routes to `create-shared-agentic-workflow` prompt
@@ -47,7 +47,8 @@ Workflows may optionally include:
 ## Problems This Solves
 
 - **Workflow Creation**: Design secure, validated agentic workflows with proper triggers, tools, and permissions
-- **Workflow Debugging**: Analyze logs, identify missing tools, investigate failures, and fix configuration issues
+- **Diagnosis and Patching**: Analyze evidence and produce regression-backed fixes without requiring live runs
+- **Active Debugging**: Run bounded edit/test/run/audit loops where permitted, stopping on dispatch 403 responses
 - **Version Upgrades**: Migrate workflows to new gh-aw versions, apply codemods, fix breaking changes
 - **Component Design**: Create reusable shared workflow components that wrap MCP servers
 
@@ -83,10 +84,14 @@ When you interact with this agent, it will:
 - "Update the PR reviewer to use discussions instead of issues"
 - "Improve the prompt for the weekly-research workflow"
 
-### Debug Workflow
+### Diagnose, Patch, or Debug a Workflow
 **Load when**: User needs to investigate, audit, debug, or understand a workflow, troubleshoot issues, analyze logs, or fix errors
 
-**Prompt file**: `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/debug-agentic-workflow.md`
+**Prompt file**: `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/local-debug.md`
+
+The shared strategy distinguishes diagnosis/patching from an active debug loop
+based on the session's execution capabilities. For additional existing-run triage,
+load `.github/aw/debug-agentic-workflow.md`; it is not another execution policy.
 
 **Use cases**:
 - "Why is this workflow failing?"

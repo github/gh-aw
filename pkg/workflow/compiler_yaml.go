@@ -28,6 +28,10 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 
 	compilerYamlLog.Printf("Built %d jobs successfully", len(c.jobManager.GetAllJobs()))
 
+	if err := c.applyEnvironmentOverride(); err != nil {
+		return err
+	}
+
 	// Validate job dependencies
 	if err := c.jobManager.ValidateDependencies(); err != nil {
 		return fmt.Errorf("job dependency validation expected each needs entry to reference an existing job id (for example, needs: build): %w", err)

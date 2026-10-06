@@ -1,146 +1,64 @@
 ---
-description: Debug and refine agentic workflows using gh-aw CLI tools and focused run-log analysis.
+description: Read-only run-log and audit triage supporting the shared local-first debugging strategy.
 disable-model-invocation: true
 ---
 
-# GitHub Agentic Workflow Debugger
+# Workflow Evidence Triage
 
-Help users investigate failing or underperforming workflows in this repository.
+Use this companion to [local-debug.md](local-debug.md) for existing-run evidence.
+Follow its mode selection and execution policy if not already loaded. A workflow
+start returning `403 Forbidden` ends active debugging and returns to diagnosing
+and patching. This evidence reference does not authorize uploads or new runs.
 
-## Load These References First
+## Collect Existing Evidence
 
-- [github-agentic-workflows.md](github-agentic-workflows.md)
-- [workflow-editing.md](workflow-editing.md)
-- [safe-outputs.md](safe-outputs.md)
-- [syntax.md](syntax.md)
-
-Load these only when relevant:
-
-- [campaign.md](campaign.md)
-- [experiments.md](experiments.md)
-- [agent-runtime-instructions.md](agent-runtime-instructions.md) for Docker, Cloud Hypervisor, or ARC DinD failures
-
-## Available Commands
+Use the workflow name or run URL already supplied. For a run URL, extract its ID
+and audit it before requesting more context:
 
 ```bash
+gh aw audit RUN_ID --json
+gh aw logs WORKFLOW --json
 gh aw status
-gh aw compile <workflow-name>
-gh aw logs <workflow-name> --json
-gh aw audit <run-id> --json
-gh aw run <workflow-name>
 ```
 
-If `gh aw` is unavailable or unauthenticated in a workflow environment, use the matching `agentic-workflows` tools instead.
-
-## Start the Conversation
-
-Ask for one of these inputs:
-
-- a workflow name
-- a workflow run URL
-- a request to list workflows with `gh aw status`
-
-## Fast Path: Run URL Provided
-
-If the user gives a GitHub Actions run URL:
-
-1. extract the run ID
-2. run `gh aw audit <run-id> --json`
-3. analyze the audit result before asking additional questions
-
-## Two Debug Modes
-
-### 1. Analyze existing logs
-
-Use when the user wants to inspect past runs.
+Start with the compact audit. Fetch targeted evidence only when needed:
 
 ```bash
-gh aw logs <workflow-name> --json
+gh aw audit RUN_ID --artifacts usage,github-api,mcp,agent
 ```
 
-Focus on:
+Read the actual downloaded artifact names rather than assuming a fixed layout.
+Use cached evidence when available. For an in-progress run, use a bounded
+monitoring deadline; do not dispatch another run or poll indefinitely.
 
-- failures and warnings
-- token usage
-- missing tool reports
-- execution time
-- repeated failure patterns
+## Identify the First Failing Boundary
 
-### 2. Run and audit now
+Separate the primary failure from cascades. Classify each failed message by
+tool/action, HTTP status, job, and time: a workflows-permission 403 and a
+`Bad credentials` 401 need different fixes.
 
-Use when the user wants to reproduce the issue.
+In Codespaces, distinguish token-source/SAML failures from missing permissions.
+Follow the shared strategy's 403 credential triage; a logged-in CLI or repository
+role does not prove that its active token is SSO-authorized.
 
-1. verify the workflow supports `workflow_dispatch`
-2. run `gh aw run <workflow-name>`
-3. poll `gh aw audit <run-id> --json` until the run reaches a terminal state
-4. inspect the downloaded artifacts
+Check tool-name/schema mismatches, prompt inputs, token source/lifetime,
+effective job permissions, firewall denials, and safe-output validation.
+For GitHub MCP, inspect both the DIFC source policy and the `safeoutputs` write
+sink policy. Never retrieve secret values or infer valid credentials from mocks.
 
-## What to Inspect in Audits
+For underperformance, distinguish missing tools, prompt ambiguity, timeout
+pressure, and token/sub-agent fan-out. Compare token usage, cache behavior,
+cost, and output quality; lower cost does not justify a quality regression.
 
-### Missing tools
+Load syntax, safe-output, engine-runtime, campaign, or experiment references
+only for the mechanism under investigation. If a workflow itself collects logs,
+it needs `actions: read` and CLI installation before invoking `gh aw`.
 
-Check for:
+## Fix and Report
 
-- tools the agent tried to call but could not access
-- name mismatches such as wrong prefixes or wrong underscore/hyphen forms
-- safe outputs that were referenced in the prompt but not configured in frontmatter
-
-Common fixes:
-
-- correct the tool name in the prompt
-- enable the required tool or safe output
-- move a write action from shell/GitHub tool usage to `safe-outputs:`
-
-### Key artifacts
-
-Inspect these when available:
-
-- `run_summary.json`
-- `agent-stdio.log`
-- `safe_outputs.jsonl`
-- token-usage artifacts under the firewall audit logs
-
-## Diagnostic Checklist
-
-- permissions and authentication failures
-- missing or misconfigured tools
-- GitHub MCP DIFC source policy without a matching `safeoutputs` write-sink policy
-- network allowlist problems
-- prompt ambiguity or lack of context
-- timeout pressure
-- unnecessary token consumption
-- expensive model invoked on events that cheap triage could resolve
-- expensive model reading large raw logs or payloads that should be queried on demand
-- orchestrator context bloated by raw worker/tool output instead of compact summaries
-- unbounded sub-agent fan-out or recursive delegation
-- safe-output validation failures
-
-## Workflow-Internal Use of `gh aw`
-
-When a generated workflow itself runs `gh aw logs` or `gh aw audit`:
-
-- add `permissions: actions: read`
-- install the CLI first with `github/gh-aw/actions/setup-cli`
-- do not place the `gh aw` command before the install step
-
-## Fix-and-Validate Loop
-
-When you suggest a fix:
-
-1. point to the exact frontmatter or prompt section
-2. explain the reason briefly
-3. validate with `gh aw compile <workflow-name>` and inspect the generated lock file for both source and sink guard policies when GitHub MCP and safe outputs are used
-4. suggest another run only after the workflow compiles
-
-When token cost is part of the issue, compare before/after runs with `gh aw audit` and inspect `aic`, input/output tokens, and cache read/write tokens. Treat quality regressions as failures even when token usage drops.
-
-## Final Response Rules
-
-End with:
-
-- the root cause or most likely cause
-- the concrete fix
-- the validation command
-- whether the user should run the workflow again
-
-Keep it concise and actionable.
+Use the shared strategy for a regression-backed patch and development compilation.
+In diagnosis/patching mode, hand off the patch and unmet hosted checks; do not
+claim to have completed an active debug loop. In debug mode, follow the separately
+human-validated iteration gates. Report mode, cause/uncertainty, change, and
+evidence. A passing compile neither authorizes a rerun nor overrides a dispatch
+denial or an explicit host restriction.

@@ -30,6 +30,33 @@ func extractTextResult(t *testing.T, result *mcp.CallToolResult) string {
 	return textContent.Text
 }
 
+func TestCompileToolDevelopmentAndEnvironmentArguments(t *testing.T) {
+	t.Parallel()
+	var capturedArgs []string
+	mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+		capturedArgs = slices.Clone(args)
+		return mockCommandWithOutput(`[]`, "")(ctx, args...)
+	}
+	server := mcp.NewServer(&mcp.Implementation{Name: "gh-aw", Version: "test"}, nil)
+	require.NoError(t, registerCompileTool(server, mockExec, ""))
+	session := connectInMemory(t, server)
+	_, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "compile",
+		Arguments: map[string]any{
+			"dev":         true,
+			"environment": "test: #1",
+			"workflows":   []string{"test.md"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, capturedArgs, "--dev")
+	index := slices.Index(capturedArgs, "--environment")
+	require.NotEqual(t, -1, index)
+	require.Greater(t, len(capturedArgs), index+1)
+	assert.Equal(t, "test: #1", capturedArgs[index+1])
+	assert.Contains(t, capturedArgs, "test.md")
+}
+
 func TestCompileTool_UsesOnlyStdoutOnSuccess(t *testing.T) {
 	t.Parallel()
 	const (

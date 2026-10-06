@@ -1,12 +1,23 @@
 ---
 name: debugging-workflows
-description: Debug gh-aw workflows using run logs, audits, and failure triage.
+description: Diagnose gh-aw failures using logs and audits; follow the shared strategy for patches and authorized local debug loops.
 ---
 
 
-# Debugging GitHub Agentic Workflows
+# Workflow Diagnosis and Debugging Evidence
 
-Use this guide to debug GitHub Agentic Workflows: download and analyze logs, audit runs, and trace workflow behavior.
+Use this reference to diagnose workflows: download/analyze existing logs, audit
+runs, and trace failures. These reads are not an active debug loop.
+
+Follow the [shared local-first strategy](../../aw/local-debug.md) for all
+reproduction, fixes, uploads, and live tests. This page is an evidence and CLI
+reference, not a separate execution policy. Respect explicit no-dispatch contexts.
+When a permitted workflow-start attempt returns `403 Forbidden`, stop the active
+edit/run/audit loop, preserve the denial, and diagnose/patch without live runs.
+Do not retry unchanged or arrange a manual/API/credential workaround.
+Codespaces can also fail organization SAML authorization: follow the shared
+credential triage, including environment-token precedence, rather than assuming
+that `gh auth status` or repository access proves workflow-run access.
 
 ## Table of Contents
 
@@ -207,7 +218,7 @@ on:
   issues:
     types: [opened]
 permissions:
-  issues: write
+  contents: read
 timeout-minutes: 10
 engine: copilot
 tools:
@@ -215,6 +226,7 @@ tools:
     mode: remote
     toolsets: [default]
 safe-outputs:
+  staged: true
   create-issue:
     labels: [ai-generated]
 ---
@@ -297,13 +309,16 @@ tools:
 - HTTP 403 (Forbidden) errors
 - "Resource not accessible" errors
 
-**Solution**: Add required permissions:
+**Solution**: Grant required read permissions to the agent and configure writes
+through safe outputs. Keep debugging outputs staged; inspect individual job/token
+permissions rather than adding write permissions to the agent:
 
 ```yaml
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
+safe-outputs:
+  staged: true
+  create-issue: {}
 ```
 
 ### Safe-Input Errors
@@ -334,7 +349,7 @@ mcp-scripts:
 
 ```yaml
 safe-outputs:
-  staged: false  # Set to false to actually create resources
+  staged: true  # Preview safe outputs while debugging
   create-issue:
     labels: [ai-generated]
 ```
@@ -405,20 +420,9 @@ timeout-minutes: 30  # Increase from default
 
 ### Polling In-Progress Runs
 
-When a run is still executing:
-
-```bash
-# Poll until completion
-while true; do
-  output=$(gh aw audit <run-id> --json 2>&1)
-  if echo "$output" | grep -q '"status":.*"\(completed\|failure\|cancelled\)"'; then
-    echo "$output"
-    break
-  fi
-  echo "⏳ Run still in progress. Waiting 45 seconds..."
-  sleep 45
-done
-```
+When a run is still executing, inspect it with `gh run view <run-id>` and collect
+`gh aw audit <run-id> --json` again within an approved monitoring deadline.
+Do not poll indefinitely or dispatch another run to obtain more evidence.
 
 ### Inspecting MCP Configuration
 
@@ -462,17 +466,14 @@ gh aw logs --parse
 gh aw logs --firewall
 ```
 
-### Debug Mode Compilation
+### Diagnostic and Development Compilation
 
 ```bash
-# Compile with verbose output
-gh aw compile --verbose
+# Strict/staged development compilation with checks and warnings as errors
+gh aw compile <workflow> --dev
 
-# Compile with strict security checks
-gh aw compile --strict
-
-# Run security scanners
-gh aw compile --actionlint --zizmor --poutine
+# Recommended when using a reviewed test environment
+gh aw compile <workflow> --dev --environment gh-aw-debug
 ```
 
 ## Reference Commands
@@ -511,14 +512,13 @@ gh aw compile --actionlint --zizmor --poutine
 | `gh aw status` | Show all workflow status |
 | `gh aw compile` | Compile all workflows |
 | `gh aw compile <workflow>` | Compile specific workflow |
-| `gh aw compile --strict` | Compile with security checks |
+| `gh aw compile <workflow> --dev` | Enforce shared development-testing checks |
 
-### Workflow Execution Commands
+### Active Debugging Commands (Local Developer Only)
 
 | Command | Description |
 |---------|-------------|
-| `gh aw run <workflow>` | Trigger workflow manually |
-| `gh workflow run <name>.lock.yml` | Alternative trigger method |
+| `gh aw run <workflow> --ref <reviewed-ref>` | Authorized local developer only, after the shared human-validation gates |
 | `gh run watch <run-id>` | Monitor running workflow |
 
 ## Additional Resources

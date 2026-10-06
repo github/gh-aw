@@ -1,6 +1,6 @@
 ---
 name: agentic-workflows
-description: Route gh-aw workflow design/create/debug/upgrade requests to the right prompts.
+description: Route gh-aw design, creation, diagnosis, patching, active debugging, and upgrade requests to the right strategies.
 ---
 
 # Agentic Workflows Router
@@ -48,6 +48,7 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/jobs.md`
 - `.github/aw/linter-workflows.md`
 - `.github/aw/llms.md`
+- `.github/aw/local-debug.md`
 - `.github/aw/loop.md`
 - `.github/aw/lsp.md`
 - `.github/aw/maintainer.md`
@@ -97,7 +98,7 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Create new workflows: `.github/aw/create-agentic-workflow.md`
 - Configure or add declarative engines: `.github/aw/configure-agentic-engine.md`
 - Update existing workflows: `.github/aw/update-agentic-workflow.md`
-- Debug, audit, or investigate workflows: `.github/aw/debug-agentic-workflow.md`
+- Diagnose, patch, audit, or actively debug workflows: `.github/aw/local-debug.md` (select mode by session capabilities; `.github/aw/debug-agentic-workflow.md` is the evidence companion)
 - Upgrade workflows and fix deprecations: `.github/aw/upgrade-agentic-workflows.md`
 - Create shared components or MCP wrappers: `.github/aw/create-shared-agentic-workflow.md`
 - Create report-generating workflows: `.github/aw/report.md`

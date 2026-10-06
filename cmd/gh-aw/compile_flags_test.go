@@ -2,7 +2,11 @@
 
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/spf13/cobra"
+)
 
 func TestCompileCommandShortFlags(t *testing.T) {
 	t.Parallel()
@@ -71,6 +75,7 @@ func TestCompileOptionsPropagateRequireSelfHostedRunners(t *testing.T) {
 	if flag == nil {
 		t.Fatal("expected --require-self-hosted-runners flag on compile command")
 	}
+
 	if flag.DefValue != "false" {
 		t.Fatalf("expected --require-self-hosted-runners default to be false, got %s", flag.DefValue)
 	}
@@ -78,5 +83,26 @@ func TestCompileOptionsPropagateRequireSelfHostedRunners(t *testing.T) {
 	config := (&compileCmdOptions{requireSelfHostedRunners: true}).toCompileConfig(nil)
 	if !config.RequireSelfHostedRunners {
 		t.Fatal("expected RequireSelfHostedRunners to be propagated to CompileConfig")
+	}
+}
+
+func TestCompileDevelopmentAndEnvironmentFlags(t *testing.T) {
+	t.Parallel()
+	for name, defaultValue := range map[string]string{"dev": "false", "environment": ""} {
+		flag := compileCmd.Flags().Lookup(name)
+		if flag == nil || flag.DefValue != defaultValue {
+			t.Fatalf("expected --%s with default %q, got %v", name, defaultValue, flag)
+		}
+	}
+	cmd := &cobra.Command{}
+	cmd.Flags().Bool("dev", false, "")
+	cmd.Flags().String("environment", "", "")
+	if err := cmd.ParseFlags([]string{"--dev", "--environment", "test: #1"}); err != nil {
+		t.Fatal(err)
+	}
+	opts := getCompileCmdOptions(cmd)
+	config := opts.toCompileConfig(nil)
+	if !config.Dev || config.EnvironmentOverride != "test: #1" {
+		t.Fatalf("development flags were not propagated: %+v", config)
 	}
 }
