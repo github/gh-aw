@@ -13,6 +13,7 @@ const SAMPLE_VALIDATION_CONFIG = {
   create_issue: {
     defaultMax: 1,
     dataEnabled: true,
+    collapseData: true,
     fields: {
       title: { required: true, type: "string", sanitize: true, maxLength: 128 },
       body: { required: true, type: "string", sanitize: true, maxLength: 65000, minLength: 20 },
@@ -118,6 +119,15 @@ const SAMPLE_VALIDATION_CONFIG = {
       body: { type: "string", sanitize: true, maxLength: 65000 },
       event: { type: "string", enum: ["APPROVE", "REQUEST_CHANGES", "COMMENT"] },
       pull_request_number: { issueOrPRNumber: true },
+      repo: { type: "string", maxLength: 256 },
+    },
+  },
+  reply_to_pull_request_review_comment: {
+    defaultMax: 10,
+    fields: {
+      comment_id: { required: true, positiveInteger: true },
+      body: { required: true, type: "string", sanitize: true, maxLength: 65000 },
+      pull_request_number: { optionalPositiveInteger: true },
       repo: { type: "string", maxLength: 256 },
     },
   },
@@ -479,11 +489,73 @@ describe("safe_output_type_validator", () => {
       expect(result.normalizedItem.body).toContain("```json");
       expect(result.normalizedItem.body).toContain('"verdict": "APPROVE"');
       expect(result.normalizedItem.body).toContain('"marker": "<!-- [PIPELINE-VERDICT] APPROVE -->"');
+      expect(result.normalizedItem.body).not.toContain("<details>");
       expect(result.normalizedItem.data).toEqual({
         verdict: "APPROVE",
         marker: "<!-- [PIPELINE-VERDICT] APPROVE -->",
         criteria_passed: 5,
       });
+    });
+
+    it.each([
+      ["add_comment", {}],
+      ["create_pull_request", { title: "Report", branch: "report" }],
+      ["create_pull_request_review_comment", { path: "test.js", line: 10 }],
+      ["submit_pull_request_review", { event: "APPROVE" }],
+      ["reply_to_pull_request_review_comment", { comment_id: 42 }],
+    ])("should keep %s structured data flat", async (type, fields) => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const body = "Review complete.";
+      const data = { verdict: "APPROVE" };
+
+      const result = validateItem({ type, ...fields, body, data }, type, 1, { dataEnabled: true });
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.body).toBe(`${body}\n\nStructured data:\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
+      expect(result.normalizedItem.body).not.toContain("<details>");
+      expect(result.normalizedItem.data).toEqual(data);
+    });
+
+    it.each([
+      ["create_issue", false],
+      ["add_comment", true],
+    ])("should honor the collapseData configuration for %s", async (type, collapseData) => {
+      const { validateItem, resetValidationConfigCache } = await import("./safe_output_type_validator.cjs");
+      const config = JSON.parse(JSON.stringify(SAMPLE_VALIDATION_CONFIG));
+      config[type].collapseData = collapseData;
+      process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify(config);
+      resetValidationConfigCache();
+
+      const result = validateItem({ type, title: "Report", body: "Detailed issue body text.", data: {} }, type, 1);
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.body.includes("<details>")).toBe(collapseData);
+      expect(result.normalizedItem.body.includes("Structured data:")).toBe(!collapseData);
+    });
+
+    it.each([{}, { status: "DEFECT_FOUND", totals: { defect: 1 }, rows: [{ number: 5 }] }])("should collapse create-issue structured data %j", async data => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const { sanitizeContent } = await import("./sanitize_content.cjs");
+      const body = "Detailed issue body text.";
+
+      const result = validateItem({ type: "create_issue", title: "Report", body, data }, "create_issue", 1);
+
+      expect(result.isValid).toBe(true);
+      const expectedBody = `${body}\n\n<details>\n<summary>Structured data</summary>\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\`\n\n</details>`;
+      expect(result.normalizedItem.body).toBe(expectedBody);
+      expect(result.normalizedItem.data).toEqual(data);
+      expect(sanitizeContent(result.normalizedItem.body)).toBe(expectedBody);
+    });
+
+    it("should leave create-issue bodies without structured data unchanged", async () => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const body = "Detailed issue body text.";
+
+      const result = validateItem({ type: "create_issue", title: "Report", body }, "create_issue", 1);
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.body).toBe(body);
+      expect(result.normalizedItem.data).toBeUndefined();
     });
 
     it("should reject data values that are not objects", async () => {

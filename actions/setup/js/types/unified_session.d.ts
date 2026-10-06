@@ -184,6 +184,8 @@ export interface UnifiedSessionEventDataMap {
   "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
   "user.message": Pick<MessageData, "content">;
+  "prompt.system": Pick<MessageData, "content">;
+  "prompt.user": Pick<MessageData, "content">;
   "assistant.message": Pick<MessageData, "content">;
   "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
   "assistant.reasoning": Pick<MessageData, "content">;

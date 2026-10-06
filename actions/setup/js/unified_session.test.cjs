@@ -36,6 +36,32 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("includes both activation prompts verbatim with distinct provenance when present", () => {
+    const system = "System instructions\n";
+    const user = "User request\n";
+    write("aw-prompts/system.txt", system);
+    write("aw-prompts/user.txt", user);
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.provenance.component === "prompt")).toEqual([
+      { type: "prompt.system", data: { content: system }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/system.txt", index: 0 } },
+      { type: "prompt.user", data: { content: user }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/user.txt", index: 0 } },
+    ]);
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toContain(
+      JSON.stringify({ type: "prompt.user", data: { content: user }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/user.txt", index: 0 } })
+    );
+    expect(events.at(-1).data.absentComponents).toContain("agent");
+  });
+
+  it("does not follow a symlinked prompt or invent missing prompt content", () => {
+    write("aw-prompts/user.txt", "");
+    fs.symlinkSync(write("private.txt", "not a prompt"), path.join(root, "aw-prompts/system.txt"));
+    const warnings = [];
+    const { events } = collectUnifiedSession({ rootDir: root, warn: warning => warnings.push(warning) });
+    expect(events.filter(event => event.provenance.component === "prompt")).toMatchObject([{ type: "prompt.user", data: { content: "" } }]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("aw-prompts/system.txt");
+  });
+
   it("emits one execution entry across canonical, stdio, persisted detector, and exit-code evidence", () => {
     const execution = { type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 1 } };
     write("agent-session.jsonl", [...require("./claude_session.cjs").normalizeClaudeSession(claudeFixtures.failure), execution]);

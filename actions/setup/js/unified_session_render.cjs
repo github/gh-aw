@@ -14,6 +14,8 @@ const RUNTIME_TYPES = new Set([
   "agent.execution",
   "session.collection",
   "session.collection_warning",
+  "prompt.system",
+  "prompt.user",
   "mcp.rpc.request",
   "mcp.rpc.response",
   "mcp.difc.filtered",
@@ -76,6 +78,8 @@ function eventDetail(event) {
     case "session.start":
       return fields(data, ["sourceEngine", "model", "sessionId"]);
     case "user.message":
+    case "prompt.system":
+    case "prompt.user":
       return undefined;
     case "assistant.message":
     case "assistant.reasoning":

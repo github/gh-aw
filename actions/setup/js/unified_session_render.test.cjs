@@ -19,6 +19,8 @@ const trace = [
   event("tool.execution_complete", { toolCallId: "shared", success: false, output: "failed" }, "agent", 1, 5, "session-a.jsonl"),
   event("tool.execution_complete", { toolCallId: "shared", success: true, output: "done" }, "agent", 1, 6, "session-b.jsonl"),
   event("user.message", { content: "PRIVATE_USER_PROMPT" }, "agent", 2, 7, "session-a.jsonl"),
+  event("prompt.system", { content: "PRIVATE_SYSTEM_INSTRUCTIONS" }, "prompt", 0, undefined, "aw-prompts/system.txt"),
+  event("prompt.user", { content: "PRIVATE_SPLIT_USER_PROMPT" }, "prompt", 0, undefined, "aw-prompts/user.txt"),
   event("assistant.message", { content: "Done <details>.\n" }, "agent", 3, 8, "session-a.jsonl"),
   event("session.result", { numTurns: 1, usage: { input_tokens: 0, output_tokens: 2 } }, "agent", 4, 9, "session-a.jsonl"),
   event("session.result", { numTurns: 2, usage: { input_tokens: 10, output_tokens: 3 } }, "agent", 2, 10, "session-b.jsonl"),
@@ -70,7 +72,7 @@ describe("unified session publication views", () => {
     for (const output of [generatePlainTextSummary(trace), generateCopilotCliStyleSummary(trace)]) {
       expect(output).toContain("File format version: 1");
       for (const type of new Set(trace.map(record => record.type))) {
-        if (type !== "user.message") expect(output).toContain(type);
+        if (!["user.message", "prompt.system", "prompt.user"].includes(type)) expect(output).toContain(type);
       }
       expect(output).toContain("list_issues");
       expect(output).toContain("rpcId=0");
