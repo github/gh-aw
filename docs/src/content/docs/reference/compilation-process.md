@@ -308,9 +308,15 @@ For an active debug loop, each live-test revision must pass development compilat
 and receive human validation of the source, generated lock, credentials,
 permissions, and bounds before upload. Bind any later Actions dispatch to the
 reviewed remote commit; a successful compile is not authorization to dispatch.
+An unknown dispatch result may mean a run already started: reconcile existing
+runs without redispatching. Moved refs or mismatched run SHAs invalidate the
+reviewed test claim. Required audit/log permission denial blocks further live
+iteration; unavailable evidence is not proof that the workflow failed.
 Repeat that review after each change, then use run logs, audits, and native
-`gh aw mcp inspect` to guide the next local iteration. Staging protects built-in
-safe outputs, not arbitrary scripts, custom jobs, or external MCP side effects.
+`gh aw mcp inspect` after checking startup effects and isolated test bindings.
+Staging protects built-in safe outputs, not arbitrary scripts, custom jobs, or
+external MCP side effects; changed approval protections and remaining writes
+require explicit human validation.
 
 ## Debugging Compilation
 

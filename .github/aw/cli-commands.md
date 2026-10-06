@@ -68,7 +68,7 @@ gh aw compile --approve           # Approve new secrets / action changes
 ### `gh aw run`
 
 > [!IMPORTANT]
-> **Always prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution by short name, validates inputs, and enables correct run-tracking with `gh aw audit` and `gh aw logs`.
+> **When dispatch is permitted and human-validated, prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution, input validation, and run-tracking. This preference grants no authorization.
 
 Trigger a workflow on demand using `workflow_dispatch`.
 
@@ -78,6 +78,10 @@ permitted run attempt by stopping live debugging and returning to diagnosis/
 patching. Do not retry unchanged or bypass the denial. `--dev` is a compilation
 profile, not run access or authorization; each live-test revision requires
 human validation.
+
+Follow the shared live-outcome table for unknown dispatch results, moved refs,
+run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching
+run-count budget; examples below do not grant approval.
 
 Codespaces may still return SAML-related 403 responses. Check the active token
 source and SSO authorization using the shared credential triage; environment
@@ -129,7 +133,14 @@ gh aw audit <run-id> --json         # JSON output
 gh aw audit <base-id> <compare-id>  # Diff two runs (regression detection)
 gh aw audit <id1> <id2> <id3> --json  # Multi-run diff
 gh aw audit <id1> <id2> --group     # Grouped findings: one entry per [run, code] with occurrence counts
+gh aw audit <id1> <id2> <id3> --group --json  # Per-run finding codes for recurrence checks
 ```
+
+Plain multi-run diffs focus on metrics/firewall/tools. For recurring errors, use
+grouped findings and cached individual reports/logs to compare first failing boundaries and normalized
+error/tool/status signatures across comparable runs. Count each run once,
+report matching/inspectable runs and IDs, and account for workflow/revision/configuration
+differences. Missing evidence is unknown, not proof that the error disappeared.
 
 **MCP equivalent**: `audit` tool (single run) / `audit-diff` tool (multi-run comparison)
 
@@ -328,7 +339,7 @@ gh aw json-schema logs-jsonl
 |---|---|
 | `gh aw status` | `status` |
 | `gh aw compile` | `compile` |
-| `gh aw run` | *(use GitHub MCP `create_workflow_dispatch`)* |
+| `gh aw run` | Not provided; no API/MCP/manual-dispatch substitution |
 | `gh aw logs` | `logs` |
 | `gh aw audit` | `audit` |
 | `gh aw audit <id1> <id2>` | `audit-diff` |

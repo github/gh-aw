@@ -21,7 +21,7 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 
 - **Creating new workflows**: Routes to `create` prompt
 - **Updating existing workflows**: Routes to `update` prompt
-- **Diagnosis, patching, and active debugging**: Routes to `local-debug`, which selects the execution mode by session capabilities; `debug-agentic-workflow` is the evidence companion
+- **Diagnosis, patching, and active debugging**: Routes to `local-debug` for mode selection and live gates; `debug-agentic-workflow` is the evidence companion
 - **Upgrading workflows**: Routes to `upgrade-agentic-workflows` prompt
 - **Creating report-generating workflows**: Routes to `report` prompt — consult this whenever the workflow posts status updates, audits, analyses, or any structured output as issues, discussions, or comments
 - **Creating shared components**: Routes to `create-shared-agentic-workflow` prompt
@@ -89,8 +89,8 @@ When you interact with this agent, it will:
 
 **Prompt file**: `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/local-debug.md`
 
-The shared strategy distinguishes diagnosis/patching from an active debug loop
-based on the session's execution capabilities. For additional existing-run triage,
+The shared strategy distinguishes diagnosis/patching from permitted active debug
+loops using explicit live gates. For additional existing-run triage,
 load `.github/aw/debug-agentic-workflow.md`; it is not another execution policy.
 
 **Use cases**:
@@ -201,7 +201,7 @@ gh aw init
 # Generate the lock file for a workflow
 gh aw compile [workflow-name]
 
-# Trigger a workflow on demand (preferred over gh workflow run)
+# Only where permitted and human-validated under local-debug.md:
 gh aw run <workflow-name>             # interactive input collection
 gh aw run <workflow-name> --ref main  # run on a specific branch
 
@@ -234,5 +234,5 @@ gh aw compile --validate
 - Follow security best practices: minimal permissions, explicit network access, no template injection
 - **Network configuration**: Use ecosystem identifiers (`node`, `python`, `go`, etc.) or explicit FQDNs in `network.allowed`. Bare shorthands like `npm` or `pypi` are **not** valid. See `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/network.md` for the full list of valid ecosystem identifiers and domain patterns.
 - **Single-file output**: When creating a workflow, produce exactly **one** workflow `.md` file. Do not create separate documentation files (architecture docs, runbooks, usage guides, etc.). If documentation is needed, add a brief `## Usage` section inside the workflow file itself.
-- **Triggering runs**: Always use `gh aw run <workflow-name>` to trigger a workflow on demand — not `gh workflow run <file>.lock.yml`. `gh aw run` handles workflow resolution by short name, input parsing and validation, and correct run-tracking for agentic workflows. Use `--ref <branch>` to run on a specific branch.
+- **Triggering runs**: Only where permitted and human-validated under `local-debug.md`, prefer `gh aw run <workflow-name>` over `gh workflow run <file>.lock.yml` for workflow resolution, input validation and run-tracking. Use the reviewed remote ref; explicit no-dispatch rules override user requests.
 - **CLI commands reference**: For a complete guide on all `gh aw` commands and their MCP tool equivalents (for restricted environments), see `https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/cli-commands.md`

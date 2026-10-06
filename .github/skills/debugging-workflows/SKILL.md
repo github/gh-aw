@@ -1,6 +1,6 @@
 ---
 name: debugging-workflows
-description: Diagnose gh-aw failures using logs and audits; follow the shared strategy for patches and authorized local debug loops.
+description: Diagnose gh-aw failures using logs and audits; follow the shared strategy for patches and permitted active debug loops.
 ---
 
 
@@ -12,12 +12,8 @@ runs, and trace failures. These reads are not an active debug loop.
 Follow the [shared local-first strategy](../../aw/local-debug.md) for all
 reproduction, fixes, uploads, and live tests. This page is an evidence and CLI
 reference, not a separate execution policy. Respect explicit no-dispatch contexts.
-When a permitted workflow-start attempt returns `403 Forbidden`, stop the active
-edit/run/audit loop, preserve the denial, and diagnose/patch without live runs.
-Do not retry unchanged or arrange a manual/API/credential workaround.
-Codespaces can also fail organization SAML authorization: follow the shared
-credential triage, including environment-token precedence, rather than assuming
-that `gh auth status` or repository access proves workflow-run access.
+Apply its live-outcome table, credential triage and untrusted-evidence rules.
+Without accessible existing logs, use source/fixtures; never dispatch for evidence.
 
 ## Table of Contents
 
@@ -35,7 +31,7 @@ that `gh auth status` or repository access proves workflow-run access.
 
 ```bash
 # Download logs from the last 24 hours
-gh aw logs --start-date -1d -o /tmp/workflow-logs
+gh aw logs --start-date -1d -o .github/aw/logs/recent
 
 # Download logs for a specific workflow
 gh aw logs weekly-research --start-date -1d
@@ -71,7 +67,7 @@ gh aw logs
 gh aw logs <workflow-name>
 
 # Download with custom output directory
-gh aw logs -o ./my-logs
+gh aw logs -o .github/aw/logs/custom
 ```
 
 ### Filter Options
@@ -136,10 +132,10 @@ When you run `gh aw logs`, the following artifacts are downloaded for each run:
 
 ```bash
 # Download failed runs from last week
-gh aw logs --start-date -1w -o /tmp/debug-logs
+gh aw logs --start-date -1w -o .github/aw/logs/debug
 
 # Check the summary for patterns
-cat /tmp/debug-logs/summary.json | jq '.runs[] | select(.conclusion == "failure")'
+cat .github/aw/logs/debug/summary.json | jq '.runs[] | select(.conclusion == "failure")'
 ```
 
 ## Auditing Specific Runs
@@ -178,6 +174,21 @@ gh aw audit 1234567890 --parse
 gh aw audit 1234567890 -v
 ```
 
+### Check Whether an Error Recurs
+
+```bash
+# Compare existing runs, without dispatching new ones
+gh aw audit 1234567890 1234567891 1234567892 --group --json
+```
+
+Use grouped per-run finding codes/counts, then cached individual reports/logs
+for exact signatures. Plain multi-run diffs focus on metrics/firewall/tools;
+absent findings or skipped runs do not prove the error disappeared.
+Match the first failing boundary and normalized error/tool/status signature
+across comparable workflows, revisions, triggers/inputs and configurations. Count each
+matching run once, report matching/inspectable runs and IDs, and keep missing
+evidence unknown. Repeated HTTP 403 alone does not establish one root cause.
+
 ### Audit Report Contents
 
 The audit command provides:
@@ -196,8 +207,8 @@ gh aw audit 1234567890 --json > audit.json
 
 # Extract key information
 cat audit.json | jq '{
-  status: .status,
-  conclusion: .conclusion,
+  status: .overview.status,
+  conclusion: .overview.conclusion,
   errors: .errors,
   missing_tools: .missing_tools,
   tool_usage: .tool_usage
@@ -309,7 +320,8 @@ tools:
 - HTTP 403 (Forbidden) errors
 - "Resource not accessible" errors
 
-**Solution**: Grant required read permissions to the agent and configure writes
+**Solution**: First distinguish SAML/token-source denial from missing permissions
+using the shared credential triage. Grant required read permissions to the agent and configure writes
 through safe outputs. Keep debugging outputs staged; inspect individual job/token
 permissions rather than adding write permissions to the agent:
 
@@ -420,11 +432,17 @@ timeout-minutes: 30  # Increase from default
 
 ### Polling In-Progress Runs
 
-When a run is still executing, inspect it with `gh run view <run-id>` and collect
-`gh aw audit <run-id> --json` again within an approved monitoring deadline.
-Do not poll indefinitely or dispatch another run to obtain more evidence.
+Classify command exit separately from workflow outcome. A nonzero audit exit may
+mean artifacts are not ready: confirm the same run with
+`gh run view <run-id> --json status,headSha,conclusion`, then poll within the
+approved interval/deadline. Audit/log permission denial blocks further live
+iteration; report evidence unavailable, not workflow failure. Follow the shared
+outcome table for dispatch timeouts and SHA mismatches; never redispatch for logs.
 
 ### Inspecting MCP Configuration
+
+Preflight declarations, startup effects and isolated test bindings using the
+shared strategy before commands that can start/connect servers.
 
 ```bash
 # Inspect MCP servers for a workflow
@@ -497,6 +515,7 @@ gh aw compile <workflow> --dev --environment gh-aw-debug
 | `gh aw audit <url>` | Audit from GitHub URL |
 | `gh aw audit <run-id> --json` | Output as JSON |
 | `gh aw audit <run-id> --parse` | Parse logs to Markdown |
+| `gh aw audit <id1> <id2> ... --group --json` | Group existing-run findings for recurrence |
 
 ### MCP Commands
 
@@ -514,12 +533,12 @@ gh aw compile <workflow> --dev --environment gh-aw-debug
 | `gh aw compile <workflow>` | Compile specific workflow |
 | `gh aw compile <workflow> --dev` | Enforce shared development-testing checks |
 
-### Active Debugging Commands (Local Developer Only)
+### Active Debugging Commands (Permitted Contexts Only)
 
 | Command | Description |
 |---------|-------------|
-| `gh aw run <workflow> --ref <reviewed-ref>` | Authorized local developer only, after the shared human-validation gates |
-| `gh run watch <run-id>` | Monitor running workflow |
+| `gh aw run <workflow> --ref <reviewed-ref>` | Only after shared human-validation gates; explicit no-dispatch rules take precedence |
+| `gh run view <run-id> --json status,headSha,conclusion` | Same-run monitoring within approved bounds |
 
 ## Additional Resources
 
