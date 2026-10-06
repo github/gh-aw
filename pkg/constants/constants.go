@@ -580,6 +580,12 @@ const AwPromptsFileExpr = GhAwRootDir + "/aw-prompts/prompt.txt"
 // AwPromptsFileShell is the runtime prompt file path in shell env-var form for host-side paths.
 const AwPromptsFileShell = GhAwRootDirShell + "/aw-prompts/prompt.txt"
 
+// AwPromptsUserFile is the runtime task-only prompt file path.
+const AwPromptsUserFile = TmpGhAwDir + "/aw-prompts/user.txt"
+
+// AwPromptsUserFileExpr is the host-side task-only prompt path in GitHub Actions expression form.
+const AwPromptsUserFileExpr = GhAwRootDir + "/aw-prompts/user.txt"
+
 // TmpMcpConfigDir is the mcp-config directory in the /tmp/gh-aw tree.
 // Engines that require a writable MCP config directory (e.g. Codex) use this path.
 const TmpMcpConfigDir = TmpGhAwDir + "/mcp-config"
