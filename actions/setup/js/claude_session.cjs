@@ -51,9 +51,10 @@ function normalizeClaudeSession(records) {
   };
   const reportError = (source, error) => emit(source, "session.result", { sourceEngine: "claude", errors: [error] });
 
-  const emitBlock = (source, block) => {
+  const streamFields = (state, index) => ({ delta: true, ...(state.id !== undefined ? { messageId: state.id } : {}), ...(index !== undefined ? { contentIndex: index } : {}) });
+  const emitBlock = (source, block, metadata = {}) => {
     if (!block || typeof block !== "object") return;
-    const data = { ...sourceFields(source), ...block };
+    const data = { ...sourceFields(source), ...block, ...metadata };
     if (block.type === "text" && typeof block.text === "string") {
       return emit(source, source.type === "user" ? "user.message" : "assistant.message", { ...data, content: block.text });
     }
@@ -131,7 +132,7 @@ function normalizeClaudeSession(records) {
           }
         } else if (raw.type === "content_block_start" && raw.content_block) {
           const block = raw.content_block;
-          const event = emitBlock(source, block);
+          const event = emitBlock(source, block, streamFields(state, raw.index));
           if (event?.type === "assistant.message") state.textEvents.push(event);
           state.blocks.set(raw.index, {
             type: block.type,
@@ -154,12 +155,12 @@ function normalizeClaudeSession(records) {
               const texts = [...state.blocks.values()].filter(value => value.type === "text").map(value => value.text);
               if (texts.length) state.refusalEvent.data.content = texts.join("");
             } else {
-              const event = emitBlock(source, { type: "text", text: delta.text });
+              const event = emitBlock(source, { type: "text", text: delta.text }, streamFields(state, raw.index));
               if (event?.type === "assistant.message") state.textEvents.push(event);
             }
           } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
             block.text += delta.thinking;
-            emitBlock(source, { type: "thinking", thinking: delta.thinking });
+            emitBlock(source, { type: "thinking", thinking: delta.thinking }, streamFields(state, raw.index));
           } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
             block.argumentText += delta.partial_json;
             if (block.event) block.event.data.argumentText = block.argumentText;
@@ -203,7 +204,7 @@ function normalizeClaudeSession(records) {
         } else if (block.type === "text" || block.type === "thinking") {
           const text = block.type === "thinking" ? block.thinking : block.text;
           if (typeof text === "string" && text.startsWith(observed.text) && text !== observed.text) {
-            emitBlock(source, { ...block, [block.type === "thinking" ? "thinking" : "text"]: text.slice(observed.text.length) });
+            emitBlock(source, { ...block, [block.type === "thinking" ? "thinking" : "text"]: text.slice(observed.text.length) }, streamFields(streamed, index));
             observed.text = text;
           }
         } else if (block.type === "tool_use" && observed.type === "tool_use" && observed.event?.data.toolCallId === block.id) {

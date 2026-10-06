@@ -2,7 +2,7 @@
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
 const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult } = require("./agent_session.cjs");
-const { escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
+const { collapseStreamedMessages, escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
 
 /**
@@ -93,10 +93,11 @@ function createLogParserFormatters(deps) {
 
   function normalizeEntriesForRendering(logEntries) {
     if (!Array.isArray(logEntries)) return [];
+    logEntries = collapseStreamedMessages(logEntries.filter(entry => entry && typeof entry === "object"));
     if (isCopilotEventLogEntries(logEntries)) {
       return convertCopilotEventsToLegacyLogEntries(logEntries);
     }
-    return logEntries.filter(entry => entry && typeof entry === "object");
+    return logEntries;
   }
 
   /**
@@ -574,7 +575,9 @@ function createLogParserFormatters(deps) {
       }
     }
     if (toolResult?.error != null) {
-      for (const errorLine of formatResultPreview(sessionOutputText(toolResult.error)).split("\n")) {
+      const error = toolResult.error;
+      const errorText = typeof error.message === "string" ? `${error.code !== undefined ? `${sessionOutputText(error.code)}: ` : ""}${error.message}` : sessionOutputText(error);
+      for (const errorLine of formatResultPreview(errorText).split("\n")) {
         if (!appendConversationLine(lines, `   Error: ${errorLine.trimStart()}`, state)) return;
       }
     }
@@ -652,7 +655,7 @@ function createLogParserFormatters(deps) {
     }
   }
 
-  function generateSummaryLines(logEntries) {
+  function generateSummaryLines(logEntries, includeStatistics = true) {
     const renderEntries = normalizeEntriesForRendering(logEntries);
     const lines = [];
     const toolUsePairs = collectToolUsePairs(renderEntries);
@@ -702,7 +705,7 @@ function createLogParserFormatters(deps) {
       lines.push("");
     }
 
-    appendStatistics(lines, renderEntries, toolUsePairs, state.standard);
+    if (includeStatistics) appendStatistics(lines, renderEntries, toolUsePairs, state.standard);
 
     return lines;
   }
@@ -787,6 +790,7 @@ function createLogParserFormatters(deps) {
         appendStatistics(lines, projected, collectToolUsePairs(projected), true);
         return lines;
       },
+      agentConversation: entries => generateSummaryLines(entries, false),
     });
   }
 

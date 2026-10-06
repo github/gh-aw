@@ -36,6 +36,25 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it.each([0, 2])("preserves explicit mixed native execution exit %i without a runtime exit artifact", exitCode => {
+    const execution = { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode } };
+    const entries = [{ type: "assistant", message: { content: "observed answer" } }, execution];
+    expect(parseEngineSession(entries.map(JSON.stringify).join("\n"), "cursor").filter(event => event.type === "agent.execution")).toEqual([execution]);
+    write("agent-session.jsonl", entries);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
+    expect(events.filter(event => event.type === "agent.execution").map(event => event.data)).toEqual([execution.data]);
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["observed answer"]);
+  });
+
+  it("uses the last observed native execution exit when no runtime exit artifact exists", () => {
+    const observations = [2, 0].map(exitCode => ({ type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode } }));
+    const entries = [{ type: "assistant", message: { content: "observed answer" } }, ...observations];
+    expect(parseEngineSession(entries.map(JSON.stringify).join("\n"), "cursor").filter(event => event.type === "agent.execution")).toEqual(observations);
+    write("agent-session.jsonl", entries);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
+    expect(events.filter(event => event.type === "agent.execution").map(event => event.data)).toEqual([observations[1].data]);
+  });
+
   it("includes both activation prompts verbatim with distinct provenance when present", () => {
     const system = "System instructions\n";
     const user = "User request\n";
@@ -97,6 +116,57 @@ describe("Unified conclusion session", () => {
     write("agent-stdio.log", "Access denied by policy settings\n[copilot-harness] done: exitCode=1\n");
     const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
     expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["inference_access_error"], exitCode: 1 } }]);
+  });
+
+  it("normalizes mixed legacy Cursor entries without letting canonical execution suppress the conversation", () => {
+    write("agent-session.jsonl", [
+      { type: "system", subtype: "init", model: null, session_id: null },
+      { type: "user", message: { content: [{ type: "text", text: "PRIVATE_USER_PROMPT" }] } },
+      { type: "assistant", message: { content: [{ type: "text", text: "First answer\nSecond line" }] } },
+      { type: "result", num_turns: 1, usage: {} },
+      { type: "agent.execution", data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 0 } },
+    ]);
+    write("agent-stdio.log", "Assistant: duplicate raw answer");
+    const events = writeUnifiedSession({
+      rootDir: root,
+      engine: "cursor",
+      warn: message => {
+        throw new Error(message);
+      },
+    });
+    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "First answer\nSecond line" }, provenance: { path: "agent-session.jsonl" } }]);
+    expect(events.find(event => event.type === "session.init").data.sourceEngine).toBe("cursor");
+    expect(events.filter(event => event.type === "agent.execution")).toHaveLength(1);
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(require("./log_parser_shared.cjs").generateCopilotCliStyleSummary(events)).not.toContain("PRIVATE_USER_PROMPT");
+    expect(persisted).not.toContain("duplicate raw answer");
+  });
+
+  it("recovers declared-engine stdout when persisted evidence contains only execution", () => {
+    write("agent-session.jsonl", [{ type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 1 } }]);
+    write("agent-stdio.log", "Assistant: recovered answer\n");
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
+    expect(events.filter(event => event.type === "assistant.message")).toMatchObject([{ data: { content: "Assistant: recovered answer" }, provenance: { path: "agent-stdio.log" } }]);
+    expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: { categories: ["agentic_engine_timeout"], exitCode: 1 } }]);
+  });
+
+  it("keeps canonical messages authoritative over equivalent legacy records and raw fallback", () => {
+    const canonical = { type: "assistant.message", data: { content: "answer" } };
+    const legacy = { type: "assistant", message: { content: [{ type: "text", text: "answer" }] } };
+    write("agent-session.jsonl", [legacy, canonical, legacy, { type: "assistant", message: { content: [{ type: "text", text: "another answer" }] } }]);
+    write("agent-stdio.log", "Assistant: must not be selected");
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["answer", "another answer"]);
+    expect(events.filter(event => event.provenance.component === "agent").every(event => event.provenance.path === "agent-session.jsonl")).toBe(true);
+  });
+
+  it("does not convert runtime tool metadata into fabricated native tool transcripts", () => {
+    write("agent-stdio.log", "Assistant: completed\n");
+    write("mcp-logs/rpc-messages.jsonl", [{ event: "rpc_request", method: "tools/call", payload: { params: { name: "bash", arguments: { command: "pwd" } } } }]);
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "cursor" });
+    expect(events.filter(event => event.type === "assistant.message")).toHaveLength(1);
+    expect(events.some(event => event.type === "tool.execution_start" || event.type === "tool.execution_complete")).toBe(false);
+    expect(events.filter(event => event.type === "mcp.rpc.request")).toHaveLength(1);
   });
 
   it("rejects malformed recorded exit codes and does not follow an exit-code symlink", () => {
@@ -388,6 +458,149 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.provenance.component === "agent")).toHaveLength(1);
     expect(events.some(event => event.data.input_tokens === 999)).toBe(false);
     expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", events: 0 }));
+  });
+
+  it("preserves canonical native source groups without needing raw snapshots", () => {
+    const nativePath = id => `sandbox/agent/logs/copilot-session-state/${id}/events.jsonl`;
+    write(
+      "agent-session.jsonl",
+      ["first", "last"].flatMap((id, index) => [
+        { type: "session.init", timestamp: `2026-10-02T00:00:0${index}Z`, data: { sourceEngine: "copilot", sessionId: id }, provenance: { path: nativePath(id), index: 0 } },
+        { type: "assistant.message", data: { content: id }, provenance: { path: nativePath(id), index: 1 } },
+        { type: "session.result", data: { usage: { inputTokens: index + 1 } }, provenance: { path: nativePath(id), index: 2 } },
+      ])
+    );
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const messages = events.filter(event => event.type === "assistant.message");
+    expect(messages.map(event => event.provenance.path)).toEqual([nativePath("first"), nativePath("last")]);
+    expect(messages.every(event => event.provenance.native.persistedPath === "agent-session.jsonl")).toBe(true);
+    expect(events.filter(event => event.type === "session.result").map(event => event.data.usage.inputTokens)).toEqual([1, 2]);
+    expect(events.at(-1).data.sources.filter(source => source.component === "agent")).toHaveLength(2);
+  });
+
+  it("normalizes genuine Copilot task summaries per canonical source before compaction", () => {
+    const summary = "Genuine final answer\n\nSecond paragraph.";
+    const canonical = ["first", "last"].flatMap((id, attempt) =>
+      [
+        { type: "session.init", data: { sourceEngine: "copilot", sessionId: id } },
+        { type: "assistant.message", data: { content: "" } },
+        ...(attempt ? [{ type: "assistant.message", data: { content: summary } }] : []),
+        { type: "vendor.unknown_complete", data: { summary: "unknown extension must not become an answer" } },
+        { type: "tool.execution_complete", data: { output: "tool output must not become an answer" } },
+        { type: "session.task_complete", id: `${id}-complete`, data: { summary, sourceDetail: "preserve original" } },
+      ].map((event, index) => ({ ...event, provenance: { component: "agent", phase: "agent", path: `sandbox/agent/logs/copilot-session-state/${id}/events.jsonl`, index } }))
+    );
+    write("agent-session.jsonl", canonical);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const answers = events.filter(event => event.type === "assistant.message" && event.data.content);
+    expect(answers.map(event => event.data.content)).toEqual([summary, summary]);
+    expect(new Set(answers.map(event => event.provenance.path)).size).toBe(2);
+    expect(events.filter(event => event.type === "session.task_complete").map(event => event.id)).toEqual(["first-complete", "last-complete"]);
+    const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
+    expect(markdown).toContain("Genuine final answer");
+    expect(markdown).toContain("Second paragraph.");
+    expect(markdown).not.toContain("unknown extension must not become an answer");
+  });
+
+  it("projects historical canonical Copilot task summaries without native files or indexed provenance", () => {
+    const summary = "Observed historical final answer\n\nSecond paragraph.";
+    write("aw_info.json", { engine_id: "copilot" });
+    write("agent-session.jsonl", [
+      { type: "session.init", data: { sessionId: "historical", sourceEngine: "copilot" } },
+      { type: "assistant.message", data: { content: "" } },
+      { type: "session.task_complete", id: "complete", timestamp: "2026-10-02T00:00:01Z", data: { summary, sourceDetail: "observed metadata" } },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const answers = events.filter(event => event.type === "assistant.message" && event.data.content);
+    expect(answers.map(event => event.data.content)).toEqual([summary]);
+    expect(answers[0].id).toBe("complete");
+    expect(answers[0].provenance.path).toBe("agent-session.jsonl");
+    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
+    expect(markdown).toContain("Observed historical final answer");
+    expect(markdown).toContain("Second paragraph.");
+  });
+
+  it("does not reproject canonical Copilot initialization after native provenance indexing", () => {
+    const native = [{ type: "session.start", id: "start", timestamp: "2026-10-02T00:00:00Z", data: { sessionId: "session", startTime: "2026-10-02T00:00:00Z" } }];
+    const canonical = require("./copilot_session.cjs")
+      .normalizeCopilotSession(native)
+      .map((event, index) => ({ ...event, provenance: { component: "agent", phase: "agent", path: "sandbox/agent/logs/copilot-session-state/session/events.jsonl", index } }));
+    write("agent-session.jsonl", canonical);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.provenance.component === "agent")).toHaveLength(canonical.length);
+    expect(events.filter(event => event.type === "session.init")).toHaveLength(1);
+  });
+
+  it("keeps identical tool call IDs and canonical indices isolated across reconstructed retry sources", () => {
+    const nativePath = id => `sandbox/agent/logs/copilot-session-state/${id}/events.jsonl`;
+    const canonical = ["first", "last"].flatMap((id, attempt) =>
+      [
+        { type: "session.init", timestamp: `2026-10-02T00:00:0${attempt}Z`, data: { sourceEngine: "copilot", sessionId: id } },
+        { type: "tool.execution_start", data: { toolCallId: "call", toolName: `${id}_tool`, input: { scope: id } } },
+        { type: "tool.execution_complete", data: { toolCallId: "call", success: true, output: `${id} output` } },
+      ].map((event, index) => ({ ...event, provenance: { component: "agent", phase: "agent", path: nativePath(id), index: 20 + attempt * 10 + index } }))
+    );
+    write("agent-session.jsonl", canonical);
+    for (const id of ["first", "last"]) {
+      write(nativePath(id), [
+        { type: "session.start", data: { sessionId: id } },
+        { type: "tool.execution_start", data: { toolCallId: "call", toolName: "raw duplicate" } },
+        { type: "tool.execution_complete", data: { toolCallId: "call", success: true, output: "raw duplicate output" } },
+      ]);
+    }
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const groups = require("./unified_session_render.cjs").scopedAgentSessions(events);
+    expect(groups).toHaveLength(2);
+    for (const [attempt, id] of ["first", "last"].entries()) {
+      const source = events.filter(event => event.provenance.component === "agent" && event.provenance.path === nativePath(id));
+      expect(source.map(event => event.provenance.index)).toEqual([20 + attempt * 10, 21 + attempt * 10, 22 + attempt * 10]);
+      expect(source.every(event => event.provenance.native.index === event.provenance.index)).toBe(true);
+      expect(groups[attempt].label).toBe(`agent/${nativePath(id)}`);
+      expect(groups[attempt].events.filter(event => event.type === "tool.execution_start").map(event => event.data)).toEqual([{ toolCallId: "call", toolName: `${id}_tool`, input: { scope: id } }]);
+      expect(groups[attempt].events.filter(event => event.type === "tool.execution_complete").map(event => event.data.output)).toEqual([`${id} output`]);
+    }
+    const output = write("usage/aw_session.jsonl", events);
+    const markdown = require("./session_cli.cjs").sessionCLI(["markdown", output]);
+    expect(markdown).toContain("first output");
+    expect(markdown).toContain("last output");
+    expect(markdown).not.toContain("raw duplicate output");
+  });
+
+  it.each([false, true])("recovers only missing Copilot session IDs, preferring the fullest native copy (native provenance: %j)", nativeProvenance => {
+    const nativePath = id => `sandbox/agent/logs/copilot-session-state/${id}/events.jsonl`;
+    const firstStart = { type: "session.start", timestamp: "2026-10-02T00:00:00Z", data: { sourceEngine: "copilot", sessionId: "first", startTime: "2026-10-02T00:00:00Z" } };
+    const lastStart = { type: "session.init", timestamp: "2026-10-02T00:00:01Z", data: { sourceEngine: "copilot", sessionId: "last", startTime: "2026-10-02T00:00:01Z" } };
+    const canonical = [lastStart, { type: "assistant.message", data: { content: "authoritative final answer" } }, { type: "session.result", data: { usage: { inputTokens: 10 }, numTurns: 1 } }];
+    write("agent-session.jsonl", nativeProvenance ? canonical.map((event, index) => ({ ...event, provenance: { path: nativePath("last"), index } })) : canonical);
+    write(nativePath("first"), [
+      firstStart,
+      { type: "assistant.message", data: { content: "recovered earlier answer" } },
+      { type: "tool.execution_start", data: { toolCallId: "first-tool", toolName: "read_file" } },
+      { type: "tool.execution_complete", data: { toolCallId: "first-tool", success: true, output: "observed output" } },
+      { type: "session.error", data: { code: 502, message: "earlier retry failure" } },
+    ]);
+    write(nativePath("short-copy"), [firstStart, { type: "assistant.message", data: { content: "do not select the shorter copy" } }]);
+    write(nativePath("last"), [
+      { ...lastStart, type: "session.start" },
+      { type: "assistant.message", data: { content: "do not override canonical" } },
+      { type: "tool.execution_start", data: { toolCallId: "extra-raw-tool", toolName: "ignored" } },
+    ]);
+    write("agent_execution_exit_code.txt", "0\n");
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["recovered earlier answer", "authoritative final answer"]);
+    expect(events.filter(event => event.type === "tool.execution_start")).toHaveLength(1);
+    expect(events.filter(event => event.type === "tool.execution_complete")).toHaveLength(1);
+    const execution = events.find(event => event.type === "agent.execution");
+    expect(execution.data).toEqual({ categories: [], errorCodes: [], errorTypes: [], exitCode: 0 });
+    expect(execution.provenance.path).toBe(nativePath("last"));
+    expect(events.filter(event => event.type === "session.result" && event.provenance.path === nativePath("last")).map(event => event.data.usage)).toEqual([{ inputTokens: 10 }]);
+    expect(
+      events
+        .at(-1)
+        .data.sources.filter(source => source.component === "agent")
+        .map(source => source.path)
+    ).toEqual([nativePath("first"), nativePath("last")]);
   });
 
   it.each([false, true])("retains current Codex accounting through conclusion collection (canonical present: %j)", canonicalPresent => {

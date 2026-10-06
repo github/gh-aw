@@ -146,15 +146,19 @@ func parseAuditLogsIfRequested(runID int64, runOutputDir string, opts AuditOptio
 }
 
 func parseAgentLogIfRequested(runID int64, runOutputDir string, verbose bool) {
-	awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
-	engine := extractEngineFromAwInfo(awInfoPath, verbose)
-	if engine == nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No engine detected (aw_info.json missing or invalid); skipping agent log rendering"))
+	rendered, err := parsePersistedAgentLog(runOutputDir)
+	if !rendered && err == nil {
+		awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
+		engine := extractEngineFromAwInfo(awInfoPath, verbose)
+		if engine == nil {
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No engine detected (aw_info.json missing or invalid); skipping agent log rendering"))
+			}
+			return
 		}
-		return
+		err = parseAgentLog(runOutputDir, engine, verbose)
 	}
-	if err := parseAgentLog(runOutputDir, engine, verbose); err != nil {
+	if err != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to parse agent log for run %d: %v", runID, err)))
 		}

@@ -18,4 +18,8 @@ import "embed"
 //go:embed js/add_mask_redaction.cjs js/redact_secrets.cjs js/safe_output_manifest.cjs
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
 //go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs
+//go:embed js/engine_log_parser.cjs
+//go:embed js/parse_kiro_log.cjs
+//go:embed js/parse_deepseek_log.cjs
+//go:embed js/parse_pydantic_log.cjs
 var SessionParserSources embed.FS

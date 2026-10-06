@@ -442,7 +442,7 @@ The following tables describe the common fields in `data`. Optional native and p
 
 | Field | Value and availability |
 | --- | --- |
-| `sourceEngine` | String: `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, `goose`, or `custom` for the originating integration. A custom delegation can retain the detected parser's engine label as described in 7.6. |
+| `sourceEngine` | String naming the originating integration, such as `claude`, `copilot`, `codex`, `gemini`, `pi`, `opencode`, `goose`, a named plaintext sample, or `custom`. A custom delegation can retain the detected parser's engine label as described in 7.6. |
 | `model` | Source-dependent model string. |
 | `sessionId` | Source-dependent native session or thread identifier. |
 | `cwd` | Source-dependent working-directory string, unchanged. |
@@ -787,6 +787,7 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Source signature | Canonical mapping or interpretation |
 | --- | --- |
 | Dot-namespaced `type` with object `data` and optional native envelope | Core events retained; other native types retained as extensions. |
+| `session.task_complete` with textual `data.summary` | Retain the native completion event and expose its source-proven final summary as assistant content without duplicating an already observed answer. |
 | Recognized Claude-compatible legacy entries | Per-record legacy mappings, with `sourceEngine: "copilot"` on mapped initialization. |
 | Framed `[DEBUG] data:` JSON response with `choices[].message` | `content` → assistant message, `reasoning_text` → reasoning, `tool_calls[].id/function` → starts; preserve argument text when it is not valid structured JSON. |
 | Distinct debug response `usage.prompt_tokens` / `completion_tokens` | Map to input/output tokens and aggregate distinct response contributions. |
@@ -794,6 +795,10 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Recognized usage/model footer and explicit `Turns:` | Preserve reported usage/model and explicit turn count; no tool-count fallback for turns. |
 
 CLI/debug framing is removed, but retained source payload text is not trimmed. A native event stream does not need a synthesized result merely because its renderer can estimate conversation turns.
+
+Retry sessions retain independent source provenance and tool-correlation scopes.
+The bootstrap persists each observed session rather than only the last attempt;
+final-attempt telemetry remains separate from the complete conversation evidence.
 
 ### 7.3 Codex
 
@@ -881,6 +886,12 @@ The adapter can discover a reported model from a finalized turn without inventin
 Recognized candidates include the native event envelope, Claude legacy message/init/result shapes, Codex known JSONL lifecycle/item shapes, Codex legacy tool/exec/thinking layouts with their actual framing, and the OpenCode and Goose signatures below. Mere namespace matches with no supported payload are insufficient. Signature detection uses valid supported records even when unknown or malformed records are adjacent.
 
 Delegation is deterministic. Specific Goose signatures precede OpenCode signatures; native event recognition and Claude-compatible per-record mixed conversion precede broad Codex fallbacks. A Goose `error` record alone does not establish custom format detection. A custom adapter MAY support additional documented engine signatures, but those signatures follow the same preservation contract. A delegated initialization MAY retain the detected engine's `sourceEngine`; custom-origin metadata, when supplied, is preserved separately. A custom engine emitting its own mapped initialization uses `sourceEngine: "custom"`.
+
+Named sample adapters also support captured plaintext from Aider, Crush, Cursor,
+DeepSeek Harness, Kiro, and Pydantic AI. These adapters use engine-specific
+framing, not an arbitrary raw-log fallback. They retain observed assistant text
+and tool evidence, omit prompts and recognized wrapper diagnostics, and leave
+unavailable native tool arguments, results, and accounting absent.
 
 When no supported signature is present, the existing custom “unrecognized format” result and empty trace are returned. A raw preview is not a normalized event and is subject to the privacy boundary in Section 8.
 
@@ -994,8 +1005,17 @@ Neither view publishes user prompts or dumps unknown extension payloads.
 | `assistant.message` | Assistant answer, including supported structured native content. |
 | `assistant.reasoning` | Distinct reasoning channel, not converted into an answer or tool output. |
 | `tool.execution_start` | All standard tools, including built-ins and bookkeeping tools; JSON arguments can be objects, arrays, scalars, null, or empty strings. A missing result is visibly pending. |
-| `tool.execution_complete` | Source-proven pairing, separate output and error previews, known success/failure versus unknown outcome, duration, and an explicit missing-start label for orphan results. Empty observed output has an `[empty output]` marker. |
+| `tool.execution_complete` | Source-proven pairing, separate output and error previews, known success/failure versus unknown outcome, duration, and an explicit missing-start label for orphan results. MCP text-block arrays display their text rather than JSON envelopes; structured errors prioritize their message and code. Empty observed output has an `[empty output]` marker. |
 | `session.result` | Selected accounting, zero-valued metrics, cache counts, structured provider errors, and permission-denial records. Tool statistics separate failed, pending, and unknown outcomes. |
+
+Conversation entries combine observed streaming text fragments within the same
+source, message, and channel before formatting. Whitespace-only fragments remain
+part of the combined text. Separate turns, reasoning channels, and tool boundaries
+stay separate; native records and timestamps remain unchanged in the source trace.
+Adjacent streaming observations in the displayed timeline also use one message
+entry with the first observed timestamp; record counts still describe the source.
+Compaction retains observed delta/partial flags, message/block identities, and
+source/channel scope needed to group fragments; it does not infer absent IDs.
 
 These are display projections, not reversible interchange conversions. Generated
 display-only IDs avoid collisions with supplied native IDs, including empty IDs.
@@ -1044,12 +1064,12 @@ The conclusion collector publishes the already-redacted `aw_session.jsonl` to
 both sinks after writing it. `generatePlainTextSummary`,
 `generateCopilotCliStyleSummary`, and `generateConversationMarkdown` recognize
 unified events. Their unified view shows file version, per-component record
-counts, per-source agent statistics, and a chronological trace. Existing
+counts, per-source agent statistics and conversations, and a chronological trace. Existing
 agent-only inputs retain their earlier rendering behavior.
 
 | Observation | Unified display projection |
 | --- | --- |
-| Agent messages and tool lifecycle | Assistant/reasoning text, tool name, correlation ID, observed outcome, and scoped accounting. User prompt records remain omitted. |
+| Agent messages and tool lifecycle | Source-ordered conversations preserve multiline assistant/reasoning text and display tool arguments, output/error previews, pending/unknown/orphan outcomes, and scoped accounting before the runtime trace. The chronological trace includes correlation IDs and observed outcomes. User prompt records remain omitted. |
 | MCPG | Method, server, RPC ID, tool name, observed responses/errors, and filter/block diagnostics. Raw RPC arguments and response bodies are omitted. |
 | AWF | Network host/method/status/decision, observed token usage, steering messages, and tracker event names. |
 | Safe outputs | Requested versus execution-recorded operations, target metadata, and structured error counts. Requests are not displayed as successes. |
