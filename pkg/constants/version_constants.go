@@ -74,6 +74,9 @@ const DefaultFirewallVersion Version = "v0.28.31"
 // selections through /reflect and accepts apiProxy.routing.
 const AWFModelRoutingMinVersion Version = "v0.28.29"
 
+// AWFRoutingCandidateModelsMinVersion separates router candidates from request policy.
+const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
+
 // AWFExcludeEnvMinVersion is the minimum AWF version that supports the --exclude-env flag.
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
 const AWFExcludeEnvMinVersion Version = "v0.25.3"

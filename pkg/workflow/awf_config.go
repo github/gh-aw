@@ -223,8 +223,9 @@ type AWFAPIProxyConfig struct {
 }
 
 type AWFModelRoutingConfig struct {
-	Objective AWFModelRoutingObjective `json:"objective"`
-	Task      AWFModelRoutingTask      `json:"task"`
+	Objective       AWFModelRoutingObjective `json:"objective"`
+	Task            AWFModelRoutingTask      `json:"task"`
+	CandidateModels []string                 `json:"candidateModels,omitempty"`
 }
 
 type AWFModelRoutingObjective struct {

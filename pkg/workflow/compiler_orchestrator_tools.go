@@ -37,6 +37,7 @@ type toolsProcessingResult struct {
 	safeOutputs           *SafeOutputsConfig
 	secretMasking         *SecretMaskingConfig
 	parsedFrontmatter     *FrontmatterConfig
+	subAgentModels        []parser.SubAgentModel
 	hasExplicitGitHubTool bool // true if tools.github was explicitly configured in frontmatter
 }
 
@@ -112,6 +113,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		return nil, err
 	}
 	parsedFrontmatter := c.tryParseFrontmatterConfig(result.Frontmatter)
+	subAgentModels := parser.ExtractSubAgentModels(result.Markdown)
 
 	return &toolsProcessingResult{
 		tools:                 config.toolsData.tools,
@@ -135,6 +137,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		safeOutputs:           config.safeOutputs,
 		secretMasking:         config.secretMasking,
 		parsedFrontmatter:     parsedFrontmatter,
+		subAgentModels:        subAgentModels,
 		hasExplicitGitHubTool: config.toolsData.hasExplicitGitHubTool,
 	}, nil
 }

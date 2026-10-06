@@ -268,6 +268,20 @@ func handleAgentImportItem(item importQueueItem, state *importBFSState) (bool, e
 		parserLog.Printf("Multiple agent files found: %s and %s", state.acc.agentFile, item.importPath)
 		return true, fmt.Errorf("multiple agent files found in imports: '%s' and '%s'. Only one agent file is allowed per workflow", state.acc.agentFile, item.importPath)
 	}
+	content, err := readFileFunc(item.fullPath)
+	if err != nil {
+		return true, fmt.Errorf("reading imported agent %q: %w", item.importPath, err)
+	}
+	if original, err := ExtractFrontmatterFromContent(string(content)); err == nil {
+		rawContent, _ := state.acc.applyImportDefaultsToContent(string(content), original.Frontmatter, item.inputs)
+		if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
+			if model, ok := parsed.Frontmatter["model"].(string); ok && strings.TrimSpace(model) != "" {
+				state.acc.subAgentModels = append(state.acc.subAgentModels, SubAgentModel{
+					Name: filepath.Base(item.fullPath), Model: strings.TrimSpace(model),
+				})
+			}
+		}
+	}
 	importRelPath := assignAgentFilePath(state.acc, fullPathSlash, item.importPath, item.fullPath)
 	if len(item.inputs) == 0 {
 		state.acc.importPaths = append(state.acc.importPaths, importRelPath)
