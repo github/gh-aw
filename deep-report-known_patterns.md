@@ -1,0 +1,6 @@
+# Known Patterns (flat-copy workaround, started 2026-10-06 — nested known_patterns.md frozen at 2026-09-07 snapshot due to #65642-class bug)
+
+## New pattern (2026-10-06, cycle 8): a "closed as COMPLETED" issue can be closed without the fix actually landing — don't trust closure status alone
+#65642/#65657 (push_repo_memory nested-subdir glob bug, this very workflow's own data-loss bug) were closed "completed" 2026-10-05, but a live reproduction this cycle (write a file, call push_repo_memory, check the reported file count/patch size) showed the bug is still 100% live — `memory_file_eligibility.cjs` source is unchanged from the version the issue described. **Lesson: when a chronic/flagged item's tracking issue shows as closed, don't just take that as resolution — if the bug is cheaply live-reproducible (as this one is, via a single tool call), reproduce it before declaring it fixed. Re-file with the live-reproduction evidence if it's still broken; this is a stronger signal than re-filing on recurrence alone (see pre-2026-09-07 snapshot for the earlier version of this lesson re: Firewall Escape Test #56577).**
+
+(Older entries from before 2026-10-06 live in the nested `deep-report/known_patterns.md` — frozen at the 2026-09-07 snapshot; not duplicated here. Re-sync once the glob-matching bug is actually fixed and the nested file can be pushed again.)
