@@ -80,7 +80,9 @@ gh aw compile WORKFLOW --dev --environment gh-aw-debug
 custom and framework jobs. Review changed protections before live testing.
 Reusable-workflow caller jobs cannot declare environments, so this override fails
 rather than skipping them; review callees separately without the override.
-Staging covers safe outputs, not arbitrary scripts, custom jobs or MCP effects.
+`--dev` disables jobs whose IDs start with `push_` and conclusion issue/comment
+reporting; diagnostics, summaries and usage artifacts remain. Other custom jobs,
+cache saves and external MCP effects are not disabled by these controls.
 
 Report mode, cause/uncertainty, fix, regression evidence and unmet gates.
 Keep local, fixture and live Actions results distinct.

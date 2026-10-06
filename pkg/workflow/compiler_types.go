@@ -29,6 +29,7 @@ type Compiler struct {
 	allowActionRefs         bool                     // If true, unresolved action refs are warnings instead of errors
 	approve                 bool                     // If true, approve safe update changes (skip safe update enforcement)
 	forceStaged             bool                     // If true, force all safe-outputs into staged mode
+	developmentMode         bool                     // If true, disable push jobs and conclusion issue/comment writes
 	environmentOverride     string                   // If set, override the environment on every generated job
 	trialMode               bool                     // If true, suppress safe outputs for trial mode execution
 	trialLogicalRepoSlug    string                   // If set in trial mode, the logical repository to checkout

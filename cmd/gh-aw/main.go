@@ -406,6 +406,7 @@ var versionCmd = &cobra.Command{
 }
 
 type compileCmdOptions struct {
+	explicitBoolFlags         map[string]bool
 	engineOverride            string
 	actionMode                string
 	actionTag                 string
@@ -504,7 +505,8 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	useSamples, _ := cmd.Flags().GetBool("use-samples")
 	return compileCmdOptions{
-		engineOverride: engineOverride, actionMode: actionMode, actionTag: actionTag, actionsRepo: actionsRepo, ghAwRef: ghAwRef,
+		explicitBoolFlags: getExplicitDevelopmentBoolFlags(cmd),
+		engineOverride:    engineOverride, actionMode: actionMode, actionTag: actionTag, actionsRepo: actionsRepo, ghAwRef: ghAwRef,
 		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile,
 		environment: environment, dev: dev,
 		validate: validate, watch: watch, noEmit: noEmit, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
@@ -513,6 +515,16 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
 	}
+}
+
+func getExplicitDevelopmentBoolFlags(cmd *cobra.Command) map[string]bool {
+	flags := make(map[string]bool)
+	for _, name := range cli.DevelopmentRequiredBoolFlags() {
+		if cmd.Flags().Changed(name) {
+			flags[name], _ = cmd.Flags().GetBool(name)
+		}
+	}
+	return flags
 }
 
 func (o *compileCmdOptions) resolveGhAwRef(ctx context.Context) error {
@@ -537,7 +549,8 @@ func (o *compileCmdOptions) workflowDir() string {
 
 func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 	return cli.CompileConfig{
-		MarkdownFiles: args, Verbose: o.verbose, EngineOverride: o.engineOverride, ActionMode: o.actionMode, ActionTag: o.actionTag,
+		ExplicitBoolFlags: o.explicitBoolFlags,
+		MarkdownFiles:     args, Verbose: o.verbose, EngineOverride: o.engineOverride, ActionMode: o.actionMode, ActionTag: o.actionTag,
 		ActionsRepo: o.actionsRepo, Validate: o.validate, Watch: o.watch, WorkflowDir: o.workflowDir(),
 		NoEmit: o.noEmit, Purge: o.purge, TrialMode: o.trial, TrialLogicalRepoSlug: o.logicalRepo, Strict: o.strict,
 		RequireSelfHostedRunners: o.requireSelfHostedRunners,
@@ -552,6 +565,9 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 
 func runCompileCmd(cmd *cobra.Command, args []string) error {
 	opts := getCompileCmdOptions(cmd)
+	if err := cli.ValidateDevelopmentCompileFlags(opts.dev, opts.explicitBoolFlags); err != nil {
+		return err
+	}
 	if cmd.Flags().Changed("environment") && opts.environment == "" {
 		return errors.New("--environment requires a non-empty environment name")
 	}

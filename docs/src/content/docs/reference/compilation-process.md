@@ -253,7 +253,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 `--dev` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
 `--actionlint`, `--zizmor`, `--poutine`, `--runner-guard`, `--syft`, `--grype`,
 `--grant`, `--yamllint`, `--shellcheck`, and `--models`. These settings are
-forced even when individual flags or frontmatter disable them. Compiler warnings,
+forced regardless of frontmatter; explicitly disabling a required flag is rejected. Compiler warnings,
 including safe-update warnings, and scanner failures cause a nonzero exit status
 and invalid JSON validation results. Missing required tools block compilation
 rather than silently skipping checks. Model checking uses the observed active
@@ -283,6 +283,11 @@ remain in the job's applicable secret scope; an environment name is not secret
 isolation and does not automatically export secrets into process environment
 variables.
 
+Development mode also disables every job whose ID starts with `push_` and
+conclusion-job issue/comment reporting. Failure handling, local diagnostics,
+step summaries, and usage artifacts remain enabled. No new memory-tool fields
+are required; ordinary compilation preserves existing persistence behavior.
+
 `--dev` cannot be combined with `--no-emit`, `--watch`, `--approve`, or
 `--allow-action-refs`, because those options bypass required checks or the trusted
 safe-update baseline. It is distinct from `--action-mode dev`, does not change
@@ -290,33 +295,9 @@ action reference mode, and does not upload, push, dispatch, or run workflows.
 Generated files remain available for inspection after failed checks and must not
 be treated as approved artifacts.
 
-Diagnosing and patching means reading existing evidence, testing components,
-editing, and compiling without live runs. Debugging is the active
-edit/test/compile/review/upload-run/audit loop where execution is permitted.
-If starting a workflow returns `403 Forbidden`, stop the live loop, preserve the
-denial, and return to diagnosis/patching; do not retry unchanged or arrange a
-credential, API, manual-dispatch, or push-trigger workaround. Explicit no-dispatch
-contexts, including Copilot cloud, remain restricted. `--dev` can be used in
-either mode and grants neither run access nor approval.
-
-Codespaces can also encounter organization SAML authorization failures.
-`GH_TOKEN`, then `GITHUB_TOKEN`, take precedence over stored CLI credentials;
-being logged in does not prove that the active token is SSO-authorized.
-Classify the denial before proposing an authorized authentication repair.
-
-For an active debug loop, each live-test revision must pass development compilation
-and receive human validation of the source, generated lock, credentials,
-permissions, and bounds before upload. Bind any later Actions dispatch to the
-reviewed remote commit; a successful compile is not authorization to dispatch.
-An unknown dispatch result may mean a run already started: reconcile existing
-runs without redispatching. Moved refs or mismatched run SHAs invalidate the
-reviewed test claim. Required audit/log permission denial blocks further live
-iteration; unavailable evidence is not proof that the workflow failed.
-Repeat that review after each change, then use run logs, audits, and native
-`gh aw mcp inspect` after checking startup effects and isolated test bindings.
-Staging protects built-in safe outputs, not arbitrary scripts, custom jobs, or
-external MCP side effects; changed approval protections and remaining writes
-require explicit human validation.
+For diagnosis/patching versus active debugging, live-test review gates, and
+Codespaces/SAML triage, follow the
+[shared local-debugging strategy](https://github.com/github/gh-aw/blob/main/.github/aw/local-debug.md).
 
 ## Debugging Compilation
 

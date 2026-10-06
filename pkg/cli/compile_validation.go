@@ -272,6 +272,7 @@ func sanitizeValidationResults(results []ValidationResult) []ValidationResult {
 
 	return sliceutil.Map(results, func(result ValidationResult) ValidationResult {
 		return ValidationResult{
+			Scope:        result.Scope,
 			Workflow:     result.Workflow,
 			Valid:        result.Valid,
 			CompiledFile: result.CompiledFile,

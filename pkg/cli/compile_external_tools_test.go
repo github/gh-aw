@@ -4,10 +4,15 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleBatchToolErrorPreservesFatalFindingInNonStrictMode(t *testing.T) {
@@ -49,6 +54,14 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 
 	var calls []string
 	fakeActionlintErr := errors.New("fake actionlint finding")
+	failAll := false
+	scannerResult := func(tool string) error {
+		calls = append(calls, tool)
+		if failAll {
+			return fmt.Errorf("fake %s finding", tool)
+		}
+		return nil
+	}
 
 	origActionlint := runBatchActionlintOnFiles
 	origZizmor := runBatchZizmorOnFiles
@@ -76,39 +89,34 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	// they all still ran, in order, after the failure.
 	runBatchActionlintOnFiles = func(_ context.Context, _ []string, _ bool, _ bool) error {
 		calls = append(calls, "actionlint")
+		if failAll {
+			return errors.Join(fakeActionlintErr, errors.New("second actionlint finding"))
+		}
 		return fakeActionlintErr
 	}
 	runBatchZizmorOnFiles = func(_ []string, _ bool, _ bool) error {
-		calls = append(calls, "zizmor")
-		return nil
+		return scannerResult("zizmor")
 	}
 	runBatchPoutineOnDirectory = func(_ string, _ bool, _ bool) error {
-		calls = append(calls, "poutine")
-		return nil
+		return scannerResult("poutine")
 	}
 	runBatchRunnerGuardOnDirectory = func(_ string, _ bool, _ bool) error {
-		calls = append(calls, "runner-guard")
-		return nil
+		return scannerResult("runner-guard")
 	}
 	runBatchSyftOnLockFiles = func(_ []string, _ bool, _ bool) error {
-		calls = append(calls, "syft")
-		return nil
+		return scannerResult("syft")
 	}
 	runBatchGrypeOnLockFiles = func(_ []string, _ bool, _ bool) error {
-		calls = append(calls, "grype")
-		return nil
+		return scannerResult("grype")
 	}
 	runBatchGrantOnLockFiles = func(_ []string, _ bool, _ bool) error {
-		calls = append(calls, "grant")
-		return nil
+		return scannerResult("grant")
 	}
 	runBatchYamllintOnFiles = func(_ []string, _ bool, _ bool) error {
-		calls = append(calls, "yamllint")
-		return nil
+		return scannerResult("yamllint")
 	}
 	runBatchShellcheckOnLockFilesAndResources = func(_ context.Context, _ []string, _ []workflow.ShellScriptResource, _ bool, _ bool) error {
-		calls = append(calls, "shellcheck")
-		return nil
+		return scannerResult("shellcheck")
 	}
 
 	ctx := context.Background()
@@ -126,7 +134,7 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	}
 
 	opts := batchToolsOptions{
-		workflowDir:            t.TempDir(),
+		workflowDir:            ".",
 		lockFilesForActionlint: []string{"a.lock.yml"},
 		lockFilesForZizmor:     []string{"a.lock.yml"},
 		lockFilesForDirTools:   []string{"a.lock.yml"},
@@ -158,4 +166,57 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 			t.Fatalf("expected scanner invocation order %v, got %v (mismatch at index %d: want %q, got %q)", wantOrder, calls, i, want, calls[i])
 		}
 	}
+
+	calls = nil
+	failAll = true
+	strictGrantErr, batchToolErr = runBatchExternalTools(ctx, config, opts, stats, &validationResults)
+	require.ErrorContains(t, strictGrantErr, "fake grant finding")
+	require.ErrorIs(t, batchToolErr, fakeActionlintErr)
+	assert.Equal(t, wantOrder, calls)
+	require.Len(t, validationResults, 1, "ordinary compilation retains its existing Grant result only")
+	assert.Empty(t, validationResults[0].Scope)
+	assert.Equal(t, "grant", validationResults[0].Workflow)
+	assert.Equal(t, 1, stats.Errors)
+
+	calls = nil
+	config.Dev = true
+	config.JSONOutput = true
+	stats = &CompilationStats{Total: 2, Succeeded: 2}
+	validationResults = []ValidationResult{
+		{Workflow: "a.md", Valid: true},
+		{Workflow: "b.md", Valid: true},
+	}
+	strictGrantErr, batchToolErr = runBatchExternalTools(ctx, config, opts, stats, &validationResults)
+	require.ErrorContains(t, strictGrantErr, "fake grant finding")
+	require.ErrorIs(t, batchToolErr, fakeActionlintErr, "regular first-error behavior must remain compatible")
+	assert.Equal(t, wantOrder, calls)
+	err := enforceDevelopmentDiagnostics(config, workflow.NewCompiler(), stats, &validationResults, strictGrantErr, batchToolErr)
+	require.Error(t, err)
+	require.Len(t, validationResults, 11, "two workflows and one batch result per scanner")
+	assert.True(t, validationResults[0].Valid)
+	assert.True(t, validationResults[1].Valid)
+	assert.Empty(t, validationResults[0].Errors)
+	assert.Empty(t, validationResults[1].Errors)
+	assert.Equal(t, 2, stats.Succeeded)
+	assert.Equal(t, 10, stats.Errors, "all findings, including the joined actionlint error, must be counted exactly once")
+	output, err := formatValidationOutput(validationResults)
+	require.NoError(t, err)
+	var decoded []ValidationResult
+	require.NoError(t, json.Unmarshal([]byte(output), &decoded))
+	for _, tool := range wantOrder {
+		index := slices.IndexFunc(decoded, func(result ValidationResult) bool { return result.Workflow == tool })
+		require.NotEqual(t, -1, index, "missing scanner: %s", tool)
+		result := decoded[index]
+		assert.Equal(t, "batch", result.Scope)
+		assert.False(t, result.Valid)
+		require.NotEmpty(t, result.Errors)
+		assert.Equal(t, tool+"_error", result.Errors[0].Type)
+		message := "fake " + tool + " finding"
+		if tool == "poutine" || tool == "runner-guard" {
+			message = tool + " failed: " + message
+		}
+		assert.Equal(t, message, result.Errors[0].Message)
+	}
+	require.Len(t, decoded[2].Errors, 2)
+	assert.Equal(t, "second actionlint finding", decoded[2].Errors[1].Message)
 }

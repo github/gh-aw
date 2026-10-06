@@ -3,8 +3,11 @@
 package main
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/cli"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +17,7 @@ func TestCompileCommandShortFlags(t *testing.T) {
 	if forceFlag == nil {
 		t.Fatal("expected --force flag on compile command")
 	}
+
 	if forceFlag.Shorthand != "f" {
 		t.Fatalf("expected --force shorthand to be -f, got -%s", forceFlag.Shorthand)
 	}
@@ -40,6 +44,36 @@ func TestCompileCommandShortFlags(t *testing.T) {
 	}
 	if forceRefreshContainerPinsFlag.DefValue != "false" {
 		t.Fatalf("expected --force-refresh-container-pins default to be false, got %s", forceRefreshContainerPinsFlag.DefValue)
+	}
+}
+
+func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
+	t.Parallel()
+	for _, name := range cli.DevelopmentRequiredBoolFlags() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cmd := &cobra.Command{}
+			cmd.SetContext(context.Background())
+			cmd.Flags().Bool("dev", false, "")
+			cmd.Flags().Bool(name, false, "")
+			if err := cmd.ParseFlags([]string{"--dev", "--" + name + "=false"}); err != nil {
+				t.Fatal(err)
+			}
+			opts := getCompileCmdOptions(cmd)
+			if enabled, supplied := opts.toCompileConfig(nil).ExplicitBoolFlags[name]; !supplied || enabled {
+				t.Fatalf("explicit --%s=false was not propagated", name)
+			}
+			if err := runCompileCmd(cmd, nil); err == nil || !strings.Contains(err.Error(), "--"+name+"=false") || !strings.Contains(err.Error(), "remove") {
+				t.Fatalf("expected actionable rejection before compilation, got %v", err)
+			}
+			if err := cmd.Flags().Set(name, "true"); err != nil {
+				t.Fatal(err)
+			}
+			opts = getCompileCmdOptions(cmd)
+			if err := cli.ValidateDevelopmentCompileFlags(opts.dev, opts.explicitBoolFlags); err != nil {
+				t.Fatalf("explicitly enabling required check should be accepted: %v", err)
+			}
+		})
 	}
 }
 

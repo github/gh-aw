@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -64,9 +65,12 @@ func TestDevelopmentCompilerFlags(t *testing.T) {
 	state := reflect.ValueOf(compiler).Elem()
 	assert.True(t, state.FieldByName("strictMode").Bool())
 	assert.True(t, state.FieldByName("forceStaged").Bool())
+	assert.True(t, state.FieldByName("developmentMode").Bool())
 	assert.True(t, state.FieldByName("requireDocker").Bool())
 	assert.False(t, state.FieldByName("skipValidation").Bool())
 	assert.Equal(t, "debug", state.FieldByName("environmentOverride").String())
+	regular := createAndConfigureCompiler(CompileConfig{})
+	assert.False(t, reflect.ValueOf(regular).Elem().FieldByName("developmentMode").Bool(), "regular compilation must not disable persistence jobs")
 }
 
 func TestDevelopmentModelChecksRequireInventoryWhenConfigured(t *testing.T) {
@@ -124,11 +128,75 @@ func TestEnforceDevelopmentDiagnostics(t *testing.T) {
 				return
 			}
 			require.ErrorContains(t, err, test.message)
-			assert.False(t, results[0].Valid, "JSON output must not claim successful validation")
-			require.Len(t, results[0].Errors, 1)
-			assert.Equal(t, "development_validation", results[0].Errors[0].Type)
+			if test.name == "structured warnings" {
+				assert.False(t, results[0].Valid)
+				require.Len(t, results[0].Errors, 1)
+				assert.Equal(t, "development_validation", results[0].Errors[0].Type)
+				assert.Zero(t, stats.Succeeded)
+			} else {
+				assert.True(t, results[0].Valid, "unscoped failures must not blame a workflow")
+				require.Len(t, results, 2)
+				assert.Equal(t, "batch", results[1].Scope)
+				assert.False(t, results[1].Valid, "JSON must report the batch failure")
+				require.Len(t, results[1].Errors, 1)
+				assert.Contains(t, results[1].Errors[0].Message, test.message)
+				assert.Equal(t, 1, stats.Succeeded)
+			}
 			assert.Equal(t, 1, stats.Errors)
-			assert.Zero(t, stats.Succeeded)
 		})
 	}
+}
+
+func TestDevelopmentExplicitlyDisabledChecks(t *testing.T) {
+	t.Parallel()
+	for _, name := range DevelopmentRequiredBoolFlags() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			config := CompileConfig{Dev: true, ExplicitBoolFlags: map[string]bool{name: false}}
+			require.ErrorContains(t, validateCompileConfig(config), "--"+name+"=false")
+			require.ErrorContains(t, validateCompileConfig(applyDevelopmentCompileMode(config)), "--"+name+"=false")
+			_, err := CompileWorkflows(context.Background(), config)
+			require.ErrorContains(t, err, "--"+name+"=false")
+			config.Dev = false
+			require.NoError(t, validateCompileConfig(config))
+			config.Dev = true
+			config.ExplicitBoolFlags[name] = true
+			require.NoError(t, validateCompileConfig(config))
+		})
+	}
+}
+
+func TestDevelopmentDiagnosticsKeepWorkflowWarningsLocal(t *testing.T) {
+	t.Parallel()
+	compiler := workflow.NewCompiler()
+	compiler.IncrementWarningCount()
+	compiler.AddSafeUpdateWarning("batch safe-update warning")
+	stats := &CompilationStats{Total: 2, Succeeded: 2, Warnings: 1}
+	results := []ValidationResult{
+		{Workflow: "a.md", Valid: true, Warnings: []ValidationIssue{{Type: "model", Message: "A has an unknown model", File: "a.md", Line: 3}}},
+		{Workflow: "b.md", Valid: true, Errors: []ValidationIssue{}, Warnings: []ValidationIssue{}},
+	}
+	err := enforceDevelopmentDiagnostics(CompileConfig{Dev: true}, compiler, stats, &results)
+	require.ErrorContains(t, err, "A has an unknown model")
+	require.ErrorContains(t, err, "batch safe-update warning")
+	require.Len(t, results, 3)
+	assert.False(t, results[0].Valid)
+	require.Len(t, results[0].Errors, 1)
+	assert.Equal(t, "a.md", results[0].Errors[0].File)
+	assert.Equal(t, 3, results[0].Errors[0].Line)
+	assert.True(t, results[1].Valid)
+	assert.Empty(t, results[1].Errors)
+	assert.Empty(t, results[1].Warnings)
+	assert.Equal(t, "batch", results[2].Scope)
+	assert.Equal(t, "compiler", results[2].Workflow)
+	assert.False(t, results[2].Valid)
+	require.Len(t, results[2].Errors, 2)
+	assert.Equal(t, 1, stats.Succeeded)
+	assert.Equal(t, 3, stats.Errors)
+
+	output, err := formatValidationOutput(results)
+	require.NoError(t, err)
+	var decoded []ValidationResult
+	require.NoError(t, json.Unmarshal([]byte(output), &decoded))
+	assert.Equal(t, results, decoded)
 }

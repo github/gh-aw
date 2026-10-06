@@ -1,18 +1,20 @@
 # ADR-66270: Support Local-First Workflow Debugging with Compile-Time `--dev` and `--environment`
 
-**Date**: 2026-02-13
-**Status**: Draft
+**Date**: 2026-10-06
+**Status**: Proposed
 **Deciders**: gh-aw maintainers (pending review; PR author: pelikhan)
 
 ---
 
 ### Context
 
-Debugging an agentic workflow in `gh-aw` has historically meant dispatching it on GitHub Actions, because only the hosted run exercises the real lock file, approvals, secrets, and runner behavior. That loop is slow, requires repository dispatch permissions that Copilot cloud agents explicitly do not have, and tempts authors into running unreviewed workflows against production environments to see what breaks. At the same time, `gh aw compile` exposed its strictness, staging, and scanner checks as a scattered set of independent flags, so "compile the way CI compiles" was an undocumented incantation that was easy to get wrong or silently downgrade (for example, through the compile MCP wrapper). PR #66270 touches 30 files across `cmd/`, `pkg/cli`, `pkg/workflow`, the instruction routers under `.github/aw/`, and the reference docs, adding ~542 lines in business-logic directories. The constraint is that any local-reproduction story must be honest: it cannot pretend to reproduce GitHub Actions credentials, approval gates, or runner semantics.
+Only a hosted run exercises the real lock file, approvals, secrets, and runner behavior together. That loop requires repository dispatch permission and can expose production resources to unreviewed changes. Local component reproduction provides useful evidence without claiming hosted-run fidelity. Meanwhile, `gh aw compile` exposes strictness, staging, and scanner checks as independent flags that callers can accidentally omit. The constraint is that local debugging must not pretend to reproduce GitHub Actions credentials, approval gates, or runner semantics.
 
 ### Decision
 
-We will make local compilation the primary workflow-debugging surface, backed by two new compile-time controls and a single shared instruction router. First, `gh aw compile --dev` becomes a compile-only "strict preflight" mode: `applyDevelopmentCompileMode` turns on strict validation, staging, image/model/analysis checks, and every scanner at once, `validateDevelopmentCompileMode` rejects bypass options (`--no-emit`, `--watch`, `--approve`, `--allow-action-refs`), and `enforceDevelopmentDiagnostics` promotes warnings to failures and preserves them in JSON diagnostics so the MCP wrapper cannot silently weaken the requested checks. Second, `gh aw compile --environment NAME` rewrites the `environment:` field on every generated job, including approval jobs, with a literal, validated, `strconv.Quote`-escaped name; reusable-workflow caller jobs (`job.Uses != ""`) fail with an explicit error because GitHub Actions forbids an environment on those jobs. Third, the installed and embedded debugging instructions are unified behind `.github/aw/local-debug.md`, which separates local diagnosis/patching from bounded, human-validated edit/run/audit loops. The primary driver is safety-through-explicitness: make the strict local loop one flag, and make live verification an explicitly reviewed, environment-scoped act rather than an accidental one.
+Use local compilation and bounded component reproduction as the first debugging steps. `gh aw compile --dev` enables strict validation, staging, image/model/analysis checks, and all scanners, rejecting bypass options and explicitly disabled required flags. Warnings become failures; workflow-local diagnostics remain attached to their workflow, while batch diagnostics are reported separately. Development compilation disables `push_` jobs and conclusion issue/comment reporting without removing diagnostic handlers, summaries, or usage artifacts. It adds no memory-tool staging fields.
+
+`gh aw compile --environment NAME` replaces the environment on every generated job, including approval jobs, with a validated literal name. Reusable-workflow caller jobs fail explicitly because GitHub Actions forbids an environment on them. Installed and embedded debugging instructions share `.github/aw/local-debug.md`, which separates local diagnosis/patching from bounded, human-validated live debugging. Neither flag authorizes workflow execution.
 
 ### Alternatives Considered
 
@@ -22,18 +24,19 @@ The strict combination (`--strict --staged --validate --validate-images --zizmor
 
 #### Alternative 2: Build a local runner/emulator for agentic workflows (act-style)
 
-Instead of improving compilation, we could have invested in locally executing the generated lock file, so authors see real job behavior without GitHub. It was considered because it is the most faithful reproduction and would cover runtime bugs that compilation cannot see. It was rejected because the fidelity would be a lie in exactly the places that matter: OIDC and `GITHUB_TOKEN` minting, environment approval gates, organization/enterprise shared secrets, and runner images cannot be reproduced locally. A partial emulator would encourage authors to trust a result that does not transfer, which is the failure mode this PR is trying to eliminate.
+Locally executing the generated lock file could exercise runtime behavior that compilation cannot see. This approach was excluded from this design: partial emulation does not establish equivalence for hosted token minting, environment approvals, shared secrets, or runner behavior. Prefer native component execution with explicit fixtures and mocks, and disclose the remaining hosted-only boundaries.
 
 #### Alternative 3: Model the environment override in workflow frontmatter instead of as a CLI flag
 
-The target environment could have been a field in the workflow markdown, compiled like any other setting. It was rejected because the override is a *debugging-time* concern, not a property of the workflow: putting it in frontmatter invites it into committed lock files, where a stale `environment: staging` would silently change production approval routing. A CLI flag keeps the override at the compile invocation that requested it and keeps the checked-in source unchanged.
+The override is a debugging-time concern rather than a persistent source setting. A CLI flag leaves workflow markdown unchanged, but it still writes the override into generated lock files. Those files can be committed; authors must review generated changes and recompile without the override before publishing production configuration.
 
 ### Consequences
 
 #### Positive
 
-- One flag (`--dev`) reproduces the full strict check set locally, so authors and agents get CI-equivalent diagnostics without dispatching a run — which also respects the Copilot-cloud no-dispatch rule.
-- `--dev` is tamper-resistant: bypass options are rejected and warnings are preserved in JSON diagnostics, so an MCP caller cannot downgrade the checks it claims to have run.
+- One flag (`--dev`) requests the complete development check set without dispatch. Local diagnostics do not replace hosted CI or runtime verification.
+- Bypass options and explicitly disabled required checks are rejected; JSON diagnostics preserve failures without treating another workflow's warning as a local defect.
+- Push jobs and conclusion issue/comment reporting are disabled for development testing; diagnostic evidence remains available.
 - `--environment` makes live verification explicitly scoped and reviewable, including on approval jobs, instead of relying on authors remembering to hand-edit lock files.
 - The reusable-workflow caller case fails loudly with actionable guidance rather than emitting a lock file that GitHub Actions would reject at run time.
 - Unifying installed and embedded routers on `local-debug.md` removes drift between the two instruction copies.
@@ -43,7 +46,7 @@ The target environment could have been a field in the workflow markdown, compile
 - Two new public CLI/MCP surfaces must be kept working and documented forever; `--dev` in particular is a bundle whose membership will need revisiting every time a new check is added.
 - `--dev` is slower and noisier than a plain compile, so authors may avoid it, and warning-as-error will fail on pre-existing findings unrelated to the change in flight (this PR already reports the progress gate blocked by pre-existing custom-linter findings).
 - `--environment` does not isolate secrets: authorized repository/organization/enterprise shared secrets remain in job scope, so the flag can create a false sense of containment if read as sandboxing.
-- Staging does not neutralize custom scripts or MCP side effects, so a `--dev` compile is still not proof that a workflow is safe to run.
+- Staging and disabled push jobs do not neutralize other custom scripts, cache saves, or MCP side effects, so a `--dev` compile is not proof that a workflow is safe to run.
 - Replacing approval-job environments is a sharp edge that requires human review; misuse could route an approval to a weaker gate.
 
 #### Neutral
@@ -55,4 +58,4 @@ The target environment could have been a field in the workflow markdown, compile
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Proposed decision; acceptance remains with the maintainers.*

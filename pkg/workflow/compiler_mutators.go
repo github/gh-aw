@@ -82,6 +82,11 @@ func (c *Compiler) SetForceStaged(force bool) {
 	c.forceStaged = force
 }
 
+// SetDevelopmentMode disables push jobs and conclusion issue/comment writes for local testing.
+func (c *Compiler) SetDevelopmentMode(enabled bool) {
+	c.developmentMode = enabled
+}
+
 // SetEnvironmentOverride replaces the environment on every generated job.
 // An empty name disables the override.
 func (c *Compiler) SetEnvironmentOverride(name string) {

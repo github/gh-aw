@@ -142,6 +142,7 @@ func configureCompilerFlags(compiler *workflow.Compiler, config CompileConfig) {
 	compiler.SetStrictMode(config.Strict)
 	compiler.SetAllowActionRefs(config.AllowActionRefs)
 	compiler.SetForceStaged(config.Staged)
+	compiler.SetDevelopmentMode(config.Dev)
 	compiler.SetEnvironmentOverride(config.EnvironmentOverride)
 	compiler.SetRequireSelfHostedRunners(config.RequireSelfHostedRunners)
 

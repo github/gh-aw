@@ -8,6 +8,26 @@ import (
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
+// DevelopmentRequiredBoolFlags lists checks that development compilation cannot disable.
+func DevelopmentRequiredBoolFlags() []string {
+	return []string{
+		"strict", "staged", "validate", "validate-images", "actionlint", "zizmor",
+		"poutine", "runner-guard", "syft", "grype", "grant", "yamllint", "shellcheck", "models",
+	}
+}
+
+// ValidateDevelopmentCompileFlags rejects explicit opt-outs while allowing omitted defaults.
+func ValidateDevelopmentCompileFlags(dev bool, flags map[string]bool) error {
+	if dev {
+		for _, name := range DevelopmentRequiredBoolFlags() {
+			if enabled, supplied := flags[name]; supplied && !enabled {
+				return fmt.Errorf("--dev cannot be combined with --%s=false: development testing requires this check; remove --%s=false or omit --dev", name, name)
+			}
+		}
+	}
+	return nil
+}
+
 func applyDevelopmentCompileMode(config CompileConfig) CompileConfig {
 	if !config.Dev {
 		return config
@@ -33,6 +53,9 @@ func validateDevelopmentCompileMode(config CompileConfig) error {
 	if !config.Dev {
 		return nil
 	}
+	if err := ValidateDevelopmentCompileFlags(config.Dev, config.ExplicitBoolFlags); err != nil {
+		return err
+	}
 	for _, option := range []struct {
 		enabled bool
 		name    string
@@ -53,42 +76,88 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 	if !config.Dev {
 		return nil
 	}
-	diagnostics := append([]string{}, compiler.GetSafeUpdateWarnings()...)
-	diagnostics = append(diagnostics, compiler.GetScheduleWarnings()...)
-	if stats.Warnings > 0 || compiler.GetWarningCount() > 0 {
-		diagnostics = append(diagnostics, "compiler reported warnings; review the complete compiler diagnostics")
+	appendDevelopmentCompilerDiagnostics(compiler, stats, results)
+	for _, err := range scanErrors {
+		for _, issue := range appendValidationErrors(nil, "scanner_error", err) {
+			if !hasDevelopmentBatchDiagnostic(*results, issue.Message) {
+				appendDevelopmentBatchDiagnostics("scanners", []ValidationIssue{issue}, stats, results)
+			}
+		}
 	}
-	for _, result := range *results {
+
+	var diagnostics []string
+	for i := range *results {
+		result := &(*results)[i]
+		if result.Scope == "batch" {
+			for _, issue := range result.Errors {
+				diagnostics = append(diagnostics, issue.Message)
+			}
+			continue
+		}
 		for _, warning := range result.Warnings {
 			diagnostics = append(diagnostics, warning.Message)
 		}
-	}
-	for _, err := range scanErrors {
-		if err != nil {
-			diagnostics = append(diagnostics, err.Error())
-		}
+		enforceDevelopmentWorkflowWarnings(result, stats)
 	}
 	if len(diagnostics) == 0 {
 		return nil
 	}
+	return errors.New("development testing checks failed; resolve all warnings and scanner failures before uploading or dispatching a live test:\n" + strings.Join(diagnostics, "\n"))
+}
 
-	err := errors.New("development testing checks failed; resolve all warnings and scanner failures before uploading or dispatching a live test:\n" + strings.Join(diagnostics, "\n"))
-	entries := *results
-	for i := range entries {
-		result := &entries[i]
-		if !result.Valid {
-			continue
-		}
-		result.Valid = false
-		result.Errors = append(result.Errors, ValidationIssue{
-			Type:    "development_validation",
-			Message: err.Error(),
-		})
-		stats.Errors++
-		if stats.Succeeded > 0 {
-			stats.Succeeded--
-		}
-		trackWorkflowFailure(stats, result.Workflow, 1, []string{err.Error()})
+func appendDevelopmentCompilerDiagnostics(compiler *workflow.Compiler, stats *CompilationStats, results *[]ValidationResult) {
+	var compilerDiagnostics []ValidationIssue
+	for _, message := range compiler.GetSafeUpdateWarnings() {
+		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "safe_update_warning", Message: message})
 	}
-	return err
+	for _, message := range compiler.GetScheduleWarnings() {
+		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{Type: "schedule_warning", Message: message})
+	}
+	if stats.Warnings > 0 || compiler.GetWarningCount() > 0 {
+		compilerDiagnostics = append(compilerDiagnostics, ValidationIssue{
+			Type: "compiler_warning", Message: "compiler reported warnings; review the complete compiler diagnostics",
+		})
+	}
+	if len(compilerDiagnostics) > 0 {
+		appendDevelopmentBatchDiagnostics("compiler", compilerDiagnostics, stats, results)
+	}
+}
+
+func hasDevelopmentBatchDiagnostic(results []ValidationResult, message string) bool {
+	for _, result := range results {
+		if result.Scope == "batch" {
+			for _, issue := range result.Errors {
+				if issue.Message == message {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func enforceDevelopmentWorkflowWarnings(result *ValidationResult, stats *CompilationStats) {
+	if !result.Valid || len(result.Warnings) == 0 {
+		return
+	}
+	result.Valid = false
+	var messages []string
+	for _, warning := range result.Warnings {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Type: "development_validation", Message: warning.Message, Line: warning.Line, File: warning.File,
+		})
+		messages = append(messages, warning.Message)
+	}
+	stats.Errors += len(messages)
+	if stats.Succeeded > 0 {
+		stats.Succeeded--
+	}
+	trackWorkflowFailure(stats, result.Workflow, len(messages), messages)
+}
+
+func appendDevelopmentBatchDiagnostics(source string, issues []ValidationIssue, stats *CompilationStats, results *[]ValidationResult) {
+	*results = append(*results, ValidationResult{
+		Scope: "batch", Workflow: source, Valid: false, Errors: issues, Warnings: []ValidationIssue{},
+	})
+	stats.Errors += len(issues)
 }
