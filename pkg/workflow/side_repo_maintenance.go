@@ -269,7 +269,10 @@ func generateSideRepoMaintenanceWorkflow(
 		return fmt.Errorf("failed to finalize side-repo maintenance workflow YAML: %w", err)
 	}
 	if opts.repoConfig != nil {
-		content = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, nil)
+		content, err = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, nil, opts.resolver)
+		if err != nil {
+			return err
+		}
 	}
 	maintenanceLog.Printf("Writing side-repo maintenance workflow to %s", renderCtx.outPath)
 	if err := os.WriteFile(renderCtx.outPath, []byte(content), constants.FilePermPublic); err != nil {

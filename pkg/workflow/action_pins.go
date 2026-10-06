@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -14,7 +15,7 @@ import (
 )
 
 var actionPinsLog = logger.New("workflow:action_pins")
-var pinnedUsesLine = regexp.MustCompile(`(?m)^( {8}uses: +)(actions/[A-Za-z0-9._/-]+)@([a-fA-F0-9]{40})([ \t]*(?:#[ \t]*([^\r\n]*))?)$`)
+var pinnedUsesLine = regexp.MustCompile(`(?m)^(?: {8}uses: | {6}- uses: )[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[a-fA-F0-9]{40}(?:[ \t]*#[ \t]*[^\r\n]*)?$`)
 
 // Type aliases — callers within pkg/workflow use these names directly.
 
@@ -128,7 +129,7 @@ func (c *Compiler) getActionPin(repo string) string {
 			if resolver != nil {
 				resolver.MarkCacheKeyAsUsed(cacheKey)
 			}
-			return actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version)
+			return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version))
 		}
 	}
 
@@ -145,9 +146,12 @@ func (c *Compiler) mapGeneratedActionPin(repo, pin string) string {
 	version := strings.TrimSpace(strings.TrimPrefix(pin, repo+"@"))
 	_, version, _ = strings.Cut(version, " # ")
 	ctx := &actionpins.PinContext{
-		Mappings:       c.getActionPinMappings(),
-		PrefixMappings: c.getActionPinPrefixes(),
-		Warnings:       c.actionPinWarnings,
+		Mappings:          c.getActionPinMappings(),
+		Warnings:          c.actionPinWarnings,
+		MarkExactMappings: true,
+	}
+	if resolver := c.GetSharedActionResolver(); resolver != nil {
+		ctx.Resolver = resolver
 	}
 	if mapped, ok := ctx.Mappings[actionpins.FormatCacheKey(repo, version)]; ok {
 		if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
@@ -156,33 +160,49 @@ func (c *Compiler) mapGeneratedActionPin(repo, pin string) string {
 		actionPinsLog.Printf("Unable to resolve mapped action %s to %s", repo, mapped)
 		return pin
 	}
-	return actionpins.ApplyResolvedActionPinPrefix(repo, pin, ctx)
+	return pin
 }
 
 // mapPinnedUsesInYAML covers standalone generators which build action steps
 // without a Compiler or WorkflowData. Only resolved uses references are changed.
-func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, warnings map[string]bool) string {
+func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, warnings map[string]bool, resolver SHAResolver) (string, error) {
 	if len(mappings) == 0 && len(prefixes) == 0 {
-		return content
+		return content, nil
 	}
 	if warnings == nil {
 		warnings = make(map[string]bool)
 	}
-	ctx := &actionpins.PinContext{Mappings: mappings, PrefixMappings: prefixes, Warnings: warnings}
-	return pinnedUsesLine.ReplaceAllStringFunc(content, func(line string) string {
-		const indentation = "        uses: "
-		reference := strings.TrimPrefix(line, indentation)
+	ctx := &actionpins.PinContext{Mappings: mappings, PrefixMappings: prefixes, Warnings: warnings, Resolver: resolver}
+	var mappingErr error
+	rewritten := pinnedUsesLine.ReplaceAllStringFunc(content, func(line string) string {
+		if mappingErr != nil {
+			return line
+		}
+		before, reference, _ := strings.Cut(line, "uses: ")
+		indentation := before + "uses: "
 		repo, suffix, _ := strings.Cut(reference, "@")
 		_, version, _ := strings.Cut(suffix, " # ")
 		version = strings.TrimSpace(version)
+		if strings.HasSuffix(reference, " # [gh-aw-exact-pin]") {
+			return indentation + strings.TrimSuffix(reference, " # [gh-aw-exact-pin]")
+		}
+		if strings.HasSuffix(reference, " [gh-aw-exact-pin]") {
+			return indentation + strings.TrimSuffix(reference, " [gh-aw-exact-pin]")
+		}
 		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
-			if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
+			ref, err := actionpins.ResolveActionPin(repo, version, ctx)
+			if err == nil && ref != "" {
 				return indentation + ref
 			}
+			if err == nil {
+				err = errors.New("mapped target has no resolvable pin")
+			}
+			mappingErr = fmt.Errorf("unable to resolve action pin mapping for %s@%s: %w", repo, version, err)
 			return line
 		}
 		return indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
 	})
+	return rewritten, mappingErr
 }
 
 // getCachedActionPinFromResolver returns the pinned action reference for repo,

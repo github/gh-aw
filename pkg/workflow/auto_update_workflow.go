@@ -129,7 +129,10 @@ func GenerateAutoUpdateWorkflow(opts GenerateAutoUpdateWorkflowOptions) error { 
 		return fmt.Errorf("failed to finalize auto-update workflow YAML: %w", err)
 	}
 	if opts.RepoConfig != nil {
-		content = mapPinnedUsesInYAML(content, opts.RepoConfig.ActionPins, opts.RepoConfig.ActionPinPrefixes, nil)
+		content, err = mapPinnedUsesInYAML(content, opts.RepoConfig.ActionPins, opts.RepoConfig.ActionPinPrefixes, nil, opts.Resolver)
+		if err != nil {
+			return err
+		}
 	}
 
 	autoUpdateWorkflowLog.Printf("Writing auto-update workflow to %s", outputFile)

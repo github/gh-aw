@@ -2007,12 +2007,16 @@ func TestMapPinnedUsesInYAML(t *testing.T) {
 	input := "      - name: Checkout\n        uses: " + checkout + "\n" +
 		"      - name: Upload\n        uses: " + upload + "\n" +
 		"        run: |\n          uses: " + checkout + "\n"
-	mapped := mapPinnedUsesInYAML(input,
+	mapped, err := mapPinnedUsesInYAML(input,
 		map[string]string{"actions/checkout@" + version: "internal/checkout@" + sha},
-		map[string]string{"actions/": "mirror/actions-"}, nil)
+		map[string]string{"actions/": "mirror/actions-"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(mapped, "\n        uses: actions/") {
 		t.Fatalf("unmapped action remains in generated steps:\n%s", mapped)
 	}
+
 	if !strings.Contains(mapped, "        uses: internal/checkout@"+sha) {
 		t.Fatalf("exact mapping should take precedence:\n%s", mapped)
 	}
@@ -2021,5 +2025,56 @@ func TestMapPinnedUsesInYAML(t *testing.T) {
 	}
 	if !strings.Contains(mapped, "          uses: "+checkout) {
 		t.Fatalf("run script must not be changed:\n%s", mapped)
+	}
+}
+
+func TestMapPinnedUsesPreservesExactMappingWithinPrefix(t *testing.T) {
+	checkout := getActionPin("actions/checkout")
+	node := getActionPin("actions/setup-node")
+	nodeSHA, _, _ := strings.Cut(strings.TrimPrefix(node, "actions/setup-node@"), " ")
+	checkoutVersion := latestActionVersionForRepo(t, "actions/checkout")
+	mappings := map[string]string{"actions/checkout@" + checkoutVersion: "actions/setup-node@" + nodeSHA}
+	compiler := NewCompiler()
+	compiler.repoConfig = &RepoConfig{ActionPins: mappings}
+	compiler.repoConfigLoaded = true
+	exact := compiler.mapGeneratedActionPin("actions/checkout", checkout)
+	content := "      - uses: " + exact + "\n        uses: " + node + "\n" +
+		"        uses: " + getActionPin("docker/setup-buildx-action") + "\n"
+	mapped, err := mapPinnedUsesInYAML(content, mappings,
+		map[string]string{"actions/": "mirror/actions-", "docker/": "mirror/docker-"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(mapped, "uses: mirror/docker-setup-buildx-action@") {
+		t.Fatalf("docker action was not redirected: %s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: mirror/actions-setup-node@") {
+		t.Fatalf("unrelated setup-node step should use the prefix: %s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: actions/setup-node@"+nodeSHA) {
+		t.Fatalf("exact target missing: %s", mapped)
+	}
+	if strings.Contains(mapped, "[gh-aw-exact-pin]") {
+		t.Fatalf("internal exact mapping marker leaked into workflow: %s", mapped)
+	}
+}
+
+func TestMapPinnedUsesResolvesMirrorTag(t *testing.T) {
+	checkout := getActionPin("actions/checkout")
+	version := latestActionVersionForRepo(t, "actions/checkout")
+	input := "        uses: " + checkout + "\n"
+	mappings := map[string]string{"actions/checkout@" + version: "internal/checkout@v4"}
+	if _, err := mapPinnedUsesInYAML(input, mappings, nil, nil, nil); err == nil {
+		t.Fatal("unresolvable mirror tag must not leave an unmapped public action")
+	}
+	cache := NewActionCache(t.TempDir())
+	sha := strings.Repeat("a", 40)
+	cache.Set("internal/checkout", "v4", sha)
+	output, err := mapPinnedUsesInYAML(input, mappings, nil, nil, NewActionResolver(cache))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "uses: internal/checkout@"+sha) {
+		t.Fatalf("mirror tag was not resolved through the action cache: %s", output)
 	}
 }

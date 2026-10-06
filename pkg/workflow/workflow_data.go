@@ -221,6 +221,7 @@ type WorkflowData struct {
 	DefaultAiCreditsPricing        *AiCreditsPricingConfig         // fallback per-token pricing from frontmatter models.default-ai-credits-pricing; used by AWF API proxy for unrecognized models
 	ActionPinMappings              map[string]string               // action-pin redirect table from aw.json action_pins: maps "owner/repo@version" → "owner/repo@version"
 	ActionPinPrefixes              map[string]string               // repository-prefix redirects from aw.json action_pin_prefixes
+	MarkExactActionMappings        bool                            // mark exact-mapped YAML references until final prefix substitution
 	ActionPinSourceVersions        map[string]string               // inline labels for frontmatter steps already pinned by SHA
 	ContainerPinMappings           map[string]string               // container-pin redirect table from aw.json container_pins: maps source image → replacement image
 	GHES                           bool                            // select action versions compatible with GitHub Enterprise Server
@@ -253,7 +254,7 @@ func (d *WorkflowData) PinContext() *actionpins.PinContext {
 		GHES:              d.GHES,
 		Warnings:          d.ActionPinWarnings,
 		Mappings:          d.ActionPinMappings,
-		PrefixMappings:    d.ActionPinPrefixes,
+		MarkExactMappings: d.MarkExactActionMappings,
 		SourceVersions:    d.ActionPinSourceVersions,
 		ContainerMappings: d.ContainerPinMappings,
 		RecordResolutionFailure: func(f actionpins.ResolutionFailure) {
@@ -263,6 +264,9 @@ func (d *WorkflowData) PinContext() *actionpins.PinContext {
 				ErrorType: string(f.ErrorType),
 			})
 		},
+	}
+	if !d.MarkExactActionMappings {
+		pinCtx.PrefixMappings = d.ActionPinPrefixes
 	}
 	// Only set Resolver if non-nil to avoid passing a typed nil interface value
 	// (which would be non-nil in actionpins but crash on method call).

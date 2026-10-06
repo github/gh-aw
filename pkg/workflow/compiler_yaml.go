@@ -102,6 +102,8 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 
 func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) { //nolint:largefunc // Existing workflow YAML assembly keeps generation steps in order.
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
+	data.MarkExactActionMappings = true
+	defer func() { data.MarkExactActionMappings = false }()
 
 	repoConfig, err := c.loadRepoConfig()
 	if err != nil {
@@ -200,7 +202,6 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// These are returned to the caller so they can be used for safe update enforcement
 	// without requiring a second scan of the full YAML content.
 	secrets := CollectSecretReferences(bodyContent)
-	actions := CollectActionReferences(bodyContent)
 
 	// If this workflow has a workflow_call trigger, inject on.workflow_call.secrets:
 	// declarations so callers can map secrets explicitly instead of using secrets: inherit.
@@ -222,6 +223,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 		}
 	}
 
+	var pinResolver SHAResolver
+	if data.ActionResolver != nil {
+		pinResolver = data.ActionResolver
+	}
+	bodyContent, err = mapPinnedUsesInYAML(bodyContent, data.ActionPinMappings, data.ActionPinPrefixes, data.ActionPinWarnings, pinResolver)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	actions := CollectActionReferences(bodyContent)
+
 	// Generate workflow header comments (including metadata as first line, plus secrets/actions lists)
 	if err := c.generateWorkflowHeader(&yaml, data, frontmatterHash, bodyHash, secrets, actions); err != nil {
 		return "", nil, nil, fmt.Errorf("workflow header rendering could not complete; ensure lockfile metadata inputs are valid: %w", err)
@@ -231,7 +242,6 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	yaml.WriteString(bodyContent)
 
 	yamlContent := yaml.String()
-	yamlContent = mapPinnedUsesInYAML(yamlContent, data.ActionPinMappings, data.ActionPinPrefixes, data.ActionPinWarnings)
 
 	// If we're in non-cloning trial mode and this workflow has issue triggers,
 	// replace github.event.issue.number with inputs.issue_number

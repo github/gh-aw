@@ -325,7 +325,10 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		return fmt.Errorf("failed to configure maintenance artifact retention: %w", err)
 	}
 	if repoConfig != nil {
-		content = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil)
+		content, err = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil, resolver)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Write the maintenance workflow file

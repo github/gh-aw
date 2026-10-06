@@ -94,7 +94,10 @@ func GenerateCentralSlashCommandWorkflow(ctx context.Context, workflowDataList [
 		return err
 	}
 	if repoConfig != nil {
-		content = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil)
+		content, err = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil, resolver)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := os.WriteFile(triggerFile, []byte(content), constants.FilePermPublic); err != nil {
