@@ -94,6 +94,8 @@ const EVENT_FIELDS = {
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
   "user.message": { content: ["content"] },
+  "prompt.system": { content: ["content"] },
+  "prompt.user": { content: ["content"] },
   "assistant.message": MESSAGE_FIELDS,
   "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
   "assistant.reasoning": MESSAGE_FIELDS,

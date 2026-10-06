@@ -85,7 +85,11 @@ The agent artifact already contains native session evidence: Copilot session
 `logEntries` as `agent-session.jsonl` so conclusion can reuse canonical events
 without parsing the same native transcript again. After downloading agent, detection, safe-output, experiment,
 and eval evidence, the conclusion job merges these observations into
-`usage/aw_session.jsonl`. Graders arrive in the agent artifact. Collection and upload
+`usage/aw_session.jsonl`. The agent artifact also carries the split activation
+`aw-prompts/system.txt` and `aw-prompts/user.txt` files; the merger records each
+available file as an untimed `prompt.system` or `prompt.user` event with its exact
+content and source path. These prompt events are omitted from default summaries.
+Graders arrive in the agent artifact. Collection and upload
 run after conclusion handlers, before setup cleanup. The existing usage JSON,
 JSONL accounting, activity summary, and result files remain available.
 
@@ -311,6 +315,14 @@ and count them as separate observations. Replicated firewall paths MUST select
 `sandbox/firewall/logs` before `sandbox/firewall/audit`, then supported legacy
 layouts; an existing empty authoritative file MUST suppress its older copy.
 Distinct gateway streams and events MUST remain separate observations.
+
+Native Copilot session files MUST pass through the Copilot adapter before
+essential-payload projection so model selection, streamed assistant text, tool
+correlation, finalized turns, and shutdown usage remain available. The agent
+step-summary parser prefers usable native events, then `agent-stdio.log`, then
+debug logs. Missing or unparseable native files MUST NOT suppress a usable
+stdio conversation; fallback diagnostics MUST NOT claim successful parsing
+when no structured events were recovered.
 
 For `detection.result`, the sanitized conclusion result at
 `usage/detection/detection_result.json` MUST take precedence over the raw
@@ -549,6 +561,7 @@ source for opaque fields.
 | Event type | Source observation |
 | --- | --- |
 | `agent.execution` | One aggregate execution/error observation for the main agent, as defined in Section 4.8. |
+| `prompt.system`, `prompt.user` | Split activation prompt file contents with source provenance, when available; omitted from default summaries. |
 | `mcp.rpc.request`, `mcp.rpc.response` | MCPG `REQUEST`/`RESPONSE` or `rpc_request`/`rpc_response`, with flat RPC metadata and error code/message. |
 | `mcp.difc.filtered`, `mcp.guard.blocked` | DIFC and guard-policy diagnostics; no inferred successful tool outcome. |
 | `mcp.tool_call`, `mcp.event` | Structured gateway calls or other gateway log messages. |

@@ -1,16 +1,16 @@
 [INFO] Starting containers...
 [pydantic-ai] provider=github model=claude-sonnet-4.5 baseUrl=http://api-proxy:10002
-clai - Pydantic AI CLI v2.36.0 using custom agent gh_aw_agent:agent with 
+clai - Pydantic AI CLI v2.36.0 using custom agent gh_aw_agent:agent with
 openai:claude-sonnet-4.5
-I'll execute the smoke test efficiently with minimal context usage.             
+I'll execute the smoke test efficiently with minimal context usage.
 
-▌ Called tool read_file.                                                      
+▌ Called tool read_file.
 
-Now I'll create the smoke test issue with all results:                          
+Now I'll create the smoke test issue with all results:
 
-▌ Called tool safeoutputs_create_issue.                                       
+▌ Called tool safeoutputs_create_issue.
 
-All smoke tests passed successfully! The issue has been created with the test   
+All smoke tests passed successfully! The issue has been created with the test
 results.                                                                        [INFO] Stopping containers...
  Container mcp-gateway Stopped
 Process exiting with code: 0

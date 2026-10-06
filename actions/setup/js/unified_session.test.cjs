@@ -55,6 +55,32 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.type === "agent.execution").map(event => event.data)).toEqual([observations[1].data]);
   });
 
+  it("includes both activation prompts verbatim with distinct provenance when present", () => {
+    const system = "System instructions\n";
+    const user = "User request\n";
+    write("aw-prompts/system.txt", system);
+    write("aw-prompts/user.txt", user);
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.provenance.component === "prompt")).toEqual([
+      { type: "prompt.system", data: { content: system }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/system.txt", index: 0 } },
+      { type: "prompt.user", data: { content: user }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/user.txt", index: 0 } },
+    ]);
+    expect(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8")).toContain(
+      JSON.stringify({ type: "prompt.user", data: { content: user }, provenance: { component: "prompt", phase: "activation", path: "aw-prompts/user.txt", index: 0 } })
+    );
+    expect(events.at(-1).data.absentComponents).toContain("agent");
+  });
+
+  it("does not follow a symlinked prompt or invent missing prompt content", () => {
+    write("aw-prompts/user.txt", "");
+    fs.symlinkSync(write("private.txt", "not a prompt"), path.join(root, "aw-prompts/system.txt"));
+    const warnings = [];
+    const { events } = collectUnifiedSession({ rootDir: root, warn: warning => warnings.push(warning) });
+    expect(events.filter(event => event.provenance.component === "prompt")).toMatchObject([{ type: "prompt.user", data: { content: "" } }]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("aw-prompts/system.txt");
+  });
+
   it("emits one execution entry across canonical, stdio, persisted detector, and exit-code evidence", () => {
     const execution = { type: "agent.execution", data: { categories: ["agentic_engine_timeout"], errorCodes: [502], errorTypes: ["server_error"], exitCode: 1 } };
     write("agent-session.jsonl", [...require("./claude_session.cjs").normalizeClaudeSession(claudeFixtures.failure), execution]);
@@ -332,6 +358,49 @@ describe("Unified conclusion session", () => {
     expect(sessionTimestamp({ timestamp: 0 })).toBe(0);
     expect(sessionTimestamp({ message: { timestamp: 1250 } })).toBe(1250);
     for (const value of ["", "123", "2026-10-02", NaN, Infinity, 8640000000000001]) expect(sessionTimestamp({ timestamp: value })).toBeUndefined();
+  });
+
+  it("normalizes native Copilot sessions before projecting unified payloads", () => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
+    write(nativePath, [
+      { type: "session.start", timestamp: "2026-10-02T00:00:00Z", data: { sessionId: "native", selectedModel: "fixture-model" } },
+      { type: "assistant.message_delta", data: { messageId: "message", deltaContent: "Recovered response." } },
+      { type: "tool.execution_start", data: { toolCallId: "call", toolName: "bash", arguments: { command: "pwd" } } },
+      { type: "tool.execution_complete", data: { toolCallId: "call", success: true, shellExecution: { exitCode: 0 } } },
+      { type: "assistant.turn_end", data: { turnId: "1" } },
+      {
+        type: "session.shutdown",
+        timestamp: "2026-10-02T00:00:05Z",
+        data: { sessionStartTime: 1790899200000, modelMetrics: { "fixture-model": { usage: { inputTokens: 10, outputTokens: 4 } } } },
+      },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.find(event => event.type === "session.init").data).toMatchObject({ sourceEngine: "copilot", model: "fixture-model" });
+    expect(events.find(event => event.type === "assistant.message").data.content).toBe("Recovered response.");
+    expect(events.find(event => event.type === "tool.execution_complete").data).toMatchObject({ toolName: "bash", success: true, exitCode: 0 });
+    expect(events.filter(event => event.type === "session.result").map(event => event.data)).toEqual([{ durationMs: 5000, usage: { inputTokens: 10, outputTokens: 4 } }, { numTurns: 1 }]);
+    expect(events.filter(event => event.provenance.component === "agent").every(event => event.provenance.path === nativePath)).toBe(true);
+    const { generatePlainTextSummary } = require("./log_parser_shared.cjs");
+    const summary = generatePlainTextSummary(events);
+    expect(summary).toContain("fixture-model");
+    expect(summary).toContain("Turns: 1");
+    expect(summary).toContain("Tokens: 14 total (10 in / 4 out)");
+    expect(summary).toContain("Tools: 1/1 succeeded");
+  });
+
+  it.each([
+    [`{"type":"session.start","data":{"sessionId":"native"}}\n`],
+    [`{"type":"session.start","data":{"sessionId":"native"}}\n{"type":"assistant.message",`],
+    [`{"type":"assistant.message","data":{"content":"partial native"}}\n{"type":"assistant.message",`],
+  ])("falls back to stdio when native Copilot events are incomplete", nativeContent => {
+    const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
+    write(nativePath, nativeContent);
+    write("agent-stdio.log", JSON.stringify({ type: "assistant.message", data: { content: "recovered stdio" } }));
+    const { events } = collectUnifiedSession({ rootDir: root, engine: "copilot" });
+    const agentEvents = events.filter(event => event.provenance.component === "agent");
+    expect(agentEvents).toEqual([expect.objectContaining({ type: "assistant.message", data: { content: "recovered stdio" }, provenance: expect.objectContaining({ path: "agent-stdio.log" }) })]);
+    expect(events.some(event => event.type === "session.collection_warning" && event.data.path === nativePath)).toBe(true);
+    expect(events.at(-1).data.sources).toContainEqual(expect.objectContaining({ path: nativePath, events: 0 }));
   });
 
   it("prefers persisted canonical events over raw logs and avoids replicated firewall accounting", () => {

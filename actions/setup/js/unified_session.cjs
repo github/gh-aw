@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
+const { hasCopilotConversation, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -157,6 +158,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   /** @type {SessionSource[]} */
   const sources = [];
   const masks = new Set();
+  const incompleteSources = new Set();
   /** @type {SessionEvent[]} */
   const warnings = [];
   const report = (file, code, line) => {
@@ -202,6 +204,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       try {
         values.push(JSON.parse(raw));
       } catch {
+        incompleteSources.add(file);
         report(file, "malformed_jsonl", index + 1);
       }
     }
@@ -222,12 +225,16 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const hasLegacyContent = normalized.some(event => ["assistant.message", "assistant.reasoning", "assistant.refusal", "user.message", "tool.execution_start", "tool.execution_complete"].includes(event.type));
     for (const record of input) {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
+        incompleteSources.add(file);
         report(file, "non_object_record", undefined);
         continue;
       }
       if (component === "agent") {
         if (isSessionEvent(record)) events.push(record);
-        else if (!hasLegacyContent || normalizeEngineLogEntries([record], engine ?? "custom").length === 0) report(file, "non_canonical_agent_event", undefined);
+        else if (!hasLegacyContent || normalizeEngineLogEntries([record], engine ?? "custom").length === 0) {
+          incompleteSources.add(file);
+          report(file, "non_canonical_agent_event", undefined);
+        }
       } else if (type) {
         events.push({ type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}), ...(record.created_at !== undefined ? { created_at: record.created_at } : {}) });
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
@@ -280,6 +287,15 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     add(metadata, "workflow", "activation", "workflow.info");
     const observedEngine = sources.at(-1)?.events[0]?.data.engine_id;
     if (engine === undefined && typeof observedEngine === "string") engine = observedEngine;
+  }
+  /** @type {Array<[string, `${string}.${string}`]>} */
+  const prompts = [
+    ["system.txt", "prompt.system"],
+    ["user.txt", "prompt.user"],
+  ];
+  for (const [fileName, type] of prompts) {
+    const file = path.join(rootDir, "aw-prompts", fileName);
+    if (exists(file)) sources.push({ component: "prompt", phase: "activation", path: path.relative(rootDir, file), events: [{ type, data: { content: read(file) } }] });
   }
   const stdio = path.join(rootDir, "agent-stdio.log");
   // Masks can be registered in stdio even when native session events are preferred.
@@ -360,9 +376,14 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   // Represented IDs remain authoritative, even when raw copies are fuller.
   for (const [id, snapshot] of snapshots) {
     if (representedIds.has(id)) continue;
-    const events = require("./copilot_session.cjs").normalizeCopilotSession(snapshot.records);
+    const events = normalizeCopilotSession(snapshot.records);
     const source = { component: "agent", phase: "agent", path: path.relative(rootDir, snapshot.file), events };
     sources.push(source);
+    if (incompleteSources.has(snapshot.file) || !hasCopilotConversation(events)) {
+      if (!incompleteSources.has(snapshot.file)) report(snapshot.file, "native_session_unusable", undefined);
+      source.events = [];
+      continue;
+    }
     copilotSources.set(source, { id, start: snapshot.start });
     agentEvents += events.filter(event => event.type !== "agent.execution").length;
   }
@@ -371,7 +392,20 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const positions = sources.map((source, index) => (copilotSources.has(source) ? index : -1)).filter(index => index >= 0);
     for (const [index, [source]] of ordered.entries()) sources[positions[index]] = source;
   } else if (!agentEvents) {
-    for (const file of native) agentEvents += add(file, "agent", "agent", undefined);
+    for (const file of native) {
+      if ([...snapshots.values()].some(snapshot => snapshot.file === file)) continue;
+      add(file, "agent", "agent", undefined);
+      const source = sources.at(-1);
+      if (source?.path === path.relative(rootDir, file)) {
+        source.events = normalizeCopilotSession(source.events);
+        if (!incompleteSources.has(file) && hasCopilotConversation(source.events)) {
+          agentEvents += source.events.length;
+        } else {
+          if (!incompleteSources.has(file)) report(file, "native_session_unusable", undefined);
+          source.events = [];
+        }
+      }
+    }
   }
   if (!agentEvents) {
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);

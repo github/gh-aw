@@ -564,7 +564,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "missing_data": {
                 "defaultMax": 20,
@@ -1128,6 +1129,8 @@ jobs:
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent-session.jsonl
             /tmp/gh-aw/agent-errors.jsonl
+            /tmp/gh-aw/aw-prompts/user.txt
+            /tmp/gh-aw/aw-prompts/system.txt
             /tmp/gh-aw/pi-streaming.jsonl
             /tmp/gh-aw/agent/pi-sessions/*.jsonl
             /tmp/gh-aw/pi-agent-dir/session.html

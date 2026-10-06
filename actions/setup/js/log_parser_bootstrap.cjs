@@ -11,6 +11,7 @@ const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { hasCopilotConversation, hasMalformedJsonl } = require("./copilot_session.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -23,7 +24,6 @@ const CLAUDE_HTTP_5XX_REQUEST_ERROR_PATTERN = /(?:http|fetch|request)\s+(?:faile
 const CLAUDE_HTTP_5XX_STATUS_PATTERN = new RegExp([CLAUDE_HTTP_5XX_PROTOCOL_PATTERN.source, CLAUDE_HTTP_5XX_STATUS_FIELD_PATTERN.source, CLAUDE_HTTP_5XX_REQUEST_ERROR_PATTERN.source].join("|"), "i");
 const STARTUP_DIAGNOSTIC_LINE_PATTERN = /(?:ERR_|Error:|CAPIError|Authentication failed|rate[_ -]?limit|429|\b5\d{2}\b|overloaded|inference)/i;
 const MAX_DIAGNOSTIC_TAIL_LINES = 8;
-const AGENT_STDIO_LOG_PATH = "/tmp/gh-aw/agent-stdio.log";
 
 /**
  * Build startup diagnostics for Claude failures with no structured entries.
@@ -161,15 +161,15 @@ function readCopilotSessions(directory, parseLog) {
  * @param {(content: string) => string|{markdown: string, mcpFailures?: string[], maxTurnsHit?: boolean, logEntries?: Array<any>}} options.parseLog - Parser function that takes log content and returns markdown or result object
  * @param {string} options.parserName - Name of the parser (e.g., "Codex", "Claude", "Copilot")
  * @param {boolean} [options.supportsDirectories=false] - Whether the parser supports reading from directories
- * @param {string} [options.artifactDir] - Root for session artifacts, defaults to the workflow runtime directory
+ * @param {string} [options.rootDir="/tmp/gh-aw"] - Runtime artifact directory
+ * @param {string} [options.artifactDir] - Compatibility alias for rootDir
  * @returns {Promise<void>}
  */
 async function runLogParser(options) {
   const fs = require("fs");
   const path = require("path");
-  const { parseLog, parserName, supportsDirectories = false } = options;
-  const artifactDir = options.artifactDir ?? path.dirname(AGENT_STDIO_LOG_PATH);
-  const agentStdioPath = path.join(artifactDir, "agent-stdio.log");
+  const { parseLog, parserName, supportsDirectories = false, rootDir = options.artifactDir ?? "/tmp/gh-aw" } = options;
+  const stdioLogPath = path.join(rootDir, "agent-stdio.log");
 
   /**
    * Recursively searches a directory tree for the first events.jsonl file.
@@ -259,65 +259,85 @@ async function runLogParser(options) {
       return;
     }
 
-    if (!fs.existsSync(logPath)) {
+    const copilotStdioFallback = parserName === "Copilot" && supportsDirectories && fs.existsSync(stdioLogPath);
+    if (!fs.existsSync(logPath) && !copilotStdioFallback) {
       core.info(`Log path not found: ${logPath}`);
       return;
     }
 
-    let content = "";
     let copilotSessions = [];
+    /** @type {Array<{source: string, read: () => string}>} */
+    const candidates = [];
+    const publicationMasks = new Set();
 
     // Check if logPath is a directory or a file
-    const stat = fs.statSync(logPath);
-    if (stat.isDirectory()) {
+    const stat = fs.existsSync(logPath) ? fs.statSync(logPath) : undefined;
+    if (!stat || stat.isDirectory()) {
       if (!supportsDirectories) {
         core.info(`Log path is a directory but ${parserName} parser does not support directories: ${logPath}`);
         return;
       }
 
       // Prefer events.jsonl (structured Copilot session format) over debug .log files
-      if (parserName === "Copilot") copilotSessions = readCopilotSessions(logPath, parseLog);
-      const eventsJsonlPath = copilotSessions.length ? null : findEventsJsonlRecursive(logPath);
-      if (copilotSessions.length) {
-        const finalSession = copilotSessions[copilotSessions.length - 1];
-        core.info(`Using ${copilotSessions.length} Copilot sessions; final attempt: ${finalSession.source}`);
-        content = finalSession.content;
-      } else if (eventsJsonlPath) {
-        core.info(`Using Copilot session events from: ${eventsJsonlPath}`);
-        content = fs.readFileSync(eventsJsonlPath, "utf8");
-      } else {
+      if (stat && parserName === "Copilot") copilotSessions = readCopilotSessions(logPath, parseLog);
+      const finalSession = copilotSessions.at(-1);
+      const eventsJsonlPath = stat && !finalSession ? findEventsJsonlRecursive(logPath) : null;
+      if (finalSession) {
+        candidates.push({ source: finalSession.source, read: () => finalSession.content });
+      }
+      if (eventsJsonlPath) {
+        candidates.push({ source: eventsJsonlPath, read: () => fs.readFileSync(eventsJsonlPath, "utf8") });
+      }
+      if (copilotStdioFallback) candidates.push({ source: stdioLogPath, read: () => fs.readFileSync(stdioLogPath, "utf8") });
+      if (stat && (!eventsJsonlPath || parserName === "Copilot")) {
         // Read all log files from the directory and concatenate them
         const files = fs.readdirSync(logPath);
         const logFiles = files.filter(file => file.endsWith(".log") || file.endsWith(".txt"));
 
-        if (logFiles.length === 0) {
-          core.info(`No log files found in directory: ${logPath}`);
-          return;
-        }
-
         // Sort log files by name to ensure consistent ordering
         logFiles.sort();
 
-        // Concatenate all log files
-        for (const file of logFiles) {
-          const filePath = path.join(logPath, file);
-          const fileContent = fs.readFileSync(filePath, "utf8");
-
-          // Add a newline before this file if the previous content doesn't end with one
-          if (content.length > 0 && !content.endsWith("\n")) {
-            content += "\n";
-          }
-
-          content += fileContent;
+        if (logFiles.length) {
+          candidates.push({
+            source: logPath,
+            read: () => logFiles.map(file => fs.readFileSync(path.join(logPath, file), "utf8")).join("\n"),
+          });
         }
+      }
+      if (!candidates.length) {
+        core.info(`No log files found in directory: ${logPath}`);
+        return;
       }
     } else {
       // Read the single log file
-      content = fs.readFileSync(logPath, "utf8");
+      candidates.push({ source: logPath, read: () => fs.readFileSync(logPath, "utf8") });
     }
 
-    const result = copilotSessions.length ? copilotSessions[copilotSessions.length - 1].result : parseLog(content);
-    const publicationMasks = new Set(collectAddMaskedValues(copilotSessions.length ? copilotSessions.map(session => session.content).join("\n") : content));
+    let content = "";
+    let result;
+    let selectedSource;
+    for (const session of copilotSessions) {
+      for (const value of collectAddMaskedValues(session.content)) publicationMasks.add(value);
+    }
+    for (const [index, candidate] of candidates.entries()) {
+      content = candidate.read();
+      selectedSource = candidate.source;
+      for (const value of collectAddMaskedValues(content)) publicationMasks.add(value);
+      result = parseLog(content);
+      const isNativeCopilotSession = parserName === "Copilot" && path.basename(candidate.source) === "events.jsonl";
+      const hasParseErrors = isNativeCopilotSession && hasMalformedJsonl(content);
+      const hasUsableConversation = Array.isArray(result?.logEntries) && hasCopilotConversation(result.logEntries);
+      if (parserName !== "Copilot" || (hasUsableConversation && !hasParseErrors)) {
+        if (parserName === "Copilot") core.info(`Using Copilot session log from: ${candidate.source}`);
+        break;
+      }
+      if (index < candidates.length - 1) {
+        const reason = hasParseErrors ? "partially malformed" : "no usable conversation";
+        core.warning(`Copilot session log from ${candidate.source} is ${reason}; trying ${candidates[index + 1].source}`);
+      }
+    }
+    const finalSession = copilotSessions.at(-1);
+    const retainedSessions = copilotSessions.filter(session => hasCopilotConversation(session.events) && !hasMalformedJsonl(session.content));
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
     // Handle result that may be a simple string or an object with metadata
@@ -335,19 +355,22 @@ async function runLogParser(options) {
       maxTurnsHit = result.maxTurnsHit || false;
       logEntries = result.logEntries || null;
     }
-    const conversationEntries = copilotSessions.length
-      ? copilotSessions.flatMap(session =>
-          session.events.map((event, index) => ({
-            ...event,
-            provenance: {
-              component: "agent",
-              phase: "agent",
-              path: session.source,
-              index,
-              ...(event.provenance ? { native: event.provenance } : {}),
-            },
-          }))
-        )
+    const conversationEntries = retainedSessions.length
+      ? [
+          ...retainedSessions.flatMap(session =>
+            session.events.map((event, index) => ({
+              ...event,
+              provenance: {
+                component: "agent",
+                phase: "agent",
+                path: session.source,
+                index,
+                ...(event.provenance ? { native: event.provenance } : {}),
+              },
+            }))
+          ),
+          ...(selectedSource === finalSession?.source ? [] : (logEntries ?? [])),
+        ]
       : logEntries;
 
     // Enrich agent-stdio.log with a normalized result entry when the engine does not
@@ -374,7 +397,6 @@ async function runLogParser(options) {
           num_turns: resultEntry.num_turns,
           usage: Object.keys(usage).length ? usage : undefined,
         };
-        const stdioLogPath = agentStdioPath;
         try {
           let alreadyHasResult = false;
           let newline = "";
@@ -421,7 +443,6 @@ async function runLogParser(options) {
 
     // Redact add-mask values from agent-stdio.log before it is uploaded as an
     // artifact so plaintext secrets do not persist outside live job logs.
-    const stdioLogPath = agentStdioPath;
     try {
       if (fs.existsSync(stdioLogPath)) {
         const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -441,7 +462,7 @@ async function runLogParser(options) {
 
     if (Array.isArray(logEntries)) {
       try {
-        const exitPath = path.join(artifactDir, "agent_execution_exit_code.txt");
+        const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
         const execution = collectAgentExecution({
           content,
           events: logEntries,
@@ -449,7 +470,7 @@ async function runLogParser(options) {
           ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
         });
         const canonicalEntries = [...conversationEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
-        writeSessionArtifact(path.join(artifactDir, "agent-session.jsonl"), canonicalEntries, [...publicationMasks]);
+        writeSessionArtifact(path.join(rootDir, "agent-session.jsonl"), canonicalEntries, [...publicationMasks]);
         core.info(`[log-parser] Persisted ${canonicalEntries.length} canonical session events`);
       } catch (err) {
         core.warning(`[log-parser] Failed to persist canonical agent session: ${getErrorMessage(err)}`);
@@ -516,7 +537,9 @@ async function runLogParser(options) {
         // Suppress the "parsed successfully" message for Claude since it always produces
         // logEntries when healthy — absence of entries means the parse fell back and is
         // about to emit a guardrail warning/failure below.
-        if (parserName !== "Claude") {
+        if (parserName === "Copilot") {
+          core.warning("Copilot produced no structured session events; publishing log diagnostics only");
+        } else if (parserName !== "Claude") {
           core.info(`${parserName} log parsed successfully`);
         }
 
