@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-06-17",
-    "workflow_name": "[aw] Failure Investigator (6h)",
-    "workflow_file": "aw-failure-investigator",
-    "total_aic_analyzed": 2184.15,
-    "runs_audited": 12,
-    "recommendations_count": 4,
-    "subagent_candidates": 1,
-    "estimated_aic_savings_per_run": 38
-  },
-  {
     "date": "2026-06-18",
     "workflow_name": "PR Description Updater",
     "workflow_file": "pr-description-caveman",
@@ -288,5 +278,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 18
+  },
+  {
+    "date": "2026-10-06",
+    "workflow_name": "Daily Caveman Optimizer",
+    "workflow_file": "daily-caveman-optimizer",
+    "total_aic_analyzed": 118.48,
+    "runs_audited": 5,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 90
   }
 ]
