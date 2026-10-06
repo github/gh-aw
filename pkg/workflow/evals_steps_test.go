@@ -144,6 +144,28 @@ func TestBuildEvalsEngineStepsHonorsNodeActionOverride(t *testing.T) {
 	}
 }
 
+func TestBuildEvalsEngineStepsHonorsNodeVersion(t *testing.T) {
+	compiler := NewCompiler()
+	for _, engineID := range []string{"copilot", "claude", "codex"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:       engineID,
+				Runtimes: map[string]any{"node": map[string]any{"version": "24.21.0"}},
+				Evals: &EvalsConfig{
+					Questions: []EvalDefinition{{ID: "test", Question: "Does the code work?"}},
+				},
+			}
+			steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
+				t.Fatalf("expected one Setup Node.js step, got %d:\n%s", count, steps)
+			}
+			if !strings.Contains(steps, "node-version: '24.21.0'") {
+				t.Errorf("expected pinned Node version in evals steps:\n%s", steps)
+			}
+		})
+	}
+}
+
 // TestBuildEvalsEngineStepsArcDindTopology verifies that the evals job
 // correctly propagates arc-dind runner topology from the main workflow data.
 // Regression: before the fix, RunnerConfig was not propagated to evalsData,

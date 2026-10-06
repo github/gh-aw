@@ -289,6 +289,28 @@ func TestBuildDetectionEngineExecutionStepHonorsNodeActionOverride(t *testing.T)
 	}
 }
 
+func TestBuildDetectionEngineExecutionStepHonorsNodeVersion(t *testing.T) {
+	compiler := NewCompiler()
+	for _, engineID := range []string{"copilot", "claude", "codex"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:       engineID,
+				Runtimes: map[string]any{"node": map[string]any{"version": "24.21.0"}},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			}
+			steps := strings.Join(compiler.buildDetectionEngineExecutionStep(data), "")
+			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
+				t.Fatalf("expected one Setup Node.js step, got %d:\n%s", count, steps)
+			}
+			if !strings.Contains(steps, "node-version: '24.21.0'") {
+				t.Errorf("expected pinned Node version in detection steps:\n%s", steps)
+			}
+		})
+	}
+}
+
 func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 	defaultStep := strings.Join(GenerateNodeJsSetupStep(), "\n")
 
@@ -296,35 +318,59 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 		name         string
 		data         *WorkflowData
 		expectedUses string
+		version      string
 	}{
 		{
 			name:         "nil data uses default",
 			data:         nil,
 			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      string(constants.DefaultNodeVersion),
 		},
 		{
 			name: "runtimes map override",
 			data: &WorkflowData{Runtimes: map[string]any{
-				"node": map[string]any{"action-repo": "myorg/setup-node", "action-version": "v1"},
+				"node": map[string]any{"action-repo": "myorg/setup-node", "action-version": "v1", "version": "24.21.0"},
 			}},
 			expectedUses: "uses: myorg/setup-node@v1",
+			version:      "24.21.0",
 		},
 		{
 			name: "typed frontmatter override",
 			data: &WorkflowData{ParsedFrontmatter: &FrontmatterConfig{RuntimesTyped: &RuntimesConfig{
-				Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2"},
+				Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2", Version: "22.13.0"},
 			}}},
 			expectedUses: "uses: myorg/setup-node@v2",
+			version:      "22.13.0",
 		},
 		{
 			name: "merged node entry without action override supersedes typed override",
 			data: &WorkflowData{
 				Runtimes: map[string]any{"node": map[string]any{"version": "22"}},
 				ParsedFrontmatter: &FrontmatterConfig{RuntimesTyped: &RuntimesConfig{
-					Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2"},
+					Node: &RuntimeConfig{ActionRepo: "myorg/setup-node", ActionVersion: "v2", Version: "22.13.0"},
 				}},
 			},
 			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      "22",
+		},
+		{
+			name: "merged node entry without version supersedes typed override",
+			data: &WorkflowData{
+				Runtimes: map[string]any{"node": map[string]any{"action-version": "v7"}},
+				ParsedFrontmatter: &FrontmatterConfig{RuntimesTyped: &RuntimesConfig{
+					Node: &RuntimeConfig{Version: "22.13.0"},
+				}},
+			},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      string(constants.DefaultNodeVersion),
+		},
+		{
+			name: "numeric version from merged runtimes",
+			data: &WorkflowData{Runtimes: map[string]any{
+				"node": map[string]any{"version": 22},
+			}},
+			expectedUses: "uses: " + getActionPin("actions/setup-node"),
+			version:      "22",
 		},
 	}
 
@@ -333,6 +379,9 @@ func TestGenerateNodeJsSetupStepForWorkflow(t *testing.T) {
 			step := strings.Join(generateNodeJsSetupStepForWorkflow(tt.data), "\n")
 			if !strings.Contains(step, tt.expectedUses) {
 				t.Errorf("expected %q in step:\n%s", tt.expectedUses, step)
+			}
+			if !strings.Contains(step, "node-version: '"+tt.version+"'") {
+				t.Errorf("expected Node version %q in step:\n%s", tt.version, step)
 			}
 			if tt.data == nil && step != defaultStep {
 				t.Errorf("expected default step, got:\n%s", step)
