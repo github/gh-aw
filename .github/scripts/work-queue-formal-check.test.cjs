@@ -61,8 +61,23 @@ if (mode === "passed") {
     jar,
     expectedJarSha256: crypto.createHash("sha256").update(fs.readFileSync(jar)).digest("hex"),
     timeoutSeconds: 10,
-    env: { FORMAL_TEST_MODE: "passed" },
+    env: { FORMAL_TEST_MODE: "passed", GITHUB_STEP_SUMMARY: path.join(dir, "step-summary.md") },
   };
+}
+
+function isolatedRun(options, ambientEnv) {
+  return spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `const { runVerification } = require(${JSON.stringify(path.join(__dirname, "work-queue-formal-check.cjs"))});
+runVerification(JSON.parse(process.argv[1]))
+  .then(result => console.log(JSON.stringify(result)))
+  .catch(error => { console.error(error.code + ": " + error.message); process.exitCode = 1; });`,
+      JSON.stringify(options),
+    ],
+    { encoding: "utf8", timeout: 15_000, env: { ...process.env, ...ambientEnv } }
+  );
 }
 
 test("only natural exit plus exhaustion is a pass", () => {
@@ -109,6 +124,7 @@ for (const { config, moduleName } of CONFIGS) {
     assert.equal(result.command[result.command.indexOf("-metadir") + 1], path.join(options.outputDir, "state"));
     assert.equal(result.command.at(-1), path.resolve(__dirname, "../../specs/work-queue", `${moduleName}.tla`));
     assert.match(fs.readFileSync(path.join(bundle, "summary.md"), "utf8"), /passed/);
+    assert.equal(fs.readFileSync(options.env.GITHUB_STEP_SUMMARY, "utf8"), fs.readFileSync(path.join(bundle, "summary.md"), "utf8"));
     assert.equal(result.checkpoints.reason, "no_checkpoint");
   });
 
@@ -262,11 +278,7 @@ process.exit(packed.status ?? 1);
 `
     );
     fs.chmodSync(tar, 0o755);
-    const originalPath = process.env.PATH;
-    process.env.PATH = `${path.dirname(tar)}${path.delimiter}${originalPath}`;
-    t.after(() => {
-      process.env.PATH = originalPath;
-    });
+    options.env.PATH = `${path.dirname(tar)}${path.delimiter}${process.env.PATH}`;
     const writeFileSync = fs.writeFileSync;
     const finalWrites = [];
     t.mock.method(fs, "writeFileSync", (file, ...args) => {
@@ -322,4 +334,62 @@ test("unexpected inventory programming errors are not swallowed", t => {
     throw new Error("unexpected defect");
   });
   assert.throws(() => checkpointBundle(state, path.join(options.outputDir, "bundle"), 1024), /unexpected defect/);
+});
+
+for (const ambientSummaryExists of [false, true]) {
+  test(`invocation summary override isolates ${ambientSummaryExists ? "existing" : "nonexistent"} ambient summary destination`, t => {
+    const options = fixture(t);
+    const dir = path.dirname(options.jar);
+    const ambientSummary = ambientSummaryExists ? path.join(dir, "ambient-summary.md") : path.join(dir, "nonexistent-parent", "ambient-summary.md");
+    if (ambientSummaryExists) fs.writeFileSync(ambientSummary, "ambient sentinel\n");
+    const collected = isolatedRun(options, { GITHUB_STEP_SUMMARY: ambientSummary });
+    assert.equal(collected.status, 0, collected.stderr);
+    const result = JSON.parse(collected.stdout);
+    assert.equal(result.status, "passed");
+    assert.equal(fs.readFileSync(options.env.GITHUB_STEP_SUMMARY, "utf8"), fs.readFileSync(path.join(options.outputDir, "bundle", "summary.md"), "utf8"));
+    if (ambientSummaryExists) assert.equal(fs.readFileSync(ambientSummary, "utf8"), "ambient sentinel\n");
+    else assert.equal(fs.existsSync(path.dirname(ambientSummary)), false);
+  });
+}
+
+test("an explicit empty summary override does not write to the ambient summary", t => {
+  const options = fixture(t);
+  const ambientSummary = path.join(path.dirname(options.jar), "ambient-summary.md");
+  fs.writeFileSync(ambientSummary, "ambient sentinel\n");
+  options.env.GITHUB_STEP_SUMMARY = "";
+  const collected = isolatedRun(options, { GITHUB_STEP_SUMMARY: ambientSummary });
+  assert.equal(collected.status, 0, collected.stderr);
+  assert.equal(JSON.parse(collected.stdout).status, "passed");
+  assert.equal(fs.readFileSync(ambientSummary, "utf8"), "ambient sentinel\n");
+});
+
+test("without an override production summary output inherits the ambient destination", t => {
+  const options = fixture(t);
+  const ambientSummary = path.join(path.dirname(options.jar), "ambient-summary.md");
+  fs.writeFileSync(ambientSummary, "existing summary\n");
+  delete options.env.GITHUB_STEP_SUMMARY;
+  delete options.javaBin;
+  const collected = isolatedRun(options, { GITHUB_STEP_SUMMARY: ambientSummary, JAVA_BIN: path.join(path.dirname(options.jar), "java") });
+  assert.equal(collected.status, 0, collected.stderr);
+  const summary = fs.readFileSync(path.join(options.outputDir, "bundle", "summary.md"), "utf8");
+  assert.equal(fs.readFileSync(ambientSummary, "utf8"), `existing summary\n${summary}`);
+});
+
+test("real ambient summary write failures remain explicit errors", t => {
+  const options = fixture(t);
+  const ambientSummary = path.join(path.dirname(options.jar), "nonexistent-parent", "step-summary.md");
+  delete options.env.GITHUB_STEP_SUMMARY;
+  const collected = isolatedRun(options, { GITHUB_STEP_SUMMARY: ambientSummary });
+  assert.equal(collected.status, 1);
+  assert.match(collected.stderr, /ENOENT/);
+  assert.ok(collected.stderr.includes(ambientSummary));
+  assert.equal(fs.existsSync(path.dirname(ambientSummary)), false);
+  assert.ok(fs.existsSync(path.join(options.outputDir, "bundle", "result.json")));
+});
+
+test("real invocation summary override failures remain explicit errors", async t => {
+  const options = fixture(t);
+  options.env.GITHUB_STEP_SUMMARY = path.join(path.dirname(options.jar), "nonexistent-parent", "step-summary.md");
+  await assert.rejects(runVerification(options), { code: "ENOENT", path: options.env.GITHUB_STEP_SUMMARY });
+  assert.equal(fs.existsSync(path.dirname(options.env.GITHUB_STEP_SUMMARY)), false);
 });

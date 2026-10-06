@@ -48,7 +48,7 @@ function inventory(directory) {
   return { bytes, files, checkpoints };
 }
 
-function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = false) {
+function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = false, env = process.env) {
   let state;
   try {
     state = inventory(stateDir);
@@ -63,7 +63,7 @@ function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = f
     return { ...result, reason: "incomplete_checkpoint" };
   }
   const archive = path.join(bundleDir, "checkpoint.tar.gz");
-  const packed = spawnSync("tar", ["-czf", archive, "-C", stateDir, "."], { timeout: 90_000, encoding: "utf8" });
+  const packed = spawnSync("tar", ["-czf", archive, "-C", stateDir, "."], { timeout: 90_000, encoding: "utf8", env });
   if (packed.error || packed.status !== 0) {
     let cleanupError = null;
     try {
@@ -78,6 +78,7 @@ function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = f
 }
 
 /**
+ * Invocation environment overrides apply to subprocesses, provenance, and summary output.
  * @param {{config: string, outputDir: string, jar: string, javaBin?: string, timeoutSeconds?: number, graceSeconds?: number, checkpointMaxBytes?: number, expectedJarSha256?: string, env?: NodeJS.ProcessEnv}} options
  */
 async function runVerification(options) {
@@ -91,7 +92,8 @@ async function runVerification(options) {
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0 || timeoutSeconds > DEFAULT_TIMEOUT_SECONDS) {
     throw new Error("timeoutSeconds must be positive and at most 16800 (4h40m)");
   }
-  const javaBin = options.javaBin || process.env.JAVA_BIN || "java";
+  const env = { ...process.env, ...options.env };
+  const javaBin = options.javaBin || env.JAVA_BIN || "java";
   const expectedJarSha256 = options.expectedJarSha256 || TLC_SHA256;
   const root = path.resolve(__dirname, "../..");
   const specDir = path.join(root, "specs/work-queue");
@@ -134,11 +136,11 @@ async function runVerification(options) {
     module: moduleName,
     status: "running",
     exhausted: false,
-    repository: process.env.GITHUB_REPOSITORY || null,
-    sha: process.env.GITHUB_SHA || null,
-    server_url: process.env.GITHUB_SERVER_URL || "https://github.com",
-    run_id: process.env.GITHUB_RUN_ID || null,
-    run_attempt: process.env.GITHUB_RUN_ATTEMPT || null,
+    repository: env.GITHUB_REPOSITORY || null,
+    sha: env.GITHUB_SHA || null,
+    server_url: env.GITHUB_SERVER_URL || "https://github.com",
+    run_id: env.GITHUB_RUN_ID || null,
+    run_attempt: env.GITHUB_RUN_ATTEMPT || null,
     started_at: started.toISOString(),
     timeout_seconds: timeoutSeconds,
     tlc_sha256: expectedJarSha256,
@@ -156,7 +158,7 @@ async function runVerification(options) {
     throw error;
   }
   writeJSON(resultPath, base);
-  const version = spawnSync(javaBin, ["-version"], { encoding: "utf8", timeout: 10_000, env: { ...process.env, ...options.env } });
+  const version = spawnSync(javaBin, ["-version"], { encoding: "utf8", timeout: 10_000, env });
   fs.writeFileSync(path.join(bundleDir, "java-version.txt"), `${version.stdout || ""}${version.stderr || ""}`);
   const logPath = path.join(bundleDir, "tlc.log");
   const reservePath = path.join(outputDir, "result-space.reserve");
@@ -166,7 +168,7 @@ async function runVerification(options) {
   let spawnError = null;
   /** @type {NodeJS.Timeout | undefined} */
   let killTimer;
-  const child = spawn(javaBin, args, { cwd: root, env: { ...process.env, ...options.env }, detached: true, stdio: ["ignore", fd, fd] });
+  const child = spawn(javaBin, args, { cwd: root, env, detached: true, stdio: ["ignore", fd, fd] });
   const signalChild = signal => {
     if (child.pid && child.exitCode === null) {
       try {
@@ -194,7 +196,7 @@ async function runVerification(options) {
   let checkpoints;
   try {
     log = fs.readFileSync(logPath, "utf8");
-    checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"));
+    checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"), env);
   } finally {
     fs.unlinkSync(reservePath);
   }
@@ -245,7 +247,7 @@ async function runVerification(options) {
       "Rewrite machine-specific source paths from command when replaying elsewhere. " +
       "Only a successful restore and continued search establish recovery capability.\n"
   );
-  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+  if (env.GITHUB_STEP_SUMMARY) fs.appendFileSync(env.GITHUB_STEP_SUMMARY, summary);
   return result;
 }
 
