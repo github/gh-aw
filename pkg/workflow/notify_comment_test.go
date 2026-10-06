@@ -1682,7 +1682,7 @@ func TestConclusionJobOmitsExperimentDownloadWithoutExperiments(t *testing.T) {
 }
 
 func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", true, "", false, func(string) string {
+	steps := strings.Join(usageArtifactStepsForTest("", true, "", false, func(string) string {
 		return "actions/download-artifact@a9bc5e6ef2cb54c177f32aa5726adaa15e7e2d59 # v3.1.0"
 	}), "")
 
@@ -1700,7 +1700,7 @@ func TestUsageArtifactDownloadsUseExactNamesWithDownloadArtifactV3(t *testing.T)
 }
 
 func TestUsageArtifactDoesNotReceiveAgentLedgerCompaction(t *testing.T) {
-	steps := strings.Join(buildUsageArtifactUploadSteps("", false, "", false, func(action string) string { return action }), "")
+	steps := strings.Join(usageArtifactStepsForTest("", false, "", false, func(action string) string { return action }), "")
 	if strings.Contains(steps, "GH_AW_LEDGER_COMPACTION") {
 		t.Fatalf("expected agent workflows not to wire ledger compaction (owned by agentic maintenance):\n%s", steps)
 	}
@@ -2078,4 +2078,9 @@ func TestConclusionReportFailedJobsExpression(t *testing.T) {
 	if strings.Contains(output, `GH_AW_REPORT_FAILED_JOBS: "${{ inputs.report-failed-jobs }}"`) {
 		t.Errorf("report-failed-jobs expression was emitted quoted: %q", output)
 	}
+}
+
+func usageArtifactStepsForTest(prefix string, hasEvals bool, experimentArtifactName string, hasDetection bool, pinAction func(string) string) []string {
+	steps := buildUsageArtifactInputDownloadSteps(prefix, hasEvals, experimentArtifactName, pinAction)
+	return append(steps, buildUsageArtifactPublishSteps(prefix, hasDetection, pinAction)...)
 }
