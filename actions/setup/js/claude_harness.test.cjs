@@ -86,12 +86,17 @@ describe("claude_harness.cjs", () => {
       expect(env.ANTHROPIC_MODEL).toBe("copilot/claude-haiku-4.5");
     });
 
-    it.each([null, { endpoints: [{ provider: "anthropic", configured: true, port: 10001 }] }, { endpoints: [{ provider: "copilot", configured: false, port: 10002 }] }])(
+    it.each([undefined, null, { endpoints: [{ provider: "anthropic", configured: true, port: 10001 }] }, { endpoints: [{ provider: "copilot", configured: false, port: 10002 }] }])(
       "fails closed without a configured reflected Copilot endpoint",
       async reflect => {
         await expect(buildClaudeChildEnv(reflect, { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_BASE_URL: "https://api.anthropic.com" }, () => {})).rejects.toThrow("configured Copilot endpoint");
       }
     );
+
+    it("preserves the Anthropic environment when reflection is unavailable", async () => {
+      const env = { GH_AW_LLM_PROVIDER: "anthropic", ANTHROPIC_MODEL: "claude-haiku-4.5", ANTHROPIC_BASE_URL: "https://custom.example/anthropic" };
+      expect(await buildClaudeChildEnv(undefined, env, () => {})).toMatchObject(env);
+    });
 
     it("normalizes a dynamically selected fallback model on the provisioned route", async () => {
       const child = await buildClaudeChildEnv(reflectData, { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_FALLBACK: "copilot/claude-sonnet-4.6" }, () => {});

@@ -365,7 +365,7 @@ function stripContinueArgs(args) {
 
 /**
  * Build Claude child process env with provider endpoint overrides resolved from /reflect.
- * @param {import("./awf_reflect.cjs").ReflectData | null} reflectData
+ * @param {import("./awf_reflect.cjs").ReflectData | null | undefined} reflectData
  * @param {NodeJS.ProcessEnv} [env]
  * @param {(message: string) => void} [logger]
  * @returns {Promise<NodeJS.ProcessEnv>}
