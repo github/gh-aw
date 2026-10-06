@@ -1239,7 +1239,7 @@ func TestTemplateInjectionYAMLParsingEdgeCases(t *testing.T) {
       - name: Setup
         uses: actions/setup-node@v4
         with:
-          node-version: 20`,
+          node-version: 24`,
 			shouldError: false,
 			description: "Steps without run fields should not cause errors",
 		},

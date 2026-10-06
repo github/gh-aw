@@ -184,7 +184,7 @@ func TestFrontmatterConfig_RunInstallScripts_TopLevel_Ignored(t *testing.T) {
 func TestRuntimeConfig_RunInstallScripts(t *testing.T) {
 	runtimes := map[string]any{
 		"node": map[string]any{
-			"version":             "20",
+			"version":             "24",
 			"run-install-scripts": true,
 		},
 	}

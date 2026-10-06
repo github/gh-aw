@@ -654,7 +654,7 @@ Override one or more runtimes, optionally with a custom setup action:
 ```yaml wrap
 runtimes:
   node:
-    version: "20"
+    version: "24"
   python:
     version: "3.12"
     action-repo: "actions/setup-python"

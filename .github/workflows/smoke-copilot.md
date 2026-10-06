@@ -74,7 +74,7 @@ runtimes:
   go:
     version: "1.26"
   node:
-    version: "20"
+    version: "24"
 models:
   providers:
     anthropic:
