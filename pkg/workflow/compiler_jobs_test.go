@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/goccy/go-yaml"
 )
 
 // ========================================
@@ -464,6 +465,22 @@ Marker: ${{ needs.select.outputs.marker }}
 	lock := string(lockContent)
 	if !strings.Contains(lock, "  activation:\n    name: Activation\n    needs: select") {
 		t.Fatalf("activation should depend on runtime-import referenced job; lock excerpt:\n%s", lock)
+	}
+	var compiledWorkflow map[string]any
+	if err := yaml.Unmarshal(lockContent, &compiledWorkflow); err != nil {
+		t.Fatalf("could not parse compiled workflow: %v", err)
+	}
+	jobs, ok := compiledWorkflow["jobs"].(map[string]any)
+	if !ok {
+		t.Fatal("compiled workflow is missing jobs")
+	}
+	activation, ok := jobs["activation"].(map[string]any)
+	if !ok {
+		t.Fatal("compiled workflow is missing activation job")
+	}
+	needs, ok := activation["needs"].(string)
+	if !ok || needs != "select" {
+		t.Errorf("activation should depend on runtime-import referenced job select; got needs: %#v", activation["needs"])
 	}
 	if !strings.Contains(lock, "GH_AW_NEEDS_SELECT_OUTPUTS_ISSUE_NUMBERS: ${{ needs.select.outputs.issue_numbers }}") {
 		t.Errorf("lock file missing issue_numbers env mapping")
