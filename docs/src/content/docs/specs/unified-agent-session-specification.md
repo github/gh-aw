@@ -312,6 +312,14 @@ and count them as separate observations. Replicated firewall paths MUST select
 layouts; an existing empty authoritative file MUST suppress its older copy.
 Distinct gateway streams and events MUST remain separate observations.
 
+Native Copilot session files MUST pass through the Copilot adapter before
+essential-payload projection so model selection, streamed assistant text, tool
+correlation, finalized turns, and shutdown usage remain available. The agent
+step-summary parser prefers usable native events, then `agent-stdio.log`, then
+debug logs. Missing or unparseable native files MUST NOT suppress a usable
+stdio conversation; fallback diagnostics MUST NOT claim successful parsing
+when no structured events were recovered.
+
 For `detection.result`, the sanitized conclusion result at
 `usage/detection/detection_result.json` MUST take precedence over the raw
 `threat-detection/detection_result.json` verdict. The conclusion result combines
