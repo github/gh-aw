@@ -12,6 +12,16 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAddMaskedValues, redactArtifactMaskedValues } = require("./add_mask_redaction.cjs");
 const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
+
+/**
+ * @param {unknown} error
+ * @param {...string} codes
+ * @returns {boolean}
+ */
+function isErrnoCode(error, ...codes) {
+  return error !== null && typeof error === "object" && "code" in error && typeof error.code === "string" && codes.includes(error.code);
+}
+
 /**
  * Recursively finds all files matching the specified extensions
  * @param {string} dir - Directory to search
@@ -33,7 +43,11 @@ function findFiles(dir, extensions) {
         try {
           entries = fs.readdirSync(currentDir, { withFileTypes: true });
         } catch (error) {
-          if (error && typeof error === "object" && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+          if (isErrnoCode(error, "ENOENT")) {
+            core.warning(`Skipping directory that disappeared during secret redaction: ${currentDir}`);
+            continue;
+          }
+          if (isErrnoCode(error, "EACCES", "EPERM")) {
             core.warning(`Skipping inaccessible directory during secret redaction: ${currentDir}`);
             continue;
           }
@@ -42,7 +56,15 @@ function findFiles(dir, extensions) {
         for (const entry of entries) {
           const fullPath = path.join(currentDir, entry.name);
           if (entry.isSymbolicLink()) {
-            fs.unlinkSync(fullPath);
+            try {
+              fs.unlinkSync(fullPath);
+            } catch (error) {
+              if (isErrnoCode(error, "ENOENT")) {
+                core.warning(`Skipping symbolic link that disappeared during secret redaction: ${fullPath}`);
+                continue;
+              }
+              throw error;
+            }
             core.warning(`Removed symbolic link before artifact upload: ${fullPath}`);
           } else if (entry.isDirectory()) {
             pending.push(fullPath);
@@ -268,6 +290,40 @@ function redactStepSummaryContent(content) {
 }
 
 /**
+ * Makes processed files writable by subsequent custom redactors, including
+ * container-owned logs that did not contain any built-in secret matches.
+ * @param {string} filePath
+ * @param {string} content
+ * @param {boolean} changed
+ */
+function writeProcessedFile(filePath, content, changed) {
+  try {
+    if (changed) {
+      fs.writeFileSync(filePath, content, "utf8");
+    } else {
+      fs.accessSync(filePath, fs.constants.W_OK);
+    }
+    return;
+  } catch (error) {
+    if (!isErrnoCode(error, "EACCES", "EPERM")) {
+      throw error;
+    }
+  }
+
+  // Replacing a file needs a writable parent, not ownership of the old inode.
+  // Keep the temporary copy private and on the same filesystem for atomic rename.
+  const temporaryDir = fs.mkdtempSync(path.join(path.dirname(filePath), ".gh-aw-redact-"));
+  try {
+    const replacement = path.join(temporaryDir, "redacted");
+    fs.writeFileSync(replacement, content, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    fs.renameSync(replacement, filePath);
+    core.warning(`Replaced non-writable file for secret redaction: ${filePath}`);
+  } finally {
+    fs.rmSync(temporaryDir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Process a single file for secret redaction
  * @param {string} filePath - Path to the file
  * @param {string[]} secretValues - Array of secret values to redact
@@ -297,24 +353,27 @@ function processFile(filePath, secretValues, maskedValues = []) {
     redacted = customResult.content;
     totalRedactions += customResult.redactionCount;
 
+    writeProcessedFile(filePath, redacted, totalRedactions > 0);
     if (totalRedactions > 0) {
-      fs.writeFileSync(filePath, redacted, "utf8");
       core.info(`Processed ${filePath}: ${totalRedactions} redaction(s)`);
     }
     return totalRedactions;
   } catch (error) {
-    if (maskedValues.length || path.extname(filePath).toLowerCase() === ".html") {
-      // Uploads can run with always(); do not leave an unsanitized source behind.
-      try {
-        fs.unlinkSync(filePath);
-      } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after runtime mask redaction failed`);
-      }
-      core.warning(`Failed to process file ${filePath}: runtime mask redaction failed`);
-      core.setFailed(`${ERR_VALIDATION}: Removed artifact source after runtime mask redaction failed`);
+    if (isErrnoCode(error, "ENOENT") && !fs.existsSync(filePath)) {
+      core.warning(`Skipping file that disappeared during secret redaction: ${filePath}`);
       return 0;
     }
-    core.warning(`Failed to process file ${filePath}: ${getErrorMessage(error)}`);
+    // Uploads can run with always(); do not leave an unsanitized source behind.
+    try {
+      fs.unlinkSync(filePath);
+    } catch (cleanupError) {
+      if (!isErrnoCode(cleanupError, "ENOENT")) {
+        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed`);
+      }
+    }
+    const reason = maskedValues.length || path.extname(filePath).toLowerCase() === ".html" ? "secret redaction failed" : getErrorMessage(error);
+    core.warning(`Failed to process file ${filePath}: ${reason}`);
+    core.setFailed(`${ERR_VALIDATION}: Removed artifact source after secret redaction failed`);
     return 0;
   }
 }
@@ -375,7 +434,15 @@ async function main() {
       try {
         for (const value of collectAddMaskedValues(fs.readFileSync(file, "utf8"))) masks.add(value);
       } catch (error) {
-        for (const source of files) fs.unlinkSync(source);
+        for (const source of files) {
+          try {
+            fs.unlinkSync(source);
+          } catch (cleanupError) {
+            if (!isErrnoCode(cleanupError, "ENOENT")) {
+              throw cleanupError;
+            }
+          }
+        }
         throw new Error(`${ERR_VALIDATION}: Removed artifact sources after runtime mask collection failed`, { cause: error });
       }
     }
