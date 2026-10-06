@@ -192,7 +192,9 @@ func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueu
 	if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
 		acc.collectActionPinSourceVersions([]byte(strings.Join(parsed.FrontmatterLines, "\n")))
 	}
-	acc.collectInlineSubAgentWarnings(item.importPath, rawContent, wasSubstituted, origParsed, origParseErr)
+	if err := acc.collectInlineSubAgentWarnings(item.importPath, item.sectionName, rawContent, wasSubstituted, origParsed, origParseErr); err != nil {
+		return nil, nil, err
+	}
 	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted)
 	if err != nil {
 		return nil, nil, err
@@ -241,16 +243,35 @@ func (acc *importAccumulator) applyImportDefaultsToContent(origContent string, o
 	return rawContent, rawContent != origContent
 }
 
-func (acc *importAccumulator) collectInlineSubAgentWarnings(importPath, rawContent string, wasSubstituted bool, origParsed *FrontmatterResult, origParseErr error) {
-	var bodyForValidation string
+func (acc *importAccumulator) collectInlineSubAgentWarnings(importPath, sectionName, rawContent string, wasSubstituted bool, origParsed *FrontmatterResult, origParseErr error) error {
+	var parsed *FrontmatterResult
+	var parseErr error
 	if !wasSubstituted && origParseErr == nil {
-		bodyForValidation = origParsed.Markdown
+		parsed = origParsed
+	} else {
+		parsed, parseErr = ExtractFrontmatterFromContent(rawContent)
 	}
-	agentWarnings := validateSubAgentFrontmatterWarnings(bodyForValidation, rawContent)
-	if bodyForValidation == "" {
-		if parsed, err := ExtractFrontmatterFromContent(rawContent); err == nil {
-			bodyForValidation = parsed.Markdown
+	if parseErr != nil {
+		for _, w := range ValidateInlineSubAgentsFrontmatter(rawContent) {
+			msg := fmt.Sprintf("import '%s': %s", importPath, w)
+			acc.warnings = append(acc.warnings, msg)
+			parserLog.Printf("%s", msg)
 		}
+		return nil
+	}
+	bodyForValidation := parsed.Markdown
+	if sectionName != "" {
+		var err error
+		bodyForValidation, err = ExtractMarkdownSection(bodyForValidation, sectionName)
+		if err != nil {
+			return fmt.Errorf("failed to extract section '%s' from imported file '%s': %w", sectionName, importPath, err)
+		}
+	}
+	var agentWarnings []string
+	if bodyForValidation == "" && sectionName == "" {
+		agentWarnings = ValidateInlineSubAgentsFrontmatter(rawContent)
+	} else {
+		agentWarnings = ValidateInlineSubAgentsInBody(bodyForValidation)
 	}
 	acc.subAgentModels = append(acc.subAgentModels, ExtractSubAgentModels(bodyForValidation)...)
 	for _, w := range agentWarnings {
@@ -258,13 +279,7 @@ func (acc *importAccumulator) collectInlineSubAgentWarnings(importPath, rawConte
 		acc.warnings = append(acc.warnings, msg)
 		parserLog.Printf("%s", msg)
 	}
-}
-
-func validateSubAgentFrontmatterWarnings(bodyForValidation, rawContent string) []string {
-	if bodyForValidation != "" {
-		return ValidateInlineSubAgentsInBody(bodyForValidation)
-	}
-	return ValidateInlineSubAgentsFrontmatter(rawContent)
+	return nil
 }
 
 func (acc *importAccumulator) extractToolsContent(rawContent string, item importQueueItem, visited map[string]struct{}, wasSubstituted bool) (string, error) {

@@ -39,7 +39,7 @@ func resolveModelRoutingAllowedModels(routing *CopilotModelRoutingConfig) ([]str
 	for _, model := range routing.AllowedModels {
 		model = strings.TrimSpace(model)
 		model = strings.TrimPrefix(model, "github-copilot/")
-		if !routingModelNamePattern.MatchString(model) {
+		if !validModelRoutingCandidate(model) {
 			return nil, fmt.Errorf("engine.model-routing.allowed-models contains invalid Copilot model %q", model)
 		}
 		qualified := "github-copilot/" + model
@@ -55,6 +55,13 @@ func resolveModelRoutingAllowedModels(routing *CopilotModelRoutingConfig) ([]str
 func intersectModelRoutingPolicy(candidates, allowed, blocked []string) ([]string, error) {
 	result := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
+		if containsExpression(candidate) {
+			if len(allowed) > 0 || len(blocked) > 0 {
+				return nil, errors.New("GitHub Actions expressions in engine.model-routing.allowed-models cannot be checked against models.allowed or models.blocked")
+			}
+			result = append(result, candidate)
+			continue
+		}
 		model := strings.TrimPrefix(candidate, "github-copilot/")
 		if len(allowed) > 0 && !matchesModelPolicy(model, candidate, allowed) {
 			continue
@@ -68,6 +75,14 @@ func intersectModelRoutingPolicy(candidates, allowed, blocked []string) ([]strin
 		return nil, errors.New("all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy")
 	}
 	return result, nil
+}
+
+func validModelRoutingCandidate(model string) bool {
+	if !containsExpression(model) {
+		return routingModelNamePattern.MatchString(model)
+	}
+	withoutExpressions := ExpressionPattern.ReplaceAllString(model, "x")
+	return routingModelNamePattern.MatchString(withoutExpressions)
 }
 
 // subAgentRequestModels extends request policy without changing router candidates.
@@ -169,9 +184,9 @@ func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
 		c.IncrementWarningCount()
 		return
 	}
-	if images := getSandboxAgentImages(data); images[awfImageRoleAPIProxy] == modelRoutingDefaultImages[awfImageRoleAPIProxy] {
+	if !apiProxySupportsRoutingCandidateModels(data) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
-			"sub-agent model routing requires an AWF apiProxy image with routing.candidateModels support (v0.28.33+); the default routed image is older. Pin current AWF images in sandbox.agent.images."))
+			"sub-agent model routing requires an AWF apiProxy image with routing.candidateModels support (v0.28.33+); the configured image is older or its version is unknown. Pin a compatible image in sandbox.agent.images."))
 		c.IncrementWarningCount()
 	}
 	candidates, err := resolveModelRoutingAllowedModels(data.EngineConfig.ModelRouting)
@@ -188,6 +203,31 @@ func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
 		c.IncrementWarningCount()
 	}
+}
+
+func apiProxySupportsRoutingCandidateModels(data *WorkflowData) bool {
+	if !isModelRoutingEnabled(data) {
+		return false
+	}
+	firewall := getFirewallConfig(data)
+	if !awfVersionAtLeast(firewall, constants.AWFRoutingCandidateModelsMinVersion) {
+		return false
+	}
+	image := getSandboxAgentImages(data)[awfImageRoleAPIProxy]
+	tag, found := imageReferenceTag(image)
+	return found && !strings.EqualFold(tag, "latest") &&
+		versionAtLeast(tag, "", string(constants.AWFRoutingCandidateModelsMinVersion))
+}
+
+func imageReferenceTag(image string) (string, bool) {
+	if digestIndex := strings.IndexByte(image, '@'); digestIndex >= 0 {
+		image = image[:digestIndex]
+	}
+	tagIndex := strings.LastIndexByte(image, ':')
+	if tagIndex <= strings.LastIndexByte(image, '/') || tagIndex == len(image)-1 {
+		return "", false
+	}
+	return image[tagIndex+1:], true
 }
 
 func matchesModelPolicy(model, qualifiedModel string, rules []string) bool {

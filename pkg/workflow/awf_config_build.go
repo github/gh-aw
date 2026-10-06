@@ -289,7 +289,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		if err != nil {
 			return "", NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
 		}
-		if awfVersionAtLeast(firewallConfig, constants.AWFRoutingCandidateModelsMinVersion) {
+		if apiProxySupportsRoutingCandidateModels(config.WorkflowData) {
 			apiProxy.Routing.CandidateModels = allowedModels
 			allowedModels, _ = subAgentRequestModels(config.WorkflowData, allowedModels, policyAllowed, disallowedModels)
 		}

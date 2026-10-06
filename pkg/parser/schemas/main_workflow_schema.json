@@ -14550,9 +14550,16 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                    "anyOf": [
+                      {
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                      },
+                      {
+                        "pattern": "\\$\\{\\{[^}]+\\}\\}"
+                      }
+                    ]
                   },
-                  "description": "Copilot model candidates; provider qualification is added by the compiler."
+                  "description": "Copilot model candidates; provider qualification is added by the compiler. GitHub Actions expressions are accepted, and candidate lists from imported workflows using the same engine are merged."
                 }
               }
             },
