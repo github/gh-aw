@@ -2443,13 +2443,14 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"assign_to_user\":{\"allowed\":[\"pelikhan\"],\"max\":25,\"target\":\"*\"},\"close_issue\":{\"max\":25,\"required_labels\":[\"cookie\",\"security\"],\"required_title_prefix\":\"[container-image-scan] Container findings for \",\"state_reason\":\"duplicate\",\"target\":\"*\"},\"create_issue\":{\"assignees\":[\"pelikhan\"],\"deduplicate_by_title\":true,\"labels\":[\"cookie\",\"security\"],\"max\":25,\"title_prefix\":\"[container-image-scan] \"},\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":25,\"required_title_prefix\":\"[container-image-scan] \",\"target\":\"*\"}}"
+          GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
       - name: Upload Safe Outputs Items

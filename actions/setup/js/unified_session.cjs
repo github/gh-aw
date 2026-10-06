@@ -320,6 +320,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     [["agent/graders/grader_results.json", "usage/graders/grader_results.json"], "grader", "agent", "grader.result"],
     [["evals/evals.jsonl", "usage/evals.jsonl"], "eval", "evals", "eval.result"],
     [["agent_usage.jsonl", "usage/agent_usage.jsonl"], "usage", "agent", "usage.report"],
+    [["github_rate_limits.jsonl", "usage/github_rate_limits.jsonl"], "github_api", "workflow", "github_api.rate_limit"],
     [["threat-detection/detection_usage.jsonl", "detection_usage.jsonl", "usage/detection_usage.jsonl"], "usage", "detection", "usage.report"],
     [["evals/evals_token_usage.jsonl", "usage/evals/token_usage.jsonl"], "usage", "evals", "usage.report"],
     [["agent_execution.json", "usage/agent/execution.json"], "execution", "agent", "execution.result"],

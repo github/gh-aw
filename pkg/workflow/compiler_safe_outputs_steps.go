@@ -123,6 +123,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 		return nil, err
 	}
 	c.addSafeOutputTokenEnvVars(&steps, data)
+	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
 	if workQueueStorage(data) == "issues" &&
 		data.SafeOutputs != nil &&
 		data.SafeOutputs.DispatchWorkflow != nil &&
@@ -151,7 +152,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	c.addSafeOutputGitHubTokenForConfig(&steps, data, configToken)
 
 	steps = append(steps, "          script: |\n")
-	steps = append(steps, generateGitHubScriptWithRequire("process_safe_outputs.cjs"))
+	steps = append(steps, generateGitHubScriptWithCredentialSource("process_safe_outputs.cjs", true))
 
 	return steps, nil
 }

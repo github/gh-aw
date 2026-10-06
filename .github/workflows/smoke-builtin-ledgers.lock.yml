@@ -2247,13 +2247,14 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-builtin-ledgers\",\"labels\":[\"automation\",\"testing\"],\"max\":1,\"title_prefix\":\"[smoke-builtin-ledgers] \"},\"create_report_incomplete_issue\":{},\"ledger_append\":{\"ledgers\":[{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"counter\",\"schema\":null,\"type\":\"counter\"},{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"log\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"workflow_run_id\":{\"type\":\"string\"}},\"required\":[\"workflow_run_id\"],\"type\":\"object\"},\"type\":\"log\"},{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"map\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"workflow_run_id\":{\"type\":\"string\"}},\"required\":[\"workflow_run_id\"],\"type\":\"object\"},\"type\":\"map\"},{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"notes\",\"schema\":null,\"type\":\"notes\"},{\"key\":\"\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"set\",\"schema\":{\"type\":\"string\"},\"type\":\"set\"},{\"key\":\"id\",\"max_patch_kb\":10,\"max_record_kb\":32,\"max_segment_kb\":100,\"name\":\"table\",\"schema\":{\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"enum\":[\"inserted\",\"updated\",\"passed\"]}},\"required\":[\"id\",\"status\"],\"type\":\"object\"},\"type\":\"table\"}],\"max\":100},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
       - name: Upload validated ledger transactions

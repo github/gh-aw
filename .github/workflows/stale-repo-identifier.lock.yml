@@ -2527,13 +2527,14 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":5},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[stale-repo-identifier] \"},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"stale-repository\",\"automated-analysis\",\"cookie\"],\"max\":10,\"title_prefix\":\"[Stale Repository] \"},\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{},\"upload_artifact\":{\"allowed-paths\":[\"**/*.png\",\"**/*.jpg\",\"**/*.svg\"],\"max-size-bytes\":104857600,\"max-uploads\":5,\"retention-days\":\"${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}\",\"skip-archive\":true},\"upload_asset\":{\"allowed-exts\":[\".png\",\".jpg\",\".jpeg\",\".svg\"],\"branch\":\"assets/${{ github.workflow }}\",\"max\":5,\"max-size\":10240}}"
           GH_AW_SAFE_OUTPUTS_STAGED: "true"
+          GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
 

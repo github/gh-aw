@@ -75,6 +75,14 @@ describe("logRateLimitFromResponse", () => {
     expect(content.trimEnd()).not.toContain("\n");
   });
 
+  it("does not persist an invalid credential source", () => {
+    logRateLimitFromResponse({ headers: { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4900" } }, "issues.get", "ghp_secret_token");
+
+    const entry = JSON.parse(appendSpy.mock.calls[0][1].trimEnd());
+    expect(entry).not.toHaveProperty("credentialSource");
+    expect(JSON.stringify(entry)).not.toContain("ghp_secret_token");
+  });
+
   it("does nothing when there are no rate-limit headers", () => {
     logRateLimitFromResponse({ headers: { "content-type": "application/json" } }, "repos.get");
     expect(appendSpy).not.toHaveBeenCalled();
