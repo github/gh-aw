@@ -90,7 +90,7 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 		insertIndex = runIndex + 1
 		for _, line := range step[insertIndex:] {
 			trimmed := strings.TrimSpace(line)
-			if trimmed == "set -o pipefail" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
+			if trimmed == "set -o pipefail" || trimmed == "gh_aw_exit_code=0" || strings.HasPrefix(trimmed, "trap 'gh_aw_exit_code=") {
 				insertIndex++
 				continue
 			}

@@ -5,6 +5,7 @@ package workflow
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -12,6 +13,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAgentExecutionExitCodeTrap_Shellcheck(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		trap string
+	}{
+		{name: "shared", trap: buildAgentExecutionExitCodeTrap()},
+		{name: "Copilot cleanup", trap: buildCopilotSettingsCleanupAndExitCodeTrap()},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.True(t, strings.HasPrefix(tt.trap, "gh_aw_exit_code=0\ntrap "),
+				"exit code must be declared before the trap:\n%s", tt.trap)
+
+			if _, err := exec.LookPath("shellcheck"); err != nil {
+				t.Skip("shellcheck is not installed")
+			}
+			cmd := exec.Command("shellcheck", "-s", "bash", "-")
+			cmd.Stdin = strings.NewReader(tt.trap)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "generated trap must pass ShellCheck:\n%s", output)
+		})
+	}
+}
 
 // TestAgentExecutionExitCodeTrap_EmitsErrorAnnotation pins the generated trap so the
 // failure annotation cannot be silently dropped.
@@ -104,6 +128,26 @@ func TestCopilotExecutionStep_ContainsExitCodeAnnotation(t *testing.T) {
 	}
 }
 
+func TestCompiledDirectExecution_RegistersExitTrapBeforeEvidenceWrites(t *testing.T) {
+	var compiled strings.Builder
+	NewCompiler().generateEngineExecutionSteps(
+		&compiled,
+		&WorkflowData{Name: "direct"},
+		NewClaudeEngine(),
+		"/tmp/gh-aw/test.log",
+	)
+
+	script := compiled.String()
+	initializationIndex := strings.Index(script, "gh_aw_exit_code=0")
+	trapIndex := strings.Index(script, "trap 'gh_aw_exit_code=")
+	evidenceIndex := strings.Index(script, `evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"`)
+	require.NotEqual(t, -1, initializationIndex, "compiled direct execution must initialize the exit code:\n%s", script)
+	require.NotEqual(t, -1, trapIndex, "compiled direct execution must register the exit trap:\n%s", script)
+	require.NotEqual(t, -1, evidenceIndex, "compiled direct execution must write start evidence:\n%s", script)
+	assert.Less(t, initializationIndex, trapIndex, "exit code initialization must precede trap registration")
+	assert.Less(t, trapIndex, evidenceIndex, "trap registration must precede execution evidence writes")
+}
+
 func TestAllAgentExecutionSteps_ContainExitCodeAnnotation(t *testing.T) {
 	workflowData := &WorkflowData{Name: "agent"}
 	tests := []struct {
@@ -156,6 +200,6 @@ func TestAllAgentExecutionSteps_ContainExitCodeAnnotation(t *testing.T) {
 func TestWrapAgentExecutionCommand_PlacesTrapAfterPipefail(t *testing.T) {
 	command := wrapAgentExecutionCommand("set -o pipefail\nfalse | cat")
 
-	assert.True(t, strings.HasPrefix(command, "set -o pipefail\ntrap "),
+	assert.True(t, strings.HasPrefix(command, "set -o pipefail\ngh_aw_exit_code=0\ntrap "),
 		"the trap must follow pipefail setup:\n%s", command)
 }
