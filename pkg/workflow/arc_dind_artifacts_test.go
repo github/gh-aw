@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,4 +41,22 @@ func TestRewriteTmpGhAwPathsForArcDind(t *testing.T) {
 		result := rewriteTmpGhAwPathsForArcDind(input)
 		assert.Equal(t, input, result)
 	})
+}
+
+func TestArcDindPostAgentStepsUseRunnerTempPaths(t *testing.T) {
+	data := &WorkflowData{RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind}}
+	compiler := &Compiler{}
+
+	var output strings.Builder
+	compiler.generateTokenUsageSummary(&output, data)
+	assert.Contains(t, output.String(), "GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw")
+
+	output.Reset()
+	compiler.generateAgentStepSummaryAppend(&output, data)
+	assert.Contains(t, output.String(), "GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw")
+
+	output.Reset()
+	compiler.generateAgentOutputPlaceholderStep(&output, data)
+	assert.Contains(t, output.String(), "${RUNNER_TEMP}/gh-aw/agent_output.json")
+	assert.NotContains(t, output.String(), "/tmp/gh-aw/agent_output.json")
 }

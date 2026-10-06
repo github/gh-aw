@@ -87,6 +87,7 @@ describe("parse_token_usage", () => {
       delete process.env.GH_AW_TOKEN_USAGE_SUMMARY_TITLE;
       delete process.env.GH_AW_AGENT_USAGE_PATH;
       delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
+      delete process.env.GH_AW_TMP_DIR;
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       process.env.GITHUB_STEP_SUMMARY = "";
 
@@ -135,6 +136,7 @@ describe("parse_token_usage", () => {
       fs.writeFileSync = originalWriteFileSync;
       delete process.env.GH_AW_AGENT_USAGE_PATH;
       delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
+      delete process.env.GH_AW_TMP_DIR;
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
       delete global.core;
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -161,6 +163,31 @@ describe("parse_token_usage", () => {
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No token usage data found"));
       expect(mockCore.summary.addDetails).not.toHaveBeenCalled();
       expect(mockCore.summary.write).not.toHaveBeenCalled();
+    });
+
+    test("reads and reports token usage from the configured ARC/DinD directory", async () => {
+      const ghAwDir = path.join(tmpDir, "runner-temp", "gh-aw");
+      const tokenUsagePath = path.join(ghAwDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      fs.writeFileSync(
+        tokenUsagePath,
+        JSON.stringify({
+          model: "gpt-4o-mini-2024-07-18",
+          provider: "copilot",
+          input_tokens: 19288,
+          output_tokens: 35,
+          ai_credits_this_response: 0.29142,
+          ai_credits_total: 0.29142,
+        })
+      );
+      process.env.GH_AW_TMP_DIR = ghAwDir;
+
+      await main();
+
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_AIC", "0.29142");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("aic", "0.29142");
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("0.29142"), true);
+      expect(JSON.parse(originalReadFileSync(path.join(ghAwDir, "agent_usage.json"), "utf8")).ai_credits).toBe(0.29142);
     });
 
     test("writes explicit zero usage evidence when requested and no usage exists", async () => {
@@ -251,6 +278,7 @@ describe("parse_token_usage", () => {
       const sessionStateDir = path.join(tmpDir, "copilot-session-state");
       const sessionDir = path.join(sessionStateDir, "session-1");
       const agentUsageFile = path.join(tmpDir, "agent_usage.json");
+      const agentUsageJSONLFile = path.join(tmpDir, "agent_usage.jsonl");
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(
         path.join(sessionDir, "events.jsonl"),
@@ -265,6 +293,7 @@ describe("parse_token_usage", () => {
       fs.readFileSync = vi.fn((p, enc) => (p === TOKEN_USAGE_PATH ? "malformed" : originalReadFileSync(p, enc)));
       fs.writeFileSync = vi.fn((p, data) => {
         if (p === AGENT_USAGE_PATH) return originalWriteFileSync(agentUsageFile, data);
+        if (p === AGENT_USAGE_JSONL_PATH) return originalWriteFileSync(agentUsageJSONLFile, data);
         return originalWriteFileSync(p, data);
       });
 

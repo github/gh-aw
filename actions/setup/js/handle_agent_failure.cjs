@@ -25,7 +25,7 @@ const { formatAICCredits } = require("./daily_aic_workflow_helpers.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp_gateway_log.cjs");
-const { readDedupedTokenUsage, TOKEN_USAGE_PATHS } = require("./parse_token_usage.cjs");
+const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usage.cjs");
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
@@ -2296,7 +2296,7 @@ function buildEngineMaxCacheMissesExceededContext(engineLabel) {
  */
 function readTokenUsageMarkdown() {
   try {
-    const readablePaths = TOKEN_USAGE_PATHS.filter(p => {
+    const readablePaths = getTokenUsagePaths().filter(p => {
       try {
         return fs.existsSync(p) && fs.statSync(p).size > 0;
       } catch {
