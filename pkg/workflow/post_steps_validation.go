@@ -13,7 +13,7 @@ var (
 	postStepAPIGetRE      = regexp.MustCompile(`(?i)(?:^|\s)(?:-X\s+GET\b|--method(?:=|\s+)GET\b)`)
 	postStepCurlPostRE    = regexp.MustCompile(`(?i)\bcurl\b[^\n]*\s(?:-X\s+POST\b|--request(?:=|\s+)POST\b|(?:-d|--data(?:-raw|-binary|-urlencode)?)(?:\s|=))`)
 	postStepOctokitRE     = regexp.MustCompile(`\b(?:github|octokit)(?:\.rest)?\.issues\.create\s*\(`)
-	postStepOutputRE      = regexp.MustCompile(`(?i)(?:\bagent_output\.json\b|(?:safeoutputs|safe-outputs)/output\.json\b|\bGH_AW_AGENT_OUTPUT\b)`)
+	postStepOutputRE      = regexp.MustCompile(`(?i)(?:\bagent_output\.json\b|(?:safeoutputs|safe-outputs)/output\.json\b|\boutputs\.jsonl\b|\bsafeoutputs\.jsonl\b|\bGH_AW_AGENT_OUTPUT\b)`)
 )
 
 // validatePostStepsSafeOutputs checks only user-provided run scripts, not compiler-generated steps.

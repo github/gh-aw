@@ -26,6 +26,8 @@ func TestValidatePostStepsSafeOutputs(t *testing.T) {
 		{"agent output", `jq '.items' /tmp/gh-aw/agent_output.json`, "safe outputs"},
 		{"agent output env", `cat "$GH_AW_AGENT_OUTPUT"`, "safe outputs"},
 		{"safe outputs output file", `cat /tmp/gh-aw/safeoutputs/output.json`, "safe outputs"},
+		{"safe outputs MCP storage", `cat "$RUNNER_TEMP/gh-aw/safeoutputs/outputs.jsonl"`, "safe outputs"},
+		{"collected safe outputs", `cat /tmp/gh-aw/safeoutputs.jsonl`, "safe outputs"},
 		{"read issues", `gh issue list --limit 10`, ""},
 		{"read issues api", `gh api /repos/octo/repo/issues`, ""},
 		{"read issues api with fields", `gh api -X GET /repos/octo/repo/issues -f state=open`, ""},
