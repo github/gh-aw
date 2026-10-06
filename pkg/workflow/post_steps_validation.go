@@ -8,8 +8,9 @@ import (
 
 var (
 	postStepIssueCreateRE = regexp.MustCompile(`(?i)(?:^|[\s|;&])gh\s+issue\s+create\b`)
-	postStepIssueAPIRE    = regexp.MustCompile(`(?i)(?:^|[/\s"'=])(?:https://api\.github\.com/)?repos/[^/\s"'?]+/[^/\s"'?]+/issues(?:[?"'\s]|$)`)
+	postStepIssueAPIRE    = regexp.MustCompile(`(?i)(?:^|[/\s"'=])(?:https://api\.github\.com/)?repos/(?:[^/\s"'?]+/[^/\s"'?]+|\$\{\{\s*github\.repository\s*\}\}|\$\{?GITHUB_REPOSITORY\}?)/issues(?:[?"'\s]|$)`)
 	postStepAPIPostRE     = regexp.MustCompile(`(?i)(?:^|\s)(?:-X\s+POST|--method(?:=|\s+)POST|-f(?:\s|=)|-F(?:\s|=)|--(?:raw-)?field(?:\s|=))`)
+	postStepAPIGetRE      = regexp.MustCompile(`(?i)(?:^|\s)(?:-X\s+GET\b|--method(?:=|\s+)GET\b)`)
 	postStepCurlPostRE    = regexp.MustCompile(`(?i)\bcurl\b[^\n]*\s(?:-X\s+POST\b|--request(?:=|\s+)POST\b|(?:-d|--data(?:-raw|-binary|-urlencode)?)(?:\s|=))`)
 	postStepOctokitRE     = regexp.MustCompile(`\b(?:github|octokit)(?:\.rest)?\.issues\.create\s*\(`)
 	postStepOutputRE      = regexp.MustCompile(`(?i)(?:\bagent_output\.json\b|(?:safeoutputs|safe-outputs)/output\.json\b|\bGH_AW_AGENT_OUTPUT\b)`)
@@ -40,7 +41,8 @@ func validatePostStepsSafeOutputs(steps []any) error {
 			createsIssue := postStepIssueCreateRE.MatchString(script) || postStepOctokitRE.MatchString(script)
 			for _, command := range ghAPICmdRE.FindAllStringSubmatch(script, -1) {
 				for _, args := range command {
-					if postStepIssueAPIRE.MatchString(parseGHAPIEndpoint(args)) && postStepAPIPostRE.MatchString(args) {
+					if postStepIssueAPIRE.MatchString(parseGHAPIEndpoint(args)) &&
+						postStepAPIPostRE.MatchString(args) && !postStepAPIGetRE.MatchString(args) {
 						createsIssue = true
 						break
 					}
