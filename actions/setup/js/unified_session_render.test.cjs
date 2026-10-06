@@ -108,11 +108,11 @@ describe("unified session publication views", () => {
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
       expect(output).toContain("[launch succeeded; workflow outcome pending]");
       expect(output).toContain("workflowName=smoke-claude-dynamic workflowRunId=dynamic-run");
-      expect(output).toContain("claude.task_started taskId=dynamic-task toolCallId=workflow-tool taskType=local_workflow");
-      expect(output).toContain("claude.task_progress taskId=dynamic-task toolCallId=workflow-tool totalTokens=0 toolUses=0 durationMs=0");
+      expect(output).toContain("dynamicWorkflows.task_started taskId=dynamic-task toolCallId=workflow-tool taskType=local_workflow");
+      expect(output).toContain("dynamicWorkflows.task_progress taskId=dynamic-task toolCallId=workflow-tool totalTokens=0 toolUses=0 durationMs=0");
       expect(output).toContain("agentId=dynamic-agent model=claude-sonnet-4-6 state=done");
-      expect(output).toContain(`claude.task_notification taskId=dynamic-task toolCallId=workflow-tool status=${status}`);
-      expect(output).toContain("claude.background_tasks_changed tasks=[]");
+      expect(output).toContain(`dynamicWorkflows.task_notification taskId=dynamic-task toolCallId=workflow-tool status=${status}`);
+      expect(output).toContain("dynamicWorkflows.background_tasks_changed tasks=[]");
       expect(output).toContain("Tokens: 18 total (7 in / 11 out)");
       expect(output).not.toContain("PRIVATE_");
     }

@@ -74,6 +74,10 @@ export interface ToolExecutionStartData {
 export interface ToolExecutionCompleteData {
   toolCallId?: string;
   toolName?: string;
+  taskId?: string;
+  taskType?: string;
+  workflowName?: string;
+  workflowRunId?: string;
   success?: boolean;
   output?: JsonValue;
   result?: JsonValue;

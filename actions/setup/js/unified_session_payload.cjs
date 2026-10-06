@@ -3,6 +3,7 @@
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {Record<string, string[]>} Fields */
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
+const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
@@ -211,8 +212,8 @@ const EVENT_FIELDS = {
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
 EVENT_FIELDS["usage.report"] = EVENT_FIELDS["firewall.token_usage"];
-for (const subtype of ["task_started", "task_progress", "task_updated", "task_notification", "background_tasks_changed"]) {
-  EVENT_FIELDS[`claude.${subtype}`] = TASK_FIELDS;
+for (const type of Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES)) {
+  EVENT_FIELDS[type] = TASK_FIELDS;
 }
 
 /**
@@ -263,7 +264,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
-  if (known && (event.type.startsWith("claude.task_") || event.type === "claude.background_tasks_changed")) {
+  if (known && event.type.startsWith("dynamicWorkflows.")) {
     if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
     const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });
     if (Object.keys(usage).length) data.usage = usage;
@@ -285,9 +286,6 @@ function normalizeUnifiedSessionEvent(event, phase) {
         })
       );
     }
-  }
-  if (event.type === "tool.execution_complete" && source.toolName === "Workflow" && source.tool_use_result?.taskType === "local_workflow") {
-    Object.assign(data, selectFields(source.tool_use_result, { taskId: ["taskId"], taskType: ["taskType"], workflowName: ["workflowName"], workflowRunId: ["runId"], status: ["status"] }));
   }
   if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
     const metadata = selectFields(event, MESSAGE_FIELDS);

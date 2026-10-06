@@ -2,6 +2,7 @@
 
 const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric, projectSessionResult } = require("./agent_session.cjs");
 const { getMessageRefusal } = require("./provider_refusal.cjs");
+const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 /**
  * Claude input tokens exclude cache reads and cache writes.
@@ -69,6 +70,7 @@ function normalizeClaudeSession(records) {
     if (block.type === "tool_result") {
       const start = block.tool_use_id !== undefined ? tools.get(toolKey(source, block.tool_use_id)) : undefined;
       const success = block.is_error === true || block.error != null ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
+      const workflow = source.tool_use_result?.taskType === "local_workflow" ? source.tool_use_result : undefined;
       return emit(source, "tool.execution_complete", {
         ...data,
         toolCallId: block.tool_use_id,
@@ -76,6 +78,7 @@ function normalizeClaudeSession(records) {
         success,
         output: block.content,
         durationMs: isMetric(block.duration_ms) ? block.duration_ms : undefined,
+        ...(workflow ? { taskId: workflow.taskId, taskType: workflow.taskType, workflowName: workflow.workflowName, workflowRunId: workflow.runId, status: workflow.status } : {}),
       });
     }
     return emit(source, "claude.content_block", data);
@@ -230,8 +233,7 @@ function normalizeClaudeSession(records) {
       }
       terminalResults.push(emit(source, "session.result", data));
     } else if (source.type === "system" && typeof source.subtype === "string") {
-      const taskEvent = ["task_started", "task_progress", "task_updated", "task_notification", "background_tasks_changed"].includes(source.subtype);
-      native(source, taskEvent ? `claude.${source.subtype}` : "claude.system");
+      native(source, Object.hasOwn(DYNAMIC_WORKFLOW_EVENT_TYPES, source.subtype) ? DYNAMIC_WORKFLOW_EVENT_TYPES[source.subtype] : "claude.system");
       if (source.subtype === "api_retry" && source.error != null) {
         reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
       } else if (source.error != null) {

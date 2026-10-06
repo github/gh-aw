@@ -8,6 +8,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { validateAgentExecution } = require("./agent_execution.cjs");
+const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 const RUNTIME_TYPES = new Set([
   "session.format",
@@ -71,6 +72,16 @@ function fields(value, keys) {
 /** @param {any} event @returns {string | undefined} */
 function eventDetail(event) {
   const data = normalizeUnifiedSessionEvent({ ...event, data: event.data ?? {} }).data;
+  if (Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES).includes(event.type)) {
+    if (event.type === DYNAMIC_WORKFLOW_EVENT_TYPES.background_tasks_changed) {
+      return Array.isArray(data.tasks) ? `tasks=[${data.tasks.map(task => fields(task, ["taskId", "taskType", "workflowName", "status"])).join("; ")}]` : "tasks unavailable";
+    }
+    return (
+      fields(data, ["taskId", "toolCallId", "taskType", "workflowName", "status"]) +
+      (data.usage ? ` ${fields(data.usage, ["totalTokens", "toolUses", "durationMs"])}` : "") +
+      (Array.isArray(data.workflowProgress) ? ` progress=[${data.workflowProgress.map(item => fields(item, ["type", "index", "phaseIndex", "agentId", "model", "state", "attempt"])).join("; ")}]` : "")
+    );
+  }
   switch (event.type) {
     case "session.format":
       return `version=${inline(data.version)}`;
@@ -90,22 +101,11 @@ function eventDetail(event) {
       return fields(data, ["toolName", "mcpServerName", "toolCallId"]) + " [started]";
     case "tool.execution_complete": {
       const outcome = data.success === false || data.error != null || data.is_error === true || data.isError === true ? "failed" : data.success === true ? "succeeded" : "outcome unknown";
-      if (data.taskType === "local_workflow" && data.status === "async_launched") {
+      if (data.workflowRunId !== undefined && data.status === "async_launched") {
         return `${fields(data, ["toolName", "toolCallId", "taskId", "workflowName", "workflowRunId"])} [launch ${outcome}; workflow outcome pending]`;
       }
       return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]`;
     }
-    case "claude.task_started":
-    case "claude.task_progress":
-    case "claude.task_updated":
-    case "claude.task_notification":
-      return (
-        fields(data, ["taskId", "toolCallId", "taskType", "workflowName", "status"]) +
-        (data.usage ? ` ${fields(data.usage, ["totalTokens", "toolUses", "durationMs"])}` : "") +
-        (Array.isArray(data.workflowProgress) ? ` progress=[${data.workflowProgress.map(item => fields(item, ["type", "index", "phaseIndex", "agentId", "model", "state", "attempt"])).join("; ")}]` : "")
-      );
-    case "claude.background_tasks_changed":
-      return Array.isArray(data.tasks) ? `tasks=[${data.tasks.map(task => fields(task, ["taskId", "taskType", "workflowName", "status"])).join("; ")}]` : "tasks unavailable";
     case "session.result":
       return fields(data, ["numTurns", "durationMs", "totalCostUsd"]);
     case "agent.execution":

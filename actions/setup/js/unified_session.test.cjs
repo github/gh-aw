@@ -51,13 +51,19 @@ describe("Unified conclusion session", () => {
       workflowName: "smoke-claude-dynamic",
       workflowRunId: "dynamic-run",
     });
-    const started = events.find(event => event.type === "claude.task_started");
+    const started = events.find(event => event.type === "dynamicWorkflows.task_started");
     expect(started.data).toMatchObject({ taskId: "dynamic-task", toolCallId: "workflow-tool", taskType: "local_workflow", workflowName: "smoke-claude-dynamic", sessionId: "dynamic-session" });
-    const progress = events.filter(event => event.type === "claude.task_progress");
+    const progress = events.filter(event => event.type === "dynamicWorkflows.task_progress");
     expect(progress[0].data.usage).toEqual({ totalTokens: 0, toolUses: 0, durationMs: 0 });
     expect(progress[1].data.workflowProgress[1]).toMatchObject({ agentId: "dynamic-agent", phaseIndex: 1, model: "claude-sonnet-4-6", state: "done" });
-    expect(events.find(event => event.type === "claude.task_updated").data).toMatchObject({ taskId: "dynamic-task", status: "completed" });
-    expect(events.find(event => event.type === "claude.task_notification").data).toMatchObject({ taskId: "dynamic-task", toolCallId: "workflow-tool", status: "completed", usage: { totalTokens: 250, toolUses: 2, durationMs: 5000 } });
+    expect(events.find(event => event.type === "dynamicWorkflows.task_updated").data).toMatchObject({ taskId: "dynamic-task", status: "completed" });
+    expect(events.find(event => event.type === "dynamicWorkflows.task_notification").data).toMatchObject({
+      taskId: "dynamic-task",
+      toolCallId: "workflow-tool",
+      status: "completed",
+      usage: { totalTokens: 250, toolUses: 2, durationMs: 5000 },
+    });
+    expect(events.some(event => event.type.startsWith("claude.task_") || event.type === "claude.background_tasks_changed")).toBe(false);
     expect(events.find(event => event.type === "session.result").data.usage).toEqual({ inputTokens: 7, outputTokens: 11, inputTokensIncludeCache: false });
     const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     expect(persisted).not.toContain("PRIVATE_");
