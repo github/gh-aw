@@ -20,14 +20,10 @@ NoExternalDependencies == [w \in Works |-> {}]
 GitHubDependencies == [w \in Works |-> {1, 2}]
 GitHubChildDependencies == [w \in Works |-> IF w = WorkCount THEN {1, 2} ELSE {}]
 Resources == UNION {ExternalDependencies[w] : w \in Works}
-WorkVertex(w) == [kind |-> "work", node |-> w]
 ResourceRef(e) ==
     [kind |-> IF e = 1 THEN "issue" ELSE "pull_request",
      host |-> "github.example", repository |-> IF e = 1 THEN "design" ELSE "library",
      number |-> e, identity |-> e]
-DependencyVertices(w) ==
-    {WorkVertex(v) : v \in Dependencies[w]}
-    \cup {ResourceRef(e) : e \in ExternalDependencies[w]}
 ResourceStatuses(e) ==
     IF ResourceRef(e).kind = "issue" THEN {"open", "closed_completed", "closed_unplanned", "unavailable"}
     ELSE {"open", "merged", "closed_unmerged", "unavailable"}

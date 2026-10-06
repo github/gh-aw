@@ -19,6 +19,7 @@ function classify(exitCode, signal, timedOut, log) {
   if (timedOut) return "timed_out";
   if (exitCode === 0 && !signal && log.includes("Model checking completed. No error has been found.") && /(?:^|\n)\d+ states generated, \d+ distinct states found, 0 states left on queue\.(?:\r?\n|$)/.test(log)) return "passed";
   if ([12, 13].includes(exitCode) && /(?:Invariant|Action property|Temporal property) .+ is violated/.test(log)) return "violation";
+  if (exitCode === 151 && /(?:^|\n)Error: The invariant of \S+ is equal to FALSE(?:\r?\n|$)/.test(log)) return "violation";
   return "tool_error";
 }
 
@@ -48,8 +49,14 @@ function inventory(directory) {
 }
 
 function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = false) {
-  const state = inventory(stateDir);
-  const result = { ...state, archived: false, resumable: false, reason: "no_checkpoint" };
+  let state;
+  try {
+    state = inventory(stateDir);
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error)) throw error;
+    return { bytes: null, files: null, checkpoints: [], archived: false, resumable: false, recovery_validation: "not_attempted", reason: "inventory_error", error: error.message };
+  }
+  const result = { ...state, archived: false, resumable: false, recovery_validation: "not_attempted", reason: "no_checkpoint" };
   if (!state.checkpoints.length) return result;
   if (state.bytes > maxBytes) return { ...result, reason: "state_size_limit" };
   if (!checkpointConfirmed || !state.checkpoints.some(file => file.path.endsWith("vars.chkpt")) || !state.checkpoints.some(file => file.path.endsWith("queue.chkpt"))) {
@@ -58,10 +65,16 @@ function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = f
   const archive = path.join(bundleDir, "checkpoint.tar.gz");
   const packed = spawnSync("tar", ["-czf", archive, "-C", stateDir, "."], { timeout: 90_000, encoding: "utf8" });
   if (packed.error || packed.status !== 0) {
-    if (fs.existsSync(archive)) fs.unlinkSync(archive);
-    return { ...result, reason: "archive_error", error: packed.error?.message || packed.stderr };
+    let cleanupError = null;
+    try {
+      if (fs.existsSync(archive)) fs.unlinkSync(archive);
+    } catch (error) {
+      if (!(error && typeof error === "object" && "code" in error)) throw error;
+      cleanupError = error.message;
+    }
+    return { ...result, reason: "archive_error", error: packed.error?.message || packed.stderr || `tar exited with status ${packed.status}, signal ${packed.signal}`, cleanup_error: cleanupError };
   }
-  return { ...result, archived: true, resumable: true, reason: null };
+  return { ...result, archived: true, reason: "unvalidated_checkpoint_candidate" };
 }
 
 /**
@@ -129,13 +142,20 @@ async function runVerification(options) {
     started_at: started.toISOString(),
     timeout_seconds: timeoutSeconds,
     tlc_sha256: expectedJarSha256,
+    tlc_actual_sha256: null,
     source_sha256: sourceHashes,
     command: [javaBin, ...args],
   };
   const resultPath = path.join(bundleDir, "result.json");
   writeJSON(resultPath, base);
   const jarHash = crypto.createHash("sha256").update(fs.readFileSync(jar)).digest("hex");
-  if (jarHash !== expectedJarSha256) throw new Error("TLC jar checksum does not match the pinned release");
+  base.tlc_actual_sha256 = jarHash;
+  if (jarHash !== expectedJarSha256) {
+    const error = new Error("TLC jar checksum does not match the pinned release");
+    writeJSON(resultPath, { ...base, status: "tool_error", error: error.message, finished_at: new Date().toISOString() });
+    throw error;
+  }
+  writeJSON(resultPath, base);
   const version = spawnSync(javaBin, ["-version"], { encoding: "utf8", timeout: 10_000, env: { ...process.env, ...options.env } });
   fs.writeFileSync(path.join(bundleDir, "java-version.txt"), `${version.stdout || ""}${version.stderr || ""}`);
   const logPath = path.join(bundleDir, "tlc.log");
@@ -170,11 +190,16 @@ async function runVerification(options) {
   clearTimeout(timer);
   clearTimeout(killTimer);
   fs.closeSync(fd);
-  fs.unlinkSync(reservePath);
-  const log = fs.readFileSync(logPath, "utf8");
+  let log;
+  let checkpoints;
+  try {
+    log = fs.readFileSync(logPath, "utf8");
+    checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"));
+  } finally {
+    fs.unlinkSync(reservePath);
+  }
   const finished = lastMatch(log, /(\d+) states generated, (\d+) distinct states found, (\d+) states left on queue\./g);
   const progress = lastMatch(log, /Progress\((\d+)\).*?: ([\d,]+) states generated.*?, ([\d,]+) distinct states found.*?, ([\d,]+) states left on queue\./g);
-  const checkpoints = checkpointBundle(stateDir, bundleDir, options.checkpointMaxBytes ?? CHECKPOINT_MAX_BYTES, log.includes("Checkpointing completed"));
   writeJSON(path.join(bundleDir, "checkpoint-inventory.json"), checkpoints);
   const status = classify(exitCode, signal, timedOut, log);
   const result = {
@@ -202,7 +227,7 @@ async function runVerification(options) {
   const summary =
     `### ${config}\n\nStatus: **${status}**. Exhausted: **${result.exhausted}**.\n\n` +
     `Elapsed: ${result.elapsed_seconds}s. Exit: ${exitCode}. Signal: ${signal || "none"}.\n\n` +
-    `Checkpoint archive: ${checkpoints.archived ? "available" : checkpoints.reason}.\n`;
+    `Checkpoint archive: ${checkpoints.archived ? "unvalidated candidate (recovery not tested)" : checkpoints.reason}.\n`;
   fs.writeFileSync(path.join(bundleDir, "summary.md"), summary);
   fs.writeFileSync(
     path.join(bundleDir, "README.md"),
@@ -212,10 +237,13 @@ async function runVerification(options) {
       "A timed_out, tool_error, setup_incomplete, or missing result is not a proof. " +
       "Decimal state counts are strings to avoid numeric precision loss.\n\n" +
       "checkpoint-inventory.json states whether the complete state directory was archived. " +
-      "Only checkpoint.tar.gz marked resumable contains a bounded full state bundle; omitted state is not recoverable from this artifact.\n\n" +
-      "For recovery, extract the archive, locate the directory containing vars.chkpt, and use the pinned TLC jar, " +
+      "checkpoint.tar.gz is only an unvalidated candidate: completeness and recovery have not been tested, " +
+      "and resumable remains false. Omitted state is not recoverable from this artifact.\n\n" +
+      "To attempt recovery, first verify all required model and worker checkpoint files, extract the archive, " +
+      "locate the directory containing vars.chkpt, and use the pinned TLC jar, " +
       "the snapshot model/configuration, -workers 2, -fp 0, and -recover /path/to/that/directory. " +
-      "Rewrite machine-specific source paths from command when replaying elsewhere.\n"
+      "Rewrite machine-specific source paths from command when replaying elsewhere. " +
+      "Only a successful restore and continued search establish recovery capability.\n"
   );
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
   return result;

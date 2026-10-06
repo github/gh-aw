@@ -469,8 +469,9 @@ Artifacts are retained for 30 days and named
 `work-queue-formal-<configuration>-<run-id>-<attempt>`. They contain exact
 model/config snapshots and hashes, Java/TLC provenance, command, raw log,
 normalized verdict/counts, and checkpoint inventory. A full state archive is
-included only when a completed checkpoint fits the 256 MiB uncompressed cap;
-otherwise the explicit omission reason is retained. Large state directories
+included only when a checkpoint diagnostic and basic file presence checks pass
+and the state fits the 256 MiB uncompressed cap; otherwise the explicit omission
+reason is retained. Large state directories
 are never uploaded indiscriminately.
 
 A read-only agent writes a separate `work-queue-formal-handoff-<run-id>-<attempt>`
@@ -483,10 +484,11 @@ and handoff artifact uploads remain real.
 
 Each daily run currently starts fresh; it does not resume a prior artifact.
 Repeated timeouts on identical sources do not accumulate verification coverage
-or prove exhaustion. The collector's `resumable` archive flag is based on
-checkpoint diagnostics/file presence and full-state packaging; actual restore
-has not been tested, so it is not a recovery-validated checkpoint. The collector
-step uses `continue-on-error`: artifact collection/workflow success must be
+or prove exhaustion. Archives are labeled `unvalidated_checkpoint_candidate`,
+with `resumable: false` and `recovery_validation: "not_attempted"`. Basic file
+presence and packaging do not validate model/worker checkpoint completeness or
+actual restore capability. The collector step uses `continue-on-error`:
+artifact collection/workflow success must be
 distinguished from the `result.json` verification verdict. The five-hour limit
 applies to each matrix job, not the whole workflow including later analysis.
 See the [evidence contract](priority-and-fairness.md#84-daily-verification-evidence-not-accumulated-proof)

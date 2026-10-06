@@ -133,7 +133,9 @@ configuration, distinguish `passed`, `violation`, `timed_out`, `tool_error`, and
 `setup_incomplete`; missing evidence is unavailable, never a pass.
 
 Summarize invariant/counterexample names if present, the latest search depth and
-state counts, and whether a complete resumable checkpoint archive is available.
+state counts, and whether an unvalidated checkpoint archive candidate is available.
+Archives do not establish checkpoint completeness or tested recovery capability;
+preserve `resumable: false` and `recovery_validation: "not_attempted"`.
 Large state directories are deliberately excluded from upload; consult
 `checkpoint-inventory.json` for the explicit archive omission reason.
 
