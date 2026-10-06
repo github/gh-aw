@@ -306,6 +306,15 @@ It does not model dynamic graph admission, multi-profile packing, policy edits,
 idempotency fingerprints/replayed transport responses, actual GitHub credentials,
 resource IDs, observation freshness, artifact delivery, JSON codecs, OTLP delivery,
 or unbounded fairness/liveness. Work positions are causal FIFO positions.
+The [protocol review revision](priority-and-fairness.md#7-proposed-normative-specification)
+additionally specifies selection-before-packing, authenticated activation
+binding recovery, terminal DeliveryFailure/replacement rules, operational
+Control, batch trust domains, and replay/resource budgets. These are acceptance
+obligations, not behavior added to or verified by this model. In particular,
+`DecisionValidity` checks conformance to `NextWork`; it is not an independent
+proportional-service or eventual-grant assertion. The dedicated fairness release
+gate is specified in
+[the validation plan](priority-and-fairness.md#independent-fairness-release-gate).
 The preceding `WorkQueue.tla` checks
 remain regression evidence for the existing implementation, not an operational
 legacy mode in the replacement.
@@ -413,6 +422,17 @@ failures keep an explicit `setup_incomplete` record; artifact availability
 remains visible even if agent analysis fails.
 GitHub resource safe outputs are preview-only; the deterministic verification
 and handoff artifact uploads remain real.
+
+Each daily run currently starts fresh; it does not resume a prior artifact.
+Repeated timeouts on identical sources do not accumulate verification coverage
+or prove exhaustion. The collector's `resumable` archive flag is based on
+checkpoint diagnostics/file presence and full-state packaging; actual restore
+has not been tested, so it is not a recovery-validated checkpoint. The collector
+step uses `continue-on-error`: artifact collection/workflow success must be
+distinguished from the `result.json` verification verdict. The five-hour limit
+applies to each matrix job, not the whole workflow including later analysis.
+See the [evidence contract](priority-and-fairness.md#84-daily-verification-evidence-not-accumulated-proof)
+for follow-up recovery and failure-signaling requirements.
 
 `Safety` includes state types, single open owner per Work, causal history,
 recomputed selection, logical/native capacities, exact Claim charge counts,
