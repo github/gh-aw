@@ -90,12 +90,12 @@ post-steps:
     uses: actions/upload-artifact@v4
     with:
       name: workflow-results
-      path: /tmp/gh-aw/
+      path: /tmp/gh-aw/agent/
       retention-days: 7
 ```
 
 Useful for artifact uploads, summaries, cleanup, or triggering downstream workflows.
-Post-steps must not create issues directly or read the agent's safe-output file (`agent_output.json`).
+Post-steps must not create issues directly, read safe-output files, or expose secrets through a step-level `env` section. Avoid uploading the entire `/tmp/gh-aw/` directory, which can contain protected safe-output files.
 Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish agent-generated issues instead.
 
 ## Custom Jobs (`jobs:`)
