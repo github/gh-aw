@@ -11,6 +11,7 @@ const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
+const { hasCopilotConversation, hasMalformedJsonl } = require("./copilot_session.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
 const CLAUDE_OVERLOAD_PATTERN = /overloaded_error|"overloaded"/i;
@@ -262,11 +263,17 @@ async function runLogParser(options) {
       content = candidate.read();
       for (const value of collectAddMaskedValues(content)) publicationMasks.add(value);
       result = parseLog(content);
-      if (parserName !== "Copilot" || (typeof result === "object" && result?.logEntries?.length)) {
+      const isNativeCopilotSession = parserName === "Copilot" && path.basename(candidate.source) === "events.jsonl";
+      const hasParseErrors = isNativeCopilotSession && hasMalformedJsonl(content);
+      const hasUsableConversation = Array.isArray(result?.logEntries) && hasCopilotConversation(result.logEntries);
+      if (parserName !== "Copilot" || (hasUsableConversation && !hasParseErrors)) {
         if (parserName === "Copilot") core.info(`Using Copilot session log from: ${candidate.source}`);
         break;
       }
-      if (index < candidates.length - 1) core.warning(`No structured Copilot session events parsed from ${candidate.source}; trying ${candidates[index + 1].source}`);
+      if (index < candidates.length - 1) {
+        const reason = hasParseErrors ? "partially malformed" : "no usable conversation";
+        core.warning(`Copilot session log from ${candidate.source} is ${reason}; trying ${candidates[index + 1].source}`);
+      }
     }
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 

@@ -663,6 +663,20 @@ describe("log_parser_bootstrap.cjs", () => {
       if (state === "empty" || state === "malformed") expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("trying"));
     });
 
+    it.each([
+      [JSON.stringify({ type: "session.start", data: { sessionId: "native" } })],
+      [`${JSON.stringify({ type: "session.start", data: { sessionId: "native" } })}\n{"type":"assistant.message",`],
+      [`${native}\n{"type":"assistant.message",`],
+    ])("falls back to stdio when native events are incomplete or lack a conversation", async nativeContent => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/events.jsonl"), nativeContent);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), stdio);
+      await runCopilot(root);
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Recovered stdio conversation.");
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).not.toContain("Native conversation.");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("trying"));
+    });
+
     it("prefers native session events without duplicating stdio or debug observations", async () => {
       fs.mkdirSync(path.join(root, "logs"));
       fs.writeFileSync(path.join(root, "logs/events.jsonl"), native);

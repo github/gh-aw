@@ -7,6 +7,32 @@
 const { normalizeAgentSession, createSessionEvent, accumulateSessionUsage, isTokenCount, isMetric } = require("./agent_session.cjs");
 const { isDeepStrictEqual } = require("node:util");
 
+const COPILOT_CONVERSATION_EVENT_TYPES = new Set(["assistant.message", "assistant.message_delta", "user.message", "tool.execution_start", "tool.execution_complete"]);
+
+/**
+ * @param {Array<any>} events
+ * @returns {boolean}
+ */
+function hasCopilotConversation(events) {
+  return events.some(event => COPILOT_CONVERSATION_EVENT_TYPES.has(event?.type));
+}
+
+/**
+ * @param {string} content
+ * @returns {boolean}
+ */
+function hasMalformedJsonl(content) {
+  return content.split(/\r?\n/).some(line => {
+    if (!line.trim()) return false;
+    try {
+      JSON.parse(line);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+}
+
 /**
  * Copilot persists lifecycle events but emits assistant.usage only on the live
  * transport. Keep those observations and project their accounting separately.
@@ -167,4 +193,4 @@ function copilotUsage(data) {
   return usage;
 }
 
-module.exports = { normalizeCopilotSession };
+module.exports = { hasCopilotConversation, hasMalformedJsonl, normalizeCopilotSession };
