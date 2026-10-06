@@ -5,6 +5,119 @@ description: A fair work-queue DAG with cross-repository Issue/PR dependencies, 
 
 # Priority and fairness for the gh-aw work queue
 
+## 0. Executive walkthrough (no protocol expertise required)
+
+Think of the work queue as a **shared task board that remembers who was assigned
+what, what actually succeeded, and what should happen next**. Agents contribute
+tasks and plans. The queue decides which ready tasks get an assignment. Workers
+do the work, and checked outputs let the next steps proceed.
+
+This is the intended experience of the **proposed design**, not a feature
+already implemented. This section is an intuitive overview; the later sections
+define the precise rules and limits.
+
+```mermaid
+flowchart LR
+    Plan["Agent proposes tasks and plans"] --> Queue["Queue chooses the next ready tasks"]
+    Queue --> Worker["Worker receives an assignment"]
+    Worker --> Check["Queue checks and records each task's outcome"]
+    Check -->|Verified results| Next["Follow-ups with satisfied prerequisites"]
+    Next --> Queue
+    Queue --> History[("One shared history")]
+    Check --> History
+```
+
+### A developer's day: one large-repository migration
+
+A developer asks an agent to plan an SDK migration in a large repository.
+Instead of one long, fragile run, the agent breaks the campaign into useful
+tasks: inspect the existing usage, propose code changes, propose documentation
+changes, and review the combined proposals.
+
+```mermaid
+flowchart LR
+    Inspect["Inspect current SDK usage"] --> Code["Propose code changes"]
+    Inspect --> Docs["Propose documentation changes"]
+    Code --> Review["Review both verified proposals"]
+    Docs --> Review
+    Review --> Handoff["Submit changes for human review"]
+```
+
+Initially, only inspection is ready. Its checked report makes the code and
+documentation tasks ready; neither has to wait for the other. The combined
+review waits for both proposals to be available and verified. A step waiting
+for a PR to merge works similarly: it waits for a trusted check of that
+condition, not an agent's assertion that it probably happened.
+
+Out of the box, ready tasks are assigned in the order the queue accepted them,
+like a normal queue. The queue looks past tasks already assigned, waiting on
+prerequisites, or waiting for a retry, and can assign unrelated ready work when
+capacity permits. Several workers can run at once, so the first task assigned
+need not be the first task finished. GitHub still determines when a reserved
+worker run actually starts.
+
+If the organization explicitly configures priorities and team shares, the queue
+also balances assignment opportunities. Higher-priority work gets more turns
+under the default priority policy, while lower-priority work still has a share.
+Within those priorities, configured teams receive their agreed relative shares
+while their tasks remain eligible. This shares **assignments**, not equal
+computing minutes or guaranteed completion times; priority does not stop a job
+already running. Without that configuration, the queue does not secretly give
+each producer a separate turn.
+
+The agent remains useful: it decides what tasks to propose, prepares their
+plans, and reacts to results. It does not get to bypass the queue, invent extra
+turns for itself, or turn its own "done" message into verified success.
+
+### Save setup time without making everything all-or-nothing
+
+Normally, a worker receives one task. For a repository that takes ten minutes
+to prepare, an approved worker can explicitly receive several compatible,
+already-ready tasks and reuse that setup. The code and documentation proposals
+could share a run; inspection and its not-yet-ready follow-ups cannot.
+
+Each task keeps its own outcome and permission to produce outputs. If the code
+proposal succeeds but the documentation task is cancelled, the code result
+survives. Documentation can get another turn later, and the combined review
+continues to wait for it. With one task, the queue attaches outputs to that task
+automatically; with several, the worker must say which task each output belongs to.
+Each assigned task still counts as its own turn for fairness. A shared run keeps
+its worker reservation until the run has demonstrably stopped.
+
+### What happens when the day does not go to plan
+
+An outage or accidental cancellation does not erase the task board. Recovery
+checks the shared history and the actual worker run. Tasks without recorded
+completion can be retried through the queue when safe, with a delay and a
+finite retry budget. Already completed tasks are not blindly run again: their
+outputs are checked, and missing or uncertain delivery stays visibly blocked
+or failed until it is resolved safely. The queue does not treat silence as proof
+that an old worker stopped.
+
+Changing the campaign halfway through does not change what existing workers
+were asked to do. By default, they finish their saved plans; revised tasks are
+new entries in the same competition. If old and new versions cannot safely
+overlap, an operator pauses new work and waits for the old runs and output
+checks to settle before switching over. Earlier assignments stay recorded;
+a revision or retry is not a shortcut to extra turns.
+
+For a developer or PM, the useful questions have concrete answers:
+
+| Question | What the queue explains |
+|---|---|
+| Why has this task not started? | Its prerequisite, retry delay, capacity/priority limit, or queued/unconfirmed GitHub launch |
+| What survived a failed run? | Each task's recorded completion, verified outputs, and remaining delivery problems |
+| What will happen next? | Which tasks are ready, which need another attempt, and which require operator action |
+| Did the campaign update lose old progress? | The old plans/results remain visible alongside the newly admitted tasks |
+
+The record of these decisions is one shared history, not an agent's memory or
+an optional telemetry dashboard. In the technical sections, a task is **Work**,
+the recorded permission to attempt one task is a **Claim**, and its checked
+output is a **Result**. The [operational recovery scenarios](#718-operational-recovery-scenarios)
+walk through the failure cases in detail.
+
+## 1. Recommendation
+
 **Research date:** 2026-10-05
 
 **Repository examined:** `github/gh-aw`, commit `81891f23dfb58b88bd90c9736887880234bffbe5`
@@ -37,8 +150,6 @@ message. This is enforced authorization, not a prompt convention.
 **Diagram convention:** use Mermaid throughout relationship, information-flow,
 and lifecycle explanations. Keep diagrams consistent with the normative tables,
 guards, and algorithms; diagrams do not introduce separate state or authority.
-
-## 1. Recommendation
 
 Introduce a **mandatory, trusted, hierarchical grant scheduler for every queue**, rather than making priority and fairness additional agent-controlled sort keys:
 
