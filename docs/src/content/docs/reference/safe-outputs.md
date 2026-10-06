@@ -1201,6 +1201,11 @@ safe-outputs:
 
 Agent calls `upload_artifact` with a `path` (file or directory) or `filters` (glob-based file selection). Artifacts are available via `gh run download` during the workflow run retention period.
 
+The repository's `artifact_retention_days` setting in `aw.json`, or the
+`GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` Actions variable when that setting is
+absent, overrides this output's `retention-days`. See
+[Artifact Retention](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention).
+
 ### Asset Uploads (`upload-asset:`)
 
 :::caution[Prefer `upload-artifact` with `skip-archive`]

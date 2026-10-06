@@ -108,6 +108,17 @@ describe("upload_artifact.cjs", () => {
   });
 
   describe("path-based upload", () => {
+    it.each(["7", "400"])("uses expression-resolved retention %s", async retention => {
+      writeStaging("report.json");
+      await runHandler(buildConfig({ "retention-days": retention }), [{ type: "upload_artifact", path: "report.json" }]);
+      expect(mockArtifactClient.uploadArtifact.mock.calls[0][3].retentionDays).toBe(Number(retention));
+    });
+
+    it.each(["", "0", "-1", "401", "7days", "1.5", true, {}, []])("rejects invalid resolved retention %j", async retention => {
+      await expect(runHandler(buildConfig({ "retention-days": retention }), [])).rejects.toThrow("retention-days must resolve to an integer between 1 and 400");
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+    });
+
     it("uploads a single file using config retention days", async () => {
       writeStaging("report.json", '{"result": "ok"}');
 
@@ -795,7 +806,8 @@ describe("upload_artifact.cjs", () => {
 
       await runHandler(buildConfig(), [{ type: "upload_artifact", path: "/etc/hosts" }]);
 
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("system directory"));
+      // macOS canonicalizes /etc to /private/etc, which the allowed-root check rejects.
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^ERR_VALIDATION: upload_artifact: path (refers to a system directory|is outside allowed source roots)/));
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
 

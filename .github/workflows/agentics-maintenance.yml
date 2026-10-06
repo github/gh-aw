@@ -958,7 +958,7 @@ jobs:
         with:
           name: secret-validation-report
           path: secret-validation-report.md
-          retention-days: 30
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}
           if-no-files-found: warn
 
   ledger_compaction_plan:
@@ -1452,7 +1452,7 @@ jobs:
         with:
           name: ledger-compaction-plans
           path: ${{ runner.temp }}/gh-aw/ledger-compaction
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: error
       - name: Report ledger compaction planning failures
         if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' }}

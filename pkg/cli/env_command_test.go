@@ -66,6 +66,26 @@ func TestNewEnvCommand(t *testing.T) {
 	assert.Contains(t, updateRepoFlag.Usage, "owner/repo format only", "env update --repo help should explicitly document its narrower repo format")
 }
 
+func TestDefaultsArtifactRetentionDays(t *testing.T) {
+	for _, value := range []string{"1", "7", "90", "400"} {
+		file, err := defaultsParseFile("defaults.yml", []byte("default_artifact_retention_days: \""+value+"\"\n"))
+		require.NoError(t, err)
+		require.NoError(t, defaultsValidateFile(&file))
+		require.NotNil(t, file.DefaultArtifactRetentionDays)
+		assert.Equal(t, value, *file.DefaultArtifactRetentionDays)
+		changes := defaultsBuildUpdateChanges(&file)
+		index := slices.IndexFunc(changes, func(change defaultsUpdateChange) bool {
+			return change.envName == "GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS"
+		})
+		require.NotEqual(t, -1, index)
+		assert.Equal(t, value, changes[index].value)
+		assert.False(t, changes[index].delete)
+	}
+	for _, value := range []string{"", "0", "-1", "401", "1.5", "seven", "${{ vars.RETENTION }}"} {
+		require.ErrorContains(t, defaultsValidateFile(&defaultsFile{DefaultArtifactRetentionDays: &value}), "default_artifact_retention_days")
+	}
+}
+
 func TestResolveDefaultsTarget(t *testing.T) {
 	orig := defaultsGetCurrentRepoSlug
 	defaultsGetCurrentRepoSlug = func() (string, error) { return "octo-org/example", nil }
