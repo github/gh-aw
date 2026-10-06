@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
+
+const conclusionWorkQueueActivationArtifactDir = "${{ runner.temp }}/gh-aw-activation"
 
 // buildConclusionSetupSteps extracts the common setup, token minting, and artifact steps.
 func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
@@ -64,7 +67,7 @@ func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []str
 	}
 	steps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName: artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String(),
-		DownloadPath: constants.TmpGhAwDirSlash,
+		DownloadPath: conclusionWorkQueueActivationArtifactDir,
 		StepName:     "Download activation artifact for work queue summary",
 		IfCondition:  "always()",
 	}, c.getActionPin)
@@ -81,7 +84,7 @@ func (c *Compiler) buildConclusionWorkQueueSummaryStep(data *WorkflowData) []str
 		"        with:\n",
 		"          script: |\n",
 		"            const { main } = require('${{ runner.temp }}/gh-aw/actions/work_queue_summary.cjs');\n",
-		"            await main({ core, githubClient: github, context });\n",
+		fmt.Sprintf("            await main({ core, githubClient: github, context, snapshotPath: '%s' });\n", path.Join(conclusionWorkQueueActivationArtifactDir, "work-queue.snapshot.json")),
 	)
 }
 
