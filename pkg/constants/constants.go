@@ -322,6 +322,9 @@ const DefaultMCPGatewayPayloadSizeThreshold = 524288
 // DefaultFirewallRegistry is the container image registry for AWF (gh-aw-firewall) Docker images
 const DefaultFirewallRegistry = "ghcr.io/github/gh-aw-firewall"
 
+// DefaultRouterRegistry is the container image registry for the gh-aw model router.
+const DefaultRouterRegistry = "ghcr.io/githubnext/gh-aw-router"
+
 // DefaultNodeAlpineLTSImage is the default Node.js Alpine LTS container image for MCP servers
 // Using node:lts-alpine provides the latest LTS version with minimal footprint
 const DefaultNodeAlpineLTSImage = "node:lts-alpine"
