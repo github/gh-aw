@@ -284,10 +284,6 @@ func generateModelRoutingConversationStep(yaml *strings.Builder, data *WorkflowD
 	}
 	promptFilePath := constants.AwPromptsUserFile
 	fallbackFilePath := constants.AwPromptsFile
-	if isArcDindTopology(data) {
-		promptFilePath = constants.AwPromptsUserFileExpr
-		fallbackFilePath = constants.AwPromptsFileExpr
-	}
 	yaml.WriteString("      - name: Prepare model-routing conversation\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_ROUTING_PROMPT: " + promptFilePath + "\n")

@@ -75,7 +75,7 @@ func TestGenerateModelRoutingConversationStep(t *testing.T) {
 		fallback string
 	}{
 		{"hosted", "", constants.AwPromptsUserFile, constants.AwPromptsFile},
-		{"arc-dind", RunnerTopologyArcDind, constants.AwPromptsUserFileExpr, constants.AwPromptsFileExpr},
+		{"arc-dind", RunnerTopologyArcDind, constants.AwPromptsUserFile, constants.AwPromptsFile},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var output strings.Builder
@@ -89,10 +89,8 @@ func TestGenerateModelRoutingConversationStep(t *testing.T) {
 			require.Contains(t, output.String(), "GH_AW_ROUTING_PROMPT_FALLBACK: "+tc.fallback+"\n")
 			require.Contains(t, output.String(), modelRoutingConversationFile)
 			require.Contains(t, output.String(), "role:'user',parts:[{text:prompt}]")
-			if tc.topology == "" {
-				require.NotContains(t, output.String(), "${{ runner.temp }}")
-				require.NotContains(t, output.String(), "${RUNNER_TEMP}")
-			}
+			require.NotContains(t, output.String(), "${{ runner.temp }}")
+			require.NotContains(t, output.String(), "${RUNNER_TEMP}")
 
 			source := `---
 on: workflow_dispatch
@@ -117,7 +115,15 @@ network:
 			require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
 			compiled, err := os.ReadFile(filepath.Join(dir, "routed.lock.yml"))
 			require.NoError(t, err)
-			require.Contains(t, string(compiled), output.String())
+			compiledYAML := string(compiled)
+			require.Contains(t, compiledYAML, output.String())
+			if tc.topology == RunnerTopologyArcDind {
+				routingStepIndex := strings.Index(compiledYAML, "- name: Prepare model-routing conversation")
+				promptStagingIndex := strings.Index(compiledYAML, "cp -a /tmp/gh-aw/aw-prompts")
+				require.NotEqual(t, -1, routingStepIndex)
+				require.NotEqual(t, -1, promptStagingIndex)
+				require.Greater(t, promptStagingIndex, routingStepIndex)
+			}
 		})
 	}
 }
