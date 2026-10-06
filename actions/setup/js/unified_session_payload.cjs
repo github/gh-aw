@@ -3,6 +3,7 @@
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {Record<string, string[]>} Fields */
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
+const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs");
 const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 /** @type {Fields} */
@@ -102,6 +103,7 @@ const TASK_FIELDS = {
 
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
+  ...COPILOT_WORKFLOW_EVENT_FIELDS,
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
@@ -329,7 +331,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
     const errors = source.errors ?? source.failures;
     if (Array.isArray(errors)) data.errors = errors.map(error => (error && typeof error === "object" && !Array.isArray(error) ? selectFields(error, SAFE_OUTPUT_FIELDS) : structuredClone(error)));
   }
-  const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"] });
+  const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
   /** @type {any} */
   const nativeMessage = event.message;
   if (!Object.hasOwn(metadata, "timestamp") && nativeMessage?.timestamp !== undefined) metadata.timestamp = structuredClone(nativeMessage.timestamp);

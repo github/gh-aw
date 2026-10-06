@@ -167,6 +167,18 @@ Dot-namespaced means a type containing a namespace separator, for example `sessi
 
 Existing native payload fields, including fields not understood by the implementation, remain supported. Native metadata can include source-specific versions; preserving an existing native field is different from adding a specification version field.
 
+Copilot dynamic workflow observations (`workflow.run_started`,
+`workflow.run_updated`, and `workflow.run_settled`) retain run identity, attempt
+or revision, status, failure class, and supplied resource counters in the unified
+projection. Subagent lifecycle observations retain their agent and tool-call
+identity; `subagent.started.workflowRunId` links them to the dynamic run, with
+`factoryRunId` accepted as a legacy alias. Publication views display these fields
+without dumping workflow arguments, results, or agent descriptions. Workflow
+resource counters are observations, not additional session token or cost totals.
+The SDK driver captures ephemeral workflow lifecycle signals explicitly. Native
+CLI disk logs need not contain these signals; collectors must not invent events
+that were never supplied by the source.
+
 ### 3.3 Parser integration
 
 **T-UAS-008 — Existing API boundary.** Parser integrations MUST keep the trace in the existing `logEntries` return member. Presentation text and flags such as `mcpFailures` and `maxTurnsHit` MUST remain separate from event data unless they reflect actual source observations. Canonical `logEntries` MUST NOT contain bare legacy `result` entries for telemetry convenience.

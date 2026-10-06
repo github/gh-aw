@@ -14806,8 +14806,8 @@
             },
             "dynamic-workflows": {
               "type": "boolean",
-              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
-              "default": true
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to false. Copilot dynamic workflows are experimental.",
+              "default": false
             },
             "mcp": {
               "type": "object",
@@ -15004,8 +15004,8 @@
             },
             "dynamic-workflows": {
               "type": "boolean",
-              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to true.",
-              "default": true
+              "description": "Whether dynamic workflows are enabled for engines that support them. Defaults to false. Copilot dynamic workflows are experimental.",
+              "default": false
             }
           },
           "required": ["runtime"],

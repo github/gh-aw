@@ -117,6 +117,13 @@ describe("unified session publication views", () => {
     }
   });
 
+  it("renders top-level parent correlation for Copilot subagent events in both views", () => {
+    const events = [header, { ...event("subagent.started", { agentName: "child" }, "agent", 1, 1), agentId: "child-id", parentId: "parent-id" }];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("subagent.started agentId=child-id agentName=child parentId=parent-id");
+    }
+  });
+
   it("scopes agent pairing, snapshots and accounting without adding firewall usage", () => {
     const output = generatePlainTextSummary(trace);
     const first = output.slice(output.indexOf("Agent source: agent/session-a.jsonl"), output.indexOf("Agent source: agent/session-b.jsonl"));

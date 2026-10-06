@@ -1320,16 +1320,16 @@ func TestEngineDynamicWorkflowsFieldExtraction(t *testing.T) {
 		enabled bool
 	}{
 		{
-			name:    "engine string defaults to enabled",
+			name:    "engine string uses engine default",
 			engine:  "claude",
-			enabled: true,
+			enabled: false,
 		},
 		{
-			name: "engine object defaults to enabled",
+			name: "engine object uses engine default",
 			engine: map[string]any{
 				"id": "claude",
 			},
-			enabled: true,
+			enabled: false,
 		},
 		{
 			name: "explicitly enabled",
@@ -1375,13 +1375,27 @@ func TestEngineDynamicWorkflowsFieldExtraction(t *testing.T) {
 func TestDynamicWorkflowsEnabledUsesEngineCapability(t *testing.T) {
 	engine := NewClaudeEngine()
 	engine.id = "not-claude"
-	assert.True(t, dynamicWorkflowsEnabled(engine, nil))
+	assert.False(t, dynamicWorkflowsEnabled(engine, nil))
+	enabled := true
+	assert.True(t, dynamicWorkflowsEnabled(engine, &EngineConfig{DynamicWorkflows: &enabled}))
 
 	disabled := false
 	assert.False(t, dynamicWorkflowsEnabled(engine, &EngineConfig{DynamicWorkflows: &disabled}))
 
 	engine.capabilities.DynamicWorkflows = false
 	assert.False(t, dynamicWorkflowsEnabled(engine, nil))
+}
+
+func TestDynamicWorkflowsEnabledRequiresOptIn(t *testing.T) {
+	enabled, disabled := true, false
+	for _, engine := range []CodingAgentEngine{NewCopilotEngine(), NewClaudeEngine(), NewCodexEngine()} {
+		t.Run(engine.GetID(), func(t *testing.T) {
+			assert.False(t, dynamicWorkflowsEnabled(engine, nil))
+			assert.False(t, dynamicWorkflowsEnabled(engine, &EngineConfig{}))
+			assert.False(t, dynamicWorkflowsEnabled(engine, &EngineConfig{DynamicWorkflows: &disabled}))
+			assert.Equal(t, engine.GetCapabilities().DynamicWorkflows, dynamicWorkflowsEnabled(engine, &EngineConfig{DynamicWorkflows: &enabled}))
+		})
+	}
 }
 
 func TestEngineBareFieldExtraction(t *testing.T) {
