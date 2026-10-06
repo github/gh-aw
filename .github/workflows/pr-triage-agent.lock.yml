@@ -981,7 +981,8 @@ jobs:
                     "risk"
                   ],
                   "type": "object"
-                }
+                },
+                "collapseData": true
               },
               "create_pull_request_review_comment": {
                 "defaultMax": 1,

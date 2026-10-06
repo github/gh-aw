@@ -681,7 +681,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "mentions": {
                 "enabled": false

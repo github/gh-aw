@@ -1140,7 +1140,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "create_pull_request_review_comment": {
                 "defaultMax": 1,

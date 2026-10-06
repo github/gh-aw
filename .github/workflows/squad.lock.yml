@@ -1242,7 +1242,8 @@ jobs:
                     "squad_artifact"
                   ],
                   "type": "object"
-                }
+                },
+                "collapseData": true
               },
               "create_pull_request": {
                 "defaultMax": 1,

@@ -929,7 +929,8 @@ jobs:
                     "sanitize": true,
                     "maxLength": 128
                   }
-                }
+                },
+                "collapseData": true
               },
               "hide_comment": {
                 "defaultMax": 5,
