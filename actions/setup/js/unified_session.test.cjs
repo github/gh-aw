@@ -344,6 +344,13 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
+  it.each([true, false])("persists dry_run=%s in workflow.info", dryRun => {
+    write("aw_info.json", { engine_id: "copilot", dry_run: dryRun });
+    writeUnifiedSession({ rootDir: root, engine: "copilot" });
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8").trimEnd().split("\n").map(JSON.parse);
+    expect(persisted.find(event => event.type === "workflow.info").data.dryRun).toBe(dryRun);
+  });
+
   it("collects rate-limit state and provenance without duplicating the copied artifact or leaking unknown fields", () => {
     const rateLimits = [
       {

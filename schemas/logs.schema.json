@@ -2835,6 +2835,12 @@
             "object"
           ],
           "properties": {
+            "dry_run": {
+              "type": "boolean"
+            },
+            "no_dry_run": {
+              "type": "boolean"
+            },
             "message": {
               "type": "string"
             },
@@ -2899,6 +2905,12 @@
             "properties": {
               "repository": {
                 "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
+              "no_dry_run": {
+                "type": "boolean"
               },
               "message": {
                 "type": "string"

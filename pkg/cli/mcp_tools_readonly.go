@@ -71,6 +71,8 @@ Returns a JSON array where each element has the following structure:
 // compileArgs holds the input parameters for the compile tool.
 type compileArgs struct {
 	Workflows   []string `json:"workflows,omitempty" jsonschema:"Workflow files to compile as an array (e.g., [\"workflow.md\"]) (empty for all)"`
+	DryRun      bool     `json:"dry_run,omitempty" jsonschema:"Disable compiler-managed GitHub mutations, stage safe outputs, record dry_run in aw_info.json, and enable strict validation and all checks; custom scripts and external MCP effects remain unverified; explicitly disabling a required check is rejected; does not upload or dispatch workflows"`
+	Environment string   `json:"environment,omitempty" jsonschema:"Override the environment on every generated job; reusable-workflow caller jobs are rejected"`
 	Strict      bool     `json:"strict,omitempty" jsonschema:"Override frontmatter to enforce strict mode validation for all workflows. Note: Workflows default to strict mode unless frontmatter sets strict: false"`
 	Zizmor      bool     `json:"zizmor,omitempty" jsonschema:"Run zizmor security scanner on generated .lock.yml files"`
 	Poutine     bool     `json:"poutine,omitempty" jsonschema:"Run poutine security scanner on generated .lock.yml files"`
@@ -122,6 +124,7 @@ Returns JSON array with validation results for each workflow:
 - valid: Boolean indicating if compilation was successful
 - errors: Array of error objects with type, message, and optional line number
 - warnings: Array of warning objects
+- scope: "batch" for compiler/scanner diagnostics that cannot be attributed to one workflow (omitted for workflow results); development compilation fails if any result is invalid
 - compiled_file: Path to the generated .lock.yml file`,
 		InputSchema: compileSchema,
 		Icons:       mcpToolIcons("📋"),
@@ -133,6 +136,26 @@ Returns JSON array with validation results for each workflow:
 		default:
 		}
 
+		if args.DryRun {
+			var rawArgs map[string]json.RawMessage
+			if err := json.Unmarshal(req.Params.Arguments, &rawArgs); err != nil {
+				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "invalid compile arguments", err.Error())
+			}
+			explicitFlags := make(map[string]bool)
+			for _, name := range DryRunRequiredBoolFlags() {
+				if raw, supplied := rawArgs[name]; supplied {
+					var enabled bool
+					if err := json.Unmarshal(raw, &enabled); err != nil {
+						return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, "invalid boolean compile flag", name)
+					}
+					explicitFlags[name] = enabled
+				}
+			}
+			if err := ValidateDevelopmentCompileFlags(args.DryRun, explicitFlags); err != nil {
+				return nil, nil, newMCPError(jsonrpc.CodeInvalidParams, err.Error(), nil)
+			}
+		}
+
 		// dockerUnavailableWarning is set when Docker is not accessible but the compile
 		// should still proceed without the static-analysis tools.  After the compile
 		// attempt, the warning is appended to workflow results in the JSON output so
@@ -141,7 +164,8 @@ Returns JSON array with validation results for each workflow:
 		var dockerUnavailableWarning string
 
 		// Check if any static analysis tools are requested that require Docker images
-		if args.Zizmor || args.Poutine || args.Actionlint || args.RunnerGuard || args.Syft || args.Grype || args.Grant || args.Yamllint {
+		// Development mode delegates all checks to the CLI and must never downgrade them.
+		if !args.DryRun && (args.Zizmor || args.Poutine || args.Actionlint || args.RunnerGuard || args.Syft || args.Grype || args.Grant || args.Yamllint) {
 			// Check if Docker images are available; if not, start downloading and return retry message
 			if err := CheckAndPrepareDockerImages(ctx, DockerImagesOptions{
 				Zizmor:      args.Zizmor,
@@ -202,6 +226,12 @@ Returns JSON array with validation results for each workflow:
 		// Add strict flag if requested
 		if args.Strict {
 			cmdArgs = append(cmdArgs, "--strict")
+		}
+		if args.DryRun {
+			cmdArgs = append(cmdArgs, "--dry-run")
+		}
+		if args.Environment != "" {
+			cmdArgs = append(cmdArgs, "--environment", args.Environment)
 		}
 
 		// Add static analysis flags if requested
@@ -290,7 +320,11 @@ Returns JSON array with validation results for each workflow:
 		if dockerUnavailableWarning != "" {
 			outputStr = injectDockerUnavailableWarning(outputStr, dockerUnavailableWarning)
 		}
-		outputStr = injectShellcheckDiagnostics(outputStr, string(stderr))
+		if args.DryRun {
+			outputStr = injectDevelopmentShellcheckDiagnostics(outputStr, string(stderr))
+		} else {
+			outputStr = injectShellcheckDiagnostics(outputStr, string(stderr))
+		}
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
@@ -506,6 +540,38 @@ func injectDockerUnavailableWarning(outputStr, warningMsg string) string {
 		Type:    "docker_unavailable",
 		Message: warningMsg,
 	})
+}
+
+func injectDevelopmentShellcheckDiagnostics(outputStr, stderrOutput string) string {
+	diagnostics := extractShellcheckDiagnostics(stderrOutput)
+	if len(diagnostics) == 0 {
+		return outputStr
+	}
+	var results []ValidationResult
+	if err := json.Unmarshal([]byte(outputStr), &results); err != nil {
+		return outputStr
+	}
+	index := -1
+	for i, result := range results {
+		if result.Scope == "batch" && result.Workflow == "shellcheck" {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		results = append(results, ValidationResult{Scope: "batch", Workflow: "shellcheck", Valid: false, Warnings: []ValidationIssue{}})
+		index = len(results) - 1
+	}
+	if index >= 0 && index < len(results) {
+		for _, diagnostic := range diagnostics {
+			results[index].Errors = append(results[index].Errors, ValidationIssue{Type: "shellcheck", Message: diagnostic})
+		}
+	}
+	output, err := formatValidationOutput(results)
+	if err != nil {
+		return outputStr
+	}
+	return output
 }
 
 func injectShellcheckDiagnostics(outputStr, stderrOutput string) string {

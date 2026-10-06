@@ -66,7 +66,7 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		// When threat detection is enabled, we only restore the cache and defer saving to a separate job after detection
 		// Use actions/cache for normal caches (which auto-saves via post-action)
 		threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
-		useRestoreOnly := cache.RestoreOnly || threatDetectionEnabled
+		useRestoreOnly := data.DryRun || cache.RestoreOnly || threatDetectionEnabled
 
 		actionName := "Restore cache-memory file share data"
 
@@ -133,6 +133,9 @@ func generateCacheMemoryGitSetupStep(builder *strings.Builder, cache CacheMemory
 // to the current integrity branch. These steps run after agent execution and before artifact
 // upload so that the saved tarball always includes up-to-date git history.
 func generateCacheMemoryGitCommitSteps(builder *strings.Builder, data *WorkflowData) {
+	if data.DryRun {
+		return
+	}
 	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
 		return
 	}

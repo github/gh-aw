@@ -200,6 +200,7 @@ const EVENT_FIELDS = {
     threshold: ["threshold"],
   },
   "workflow.info": {
+    dryRun: ["dryRun", "dry_run"],
     engineId: ["engineId", "engine_id", "engine"],
     agentVersion: ["agentVersion", "agent_version"],
     cliVersion: ["cliVersion", "cli_version"],
