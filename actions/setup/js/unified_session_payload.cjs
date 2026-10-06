@@ -125,6 +125,8 @@ const EVENT_FIELDS = {
     taskType: ["taskType"],
     workflowName: ["workflowName"],
     workflowRunId: ["workflowRunId"],
+    workflowSessionUrl: ["workflowSessionUrl"],
+    warning: ["warning"],
   },
   "session.result": {
     numTurns: ["numTurns", "num_turns"],

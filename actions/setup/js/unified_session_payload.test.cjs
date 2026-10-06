@@ -14,6 +14,50 @@ import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it("projects and validates remote workflow launches without assuming a local run ID", () => {
+    const record = structuredClone(dynamicWorkflow.find(record => record.tool_use_result));
+    record.tool_use_result = {
+      status: "remote_launched",
+      taskId: "remote-task",
+      taskType: "remote_agent",
+      workflowName: "smoke-claude-dynamic",
+      sessionUrl: "https://claude.ai/code/session-fixture",
+      warning: "Local changes are not present in the cloud checkout",
+      scriptPath: "PRIVATE_SCRIPT_PATH",
+    };
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "remote.jsonl", events: normalizeClaudeSession([record]) }]);
+    expect(events[0].data).toMatchObject({
+      taskId: "remote-task",
+      taskType: "remote_agent",
+      workflowName: "smoke-claude-dynamic",
+      workflowSessionUrl: record.tool_use_result.sessionUrl,
+      warning: record.tool_use_result.warning,
+      status: "remote_launched",
+    });
+    expect(events[0].data).not.toHaveProperty("workflowRunId");
+    expect(createSessionValidator("unified").event(events[0])).toBe(true);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("workflowSessionUrl=https://claude.ai/code/session-fixture");
+      expect(output).toContain("warning=Local changes are not present in the cloud checkout");
+      expect(output).toContain("[launch succeeded; workflow outcome pending]");
+      expect(output).not.toContain("PRIVATE_");
+    }
+  });
+
+  it("renders a failed workflow launch without claiming its workflow is running", () => {
+    const record = structuredClone(dynamicWorkflow.find(record => record.tool_use_result));
+    record.tool_use_result.error = "Workflow syntax check failed";
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "invalid.jsonl", events: normalizeClaudeSession([record]) }]);
+    expect(events[0].data).toMatchObject({ error: "Workflow syntax check failed", success: false, status: "async_launched" });
+    expect(createSessionValidator("unified").event(events[0])).toBe(true);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("[launch failed]");
+      expect(output).toContain("Workflow syntax check failed");
+      expect(output).not.toContain("workflow outcome pending");
+      expect(output).not.toContain("[launch succeeded");
+    }
+  });
+
   it("preserves completion-only dynamic workflow launch metadata without a tool start", () => {
     const record = dynamicWorkflow.find(record => record.tool_use_result);
     const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "partial.jsonl", events: normalizeClaudeSession([record]) }]);

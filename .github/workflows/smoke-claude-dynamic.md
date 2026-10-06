@@ -46,6 +46,7 @@ post-steps:
       const path = require("node:path");
       const { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "log_parser_shared.cjs"));
       const { normalizeClaudeSession } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "claude_session.cjs"));
+      const { normalizeUnifiedSessionEvent } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "unified_session_payload.cjs"));
       const script = ".claude/workflows/smoke-claude-dynamic.js";
       const fixture = ".claude/workflows/references/smoke-claude-dynamic/.context";
       for (const file of [script, fixture]) {
@@ -64,7 +65,7 @@ post-steps:
       }, "The saved workflow must return the expected fixture and invocation arguments");
       const records = parseLogEntries(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
       assert.ok(Array.isArray(records), "Claude must produce a parseable native session log");
-      const events = normalizeClaudeSession(records);
+      const events = normalizeClaudeSession(records).map(event => normalizeUnifiedSessionEvent(event));
       const launches = events.filter(event =>
         event.type === "tool.execution_start" &&
         event.data?.toolName === "Workflow" &&
@@ -72,17 +73,24 @@ post-steps:
         event.data.input.args?.runId === process.env.SMOKE_RUN_ID
       );
       assert.ok(launches.length > 0, "Claude must invoke the saved script through the native Workflow tool");
-      assert.ok(launches.some(launch => events.some(event =>
-        event.type === "tool.execution_complete" &&
-        event.data?.toolCallId === launch.data.toolCallId &&
-        event.data.success === true
-      )), "The native Workflow tool must launch successfully");
-      assert.ok(launches.some(launch => records.some(record =>
-        record.type === "system" &&
-        record.subtype === "task_notification" &&
-        record.tool_use_id === launch.data.toolCallId &&
-        record.status === "completed"
-      )), "The launched dynamic workflow must complete successfully");
+      assert.ok(launches.some(launch => {
+        const completion = events.find(event =>
+          event.type === "tool.execution_complete" &&
+          event.data?.toolCallId === launch.data.toolCallId
+        );
+        return completion?.data.success === true &&
+          completion.data.error == null &&
+          completion.data.status === "async_launched" &&
+          completion.data.workflowName === "smoke-claude-dynamic" &&
+          typeof completion.data.taskId === "string" &&
+          typeof completion.data.workflowRunId === "string" &&
+          events.some(event =>
+            event.type === "dynamicWorkflows.task_notification" &&
+            event.data?.toolCallId === launch.data.toolCallId &&
+            event.data.taskId === completion.data.taskId &&
+            event.data.status === "completed"
+          );
+      }), "The native Workflow tool must launch locally without errors and its correlated task must complete");
       fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
         "## Claude dynamic workflow smoke: PASS\n\n" +
         "Verified trusted activation packaging, recursive hidden-file restoration, " +
@@ -98,6 +106,9 @@ Its script is `.claude/workflows/smoke-claude-dynamic.js`.
 Do not create, rewrite, or substitute a workflow script, and do not perform the
 fixture-reading task yourself.
 
+Check the launch result's `error` field before treating it as started: a syntax
+error can return `status: "async_launched"` even though no workflow ran. This smoke
+requires a local launch, not `remote_launched`.
 Wait for the workflow to finish and use its returned JSON object, not the
 background-launch acknowledgement. It must contain `status: "PASS"`,
 `workflow: "smoke-claude-dynamic"`, the fixture token, and this run's ID.

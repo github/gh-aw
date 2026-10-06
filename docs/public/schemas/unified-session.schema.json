@@ -63,7 +63,7 @@
         "then": {
           "properties": {
             "data": {
-              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22%7C%22taskId%22%7C%22taskType%22%7C%22workflowName%22%7C%22workflowRunId%22)%3E"
+              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22%7C%22taskId%22%7C%22taskType%22%7C%22workflowName%22%7C%22workflowRunId%22%7C%22workflowSessionUrl%22%7C%22warning%22)%3E"
             }
           }
         }
@@ -337,7 +337,7 @@
       "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" } },
       "additionalProperties": false
     },
-    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\")>": {
+    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\"|\"workflowSessionUrl\"|\"warning\")>": {
       "type": "object",
       "properties": {
         "toolCallId": { "type": "string" },
@@ -353,7 +353,9 @@
         "taskId": { "type": "string" },
         "taskType": { "type": "string" },
         "workflowName": { "type": "string" },
-        "workflowRunId": { "type": "string" }
+        "workflowRunId": { "type": "string" },
+        "workflowSessionUrl": { "type": "string" },
+        "warning": { "type": "string" }
       },
       "additionalProperties": false
     },

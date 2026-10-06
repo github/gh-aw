@@ -101,8 +101,9 @@ function eventDetail(event) {
       return fields(data, ["toolName", "mcpServerName", "toolCallId"]) + " [started]";
     case "tool.execution_complete": {
       const outcome = data.success === false || data.error != null || data.is_error === true || data.isError === true ? "failed" : data.success === true ? "succeeded" : "outcome unknown";
-      if (data.workflowRunId !== undefined && data.status === "async_launched") {
-        return `${fields(data, ["toolName", "toolCallId", "taskId", "workflowName", "workflowRunId"])} [launch ${outcome}; workflow outcome pending]`;
+      if ((data.workflowRunId !== undefined || data.workflowName !== undefined || data.workflowSessionUrl !== undefined) && (data.status === "async_launched" || data.status === "remote_launched")) {
+        const pending = outcome === "failed" ? "" : "; workflow outcome pending";
+        return `${fields(data, ["toolName", "toolCallId", "taskId", "workflowName", "workflowRunId", "workflowSessionUrl", "warning"])} [launch ${outcome}${pending}]`;
       }
       return `${fields(data, ["toolName", "mcpServerName", "toolCallId", "durationMs"])} [${outcome}]`;
     }

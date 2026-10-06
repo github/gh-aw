@@ -69,8 +69,12 @@ function normalizeClaudeSession(records) {
     }
     if (block.type === "tool_result") {
       const start = block.tool_use_id !== undefined ? tools.get(toolKey(source, block.tool_use_id)) : undefined;
-      const success = block.is_error === true || block.error != null ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
-      const workflow = source.tool_use_result?.taskType === "local_workflow" ? source.tool_use_result : undefined;
+      const result = source.tool_use_result;
+      const workflow =
+        result && (block.name === "Workflow" || start?.toolName === "Workflow" || result.taskType === "local_workflow" || (["async_launched", "remote_launched"].includes(result.status) && typeof result.workflowName === "string"))
+          ? result
+          : undefined;
+      const success = block.is_error === true || block.error != null || workflow?.error != null ? false : block.is_error === false ? true : typeof block.success === "boolean" ? block.success : undefined;
       return emit(source, "tool.execution_complete", {
         ...data,
         toolCallId: block.tool_use_id,
@@ -78,7 +82,18 @@ function normalizeClaudeSession(records) {
         success,
         output: block.content,
         durationMs: isMetric(block.duration_ms) ? block.duration_ms : undefined,
-        ...(workflow ? { taskId: workflow.taskId, taskType: workflow.taskType, workflowName: workflow.workflowName, workflowRunId: workflow.runId, status: workflow.status } : {}),
+        ...(workflow
+          ? {
+              taskId: workflow.taskId,
+              taskType: workflow.taskType,
+              workflowName: workflow.workflowName,
+              workflowRunId: workflow.runId,
+              workflowSessionUrl: workflow.sessionUrl,
+              status: workflow.status,
+              warning: workflow.warning,
+              ...(workflow.error != null ? { error: workflow.error } : {}),
+            }
+          : {}),
       });
     }
     return emit(source, "claude.content_block", data);

@@ -66,6 +66,8 @@ The repository's [`smoke-claude-dynamic` workflow](https://github.com/github/gh-
 
 Unified session traces distinguish a successful background launch from workflow completion. The Claude adapter maps task lifecycle observations to engine-independent events (`dynamicWorkflows.task_started`, `dynamicWorkflows.task_progress`, `dynamicWorkflows.task_updated`, `dynamicWorkflows.task_notification`, and `dynamicWorkflows.background_tasks_changed`). These retain task/tool correlation and expose observed progress and completion status without publishing embedded workflow scripts or agent prompts. Task usage snapshots are shown separately, not added to the parent session's token totals.
 
+The [`Workflow` result](https://code.claude.com/docs/en/agent-sdk/typescript#workflow-2) can report `async_launched` for a local run or `remote_launched` for a cloud session. Unified traces preserve the run ID as `workflowRunId` or the cloud session URL as `workflowSessionUrl`, along with launch warnings. An embedded `error` marks the launch as failed even if its status is `async_launched`; that status alone is not evidence that the script ran. The smoke workflow requires an error-free local launch and a matching completed task.
+
 For an offline native-CLI compatibility check against an installed version, run the opt-in contract suite from `actions/setup/js`:
 
 ```bash

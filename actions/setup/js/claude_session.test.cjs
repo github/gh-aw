@@ -138,6 +138,43 @@ describe("Claude CI session shapes", () => {
 });
 
 describe("Claude dynamic workflow transport", () => {
+  it.each(["async_launched", "remote_launched"])("retains %s launch metadata even with an optional task type and no start event", status => {
+    const record = structuredClone(dynamicWorkflow.find(record => record.tool_use_result));
+    record.tool_use_result = {
+      status,
+      taskId: "dynamic-task",
+      workflowName: "smoke-claude-dynamic",
+      ...(status === "remote_launched" ? { sessionUrl: "https://claude.ai/code/session-fixture", warning: "Local changes are not present in the cloud checkout" } : { runId: "dynamic-run" }),
+    };
+    const original = structuredClone(record);
+    const events = normalizeClaudeSession([record]);
+    expect(events[0].data).toMatchObject({
+      toolCallId: "workflow-tool",
+      success: true,
+      taskId: "dynamic-task",
+      workflowName: "smoke-claude-dynamic",
+      status,
+    });
+    if (status === "remote_launched") {
+      expect(events[0].data.workflowSessionUrl).toBe(record.tool_use_result.sessionUrl);
+      expect(events[0].data.warning).toBe(record.tool_use_result.warning);
+      expect(events[0].data.workflowRunId).toBeUndefined();
+    } else {
+      expect(events[0].data.workflowRunId).toBe("dynamic-run");
+    }
+    expect(record).toEqual(original);
+    expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
+  });
+
+  it("treats an embedded Workflow syntax error as a failed launch despite an async_launched status", () => {
+    const record = structuredClone(dynamicWorkflow.find(record => record.tool_use_result));
+    record.tool_use_result.error = "Workflow syntax check failed";
+    const events = normalizeClaudeSession([record]);
+    expect(events[0].data).toMatchObject({ success: false, status: "async_launched", error: "Workflow syntax check failed", taskId: "dynamic-task" });
+    expect(projectSessionResult(events)).toBeUndefined();
+    expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
+  });
+
   it("preserves launch metadata, workflow phases, agent progress, task patches and terminal notifications", () => {
     const records = freeze(structuredClone(dynamicWorkflow));
     const events = normalizeClaudeSession(records);

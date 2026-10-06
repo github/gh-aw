@@ -78,6 +78,8 @@ export interface ToolExecutionCompleteData {
   taskType?: string;
   workflowName?: string;
   workflowRunId?: string;
+  workflowSessionUrl?: string;
+  warning?: string;
   success?: boolean;
   output?: JsonValue;
   result?: JsonValue;

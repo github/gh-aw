@@ -133,6 +133,8 @@
         "taskType": { "type": "string" },
         "workflowName": { "type": "string" },
         "workflowRunId": { "type": "string" },
+        "workflowSessionUrl": { "type": "string" },
+        "warning": { "type": "string" },
         "success": { "type": "boolean" },
         "output": { "$ref": "#/definitions/JsonValue" },
         "result": { "$ref": "#/definitions/JsonValue" },
