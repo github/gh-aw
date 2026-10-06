@@ -635,6 +635,99 @@ describe("log_parser_bootstrap.cjs", () => {
         }));
     }));
 
+  describe("Copilot session source fallback", () => {
+    let root;
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(__dirname, "test-copilot-sources-"));
+      process.env.GH_AW_AGENT_OUTPUT = path.join(root, "logs");
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+    });
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+    const stdio = JSON.stringify({ type: "assistant.message", data: { content: "Recovered stdio conversation." } });
+    const native = JSON.stringify({ type: "assistant.message", data: { content: "Native conversation." } });
+    const runCopilot = rootDir => runLogParser({ parseLog: require("./parse_copilot_log.cjs").parseCopilotLog, parserName: "Copilot", supportsDirectories: true, rootDir });
+
+    it.each(["missing", "empty", "malformed", "debug-only"])("renders stdio when session logs are %s", async state => {
+      const logs = path.join(root, "logs");
+      if (state !== "missing") fs.mkdirSync(logs);
+      if (state === "empty" || state === "malformed") fs.writeFileSync(path.join(logs, "events.jsonl"), state === "empty" ? "" : "{bad\n");
+      if (state === "debug-only") fs.writeFileSync(path.join(logs, "process.log"), native);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), stdio);
+      await runCopilot(root);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Recovered stdio conversation.");
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).not.toContain("Native conversation.");
+      expect(fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8")).toContain("Recovered stdio conversation.");
+      if (state === "empty" || state === "malformed") expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("trying"));
+    });
+
+    it.each([
+      [JSON.stringify({ type: "session.start", data: { sessionId: "native" } })],
+      [`${JSON.stringify({ type: "session.start", data: { sessionId: "native" } })}\n{"type":"assistant.message",`],
+      [`${native}\n{"type":"assistant.message",`],
+    ])("falls back to stdio when native events are incomplete or lack a conversation", async nativeContent => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/events.jsonl"), nativeContent);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), stdio);
+      await runCopilot(root);
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Recovered stdio conversation.");
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).not.toContain("Native conversation.");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("trying"));
+    });
+
+    it("prefers native session events without duplicating stdio or debug observations", async () => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/events.jsonl"), native);
+      fs.writeFileSync(path.join(root, "logs/process.log"), stdio);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), stdio);
+      await runCopilot(root);
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("Native conversation.");
+      expect(summary).not.toContain("Recovered stdio conversation.");
+      const events = fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+      expect(events.filter(event => event.type === "assistant.message")).toHaveLength(1);
+    });
+
+    it("falls back to debug logs when stdio contains only infrastructure output", async () => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/process.log"), native);
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), "[INFO] Containers stopped successfully\n");
+      await runCopilot(root);
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Native conversation.");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("trying"));
+    });
+
+    it("does not read debug logs when a preferred native conversation is usable", async () => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/events.jsonl"), native);
+      fs.mkdirSync(path.join(root, "logs/unreadable.log"));
+      await runCopilot(root);
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Native conversation.");
+    });
+
+    it("reports unrecognized Copilot logs rather than claiming successful parsing", async () => {
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/process.log"), "unrecognized log\n");
+      await runCopilot(root);
+      expect(mockCore.warning).toHaveBeenCalledWith("Copilot produced no structured session events; publishing log diagnostics only");
+      expect(mockCore.info).not.toHaveBeenCalledWith("Copilot log parsed successfully");
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).toContain("Log format not recognized");
+    });
+
+    it("redacts stdio masks in a preferred native conversation before publication", async () => {
+      const secret = "private-runtime-mask";
+      fs.mkdirSync(path.join(root, "logs"));
+      fs.writeFileSync(path.join(root, "logs/events.jsonl"), JSON.stringify({ type: "assistant.message", data: { content: `Native ${secret}` } }));
+      fs.writeFileSync(path.join(root, "agent-stdio.log"), `::add-mask::${secret}\n`);
+      await runCopilot(root);
+      expect(mockCore.summary.addRaw.mock.calls[0][0]).not.toContain(secret);
+      expect(fs.readFileSync(path.join(root, "agent-session.jsonl"), "utf8")).not.toContain(secret);
+    });
+  });
+
   describe("step summary secret redaction", () => {
     // Built from parts so the fixtures are never literal credential strings in source.
     const FAKE_PAT = "ghp_" + "a1b2c3d4e5".repeat(3) + "f6g7h8";

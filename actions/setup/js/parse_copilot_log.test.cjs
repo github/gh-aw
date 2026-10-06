@@ -553,6 +553,7 @@ describe("parse_copilot_log.cjs", () => {
 
     it("should handle missing log file", async () => {
       process.env.GH_AW_AGENT_OUTPUT = "/nonexistent/file.log";
+      vi.spyOn(fs, "existsSync").mockReturnValue(false);
       await main();
       expect(mockCore.info).toHaveBeenCalledWith("Log path not found: /nonexistent/file.log");
     });
