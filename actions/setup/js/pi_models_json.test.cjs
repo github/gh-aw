@@ -125,6 +125,45 @@ describe("pi_models_json.cjs", () => {
       expect(parsed.providers["aw-gateway"].api).toBe("openai-responses");
     });
 
+    it("uses function tools for codemode on Copilot Responses routes while preserving other compatibility metadata", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "gpt-5.5",
+        provider: "github",
+        api: "openai-responses",
+        metadata: { compat: { supportsOpenAIGrammarTools: true, supportsStrictMode: true, supportsDeveloperRole: false } },
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "gpt-5.5", compat: { supportsOpenAIGrammarTools: false, supportsStrictMode: true, supportsDeveloperRole: false } }]);
+    });
+
+    it("disables Responses grammar tools even without catalog compatibility metadata", () => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10002",
+        apiKeyEnvVar: "COPILOT_GITHUB_TOKEN",
+        modelId: "custom-model",
+        provider: "github",
+        api: "openai-responses",
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "custom-model", compat: { supportsOpenAIGrammarTools: false } }]);
+    });
+
+    it.each([
+      ["openai", "openai-responses"],
+      ["github", "openai-completions"],
+      ["anthropic", "anthropic-messages"],
+    ])("preserves grammar-tool compatibility for %s using %s", (provider, api) => {
+      const json = piModelsJson.buildModelsJSON({
+        baseUrl: "http://api-proxy:10000",
+        apiKeyEnvVar: "CODEX_API_KEY",
+        modelId: "fixture",
+        provider,
+        api,
+        metadata: { compat: { supportsOpenAIGrammarTools: true } },
+      });
+      expect(JSON.parse(json).providers["aw-gateway"].models).toEqual([{ id: "fixture", compat: { supportsOpenAIGrammarTools: true } }]);
+    });
+
     it("uses the native Copilot context window for claude-sonnet-5", () => {
       const json = piModelsJson.buildModelsJSON({
         baseUrl: "http://api-proxy:10002",
@@ -335,6 +374,7 @@ describe("pi_models_json.cjs", () => {
 
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].api).toBe("openai-responses");
+      expect(written.providers["aw-gateway"].models[0].compat).toEqual({ supportsOpenAIGrammarTools: false });
       expect(stderrOutput.join("")).toContain("awf-reflect: model availability confirmed (provider=copilot, model=gpt-5.5)");
       expect(stderrOutput.join("")).toContain("resolved model API=openai-responses");
     });

@@ -6,10 +6,11 @@ import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+const { buildModelsJSON } = await import("./pi_models_json.cjs");
 const cli = process.env.GH_AW_PI_TEST_CLI;
 
 describe.runIf(cli)("Pi v1 real headless CLI", () => {
-  it("loads native MCP, resources, codemode, and non-bypassable tool policy without project context", async () => {
+  it.each(["openai-completions", "openai-responses"])("loads native MCP, resources, codemode, and non-bypassable tool policy over %s without project context", async api => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-v1-live-"));
     const requests = [];
     const mcpCalls = [];
@@ -50,8 +51,23 @@ describe.runIf(cli)("Pi v1 real headless CLI", () => {
         ["bash", { command: "printf blocked" }],
         ["mcp__fixture__noop", {}],
         ["read_mcp_resource", { server: "fixture", uri: "test://fixture/status" }],
+        ["codemode", { code: "text(await tools.mcp__fixture__noop({}));" }],
       ];
       const call = calls[turn++];
+      if (api === "openai-responses") {
+        const output = call
+          ? [{ type: "function_call", id: `fc_${turn}`, call_id: `call-${turn}`, name: call[0], arguments: JSON.stringify(call[1]), status: "completed" }]
+          : [{ type: "message", id: `msg_${turn}`, role: "assistant", content: [{ type: "output_text", text: "Fixture complete", annotations: [] }], status: "completed" }];
+        res.setHeader("Content-Type", "text/event-stream");
+        const events = [
+          { type: "response.created", response: { id: `response-${turn}`, status: "in_progress", output: [] } },
+          { type: "response.output_item.added", output_index: 0, item: output[0] },
+          { type: "response.output_item.done", output_index: 0, item: output[0] },
+          { type: "response.completed", response: { id: `response-${turn}`, status: "completed", output, usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } } },
+        ];
+        res.end(events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""));
+        return;
+      }
       const message = call ? { role: "assistant", content: null, tool_calls: [{ id: `call-${turn}`, type: "function", function: { name: call[0], arguments: JSON.stringify(call[1]) } }] } : { role: "assistant", content: "Fixture complete" };
       if (body.stream) {
         res.setHeader("Content-Type", "text/event-stream");
@@ -78,7 +94,10 @@ describe.runIf(cli)("Pi v1 real headless CLI", () => {
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const agentDir = path.join(dir, "agent");
     fs.mkdirSync(agentDir);
-    fs.writeFileSync(path.join(agentDir, "models.json"), JSON.stringify({ providers: { fixture: { api: "openai-completions", apiKey: "fixture-only", baseUrl, models: [{ id: "fixture", contextWindow: 128000, maxTokens: 1024 }] } } }));
+    fs.writeFileSync(
+      path.join(agentDir, "models.json"),
+      buildModelsJSON({ baseUrl, apiKeyEnvVar: "COPILOT_GITHUB_TOKEN", modelId: "fixture", provider: "github", api, metadata: { contextWindow: 128000, maxTokens: 1024, compat: { supportsOpenAIGrammarTools: true } } })
+    );
     fs.writeFileSync(path.join(agentDir, "mcp.json"), JSON.stringify({ mcpServers: { fixture: { url: `${baseUrl}/mcp`, exposure: "direct" } } }));
     fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ defaultTools: ["+codemode", "+tool_search"], enableInstallTelemetry: false }));
     fs.writeFileSync(path.join(dir, "AGENTS.md"), "CONTEXT_MUST_NOT_BE_LOADED");
@@ -94,7 +113,7 @@ describe.runIf(cli)("Pi v1 real headless CLI", () => {
           "--no-context-files",
           "--no-extensions",
           "--model",
-          "fixture/fixture",
+          "aw-gateway/fixture",
           "--extension",
           path.join(import.meta.dirname, "pi_tool_policy.cjs"),
           "--extension",
@@ -114,9 +133,14 @@ describe.runIf(cli)("Pi v1 real headless CLI", () => {
         .split("\n")
         .map(line => JSON.parse(line));
       expect(records.some(record => record.type === "agent_settled")).toBe(true);
-      expect(records.find(record => record.type === "tool_execution_end" && record.toolCallId === "call-2").isError).toBe(true);
-      expect(mcpCalls).toEqual(["noop", "resource"]);
+      expect(records.find(record => record.type === "tool_execution_end" && record.toolCallId.split("|")[0] === "call-2").isError).toBe(true);
+      expect(mcpCalls).toEqual(["noop", "resource", "noop"]);
       expect(requests.some(request => request.tools?.some(tool => tool.function?.name === "codemode" || tool.name === "codemode"))).toBe(true);
+      if (api === "openai-responses") {
+        const tools = requests[0].tools;
+        expect(tools.find(tool => tool.name === "codemode")).toMatchObject({ type: "function", parameters: { properties: { code: { type: "string" } } } });
+        expect(tools.some(tool => tool.type === "custom")).toBe(false);
+      }
       expect(JSON.stringify(requests)).not.toContain("CONTEXT_MUST_NOT_BE_LOADED");
     } finally {
       await new Promise(resolve => server.close(resolve));

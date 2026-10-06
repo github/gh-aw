@@ -97,6 +97,8 @@ Pi supports native MCP tools and resources, codemode, tool search, provider-pref
 
 Codemode batches tool calls and reduces results before they enter model context. Its classifier and image-generation APIs are available when the configured provider route supports those model types. Custom providers still need a compatible API-proxy target and credentials; enabling codemode does not grant additional credentials or network access.
 
+For Copilot models using the Responses API, gh-aw disables grammar-based custom tools (`model.compat.supportsOpenAIGrammarTools: false`) so Pi sends codemode as a JSON-schema function tool. Codemode remains enabled; the Copilot compatibility adapter does not accept its custom-tool format. Other provider routes retain their configured compatibility settings.
+
 | Option | Pi behavior |
 |---|---|
 | `max-turns`, `max-ai-credits` | Enforced by the AWF inference proxy. |

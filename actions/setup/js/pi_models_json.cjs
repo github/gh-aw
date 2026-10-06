@@ -99,7 +99,16 @@ function buildModelsJSON(options) {
         api: api || "openai-completions",
         // AWF owns the upstream credential; Pi only needs a non-secret placeholder.
         apiKey: "awf-proxy",
-        models: [{ ...metadata, id: modelId, ...(contextWindow ? { contextWindow } : {}), ...(provider === "github" && modelId === "claude-haiku-4.5" ? { reasoning: false } : {}) }],
+        models: [
+          {
+            ...metadata,
+            id: modelId,
+            ...(contextWindow ? { contextWindow } : {}),
+            ...(provider === "github" && modelId === "claude-haiku-4.5" ? { reasoning: false } : {}),
+            // Copilot's Responses adapter only supports apply_patch custom tools.
+            ...(provider === "github" && api === "openai-responses" ? { compat: { ...metadata.compat, supportsOpenAIGrammarTools: false } } : {}),
+          },
+        ],
       },
       ...(nativeProvider && !["github-copilot", "anthropic", "openai", "google"].includes(nativeProvider) ? { [nativeProvider]: { baseUrl, apiKey: "awf-proxy" } } : {}),
     },
