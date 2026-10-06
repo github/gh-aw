@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "CompletionOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Completion"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "dispatch_id",
+        "claim_handle",
+        "run_id",
+        "run_attempt"
+      ],
+      "type": "object"
+    },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "CompletionOperation.json",
+  "$ref": "#/$defs/CompletionOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompletionOperation"
+}

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "default FIFO uses causal acceptance not clocks or identity",
+    "mode": "weighted-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "accounting_weights": { "": 1 },
+    "nodes": [
+      { "key": "a", "priority": 3, "account": "", "profile": "default", "enqueued": 9000 },
+      { "key": "b", "priority": 3, "account": "", "profile": "default", "enqueued": 1 },
+      { "key": "c", "priority": 3, "account": "", "profile": "default", "enqueued": 0 }
+    ],
+    "max_claims": 3,
+    "max_dispatches": 3,
+    "profile_max": 1,
+    "share_keys": false,
+    "expected": ["a", "b", "c"],
+    "reason": "claim_budget_reached"
+  },
+  {
+    "name": "fair prefix X Y X does not backfill",
+    "mode": "weighted-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "accounting_weights": { "": 1 },
+    "nodes": [
+      { "key": "x1", "priority": 3, "account": "", "profile": "x", "enqueued": 0 },
+      { "key": "y1", "priority": 3, "account": "", "profile": "y", "enqueued": 0 },
+      { "key": "x2", "priority": 3, "account": "", "profile": "x", "enqueued": 0 }
+    ],
+    "max_claims": 3,
+    "max_dispatches": 1,
+    "profile_max": 16,
+    "share_keys": false,
+    "expected": ["x1"],
+    "reason": "dispatch_budget_blocked"
+  },
+  {
+    "name": "strict priority then causal FIFO",
+    "mode": "strict-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "accounting_weights": { "": 1 },
+    "nodes": [
+      { "key": "p3-first", "priority": 3, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1-first", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1-second", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p5", "priority": 5, "account": "", "profile": "default", "enqueued": 0 }
+    ],
+    "max_claims": 4,
+    "max_dispatches": 1,
+    "profile_max": 16,
+    "share_keys": false,
+    "expected": ["p1-first", "p1-second", "p3-first", "p5"],
+    "reason": "claim_budget_reached"
+  },
+  {
+    "name": "weighted accounting independent two to one answer",
+    "mode": "weighted-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "accounting_weights": { "": 1, "a": 2, "b": 1 },
+    "nodes": [
+      { "key": "a1", "priority": 3, "account": "a", "profile": "default", "enqueued": 0 },
+      { "key": "b1", "priority": 3, "account": "b", "profile": "default", "enqueued": 0 },
+      { "key": "a2", "priority": 3, "account": "a", "profile": "default", "enqueued": 0 },
+      { "key": "b2", "priority": 3, "account": "b", "profile": "default", "enqueued": 0 },
+      { "key": "a3", "priority": 3, "account": "a", "profile": "default", "enqueued": 0 },
+      { "key": "b3", "priority": 3, "account": "b", "profile": "default", "enqueued": 0 },
+      { "key": "a4", "priority": 3, "account": "a", "profile": "default", "enqueued": 0 }
+    ],
+    "max_claims": 6,
+    "max_dispatches": 1,
+    "profile_max": 16,
+    "share_keys": true,
+    "expected": ["a1", "a2", "b1", "a3", "a4", "b2"],
+    "reason": "claim_budget_reached"
+  },
+  {
+    "name": "weighted priority independent sixteen-grant share prefix",
+    "mode": "weighted-priority",
+    "class_weights": [8, 4, 2, 1, 1],
+    "accounting_weights": { "": 1 },
+    "nodes": [
+      { "key": "p1a", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1b", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1c", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1d", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1e", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1f", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1g", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1h", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p1i", "priority": 1, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p2a", "priority": 2, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p2b", "priority": 2, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p2c", "priority": 2, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p2d", "priority": 2, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p2e", "priority": 2, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p3a", "priority": 3, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p3b", "priority": 3, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p3c", "priority": 3, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p4a", "priority": 4, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p4b", "priority": 4, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p5a", "priority": 5, "account": "", "profile": "default", "enqueued": 0 },
+      { "key": "p5b", "priority": 5, "account": "", "profile": "default", "enqueued": 0 }
+    ],
+    "max_claims": 16,
+    "max_dispatches": 1,
+    "profile_max": 16,
+    "share_keys": false,
+    "expected": ["p1a", "p1b", "p2a", "p1c", "p1d", "p2b", "p3a", "p1e", "p1f", "p2c", "p1g", "p1h", "p2d", "p3b", "p4a", "p5a"],
+    "reason": "claim_budget_reached"
+  }
+]

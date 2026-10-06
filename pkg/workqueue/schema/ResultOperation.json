@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "checked_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "conclusion": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effects": {
+          "anyOf": [
+            {
+              "const": "none"
+            },
+            {
+              "const": "partial"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "prelaunch"
+            },
+            {
+              "const": "nonlaunch"
+            },
+            {
+              "const": "terminal_run"
+            },
+            {
+              "const": "delivery"
+            },
+            {
+              "const": "reconciliation"
+            }
+          ]
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "receipt": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "const": "trusted_publisher"
+            },
+            {
+              "const": "github_api"
+            },
+            {
+              "const": "trusted_activation"
+            },
+            {
+              "const": "verified_receipts"
+            }
+          ]
+        },
+        "status": {
+          "const": "completed"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "source",
+        "repository",
+        "workflow",
+        "ref",
+        "principal",
+        "checked_at"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ResultOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "completion_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "descriptor": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "Result"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "completion_id",
+        "descriptor",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "ResultOperation.json",
+  "$ref": "#/$defs/ResultOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResultOperation"
+}

@@ -1,0 +1,1830 @@
+{
+  "assignment": {
+    "claims": [
+      {
+        "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+        "handle": "h1",
+        "result_refs": [],
+        "work": {
+          "task": "a"
+        },
+        "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+      },
+      {
+        "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_2",
+        "handle": "h2",
+        "result_refs": [],
+        "work": {
+          "task": "b"
+        },
+        "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
+      },
+      {
+        "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3",
+        "handle": "h3",
+        "result_refs": [],
+        "work": {
+          "task": "c"
+        },
+        "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+      }
+    ],
+    "commit_id": "q3",
+    "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+    "policy_epoch": "epoch1",
+    "pool": "default",
+    "request_id": "grant",
+    "version": 3,
+    "worker_profile": "default"
+  },
+  "canonical": "{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":1000,\"id\":\"q0\",\"operations\":[{\"epoch\":\"epoch1\",\"kind\":\"Policy\",\"policy\":{\"accounting_weights\":{\"\":1},\"class_weights\":[8,4,2,1,1],\"limits\":{\"assignment_bytes\":49152,\"evidence_bytes\":1024,\"graph_nodes\":4096,\"ledger_bytes\":67108864,\"observation_writes\":4096,\"operations\":256,\"payload_bytes\":16384,\"pending_nodes\":4096,\"predecessors\":64,\"recovery_bytes\":16777216,\"result_bytes\":4096},\"mode\":\"weighted-priority\",\"pools\":{\"default\":{\"allowed_repositories\":[\"owner/repo\"],\"default_profile\":\"default\",\"logical_limit\":16,\"max_observation_age_ms\":60000,\"native_limit\":16,\"profiles\":{\"default\":{\"credential_scope\":\"repository\",\"effect_scope\":\"owner/repo\",\"max_claims\":3,\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"share_keys\":false,\"trust_domain\":\"default\",\"workflow\":\".github/workflows/worker.lock.yml\"}},\"reconciliation\":{\"deadline_ms\":300000,\"max_attempts\":5},\"retry\":{\"backoff_ms\":30000,\"max_attempts\":3}}},\"producers\":{\"1001\":{\"fairness_keys\":[\"\"],\"pools\":[\"default\"],\"priorities\":[1,2,3,4,5]}}}}],\"policy_epoch\":\"epoch1\",\"previous\":null,\"request\":{\"fingerprint\":\"5ff2536643789162e6967a87ef319639cfdce13026e4348e22167aef2ae9fb7b\",\"id\":\"genesis\",\"kind\":\"policy\",\"parameters\":{\"operations\":[{\"epoch\":\"epoch1\",\"kind\":\"Policy\",\"policy\":{\"accounting_weights\":{\"\":1},\"class_weights\":[8,4,2,1,1],\"limits\":{\"assignment_bytes\":49152,\"evidence_bytes\":1024,\"graph_nodes\":4096,\"ledger_bytes\":67108864,\"observation_writes\":4096,\"operations\":256,\"payload_bytes\":16384,\"pending_nodes\":4096,\"predecessors\":64,\"recovery_bytes\":16777216,\"result_bytes\":4096},\"mode\":\"weighted-priority\",\"pools\":{\"default\":{\"allowed_repositories\":[\"owner/repo\"],\"default_profile\":\"default\",\"logical_limit\":16,\"max_observation_age_ms\":60000,\"native_limit\":16,\"profiles\":{\"default\":{\"credential_scope\":\"repository\",\"effect_scope\":\"owner/repo\",\"max_claims\":3,\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"share_keys\":false,\"trust_domain\":\"default\",\"workflow\":\".github/workflows/worker.lock.yml\"}},\"reconciliation\":{\"deadline_ms\":300000,\"max_attempts\":5},\"retry\":{\"backoff_ms\":30000,\"max_attempts\":3}}},\"producers\":{\"1001\":{\"fairness_keys\":[\"\"],\"pools\":[\"default\"],\"priorities\":[1,2,3,4,5]}}}}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"producer\"},\"at\":2000,\"id\":\"q1\",\"operations\":[{\"batch_trust_domain\":\"default\",\"depends_on\":[],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"a\",\"payload\":{\"task\":\"a\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"condition\":\"completed\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"}}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"b\",\"payload\":{\"task\":\"b\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"c\",\"payload\":{\"task\":\"c\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"d\",\"payload\":{\"task\":\"d\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"e\",\"payload\":{\"task\":\"e\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2\",\"worker_profile\":\"default\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q0\",\"request\":{\"fingerprint\":\"e157fd5d8036a70612784f21727c9580a57a72c6da6c88f3b7aa0cdcb09e483d\",\"id\":\"submit\",\"kind\":\"submit\",\"parameters\":{\"nodes\":[{\"batch_trust_domain\":\"default\",\"depends_on\":[],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"a\",\"payload\":{\"task\":\"a\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"condition\":\"completed\",\"kind\":\"issue\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"}}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"b\",\"payload\":{\"task\":\"b\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"c\",\"payload\":{\"task\":\"c\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"d\",\"payload\":{\"task\":\"d\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\",\"worker_profile\":\"default\"},{\"batch_trust_domain\":\"default\",\"depends_on\":[{\"kind\":\"work\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"enqueued\":1000,\"fairness_key\":\"\",\"graph_id\":\"graph\",\"kind\":\"Work\",\"node_key\":\"e\",\"payload\":{\"task\":\"e\"},\"pool\":\"default\",\"priority\":3,\"work_id\":\"6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2\",\"worker_profile\":\"default\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"reconciler\"},\"at\":2500,\"id\":\"q2\",\"operations\":[{\"condition\":\"completed\",\"credential_generation\":\"initial\",\"kind\":\"Observation\",\"observation_id\":\"o1\",\"observed_at\":2500,\"read_status\":\"ok\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"resource_state\":\"closed\",\"state\":\"ready\",\"state_reason\":\"completed\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q1\",\"request\":{\"fingerprint\":\"537026df69104b34753ead22ba61822f2b2f202963b21a8a6c3178dc0c58d401\",\"id\":\"observe\",\"kind\":\"observe\",\"parameters\":{\"operations\":[{\"condition\":\"completed\",\"credential_generation\":\"initial\",\"kind\":\"Observation\",\"observation_id\":\"o1\",\"observed_at\":2500,\"read_status\":\"ok\",\"resource\":{\"host\":\"github.com\",\"kind\":\"issue\",\"number\":\"7\",\"repository\":\"owner/repo\",\"repository_id\":\"1\",\"resource_id\":\"9007199254740993\"},\"resource_state\":\"closed\",\"state\":\"ready\",\"state_reason\":\"completed\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":3000,\"id\":\"q3\",\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"handle\":\"h1\",\"kind\":\"Claim\",\"observations\":[],\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"},{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_2\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"handle\":\"h2\",\"kind\":\"Claim\",\"observations\":[\"o1\"],\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"},{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"handle\":\"h3\",\"kind\":\"Claim\",\"observations\":[],\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q2\",\"request\":{\"fingerprint\":\"cf4e9b1940d0b60bd5bf5c9a7767e4ac692d79cdf8397a9ffb22ac94f23508c5\",\"id\":\"grant\",\"kind\":\"dispatch_next\",\"parameters\":{\"max_bytes\":49152,\"max_claims\":3,\"max_dispatches\":1,\"pool\":\"default\"}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"at\":4000,\"id\":\"q4\",\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"kind\":\"Dispatch\",\"sender\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"state\":\"started\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q3\",\"request\":{\"fingerprint\":\"265f2086c95eb7dfb774100a1769c130d849d2969fa6d0b8d1d237dec783e502\",\"id\":\"start\",\"kind\":\"dispatch\",\"parameters\":{\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"kind\":\"Dispatch\",\"sender\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"dispatcher\",\"run_attempt\":1,\"run_id\":\"101\",\"workflow\":\".github/workflows/dispatcher.lock.yml\"},\"state\":\"started\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"reconciler\"},\"at\":4100,\"id\":\"q5\",\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"evidence\":{\"checked_at\":4000,\"kind\":\"reconciliation\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Dispatch\",\"run\":{\"event\":\"workflow_dispatch\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"state\":\"bound\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q4\",\"request\":{\"fingerprint\":\"e4e977bc8b6564dd3fe412bfe9addef0113f8e832f0a4e54bf0ad9940e1a9168\",\"id\":\"bind\",\"kind\":\"dispatch\",\"parameters\":{\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"evidence\":{\"checked_at\":4000,\"kind\":\"reconciliation\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Dispatch\",\"run\":{\"event\":\"workflow_dispatch\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"state\":\"bound\"}]}},\"version\":3}\n{\"actor\":{\"claim_handle\":\"h1\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":4200,\"id\":\"q6\",\"operations\":[{\"claim_handle\":\"h1\",\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"kind\":\"Completion\",\"run_attempt\":1,\"run_id\":\"202\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q5\",\"request\":{\"fingerprint\":\"0f3196979bcc58ad454a54ba3416b54cef21721ac67785db5845c53a7639b5cd\",\"id\":\"finish-a\",\"kind\":\"finish\",\"parameters\":{\"claim_handle\":\"h1\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"outcome\":\"completed\"}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"reconciler\"},\"at\":4300,\"id\":\"q7\",\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"completion_id\":\"q6\",\"descriptor\":{\"ok\":true},\"evidence\":{\"checked_at\":4000,\"kind\":\"delivery\",\"principal\":\"1001\",\"receipt\":\"verified-h1\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"verified_receipts\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Result\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q6\",\"request\":{\"fingerprint\":\"02a74050eae0509066ce93c2868761debdf3c15d0beaf9a2a201f4bf67ac981b\",\"id\":\"result-a\",\"kind\":\"result\",\"parameters\":{\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"completion_id\":\"q6\",\"descriptor\":{\"ok\":true},\"evidence\":{\"checked_at\":4000,\"kind\":\"delivery\",\"principal\":\"1001\",\"receipt\":\"verified-h1\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"verified_receipts\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Result\",\"work_id\":\"c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d\"}]}},\"version\":3}\n{\"actor\":{\"claim_handle\":\"h2\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":4400,\"id\":\"q8\",\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_2\",\"kind\":\"ClaimCancellation\",\"reason\":\"worker_cancelled\",\"retry_not_before\":34400,\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q7\",\"request\":{\"fingerprint\":\"3df02147ceae51796ad6cdff0f2ec38c675c6415c81c69ece3bed780cdefc7b2\",\"id\":\"finish-b\",\"kind\":\"finish\",\"parameters\":{\"claim_handle\":\"h2\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"outcome\":\"cancelled\"}},\"version\":3}\n{\"actor\":{\"claim_handle\":\"h3\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"worker\",\"run_attempt\":1,\"run_id\":\"202\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"at\":4500,\"id\":\"q9\",\"operations\":[{\"claim_handle\":\"h3\",\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"kind\":\"Completion\",\"run_attempt\":1,\"run_id\":\"202\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q8\",\"request\":{\"fingerprint\":\"47cd4cc4fb45b953df0c2b7f0057f0195f63345263629c41768ca3224654bd37\",\"id\":\"finish-c\",\"kind\":\"finish\",\"parameters\":{\"claim_handle\":\"h3\",\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"outcome\":\"completed\"}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"reconciler\"},\"at\":4600,\"id\":\"q10\",\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3\",\"completion_id\":\"q9\",\"disposition\":\"unknown\",\"evidence\":{\"attempts\":5,\"checked_at\":4000,\"conclusion\":\"failure\",\"effects\":\"unknown\",\"kind\":\"terminal_run\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"status\":\"completed\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"DeliveryFailure\",\"reason\":\"delivery_unknown\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q9\",\"request\":{\"fingerprint\":\"81eb5a67f3da59f3000b39fd294821fa81f743756e49ef46b4e04ea26f211199\",\"id\":\"failure-c\",\"kind\":\"delivery_failure\",\"parameters\":{\"operations\":[{\"claim_id\":\"c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3\",\"completion_id\":\"q9\",\"disposition\":\"unknown\",\"evidence\":{\"attempts\":5,\"checked_at\":4000,\"conclusion\":\"failure\",\"effects\":\"unknown\",\"kind\":\"terminal_run\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"status\":\"completed\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"DeliveryFailure\",\"reason\":\"delivery_unknown\",\"work_id\":\"d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":4700,\"id\":\"q11\",\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"abandoned\",\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q10\",\"request\":{\"fingerprint\":\"e8123d051ca0fbf1f0d43f2d06aa1bf85e789f5b621e4da673d0798f90a4defb\",\"id\":\"cancel-b\",\"kind\":\"cancel_work\",\"parameters\":{\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"abandoned\",\"work_id\":\"1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"reconciler\"},\"at\":4800,\"id\":\"q12\",\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"evidence\":{\"checked_at\":4000,\"conclusion\":\"failure\",\"kind\":\"terminal_run\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"status\":\"completed\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Release\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q11\",\"request\":{\"fingerprint\":\"1f3eb17dbe8ac7c65a0f690cd17b4ac8ea7337d81e54fbcad070f959745f3d91\",\"id\":\"release\",\"kind\":\"release\",\"parameters\":{\"operations\":[{\"dispatch_id\":\"d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1\",\"evidence\":{\"checked_at\":4000,\"conclusion\":\"failure\",\"kind\":\"terminal_run\",\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"repository\":\"owner/repo\",\"run_attempt\":1,\"run_id\":\"202\",\"source\":\"github_api\",\"status\":\"completed\",\"workflow\":\".github/workflows/worker.lock.yml\"},\"kind\":\"Release\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":4900,\"id\":\"q13\",\"operations\":[{\"control\":\"grants_paused\",\"kind\":\"Control\",\"reason\":\"drain\",\"value\":true}],\"policy_epoch\":\"epoch1\",\"previous\":\"q12\",\"request\":{\"fingerprint\":\"a7a3a718b4568b9d57e4335059575ab2654d7d85c12dffa30c50943b9f6ce555\",\"id\":\"pause\",\"kind\":\"control\",\"parameters\":{\"operations\":[{\"control\":\"grants_paused\",\"kind\":\"Control\",\"reason\":\"drain\",\"value\":true}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":5000,\"id\":\"q14\",\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"drain\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q13\",\"request\":{\"fingerprint\":\"45058a702e6a994a990c541a3dcf3a2335742548a5b84b0910a285f603576b98\",\"id\":\"cancel-d\",\"kind\":\"cancel_work\",\"parameters\":{\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"drain\",\"work_id\":\"8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":5100,\"id\":\"q15\",\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"drain\",\"work_id\":\"6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2\"}],\"policy_epoch\":\"epoch1\",\"previous\":\"q14\",\"request\":{\"fingerprint\":\"7ce4e5b73d1123544ab4a4f99031bc7faa9246ac34d6abf5042e4c9c7431ab97\",\"id\":\"cancel-e\",\"kind\":\"cancel_work\",\"parameters\":{\"operations\":[{\"kind\":\"WorkCancellation\",\"reason\":\"drain\",\"work_id\":\"6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2\"}]}},\"version\":3}\n{\"actor\":{\"principal\":\"1001\",\"repository\":\"owner/repo\",\"role\":\"administrator\"},\"at\":5200,\"id\":\"q16\",\"operations\":[{\"epoch\":\"epoch2\",\"kind\":\"Policy\",\"policy\":{\"accounting_weights\":{\"\":1},\"class_weights\":[8,4,2,1,1],\"limits\":{\"assignment_bytes\":49152,\"evidence_bytes\":1024,\"graph_nodes\":4096,\"ledger_bytes\":67108864,\"observation_writes\":4096,\"operations\":256,\"payload_bytes\":16384,\"pending_nodes\":4096,\"predecessors\":64,\"recovery_bytes\":16777216,\"result_bytes\":4096},\"mode\":\"weighted-priority\",\"pools\":{\"default\":{\"allowed_repositories\":[\"owner/repo\"],\"default_profile\":\"default\",\"logical_limit\":16,\"max_observation_age_ms\":60000,\"native_limit\":16,\"profiles\":{\"default\":{\"credential_scope\":\"repository\",\"effect_scope\":\"owner/repo\",\"max_claims\":3,\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"share_keys\":false,\"trust_domain\":\"default\",\"workflow\":\".github/workflows/worker.lock.yml\"}},\"reconciliation\":{\"deadline_ms\":300000,\"max_attempts\":5},\"retry\":{\"backoff_ms\":30000,\"max_attempts\":3}}},\"producers\":{\"1001\":{\"fairness_keys\":[\"\"],\"pools\":[\"default\"],\"priorities\":[1,2,3,4,5]}}}}],\"policy_epoch\":\"epoch2\",\"previous\":\"q15\",\"request\":{\"fingerprint\":\"c31426a5e9ff0b08a46750e1bcd5b78054af17b33c2cf95ed8b1d66dfb588cff\",\"id\":\"policy2\",\"kind\":\"policy\",\"parameters\":{\"operations\":[{\"epoch\":\"epoch2\",\"kind\":\"Policy\",\"policy\":{\"accounting_weights\":{\"\":1},\"class_weights\":[8,4,2,1,1],\"limits\":{\"assignment_bytes\":49152,\"evidence_bytes\":1024,\"graph_nodes\":4096,\"ledger_bytes\":67108864,\"observation_writes\":4096,\"operations\":256,\"payload_bytes\":16384,\"pending_nodes\":4096,\"predecessors\":64,\"recovery_bytes\":16777216,\"result_bytes\":4096},\"mode\":\"weighted-priority\",\"pools\":{\"default\":{\"allowed_repositories\":[\"owner/repo\"],\"default_profile\":\"default\",\"logical_limit\":16,\"max_observation_age_ms\":60000,\"native_limit\":16,\"profiles\":{\"default\":{\"credential_scope\":\"repository\",\"effect_scope\":\"owner/repo\",\"max_claims\":3,\"principal\":\"1001\",\"ref\":\"0000000000000000000000000000000000000000\",\"share_keys\":false,\"trust_domain\":\"default\",\"workflow\":\".github/workflows/worker.lock.yml\"}},\"reconciliation\":{\"deadline_ms\":300000,\"max_attempts\":5},\"retry\":{\"backoff_ms\":30000,\"max_attempts\":3}}},\"producers\":{\"1001\":{\"fairness_keys\":[\"\"],\"pools\":[\"default\"],\"priorities\":[1,2,3,4,5]}}}}]}},\"version\":3}\n",
+  "commits": [
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 1000,
+      "id": "q0",
+      "operations": [
+        {
+          "epoch": "epoch1",
+          "kind": "Policy",
+          "policy": {
+            "accounting_weights": {
+              "": 1
+            },
+            "class_weights": [
+              8,
+              4,
+              2,
+              1,
+              1
+            ],
+            "limits": {
+              "assignment_bytes": 49152,
+              "evidence_bytes": 1024,
+              "graph_nodes": 4096,
+              "ledger_bytes": 67108864,
+              "observation_writes": 4096,
+              "operations": 256,
+              "payload_bytes": 16384,
+              "pending_nodes": 4096,
+              "predecessors": 64,
+              "recovery_bytes": 16777216,
+              "result_bytes": 4096
+            },
+            "mode": "weighted-priority",
+            "pools": {
+              "default": {
+                "allowed_repositories": [
+                  "owner/repo"
+                ],
+                "default_profile": "default",
+                "logical_limit": 16,
+                "max_observation_age_ms": 60000,
+                "native_limit": 16,
+                "profiles": {
+                  "default": {
+                    "credential_scope": "repository",
+                    "effect_scope": "owner/repo",
+                    "max_claims": 3,
+                    "principal": "1001",
+                    "ref": "0000000000000000000000000000000000000000",
+                    "share_keys": false,
+                    "trust_domain": "default",
+                    "workflow": ".github/workflows/worker.lock.yml"
+                  }
+                },
+                "reconciliation": {
+                  "deadline_ms": 300000,
+                  "max_attempts": 5
+                },
+                "retry": {
+                  "backoff_ms": 30000,
+                  "max_attempts": 3
+                }
+              }
+            },
+            "producers": {
+              "1001": {
+                "fairness_keys": [
+                  ""
+                ],
+                "pools": [
+                  "default"
+                ],
+                "priorities": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": null,
+      "request": {
+        "fingerprint": "5ff2536643789162e6967a87ef319639cfdce13026e4348e22167aef2ae9fb7b",
+        "id": "genesis",
+        "kind": "policy",
+        "parameters": {
+          "operations": [
+            {
+              "epoch": "epoch1",
+              "kind": "Policy",
+              "policy": {
+                "accounting_weights": {
+                  "": 1
+                },
+                "class_weights": [
+                  8,
+                  4,
+                  2,
+                  1,
+                  1
+                ],
+                "limits": {
+                  "assignment_bytes": 49152,
+                  "evidence_bytes": 1024,
+                  "graph_nodes": 4096,
+                  "ledger_bytes": 67108864,
+                  "observation_writes": 4096,
+                  "operations": 256,
+                  "payload_bytes": 16384,
+                  "pending_nodes": 4096,
+                  "predecessors": 64,
+                  "recovery_bytes": 16777216,
+                  "result_bytes": 4096
+                },
+                "mode": "weighted-priority",
+                "pools": {
+                  "default": {
+                    "allowed_repositories": [
+                      "owner/repo"
+                    ],
+                    "default_profile": "default",
+                    "logical_limit": 16,
+                    "max_observation_age_ms": 60000,
+                    "native_limit": 16,
+                    "profiles": {
+                      "default": {
+                        "credential_scope": "repository",
+                        "effect_scope": "owner/repo",
+                        "max_claims": 3,
+                        "principal": "1001",
+                        "ref": "0000000000000000000000000000000000000000",
+                        "share_keys": false,
+                        "trust_domain": "default",
+                        "workflow": ".github/workflows/worker.lock.yml"
+                      }
+                    },
+                    "reconciliation": {
+                      "deadline_ms": 300000,
+                      "max_attempts": 5
+                    },
+                    "retry": {
+                      "backoff_ms": 30000,
+                      "max_attempts": 3
+                    }
+                  }
+                },
+                "producers": {
+                  "1001": {
+                    "fairness_keys": [
+                      ""
+                    ],
+                    "pools": [
+                      "default"
+                    ],
+                    "priorities": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "producer"
+      },
+      "at": 2000,
+      "id": "q1",
+      "operations": [
+        {
+          "batch_trust_domain": "default",
+          "depends_on": [],
+          "enqueued": 1000,
+          "fairness_key": "",
+          "graph_id": "graph",
+          "kind": "Work",
+          "node_key": "a",
+          "payload": {
+            "task": "a"
+          },
+          "pool": "default",
+          "priority": 3,
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+          "worker_profile": "default"
+        },
+        {
+          "batch_trust_domain": "default",
+          "depends_on": [
+            {
+              "condition": "completed",
+              "kind": "issue",
+              "resource": {
+                "host": "github.com",
+                "kind": "issue",
+                "number": "7",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993"
+              }
+            }
+          ],
+          "enqueued": 1000,
+          "fairness_key": "",
+          "graph_id": "graph",
+          "kind": "Work",
+          "node_key": "b",
+          "payload": {
+            "task": "b"
+          },
+          "pool": "default",
+          "priority": 3,
+          "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60",
+          "worker_profile": "default"
+        },
+        {
+          "batch_trust_domain": "default",
+          "depends_on": [],
+          "enqueued": 1000,
+          "fairness_key": "",
+          "graph_id": "graph",
+          "kind": "Work",
+          "node_key": "c",
+          "payload": {
+            "task": "c"
+          },
+          "pool": "default",
+          "priority": 3,
+          "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb",
+          "worker_profile": "default"
+        },
+        {
+          "batch_trust_domain": "default",
+          "depends_on": [
+            {
+              "kind": "work",
+              "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+            }
+          ],
+          "enqueued": 1000,
+          "fairness_key": "",
+          "graph_id": "graph",
+          "kind": "Work",
+          "node_key": "d",
+          "payload": {
+            "task": "d"
+          },
+          "pool": "default",
+          "priority": 3,
+          "work_id": "8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100",
+          "worker_profile": "default"
+        },
+        {
+          "batch_trust_domain": "default",
+          "depends_on": [
+            {
+              "kind": "work",
+              "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+            }
+          ],
+          "enqueued": 1000,
+          "fairness_key": "",
+          "graph_id": "graph",
+          "kind": "Work",
+          "node_key": "e",
+          "payload": {
+            "task": "e"
+          },
+          "pool": "default",
+          "priority": 3,
+          "work_id": "6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2",
+          "worker_profile": "default"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q0",
+      "request": {
+        "fingerprint": "e157fd5d8036a70612784f21727c9580a57a72c6da6c88f3b7aa0cdcb09e483d",
+        "id": "submit",
+        "kind": "submit",
+        "parameters": {
+          "nodes": [
+            {
+              "batch_trust_domain": "default",
+              "depends_on": [],
+              "enqueued": 1000,
+              "fairness_key": "",
+              "graph_id": "graph",
+              "kind": "Work",
+              "node_key": "a",
+              "payload": {
+                "task": "a"
+              },
+              "pool": "default",
+              "priority": 3,
+              "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d",
+              "worker_profile": "default"
+            },
+            {
+              "batch_trust_domain": "default",
+              "depends_on": [
+                {
+                  "condition": "completed",
+                  "kind": "issue",
+                  "resource": {
+                    "host": "github.com",
+                    "kind": "issue",
+                    "number": "7",
+                    "repository": "owner/repo",
+                    "repository_id": "1",
+                    "resource_id": "9007199254740993"
+                  }
+                }
+              ],
+              "enqueued": 1000,
+              "fairness_key": "",
+              "graph_id": "graph",
+              "kind": "Work",
+              "node_key": "b",
+              "payload": {
+                "task": "b"
+              },
+              "pool": "default",
+              "priority": 3,
+              "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60",
+              "worker_profile": "default"
+            },
+            {
+              "batch_trust_domain": "default",
+              "depends_on": [],
+              "enqueued": 1000,
+              "fairness_key": "",
+              "graph_id": "graph",
+              "kind": "Work",
+              "node_key": "c",
+              "payload": {
+                "task": "c"
+              },
+              "pool": "default",
+              "priority": 3,
+              "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb",
+              "worker_profile": "default"
+            },
+            {
+              "batch_trust_domain": "default",
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+                }
+              ],
+              "enqueued": 1000,
+              "fairness_key": "",
+              "graph_id": "graph",
+              "kind": "Work",
+              "node_key": "d",
+              "payload": {
+                "task": "d"
+              },
+              "pool": "default",
+              "priority": 3,
+              "work_id": "8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100",
+              "worker_profile": "default"
+            },
+            {
+              "batch_trust_domain": "default",
+              "depends_on": [
+                {
+                  "kind": "work",
+                  "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+                }
+              ],
+              "enqueued": 1000,
+              "fairness_key": "",
+              "graph_id": "graph",
+              "kind": "Work",
+              "node_key": "e",
+              "payload": {
+                "task": "e"
+              },
+              "pool": "default",
+              "priority": 3,
+              "work_id": "6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2",
+              "worker_profile": "default"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "reconciler"
+      },
+      "at": 2500,
+      "id": "q2",
+      "operations": [
+        {
+          "condition": "completed",
+          "credential_generation": "initial",
+          "kind": "Observation",
+          "observation_id": "o1",
+          "observed_at": 2500,
+          "read_status": "ok",
+          "resource": {
+            "host": "github.com",
+            "kind": "issue",
+            "number": "7",
+            "repository": "owner/repo",
+            "repository_id": "1",
+            "resource_id": "9007199254740993"
+          },
+          "resource_state": "closed",
+          "state": "ready",
+          "state_reason": "completed"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q1",
+      "request": {
+        "fingerprint": "537026df69104b34753ead22ba61822f2b2f202963b21a8a6c3178dc0c58d401",
+        "id": "observe",
+        "kind": "observe",
+        "parameters": {
+          "operations": [
+            {
+              "condition": "completed",
+              "credential_generation": "initial",
+              "kind": "Observation",
+              "observation_id": "o1",
+              "observed_at": 2500,
+              "read_status": "ok",
+              "resource": {
+                "host": "github.com",
+                "kind": "issue",
+                "number": "7",
+                "repository": "owner/repo",
+                "repository_id": "1",
+                "resource_id": "9007199254740993"
+              },
+              "resource_state": "closed",
+              "state": "ready",
+              "state_reason": "completed"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 3000,
+      "id": "q3",
+      "operations": [
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "handle": "h1",
+          "kind": "Claim",
+          "observations": [],
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+        },
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_2",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "handle": "h2",
+          "kind": "Claim",
+          "observations": [
+            "o1"
+          ],
+          "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
+        },
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "handle": "h3",
+          "kind": "Claim",
+          "observations": [],
+          "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q2",
+      "request": {
+        "fingerprint": "cf4e9b1940d0b60bd5bf5c9a7767e4ac692d79cdf8397a9ffb22ac94f23508c5",
+        "id": "grant",
+        "kind": "dispatch_next",
+        "parameters": {
+          "max_bytes": 49152,
+          "max_claims": 3,
+          "max_dispatches": 1,
+          "pool": "default"
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "dispatcher",
+        "run_attempt": 1,
+        "run_id": "101",
+        "workflow": ".github/workflows/dispatcher.lock.yml"
+      },
+      "at": 4000,
+      "id": "q4",
+      "operations": [
+        {
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "kind": "Dispatch",
+          "sender": {
+            "principal": "1001",
+            "repository": "owner/repo",
+            "role": "dispatcher",
+            "run_attempt": 1,
+            "run_id": "101",
+            "workflow": ".github/workflows/dispatcher.lock.yml"
+          },
+          "state": "started"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q3",
+      "request": {
+        "fingerprint": "265f2086c95eb7dfb774100a1769c130d849d2969fa6d0b8d1d237dec783e502",
+        "id": "start",
+        "kind": "dispatch",
+        "parameters": {
+          "operations": [
+            {
+              "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+              "kind": "Dispatch",
+              "sender": {
+                "principal": "1001",
+                "repository": "owner/repo",
+                "role": "dispatcher",
+                "run_attempt": 1,
+                "run_id": "101",
+                "workflow": ".github/workflows/dispatcher.lock.yml"
+              },
+              "state": "started"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "reconciler"
+      },
+      "at": 4100,
+      "id": "q5",
+      "operations": [
+        {
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "evidence": {
+            "checked_at": 4000,
+            "kind": "reconciliation",
+            "principal": "1001",
+            "ref": "0000000000000000000000000000000000000000",
+            "repository": "owner/repo",
+            "run_attempt": 1,
+            "run_id": "202",
+            "source": "github_api",
+            "workflow": ".github/workflows/worker.lock.yml"
+          },
+          "kind": "Dispatch",
+          "run": {
+            "event": "workflow_dispatch",
+            "principal": "1001",
+            "ref": "0000000000000000000000000000000000000000",
+            "repository": "owner/repo",
+            "run_attempt": 1,
+            "run_id": "202",
+            "workflow": ".github/workflows/worker.lock.yml"
+          },
+          "state": "bound"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q4",
+      "request": {
+        "fingerprint": "e4e977bc8b6564dd3fe412bfe9addef0113f8e832f0a4e54bf0ad9940e1a9168",
+        "id": "bind",
+        "kind": "dispatch",
+        "parameters": {
+          "operations": [
+            {
+              "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+              "evidence": {
+                "checked_at": 4000,
+                "kind": "reconciliation",
+                "principal": "1001",
+                "ref": "0000000000000000000000000000000000000000",
+                "repository": "owner/repo",
+                "run_attempt": 1,
+                "run_id": "202",
+                "source": "github_api",
+                "workflow": ".github/workflows/worker.lock.yml"
+              },
+              "kind": "Dispatch",
+              "run": {
+                "event": "workflow_dispatch",
+                "principal": "1001",
+                "ref": "0000000000000000000000000000000000000000",
+                "repository": "owner/repo",
+                "run_attempt": 1,
+                "run_id": "202",
+                "workflow": ".github/workflows/worker.lock.yml"
+              },
+              "state": "bound"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "claim_handle": "h1",
+        "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "worker",
+        "run_attempt": 1,
+        "run_id": "202",
+        "workflow": ".github/workflows/worker.lock.yml"
+      },
+      "at": 4200,
+      "id": "q6",
+      "operations": [
+        {
+          "claim_handle": "h1",
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "kind": "Completion",
+          "run_attempt": 1,
+          "run_id": "202",
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q5",
+      "request": {
+        "fingerprint": "0f3196979bcc58ad454a54ba3416b54cef21721ac67785db5845c53a7639b5cd",
+        "id": "finish-a",
+        "kind": "finish",
+        "parameters": {
+          "claim_handle": "h1",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "outcome": "completed"
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "reconciler"
+      },
+      "at": 4300,
+      "id": "q7",
+      "operations": [
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "completion_id": "q6",
+          "descriptor": {
+            "ok": true
+          },
+          "evidence": {
+            "checked_at": 4000,
+            "kind": "delivery",
+            "principal": "1001",
+            "receipt": "verified-h1",
+            "ref": "0000000000000000000000000000000000000000",
+            "repository": "owner/repo",
+            "run_attempt": 1,
+            "run_id": "202",
+            "source": "verified_receipts",
+            "workflow": ".github/workflows/worker.lock.yml"
+          },
+          "kind": "Result",
+          "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q6",
+      "request": {
+        "fingerprint": "02a74050eae0509066ce93c2868761debdf3c15d0beaf9a2a201f4bf67ac981b",
+        "id": "result-a",
+        "kind": "result",
+        "parameters": {
+          "operations": [
+            {
+              "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+              "completion_id": "q6",
+              "descriptor": {
+                "ok": true
+              },
+              "evidence": {
+                "checked_at": 4000,
+                "kind": "delivery",
+                "principal": "1001",
+                "receipt": "verified-h1",
+                "ref": "0000000000000000000000000000000000000000",
+                "repository": "owner/repo",
+                "run_attempt": 1,
+                "run_id": "202",
+                "source": "verified_receipts",
+                "workflow": ".github/workflows/worker.lock.yml"
+              },
+              "kind": "Result",
+              "work_id": "c26bb3b003984e39a4945d5b9e06e9d67fe7fa15e78b222ab43495857e882f2d"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "claim_handle": "h2",
+        "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "worker",
+        "run_attempt": 1,
+        "run_id": "202",
+        "workflow": ".github/workflows/worker.lock.yml"
+      },
+      "at": 4400,
+      "id": "q8",
+      "operations": [
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_2",
+          "kind": "ClaimCancellation",
+          "reason": "worker_cancelled",
+          "retry_not_before": 34400,
+          "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q7",
+      "request": {
+        "fingerprint": "3df02147ceae51796ad6cdff0f2ec38c675c6415c81c69ece3bed780cdefc7b2",
+        "id": "finish-b",
+        "kind": "finish",
+        "parameters": {
+          "claim_handle": "h2",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "outcome": "cancelled"
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "claim_handle": "h3",
+        "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "worker",
+        "run_attempt": 1,
+        "run_id": "202",
+        "workflow": ".github/workflows/worker.lock.yml"
+      },
+      "at": 4500,
+      "id": "q9",
+      "operations": [
+        {
+          "claim_handle": "h3",
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "kind": "Completion",
+          "run_attempt": 1,
+          "run_id": "202",
+          "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q8",
+      "request": {
+        "fingerprint": "47cd4cc4fb45b953df0c2b7f0057f0195f63345263629c41768ca3224654bd37",
+        "id": "finish-c",
+        "kind": "finish",
+        "parameters": {
+          "claim_handle": "h3",
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "outcome": "completed"
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "reconciler"
+      },
+      "at": 4600,
+      "id": "q10",
+      "operations": [
+        {
+          "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3",
+          "completion_id": "q9",
+          "disposition": "unknown",
+          "evidence": {
+            "attempts": 5,
+            "checked_at": 4000,
+            "conclusion": "failure",
+            "effects": "unknown",
+            "kind": "terminal_run",
+            "principal": "1001",
+            "ref": "0000000000000000000000000000000000000000",
+            "repository": "owner/repo",
+            "run_attempt": 1,
+            "run_id": "202",
+            "source": "github_api",
+            "status": "completed",
+            "workflow": ".github/workflows/worker.lock.yml"
+          },
+          "kind": "DeliveryFailure",
+          "reason": "delivery_unknown",
+          "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q9",
+      "request": {
+        "fingerprint": "81eb5a67f3da59f3000b39fd294821fa81f743756e49ef46b4e04ea26f211199",
+        "id": "failure-c",
+        "kind": "delivery_failure",
+        "parameters": {
+          "operations": [
+            {
+              "claim_id": "c_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_3",
+              "completion_id": "q9",
+              "disposition": "unknown",
+              "evidence": {
+                "attempts": 5,
+                "checked_at": 4000,
+                "conclusion": "failure",
+                "effects": "unknown",
+                "kind": "terminal_run",
+                "principal": "1001",
+                "ref": "0000000000000000000000000000000000000000",
+                "repository": "owner/repo",
+                "run_attempt": 1,
+                "run_id": "202",
+                "source": "github_api",
+                "status": "completed",
+                "workflow": ".github/workflows/worker.lock.yml"
+              },
+              "kind": "DeliveryFailure",
+              "reason": "delivery_unknown",
+              "work_id": "d5767d8baefdf1499aba5c64badac086cdfb019aee9bc3ccacafe13f02677abb"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 4700,
+      "id": "q11",
+      "operations": [
+        {
+          "kind": "WorkCancellation",
+          "reason": "abandoned",
+          "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q10",
+      "request": {
+        "fingerprint": "e8123d051ca0fbf1f0d43f2d06aa1bf85e789f5b621e4da673d0798f90a4defb",
+        "id": "cancel-b",
+        "kind": "cancel_work",
+        "parameters": {
+          "operations": [
+            {
+              "kind": "WorkCancellation",
+              "reason": "abandoned",
+              "work_id": "1e74d1b8ad16053d592df448d63b2fe0e6e53f904031a6147a2ff95f9ac32f60"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "reconciler"
+      },
+      "at": 4800,
+      "id": "q12",
+      "operations": [
+        {
+          "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+          "evidence": {
+            "checked_at": 4000,
+            "conclusion": "failure",
+            "kind": "terminal_run",
+            "principal": "1001",
+            "ref": "0000000000000000000000000000000000000000",
+            "repository": "owner/repo",
+            "run_attempt": 1,
+            "run_id": "202",
+            "source": "github_api",
+            "status": "completed",
+            "workflow": ".github/workflows/worker.lock.yml"
+          },
+          "kind": "Release"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q11",
+      "request": {
+        "fingerprint": "1f3eb17dbe8ac7c65a0f690cd17b4ac8ea7337d81e54fbcad070f959745f3d91",
+        "id": "release",
+        "kind": "release",
+        "parameters": {
+          "operations": [
+            {
+              "dispatch_id": "d_3492ad65d05a973fef8c825521eeb41ae64625a672a8aeeeabc696e16d62a020_1",
+              "evidence": {
+                "checked_at": 4000,
+                "conclusion": "failure",
+                "kind": "terminal_run",
+                "principal": "1001",
+                "ref": "0000000000000000000000000000000000000000",
+                "repository": "owner/repo",
+                "run_attempt": 1,
+                "run_id": "202",
+                "source": "github_api",
+                "status": "completed",
+                "workflow": ".github/workflows/worker.lock.yml"
+              },
+              "kind": "Release"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 4900,
+      "id": "q13",
+      "operations": [
+        {
+          "control": "grants_paused",
+          "kind": "Control",
+          "reason": "drain",
+          "value": true
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q12",
+      "request": {
+        "fingerprint": "a7a3a718b4568b9d57e4335059575ab2654d7d85c12dffa30c50943b9f6ce555",
+        "id": "pause",
+        "kind": "control",
+        "parameters": {
+          "operations": [
+            {
+              "control": "grants_paused",
+              "kind": "Control",
+              "reason": "drain",
+              "value": true
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 5000,
+      "id": "q14",
+      "operations": [
+        {
+          "kind": "WorkCancellation",
+          "reason": "drain",
+          "work_id": "8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q13",
+      "request": {
+        "fingerprint": "45058a702e6a994a990c541a3dcf3a2335742548a5b84b0910a285f603576b98",
+        "id": "cancel-d",
+        "kind": "cancel_work",
+        "parameters": {
+          "operations": [
+            {
+              "kind": "WorkCancellation",
+              "reason": "drain",
+              "work_id": "8ee985799f4fd27f44973f20eed7c1a75fd36303c924ef5a2b01ea4e7ab4a100"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 5100,
+      "id": "q15",
+      "operations": [
+        {
+          "kind": "WorkCancellation",
+          "reason": "drain",
+          "work_id": "6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2"
+        }
+      ],
+      "policy_epoch": "epoch1",
+      "previous": "q14",
+      "request": {
+        "fingerprint": "7ce4e5b73d1123544ab4a4f99031bc7faa9246ac34d6abf5042e4c9c7431ab97",
+        "id": "cancel-e",
+        "kind": "cancel_work",
+        "parameters": {
+          "operations": [
+            {
+              "kind": "WorkCancellation",
+              "reason": "drain",
+              "work_id": "6d7af383a211e734a90583d754cba5a2f7507b86cc3ec9c7535b540a17de2df2"
+            }
+          ]
+        }
+      },
+      "version": 3
+    },
+    {
+      "actor": {
+        "principal": "1001",
+        "repository": "owner/repo",
+        "role": "administrator"
+      },
+      "at": 5200,
+      "id": "q16",
+      "operations": [
+        {
+          "epoch": "epoch2",
+          "kind": "Policy",
+          "policy": {
+            "accounting_weights": {
+              "": 1
+            },
+            "class_weights": [
+              8,
+              4,
+              2,
+              1,
+              1
+            ],
+            "limits": {
+              "assignment_bytes": 49152,
+              "evidence_bytes": 1024,
+              "graph_nodes": 4096,
+              "ledger_bytes": 67108864,
+              "observation_writes": 4096,
+              "operations": 256,
+              "payload_bytes": 16384,
+              "pending_nodes": 4096,
+              "predecessors": 64,
+              "recovery_bytes": 16777216,
+              "result_bytes": 4096
+            },
+            "mode": "weighted-priority",
+            "pools": {
+              "default": {
+                "allowed_repositories": [
+                  "owner/repo"
+                ],
+                "default_profile": "default",
+                "logical_limit": 16,
+                "max_observation_age_ms": 60000,
+                "native_limit": 16,
+                "profiles": {
+                  "default": {
+                    "credential_scope": "repository",
+                    "effect_scope": "owner/repo",
+                    "max_claims": 3,
+                    "principal": "1001",
+                    "ref": "0000000000000000000000000000000000000000",
+                    "share_keys": false,
+                    "trust_domain": "default",
+                    "workflow": ".github/workflows/worker.lock.yml"
+                  }
+                },
+                "reconciliation": {
+                  "deadline_ms": 300000,
+                  "max_attempts": 5
+                },
+                "retry": {
+                  "backoff_ms": 30000,
+                  "max_attempts": 3
+                }
+              }
+            },
+            "producers": {
+              "1001": {
+                "fairness_keys": [
+                  ""
+                ],
+                "pools": [
+                  "default"
+                ],
+                "priorities": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "policy_epoch": "epoch2",
+      "previous": "q15",
+      "request": {
+        "fingerprint": "c31426a5e9ff0b08a46750e1bcd5b78054af17b33c2cf95ed8b1d66dfb588cff",
+        "id": "policy2",
+        "kind": "policy",
+        "parameters": {
+          "operations": [
+            {
+              "epoch": "epoch2",
+              "kind": "Policy",
+              "policy": {
+                "accounting_weights": {
+                  "": 1
+                },
+                "class_weights": [
+                  8,
+                  4,
+                  2,
+                  1,
+                  1
+                ],
+                "limits": {
+                  "assignment_bytes": 49152,
+                  "evidence_bytes": 1024,
+                  "graph_nodes": 4096,
+                  "ledger_bytes": 67108864,
+                  "observation_writes": 4096,
+                  "operations": 256,
+                  "payload_bytes": 16384,
+                  "pending_nodes": 4096,
+                  "predecessors": 64,
+                  "recovery_bytes": 16777216,
+                  "result_bytes": 4096
+                },
+                "mode": "weighted-priority",
+                "pools": {
+                  "default": {
+                    "allowed_repositories": [
+                      "owner/repo"
+                    ],
+                    "default_profile": "default",
+                    "logical_limit": 16,
+                    "max_observation_age_ms": 60000,
+                    "native_limit": 16,
+                    "profiles": {
+                      "default": {
+                        "credential_scope": "repository",
+                        "effect_scope": "owner/repo",
+                        "max_claims": 3,
+                        "principal": "1001",
+                        "ref": "0000000000000000000000000000000000000000",
+                        "share_keys": false,
+                        "trust_domain": "default",
+                        "workflow": ".github/workflows/worker.lock.yml"
+                      }
+                    },
+                    "reconciliation": {
+                      "deadline_ms": 300000,
+                      "max_attempts": 5
+                    },
+                    "retry": {
+                      "backoff_ms": 30000,
+                      "max_attempts": 3
+                    }
+                  }
+                },
+                "producers": {
+                  "1001": {
+                    "fairness_keys": [
+                      ""
+                    ],
+                    "pools": [
+                      "default"
+                    ],
+                    "priorities": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "version": 3
+    }
+  ],
+  "description": "Independent FIFO answers and all twelve operations; every causal prefix is checked.",
+  "prefixes": [
+    {
+      "claims": 0,
+      "class_v": "0",
+      "key_v": "0",
+      "native_reservations": 0,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "no_work",
+      "tip": "q0",
+      "works": {}
+    },
+    {
+      "claims": 0,
+      "class_v": "0",
+      "key_v": "0",
+      "native_reservations": 0,
+      "next_node": "a",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q1",
+      "works": {
+        "a": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 0,
+      "class_v": "0",
+      "key_v": "0",
+      "native_reservations": 0,
+      "next_node": "a",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q2",
+      "works": {
+        "a": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "no_eligible_work",
+      "tip": "q3",
+      "works": {
+        "a": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "no_eligible_work",
+      "tip": "q4",
+      "works": {
+        "a": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "no_eligible_work",
+      "tip": "q5",
+      "works": {
+        "a": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "no_eligible_work",
+      "tip": "q6",
+      "works": {
+        "a": {
+          "barrier": "pending",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q7",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q8",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "c": {
+          "barrier": "none",
+          "state": "claimed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q9",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "c": {
+          "barrier": "pending",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q10",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 1,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q11",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 0,
+      "next_node": "d",
+      "policy_epoch": "epoch1",
+      "reason": "selected",
+      "tip": "q12",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 0,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "grants_paused",
+      "tip": "q13",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "available"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 0,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "grants_paused",
+      "tip": "q14",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "available"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "12",
+      "key_v": "3",
+      "native_reservations": 0,
+      "next_node": "",
+      "policy_epoch": "epoch1",
+      "reason": "grants_paused",
+      "tip": "q15",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "cancelled"
+        }
+      }
+    },
+    {
+      "claims": 3,
+      "class_v": "0",
+      "key_v": "0",
+      "native_reservations": 0,
+      "next_node": "",
+      "policy_epoch": "epoch2",
+      "reason": "grants_paused",
+      "tip": "q16",
+      "works": {
+        "a": {
+          "barrier": "verified",
+          "state": "completed"
+        },
+        "b": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "c": {
+          "barrier": "failed",
+          "state": "completed"
+        },
+        "d": {
+          "barrier": "none",
+          "state": "cancelled"
+        },
+        "e": {
+          "barrier": "none",
+          "state": "cancelled"
+        }
+      }
+    }
+  ]
+}

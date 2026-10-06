@@ -1,0 +1,52 @@
+{
+  "$defs": {
+    "ClaimOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Claim"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "dispatch_id",
+        "handle",
+        "observations"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "ClaimOperation.json",
+  "$ref": "#/$defs/ClaimOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClaimOperation"
+}

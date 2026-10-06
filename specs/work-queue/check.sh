@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|QueueService|QueueLifecycle) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, or ClaimScopedWorker when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, QueueService, or QueueLifecycle when set." >&2
         exit 1
         ;;
 esac
@@ -93,6 +93,31 @@ run_model BrokenCancelledClaimOutput EffectAuthorization Invariant 12 ClaimScope
 run_model BrokenMixedDAGAdmission DAGAuthorization Invariant 12 ClaimScopedWorker
 run_model SingleClaimScopeWitness NoAutomaticScope Invariant 12 ClaimScopedWorker
 run_model MixedClaimDAGWitness NoMixedDAGProgress Invariant 12 ClaimScopedWorker
+run_model ServiceFixed "" Invariant 0 QueueService
+run_model ServiceDynamic "" Invariant 0 QueueService
+run_model BrokenServiceShare ServiceDeviation Invariant 12 QueueService
+run_model StrictServiceStarvation EventualService Temporal 13 QueueService \
+    "Temporal properties were violated"
+run_model UnfairServiceStarvation EventualService Temporal 13 QueueService \
+    "Temporal properties were violated"
+run_model UnpackableServiceStarvation EventualService Temporal 13 QueueService \
+    "Temporal properties were violated"
+run_model LifecycleRecurring "" Invariant 0 QueueLifecycle
+run_model LifecyclePacked "" Invariant 0 QueueLifecycle
+run_model BrokenLifecyclePrefix FairPrefixPacking Invariant 12 QueueLifecycle
+run_model BrokenLifecycleSender OneSender Invariant 12 QueueLifecycle
+run_model BrokenLifecycleBinding BindingAuthority Invariant 12 QueueLifecycle
+run_model BrokenLifecycleActivation BindingAuthority Invariant 12 QueueLifecycle
+run_model BrokenLifecycleRerun AttemptOneEffects Invariant 12 QueueLifecycle
+run_model BrokenLifecycleRelease ReservationAuthority Invariant 12 QueueLifecycle
+run_model BrokenLifecycleConflictRelease ReservationAuthority Invariant 12 QueueLifecycle
+run_model BrokenLifecycleControl ControlNotPreemption Invariant 12 QueueLifecycle
+run_model BrokenLifecycleDelivery DeliveryExclusivity Invariant 12 QueueLifecycle
+run_model BrokenLifecycleReplacement ReplacementSafety Invariant 12 QueueLifecycle
+run_model BrokenLifecycleVerificationBudget DeliveryFailureBudget Invariant 12 QueueLifecycle
+run_model LifecycleMixedDAGWitness NoMixedLifecycleWitness Invariant 12 QueueLifecycle
+run_model LifecycleActivationWitness NoActivationRecoveryWitness Invariant 12 QueueLifecycle
+run_model LifecycleConflictWitness NoConflictReservationWitness Invariant 12 QueueLifecycle
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1

@@ -1,0 +1,34 @@
+{
+  "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ReconciliationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "deadline_ms"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "ReconciliationPolicy.json",
+  "$ref": "#/$defs/ReconciliationPolicy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReconciliationPolicy"
+}

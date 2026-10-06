@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "ClaimCancellationOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "ClaimCancellation"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "retry_not_before": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "reason",
+        "retry_not_before"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ReasonCode": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "type": "string"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "ClaimCancellationOperation.json",
+  "$ref": "#/$defs/ClaimCancellationOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClaimCancellationOperation"
+}

@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": [
+        "kind",
+        "host",
+        "repository",
+        "repository_id",
+        "resource_id",
+        "number"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "Resource.json",
+  "$ref": "#/$defs/Resource",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resource"
+}

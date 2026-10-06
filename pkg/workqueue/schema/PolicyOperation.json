@@ -1,0 +1,328 @@
+{
+  "$defs": {
+    "ClaimBound": {
+      "maximum": 16,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "assignment_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "evidence_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "graph_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "ledger_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "observation_writes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "operations": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "payload_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "pending_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "predecessors": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "recovery_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "result_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "ledger_bytes",
+        "recovery_bytes",
+        "payload_bytes",
+        "graph_nodes",
+        "predecessors",
+        "pending_nodes",
+        "operations",
+        "assignment_bytes",
+        "result_bytes",
+        "evidence_bytes",
+        "observation_writes"
+      ],
+      "type": "object"
+    },
+    "PolicyOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Policy"
+        },
+        "policy": {
+          "$ref": "#/$defs/QueuePolicy"
+        }
+      },
+      "required": [
+        "kind",
+        "epoch",
+        "policy"
+      ],
+      "type": "object"
+    },
+    "PoolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_repositories": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "default_profile": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "max_observation_age_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "native_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "per_account_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "profiles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkerProfile"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        },
+        "reconciliation": {
+          "$ref": "#/$defs/ReconciliationPolicy"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryPolicy"
+        }
+      },
+      "required": [
+        "default_profile",
+        "profiles",
+        "logical_limit",
+        "native_limit",
+        "allowed_repositories",
+        "max_observation_age_ms",
+        "retry",
+        "reconciliation"
+      ],
+      "type": "object"
+    },
+    "Priority": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ProducerRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fairness_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "priorities": {
+          "items": {
+            "$ref": "#/$defs/Priority"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "pools",
+        "priorities",
+        "fairness_keys"
+      ],
+      "type": "object"
+    },
+    "QueuePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "accounting_weights": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Weight"
+          },
+          "type": "object"
+        },
+        "class_weights": {
+          "items": {
+            "$ref": "#/$defs/Weight"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "const": "weighted-priority"
+            },
+            {
+              "const": "strict-priority"
+            }
+          ]
+        },
+        "pools": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PoolPolicy"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        },
+        "producers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ProducerRule"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        }
+      },
+      "required": [
+        "mode",
+        "class_weights",
+        "accounting_weights",
+        "producers",
+        "pools",
+        "limits"
+      ],
+      "type": "object"
+    },
+    "ReconciliationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "deadline_ms"
+      ],
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "backoff_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "backoff_ms"
+      ],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Weight": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "WorkerProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effect_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/ClaimBound"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "share_keys": {
+          "type": "boolean"
+        },
+        "trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "workflow",
+        "ref",
+        "principal",
+        "trust_domain",
+        "credential_scope",
+        "effect_scope",
+        "max_claims",
+        "share_keys"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "PolicyOperation.json",
+  "$ref": "#/$defs/PolicyOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PolicyOperation"
+}

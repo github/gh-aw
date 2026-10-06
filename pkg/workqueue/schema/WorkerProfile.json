@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "ClaimBound": {
+      "maximum": 16,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "WorkerProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effect_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/ClaimBound"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "share_keys": {
+          "type": "boolean"
+        },
+        "trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "workflow",
+        "ref",
+        "principal",
+        "trust_domain",
+        "credential_scope",
+        "effect_scope",
+        "max_claims",
+        "share_keys"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "WorkerProfile.json",
+  "$ref": "#/$defs/WorkerProfile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkerProfile"
+}

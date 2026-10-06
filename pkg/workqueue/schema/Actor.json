@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "Actor": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "const": "administrator"
+            },
+            {
+              "const": "producer"
+            },
+            {
+              "const": "dispatcher"
+            },
+            {
+              "const": "worker"
+            },
+            {
+              "const": "reconciler"
+            }
+          ]
+        },
+        "run_attempt": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "role",
+        "principal",
+        "repository"
+      ],
+      "type": "object"
+    },
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    }
+  },
+  "$id": "Actor.json",
+  "$ref": "#/$defs/Actor",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Actor"
+}

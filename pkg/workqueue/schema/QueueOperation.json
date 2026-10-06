@@ -1,0 +1,1179 @@
+{
+  "$defs": {
+    "Actor": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "const": "administrator"
+            },
+            {
+              "const": "producer"
+            },
+            {
+              "const": "dispatcher"
+            },
+            {
+              "const": "worker"
+            },
+            {
+              "const": "reconciler"
+            }
+          ]
+        },
+        "run_attempt": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "role",
+        "principal",
+        "repository"
+      ],
+      "type": "object"
+    },
+    "ClaimBound": {
+      "maximum": 16,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ClaimCancellationOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "ClaimCancellation"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "retry_not_before": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "reason",
+        "retry_not_before"
+      ],
+      "type": "object"
+    },
+    "ClaimOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Claim"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "dispatch_id",
+        "handle",
+        "observations"
+      ],
+      "type": "object"
+    },
+    "CompletionOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Completion"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "dispatch_id",
+        "claim_handle",
+        "run_id",
+        "run_attempt"
+      ],
+      "type": "object"
+    },
+    "ControlOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "control": {
+          "anyOf": [
+            {
+              "const": "admission_paused"
+            },
+            {
+              "const": "grants_paused"
+            },
+            {
+              "const": "credential_generation"
+            }
+          ]
+        },
+        "kind": {
+          "const": "Control"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Identity"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "control",
+        "value",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "DeliveryFailureOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "completion_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "disposition": {
+          "anyOf": [
+            {
+              "const": "none"
+            },
+            {
+              "const": "partial"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "DeliveryFailure"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "completion_id",
+        "reason",
+        "disposition",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Dependency": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkEdge"
+        },
+        {
+          "$ref": "#/$defs/IssueEdge"
+        },
+        {
+          "$ref": "#/$defs/PullRequestEdge"
+        }
+      ]
+    },
+    "DispatchOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "Dispatch"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "run": {
+          "$ref": "#/$defs/RunBinding"
+        },
+        "sender": {
+          "$ref": "#/$defs/Actor"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "const": "started"
+            },
+            {
+              "const": "bound"
+            },
+            {
+              "const": "rejected"
+            },
+            {
+              "const": "uncertain"
+            },
+            {
+              "const": "unresolved"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "dispatch_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "checked_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "conclusion": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effects": {
+          "anyOf": [
+            {
+              "const": "none"
+            },
+            {
+              "const": "partial"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "prelaunch"
+            },
+            {
+              "const": "nonlaunch"
+            },
+            {
+              "const": "terminal_run"
+            },
+            {
+              "const": "delivery"
+            },
+            {
+              "const": "reconciliation"
+            }
+          ]
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "receipt": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "const": "trusted_publisher"
+            },
+            {
+              "const": "github_api"
+            },
+            {
+              "const": "trusted_activation"
+            },
+            {
+              "const": "verified_receipts"
+            }
+          ]
+        },
+        "status": {
+          "const": "completed"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "source",
+        "repository",
+        "workflow",
+        "ref",
+        "principal",
+        "checked_at"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "IssueEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "closed"
+            }
+          ]
+        },
+        "kind": {
+          "const": "issue"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "assignment_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "evidence_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "graph_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "ledger_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "observation_writes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "operations": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "payload_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "pending_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "predecessors": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "recovery_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "result_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "ledger_bytes",
+        "recovery_bytes",
+        "payload_bytes",
+        "graph_nodes",
+        "predecessors",
+        "pending_nodes",
+        "operations",
+        "assignment_bytes",
+        "result_bytes",
+        "evidence_bytes",
+        "observation_writes"
+      ],
+      "type": "object"
+    },
+    "ObservationOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "closed"
+            },
+            {
+              "const": "merged"
+            }
+          ]
+        },
+        "credential_generation": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Observation"
+        },
+        "merge_commit": {
+          "$ref": "#/$defs/Identity"
+        },
+        "merged": {
+          "type": "boolean"
+        },
+        "observation_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "read_status": {
+          "$ref": "#/$defs/Identity"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        },
+        "resource_state": {
+          "anyOf": [
+            {
+              "const": "open"
+            },
+            {
+              "const": "closed"
+            }
+          ]
+        },
+        "source_updated_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "const": "ready"
+            },
+            {
+              "const": "waiting"
+            },
+            {
+              "const": "failed"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "state_reason": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "not_planned"
+            },
+            {
+              "const": "reopened"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "observation_id",
+        "resource",
+        "condition",
+        "state",
+        "observed_at",
+        "credential_generation",
+        "read_status"
+      ],
+      "type": "object"
+    },
+    "PolicyOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "epoch": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Policy"
+        },
+        "policy": {
+          "$ref": "#/$defs/QueuePolicy"
+        }
+      },
+      "required": [
+        "kind",
+        "epoch",
+        "policy"
+      ],
+      "type": "object"
+    },
+    "PoolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_repositories": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "default_profile": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "max_observation_age_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "native_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "per_account_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "profiles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkerProfile"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        },
+        "reconciliation": {
+          "$ref": "#/$defs/ReconciliationPolicy"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryPolicy"
+        }
+      },
+      "required": [
+        "default_profile",
+        "profiles",
+        "logical_limit",
+        "native_limit",
+        "allowed_repositories",
+        "max_observation_age_ms",
+        "retry",
+        "reconciliation"
+      ],
+      "type": "object"
+    },
+    "Priority": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ProducerRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fairness_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "priorities": {
+          "items": {
+            "$ref": "#/$defs/Priority"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "pools",
+        "priorities",
+        "fairness_keys"
+      ],
+      "type": "object"
+    },
+    "PullRequestEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "const": "merged"
+        },
+        "kind": {
+          "const": "pull_request"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "QueueOperation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PolicyOperation"
+        },
+        {
+          "$ref": "#/$defs/ControlOperation"
+        },
+        {
+          "$ref": "#/$defs/WorkOperation"
+        },
+        {
+          "$ref": "#/$defs/ClaimOperation"
+        },
+        {
+          "$ref": "#/$defs/CompletionOperation"
+        },
+        {
+          "$ref": "#/$defs/ResultOperation"
+        },
+        {
+          "$ref": "#/$defs/DeliveryFailureOperation"
+        },
+        {
+          "$ref": "#/$defs/ObservationOperation"
+        },
+        {
+          "$ref": "#/$defs/ClaimCancellationOperation"
+        },
+        {
+          "$ref": "#/$defs/WorkCancellationOperation"
+        },
+        {
+          "$ref": "#/$defs/DispatchOperation"
+        },
+        {
+          "$ref": "#/$defs/ReleaseOperation"
+        }
+      ]
+    },
+    "QueuePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "accounting_weights": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Weight"
+          },
+          "type": "object"
+        },
+        "class_weights": {
+          "items": {
+            "$ref": "#/$defs/Weight"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "const": "weighted-priority"
+            },
+            {
+              "const": "strict-priority"
+            }
+          ]
+        },
+        "pools": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PoolPolicy"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        },
+        "producers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ProducerRule"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        }
+      },
+      "required": [
+        "mode",
+        "class_weights",
+        "accounting_weights",
+        "producers",
+        "pools",
+        "limits"
+      ],
+      "type": "object"
+    },
+    "ReasonCode": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "type": "string"
+    },
+    "ReconciliationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "deadline_ms"
+      ],
+      "type": "object"
+    },
+    "ReleaseOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "Release"
+        }
+      },
+      "required": [
+        "kind",
+        "dispatch_id",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Replacement": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "anyOf": [
+            {
+              "const": "idempotent"
+            },
+            {
+              "const": "compensated"
+            },
+            {
+              "const": "inspection"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/Identity"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "work_id",
+        "disposition",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": [
+        "kind",
+        "host",
+        "repository",
+        "repository_id",
+        "resource_id",
+        "number"
+      ],
+      "type": "object"
+    },
+    "ResultOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "completion_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "descriptor": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "Result"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "claim_id",
+        "completion_id",
+        "descriptor",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "backoff_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "backoff_ms"
+      ],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "RunBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "const": "workflow_dispatch"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "run_id",
+        "run_attempt",
+        "repository",
+        "workflow",
+        "ref",
+        "principal",
+        "event"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Weight": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "WorkCancellationOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "WorkCancellation"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "WorkEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "work"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id"
+      ],
+      "type": "object"
+    },
+    "WorkOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "batch_trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "depends_on": {
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "enqueued": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "fairness_key": {
+          "maxLength": 128,
+          "type": "string"
+        },
+        "graph_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Work"
+        },
+        "node_key": {
+          "$ref": "#/$defs/Identity"
+        },
+        "payload": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
+        },
+        "replacement_of": {
+          "$ref": "#/$defs/Replacement"
+        },
+        "subject": {
+          "$ref": "#/$defs/Resource"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "worker_profile": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "graph_id",
+        "node_key",
+        "pool",
+        "priority",
+        "fairness_key",
+        "worker_profile",
+        "batch_trust_domain",
+        "payload",
+        "depends_on",
+        "enqueued"
+      ],
+      "type": "object"
+    },
+    "WorkerProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effect_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/ClaimBound"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "share_keys": {
+          "type": "boolean"
+        },
+        "trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "workflow",
+        "ref",
+        "principal",
+        "trust_domain",
+        "credential_scope",
+        "effect_scope",
+        "max_claims",
+        "share_keys"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "QueueOperation.json",
+  "$ref": "#/$defs/QueueOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QueueOperation"
+}

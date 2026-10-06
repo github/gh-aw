@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "DispatchNextParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "max_dispatches": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "pool",
+        "max_claims",
+        "max_dispatches",
+        "max_bytes"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "DispatchNextParameters.json",
+  "$ref": "#/$defs/DispatchNextParameters",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DispatchNextParameters"
+}

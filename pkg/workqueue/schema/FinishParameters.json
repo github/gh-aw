@@ -1,16 +1,12 @@
 {
   "$defs": {
-    "Identity": {
-      "maxLength": 256,
-      "minLength": 1,
-      "type": "string",
-      "x-forbid-ascii-controls": true,
-      "x-utf8-max-bytes": 256
-    },
-    "WorkQueueFinishIntent": {
+    "FinishParameters": {
       "additionalProperties": false,
       "properties": {
         "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
           "$ref": "#/$defs/Identity"
         },
         "outcome": {
@@ -25,13 +21,22 @@
         }
       },
       "required": [
+        "dispatch_id",
+        "claim_handle",
         "outcome"
       ],
       "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
     }
   },
-  "$id": "WorkQueueFinishIntent.json",
-  "$ref": "#/$defs/WorkQueueFinishIntent",
+  "$id": "FinishParameters.json",
+  "$ref": "#/$defs/FinishParameters",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkQueueFinishIntent"
+  "title": "FinishParameters"
 }

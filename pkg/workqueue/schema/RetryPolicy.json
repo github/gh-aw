@@ -1,0 +1,34 @@
+{
+  "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "backoff_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "backoff_ms"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "RetryPolicy.json",
+  "$ref": "#/$defs/RetryPolicy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RetryPolicy"
+}

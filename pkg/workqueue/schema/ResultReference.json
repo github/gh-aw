@@ -7,31 +7,30 @@
       "x-forbid-ascii-controls": true,
       "x-utf8-max-bytes": 256
     },
-    "WorkQueueFinishIntent": {
+    "ResultReference": {
       "additionalProperties": false,
       "properties": {
-        "claim_handle": {
+        "descriptor": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "result_commit_id": {
           "$ref": "#/$defs/Identity"
         },
-        "outcome": {
-          "anyOf": [
-            {
-              "const": "completed"
-            },
-            {
-              "const": "cancelled"
-            }
-          ]
+        "work_id": {
+          "$ref": "#/$defs/Identity"
         }
       },
       "required": [
-        "outcome"
+        "work_id",
+        "result_commit_id",
+        "descriptor"
       ],
       "type": "object"
     }
   },
-  "$id": "WorkQueueFinishIntent.json",
-  "$ref": "#/$defs/WorkQueueFinishIntent",
+  "$id": "ResultReference.json",
+  "$ref": "#/$defs/ResultReference",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkQueueFinishIntent"
+  "title": "ResultReference"
 }

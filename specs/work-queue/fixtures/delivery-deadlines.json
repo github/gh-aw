@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "completion_at": 4000,
+  "max_attempts": 5,
+  "deadline_ms": 300000,
+  "cases": [
+    { "id": "before-deadline-zero-attempts", "at": 303999, "attempts": 0, "effects": "unknown", "disposition": "unknown", "expected": "reconciliation_pending" },
+    { "id": "before-deadline-four-attempts", "at": 303999, "attempts": 4, "effects": "unknown", "disposition": "unknown", "expected": "reconciliation_pending" },
+    { "id": "attempt-limit-before-deadline", "at": 4000, "attempts": 5, "effects": "unknown", "disposition": "unknown", "expected": "allowed" },
+    { "id": "exact-deadline-zero-attempts", "at": 304000, "attempts": 0, "effects": "unknown", "disposition": "unknown", "expected": "allowed" },
+    { "id": "after-deadline-one-attempt", "at": 304001, "attempts": 1, "effects": "unknown", "disposition": "unknown", "expected": "allowed" },
+    { "id": "deadline-missing-effects-means-unknown", "at": 304000, "attempts": 0, "disposition": "unknown", "expected": "allowed" },
+    { "id": "deadline-positive-none-receipt", "at": 304000, "attempts": 1, "effects": "none", "disposition": "none", "receipt": "verified-no-effects", "expected": "allowed" },
+    { "id": "deadline-none-without-receipt", "at": 304000, "attempts": 1, "effects": "none", "disposition": "none", "expected": "evidence_invalid" },
+    { "id": "deadline-none-with-unknown-effects", "at": 304000, "attempts": 1, "effects": "unknown", "disposition": "none", "receipt": "not-no-effects-proof", "expected": "evidence_invalid" },
+    { "id": "deadline-matching-partial", "at": 304000, "attempts": 1, "effects": "partial", "disposition": "partial", "receipt": "verified-partial-effects", "expected": "allowed" },
+    { "id": "deadline-partial-with-none-effects", "at": 304000, "attempts": 1, "effects": "none", "disposition": "partial", "receipt": "verified-no-effects", "expected": "evidence_invalid" },
+    { "id": "deadline-unknown-with-partial-effects", "at": 304000, "attempts": 1, "effects": "partial", "disposition": "unknown", "expected": "evidence_invalid" }
+  ]
+}

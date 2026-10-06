@@ -1,0 +1,135 @@
+{
+  "$defs": {
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Dependency": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkEdge"
+        },
+        {
+          "$ref": "#/$defs/IssueEdge"
+        },
+        {
+          "$ref": "#/$defs/PullRequestEdge"
+        }
+      ]
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "IssueEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "closed"
+            }
+          ]
+        },
+        "kind": {
+          "const": "issue"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "PullRequestEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "const": "merged"
+        },
+        "kind": {
+          "const": "pull_request"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": [
+        "kind",
+        "host",
+        "repository",
+        "repository_id",
+        "resource_id",
+        "number"
+      ],
+      "type": "object"
+    },
+    "WorkEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "work"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "Dependency.json",
+  "$ref": "#/$defs/Dependency",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dependency"
+}

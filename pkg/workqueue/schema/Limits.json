@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "assignment_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "evidence_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "graph_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "ledger_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "observation_writes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "operations": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "payload_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "pending_nodes": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "predecessors": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "recovery_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "result_bytes": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "ledger_bytes",
+        "recovery_bytes",
+        "payload_bytes",
+        "graph_nodes",
+        "predecessors",
+        "pending_nodes",
+        "operations",
+        "assignment_bytes",
+        "result_bytes",
+        "evidence_bytes",
+        "observation_writes"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "Limits.json",
+  "$ref": "#/$defs/Limits",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Limits"
+}

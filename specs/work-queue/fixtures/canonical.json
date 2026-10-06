@@ -1,0 +1,66 @@
+{
+  "valid": [
+    {
+      "name": "integer-like keys use UTF-8 order, not language property enumeration",
+      "input": "{\"2\":\"two\",\"10\":\"ten\"}",
+      "expected": "{\"10\":\"ten\",\"2\":\"two\"}"
+    },
+    {
+      "name": "supplementary Unicode keys use UTF-8 order, not UTF-16",
+      "input": "{\"𐀀\":2,\"￿\":1}",
+      "expected": "{\"￿\":1,\"𐀀\":2}"
+    },
+    {
+      "name": "HTML and slash are not escaped",
+      "input": "{\"html\":\"<>&/\"}",
+      "expected": "{\"html\":\"<>&/\"}"
+    },
+    {
+      "name": "literal escaped Unicode text is preserved",
+      "input": "{\"x\":\"\\\\u2028\"}",
+      "expected": "{\"x\":\"\\\\u2028\"}"
+    },
+    {
+      "name": "Unicode separator is emitted literally",
+      "input": "{\"x\":\"\\u2028\"}",
+      "expected": "{\"x\":\" \"}"
+    },
+    {
+      "name": "paired surrogates become one valid Unicode scalar",
+      "input": "{\"x\":\"\\ud83d\\ude00\"}",
+      "expected": "{\"x\":\"😀\"}"
+    },
+    {
+      "name": "safe numeric boundary and canonical string bigint",
+      "input": "{\"big\":\"9007199254740993\",\"safe\":9007199254740991}",
+      "expected": "{\"big\":\"9007199254740993\",\"safe\":9007199254740991}"
+    },
+    {
+      "name": "accepted nested payload data is preserved without numeric or Unicode coercion",
+      "input": "{\"payload\":{\"fraction\":\"1.25\",\"exponent\":\"1e3\",\"big\":\"9007199254740993\",\"negative_zero\":\"-0\",\"nested\":[true,null,{\"text\":\"é😀<>&\",\"literal\":\"\\\\u0041\",\"__proto__\":{\"x\":1}}],\"boundary\":[-9007199254740991,0,9007199254740991]}}",
+      "expected": "{\"payload\":{\"big\":\"9007199254740993\",\"boundary\":[-9007199254740991,0,9007199254740991],\"exponent\":\"1e3\",\"fraction\":\"1.25\",\"negative_zero\":\"-0\",\"nested\":[true,null,{\"__proto__\":{\"x\":1},\"literal\":\"\\\\u0041\",\"text\":\"é😀<>&\"}]}}"
+    }
+  ],
+  "invalid": ["{\"x\":1,\"x\":2}", "{\"x\":{\"a\":1,\"a\":2}}", "{\"x\":9007199254740992}", "{\"x\":1.0}", "{\"x\":1e2}", "{\"x\":-0}", "{\"x\":\"\\ud800\"}", "{\"x\":\"\\udc00\"}", "{} {}"],
+  "error_codes": [
+    { "name": "unpaired high surrogate value", "input": "{\"x\":\"\\ud800\"}", "code": "invalid_unicode" },
+    { "name": "unpaired low surrogate value", "input": "{\"x\":\"\\udc00\"}", "code": "invalid_unicode" },
+    { "name": "high surrogate followed by a non-surrogate", "input": "{\"x\":\"\\ud800\\u0041\"}", "code": "invalid_unicode" },
+    { "name": "unpaired high surrogate object key", "input": "{\"\\ud800\":1}", "code": "invalid_unicode" },
+    { "name": "unpaired low surrogate object key", "input": "{\"\\udc00\":1}", "code": "invalid_unicode" },
+    { "name": "escaped-equivalent duplicate key", "input": "{\"x\":1,\"\\u0078\":2}", "code": "duplicate_key" },
+    { "name": "unsafe integer token", "input": "{\"x\":9007199254740992}", "code": "noncanonical_number" },
+    { "name": "noncanonical negative zero token", "input": "{\"x\":-0}", "code": "noncanonical_number" },
+    { "name": "fractional value token", "input": "{\"x\":1.25}", "code": "noncanonical_number" },
+    { "name": "fractional spelling of an integer", "input": "{\"x\":1.0}", "code": "noncanonical_number" },
+    { "name": "exponent spelling of an integer", "input": "{\"x\":1e3}", "code": "noncanonical_number" }
+  ],
+  "typed_number_rejections": [
+    { "name": "typed negative zero", "input": "-0", "code": "noncanonical_number" },
+    { "name": "typed positive fraction", "input": "1.25", "code": "noncanonical_number" },
+    { "name": "typed negative fraction", "input": "-0.5", "code": "noncanonical_number" },
+    { "name": "typed unsafe positive integer", "input": "9007199254740992", "code": "noncanonical_number" },
+    { "name": "typed unsafe negative integer", "input": "-9007199254740992", "code": "noncanonical_number" },
+    { "name": "typed unsafe exponent value", "input": "1e21", "code": "noncanonical_number" }
+  ]
+}

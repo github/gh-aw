@@ -1,0 +1,271 @@
+{
+  "$defs": {
+    "Actor": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_handle": {
+          "$ref": "#/$defs/Identity"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "const": "administrator"
+            },
+            {
+              "const": "producer"
+            },
+            {
+              "const": "dispatcher"
+            },
+            {
+              "const": "worker"
+            },
+            {
+              "const": "reconciler"
+            }
+          ]
+        },
+        "run_attempt": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "role",
+        "principal",
+        "repository"
+      ],
+      "type": "object"
+    },
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "DispatchOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "kind": {
+          "const": "Dispatch"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "run": {
+          "$ref": "#/$defs/RunBinding"
+        },
+        "sender": {
+          "$ref": "#/$defs/Actor"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "const": "started"
+            },
+            {
+              "const": "bound"
+            },
+            {
+              "const": "rejected"
+            },
+            {
+              "const": "uncertain"
+            },
+            {
+              "const": "unresolved"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "dispatch_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "checked_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "conclusion": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effects": {
+          "anyOf": [
+            {
+              "const": "none"
+            },
+            {
+              "const": "partial"
+            },
+            {
+              "const": "unknown"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "prelaunch"
+            },
+            {
+              "const": "nonlaunch"
+            },
+            {
+              "const": "terminal_run"
+            },
+            {
+              "const": "delivery"
+            },
+            {
+              "const": "reconciliation"
+            }
+          ]
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "receipt": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "const": "trusted_publisher"
+            },
+            {
+              "const": "github_api"
+            },
+            {
+              "const": "trusted_activation"
+            },
+            {
+              "const": "verified_receipts"
+            }
+          ]
+        },
+        "status": {
+          "const": "completed"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "source",
+        "repository",
+        "workflow",
+        "ref",
+        "principal",
+        "checked_at"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ReasonCode": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "type": "string"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "RunBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "const": "workflow_dispatch"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "run_id",
+        "run_attempt",
+        "repository",
+        "workflow",
+        "ref",
+        "principal",
+        "event"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "$id": "DispatchOperation.json",
+  "$ref": "#/$defs/DispatchOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DispatchOperation"
+}

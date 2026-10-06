@@ -1,0 +1,16 @@
+{
+  "version": 3,
+  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+  "cases": [
+    { "name": "single alphanumeric", "reason": "0", "valid": true },
+    { "name": "sanitized punctuation", "reason": "delivery.none:worker_cancelled-v3", "valid": true },
+    { "name": "maximum 128 ASCII characters", "reason": "abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop", "valid": true },
+    { "name": "129 ASCII characters", "reason": "abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopx", "valid": false },
+    { "name": "empty reason", "reason": "", "valid": false },
+    { "name": "leading punctuation", "reason": "_invalid", "valid": false },
+    { "name": "whitespace prose", "reason": "worker cancelled", "valid": false },
+    { "name": "embedded newline", "reason": "worker\ncancelled", "valid": false },
+    { "name": "credential-like slash", "reason": "owner/repo", "valid": false },
+    { "name": "non-ASCII text", "reason": "worker_é", "valid": false }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$defs": {
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "WorkEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "work"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "WorkEdge.json",
+  "$ref": "#/$defs/WorkEdge",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkEdge"
+}

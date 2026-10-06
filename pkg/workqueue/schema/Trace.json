@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
     "Identity": {
       "maxLength": 256,
       "minLength": 1,
@@ -7,31 +12,25 @@
       "x-forbid-ascii-controls": true,
       "x-utf8-max-bytes": 256
     },
-    "WorkQueueFinishIntent": {
+    "Trace": {
       "additionalProperties": false,
       "properties": {
-        "claim_handle": {
+        "publisher_attempt": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "span_id": {
           "$ref": "#/$defs/Identity"
         },
-        "outcome": {
-          "anyOf": [
-            {
-              "const": "completed"
-            },
-            {
-              "const": "cancelled"
-            }
-          ]
+        "trace_id": {
+          "$ref": "#/$defs/Identity"
         }
       },
-      "required": [
-        "outcome"
-      ],
+      "required": [],
       "type": "object"
     }
   },
-  "$id": "WorkQueueFinishIntent.json",
-  "$ref": "#/$defs/WorkQueueFinishIntent",
+  "$id": "Trace.json",
+  "$ref": "#/$defs/Trace",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkQueueFinishIntent"
+  "title": "Trace"
 }

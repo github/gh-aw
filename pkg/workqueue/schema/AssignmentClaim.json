@@ -59,55 +59,10 @@
         "descriptor"
       ],
       "type": "object"
-    },
-    "WorkQueueAssignment": {
-      "additionalProperties": false,
-      "properties": {
-        "claims": {
-          "items": {
-            "$ref": "#/$defs/AssignmentClaim"
-          },
-          "maxItems": 16,
-          "minItems": 1,
-          "type": "array"
-        },
-        "commit_id": {
-          "$ref": "#/$defs/Identity"
-        },
-        "dispatch_id": {
-          "$ref": "#/$defs/Identity"
-        },
-        "policy_epoch": {
-          "$ref": "#/$defs/Identity"
-        },
-        "pool": {
-          "$ref": "#/$defs/Identity"
-        },
-        "request_id": {
-          "$ref": "#/$defs/Identity"
-        },
-        "version": {
-          "const": 3
-        },
-        "worker_profile": {
-          "$ref": "#/$defs/Identity"
-        }
-      },
-      "required": [
-        "version",
-        "dispatch_id",
-        "request_id",
-        "commit_id",
-        "policy_epoch",
-        "pool",
-        "worker_profile",
-        "claims"
-      ],
-      "type": "object"
     }
   },
-  "$id": "WorkQueueAssignment.json",
-  "$ref": "#/$defs/WorkQueueAssignment",
+  "$id": "AssignmentClaim.json",
+  "$ref": "#/$defs/AssignmentClaim",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkQueueAssignment"
+  "title": "AssignmentClaim"
 }

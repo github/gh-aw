@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "Priority": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ProducerRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fairness_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "priorities": {
+          "items": {
+            "$ref": "#/$defs/Priority"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "pools",
+        "priorities",
+        "fairness_keys"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "ProducerRule.json",
+  "$ref": "#/$defs/ProducerRule",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProducerRule"
+}

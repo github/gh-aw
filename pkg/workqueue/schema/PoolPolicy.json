@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "ClaimBound": {
+      "maximum": 16,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "CountBound": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "PoolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_repositories": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "type": "array"
+        },
+        "default_profile": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "max_observation_age_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "native_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "per_account_limit": {
+          "$ref": "#/$defs/CountBound"
+        },
+        "profiles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkerProfile"
+          },
+          "type": "object",
+          "x-forbid-key-ascii-controls": true,
+          "x-key-min-utf8-bytes": 1,
+          "x-key-utf8-max-bytes": 256
+        },
+        "reconciliation": {
+          "$ref": "#/$defs/ReconciliationPolicy"
+        },
+        "retry": {
+          "$ref": "#/$defs/RetryPolicy"
+        }
+      },
+      "required": [
+        "default_profile",
+        "profiles",
+        "logical_limit",
+        "native_limit",
+        "allowed_repositories",
+        "max_observation_age_ms",
+        "retry",
+        "reconciliation"
+      ],
+      "type": "object"
+    },
+    "ReconciliationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "deadline_ms"
+      ],
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "backoff_ms": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "max_attempts": {
+          "$ref": "#/$defs/CountBound"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "backoff_ms"
+      ],
+      "type": "object"
+    },
+    "Revision": {
+      "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "WorkerProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "effect_scope": {
+          "$ref": "#/$defs/Identity"
+        },
+        "max_claims": {
+          "$ref": "#/$defs/ClaimBound"
+        },
+        "principal": {
+          "$ref": "#/$defs/Identity"
+        },
+        "ref": {
+          "$ref": "#/$defs/Revision"
+        },
+        "share_keys": {
+          "type": "boolean"
+        },
+        "trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "workflow": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "workflow",
+        "ref",
+        "principal",
+        "trust_domain",
+        "credential_scope",
+        "effect_scope",
+        "max_claims",
+        "share_keys"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "PoolPolicy.json",
+  "$ref": "#/$defs/PoolPolicy",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PoolPolicy"
+}

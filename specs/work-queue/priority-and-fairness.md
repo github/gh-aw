@@ -294,7 +294,7 @@ The existing upgrade, ordering, and compatibility behavior above is evidence abo
 
 ### 2.2 Two storage and command distinctions matter
 
-The examined workflow runtime uses `work-queue` and versioned workflow facts. The examined operator CLI defaults to `gh-aw-work-queue` and preserves payload/run-provenance fields in a different format. Those current formats are not interchangeable. The replacement MUST use one current `QueueCommit` codec and replayer for both surfaces, rather than maintain two scheduling implementations. Separately configured queue branches remain separate authorities; sharing a format does not merge their entitlement, permissions, or worker-effect authorization. Neither surface retains an unscheduled mode. [R11], [R12]
+The examined workflow runtime uses `work-queue` and versioned workflow facts. The examined operator CLI defaults to `gh-aw-work-queue` and preserves payload/run-provenance fields in a different format. Those old formats are not interchangeable. The replacement MUST use one current `QueueCommit` contract and the exact algorithm for both surfaces. Native Go and JavaScript engines are deliberately retained: generated schemas and independent, exact cross-language conformance fixtures enforce identical replay, selection, packing, and request semantics. Each language's consumers reuse its engine rather than implementing separate CLI, publisher, snapshot, or explanation selectors. Separately configured queue branches remain separate authorities; sharing a format does not merge their entitlement, permissions, or worker-effect authorization. Neither surface retains an unscheduled mode. [R11], [R12]
 
 Git and Issues expose similar tools, but do not offer identical consistency primitives. HMAC signatures authenticate Issues records; they do not turn a sequence of issue/comment reads and writes into an atomic queue-wide scheduling transaction. A design requiring a single global scheduling decision must acknowledge that difference. [R7], [R8]
 
@@ -548,7 +548,7 @@ Define one new current `QueueCommit` transaction protocol with closed, typed ope
 | `pool` | Required configured scheduling/worker-capability domain |
 | `worker_profile` | Approved worker/recipe profile; omitted submissions use the pool's explicit default |
 | `batch_trust_domain` | Required compiler/policy-resolved sharing boundary; never an agent-selected entitlement or permission set |
-| `payload` | Immutable validated task description, inputs, and optional agent-generated plan |
+| `payload` | Immutable JSON object within the [current wire value profile](#current-wire-encoding), containing task inputs and an optional agent-generated plan |
 | `graph_id`, `node_key` | Trusted graph namespace and stable local node identity; neither grants a separate fairness share |
 | `depends_on` | Required array of typed Work, Issue, or PR predecessor references; new independent submissions resolve it to `[]` |
 | `subject` | Optional typed Issue/PR that this Work operates on, distinct from its dependency conditions |
@@ -656,7 +656,7 @@ Use an exact integer tick scale for each sibling competition set. Compute `Q` as
 
 The scale is computed once per policy epoch and immutable during it. Newly admitted authorized keys with default weight 1 need no scale change. Rational arithmetic remains useful as an independent reference model; the runtime MUST NOT use rounded floating-point reciprocals.
 
-The following is the version-1 rule, including an explicit no-idle-credit policy:
+The following is the current rule, including an explicit no-idle-credit policy:
 
 ```text
 pick(parent, eligible_keys):
@@ -720,6 +720,44 @@ Use **one `QueueCommit` JSON object per line of the existing `work-queue.jsonl`*
 The request fingerprint binds the actor and the validated logical intent, not the observed branch SHA or tentative selected Work. Reusing a request ID with different meaning MUST fail. A conflict retry may regenerate the tentative operations and predecessor, but must reuse the same logical request. Once committed, its identity and result are immutable.
 
 Keep the logical request's origin fixed across job retries of the same serialized intent. A new publisher attempt belongs in diagnostics/trace metadata, not in a regenerated fingerprint that makes the same request look different. New agent runs/intents receive new handles; recovering an old handle preserves its trusted origin.
+
+#### Current wire encoding
+
+Version 3 uses a deliberately restricted JSON value profile, including immutable
+Work payloads. JSON number tokens MUST be plain safe integers in the inclusive
+range `-9007199254740991..9007199254740991`; reject fractions, exponent notation,
+negative zero and unsafe integers rather than rounding or coercing them.
+Nonintegral quantities and larger exact values must be represented explicitly
+as strings. This is not a promise to preserve arbitrary numeric JSON inputs or
+automatically convert older payloads.
+
+The restriction prevents either native engine from rounding a numeric value
+before equality checks, fingerprints or resource accounting. A single integer
+spelling also prevents alternate numeric representations from identifying the
+same request differently. Typed producer inputs MUST reject nonintegral or
+unsafe numbers and negative zero before serialization, not silently replace
+them with a different value.
+
+Within this profile and the installed size/depth limits, producers and readers
+MUST preserve every accepted payload field and value recursively, including
+strings, booleans, nulls, arrays, nested objects and exact safe integers.
+Canonicalization changes key order, insignificant whitespace and equivalent
+JSON escaping, not the decoded data. It MUST NOT discard unknown payload
+fields, normalize Unicode, coerce strings into numbers or convert rejected
+numeric inputs into accepted values.
+
+Canonical encoding sorts object keys by their UTF-8 bytes, emits no insignificant
+whitespace, and preserves valid Unicode without HTML or U+2028/U+2029 escaping.
+Reject recursively duplicated decoded keys, invalid UTF-8 and unpaired
+surrogates. Do not normalize Unicode or reinterpret a literal backslash-u escape
+as a different value. Scheduling passes are canonical decimal strings backed by
+native arbitrary-precision integers, not JSON numbers.
+
+Identity bounds apply to UTF-8 bytes, including identity-valued record keys.
+Structural schema character limits alone do not enforce that byte bound; both
+native engines perform the semantic check. Positive resource/principal decimal
+IDs remain lossless strings. The shared contract and independent encoding,
+identity and reason-code fixtures define the exact accepted limits.
 
 Use a small operation union:
 
@@ -1032,7 +1070,7 @@ Suggested behavior:
 | `work_queue_read` | Display policy, key/class metadata, blocked reasons, and a snapshot prediction; explicitly non-authoritative |
 | Existing `sort` | Remain presentation-only; never override policy |
 | `work_queue_dispatch_next` | Stage pool, `max_claims`, and `max_dispatches`; commit a fair packable prefix and bind complete Claim arrays to approved workers |
-| Explicit Work selection | No direct-claim selector, preferred-Work assertion, arbitrary filter, or target-specific queue bypass in version 1 |
+| Explicit Work selection | No direct-claim selector, preferred-Work assertion, arbitrary filter, or target-specific queue bypass |
 | Administrative priority/weight change | Append an authorized Policy transaction only after quiescence; no Control-based debt reset or out-of-policy grant override |
 | Operational recovery | Authorized Control operations pause/resume admission/grants or rotate equivalent credentials without resetting passes; reconcile launch and delivery barriers, never force-release |
 | Worker finish and safe outputs | Resolve the sole assignment handle automatically; require explicit handles for multiple Claims and reject foreign/ambiguous scopes before handlers |
@@ -1043,7 +1081,7 @@ Pools must define complete target eligibility. Letting each caller restrict the 
 
 ### 7.10 Policy changes and breaking deployment
 
-For version 1, **scheduling policy** is immutable while the queue contains any
+In the current protocol, **scheduling policy** is immutable while the queue contains any
 nonterminal Work, outstanding reservation, or unresolved completed-node delivery
 barrier. To change weights, mode, routing, trust domains, entitlement, or admission
 limits, pause new admission/grants, drain/cancel and reconcile existing work,
@@ -1096,7 +1134,7 @@ There is no runtime migration or backward-compatible reader for old queues. Enco
 Compaction must preserve the complete causal commit chain and all operations,
 including ownership, delivery outcomes, controls, charge history, request
 idempotency, dispatch bindings, and releases. Removing unique old commits can
-change future selections or lose an uncertain launch. Version 1 compaction only
+change future selections or lose an uncertain launch. Current compaction only
 removes exact duplicate commit records and writes causal order. Authoritative
 checkpoints/history truncation remain outside scope; disposable indexes and
 bounded operation are specified in section 7.17.
@@ -1107,9 +1145,9 @@ bounded operation are specified in section 7.17.
 
 | Layer | Required contract | Present evidence / release obligation |
 |---|---|---|
-| Algorithmic fairness | Deterministic unit-grant proportional service for fixed continuously eligible weighted competitors; conditional eventual service below | Disposable exact-ratio examples exist; independent deviation bounds and temporal properties remain to be established |
-| Protocol safety | Current-only mandatory scheduling, causal replay, fresh fair-prefix grants, one charge/Claim and native reservation/group, no fork/bypass, isolated one-shot effects | Bounded successor and Claim-scope checks cover abstract subsets; packing, writer provenance, Control, and DeliveryFailure refinements are not yet modeled |
-| Implementation conformance | Runtime/operator codecs, selector, publisher, binder, and recovery enforce the same contract on real APIs | No replacement runtime implementation or conformance result exists |
+| Algorithmic fairness | Deterministic unit-grant proportional service for fixed continuously eligible weighted competitors; conditional eventual service below | Exact examples and bounded independent sibling deviation/eventual-service checks pass; complete two-level/runtime refinement remains outstanding |
+| Protocol safety | Current-only mandatory scheduling, causal replay, fresh fair-prefix grants, one charge/Claim and native reservation/group, no fork/bypass, isolated one-shot effects | Bounded successor, Claim-scope and lifecycle models cover packing, Control, binding and DeliveryFailure subsets; actual credentials, writer provenance and full runtime refinement remain separate obligations |
+| Implementation conformance | Runtime/operator codecs, selector, publisher, binder, and recovery enforce the same contract on real APIs | Native implementations and source-hashed exact conformance results exist; compiler/effects integration and supported-host evidence remain incomplete as tracked in section 9.1 |
 | Operational evidence | Reproducible source/tool identities and explicit passed/violation/incomplete verdicts | Exhausted finite cases are documented separately from two unfinished searches; artifact collection is not a proof |
 
 The scheduler admits the largest **fair prefix** allowed by the request and
@@ -1163,7 +1201,8 @@ The dispatcher remains an agent, not a scripted fairness loop. Its job is to ide
 
 #### Minimal MCP intent surface
 
-These proposed tool names are not currently implemented:
+The current MCP implementation exposes the following role-gated intent surface;
+compiler and end-to-end integration status remains tracked in section 9.1:
 
 | Tool | Semantics |
 |---|---|
@@ -1176,6 +1215,38 @@ These proposed tool names are not currently implemented:
 The agent-side MCP server continues to read its immutable activation artifact and write only staged-intent files. It receives no queue Git credentials and never publishes a `QueueCommit`. Trusted safe-output processing binds staged intent handles to stable request IDs/fingerprints; retries reuse those handles, while different logical requests have different IDs.
 
 Staging returns `{intent_id, status: "staged"}`, not a Claim or an effective assignment. A read/pending preview MUST distinguish `activation_snapshot` from `staged_preview`; pending submissions and dispatch requests never confer authority. A queue prediction can be stale without being an error.
+
+#### Observers, origins and worker authority
+
+Read-only observers expose read/explain only. They neither initialize policy
+nor submit, dispatch or finish Work. Their ordinary configured report outputs
+use ordinary safe-output permissions, not an unassigned dispatcher's narrow
+queue-control exception. A declared worker with a missing or malformed
+assignment MUST fail; missing input does not turn it into an observer.
+
+The protected compiled role and authenticated native context determine
+authority. Optional snapshot `role` is bounded display metadata, never an
+authorization flag. Genuine queue absence may be represented by `sha: null`
+and an empty log for observers; an existing invalid ledger remains an error.
+
+Capture the logical origin from authenticated native evidence into a trusted
+snapshot-step output and propagate it through the job-output channel.
+Intent artifacts cannot supply or replace it. Keep that stable requester,
+the current authenticated START sender and the actual dispatch credential's
+worker principal distinct; a source run's human actor ID is not an implicit
+GITHUB_TOKEN/App worker-principal mapping.
+
+```mermaid
+flowchart LR
+    Role["Protected compiled role"] --> Observer["Observer: read/explain"]
+    Role --> Worker["Declared worker"]
+    Run["Authenticated original run"] --> Origin["Protected logical-origin output"]
+    Origin --> Broker["Trusted intent processor"]
+    Artifact["Agent-staged intent"] --> Broker
+    Worker --> Binding["Immutable assignment + native binding"]
+    Binding --> Gate["Per-Claim effect gate"]
+    Snapshot["Snapshot role metadata"] -.-> View["Display only"]
+```
 
 An agent can request another batch, but cannot evade limits by emitting many small requests. Apply the existing compiler's dispatch budget across the run, and enforce outstanding pool/account limits and request idempotency during trusted publication. Reuse the existing allowed-worker and per-run dispatch-count concepts rather than create a parallel privilege system. [R21]
 
@@ -1320,7 +1391,7 @@ The repository already has `otlp.logSpan` for custom spans, a sanitized local OT
 
 Use phase spans such as `work-queue.schedule.run`, `work-queue.publish.run`, `work-queue.launch.run`, and `work-queue.reconcile.run`, consistent with the existing helper's naming. Propagate the current trusted workflow context into the worker; include request/commit/Claim correlation in its compiler-managed assignment.
 
-The current `logSpan` helper returns no span context. Version 1 therefore should not promise that the worker is parented to the exact grant span. Reuse the existing setup-span parent and correlate phase/worker spans through queue IDs. A batch worker carries all assigned Claim references, so one run trace can contain separately attributable Claim finalizations/effects. Optional cross-trace span links can connect enqueue and later dispatch episodes when supported, but are not necessary for offline explainability. OpenTelemetry distinguishes parent relationships, events, and links for asynchronous causality. [O1]
+The current `logSpan` helper returns no span context. The initial implementation therefore should not promise that the worker is parented to the exact grant span. Reuse the existing setup-span parent and correlate phase/worker spans through queue IDs. A batch worker carries all assigned Claim references, so one run trace can contain separately attributable Claim finalizations/effects. Optional cross-trace span links can connect enqueue and later dispatch episodes when supported, but are not necessary for offline explainability. OpenTelemetry distinguishes parent relationships, events, and links for asynchronous causality. [O1]
 
 | Correlation field | Use |
 |---|---|
@@ -2345,9 +2416,11 @@ liveness; fairness of scheduling cannot make a failed prerequisite succeed.
 The review revision's packing predicate, writer/role checks, operational controls,
 terminal DeliveryFailure/replacement procedure, and resource budgets are
 **specified acceptance obligations, not additions already checked by
-FairWorkQueue.tla**. Current checks cover neither sustained grant-share error nor
-eventual-service properties. Bounded checks do not imply an unbounded proof or
-runtime refinement. The current model documentation makes that distinction.
+FairWorkQueue.tla**. Its selector-conformance checks do not establish sustained
+grant-share error or eventual service. The separate `QueueService.tla` model
+adds the bounded sibling-service evidence described below; it does not establish
+a full hierarchy or runtime refinement. Bounded checks do not imply an unbounded
+proof. The model documentation makes that distinction.
 The operational outage/cancellation/fault/campaign walkthroughs in section 7.18
 are likewise runtime acceptance scenarios, not new formal verification results.
 [R14], [R16]
@@ -2364,10 +2437,27 @@ schema/transport conformance, scheduler fairness, or an unbounded liveness proof
 
 #### Independent fairness release gate
 
-Add a small dedicated scheduler model with recurring unit-service opportunities,
-fixed positive weights, bounded competitor sets, and explicit eligibility
+The independent release gate requires recurring unit-service opportunities,
+fixed positive weights, bounded competitor sets and explicit eligibility
 transitions. It must not merely assert that the next selection equals the same
-selector used to generate it.
+selector used to generate it. [`QueueService.tla`](QueueService.tla) provides a
+first bounded sibling-set instantiation with weights 5:3:2: fixed competition
+exhausts 30 states, arbitrary eligibility changes exhaust 60,360 states, and four
+share/starvation controls return their exact expected violations.
+
+The independent count predicates check exact ten-grant cycle shares and a
+three-grant prefix-deviation bound for that fixed set. Recurring service bits
+check eventual grants, not persistence of a previously selected winner. The
+dynamic case assumes a packable service opportunity and weak fairness of Grant;
+strict priority, absent service fairness, and a persistently un-packable winner
+each demonstrate why eligibility alone cannot guarantee progress.
+
+This model normalizes passes relative to the parent clock and discards only
+inactive past debt that reactivation would clamp anyway. Count history is kept
+only in the fixed-set case; dynamic eligibility is checked for eventual service,
+not an unsupported dynamic ratio theorem. These finite checks are not a proof
+for arbitrary weights, composed class/key hierarchies, queue publication,
+resource release, or the runtime.
 
 Check an independent weighted-service-deviation predicate for fixed-set
 intervals, with its bound stated and justified for the exact rule in section
@@ -2377,9 +2467,18 @@ counterexamples without those assumptions, strict-priority starvation, join/
 reactivation, cap/release, and a persistently un-packable next winner. A fixed-set
 ratio fixture is not a dynamic-eligibility liveness theorem.
 
-Refine the lifecycle model separately for multi-profile fair-prefix packing,
-binding conflicts/activation recovery, Control, mutually exclusive delivery
-outcomes, and replacement admission. Then establish runtime conformance with
+[`QueueLifecycle.tla`](QueueLifecycle.tla) supplies a separate bounded lifecycle
+instantiation for multi-profile fair-prefix packing, binding conflicts and
+activation recovery, Control, mutually exclusive delivery outcomes, replacement
+admission and bounded verification attempts. Its independent X/Y/X packing
+oracle distinguishes stopping at an un-packable winner from backfilling.
+Two positive configurations exhaust 208,108 states; eleven negative controls
+and three guarded witnesses require exact named diagnostics.
+The [reproduction guide](README.md#bounded-launch-delivery-and-recovery-evidence)
+states its evidence abstractions and omissions. It proves neither real host
+authentication nor eventual lifecycle progress.
+
+Complete the lifecycle refinement and establish runtime conformance with
 independent cross-language fixtures and adversarial API/transport tests. None of
 these gates can be satisfied by collecting more states from an unchanged model
 that does not express the required property.
@@ -2434,7 +2533,10 @@ compositional verification, not identical fresh starts indefinitely.
 
 ## 9. Implementation map
 
-This research intentionally changes no repository implementation. A follow-up implementation must wire all relevant surfaces, not just replay sorting.
+The implementation in [PR #66024](https://github.com/github/gh-aw/pull/66024)
+wires these surfaces together rather than adding replay sorting alone. The
+coverage table below distinguishes implementation work from verified guarantees
+and explicitly deferred deployment requirements.
 
 | Surface | Expected work |
 |---|---|
@@ -2463,11 +2565,55 @@ advisory-only or unscheduled intermediate queue. Historical usage accounting,
 critical-path optimization, DRF, runtime-aware backfilling, and preemption remain
 separate later capabilities.
 
+### 9.1 Implementation coverage and remaining requirements
+
+This table is a release checklist, not a claim that the whole specification is
+already implemented or proved. Update a row only when its runtime path and
+corresponding evidence exist. A green ordinary CI run does not discharge an
+unexecuted formal, supported-host, performance, or deployment-security gate.
+
+| Requirement | Implementation/evidence status |
+|---|---|
+| Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented native contract; captured full Go suite and source-hashed 100-case exact conformance passes exist; current producer-cancellation regression and final combined rerun remain integration gates |
+| Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | In progress |
+| Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | In progress |
+| Immutable arrays, actual run binding and conservative native recovery | In progress |
+| Universal Claim-scoped outputs, independent outcomes and custom/deferred paths | Built-in gates and trusted custom/raw/native-asset adapter framework implemented with scoped tests; prepared code/tree, broader GraphQL/external/persistent/control verification and final pipeline integration remain unfinished or unverified |
+| Compiler/MCP/operator/explain/trace and workflow examples | In progress |
+| Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
+| Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
+| Retained-history, contention and recovery-headroom operating envelope | Newer source-hashed local benchmark artifacts pass 30 rows including JS 16/64/80 MiB retained histories; earlier depth failures are historical. Final-source, closure-envelope, contention/host/API measurements and deployment SLOs remain outstanding |
+| Existing `FairDAGGitHub` and `QueueOrdering` exhaustive searches | Incomplete; no observed violation is not a pass |
+| Full JS typecheck/existing dependency-based tests | Declared tools and locked type dependencies restored; parent scoped Vitest passes 355 tests/27 files and session schema drift passes. Normal TypeScript checking still fails new queue-source/check-file diagnostics; the isolated published baseline has one unrelated existing diagnostic. Full locked Vite installation remains separately blocked on `source-map-js@1.2.2` |
+| TypeSpec schema generation | Dependency-free subset emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass; semantic equivalence of the native and official emitted schemas remains unverified |
+| Automated verification/provisioning of queue-branch writer restrictions | **Deferred by user direction; not implemented** |
+
+The writer-restriction deferral does not relax the normative trust requirement
+in section 7.16. Deployment still needs independently enforced trusted writers,
+no force-updates/deletion, and credentials withheld from agent execution.
+Authenticated ingestion, actual run/attempt binding and Claim/resource checks
+remain in implementation scope; they cannot establish that an untrusted writer
+was unable to replace the underlying branch. Until that boundary is enforced
+and evidenced, do not advertise the deployment-security contract as satisfied.
+
+```mermaid
+flowchart LR
+    Contract["One contract and independent fixtures"] --> Go["Native Go engine"]
+    Contract --> JS["Native JavaScript engine"]
+    Go --> Parity["Exact replay and scheduling conformance"]
+    JS --> Parity
+    Parity --> Functional["Functional queue evidence"]
+    Functional --> Release["Release requirements"]
+    Hosts["Supported-host binding evidence"] --> Release
+    Formal["Explicit formal verdicts"] --> Release
+    Deployment["Deferred writer-restriction enforcement"] -.-> Release
+```
+
 ## 10. Research limits and unresolved engineering questions
 
 The recommendation is concrete, but several items require implementation-specific decisions and proof:
 
-1. The wire schema/runtime are proposals. The successor checks abstract causal-prefix, DAG/readiness, normalized external gates, and batched closure; dynamic graph admission, DeliveryFailure/replacements, Control, writer provenance, resource budgets, JSON validation, actual cross-repo identity/permissions/freshness, packing, transport, and compaction refinement remain obligations.
+1. Native wire/runtime implementations and bounded successor/lifecycle checks now exist. Complete refinement of dynamic graph admission, replacements, writer provenance, resource budgets, JSON validation, actual cross-repo identity/permissions/freshness, packing, transport and compaction remains an obligation, not a consequence of bounded passes.
 2. The current Git backend's freshness/ref semantics must be validated under actual concurrent publication, including ambiguous responses.
 3. The pinned run-details API and authenticated activation-binding recovery require integration tests against each supported host. Unknown launch outcomes can require intervention even with that mechanism; older response-only dispatch contracts are unsupported.
 4. The proposed dynamic-key, integer-tick hierarchy, and eligibility rules need independent deviation/liveness evidence and conformance checks and are not covered wholesale by the original stride algorithm's theorems; live weight rebasing is outside version 1.

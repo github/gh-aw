@@ -1,0 +1,243 @@
+{
+  "$defs": {
+    "Decimal": {
+      "maxLength": 256,
+      "pattern": "^[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Dependency": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkEdge"
+        },
+        {
+          "$ref": "#/$defs/IssueEdge"
+        },
+        {
+          "$ref": "#/$defs/PullRequestEdge"
+        }
+      ]
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "IssueEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "const": "completed"
+            },
+            {
+              "const": "closed"
+            }
+          ]
+        },
+        "kind": {
+          "const": "issue"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "Priority": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "PullRequestEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "const": "merged"
+        },
+        "kind": {
+          "const": "pull_request"
+        },
+        "resource": {
+          "$ref": "#/$defs/Resource"
+        }
+      },
+      "required": [
+        "kind",
+        "resource",
+        "condition"
+      ],
+      "type": "object"
+    },
+    "Replacement": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "anyOf": [
+            {
+              "const": "idempotent"
+            },
+            {
+              "const": "compensated"
+            },
+            {
+              "const": "inspection"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/Identity"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "work_id",
+        "disposition",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "const": "issue"
+            },
+            {
+              "const": "pull_request"
+            }
+          ]
+        },
+        "number": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "repository": {
+          "$ref": "#/$defs/Identity"
+        },
+        "repository_id": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "resource_id": {
+          "$ref": "#/$defs/Decimal"
+        }
+      },
+      "required": [
+        "kind",
+        "host",
+        "repository",
+        "repository_id",
+        "resource_id",
+        "number"
+      ],
+      "type": "object"
+    },
+    "Timestamp": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "WorkEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "work"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id"
+      ],
+      "type": "object"
+    },
+    "WorkOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "batch_trust_domain": {
+          "$ref": "#/$defs/Identity"
+        },
+        "depends_on": {
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "enqueued": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "fairness_key": {
+          "maxLength": 128,
+          "type": "string"
+        },
+        "graph_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "kind": {
+          "const": "Work"
+        },
+        "node_key": {
+          "$ref": "#/$defs/Identity"
+        },
+        "payload": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "pool": {
+          "$ref": "#/$defs/Identity"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
+        },
+        "replacement_of": {
+          "$ref": "#/$defs/Replacement"
+        },
+        "subject": {
+          "$ref": "#/$defs/Resource"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
+        },
+        "worker_profile": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "kind",
+        "work_id",
+        "graph_id",
+        "node_key",
+        "pool",
+        "priority",
+        "fairness_key",
+        "worker_profile",
+        "batch_trust_domain",
+        "payload",
+        "depends_on",
+        "enqueued"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "WorkOperation.json",
+  "$ref": "#/$defs/WorkOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkOperation"
+}

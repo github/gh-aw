@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "identity_max_utf8_bytes": 256,
+  "decimal_max_digits": 256,
+  "identity": [
+    { "name": "ASCII at byte ceiling", "text": "a", "repeat": 256, "expected_utf8_bytes": 256, "valid": true },
+    { "name": "ASCII above byte ceiling", "text": "a", "repeat": 257, "expected_utf8_bytes": 257, "valid": false },
+    { "name": "four-byte Unicode at byte ceiling", "text": "😀", "repeat": 64, "expected_utf8_bytes": 256, "valid": true },
+    { "name": "four-byte Unicode above byte ceiling", "text": "😀", "repeat": 65, "expected_utf8_bytes": 260, "valid": false },
+    { "name": "reported 400-byte Unicode counterexample", "text": "😀", "repeat": 100, "expected_utf8_bytes": 400, "valid": false },
+    { "name": "two-byte Unicode at byte ceiling", "text": "é", "repeat": 128, "expected_utf8_bytes": 256, "valid": true },
+    { "name": "empty identity", "text": "", "repeat": 1, "expected_utf8_bytes": 0, "valid": false },
+    { "name": "ASCII control", "text": "a\u0001", "repeat": 1, "expected_utf8_bytes": 2, "valid": false },
+    { "name": "ASCII DEL", "text": "a\u007f", "repeat": 1, "expected_utf8_bytes": 2, "valid": false }
+  ],
+  "decimal": [
+    { "name": "129 digits remains within canonical contract", "digits": 129, "valid": true },
+    { "name": "maximum canonical decimal identity", "digits": 256, "valid": true },
+    { "name": "above canonical decimal identity ceiling", "digits": 257, "valid": false }
+  ]
+}

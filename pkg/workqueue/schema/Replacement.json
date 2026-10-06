@@ -7,31 +7,39 @@
       "x-forbid-ascii-controls": true,
       "x-utf8-max-bytes": 256
     },
-    "WorkQueueFinishIntent": {
+    "Replacement": {
       "additionalProperties": false,
       "properties": {
-        "claim_handle": {
-          "$ref": "#/$defs/Identity"
-        },
-        "outcome": {
+        "disposition": {
           "anyOf": [
             {
-              "const": "completed"
+              "const": "idempotent"
             },
             {
-              "const": "cancelled"
+              "const": "compensated"
+            },
+            {
+              "const": "inspection"
             }
           ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/Identity"
+        },
+        "work_id": {
+          "$ref": "#/$defs/Identity"
         }
       },
       "required": [
-        "outcome"
+        "work_id",
+        "disposition",
+        "evidence"
       ],
       "type": "object"
     }
   },
-  "$id": "WorkQueueFinishIntent.json",
-  "$ref": "#/$defs/WorkQueueFinishIntent",
+  "$id": "Replacement.json",
+  "$ref": "#/$defs/Replacement",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WorkQueueFinishIntent"
+  "title": "Replacement"
 }

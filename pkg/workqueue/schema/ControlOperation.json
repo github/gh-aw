@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "ControlOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "control": {
+          "anyOf": [
+            {
+              "const": "admission_paused"
+            },
+            {
+              "const": "grants_paused"
+            },
+            {
+              "const": "credential_generation"
+            }
+          ]
+        },
+        "kind": {
+          "const": "Control"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Identity"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "control",
+        "value",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string",
+      "x-forbid-ascii-controls": true,
+      "x-utf8-max-bytes": 256
+    },
+    "ReasonCode": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "type": "string"
+    }
+  },
+  "$id": "ControlOperation.json",
+  "$ref": "#/$defs/ControlOperation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ControlOperation"
+}
