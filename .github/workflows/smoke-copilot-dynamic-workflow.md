@@ -13,6 +13,7 @@ permissions:
 engine:
   id: copilot
   dynamic-workflows: true
+  args: ["--experimental"]
 checkout:
   pull-request: false
 safe-outputs:
