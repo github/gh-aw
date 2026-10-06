@@ -77,6 +77,27 @@ function sanitizeModelName(value) {
 }
 
 /**
+ * Read the compiler's effective proxy budget when network audit entries omit it.
+ * @returns {string}
+ */
+function parseMaxAICreditsFromAWFConfig() {
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const configPath = process.env.GH_AW_AWF_CONFIG_PATH || path.join(agentOutputFile ? path.dirname(agentOutputFile) : "/tmp/gh-aw", "awf-config.json");
+  if (!fs.existsSync(configPath)) return "";
+  try {
+    /** @type {unknown} */
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    if (!config || typeof config !== "object" || !("apiProxy" in config)) return "";
+    const apiProxy = config.apiProxy;
+    if (!apiProxy || typeof apiProxy !== "object" || !("maxAiCredits" in apiProxy)) return "";
+    return parsePositiveNumberString(apiProxy.maxAiCredits);
+  } catch (error) {
+    core.warning(`Could not read AWF AI credits budget from ${configPath}: ${error instanceof Error ? error.message : String(error)}`);
+    return "";
+  }
+}
+
+/**
  * @param {string} [auditJsonlPathOverride]
  * @returns {string}
  */
@@ -369,10 +390,20 @@ function parseMaxAICreditsExceededFromAuditLog(auditJsonlPathOverride) {
   );
   if (explicitExceeded) return true;
 
-  const configuredMaxAICredits = parsePositiveNumberString(process.env.GH_AW_MAX_AI_CREDITS) || parseMaxAICreditsFromAuditLog(auditJsonlPathOverride);
+  const configuredMaxAICredits = parsePositiveNumberString(process.env.GH_AW_MAX_AI_CREDITS) || parseMaxAICreditsFromAuditLog(auditJsonlPathOverride) || parseMaxAICreditsFromAWFConfig();
   if (!configuredMaxAICredits) return false;
 
-  const latestAICreditsTotal = iterateJSONLFiles(
+  const latestAICreditsTotal = parseLatestAICreditsTotalFromTokenUsageLog(auditJsonlPathOverride);
+  if (!latestAICreditsTotal) return false;
+  return Number.parseFloat(latestAICreditsTotal) >= Number.parseFloat(configuredMaxAICredits);
+}
+
+/**
+ * @param {string} [auditJsonlPathOverride]
+ * @returns {string}
+ */
+function parseLatestAICreditsTotalFromTokenUsageLog(auditJsonlPathOverride) {
+  return iterateJSONLFiles(
     resolveTokenUsageLogPaths(auditJsonlPathOverride),
     "",
     content => /(?:ai_credits_total|aiCreditsTotal)/.test(content),
@@ -386,8 +417,6 @@ function parseMaxAICreditsExceededFromAuditLog(auditJsonlPathOverride) {
       return latestTotal || acc;
     }
   );
-  if (!latestAICreditsTotal) return false;
-  return Number.parseFloat(latestAICreditsTotal) >= Number.parseFloat(configuredMaxAICredits);
 }
 
 /**
@@ -625,15 +654,19 @@ function logAICreditSource(label, auditValue, stdioValue, envValue, envVarName) 
 function resolveAICreditsFailureState({ logProvenance = true } = {}) {
   const stdioSignals = parseAICreditsExceededFromAgentStdio();
   const { aiCredits: auditAICredits, maxAICredits: auditMaxAICredits, rateLimitError: auditRateLimitError, maxAICreditsExceeded: auditMaxAICreditsExceeded } = parseAuditLogCombined();
+  const tokenAICredits = parseLatestAICreditsTotalFromTokenUsageLog();
+  const configMaxAICredits = auditMaxAICredits ? "" : parseMaxAICreditsFromAWFConfig();
   const envAICredits = parsePositiveNumberString(process.env.GH_AW_AIC);
   const envMaxAICredits = parsePositiveNumberString(process.env.GH_AW_MAX_AI_CREDITS);
   const envRateLimitSignal = process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR === "true";
-  const envRateLimitSignalHasEvidence = envRateLimitSignal && !!(auditAICredits || stdioSignals.aiCredits || envAICredits);
+  const envRateLimitSignalHasEvidence = envRateLimitSignal && !!(auditAICredits || tokenAICredits || stdioSignals.aiCredits || envAICredits);
 
   // Log provenance so failing issues can be diagnosed when credit data is missing.
   if (logProvenance) {
-    logAICreditSource("aiCredits", auditAICredits, stdioSignals.aiCredits, envAICredits, "GH_AW_AIC");
-    logAICreditSource("maxAICredits", auditMaxAICredits, stdioSignals.maxAICredits, envMaxAICredits, "GH_AW_MAX_AI_CREDITS");
+    if (!auditAICredits && tokenAICredits) core.info(`[ai-credits] aiCredits source=token_usage value=${tokenAICredits}`);
+    else logAICreditSource("aiCredits", auditAICredits, stdioSignals.aiCredits, envAICredits, "GH_AW_AIC");
+    if (configMaxAICredits) core.info(`[ai-credits] maxAICredits source=awf_config value=${configMaxAICredits}`);
+    else logAICreditSource("maxAICredits", auditMaxAICredits, stdioSignals.maxAICredits, envMaxAICredits, "GH_AW_MAX_AI_CREDITS");
 
     const rawRateLimitSignalSource = auditRateLimitError
       ? "audit_log"
@@ -647,11 +680,14 @@ function resolveAICreditsFailureState({ logProvenance = true } = {}) {
     core.info(`[ai-credits] rateLimitSignal source=${rawRateLimitSignalSource}`);
   }
 
-  const aiCredits = auditAICredits || stdioSignals.aiCredits || envAICredits || "";
-  const maxAICredits = auditMaxAICredits || stdioSignals.maxAICredits || envMaxAICredits || "";
+  const aiCredits = auditAICredits || tokenAICredits || stdioSignals.aiCredits || envAICredits || "";
+  const maxAICredits = auditMaxAICredits || configMaxAICredits || stdioSignals.maxAICredits || envMaxAICredits || "";
   const rawAICreditsRateLimitError = auditRateLimitError || stdioSignals.rateLimitError || envRateLimitSignalHasEvidence;
   const aiCreditsRateLimitError = shouldReportAICreditsRateLimitError(rawAICreditsRateLimitError);
-  return { aiCredits, maxAICredits, aiCreditsRateLimitError, maxAICreditsExceeded: auditMaxAICreditsExceeded || stdioSignals.maxAICreditsExceeded };
+  // A completed response can cross the cap without another request being rejected.
+  // Only infer budget exhaustion from token totals when the agent job failed.
+  const tokenBudgetExceeded = process.env.GH_AW_AGENT_CONCLUSION === "failure" && !!tokenAICredits && !!maxAICredits && Number.parseFloat(tokenAICredits) >= Number.parseFloat(maxAICredits);
+  return { aiCredits, maxAICredits, aiCreditsRateLimitError, maxAICreditsExceeded: auditMaxAICreditsExceeded || stdioSignals.maxAICreditsExceeded || tokenBudgetExceeded };
 }
 
 /**
