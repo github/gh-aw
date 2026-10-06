@@ -99,7 +99,8 @@ func getSandboxAgentImages(workflowData *WorkflowData) map[string]string {
 		maps.Copy(images, agentConfig.Images)
 	}
 	if isModelRoutingEnabled(workflowData) {
-		for role, image := range modelRoutingDefaultImages {
+		defaultImages, _ := modelRoutingDefaultImages(workflowData, images)
+		for role, image := range defaultImages {
 			if _, exists := images[role]; !exists {
 				images[role] = image
 			}
@@ -108,12 +109,34 @@ func getSandboxAgentImages(workflowData *WorkflowData) map[string]string {
 	return images
 }
 
-var modelRoutingDefaultImages = map[string]string{
-	awfImageRoleSquid:    "ghcr.io/github/gh-aw-firewall/squid:0.28.30@sha256:a147f70732f81d02d59b3bddc2f7ad074d51a291f12abd8bc310b0f3ef5e1629",
-	awfImageRoleAgent:    "ghcr.io/github/gh-aw-firewall/agent:0.28.30@sha256:ae5d5b76eba522c375a36dd92a0146188bec19b2b7febae304e0dc420a28972b",
-	awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy:0.28.30@sha256:6294a95f9ca39be1cd6125cebffa9d2ba72a9bfabb8bab2160111788b67ab94d",
-	awfImageRoleCliProxy: "ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.30@sha256:f57aae1f4d91feda6f45633bcc7a3e1b0de70a97326dde354f3448a3f09de02c",
-	awfImageRoleRouter:   "ghcr.io/githubnext/gh-aw-router:latest@sha256:d1612d0eaec3fa8f14c38bbd0a6a0682732fc9f83b7fec94219d3e757a048270",
+func modelRoutingDefaultImages(workflowData *WorkflowData, configuredImages map[string]string) (map[string]string, []string) {
+	images := make(map[string]string)
+	var missing []string
+	imageTag := getAWFImageTag(getFirewallConfig(workflowData))
+	roles := []string{awfImageRoleSquid, awfImageRoleAgent, awfImageRoleAPIProxy, awfImageRoleCliProxy}
+	for _, role := range roles {
+		if _, configured := configuredImages[role]; configured {
+			continue
+		}
+		image := defaultAWFImageForRole(role, imageTag)
+		pin, found := lookupContainerPin(image, workflowData.ActionCache)
+		if !found || pin.PinnedImage == "" {
+			missing = append(missing, image)
+			continue
+		}
+		images[role] = pin.PinnedImage
+	}
+
+	if _, configured := configuredImages[awfImageRoleRouter]; !configured {
+		image := "ghcr.io/githubnext/gh-aw-router:" + string(constants.DefaultRouterVersion)
+		pin, found := lookupContainerPin(image, workflowData.ActionCache)
+		if !found || pin.PinnedImage == "" {
+			missing = append(missing, image)
+		} else {
+			images[awfImageRoleRouter] = pin.PinnedImage
+		}
+	}
+	return images, missing
 }
 
 // isKnownAWFImageRole reports whether role is part of the closed AWF role set.
@@ -240,6 +263,23 @@ func validateSandboxAgentImages(workflowData *WorkflowData) error {
 	images := getSandboxAgentImages(workflowData)
 	if images == nil {
 		return nil
+	}
+
+	if isModelRoutingEnabled(workflowData) {
+		configuredImages := map[string]string(nil)
+		if agentConfig := getAgentConfig(workflowData); agentConfig != nil {
+			configuredImages = agentConfig.Images
+		}
+		_, missing := modelRoutingDefaultImages(workflowData, configuredImages)
+		if len(missing) > 0 {
+			effectiveVersion := getAWFImageTag(getFirewallConfig(workflowData))
+			return NewValidationError(
+				"sandbox.agent.images",
+				strings.Join(missing, ", "),
+				"no digest pins are available for model routing with AWF version "+effectiveVersion,
+				fmt.Sprintf("Add matching entries to the embedded container pin catalog or provide explicit sandbox.agent.images overrides for: %s.", strings.Join(missing, ", ")),
+			)
+		}
 	}
 
 	roles := make([]string, 0, len(images))
