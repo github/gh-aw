@@ -2287,6 +2287,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_drive_memory:
+    name: Update drive memory
     needs:
       - activation
       - agent

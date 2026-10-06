@@ -24,6 +24,7 @@ var generatedJobNames = map[string]string{
 	"push_repo_memory":                          "Push repository memory",
 	"push_ledger_changes":                       "Push ledger changes",
 	"update_cache_memory":                       "Update cache memory",
+	updateDriveMemoryJobName:                    "Update drive memory",
 	"check_token_telemetry":                     "Check token telemetry",
 	"send_slack_message":                        "Send Slack message",
 }

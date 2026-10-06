@@ -117,14 +117,16 @@ jobs:
 func TestOptionalGeneratedJobAnnotations(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = &JobManager{jobs: map[string]*Job{
-		"evals":               {Name: "evals", Permissions: "contents: read"},
-		"update_cache_memory": {Name: "update_cache_memory", Permissions: "contents: write"},
-		"custom":              {Name: "custom", Permissions: "contents: read"},
+		"evals":                  {Name: "evals", Permissions: "contents: read"},
+		"update_cache_memory":    {Name: "update_cache_memory", Permissions: "contents: write"},
+		updateDriveMemoryJobName: {Name: updateDriveMemoryJobName, Permissions: "contents: write"},
+		"custom":                 {Name: "custom", Permissions: "contents: read"},
 	}}
 	compiler.annotateGeneratedJobs(&WorkflowData{})
 
 	require.Equal(t, "Evaluations", compiler.jobManager.jobs["evals"].DisplayName)
 	require.Equal(t, "Update cache memory", compiler.jobManager.jobs["update_cache_memory"].DisplayName)
+	require.Equal(t, "Update drive memory", compiler.jobManager.jobs[updateDriveMemoryJobName].DisplayName)
 	require.Empty(t, compiler.jobManager.jobs["custom"].DisplayName)
 	for _, job := range compiler.jobManager.jobs {
 		require.Contains(t, job.PermissionsComment, "# Permissions for the")
