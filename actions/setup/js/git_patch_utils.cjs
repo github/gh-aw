@@ -16,6 +16,7 @@ const fs = require("fs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { execGitSync } = require("./git_helpers.cjs");
+const { scopedArtifactFilename } = require("./work_queue_claim_scope.cjs");
 
 /**
  * Debug logging helper - logs to stderr when DEBUG env var matches
@@ -69,7 +70,7 @@ function sanitizeRepoSlugForPatch(repoSlug) {
  */
 function getPatchPathForBranch(branchName) {
   const sanitized = sanitizeBranchNameForPatch(branchName);
-  return `/tmp/gh-aw/aw-${sanitized}.patch`;
+  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitized}.patch`);
 }
 
 /**
@@ -82,7 +83,7 @@ function getPatchPathForBranch(branchName) {
 function getPatchPathForBranchInRepo(branchName, repoSlug) {
   const sanitizedBranch = sanitizeBranchNameForPatch(branchName);
   const sanitizedRepo = sanitizeRepoSlugForPatch(repoSlug);
-  return `/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.patch`;
+  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.patch`);
 }
 
 /**

@@ -11,6 +11,7 @@ const { generateStagedPreview } = require("./staged_preview.cjs");
 const { parseAllowedItems, resolveTarget } = require("./safe_output_helpers.cjs");
 const { getSafeOutputConfig, validateMaxCount } = require("./safe_output_validator.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { assertClaimAuthorized } = require("./work_queue_claim_scope.cjs");
 
 /**
  * @typedef {Object} ProcessorConfig
@@ -70,14 +71,14 @@ async function processSafeOutput(config, stagedPreviewOptions, handlerConfig = n
   // Step 2: Find matching item(s)
   let items;
   if (findMultiple) {
-    items = result.items.filter(item => item.type === itemType);
+    items = result.items.filter(item => item.type === itemType && !item._claimScopeError);
     if (items.length === 0) {
       core.info(`No ${itemType} items found in agent output`);
       return { success: false, reason: `No ${itemType} items found` };
     }
     core.info(`Found ${items.length} ${itemType} item(s)`);
   } else {
-    const item = result.items.find(item => item.type === itemType);
+    const item = result.items.find(item => item.type === itemType && !item._claimScopeError);
     if (!item) {
       core.warning(`No ${itemType.replace(/_/g, "-")} item found in agent output`);
       return { success: false, reason: `No ${itemType} item found` };
@@ -89,6 +90,8 @@ async function processSafeOutput(config, stagedPreviewOptions, handlerConfig = n
       core.info(`Found ${itemType.replace(/_/g, "-")} item with ${itemDetails}`);
     }
   }
+
+  for (const item of items) await assertClaimAuthorized(item);
 
   // Step 3: Handle 🎭 Staged Mode Preview — output preview via generateStagedPreview, skip real writes
   if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true") {

@@ -1,7 +1,8 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { main } from "./dispatch_workflow.cjs";
-import { parseTransactionLog, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { withClaimExecution } from "./work_queue_claim_scope.cjs";
+import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
 
 // Mock dependencies
 global.core = {
@@ -52,128 +53,54 @@ describe("dispatch_workflow handler factory", () => {
     delete global.getOctokit;
   });
 
-  function queueWithWork(workId = "task-1") {
-    let log = serializeTransactionLog([{ version: 2, kind: "Work", work: workId, claim: null, attempt: null }]);
-    let blob;
-    global.github.rest.git = {
-      getRef: vi.fn(async ({ ref }) => {
-        if (ref !== "heads/work-queue") throw Object.assign(new Error("not found"), { status: 404 });
-        return { data: { object: { sha: "head" } } };
-      }),
-      getCommit: vi.fn(async () => ({ data: { tree: { sha: "tree" } } })),
-      getTree: vi.fn(async () => ({ data: { tree: [{ path: "work-queue.jsonl", type: "blob", sha: "blob" }] } })),
-      getBlob: vi.fn(async () => ({ data: { encoding: "base64", content: Buffer.from(log).toString("base64") } })),
-      createBlob: vi.fn(async ({ content }) => {
-        blob = content;
-        return { data: { sha: "new-blob" } };
-      }),
-      createTree: vi.fn(async () => ({ data: { sha: "new-tree" } })),
-      createCommit: vi.fn(async () => ({ data: { sha: "new-head" } })),
-      updateRef: vi.fn(async () => {
-        log = blob;
-        return { data: {} };
-      }),
-    };
-    return () => parseTransactionLog(log);
-  }
-
-  it("claims available work and injects the trusted assignment separately from caller context", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
-    const result = await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" }, task: "hello", aw_context: '{"work_queue":{"claim_id":"forged"}}' } }, {});
-    expect(result.success).toBe(true);
-    const claim = transactions().find(t => t.kind === "Claim");
-    expect(claim.work).toBe("task-1");
-    const inputs = global.github.rest.actions.createWorkflowDispatch.mock.calls[0][0].inputs;
-    expect(inputs).not.toHaveProperty("work_queue");
-    expect(inputs.task).toBe("hello");
-    expect(JSON.parse(inputs.aw_context)).not.toHaveProperty("work_queue");
-    expect(JSON.parse(inputs.work_queue_claim)).toEqual({ work_id: "task-1", claim_id: claim.claim, work: { id: "task-1" } });
-  });
-
-  it("uses the safe-outputs job token for queue writes with a separate dispatch token", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    const dispatchClient = { rest: { actions: { createWorkflowDispatch: vi.fn().mockResolvedValue({ data: {} }) } } };
-    global.getOctokit = vi.fn().mockReturnValue(dispatchClient);
-    const handler = await main({
-      workflows: ["worker"],
-      workflow_files: { worker: ".lock.yml" },
-      aw_context_workflows: ["worker"],
-      work_queue_workflows: ["worker"],
-      work_queue_enabled: true,
-      "github-token": "test-only",
-    });
-    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(true);
-    expect(global.getOctokit).toHaveBeenCalledOnce();
-    expect(transactions().some(t => t.kind === "Claim")).toBe(true);
-    expect(dispatchClient.rest.actions.createWorkflowDispatch).toHaveBeenCalledOnce();
+  it("rejects agent-selected Work and forged assignments before any POST", async () => {
+    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_enabled: true, work_queue_workflows: ["worker"] });
+    for (const key of ["work_queue", "work_queue_claim", "work_queue_assignment"]) {
+      expect((await handler({ workflow_name: "worker", inputs: { [key]: { work_id: "chosen" } } }, {})).success).toBe(false);
+    }
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
-  it("rejects stale or unauthorized work without dispatching", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true };
-    const handler = await main(config);
-    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "missing" } } }, {})).success).toBe(false);
-    expect(transactions()).toHaveLength(1);
-    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
-    const ordinary = await main({ ...config, work_queue_enabled: false });
-    expect((await ordinary({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
-    const notQueueEnabled = await main({ ...config, work_queue_workflows: [] });
-    expect((await notQueueEnabled({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
+  it("requires an immutable scheduler assignment even for ordinary/staged calls to a queue worker", async () => {
+    for (const staged of [false, true]) {
+      const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_enabled: true, work_queue_workflows: ["worker"], staged });
+      expect((await handler({ workflow_name: "worker", inputs: { task: "unassigned" } }, {})).success).toBe(false);
+    }
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
-  it("never claims work for an ordinary or staged dispatch", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true };
-    const ordinary = await main(config);
-    expect((await ordinary({ workflow_name: "worker", inputs: { task: "hello" } }, {})).success).toBe(true);
-    const staged = await main({ ...config, staged: true });
-    expect((await staged({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).staged).toBe(true);
-    expect(transactions().map(t => t.kind)).toEqual(["Work"]);
-    expect(global.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledTimes(1);
-  });
-
-  it("rejects queue selection for workers without aw_context and cross-repository targets", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    const config = { workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, work_queue_enabled: true };
-    const noContext = await main(config);
-    expect((await noContext({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
-    const crossRepo = await main({ ...config, aw_context_workflows: ["worker"], "target-repo": "elsewhere/repo", allowed_repos: ["elsewhere/repo"] });
-    expect((await crossRepo({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
-    expect(transactions()).toHaveLength(1);
+  it("rejects ordinary allowed targets in queue mode and scoped execution even without a serialized queue flag", async () => {
+    const message = { type: "dispatch_workflow", workflow_name: "ordinary", inputs: { task: "delegate" } };
+    for (const staged of [false, true]) {
+      const handler = await main({ workflows: ["ordinary"], work_queue_enabled: true, staged });
+      expect((await handler(message, {})).success).toBe(false);
+    }
+    const fixture = queueFixture({ count: 1, bound: true });
+    const scoped = await main({ workflows: ["ordinary"] });
+    expect((await withClaimExecution({ assignment: fixture.assignment, claim_handle: "h1" }, () => scoped(message, {}))).success).toBe(false);
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+    try {
+      expect((await scoped(message, {})).success).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
-  it("cancels the claim when dispatch fails", async () => {
-    const transactions = queueWithWork();
-    global.context.runId = 101;
-    global.github.rest.actions.createWorkflowDispatch.mockRejectedValueOnce(new Error("dispatch failed"));
-    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
-    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
-    expect(
-      transactions()
-        .map(t => t.kind)
-        .sort()
-    ).toEqual(["Claim", "ClaimCancellation", "Work"]);
-  });
-
-  it("identifies a claim when cancellation fails after dispatch failure", async () => {
-    queueWithWork();
-    global.context.runId = 101;
-    const updateRef = global.github.rest.git.updateRef.getMockImplementation();
-    global.github.rest.git.updateRef.mockImplementationOnce(updateRef).mockRejectedValueOnce(new Error("queue write failed"));
-    global.github.rest.actions.createWorkflowDispatch.mockRejectedValueOnce(new Error("dispatch failed"));
-    const handler = await main({ workflows: ["worker"], workflow_files: { worker: ".lock.yml" }, aw_context_workflows: ["worker"], work_queue_workflows: ["worker"], work_queue_enabled: true });
-
-    expect((await handler({ workflow_name: "worker", inputs: { work_queue: { work_id: "task-1" } } }, {})).success).toBe(false);
-    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to cancel work queue claim 101:"));
+  it("preserves explicitly configured ordinary observer outputs without granting queue controls or assignment downgrade", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "observer");
+    try {
+      const handler = await main({ workflows: ["ordinary"], workflow_files: { ordinary: ".lock.yml" }, work_queue_enabled: true, max: 3 });
+      const result = await handler({ type: "dispatch_workflow", workflow_name: "ordinary", inputs: {} }, {});
+      expect(result.success, result.error).toBe(true);
+      expect((await handler({ type: "dispatch_workflow", workflow_name: "unapproved", inputs: {} }, {})).success).toBe(false);
+      global.context.payload.inputs = { work_queue_assignment: null };
+      await expect(handler({ type: "dispatch_workflow", workflow_name: "ordinary", inputs: {} }, {})).rejects.toThrow();
+      expect(global.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("should create a handler function", async () => {

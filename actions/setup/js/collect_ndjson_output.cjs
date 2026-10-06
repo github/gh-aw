@@ -3,6 +3,8 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { repairJson, sanitizePrototypePollution } = require("./json_repair_helpers.cjs");
+const { normalizeRuntimeMessage, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
+const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
 const { isPayloadUserBot } = require("./resolve_mentions.cjs");
@@ -14,6 +16,7 @@ const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
 async function main() {
   try {
     const fs = require("fs");
+    const queueScope = readClaimScopeContext();
     const { sanitizeContent } = require("./sanitize_content.cjs");
     const { validateItem, getMaxAllowedForType, getMinRequiredForType, hasValidationConfig, MAX_BODY_LENGTH: maxBodyLength, resetValidationConfigCache } = require("./safe_output_type_validator.cjs");
     const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
@@ -270,14 +273,25 @@ async function main() {
       const line = lines[i].trim();
       if (line === "") continue;
       core.info(`[INGESTION] Processing line ${i + 1}: ${line.substring(0, 200)}...`);
+      let item;
+      const rejectItem = (message, code = "claim_scope_invalid") => {
+        errors.push(message);
+        if (queueScope)
+          parsedItems.push({
+            type: typeof item?.type === "string" ? item.type : "invalid",
+            ...(item && Object.hasOwn(item, "claim_handle") ? { claim_handle: item.claim_handle } : {}),
+            _claimScopeError: message,
+            _claimScopeErrorCode: code,
+          });
+      };
       try {
-        const item = parseJsonWithRepair(line);
+        item = queueScope ? sanitizePrototypePollution(parseStrictJSON(line)) : parseJsonWithRepair(line);
         if (item === undefined) {
-          errors.push(`Line ${i + 1}: Invalid JSON - JSON parsing failed`);
+          rejectItem(`Line ${i + 1}: Invalid JSON - JSON parsing failed`);
           continue;
         }
-        if (!item.type) {
-          errors.push(`Line ${i + 1}: Missing required 'type' field`);
+        if (!item?.type || typeof item.type !== "string") {
+          rejectItem(`Line ${i + 1}: Missing or invalid required 'type' field`);
           continue;
         }
         // Normalize type to use underscores (convert any dashes to underscores for resilience)
@@ -286,12 +300,19 @@ async function main() {
         core.info(`[INGESTION] Line ${i + 1}: Original type='${originalType}', Normalized type='${itemType}'`);
         // Update item.type to normalized value
         item.type = itemType;
-        if (!expectedOutputTypes[itemType]) {
-          core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
-          errors.push(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
+        try {
+          item = normalizeRuntimeMessage(item);
+        } catch (error) {
+          const message = `Line ${i + 1}: ${getErrorMessage(error)}`;
+          rejectItem(message, error.code);
           continue;
         }
-        if (itemType === "noop" && isProbingNoopMessage(item.message)) {
+        if (!expectedOutputTypes[itemType]) {
+          core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
+          rejectItem(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
+          continue;
+        }
+        if (!queueScope && itemType === "noop" && isProbingNoopMessage(item.message)) {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
@@ -306,10 +327,10 @@ async function main() {
               repoResult.repoParts
             )
           : [];
-        const typeCount = parsedItems.filter(existing => existing.type === itemType).length;
+        const typeCount = parsedItems.filter(existing => existing.type === itemType && existing.claim_handle === item.claim_handle && !existing._claimScopeError).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
-          errors.push(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
+          rejectItem(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
           continue;
         }
         core.info(`Line ${i + 1}: type '${itemType}'`);
@@ -338,34 +359,32 @@ async function main() {
             dataSchema: typeConfig !== null && typeof typeConfig === "object" ? typeConfig.data_schema : undefined,
           });
           if (!validationResult.isValid) {
-            if (validationResult.error) {
-              errors.push(validationResult.error);
-            }
+            rejectItem(validationResult.error || `Line ${i + 1}: Invalid ${itemType} output`);
             continue;
           }
           // Use the normalized item (with sanitized/validated fields) rather
           // than the raw input, so downstream consumers see the canonical form.
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validationResult.normalizedItem);
+          parsedItems.push({ ...validationResult.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) });
         } else {
           // Fall back to validateItemWithSafeJobConfig for unknown types
           const jobOutputType = expectedOutputTypes[itemType];
           if (!jobOutputType) {
-            errors.push(`Line ${i + 1}: Unknown output type '${itemType}'`);
+            rejectItem(`Line ${i + 1}: Unknown output type '${itemType}'`);
             continue;
           }
           const safeJobConfig = jobOutputType;
           const validation = validateItemWithSafeJobConfig(item, safeJobConfig, i + 1);
           if (!validation.isValid) {
-            errors.push(...validation.errors);
+            for (const error of validation.errors) rejectItem(error);
             continue;
           }
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push(validation.normalizedItem);
+          parsedItems.push({ ...validation.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) });
         }
       } catch (error) {
         const errorMsg = getErrorMessage(error);
-        errors.push(`Line ${i + 1}: Invalid JSON - ${errorMsg}`);
+        rejectItem(`Line ${i + 1}: Invalid JSON - ${errorMsg}`);
       }
     }
     if (errors.length > 0) {
@@ -383,7 +402,7 @@ async function main() {
     }
     core.info(`Successfully parsed ${parsedItems.length} valid output items`);
     let collectorEmptyOutputCause;
-    if (!parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
+    if (!queueScope && !parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
       const incompleteOutcome = buildEmptyOutputOutcome(errors);
       parsedItems.push(incompleteOutcome);
       collectorEmptyOutputCause = incompleteOutcome.reason;
@@ -418,7 +437,7 @@ async function main() {
     let hasPatch = false;
     const patchFiles = [];
     try {
-      if (fs.existsSync(patchDir)) {
+      if (outputContent.trim() && fs.existsSync(patchDir)) {
         const dirEntries = fs.readdirSync(patchDir);
         for (const entry of dirEntries) {
           if (/^aw-.+\.(patch|bundle)$/.test(entry)) {

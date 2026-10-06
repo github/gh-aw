@@ -15,7 +15,8 @@ declare global {
    * GitHub API client instance provided by github-script action
    * This is an authenticated Octokit instance with pagination plugins
    */
-  const github: InstanceType<typeof GitHub>;
+  // The setup shim publishes a mutable global so Claim effects can install a scoped facade.
+  var github: InstanceType<typeof GitHub>;
 
   /**
    * Alternative name for the github client (same as github)

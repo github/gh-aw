@@ -16,7 +16,7 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
  * forwarding them to external action `with:` inputs.
  * @type {Set<string>}
  */
-const INTERNAL_MESSAGE_FIELDS = new Set(["type"]);
+const INTERNAL_MESSAGE_FIELDS = new Set(["type", "claim_handle", "claim_id", "work_id"]);
 
 /**
  * Main handler factory for a custom safe output action.

@@ -4,6 +4,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const fs = require("fs");
+const { normalizeRuntimeMessage, normalizeClaimScope, readClaimScopeContext, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 
 /**
  * Maximum content length to log for debugging purposes
@@ -32,6 +33,7 @@ function truncateForLogging(content) {
  * 3. Validating the JSON structure
  * 4. Returning parsed items array
  *
+ * @param {{partitioning?: boolean}} [options]
  * @returns {{
  *   success: true,
  *   items: any[],
@@ -42,7 +44,11 @@ function truncateForLogging(content) {
  *   error?: string
  * }} Result object with success flag and items array (if successful) or error message
  */
-function loadAgentOutput() {
+function loadAgentOutput(options = {}) {
+  const scope = readClaimScopeContext();
+  if (!options.partitioning && scope && !currentClaimHandle()) {
+    return { success: false, error: "Queue standalone handlers require a trusted per-Claim execution context" };
+  }
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
 
   // No agent output file specified
@@ -74,7 +80,7 @@ function loadAgentOutput() {
   // Parse the validated output JSON
   let validatedOutput;
   try {
-    validatedOutput = JSON.parse(outputContent);
+    validatedOutput = scope ? require("./work_queue_codec.cjs").parseStrictJSON(outputContent) : JSON.parse(outputContent);
   } catch (error) {
     const errorMessage = `Error parsing agent output JSON: ${getErrorMessage(error)}`;
     core.error(errorMessage);
@@ -91,7 +97,23 @@ function loadAgentOutput() {
 
   return {
     success: true,
-    items: validatedOutput.items,
+    items: validatedOutput.items
+      .map(item => {
+        try {
+          if (currentClaimHandle()) {
+            if (scope?.assignment) return normalizeClaimScope(item, scope.assignment);
+          }
+          return normalizeRuntimeMessage(item);
+        } catch (error) {
+          return {
+            type: item?.type,
+            ...(item && Object.hasOwn(item, "claim_handle") ? { claim_handle: item.claim_handle } : {}),
+            _claimScopeError: getErrorMessage(error),
+            _claimScopeErrorCode: error.code,
+          };
+        }
+      })
+      .filter(item => !currentClaimHandle() || (!item._claimScopeError && item.claim_handle === currentClaimHandle())),
     ...(typeof validatedOutput.collectorEmptyOutputCause === "string" ? { collectorEmptyOutputCause: validatedOutput.collectorEmptyOutputCause } : {}),
   };
 }

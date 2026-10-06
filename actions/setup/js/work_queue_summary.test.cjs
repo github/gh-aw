@@ -1,187 +1,101 @@
 // @ts-check
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
-import os from "os";
 import path from "path";
+import { randomUUID } from "crypto";
 import { main, renderSummary } from "./work_queue_summary.cjs";
-import { replayTransactions, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { serializeTransactionLog } from "./work_queue_replay.cjs";
+import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
 
-const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (id, claimId) => ({ version: 2, kind: "Claim", work: id, claim: claimId, attempt: null });
-const initial = [work("done"), claim("done", "claim-a"), work("retry"), claim("retry", "claim-b"), work("cancel"), work("waiting")];
-const latest = [
-  ...initial,
-  { version: 2, kind: "Completion", work: "done", claim: "claim-a", attempt: "run-1" },
-  { version: 2, kind: "ClaimCancellation", work: "retry", claim: "claim-b", attempt: null },
-  { version: 2, kind: "WorkCancellation", work: "cancel", claim: null, attempt: null },
-  work("new"),
-  claim("new", "claim-c"),
-  claim("new", "claim-d"),
-];
-let tempDirectory;
-
-function snapshot(transactions = initial, worker = null) {
-  return { sha: "head", worker, projection: replayTransactions(transactions) };
-}
-
-function setup() {
-  tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "work-queue-summary-"));
-  const snapshotPath = path.join(tempDirectory, "snapshot.json");
-  fs.writeFileSync(snapshotPath, JSON.stringify({ version: 2, sha: "head", worker: null, transactionLog: serializeTransactionLog(initial) }));
-  const summary = { addRaw: vi.fn(), write: vi.fn().mockResolvedValue(undefined) };
-  summary.addRaw.mockReturnValue(summary);
-  const core = { summary, info: vi.fn(), warning: vi.fn() };
-  return { snapshotPath, core, githubClient: {}, context: { repo: { owner: "owner", repo: "repo" } } };
-}
-
+const directories = [];
 afterEach(() => {
-  if (tempDirectory) {
-    fs.rmSync(tempDirectory, { recursive: true, force: true });
-    tempDirectory = undefined;
-  }
+  for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
+function snapshotFile(fixture) {
+  const directory = path.join(process.cwd(), `.queue-summary-test-${randomUUID()}`);
+  fs.mkdirSync(directory);
+  directories.push(directory);
+  const filename = path.join(directory, "snapshot.json");
+  fs.writeFileSync(filename, JSON.stringify({ version: 3, sha: "activation", worker: fixture.assignment, origin: fixture.dispatcher, captured_at: fixture.at, transactionLog: serializeTransactionLog(fixture.transactions) }));
+  return filename;
+}
+function finish(fixture, handle, outcome) {
+  fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle, outcome }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle });
+}
 
-describe("work queue conclusion summary", () => {
-  it("shows queue state changes and every transaction kind in collapsed details", () => {
-    const summary = renderSummary(snapshot(), replayTransactions(latest));
-    expect(summary).toContain("### Work queue activity\n\n5 work items in the queue; 6 new transactions observed since activation.");
-    expect(summary).toContain("<details>\n<summary>Show work queue activity</summary>\n\n");
-    expect(summary).not.toContain("<details open");
-    expect(summary).toContain("changes may include activity from other workflow runs");
-    expect(summary).toContain("| available | 2 | 2 |");
-    expect(summary).toContain("| claimed | 2 | 1 |");
-    expect(summary).toContain("| completed | 0 | 1 |");
-    expect(summary).toContain("| cancelled | 0 | 1 |");
-    expect(summary).toContain("| effective | 2 | 2 |");
-    expect(summary).toContain("| superseded | 0 | 1 |");
-    expect(summary).toContain("| Claims created | 2 |");
-    for (const label of ["Work added", "Claims cancelled", "Work completed", "Work cancelled"]) {
-      expect(summary).toContain(`| ${label} | 1 |`);
-    }
-    expect(summary).toContain("Unique transactions: 6 at activation; 12 at conclusion.");
-    expect(summary).toContain("No worker claim was assigned to this run.");
-    expect(summary).toMatch(/<\/details>\n$/);
-    expect(summary.indexOf("| Work state")).toBeGreaterThan(summary.indexOf("<details>"));
+describe("fair DAG queue lifecycle summaries", () => {
+  it("summarizes genuine observer absence without calling an empty authoritative ledger valid", async () => {
+    const fixture = queueFixture({ granted: false });
+    const snapshotPath = snapshotFile(fixture);
+    fs.writeFileSync(snapshotPath, JSON.stringify({ version: 3, sha: null, worker: null, origin: fixture.dispatcher, role: "observer", captured_at: fixture.at, transactionLog: "" }));
+    const addRaw = vi.fn(() => ({ write: async () => {} }));
+    await main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, readWorkQueueLog: async () => ({ sha: null, transactions: [] }), core: { summary: { addRaw }, warning: vi.fn() } });
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("0 Work nodes; 0 new checked commits"));
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("read-only queue observer"));
+    await expect(
+      main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.dispatcherContext, readWorkQueueLog: async () => ({ sha: "existing", transactions: [] }), core: { summary: { addRaw }, warning: vi.fn() } })
+    ).rejects.toThrow(/summarize/);
   });
 
-  it("deduplicates facts and does not count reordering as activity", () => {
-    const summary = renderSummary(snapshot(), replayTransactions([...initial].reverse().concat(initial)));
-    expect(summary).toContain("0 new transactions observed");
-    expect(summary).toContain("Unique transactions: 6 at activation; 6 at conclusion.");
-    expect(summary).toContain("| Claims created | 0 |");
+  it("distinguishes observer reports from unassigned queue-control authority", () => {
+    const fixture = queueFixture({ granted: false });
+    const summary = renderSummary({ projection: fixture.state, worker: null, role: "observer" }, fixture.state);
+    expect(summary).toContain("read-only queue observer");
+    expect(summary).toContain("Queue mutations and worker Claim effects are unavailable");
+    expect(summary).toContain("ordinary configured outputs retain their normal authorization");
+    expect(summary).not.toContain("Queue-control intents");
   });
 
-  it("reports an empty queue explicitly", () => {
-    const summary = renderSummary(snapshot([]), replayTransactions([]));
-    expect(summary).toContain("0 work items in the queue; 0 new transactions");
-    expect(summary).toContain("| available | 0 | 0 |");
+  it("distinguishes independent mixed outcomes, pending delivery and retained native reservation", () => {
+    const fixture = queueFixture({ bound: true });
+    const snapshot = { projection: fixture.state, worker: fixture.assignment };
+    finish(fixture, "h1", "completed");
+    finish(fixture, "h2", "cancelled");
+    finish(fixture, "h3", "completed");
+    const summary = renderSummary(snapshot, fixture.state);
+    expect(summary).toContain("completed_with_cancellations");
+    expect(summary).toContain("2 completed, 1 cancelled, 0 unsettled");
+    expect(summary).toContain("Native reservation: **retained**");
+    expect(summary).toContain("Completion does not imply verified delivery");
+    expect(summary).toContain("| Completion | 2 |");
+    expect(summary).toContain("| ClaimCancellation | 1 |");
+    expect(summary).not.toContain("stored task");
+    expect(summary).not.toContain(fixture.assignment.claims[0].work_id);
   });
 
-  it.each([
-    [[], [work("one")], "1 work item in the queue; 1 new transaction observed since activation."],
-    [[work("one")], [work("one")], "1 work item in the queue; 0 new transactions observed since activation."],
-    [[work("one")], [work("one"), work("two")], "2 work items in the queue; 1 new transaction observed since activation."],
-  ])("pluralizes work items and new transactions independently", (before, after, expected) => {
-    expect(renderSummary(snapshot(before), replayTransactions(after))).toContain(expected);
+  it("labels started/unbound reservations as unresolved, never stopped or empty", () => {
+    const fixture = queueFixture({ started: true });
+    const summary = renderSummary({ projection: fixture.state, worker: fixture.assignment }, fixture.state);
+    expect(summary).toContain("1 outstanding native reservations (1 unbound or unresolved)");
+    expect(summary).toContain("Assigned group: **pending**");
   });
 
-  it.each([
-    ["done", "claim-a", "completed", "effective"],
-    ["retry", "claim-b", "available", "cancelled"],
-    ["new", "claim-d", "claimed", "superseded"],
-    ["missing", "__proto__", "absent", "absent"],
-  ])("reports worker state without disclosing identifiers for %s", (workId, claimId, workState, claimState) => {
-    const summary = renderSummary(snapshot(initial, { work_id: workId, claim_id: claimId }), replayTransactions(latest));
-    expect(summary).toContain(`Assigned worker: work **${workState}**; claim **${claimState}**.`);
-    expect(summary).not.toContain(claimId);
+  it("writes a read-only progressive summary from the current canonical ledger", async () => {
+    const fixture = queueFixture({ bound: true });
+    const snapshotPath = snapshotFile(fixture);
+    finish(fixture, "h1", "completed");
+    const addRaw = vi.fn(() => ({ write: async () => {} }));
+    await main({ snapshotPath, githubClient: fixture.githubClient, context: fixture.workerContext, readWorkQueueLog: fixture.readWorkQueueLog, core: { summary: { addRaw }, warning: vi.fn() } });
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("<details>"));
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("1 new checked commits"));
   });
 
-  it("never renders untrusted queue identifiers or attempt data", () => {
-    const id = "</details>\n<script>secret</script>";
-    const summary = renderSummary(snapshot([]), replayTransactions([work(id), claim(id, "`unsafe|claim`"), { version: 2, kind: "Completion", work: id, claim: "`unsafe|claim`", attempt: "sensitive-attempt" }]));
-    expect(summary).not.toContain(id);
-    expect(summary).not.toContain("unsafe");
-    expect(summary).not.toContain("sensitive-attempt");
-    expect(summary.match(/<\/details>/g)).toHaveLength(1);
-  });
-
-  it("writes the summary with a read-only refresh of the durable queue", async () => {
-    const options = setup();
-    const readWorkQueueLog = vi.fn().mockResolvedValue({ sha: "latest", transactions: latest });
-    await main({ ...options, readWorkQueueLog });
-    expect(readWorkQueueLog).toHaveBeenCalledWith({
-      githubClient: options.githubClient,
-      owner: "owner",
-      repo: "repo",
-      publishUpgrades: false,
-      core: options.core,
-    });
-    expect(options.core.summary.addRaw).toHaveBeenCalledWith(renderSummary(snapshot(), replayTransactions(latest)));
-    expect(options.core.summary.write).toHaveBeenCalledOnce();
-    expect(options.core.warning).not.toHaveBeenCalled();
-  });
-
-  it("reads legacy queue data without publishing upgrades", async () => {
-    const options = setup();
-    const legacyWork = { kind: "Work", work: "legacy", claim: null, attempt: null };
-    const createBlob = vi.fn();
-    const githubClient = {
-      rest: {
-        git: {
-          getRef: async ({ ref }) => {
-            if (ref !== "heads/work-queue") throw Object.assign(new Error("Not Found"), { status: 404 });
-            return { data: { object: { sha: "legacy-head" } } };
-          },
-          getCommit: async () => ({ data: { tree: { sha: "tree" } } }),
-          getTree: async () => ({ data: { tree: [{ path: "work-queue.jsonl", type: "blob", sha: "blob" }] } }),
-          getBlob: async () => ({ data: { encoding: "base64", content: Buffer.from(`${JSON.stringify(legacyWork)}\n`).toString("base64") } }),
-          createBlob,
+  it("reports ledger validation failure without inventing a successful state", async () => {
+    const fixture = queueFixture({ bound: true });
+    const snapshotPath = snapshotFile(fixture);
+    const addRaw = vi.fn(() => ({ write: async () => {} }));
+    await expect(
+      main({
+        snapshotPath,
+        context: fixture.workerContext,
+        githubClient: fixture.githubClient,
+        readWorkQueueLog: async () => {
+          throw new Error("private data");
         },
-      },
-    };
-    await main({ ...options, githubClient });
-    expect(createBlob).not.toHaveBeenCalled();
-    expect(options.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("1 work item in the queue; 1 new transaction"));
-  });
-
-  it("treats a missing queue branch as an empty queue", async () => {
-    const options = setup();
-    const githubClient = {
-      rest: {
-        git: {
-          getRef: async () => {
-            throw Object.assign(new Error("Not Found"), { status: 404 });
-          },
-        },
-      },
-    };
-    await main({ ...options, githubClient });
-    expect(options.core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("0 work items in the queue; 0 new transactions"));
-    expect(options.core.warning).not.toHaveBeenCalled();
-  });
-
-  it("does not misreport a summary write failure as unavailable queue data", async () => {
-    const options = setup();
-    const readWorkQueueLog = vi.fn().mockResolvedValue({ transactions: initial });
-    options.core.summary.write.mockRejectedValue(new Error("summary write failed"));
-    await expect(main({ ...options, readWorkQueueLog })).rejects.toThrow("summary write failed");
-    expect(options.core.warning).not.toHaveBeenCalled();
-    expect(options.core.summary.addRaw).toHaveBeenCalledOnce();
-  });
-
-  it.each(["missing snapshot", "malformed snapshot", "failed refresh", "invalid queue"])("reports %s as unavailable rather than an empty queue", async failure => {
-    const options = setup();
-    const readWorkQueueLog = vi.fn().mockResolvedValue({ sha: null, transactions: [] });
-    if (failure === "missing snapshot") fs.unlinkSync(options.snapshotPath);
-    if (failure === "malformed snapshot") fs.writeFileSync(options.snapshotPath, '{"version":0}');
-    if (failure === "failed refresh") readWorkQueueLog.mockRejectedValue(new Error("sensitive API error"));
-    if (failure === "invalid queue") readWorkQueueLog.mockResolvedValue({ transactions: [{ kind: "unknown", work: "sensitive" }] });
-    await expect(main({ ...options, readWorkQueueLog })).rejects.toThrow("Failed to summarize work queue activity");
-    expect(options.core.warning).toHaveBeenCalledOnce();
-    const summary = options.core.summary.addRaw.mock.calls[0][0];
-    expect(summary).toContain("<details>");
-    expect(summary).toContain("Activity is unavailable");
-    expect(summary).not.toContain("0 work items");
-    expect(summary).not.toContain("sensitive");
+        core: { warning: vi.fn(), summary: { addRaw } },
+      })
+    ).rejects.toThrow(/summarize/);
+    expect(addRaw).toHaveBeenCalledWith(expect.stringContaining("no successful queue state is inferred"));
+    expect(addRaw.mock.calls[0][0]).not.toContain("private data");
   });
 });

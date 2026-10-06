@@ -14,11 +14,8 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { resolveTargetRepoConfig, parseRepoSlug, validateTargetRepo } = require("./repo_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { buildAwContext } = require("./aw_context.cjs");
-const { randomUUID } = require("node:crypto");
-const { readWorkQueueLog, applyAndPublishWorkQueueTransactions } = require("./work_queue_store.cjs");
-const { replayTransactions } = require("./work_queue_replay.cjs");
-const { CURRENT_VERSION } = require("./work_queue_codemods.cjs");
+const { buildAwContext, resolveWorkQueueRuntime } = require("./aw_context.cjs");
+const { currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 
 /**
@@ -34,9 +31,6 @@ async function main(config = {}) {
   const awContextWorkflows = new Set(config.aw_context_workflows || []); // Workflows that accept compiler-managed aw_context
   const workQueueWorkflows = new Set(config.work_queue_workflows || []); // Queue-enabled workers that accept compiler-managed claims
   const githubClient = await createAuthenticatedGitHubClient(config);
-  // Queue publication uses the safe-outputs job token, not a dispatch handler's
-  // optionally scoped GitHub App token.
-  const queueClient = github;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
   const allowedRefPatterns = parseAllowedRefPatterns(config.allowed_refs);
   const allowedRefRegexes = allowedRefPatterns.map(pattern => globPatternToRegex(pattern, { pathMode: true, caseSensitive: true }));
@@ -90,6 +84,7 @@ async function main(config = {}) {
 
   // Track how many items we've processed for max limit
   let processedCount = 0;
+  let queueDispatches = 0;
   let lastDispatchTime = 0;
   const isStaged = isStagedMode(config);
 
@@ -173,8 +168,35 @@ async function main(config = {}) {
    * @returns {Promise<Object>} Result with success/error status
    */
   return async function handleDispatchWorkflow(message, resolvedTemporaryIds) {
+    if (message.type === "work_queue_dispatch_next") {
+      if (!config.work_queue_enabled || isCrossRepoDispatch) return { success: false, error: "work_queue_dispatch_next requires a same-repository queue dispatcher" };
+      try {
+        const { dispatchQueueIntent } = require("./work_queue_dispatch.cjs");
+        const result = await dispatchQueueIntent({
+          message,
+          config,
+          queueClient: github,
+          dispatchClient: githubClient,
+          context,
+          core,
+          remainingDispatches: maxCount - processedCount - queueDispatches,
+          staged: isStaged,
+        });
+        queueDispatches += result.dispatches ?? 0;
+        return result;
+      } catch {
+        return { success: false, error: "Work queue dispatch failed closed; inspect its durable request and launch state" };
+      }
+    }
+    if (config.work_queue_enabled || process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || currentClaimHandle()) {
+      const observer = process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && !currentClaimHandle() && resolveWorkQueueRuntime(context.payload).role === "observer";
+      if (!observer) return { success: false, error: "Queue-scoped code cannot delegate an ordinary workflow dispatch; stage publisher-selected work_queue_dispatch_next" };
+    }
+    if (message.inputs && ["work_queue", "work_queue_claim", "work_queue_assignment"].some(key => Object.hasOwn(message.inputs, key))) {
+      return { success: false, error: "Agent-supplied queue assignments and Work selectors are unsupported; stage work_queue_dispatch_next" };
+    }
     // Check if we've hit the max limit
-    if (processedCount >= maxCount) {
+    if (processedCount + queueDispatches >= maxCount) {
       core.warning(`Skipping dispatch_workflow: max count of ${maxCount} reached`);
       return {
         success: false,
@@ -193,6 +215,9 @@ async function main(config = {}) {
         error: "Workflow name is empty",
       };
     }
+    if (workQueueWorkflows.has(workflowName)) {
+      return { success: false, error: "Queue workers require a publisher-selected immutable assignment; stage work_queue_dispatch_next" };
+    }
 
     // Validate workflow is in allowed list
     if (allowedWorkflows.length > 0 && !allowedWorkflows.includes(workflowName)) {
@@ -204,9 +229,6 @@ async function main(config = {}) {
       };
     }
 
-    let claim;
-    let claimPublished = false;
-    let dispatched = false;
     try {
       // Add 5 second delay between dispatches (except for the first one)
       if (lastDispatchTime > 0) {
@@ -250,18 +272,6 @@ async function main(config = {}) {
         };
       }
 
-      const selection = message.inputs?.work_queue;
-      let workId;
-      if (selection !== undefined) {
-        if (!config.work_queue_enabled || isCrossRepoDispatch || !awContextWorkflows.has(workflowName) || !workQueueWorkflows.has(workflowName)) {
-          throw new Error("Work queue dispatch requires tools.work-queue, a same-repository worker with aw_context, and tools.work-queue enabled on the worker");
-        }
-        if (!selection || typeof selection !== "object" || Array.isArray(selection) || Object.keys(selection).length !== 1 || typeof selection.work_id !== "string" || !selection.work_id) {
-          throw new TypeError("work_queue must contain only a non-empty work_id");
-        }
-        workId = selection.work_id;
-      }
-
       // Prepare inputs - convert all values to strings as required by workflow_dispatch
       // and resolve any #temporary_id references before dispatching
       /** @type {Record<string, string>} */
@@ -271,7 +281,7 @@ async function main(config = {}) {
         const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
         for (const [key, value] of Object.entries(message.inputs)) {
-          if (key === "work_queue" || key === "aw_context" || key === "work_queue_claim") continue;
+          if (key === "aw_context" || key === "work_queue_assignment" || key === "work_queue_claim") continue;
           // Convert value to string
           let strValue;
           if (value === null || value === undefined) {
@@ -340,33 +350,6 @@ async function main(config = {}) {
         };
       }
 
-      if (workId !== undefined) {
-        const current = await readWorkQueueLog({ githubClient: queueClient, owner: repo.owner, repo: repo.repo, core });
-        if (!replayTransactions(current.transactions).available.includes(workId)) {
-          throw new Error("Selected work is no longer available");
-        }
-        const runId = String(context.runId ?? process.env.GITHUB_RUN_ID ?? "").trim();
-        if (!runId) throw new Error("Cannot claim work without a dispatcher run ID");
-        claim = { version: CURRENT_VERSION, kind: "Claim", work: workId, claim: `${runId}:${randomUUID()}`, attempt: null };
-        const published = await applyAndPublishWorkQueueTransactions({
-          githubClient: queueClient,
-          owner: repo.owner,
-          repo: repo.repo,
-          intents: [claim],
-          core,
-        });
-        if (published.rejected.length > 0) throw new Error("Selected work could not be claimed");
-        claimPublished = true;
-        if (replayTransactions(published.transactions).claim[claim.claim] !== "effective") {
-          throw new Error("Selected work claim is no longer effective");
-        }
-        inputs["work_queue_claim"] = JSON.stringify({
-          work_id: workId,
-          claim_id: claim.claim,
-          work: { id: workId },
-        });
-      }
-
       // Dispatch the workflow using the resolved file.
       // Request return_run_details for newer GitHub API support; fall back without it
       // for older GitHub Enterprise Server deployments that don't support the parameter.
@@ -403,8 +386,6 @@ async function main(config = {}) {
           throw err;
         }
       }
-      dispatched = true;
-
       const runId = response && response.data ? response.data.workflow_run_id : undefined;
       if (runId) {
         core.info(`✓ Successfully dispatched workflow: ${workflowFile} (run ID: ${runId})`);
@@ -422,20 +403,6 @@ async function main(config = {}) {
         run_id: runId,
       };
     } catch (error) {
-      if (claimPublished && !dispatched) {
-        try {
-          const cancellation = await applyAndPublishWorkQueueTransactions({
-            githubClient: queueClient,
-            owner: repo.owner,
-            repo: repo.repo,
-            intents: [{ version: CURRENT_VERSION, kind: "ClaimCancellation", work: claim.work, claim: claim.claim, attempt: null }],
-            core,
-          });
-          if (cancellation.rejected.length > 0) throw new Error("Claim cancellation was rejected");
-        } catch {
-          core.warning(`Failed to cancel work queue claim ${claim.claim} for work ${claim.work} after dispatch failure; inspect the runtime work-queue branch and reconcile this claim.`);
-        }
-      }
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to dispatch workflow "${workflowName}": ${errorMessage}`);
 

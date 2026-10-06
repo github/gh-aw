@@ -6,6 +6,16 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_PATH } = require("./constants.cjs");
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
+const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity } = require("./work_queue_claim_scope.cjs");
+
+/** @param {string} filename @returns {string} */
+function scopedArtifactFile(filename) {
+  const handle = currentClaimHandle();
+  if (!handle) return filename;
+  const directory = claimArtifactPath(nodePath.dirname(filename), handle);
+  fs.mkdirSync(directory, { recursive: true });
+  return nodePath.join(directory, nodePath.basename(filename));
+}
 
 /**
  * Collect custom secret values for artifact redaction.
@@ -131,9 +141,11 @@ function redactManifestValue(value, secretValues) {
  * @returns {(item: {type: string, url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}) => void} Logger function
  */
 function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
+  const identity = currentClaimHandle() ? claimIdentity(currentClaimHandle()) : null;
+  const destination = scopedArtifactFile(manifestFile);
   // Touch the file immediately so it exists for artifact upload
   // even if no items are created during this run.
-  ensureManifestExists(manifestFile);
+  ensureManifestExists(destination);
 
   /**
    * Log an executed safe output item to the manifest file.
@@ -141,11 +153,14 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
    * @param {{type: string, url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}} item - Executed item details
    */
   return function logCreatedItem(item) {
+    if (identity) assertClaimIdentity(identity);
+    else if (currentClaimHandle()) throw new Error("Manifest logger cannot borrow a queue Claim after factory creation");
     if (!item) return;
 
     /** @type {ManifestEntry} */
     const entry = {
       type: item.type,
+      ...(identity || {}),
       ...(item.url ? { url: item.url } : {}),
       ...(item.number != null ? { number: item.number } : {}),
       ...(item.repo ? { repo: item.repo } : {}),
@@ -175,13 +190,14 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       }
       jsonLine = JSON.stringify({
         type: entry.type,
+        ...(identity || {}),
         ...(entry.provider ? { provider: entry.provider } : {}),
         ...(entry.number != null ? { number: entry.number } : {}),
         timestamp: entry.timestamp,
       });
     }
     try {
-      fs.appendFileSync(manifestFile, jsonLine + "\n");
+      fs.appendFileSync(destination, jsonLine + "\n");
     } catch (error) {
       throw new Error(`${ERR_SYSTEM}: Failed to write to manifest file: ${getErrorMessage(error)}`, { cause: error });
     }
@@ -196,6 +212,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
  * @param {string} [manifestFile] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
  */
 function ensureManifestExists(manifestFile = MANIFEST_FILE_PATH) {
+  if (!manifestFile.includes(`${nodePath.sep}claims${nodePath.sep}`)) manifestFile = scopedArtifactFile(manifestFile);
   if (!fs.existsSync(manifestFile)) {
     try {
       fs.writeFileSync(manifestFile, "");
@@ -285,6 +302,7 @@ function extractCreatedItemFromResult(type, result) {
  * @param {string} [filePath] - Path to the output file (defaults to TEMPORARY_ID_MAP_FILE_PATH)
  */
 function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FILE_PATH) {
+  filePath = scopedArtifactFile(filePath);
   try {
     const dir = nodePath.dirname(filePath);
     if (!fs.existsSync(dir)) {
@@ -312,9 +330,11 @@ function writeTemporaryIdMapFile(temporaryIdMap, filePath = TEMPORARY_ID_MAP_FIL
  * @param {string} [filePath] - Path to the output file (defaults to SAFE_OUTPUT_ERRORS_FILE_PATH)
  */
 function writeSafeOutputErrorReport(report, filePath = SAFE_OUTPUT_ERRORS_FILE_PATH) {
+  filePath = scopedArtifactFile(filePath);
   /** @type {Record<string, any>} */
   const entry = {
     timestamp: new Date().toISOString(),
+    ...(currentClaimHandle() ? { claim_handle: currentClaimHandle() } : {}),
     status: report?.status || "failure",
     ...(report?.errorCode ? { errorCode: report.errorCode } : {}),
     ...(report?.message ? { message: report.message } : {}),

@@ -25,9 +25,13 @@ var repoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 // Branch operates through GitHub Git APIs without a local checkout or Git executable.
 type Branch struct {
-	Remote string
-	Name   string
-	client *api.RESTClient
+	Remote              string
+	Name                string
+	DependencyClients   map[string]*api.RESTClient
+	DeliveryVerifier    DeliveryVerifier
+	RemediationVerifier RemediationVerifier
+	deliveryFailures    map[string]string
+	client              *api.RESTClient
 }
 
 func (b Branch) validate() error {
@@ -85,9 +89,10 @@ func hasStatus(err error, status int) bool {
 type branchSnapshot struct {
 	head string
 	tree string
+	data []byte
 }
 
-func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error) {
+func (b Branch) read(ctx context.Context) ([]QueueCommit, branchSnapshot, error) {
 	var ref struct {
 		Ref    string `json:"ref"`
 		Object struct {
@@ -119,11 +124,12 @@ func (b Branch) read(ctx context.Context) ([]Transaction, branchSnapshot, error)
 	if snapshot.tree == "" {
 		return nil, snapshot, errors.New("queue commit has no tree")
 	}
-	transactions, err := b.readLog(ctx, snapshot.tree)
+	transactions, data, err := b.readLog(ctx, snapshot.tree)
+	snapshot.data = data
 	return transactions, snapshot, err
 }
 
-func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, error) {
+func (b Branch) readLog(ctx context.Context, treeSHA string) ([]QueueCommit, []byte, error) {
 	var tree struct {
 		Truncated bool `json:"truncated"`
 		Tree      []struct {
@@ -134,52 +140,60 @@ func (b Branch) readLog(ctx context.Context, treeSHA string) ([]Transaction, err
 		} `json:"tree"`
 	}
 	if err := b.request(ctx, http.MethodGet, "git/trees/"+treeSHA, nil, &tree); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if tree.Truncated {
-		return nil, errors.New("queue tree is truncated")
+		return nil, nil, errors.New("queue tree is truncated")
 	}
 	for _, entry := range tree.Tree {
 		if entry.Path != FileName {
 			continue
 		}
 		if entry.Type != "blob" || (entry.Mode != "100644" && entry.Mode != "100755") || entry.SHA == "" {
-			return nil, errors.New("queue log must be a regular file")
+			return nil, nil, errors.New("queue log must be a regular file")
 		}
 		var blob struct {
 			Encoding string `json:"encoding"`
 			Content  string `json:"content"`
 		}
 		if err := b.request(ctx, http.MethodGet, "git/blobs/"+entry.SHA, nil, &blob); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if blob.Encoding != "base64" {
-			return nil, errors.New("unsupported queue blob encoding")
+			return nil, nil, errors.New("unsupported queue blob encoding")
 		}
 		data, err := base64.StdEncoding.DecodeString(blob.Content)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		transactions, err := Parse(data)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		for _, commit := range transactions {
+			if !strings.EqualFold(commit.Actor.Repository, b.Remote) {
+				return nil, nil, queueError("repository_scope_invalid", "ledger actor belongs to another repository")
+			}
 		}
 		_, err = Replay(transactions)
-		return transactions, err
+		return transactions, data, err
 	}
-	return nil, errors.New("queue branch is missing " + FileName)
+	return nil, nil, errors.New("queue branch is missing " + FileName)
 }
 
-func (b Branch) Read(ctx context.Context) ([]Transaction, error) {
+func (b Branch) Read(ctx context.Context) ([]QueueCommit, error) {
 	b, err := b.withClient()
 	if err != nil {
 		return nil, err
 	}
-	transactions, _, err := b.read(ctx)
+	transactions, snapshot, err := b.read(ctx)
+	if err == nil && snapshot.head == "" {
+		return nil, queueError("queue_missing", "queue branch %s does not exist", b.Name)
+	}
 	return transactions, err
 }
 
-func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []Transaction) (bool, error) {
+func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []QueueCommit) (bool, error) {
 	if _, err := Replay(next); err != nil {
 		return false, err
 	}
@@ -221,42 +235,241 @@ func (b Branch) publish(ctx context.Context, snapshot branchSnapshot, next []Tra
 	return hasStatus(err, http.StatusConflict) || hasStatus(err, http.StatusUnprocessableEntity), err
 }
 
-// Update retries rejected non-force reference updates from a fresh branch snapshot.
-func (b Branch) Update(ctx context.Context, change func([]Transaction) ([]Transaction, bool, error)) ([]Transaction, bool, error) {
+// Authenticate derives operator identity from the credential, not command flags,
+// Git authors, submitted actor fields, or an untrusted Actions environment.
+func (b Branch) Authenticate(ctx context.Context, role string) (Actor, error) {
 	b, err := b.withClient()
 	if err != nil {
-		return nil, false, err
+		return Actor{}, err
 	}
+	if role != "administrator" && role != "producer" && role != "reconciler" {
+		return Actor{}, queueError("actor_unauthorized", "native operator publisher cannot impersonate workflow roles")
+	}
+	var user struct {
+		ID json.Number `json:"id"`
+	}
+	if err := b.client.DoWithContext(ctx, http.MethodGet, "user", nil, &user); err != nil {
+		return Actor{}, err
+	}
+	var repository struct {
+		FullName    string `json:"full_name"`
+		Permissions struct {
+			Push  bool `json:"push"`
+			Admin bool `json:"admin"`
+		} `json:"permissions"`
+	}
+	if err := b.client.DoWithContext(ctx, http.MethodGet, "repos/"+b.Remote, nil, &repository); err != nil {
+		return Actor{}, err
+	}
+	if !decimalIdentity(user.ID.String()) || !strings.EqualFold(repository.FullName, b.Remote) ||
+		!repository.Permissions.Push || role == "administrator" && !repository.Permissions.Admin {
+		return Actor{}, queueError("actor_unauthorized", "authenticated repository writer/administrator permission is required")
+	}
+	return Actor{Role: role, Principal: user.ID.String(), Repository: repository.FullName}, nil
+}
+
+type Publication struct {
+	Commit   *QueueCommit `json:"commit,omitempty"`
+	Decision Decision     `json:"decision"`
+	Changed  bool         `json:"changed"`
+}
+
+func (b Branch) defaultPolicy(ctx context.Context, principal string) (Policy, error) {
+	var repository struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := b.request(ctx, http.MethodGet, "", nil, &repository); err != nil {
+		return Policy{}, err
+	}
+	if repository.DefaultBranch == "" {
+		return Policy{}, queueError("policy_invalid", "new queue requires an immutable approved default worker revision")
+	}
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := b.request(ctx, http.MethodGet, "git/ref/heads/"+repository.DefaultBranch, nil, &ref); err != nil {
+		return Policy{}, err
+	}
+	if !revisionPattern.MatchString(ref.Object.SHA) {
+		return Policy{}, queueError("policy_invalid", "default worker revision is not immutable")
+	}
+	policy := DefaultPolicy(principal, b.Remote)
+	pool := policy.Pools["default"]
+	profile := pool.Profiles["default"]
+	profile.Ref = ref.Object.SHA
+	pool.Profiles["default"] = profile
+	policy.Pools["default"] = pool
+	return policy, nil
+}
+
+func extending(previous, current []QueueCommit) bool {
+	oldOrder, err := causalOrder(previous)
+	if err != nil {
+		return false
+	}
+	newOrder, err := causalOrder(current)
+	if err != nil || len(newOrder) < len(oldOrder) {
+		return false
+	}
+	for i, old := range oldOrder {
+		if !sameJSON(old, newOrder[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Publish retains only authenticated logical intent across CAS retries. It
+// discards selections, handles, charges and clocks and recovers uncertain ref
+// acknowledgments by stable request identity before constructing another grant.
+func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publication, error) {
+	b, err := b.withClient()
+	if err != nil {
+		return Publication{}, err
+	}
+	authenticated, err := b.Authenticate(ctx, actor.Role)
+	if err != nil || !sameJSON(authenticated, actor) {
+		if err != nil {
+			return Publication{}, err
+		}
+		return Publication{}, queueError("actor_unauthorized", "request actor differs from authenticated operator")
+	}
+	b.Remote = authenticated.Repository
+	if err := validateRequestOrigin(actor, request); err != nil {
+		return Publication{}, err
+	}
+	var last []QueueCommit
+	var pendingErr error
 	for attempt := range maxRetries {
 		transactions, snapshot, err := b.read(ctx)
 		if err != nil {
-			return nil, false, err
+			return Publication{}, err
 		}
-		next, changed, err := change(transactions)
-		if err != nil || !changed {
-			return next, changed, err
+		if len(last) > 0 && (snapshot.head == "" || !extending(last, transactions)) {
+			return Publication{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during publication")
+		}
+		creating := snapshot.head == ""
+		if creating {
+			admin, err := b.Authenticate(ctx, "administrator")
+			if err != nil {
+				return Publication{}, queueError("policy_missing", "new queues require authenticated policy initialization: %v", err)
+			}
+			policy, err := b.defaultPolicy(ctx, admin.Principal)
+			if err != nil {
+				return Publication{}, err
+			}
+			genesis, err := Genesis(admin, policy,
+				"init_"+hashBytes([]byte(request.ID)), "epoch_"+hashBytes([]byte(request.ID)), time.Now().UnixMilli())
+			if err != nil {
+				return Publication{}, err
+			}
+			transactions = []QueueCommit{genesis}
+		}
+		state, err := Replay(transactions)
+		if err != nil {
+			return Publication{}, err
+		}
+		if existing, ok := state.Requests[request.ID]; ok {
+			if existing.Request.Fingerprint != request.Fingerprint || !sameJSON(existing.Actor, actor) {
+				return Publication{}, queueError("request_reuse", "request identity has different accepted meaning")
+			}
+			_, commit, decision, err := BuildCandidate(transactions, actor, request, time.Now().UnixMilli())
+			return Publication{Commit: commit, Decision: decision, Changed: false}, err
+		}
+		if err := validateRequestRole(actor, request.Kind); err != nil {
+			return Publication{}, err
+		}
+		if pendingErr != nil && !hasStatus(pendingErr, http.StatusConflict) &&
+			!hasStatus(pendingErr, http.StatusUnprocessableEntity) &&
+			(hasStatus(pendingErr, http.StatusUnauthorized) || hasStatus(pendingErr, http.StatusForbidden)) {
+			return Publication{}, pendingErr
+		}
+		if err := b.verifyRequestEvidence(ctx, state, actor, request); err != nil {
+			return Publication{}, err
+		}
+		var observations []Observation
+		if request.Kind == "dispatch_next" {
+			var params DispatchParameters
+			if err := json.Unmarshal(request.Parameters, &params); err != nil {
+				return Publication{}, err
+			}
+			observations, err = b.refreshForDispatch(ctx, state, params.Pool, request.ID)
+			if err != nil {
+				return Publication{}, err
+			}
+		}
+		next, commit, decision, err := buildCandidateWithObservations(transactions, actor, request, time.Now().UnixMilli(), observations)
+		if err != nil {
+			return Publication{}, err
+		}
+		if commit == nil {
+			if len(observations) == 0 {
+				return Publication{Decision: decision}, nil
+			}
+			operations := []Operation{}
+			for _, observation := range observations {
+				operations = append(operations, Op(observation))
+			}
+			evidence, _ := canonicalValue(operations)
+			observationRequest, err := NewRequest("observe_"+hashBytes([]byte(request.ID+"\n"+state.Tip+"\n"+string(evidence))),
+				"observe", actor, OperationsParameters{Operations: operations})
+			if err != nil {
+				return Publication{}, err
+			}
+			next, commit, _, err = BuildCandidate(transactions, actor, observationRequest, time.Now().UnixMilli())
+			if err != nil {
+				return Publication{}, err
+			}
+			// The read evidence is durable, but no-grant still does not consume
+			// the original dispatch request or any service charge.
+			decision.Tip = commit.ID
 		}
 		conflict, err := b.publish(ctx, snapshot, next)
 		if err == nil {
-			return next, true, nil
+			return Publication{Commit: commit, Decision: decision, Changed: true}, nil
 		}
 		if ctx.Err() != nil {
-			return nil, false, ctx.Err()
+			return Publication{}, ctx.Err()
 		}
-		if !conflict {
-			return nil, false, err
+		// Ref update may have succeeded even when the response was lost. Safe
+		// reads find the stable request before any new candidate is published.
+		pendingErr = err
+		if !creating {
+			last = transactions
 		}
 		if attempt == maxRetries-1 {
-			return nil, false, fmt.Errorf("queue publication failed after %d attempts: %w", maxRetries, err)
+			current, _, readErr := b.read(ctx)
+			if readErr == nil && len(current) > 0 {
+				projection, replayErr := Replay(current)
+				if replayErr == nil {
+					if existing, ok := projection.Requests[request.ID]; ok &&
+						existing.Request.Fingerprint == request.Fingerprint && sameJSON(existing.Actor, actor) {
+						_, committed, decision, err := BuildCandidate(current, actor, request, time.Now().UnixMilli())
+						return Publication{Commit: committed, Decision: decision}, err
+					}
+				}
+			}
+			return Publication{}, fmt.Errorf("queue publication unresolved after %d attempts: %w", maxRetries, err)
 		}
-		delay := time.Duration(50*(1<<attempt)+rand.Intn(50)) * time.Millisecond
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, false, ctx.Err()
-		case <-timer.C:
+		_ = conflict
+		if err := waitForPublicationRetry(ctx, attempt); err != nil {
+			return Publication{}, err
 		}
 	}
-	return nil, false, errors.New("queue publication exhausted retries")
+
+	return Publication{}, errors.New("queue publication exhausted retries")
+}
+
+func waitForPublicationRetry(ctx context.Context, attempt int) error {
+	delay := time.Duration(50*(1<<attempt)+rand.Intn(50)) * time.Millisecond
+	timer := time.NewTimer(delay)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

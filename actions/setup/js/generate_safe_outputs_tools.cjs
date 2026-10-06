@@ -288,7 +288,7 @@ async function main() {
   }
 
   // Load tools meta (description suffixes, repo params, dynamic tools)
-  /** @type {{description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<unknown>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>, item_schemas?: Record<string, Record<string, unknown>>}} */
+  /** @type {{work_queue_scoped?: boolean, description_suffixes?: Record<string, string>, repo_params?: Record<string, {type: string, description: string}>, dynamic_tools?: Array<any>, required_field_removals?: Record<string, string[]>, required_field_additions?: Record<string, string[]>, property_injections?: Record<string, Record<string, unknown>>, item_schemas?: Record<string, Record<string, unknown>>}} */
   let toolsMeta = { description_suffixes: {}, repo_params: {}, dynamic_tools: [] };
   if (fs.existsSync(toolsMetaPath)) {
     /** @type {string} */
@@ -495,6 +495,18 @@ async function main() {
   // Append dynamic tools (custom jobs, dispatch_workflow, call_workflow)
   const dynamicTools = Array.isArray(toolsMeta.dynamic_tools) ? toolsMeta.dynamic_tools : [];
   const allFilteredTools = [...filteredTools, ...dynamicTools];
+  if (toolsMeta.work_queue_scoped === true) {
+    for (const tool of allFilteredTools) {
+      tool.inputSchema.properties ||= {};
+      if (Object.prototype.hasOwnProperty.call(tool.inputSchema.properties, "claim_handle")) throw new Error(`${ERR_CONFIG}: claim_handle is reserved for trusted queue scope`);
+      tool.inputSchema.properties.claim_handle = {
+        type: "string",
+        minLength: 1,
+        maxLength: 256,
+        description: "Immutable assignment Claim handle. May be omitted only for an originally single-Claim assignment.",
+      };
+    }
+  }
 
   // Write the result to the output path
   try {

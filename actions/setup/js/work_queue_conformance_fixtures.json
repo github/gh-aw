@@ -1,0 +1,108 @@
+{
+  "version": 3,
+  "oracle": "Hand-derived FIFO and integer-pass expectations; neither native engine supplies expected results.",
+  "selection": [
+    {
+      "name": "causal FIFO ignores enqueue age and identity ordering",
+      "mode": "weighted-priority",
+      "accounting_weights": { "": 1 },
+      "works": [
+        { "name": "z", "priority": 3, "fairness_key": "", "enqueued": 9 },
+        { "name": "a", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "b", "priority": 3, "fairness_key": "", "enqueued": 1 }
+      ],
+      "expected_names": ["z", "a", "b"]
+    },
+    {
+      "name": "weighted accounting keys divide turns rather than backlog",
+      "mode": "weighted-priority",
+      "accounting_weights": { "": 1, "a": 2, "b": 1 },
+      "works": [
+        { "name": "a0", "priority": 3, "fairness_key": "a", "enqueued": 0 },
+        { "name": "a1", "priority": 3, "fairness_key": "a", "enqueued": 0 },
+        { "name": "a2", "priority": 3, "fairness_key": "a", "enqueued": 0 },
+        { "name": "a3", "priority": 3, "fairness_key": "a", "enqueued": 0 },
+        { "name": "b0", "priority": 3, "fairness_key": "b", "enqueued": 0 },
+        { "name": "b1", "priority": 3, "fairness_key": "b", "enqueued": 0 }
+      ],
+      "expected_names": ["a0", "a1", "b0", "a2", "a3", "b1"]
+    },
+    {
+      "name": "priority-class ties use numeric order",
+      "mode": "weighted-priority",
+      "accounting_weights": { "": 1 },
+      "works": [
+        { "name": "p1a", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1b", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1c", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1d", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1e", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1f", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1g", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1h", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p1i", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "p2a", "priority": 2, "fairness_key": "", "enqueued": 0 },
+        { "name": "p2b", "priority": 2, "fairness_key": "", "enqueued": 0 },
+        { "name": "p2c", "priority": 2, "fairness_key": "", "enqueued": 0 },
+        { "name": "p2d", "priority": 2, "fairness_key": "", "enqueued": 0 },
+        { "name": "p2e", "priority": 2, "fairness_key": "", "enqueued": 0 },
+        { "name": "p3a", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "p3b", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "p3c", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "p4a", "priority": 4, "fairness_key": "", "enqueued": 0 },
+        { "name": "p4b", "priority": 4, "fairness_key": "", "enqueued": 0 },
+        { "name": "p5a", "priority": 5, "fairness_key": "", "enqueued": 0 },
+        { "name": "p5b", "priority": 5, "fairness_key": "", "enqueued": 0 }
+      ],
+      "expected_names": ["p1a", "p1b", "p2a", "p1c", "p1d", "p2b", "p3a", "p1e", "p1f", "p2c", "p1g", "p1h", "p2d", "p3b", "p4a", "p5a"]
+    },
+    {
+      "name": "strict priority is explicit and may starve lower classes",
+      "mode": "strict-priority",
+      "accounting_weights": { "": 1 },
+      "works": [
+        { "name": "normal", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "urgent1", "priority": 1, "fairness_key": "", "enqueued": 0 },
+        { "name": "urgent2", "priority": 1, "fairness_key": "", "enqueued": 0 }
+      ],
+      "expected_names": ["urgent1", "urgent2", "normal"]
+    },
+    {
+      "name": "UTF-8 accounting key order differs from UTF-16",
+      "mode": "weighted-priority",
+      "accounting_weights": { "": 1, "𐀀": 1, "": 1 },
+      "works": [
+        { "name": "astral1", "priority": 3, "fairness_key": "𐀀", "enqueued": 0 },
+        { "name": "private1", "priority": 3, "fairness_key": "", "enqueued": 0 },
+        { "name": "astral2", "priority": 3, "fairness_key": "𐀀", "enqueued": 0 },
+        { "name": "private2", "priority": 3, "fairness_key": "", "enqueued": 0 }
+      ],
+      "expected_names": ["private1", "astral1", "private2", "astral2"]
+    },
+    {
+      "name": "LCM exceeds floating-point precision",
+      "mode": "weighted-priority",
+      "accounting_weights": { "": 1, "a": 997, "b": 991, "c": 983, "d": 977, "e": 971, "f": 967 },
+      "works": [
+        { "name": "d", "priority": 3, "fairness_key": "d", "enqueued": 0 },
+        { "name": "f", "priority": 3, "fairness_key": "f", "enqueued": 0 },
+        { "name": "a", "priority": 3, "fairness_key": "a", "enqueued": 0 },
+        { "name": "e", "priority": 3, "fairness_key": "e", "enqueued": 0 },
+        { "name": "b", "priority": 3, "fairness_key": "b", "enqueued": 0 },
+        { "name": "c", "priority": 3, "fairness_key": "c", "enqueued": 0 }
+      ],
+      "expected_names": ["a", "b", "c", "d", "e", "f"]
+    }
+  ],
+  "codec": [
+    {
+      "name": "bytewise Unicode and integer-like object keys",
+      "input": "{\"𐀀\":1,\"\":2,\"2\":2,\"10\":10,\"<>&\":\"<>&\"}",
+      "canonical": "{\"10\":10,\"2\":2,\"<>&\":\"<>&\",\"\":2,\"𐀀\":1}"
+    },
+    { "name": "escaped-equivalent duplicate key", "input": "{\"x\":1,\"\\u0078\":2}", "invalid": true },
+    { "name": "fractional numeric spelling", "input": "{\"x\":1.0}", "invalid": true },
+    { "name": "lossy arbitrary API ID", "input": "{\"run_id\":9007199254740993}", "invalid": true },
+    { "name": "opaque lossless run ID", "input": "{\"run_id\":\"99999999999999999999999999\"}", "canonical": "{\"run_id\":\"99999999999999999999999999\"}" }
+  ]
+}

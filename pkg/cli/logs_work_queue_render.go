@@ -18,7 +18,29 @@ func renderWorkQueueToWriter(w io.Writer, report *WorkQueueReport) {
 	}
 	fmt.Fprintln(w, "  work_queue:")
 	if snapshot := report.Snapshot; snapshot != nil {
-		fmt.Fprintf(w, "    snapshot: %d transactions\n", len(snapshot.Transactions))
+		if current := snapshot.Current; current != nil {
+			fmt.Fprintf(w, "    snapshot: protocol=3 commits=%d (captured ledger, not live authority)\n", current.CommitCount)
+			if current.Role == "observer" {
+				fmt.Fprintln(w, "    role: observer (read-only diagnostics; no worker or publisher authority)")
+				if !current.PolicyInstalled {
+					fmt.Fprintln(w, "    policy: absent (no queue initialized)")
+				}
+			}
+			fmt.Fprintf(w, "    queue_tip: %s policy_epoch=%s\n", escapeWorkQueueDisplay(current.Tip), escapeWorkQueueDisplay(current.PolicyEpoch))
+			fmt.Fprintf(w, "    control: admission_paused=%t grants_paused=%t (not preemption)\n", current.Paused, current.GrantsPaused)
+			if assignment := current.Assignment; assignment != nil {
+				fmt.Fprintf(w, "    assignment: %s request=%s commit=%s native=%s released=%t\n",
+					escapeWorkQueueDisplay(assignment.DispatchID), escapeWorkQueueDisplay(assignment.RequestID),
+					escapeWorkQueueDisplay(assignment.CommitID), escapeWorkQueueDisplay(assignment.State), assignment.Released)
+				for _, claim := range assignment.Claims[:min(len(assignment.Claims), 16)] {
+					fmt.Fprintf(w, "    claim: %s work=%s durable=%s delivery=%s\n", escapeWorkQueueDisplay(claim.Handle),
+						escapeWorkQueueDisplay(claim.WorkID), escapeWorkQueueDisplay(claim.State), escapeWorkQueueDisplay(claim.Barrier))
+				}
+				fmt.Fprintln(w, "    delivery: verified means a ledger Result attestation, not a live API recheck")
+			}
+		} else {
+			fmt.Fprintf(w, "    snapshot: %d transactions (historical read-only diagnostic)\n", len(snapshot.Transactions))
+		}
 		if snapshot.SHA != nil {
 			fmt.Fprintf(w, "    snapshot_sha: %s\n", escapeWorkQueueDisplay(*snapshot.SHA))
 		}
@@ -29,7 +51,14 @@ func renderWorkQueueToWriter(w io.Writer, report *WorkQueueReport) {
 	if report.FinishIntent != "" {
 		fmt.Fprintf(w, "    finish_intent: %s (requested, not a verified outcome)\n", escapeWorkQueueDisplay(report.FinishIntent))
 	}
-	for _, operation := range report.Operations {
+	for _, intent := range report.FinishIntents[:min(len(report.FinishIntents), 256)] {
+		fmt.Fprintf(w, "    finish_intent: claim=%s outcome=%s (staged, not durable or verified)\n",
+			escapeWorkQueueDisplay(intent.Handle), escapeWorkQueueDisplay(intent.Outcome))
+	}
+	if len(report.Operations) > 0 {
+		fmt.Fprintln(w, "    operation_logs: diagnostics only, not independent delivery evidence")
+	}
+	for _, operation := range report.Operations[:min(len(report.Operations), 256)] {
 		fmt.Fprintf(w, "    %s: %s\n", escapeWorkQueueDisplay(operation.Timestamp), escapeWorkQueueDisplay(operation.Message))
 	}
 }
@@ -45,7 +74,7 @@ func renderLogsWorkQueueToWriter(w io.Writer, runs []RunData) {
 }
 
 func escapeWorkQueueDisplay(value string) string {
-	return strings.TrimSuffix(strings.TrimPrefix(strconv.QuoteToGraphic(value), `"`), `"`)
+	return strings.TrimSuffix(strings.TrimPrefix(strconv.QuoteToGraphic(boundWorkQueueDisplay(value, 512)), `"`), `"`)
 }
 
 func workQueueReportRuns(runs []RunData, include bool) []RunData {

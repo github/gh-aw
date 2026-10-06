@@ -8,13 +8,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
-	"github.com/github/gh-aw/pkg/workqueue"
 )
+
+var workQueueControlSummaryPattern = regexp.MustCompile(`^Work queue controls: [0-9]{1,9} checked requests; [0-9]{1,9} blocked intents$`)
 
 const (
 	workQueueSnapshotFile       = "work-queue.snapshot.json"
@@ -22,21 +25,25 @@ const (
 	legacyWorkQueueSnapshotFile = "dispatch-work-coordinator.snapshot.json"
 	legacyWorkQueueFinishFile   = "dispatch-work-coordinator.finish.jsonl"
 	workQueueTransactionVersion = 2
+	// Historical diagnostic wire bound; independent of the current engine.
+	historicalMaxEnqueued int64 = 9007199254740991
 )
 
 // WorkQueueReport separates activation-time queue facts and agent intent
 // from the operations observed in this run's workflow job logs.
 type WorkQueueReport struct {
-	Snapshot     *WorkQueueSnapshot   `json:"snapshot,omitempty"`
-	FinishIntent string               `json:"finish_intent,omitempty"`
-	Operations   []WorkQueueOperation `json:"operations,omitempty"`
+	Snapshot      *WorkQueueSnapshot       `json:"snapshot,omitempty"`
+	FinishIntent  string                   `json:"finish_intent,omitempty"`
+	FinishIntents []WorkQueueFinishReceipt `json:"finish_intents,omitempty"`
+	Operations    []WorkQueueOperation     `json:"operations,omitempty"`
 }
 
 type WorkQueueSnapshot struct {
-	Version      int                    `json:"version"`
-	SHA          *string                `json:"sha"`
-	Worker       *WorkQueueWorker       `json:"worker"`
-	Transactions []WorkQueueTransaction `json:"transactions"`
+	Version      int                       `json:"version"`
+	SHA          *string                   `json:"sha"`
+	Worker       *WorkQueueWorker          `json:"worker"`
+	Transactions []WorkQueueTransaction    `json:"transactions"`
+	Current      *WorkQueueCurrentSnapshot `json:"current,omitempty"`
 }
 
 type WorkQueueWorker struct {
@@ -44,8 +51,7 @@ type WorkQueueWorker struct {
 	ClaimID string `json:"claim_id"`
 }
 
-// These fields follow the runtime queue protocol, not pkg/workqueue's
-// independent CLI queue protocol.
+// These fields decode the historical runtime protocol, not the current engine.
 type WorkQueueTransaction struct {
 	Version  int     `json:"version"`
 	Kind     string  `json:"kind"`
@@ -67,7 +73,7 @@ func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(snapshotPath)
+	data, err := readBoundedWorkQueueArtifact(snapshotPath, 162<<20)
 	if err == nil {
 		report.Snapshot, err = parseWorkQueueSnapshot(data)
 	}
@@ -79,7 +85,11 @@ func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report.FinishIntent, err = readWorkQueueFinishIntent(finishPath)
+	if report.Snapshot != nil && report.Snapshot.Version == 3 {
+		report.FinishIntents, err = readCurrentWorkQueueFinishIntents(finishPath, report.Snapshot.Current)
+	} else {
+		report.FinishIntent, err = readWorkQueueFinishIntent(finishPath)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +97,7 @@ func extractWorkQueueReport(runDir string) (*WorkQueueReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	if report.Snapshot == nil && report.FinishIntent == "" && len(report.Operations) == 0 {
+	if report.Snapshot == nil && report.FinishIntent == "" && len(report.FinishIntents) == 0 && len(report.Operations) == 0 {
 		return nil, nil
 	}
 	return report, nil
@@ -108,6 +118,9 @@ func parseWorkQueueSnapshot(data []byte) (*WorkQueueSnapshot, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return nil, err
+	}
+	if string(fields["version"]) == "3" {
+		return parseCurrentWorkQueueSnapshot(data)
 	}
 	for _, field := range []string{"version", "sha", "worker", "transactionLog"} {
 		if _, present := fields[field]; !present {
@@ -153,7 +166,8 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if fields == nil {
 		return tx, errors.New("transaction must be a JSON object")
 	}
-	// Match the runtime's closed historical shapes before upgrading to v2.
+	// Read-only historical diagnostics. This decoder never supplies operational
+	// replay or publication; Version below is a reporting normalization only.
 	_, hasVersion := fields["version"]
 	version := 0
 	if hasVersion {
@@ -184,7 +198,7 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 	if err := json.Unmarshal(data, &tx); err != nil {
 		return tx, err
 	}
-	if hasEnqueued && (tx.Kind != "Work" || tx.Enqueued == nil || *tx.Enqueued < 0 || *tx.Enqueued > workqueue.MaxEnqueued) {
+	if hasEnqueued && (tx.Kind != "Work" || tx.Enqueued == nil || *tx.Enqueued < 0 || *tx.Enqueued > historicalMaxEnqueued) {
 		return tx, errors.New("invalid Work enqueue time")
 	}
 	if tx.Work == "" ||
@@ -295,7 +309,20 @@ func readWorkQueueStepLog(path, source string, seen map[string]struct{}) ([]Work
 			continue
 		}
 		message = strings.TrimSpace(message)
+		if strings.HasPrefix(message, "Work queue controls:") {
+			_, step, found := strings.Cut(filepath.Base(source), "_")
+			if !found || step != "Process trusted work queue controls.txt" ||
+				!isWorkQueueStepLog(strings.TrimPrefix(filepath.ToSlash(source), "workflow-logs/")) ||
+				!workQueueControlSummaryPattern.MatchString(message) {
+				continue
+			}
+		}
 		if !strings.HasPrefix(message, "Work queue: ") &&
+			!strings.HasPrefix(message, "Work queue activation: ") &&
+			!strings.HasPrefix(message, "Work queue finish: ") &&
+			!strings.HasPrefix(message, "Work queue delivery: ") &&
+			!strings.HasPrefix(message, "Work queue reconciliation: ") &&
+			!workQueueControlSummaryPattern.MatchString(message) &&
 			!strings.HasPrefix(message, "Work queue claim reconciliation") &&
 			!strings.HasPrefix(message, "Captured work queue snapshot (") &&
 			!strings.HasPrefix(message, "Dispatch coordinator: ") &&
@@ -308,8 +335,11 @@ func readWorkQueueStepLog(path, source string, seen map[string]struct{}) ([]Work
 			continue
 		}
 		seen[key] = struct{}{}
+		if len(seen) > 256 {
+			return nil, errors.New("work queue operation report exceeds 256 entries")
+		}
 		operations = append(operations, WorkQueueOperation{
-			Timestamp: timestamp, Message: message, Source: source,
+			Timestamp: timestamp, Message: boundWorkQueueDisplay(message, 512), Source: source,
 		})
 	}
 	return operations, scanner.Err()
@@ -351,12 +381,16 @@ func mergeWorkQueueReport(report **WorkQueueReport, extracted *WorkQueueReport) 
 		return true
 	}
 	changed := false
-	if (*report).Snapshot == nil && extracted.Snapshot != nil {
+	if extracted.Snapshot != nil && !reflect.DeepEqual((*report).Snapshot, extracted.Snapshot) {
 		(*report).Snapshot = extracted.Snapshot
 		changed = true
 	}
-	if (*report).FinishIntent == "" && extracted.FinishIntent != "" {
+	if (*report).FinishIntent != extracted.FinishIntent {
 		(*report).FinishIntent = extracted.FinishIntent
+		changed = true
+	}
+	if !slices.Equal((*report).FinishIntents, extracted.FinishIntents) {
+		(*report).FinishIntents = extracted.FinishIntents
 		changed = true
 	}
 	if len((*report).Operations) == 0 && len(extracted.Operations) > 0 {
@@ -390,9 +424,9 @@ func isWorkQueueStepLog(source string) bool {
 	switch name {
 	case "Snapshot work queue state.txt", "Snapshot dispatch coordinator state.txt":
 		return jobMatches("activation")
-	case "Reconcile work queue claim.txt", "Reconcile dispatch work claim.txt":
+	case "Reconcile work queue claim.txt", "Reconcile dispatch work claim.txt", "Process trusted work queue controls.txt", "Process Safe Outputs.txt":
 		return jobMatches("safe_outputs")
-	case "Copy work queue claim finish intent.txt", "Copy dispatch claim finish intent.txt":
+	case "Collect work queue intents.txt", "Copy work queue claim finish intent.txt", "Copy dispatch claim finish intent.txt":
 		return jobMatches("agent")
 	default:
 		return false

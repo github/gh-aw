@@ -1,215 +1,242 @@
 // @ts-check
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
-import os from "os";
 import path from "path";
-import { createWorkQueueFinishTool, createWorkQueueStateTool, loadWorkQueueSnapshot, readWorkQueueState } from "./work_queue_mcp_server.cjs";
-import { createWorkTransaction, serializeTransactionLog } from "./work_queue_replay.cjs";
+import { randomUUID } from "crypto";
+import {
+  createWorkQueueDispatchTool,
+  createWorkQueueExplainTool,
+  createWorkQueueFinishTool,
+  createWorkQueueSubmitTool,
+  createWorkQueueStateTool,
+  createWorkQueueTools,
+  loadWorkQueueSnapshot,
+  parseSnapshotEnvelope,
+  readWorkQueueState,
+} from "./work_queue_mcp_server.cjs";
+import { serializeTransactionLog } from "./work_queue_replay.cjs";
+import { readStagedIntents } from "./work_queue_intents.cjs";
 import { createServer, handleMessage, registerTool } from "./mcp_server_core.cjs";
+import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
 
-const work = id => ({ version: 2, kind: "Work", work: id, claim: null, attempt: null });
-const claim = (workId, id) => ({ version: 2, kind: "Claim", work: workId, claim: id, attempt: null });
-
-const tempFiles = [];
-
-function writeSnapshot(snapshot) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "work-queue-"));
+const directories = [];
+function setup(options = {}) {
+  const fixture = queueFixture({ granted: false, ...options });
+  const directory = path.join(process.cwd(), `.queue-mcp-test-${randomUUID()}`);
+  fs.mkdirSync(directory);
+  directories.push(directory);
+  const envelope = { version: 3, sha: "activation-head", captured_at: fixture.at, origin: fixture.dispatcher, worker: fixture.assignment, transactionLog: serializeTransactionLog(fixture.transactions) };
   const snapshotPath = path.join(directory, "snapshot.json");
-  fs.writeFileSync(snapshotPath, JSON.stringify(snapshot));
-  tempFiles.push(directory);
-  return snapshotPath;
+  fs.writeFileSync(snapshotPath, JSON.stringify(envelope));
+  return { fixture, envelope, snapshot: loadWorkQueueSnapshot(snapshotPath), snapshotPath, intentPath: path.join(directory, "intents.jsonl"), finishIntentPath: path.join(directory, "finish.jsonl") };
 }
-
+const response = value => JSON.parse(value.content[0].text);
 afterEach(() => {
-  for (const directory of tempFiles.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+  vi.unstubAllEnvs();
+  for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-describe("work queue MCP snapshot", () => {
-  it("reads and replays an activation snapshot without a Git client", () => {
-    const snapshotPath = writeSnapshot({
-      version: 2,
-      sha: "activation-head",
-      transactionLog: serializeTransactionLog([work("w"), claim("w", "c")]),
-      worker: null,
-    });
-    const snapshot = loadWorkQueueSnapshot(snapshotPath);
-
-    expect(readWorkQueueState(snapshot)).toEqual({
-      snapshot_sha: "activation-head",
-      next_work: null,
-      works: [{ id: "w", state: "claimed", enqueued: 0, winner: "c", claims: [{ id: "c", state: "effective" }] }],
-    });
-    const tool = createWorkQueueStateTool(snapshot);
-    expect(tool.name).toBe("work_queue_read");
-    expect(JSON.parse(tool.handler({ work: "missing" }).content[0].text)).toEqual({
-      snapshot_sha: "activation-head",
-      next_work: null,
-      works: [{ id: "missing", state: "absent", winner: null, claims: [] }],
-    });
+describe("bounded credential-free work queue MCP", () => {
+  it("supports the observer smoke read/explain protocol before queue initialization without any finish artifact", () => {
+    const test = setup();
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: null, transactionLog: "", role: "observer" }));
+    const snapshot = loadWorkQueueSnapshot(test.snapshotPath);
+    const work = "__gh_aw_smoke__-15";
+    const result = response(createWorkQueueStateTool(snapshot).handler({ work }));
+    expect(result).toMatchObject({ view: "activation_snapshot", snapshot_sha: null, work: { id: work, state: "absent" }, queue_state: "uninitialized", prediction: { work_id: null, reason: "queue_uninitialized", authoritative: false } });
+    const explained = response(createWorkQueueExplainTool(snapshot).handler({ work, pool: "default" }));
+    expect(explained).toMatchObject({ view: "activation_snapshot", snapshot_sha: null, explanation: { work_id: work, state: "absent", ready: false, authoritative: false } });
+    expect(createWorkQueueTools(snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_explain"]);
+    expect(() => createWorkQueueFinishTool({ snapshot, finishIntentPath: test.finishIntentPath }).handler({ outcome: "completed" })).toThrow();
+    expect(fs.existsSync(test.finishIntentPath)).toBe(false);
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, sha: "existing", transactionLog: "", role: "observer" }));
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/policy_missing/);
   });
 
-  it("treats prototype-named identifiers as ordinary identifiers", () => {
-    const snapshotPath = writeSnapshot({
-      version: 2,
-      sha: null,
-      transactionLog: serializeTransactionLog([work("constructor"), claim("constructor", "toString")]),
-      worker: null,
+  it("reports independent Work/Claim states, pending delivery, native accounting and absent Work without payloads", () => {
+    const test = setup({ granted: true, bound: true });
+    test.fixture.append("finish", { dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1", outcome: "completed" }, { ...test.fixture.workerActor, dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h1" });
+    test.fixture.append("finish", { dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h2", outcome: "cancelled" }, { ...test.fixture.workerActor, dispatch_id: test.fixture.assignment.dispatch_id, claim_handle: "h2" });
+    const snapshot = { ...test.snapshot, role: "observer", worker: null, projection: test.fixture.state };
+    expect(readWorkQueueState(snapshot)).toMatchObject({
+      queue_state: "initialized",
+      policy_mode: "weighted-priority",
+      fairness_units: "durable_claims",
+      counts: { completed: 1, available: 1, claimed: 1 },
+      claim_counts: { completed: 1, cancelled: 1, open: 1 },
+      barrier_counts: { pending: 1, none: 2 },
+      native_reservations: { outstanding: 1, unbound: 0 },
     });
-
-    expect(readWorkQueueState(loadWorkQueueSnapshot(snapshotPath), { work: "constructor" })).toEqual({
-      snapshot_sha: null,
-      next_work: null,
-      works: [{ id: "constructor", state: "claimed", enqueued: 0, winner: "toString", claims: [{ id: "toString", state: "effective" }] }],
-    });
+    expect(readWorkQueueState(snapshot, { work: "absent" }).work.state).toBe("absent");
+    expect(response(createWorkQueueExplainTool(snapshot).handler({ work: "absent" })).explanation).toMatchObject({ state: "absent", reason: "work_absent", authoritative: false });
+    expect(JSON.stringify(readWorkQueueState(snapshot))).not.toContain("stored task");
   });
 
-  it("recommends and lists available work oldest-first from the immutable snapshot", () => {
-    const snapshotPath = writeSnapshot({
-      version: 2,
-      sha: "old-head",
-      transactionLog: serializeTransactionLog([createWorkTransaction("a-new", 20), createWorkTransaction("z-old", 10), createWorkTransaction("claimed", 1), claim("claimed", "c")]),
-      worker: null,
-    });
-    const snapshot = loadWorkQueueSnapshot(snapshotPath);
-    const result = readWorkQueueState(snapshot);
-    expect(result.next_work).toBe("z-old");
-    expect(result.works.map(item => item.id)).toEqual(["z-old", "a-new", "claimed"]);
-    expect(result.works.map(item => item.enqueued)).toEqual([10, 20, 1]);
-    expect(readWorkQueueState(snapshot, { work: "a-new" }).next_work).toBe("z-old");
+  it("exposes only read/explain to explicit observers and never stages queue mutations", () => {
+    const test = setup();
+    const snapshot = { ...test.snapshot, role: "observer" };
+    expect(createWorkQueueTools(snapshot).map(tool => tool.name)).toEqual(["work_queue_read", "work_queue_explain"]);
+    expect(readWorkQueueState(snapshot).total).toBe(3);
+    const work = readWorkQueueState(snapshot).works[0].id;
+    expect(response(createWorkQueueExplainTool(snapshot).handler({ work })).view).toBe("activation_snapshot");
+    expect(() => createWorkQueueSubmitTool(snapshot, { intentPath: test.intentPath }).handler({ nodes: [{ graph_id: "g", node_key: "n", payload: {} }] })).toThrow(/observer_read_only/);
+    expect(() => createWorkQueueDispatchTool(snapshot, { intentPath: test.intentPath }).handler({ pool: "default", max_claims: 1, max_dispatches: 1 })).toThrow(/observer_read_only/);
+    expect(() => createWorkQueueFinishTool({ snapshot, finishIntentPath: test.finishIntentPath }).handler({})).toThrow();
+    expect(fs.existsSync(test.intentPath)).toBe(false);
+    expect(fs.existsSync(test.finishIntentPath)).toBe(false);
   });
 
-  it("sorts available Work with field and length expressions while retaining default ties", () => {
-    const snapshot = loadWorkQueueSnapshot(
-      writeSnapshot({
-        version: 2,
-        sha: "head",
-        transactionLog: serializeTransactionLog([createWorkTransaction("z", 10), createWorkTransaction("aaa", 20), createWorkTransaction("bb", 20), createWorkTransaction("claimed", 30), claim("claimed", "c")]),
-        worker: null,
-      })
+  it("rejects forged observer snapshots when the compiled role declares a worker", () => {
+    const test = setup();
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+    expect(() => createWorkQueueTools({ ...test.snapshot, role: "observer" })).toThrow(/role_conflict/);
+    expect(() => createWorkQueueTools({ ...test.snapshot, role: "worker" })).toThrow(/assignment_required/);
+    fs.writeFileSync(test.snapshotPath, JSON.stringify({ ...test.envelope, role: "observer" }));
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/role_conflict/);
+  });
+
+  it("reads and explains only activation state with explicit stale prediction provenance", () => {
+    const { snapshot, fixture } = setup();
+    const result = readWorkQueueState(snapshot, { limit: 1 });
+    expect(result).toMatchObject({ view: "activation_snapshot", snapshot_sha: "activation-head", total: 3, next_offset: 1, prediction: { authoritative: false } });
+    expect(result.prediction.work_id).toBe([...fixture.state.works.keys()][0]);
+    expect(result.works).toHaveLength(1);
+    expect(result.works[0]).not.toHaveProperty("payload");
+    const explanation = response(createWorkQueueExplainTool(snapshot).handler({ work: result.works[0].id }));
+    expect(explanation.view).toBe("activation_snapshot");
+    expect(explanation.explanation).toMatchObject({ work_id: result.works[0].id, state: "available" });
+  });
+
+  it("makes presentation sorting independent of the scheduler's next fair winner", () => {
+    const { snapshot } = setup();
+    const baseline = readWorkQueueState(snapshot);
+    const sorted = readWorkQueueState(snapshot, { sort: [{ key: "id", direction: "desc" }] });
+    expect(sorted.works.map(work => work.id)).toEqual(
+      baseline.works
+        .map(work => work.id)
+        .sort()
+        .reverse()
     );
-    const newestFirst = [{ key: "enqueued", direction: "desc" }];
-    expect(readWorkQueueState(snapshot, { sort: newestFirst }).works.map(item => item.id)).toEqual(["aaa", "bb", "z", "claimed"]);
-    expect(readWorkQueueState(snapshot, { sort: newestFirst }).next_work).toBe("aaa");
-    expect(readWorkQueueState(snapshot, { work: "z", sort: newestFirst }).next_work).toBe("aaa");
-
-    const byLength = [
-      { key: "id_length", direction: "asc" },
-      { key: "id", direction: "desc" },
-    ];
-    expect(readWorkQueueState(snapshot, { sort: byLength }).works.map(item => item.id)).toEqual(["z", "bb", "aaa", "claimed"]);
-    expect(readWorkQueueState(snapshot, { sort: [{ key: "id", direction: "desc" }] }).next_work).toBe("z");
-    expect(readWorkQueueState(snapshot).next_work).toBe("z");
+    expect(sorted.prediction).toEqual(baseline.prediction);
+    for (const args of [{ limit: 129 }, { offset: -1 }, { sort: [] }, { sort: [{ key: "state", direction: "asc" }] }, { actor: "forged" }]) expect(() => readWorkQueueState(snapshot, args)).toThrow();
+    expect(createWorkQueueStateTool(snapshot).inputSchema.properties.limit.maximum).toBe(128);
   });
 
-  it("sorts IDs by Unicode code point length", () => {
-    const snapshot = loadWorkQueueSnapshot(
-      writeSnapshot({
-        version: 2,
-        sha: "head",
-        transactionLog: serializeTransactionLog([createWorkTransaction("😀", 10), createWorkTransaction("ab", 10)]),
-        worker: null,
-      })
-    );
-
-    expect(readWorkQueueState(snapshot, { sort: [{ key: "id_length", direction: "asc" }] }).works.map(item => item.id)).toEqual(["😀", "ab"]);
-  });
-
-  it("rejects unsupported and unbounded sort operators", () => {
-    const snapshot = loadWorkQueueSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null }));
-    const term = { key: "id", direction: "asc" };
-    for (const sort of [[], [term, term, term, term, term], "id", [{ ...term, direction: "random" }], [{ ...term, extra: true }], [{ ...term, key: "state" }]]) {
-      expect(() => readWorkQueueState(snapshot, { sort })).toThrow(TypeError);
+  it("rejects old snapshots, unsupported logs and duplicate keys without any upgrade", () => {
+    const test = setup();
+    for (const envelope of [
+      { ...test.envelope, version: 2 },
+      { ...test.envelope, transactionLog: '{"version":2,"kind":"Work","work":"old"}\n' },
+    ]) {
+      fs.writeFileSync(test.snapshotPath, JSON.stringify(envelope));
+      expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow();
     }
-    const sortSchema = createWorkQueueStateTool(snapshot).inputSchema.properties.sort;
-    expect(sortSchema.minItems).toBe(1);
-    expect(sortSchema.maxItems).toBe(4);
-    expect(sortSchema.items.required).toEqual(["key", "direction"]);
-    expect(sortSchema.items.properties.key.enum).toEqual(["id", "enqueued", "id_length"]);
+    fs.writeFileSync(test.snapshotPath, '{"version":3,"version":2}');
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/duplicate/);
   });
 
-  it("loads v1 Work at age zero without changing the snapshot envelope", () => {
-    const snapshotPath = writeSnapshot({
-      version: 2,
-      sha: "historical-head",
-      transactionLog: `${JSON.stringify(createWorkTransaction("new", 100))}\n${JSON.stringify({ ...work("legacy"), version: 1 })}\n`,
-      worker: null,
-    });
-    const snapshot = loadWorkQueueSnapshot(snapshotPath);
-    expect(JSON.parse(fs.readFileSync(snapshotPath, "utf8")).version).toBe(2);
-    expect(snapshot.projection.transactions).toContainEqual(work("legacy"));
-    const result = readWorkQueueState(snapshot);
-    expect(result.next_work).toBe("legacy");
-    expect(result.works.map(item => [item.id, item.enqueued])).toEqual([
-      ["legacy", 0],
-      ["new", 100],
-    ]);
+  it("frames escaped ledger strings independently without weakening strict metadata or ledger parsing", () => {
+    const test = setup();
+    const encoded = JSON.stringify(test.envelope).replace('"transactionLog":', '"transaction\\u004cog":');
+    expect(parseSnapshotEnvelope(encoded)).toEqual(test.envelope);
+    fs.writeFileSync(test.snapshotPath, encoded);
+    expect(loadWorkQueueSnapshot(test.snapshotPath).projection.tip).toBe(test.fixture.state.tip);
+    for (const invalid of [
+      '{"transactionLog":"x","transaction\\u004cog":"y"}',
+      '{"transactionLog":"x","metadata":{"a":1,"a":2}}',
+      '{"transactionLog":"x","metadata":1e2}',
+      '{"transactionLog":"x","metadata":-0}',
+      '{"transactionLog":"\\ud800"}',
+      '{"transactionLog":"\\x20"}',
+      '{"metadata":"transactionLog":"x"}',
+      '{"transactionLog":"unterminated}',
+    ])
+      expect(() => parseSnapshotEnvelope(invalid)).toThrow();
+    const nested = { transactionLog: '{"nested":"transactionLog: \\\\ end"}\n', worker: { transactionLog: "must stay strictly parsed" } };
+    expect(parseSnapshotEnvelope(JSON.stringify(nested))).toEqual(nested);
+    const corrupt = Buffer.from(JSON.stringify(test.envelope));
+    corrupt[corrupt.indexOf("activation-head")] = 0x80;
+    fs.writeFileSync(test.snapshotPath, corrupt);
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/encoded data/);
+    fs.writeFileSync(test.snapshotPath, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(test.envelope))]));
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow();
   });
 
-  it("rejects snapshots with an unsupported shape or invalid transaction log", () => {
-    expect(() => loadWorkQueueSnapshot(writeSnapshot({ version: 1, sha: null, transactionLog: "" }))).toThrow(/invalid shape/);
-    expect(() => loadWorkQueueSnapshot(writeSnapshot({ version: 2, sha: null, transactionLog: "{}\n", worker: null }))).toThrow(/invalid transaction log/);
+  it("accepts outer escaping above 80 MiB while retaining the decoded 80 MiB ledger bound", () => {
+    const ledger = '"'.repeat(40 * 1024 * 1024 + 1);
+    const encoded = JSON.stringify({ transactionLog: ledger, version: 3 });
+    expect(Buffer.byteLength(encoded)).toBeGreaterThan(80 * 1024 * 1024);
+    expect(parseSnapshotEnvelope(encoded).transactionLog).toBe(ledger);
   });
 
-  it("records a finish intent without exposing authority parameters", () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "work-queue-finish-"));
-    tempFiles.push(directory);
-    const finishPath = path.join(directory, "finish.jsonl");
-    const tool = createWorkQueueFinishTool({ finishIntentPath: finishPath });
-
-    expect(tool.name).toBe("work_queue_claim_finish");
-    expect(Object.keys(tool.inputSchema.properties)).toEqual(["outcome"]);
-    expect(tool.inputSchema.additionalProperties).toBe(false);
-    expect(JSON.parse(tool.handler({ outcome: "completed", work_id: "untrusted" }).content[0].text)).toEqual({ recorded: true, outcome: "completed" });
-    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
-    expect(fs.statSync(finishPath).mode & 0o777).toBe(0o644);
+  it("rejects oversized decoded ledgers and outer files before authoritative replay", () => {
+    expect(() => parseSnapshotEnvelope('{"transactionLog":"' + "x".repeat(80 * 1024 * 1024 + 1) + '"}')).toThrow(/ledger exceeds.*bounded/);
+    const test = setup();
+    fs.truncateSync(test.snapshotPath, 162 * 1024 * 1024 + 1);
+    expect(() => loadWorkQueueSnapshot(test.snapshotPath)).toThrow(/snapshot exceeds.*bounded/);
   });
 
-  it("returns queue state and finish confirmation through the stdio MCP transport", async () => {
-    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
-    const finishPath = path.join(path.dirname(snapshotPath), "finish.jsonl");
-    const server = createServer({ name: "work-queue", version: "1.0.0" });
+  it("stages submit/dispatch-next without Work selectors, authority or durable mutation", () => {
+    const test = setup();
+    const options = { intentPath: test.intentPath, createIntentId: () => "intent1" };
+    const dispatch = createWorkQueueDispatchTool(test.snapshot, options);
+    const result = response(dispatch.handler({ pool: "default", max_claims: 3, max_dispatches: 1 }));
+    expect(result).toEqual({ intent_id: "intent1", status: "staged" });
+    expect(result).not.toHaveProperty("claims");
+    expect(test.fixture.state.claims.size).toBe(0);
+    expect(readStagedIntents(test.intentPath)).toEqual([{ version: 3, intent_id: "intent1", kind: "dispatch_next", parameters: { pool: "default", max_claims: 3, max_dispatches: 1 } }]);
+    for (const extra of [{ work_id: "chosen" }, { ref: "main" }, { actor: "forged" }, { workflow: "worker" }, { claim_handle: "foreign" }])
+      expect(() => dispatch.handler({ pool: "default", max_claims: 1, max_dispatches: 1, ...extra })).toThrow();
+    const submit = createWorkQueueSubmitTool(test.snapshot, { ...options, createIntentId: () => "intent2" });
+    expect(response(submit.handler({ nodes: [{ graph_id: "g2", node_key: "n", payload: { plan: "stored task" }, worker_profile: "default" }] })).status).toBe("staged");
+    expect(() => submit.handler({ nodes: [{ graph_id: "g2", node_key: "n", payload: {}, batch_trust_domain: "forged" }] })).toThrow();
+  });
+
+  it("stages independent finishes and requires multi-Claim handles from the original assignment", () => {
+    const batch = setup({ granted: true, bound: true });
+    const finish = createWorkQueueFinishTool({ snapshot: batch.snapshot, finishIntentPath: batch.finishIntentPath, createIntentId: () => "finish1" });
+    for (const args of [{}, { claim_handle: null }, { claim_handle: "" }, { claim_handle: "foreign" }, { claim_handle: "h1", work_id: "forged" }]) expect(() => finish.handler(args)).toThrow();
+    const staged = response(finish.handler({ claim_handle: "h1", outcome: "completed" }));
+    expect(staged).toEqual({ intent_id: "finish1", status: "staged", claim_handle: "h1" });
+    expect(response(finish.handler({ claim_handle: "h1", outcome: "completed" }))).toEqual(staged);
+    expect(() => finish.handler({ claim_handle: "h1", outcome: "cancelled" })).toThrow(/conflict/);
+    expect(readStagedIntents(batch.finishIntentPath)).toHaveLength(1);
+    expect(fs.statSync(batch.finishIntentPath).mode & 0o777).toBe(0o644);
+    const single = setup({ granted: true, bound: true, count: 1 });
+    const singleton = createWorkQueueFinishTool({ snapshot: single.snapshot, finishIntentPath: single.finishIntentPath, createIntentId: () => "single" });
+    expect(response(singleton.handler({})).claim_handle).toBe("h1");
+    expect(() => singleton.handler({ outcome: null })).toThrow();
+    expect(() => createWorkQueueFinishTool({ snapshot: setup().snapshot }).handler({})).toThrow(/assignment_required/);
+  });
+
+  it("stages omitted root identities for trusted resolution without accepting explicit invalid identities", () => {
+    const test = setup();
+    const payload = { plan: "independent root", effect_contract: { kind: "none" } };
+    const submit = createWorkQueueSubmitTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "default-root" });
+    expect(response(submit.handler({ nodes: [{ payload }] })).status).toBe("staged");
+    expect(readStagedIntents(test.intentPath)[0].parameters).toEqual({ nodes: [{ payload }] });
+    expect(test.fixture.state.works.size).toBe(3);
+    for (const field of ["graph_id", "node_key"]) {
+      for (const value of ["", null, undefined]) expect(() => submit.handler({ nodes: [{ payload, [field]: value }] })).toThrow();
+    }
+    expect(readStagedIntents(test.intentPath)).toHaveLength(1);
+  });
+
+  it("attributes worker-generated queue control to its Claim but never rewrites its ownership", () => {
+    const test = setup({ granted: true, bound: true });
+    const tool = createWorkQueueDispatchTool(test.snapshot, { intentPath: test.intentPath, createIntentId: () => "scoped" });
+    expect(() => tool.handler({ pool: "default", max_claims: 1, max_dispatches: 1 })).toThrow(/claim_handle/);
+    expect(response(tool.handler({ pool: "default", max_claims: 1, max_dispatches: 1, claim_handle: "h2" })).claim_handle).toBe("h2");
+    expect(test.fixture.state.claims.get(test.fixture.assignment.claims[1].claim_id).state).toBe("open");
+  });
+
+  it("serves bounded read results through the existing MCP stdio transport", async () => {
+    const { snapshot } = setup();
+    const server = createServer({ name: "work-queue", version: "3.0.0" });
     server.debug = vi.fn();
     server.writeMessage = vi.fn();
-    registerTool(server, createWorkQueueStateTool(loadWorkQueueSnapshot(snapshotPath)));
-    registerTool(server, createWorkQueueFinishTool({ finishIntentPath: finishPath }));
-
-    for (const [id, name, args, expected] of [
-      [1, "work_queue_read", { work: "missing" }, { snapshot_sha: null, next_work: null, works: [{ id: "missing", state: "absent", winner: null, claims: [] }] }],
-      [2, "work_queue_claim_finish", { outcome: "completed" }, { recorded: true, outcome: "completed" }],
-    ]) {
-      await handleMessage(server, { jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
-      expect(server.writeMessage).toHaveBeenCalledWith({
-        jsonrpc: "2.0",
-        id,
-        result: { content: [{ type: "text", text: JSON.stringify(expected) }], isError: false },
-      });
-    }
-    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
-  });
-
-  it("makes an existing owner-only intent readable for runner artifact collection", () => {
-    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
-    const finishPath = path.join(path.dirname(snapshotPath), "finish.jsonl");
-    fs.writeFileSync(finishPath, "", { mode: 0o600 });
-    const tool = createWorkQueueFinishTool({ finishIntentPath: finishPath });
-
-    tool.handler({});
-
-    expect(fs.statSync(finishPath).mode & 0o777).toBe(0o644);
-    expect(fs.readFileSync(finishPath, "utf8")).toBe('{"outcome":"completed"}\n');
-  });
-
-  it("reports filesystem failures instead of confirming a recorded finish intent", () => {
-    const snapshotPath = writeSnapshot({ version: 2, sha: null, transactionLog: "", worker: null });
-    const tool = createWorkQueueFinishTool({ finishIntentPath: path.join(path.dirname(snapshotPath), "finish.jsonl") });
-    const error = new Error("permission denied");
-    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
-      throw error;
-    });
-    try {
-      expect(() => tool.handler({ outcome: "completed" })).toThrow(expect.objectContaining({ message: "Failed to record work queue finish intent", cause: error }));
-    } finally {
-      append.mockRestore();
-    }
+    registerTool(server, createWorkQueueStateTool(snapshot));
+    await handleMessage(server, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "work_queue_read", arguments: { limit: 1 } } });
+    expect(server.writeMessage).toHaveBeenCalledWith({ jsonrpc: "2.0", id: 1, result: { ...createWorkQueueStateTool(snapshot).handler({ limit: 1 }), isError: false } });
   });
 });

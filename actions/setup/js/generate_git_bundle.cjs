@@ -7,6 +7,7 @@
 // allowlist check is required in this handler.
 
 const fs = require("fs");
+const { scopedArtifactFilename } = require("./work_queue_claim_scope.cjs");
 const os = require("os");
 const path = require("path");
 
@@ -60,7 +61,7 @@ function sanitizeBranchNameForBundle(branchName) {
  */
 function getBundlePathForBranch(branchName) {
   const sanitized = sanitizeBranchNameForBundle(branchName);
-  return `/tmp/gh-aw/aw-${sanitized}.bundle`;
+  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitized}.bundle`);
 }
 
 /**
@@ -82,7 +83,7 @@ function sanitizeRepoSlugForBundle(repoSlug) {
 function getBundlePathForBranchInRepo(branchName, repoSlug) {
   const sanitizedBranch = sanitizeBranchNameForBundle(branchName);
   const sanitizedRepo = sanitizeRepoSlugForBundle(repoSlug);
-  return `/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.bundle`;
+  return scopedArtifactFilename(`/tmp/gh-aw/aw-${sanitizedRepo}-${sanitizedBranch}.bundle`);
 }
 
 /**
