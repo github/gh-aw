@@ -47,6 +47,7 @@ post-steps:
       const fs = require("node:fs");
       const path = require("node:path");
       const { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "log_parser_shared.cjs"));
+      const { normalizeClaudeSession } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "claude_session.cjs"));
       const script = ".claude/workflows/smoke-claude-dynamic.js";
       const fixture = ".claude/workflows/references/smoke-claude-dynamic/.context";
       for (const file of [script, fixture]) {
@@ -63,19 +64,27 @@ post-steps:
         token: "gh-aw-claude-dynamic-fixture-v1",
         runId: process.env.SMOKE_RUN_ID
       }, "The saved workflow must return the expected fixture and invocation arguments");
-      const events = parseLogEntries(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
+      const records = parseLogEntries(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
+      assert.ok(Array.isArray(records), "Claude must produce a parseable native session log");
+      const events = normalizeClaudeSession(records);
       const launches = events.filter(event =>
         event.type === "tool.execution_start" &&
         event.data?.toolName === "Workflow" &&
-        JSON.stringify(event.data.input).includes("smoke-claude-dynamic")
+        event.data.input?.name === "smoke-claude-dynamic" &&
+        event.data.input.args?.runId === process.env.SMOKE_RUN_ID
       );
       assert.ok(launches.length > 0, "Claude must invoke the saved script through the native Workflow tool");
       assert.ok(launches.some(launch => events.some(event =>
         event.type === "tool.execution_complete" &&
         event.data?.toolCallId === launch.data.toolCallId &&
-        event.data.success !== false &&
-        event.data.is_error !== true
+        event.data.success === true
       )), "The native Workflow tool must launch successfully");
+      assert.ok(launches.some(launch => records.some(record =>
+        record.type === "system" &&
+        record.subtype === "task_notification" &&
+        record.tool_use_id === launch.data.toolCallId &&
+        record.status === "completed"
+      )), "The launched dynamic workflow must complete successfully");
       fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
         "## Claude dynamic workflow smoke: PASS\n\n" +
         "Verified trusted activation packaging, recursive hidden-file restoration, " +
