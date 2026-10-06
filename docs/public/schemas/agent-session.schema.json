@@ -13,6 +13,7 @@
       { "if": { "properties": { "type": { "const": "agent.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AgentExecutionData" } } } },
       { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } },
       { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } },
+      { "if": { "properties": { "type": { "const": "assistant.refusal" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AssistantRefusalData" } } } },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
       { "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionInitData" } } } },
@@ -32,6 +33,18 @@
         "exitCode": { "$ref": "#/definitions/SessionExitCode" }
       },
       "required": ["categories", "errorCodes", "errorTypes"],
+      "additionalProperties": {}
+    },
+    "AssistantRefusalData": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
+        "content": { "$ref": "#/definitions/JsonValue" },
+        "policyCategory": { "type": ["string", "null"] },
+        "explanation": { "type": ["string", "null"] },
+        "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
+      },
+      "required": ["reason"],
       "additionalProperties": {}
     },
     "DetectionResultData": {

@@ -6,6 +6,7 @@ const messages: CoreSessionEvent[] = [
   { type: "session.init", data: { sourceEngine: "copilot", tools: [] } },
   { type: "user.message", data: { content: "private prompt" } },
   { type: "assistant.message", data: { content: "" } },
+  { type: "assistant.refusal", data: { reason: "content_filter", policyCategory: null } },
   { type: "assistant.reasoning", data: { content: "reasoning" } },
   { type: "tool.execution_start", data: { toolCallId: "call", input: false } },
   { type: "tool.execution_complete", data: { toolCallId: "call", success: false, output: null } },
@@ -40,6 +41,11 @@ createSessionEvent({}, "tool.execution_complete", { success: "yes" });
 createSessionEvent({}, "result", {});
 createSessionEvent({}, "vendor.progress", { nativeValue: false });
 createSessionEvent({}, "session.format", { version: 1 });
+createSessionEvent({}, "assistant.refusal", { reason: "refusal", content: "", explanation: null, partial: true });
+// @ts-expect-error Refusal reasons are explicit provider signals, not arbitrary prose.
+createSessionEvent({}, "assistant.refusal", { reason: "I cannot help" });
+// @ts-expect-error A refusal requires a structured reason even when text is unavailable.
+createSessionEvent({}, "assistant.refusal", {});
 // @ts-expect-error File format version is numeric, not a document version string.
 createSessionEvent({}, "session.format", { version: "1.1.0" });
 // @ts-expect-error The file format header requires a version.

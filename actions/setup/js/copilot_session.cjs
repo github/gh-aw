@@ -96,7 +96,7 @@ function normalizeCopilotSession(entries) {
       const start = tools.get(data.toolCallId);
       if (!Object.hasOwn(data, "toolName") && start?.toolName !== undefined) data.toolName = start.toolName;
       if (!Object.hasOwn(data, "exitCode") && Number.isSafeInteger(data.shellExecution?.exitCode)) data.exitCode = data.shellExecution.exitCode;
-    } else if (event.type === "assistant.message" && typeof data.reasoningText === "string") {
+    } else if ((event.type === "assistant.message" || event.type === "assistant.refusal") && typeof data.reasoningText === "string") {
       project("assistant.reasoning", { content: data.reasoningText });
     } else if (event.type === "assistant.message_delta" && typeof data.deltaContent === "string" && !snapshots.has(data.messageId)) {
       project("assistant.message", { content: data.deltaContent });
