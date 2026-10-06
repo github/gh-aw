@@ -97,6 +97,8 @@ Pi supports native MCP tools and resources, codemode, tool search, provider-pref
 
 Codemode batches tool calls and reduces results before they enter model context. Its classifier and image-generation APIs are available when the configured provider route supports those model types. Custom providers still need a compatible API-proxy target and credentials; enabling codemode does not grant additional credentials or network access.
 
+For Copilot models using the Responses API, gh-aw disables grammar-based custom tools (`model.compat.supportsOpenAIGrammarTools: false`) so Pi sends codemode as a JSON-schema function tool. Codemode remains enabled; the Copilot compatibility adapter does not accept its custom-tool format. Other provider routes retain their configured compatibility settings.
+
 | Option | Pi behavior |
 |---|---|
 | `max-turns`, `max-ai-credits` | Enforced by the AWF inference proxy. |
@@ -110,6 +112,8 @@ Codemode batches tool calls and reduces results before they enter model context.
 | `engine.driver: pi_rpc_driver.cjs` | Runs a headless RPC subprocess through Pi's RPC client. |
 
 Project-local executable resources remain untrusted by default. Workflow-installed packages and activation-installed skills use the managed agent directory. Model catalog metadata preserves thinking, vision, token limits, pricing, and cache lifetimes through gateway routing. Workflow system instructions remain separate from user instructions so compaction does not summarize them away.
+
+When AWF `/reflect` completes model discovery and reports reasoning-effort support for the selected provider and model, Pi uses that capability information instead of model-name exceptions. If discovery is incomplete or reflection does not report reasoning capability data, Pi retains the model catalog or `engine.config.model` reasoning setting. Missing effort fields alone do not disable reasoning.
 
 Custom executables without the npm SDK must supply complete model metadata (`reasoning`, `input`, `contextWindow`, and `maxTokens`) in `engine.config.model`.
 
