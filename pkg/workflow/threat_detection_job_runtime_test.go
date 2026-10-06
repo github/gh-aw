@@ -101,6 +101,7 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 		wantArcDindSetup     bool
 		wantCopilotInstalled bool
 		wantNodeActionRef    string
+		wantNodeVersion      string
 	}{
 		{
 			name: "copilot on standard topology",
@@ -190,6 +191,16 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 			wantInstallStep:   "Install Codex CLI",
 			wantNodeActionRef: "myorg/myrepo/.github/actions/setup-node@main",
 		},
+		{
+			name: "external detector honors pinned node version",
+			data: &WorkflowData{
+				AI:          "claude",
+				Runtimes:    map[string]any{"node": map[string]any{"version": "24.21.0"}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep: "Install Claude Code CLI",
+			wantNodeVersion: "24.21.0",
+		},
 	}
 
 	for _, tt := range tests {
@@ -206,6 +217,9 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 
 			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
 				t.Fatalf("expected exactly one Setup Node.js step, got %d:\n%s", count, steps)
+			}
+			if tt.wantNodeVersion != "" && !strings.Contains(steps, "node-version: '"+tt.wantNodeVersion+"'") {
+				t.Errorf("expected Node version %q:\n%s", tt.wantNodeVersion, steps)
 			}
 			if tt.wantInstallStep != "" {
 				nodeIndex := strings.Index(steps, "- name: Setup Node.js")

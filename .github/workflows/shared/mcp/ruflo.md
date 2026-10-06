@@ -33,7 +33,7 @@ Why stdio instead of Docker:
 - No official GHCR/Docker image for the MCP server was identified from upstream docs
 
 Runtime requirements:
-- Node.js 20+ (the generated workflow currently runs on Node.js 24)
+- Node.js 24+ (the generated workflow currently runs on Node.js 24)
 - Network access to npm (`node` ecosystem) for first-run package resolution
 
 Selected allowlist:

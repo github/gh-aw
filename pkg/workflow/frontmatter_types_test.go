@@ -791,7 +791,7 @@ func TestFrontmatterConfigFieldExtraction(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 		}
@@ -1249,7 +1249,7 @@ func TestFrontmatterConfigIntegration(t *testing.T) {
 			},
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 		}
@@ -1334,7 +1334,7 @@ func TestRuntimesConfigTyping(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 		}
@@ -1353,8 +1353,8 @@ func TestRuntimesConfigTyping(t *testing.T) {
 			t.Fatal("RuntimesTyped.Node should not be nil")
 		}
 
-		if config.RuntimesTyped.Node.Version != "20" {
-			t.Errorf("Node version = %s, want 20", config.RuntimesTyped.Node.Version)
+		if config.RuntimesTyped.Node.Version != "24" {
+			t.Errorf("Node version = %s, want 24", config.RuntimesTyped.Node.Version)
 		}
 
 		// Legacy field should still be populated
@@ -1394,7 +1394,7 @@ func TestRuntimesConfigTyping(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 				"python": map[string]any{
 					"version": "3.11",
@@ -1430,7 +1430,7 @@ func TestRuntimesConfigTyping(t *testing.T) {
 			"name": "test-workflow",
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 		}
@@ -1454,15 +1454,15 @@ func TestRuntimesConfigTyping(t *testing.T) {
 			t.Fatal("node runtime should be in runtimes map")
 		}
 
-		if node["version"] != "20" {
-			t.Errorf("node version = %v, want 20", node["version"])
+		if node["version"] != "24" {
+			t.Errorf("node version = %v, want 24", node["version"])
 		}
 	})
 
 	t.Run("handles all runtime types", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
-				"node":   map[string]any{"version": "20"},
+				"node":   map[string]any{"version": "24"},
 				"python": map[string]any{"version": "3.11"},
 				"go":     map[string]any{"version": "1.21"},
 				"uv":     map[string]any{"version": "0.1.0"},
@@ -1672,7 +1672,7 @@ func TestTypedConfigsBackwardCompatibility(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 		}
@@ -1692,8 +1692,8 @@ func TestTypedConfigsBackwardCompatibility(t *testing.T) {
 
 		// Legacy field should have the same data
 		if node, ok := config.Runtimes["node"].(map[string]any); ok {
-			if node["version"] != "20" {
-				t.Error("Legacy Runtimes field should have version 20")
+			if node["version"] != "24" {
+				t.Error("Legacy Runtimes field should have version 24")
 			}
 		} else {
 			t.Error("Legacy Runtimes should have node entry")
@@ -1735,7 +1735,7 @@ func TestTypedConfigsBackwardCompatibility(t *testing.T) {
 		frontmatter := map[string]any{
 			"runtimes": map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 			"permissions": map[string]any{
@@ -1808,7 +1808,7 @@ func TestParseRuntimesConfigWithIfCondition(t *testing.T) {
 					"if":      "hashFiles('requirements.txt') != ''",
 				},
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 					"if":      "hashFiles('package.json') != ''",
 				},
 			},
@@ -1822,7 +1822,7 @@ func TestParseRuntimesConfigWithIfCondition(t *testing.T) {
 					If:      "hashFiles('requirements.txt') != ''",
 				},
 				"node": {
-					Version: "20",
+					Version: "24",
 					If:      "hashFiles('package.json') != ''",
 				},
 			},
@@ -1831,12 +1831,12 @@ func TestParseRuntimesConfigWithIfCondition(t *testing.T) {
 			name: "runtime without if condition",
 			runtimes: map[string]any{
 				"node": map[string]any{
-					"version": "20",
+					"version": "24",
 				},
 			},
 			expected: map[string]RuntimeConfig{
 				"node": {
-					Version: "20",
+					Version: "24",
 					If:      "",
 				},
 			},
@@ -1895,7 +1895,7 @@ func TestRuntimesConfigToMapWithIfCondition(t *testing.T) {
 			If:      "hashFiles('requirements.txt') != ''",
 		},
 		Node: &RuntimeConfig{
-			Version: "20",
+			Version: "24",
 		},
 	}
 
@@ -1930,8 +1930,8 @@ func TestRuntimesConfigToMapWithIfCondition(t *testing.T) {
 	if !ok {
 		t.Fatal("node runtime not found in result")
 	}
-	if nodeMap["version"] != "20" {
-		t.Errorf("node version: got %v, want 20", nodeMap["version"])
+	if nodeMap["version"] != "24" {
+		t.Errorf("node version: got %v, want 24", nodeMap["version"])
 	}
 	if _, hasIf := nodeMap["if"]; hasIf {
 		t.Error("node should not have if condition in map")
@@ -1941,7 +1941,7 @@ func TestRuntimesConfigToMapWithIfCondition(t *testing.T) {
 func TestParseRuntimesConfig_Cooldown(t *testing.T) {
 	runtimes := map[string]any{
 		"node": map[string]any{
-			"version":  "20",
+			"version":  "24",
 			"cooldown": false,
 		},
 	}
@@ -1965,7 +1965,7 @@ func TestRuntimesConfigToMap_Cooldown(t *testing.T) {
 	disabled := false
 	result := runtimesConfigToMap(&RuntimesConfig{
 		Node: &RuntimeConfig{
-			Version:  "20",
+			Version:  "24",
 			Cooldown: &disabled,
 		},
 	})

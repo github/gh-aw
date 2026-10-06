@@ -165,7 +165,7 @@ Check that:
 Use these commands from the repository root:
 
 ```bash
-# Install documentation dependencies (Node.js 20+ required)
+# Install documentation dependencies (Node.js 24+ required)
 make deps-docs
 
 # Build the documentation (recommended before completing work)

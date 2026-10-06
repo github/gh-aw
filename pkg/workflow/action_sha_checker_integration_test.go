@@ -146,7 +146,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Run tests
         run: npm test

@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -60,6 +61,22 @@ func resolveNodeSetupActionOverride(data *WorkflowData) (string, string) {
 	return "", ""
 }
 
+func resolveNodeSetupVersion(data *WorkflowData) string {
+	if data == nil {
+		return ""
+	}
+	if nodeConfig, ok := data.Runtimes["node"].(map[string]any); ok {
+		if version, ok := runtimeVersionToString(nodeConfig["version"]); ok {
+			return version
+		}
+		return ""
+	}
+	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.RuntimesTyped != nil && data.ParsedFrontmatter.RuntimesTyped.Node != nil {
+		return data.ParsedFrontmatter.RuntimesTyped.Node.Version
+	}
+	return ""
+}
+
 // resolveNodeSetupActionRef returns the `uses:` reference for the Setup Node.js
 // step when a runtimes.node.action-repo / action-version override is configured,
 // mirroring generateSetupStep. Returns "" when no override is configured.
@@ -85,42 +102,59 @@ func resolveNodeSetupActionRef(data *WorkflowData) string {
 
 // generateNodeJsSetupStepForWorkflow creates the Setup Node.js step for jobs that
 // bypass DetectRuntimeRequirements (e.g. threat detection and evals jobs), honoring
-// the runtimes.node.action-repo / action-version frontmatter override the same way
+// the runtimes.node version and action overrides the same way
 // the main agent job does (see applyRuntimeOverrides and generateSetupStep).
 func generateNodeJsSetupStepForWorkflow(data *WorkflowData) GitHubActionStep {
-	return rewriteNodeSetupStepUses(GenerateNodeJsSetupStep(), resolveNodeSetupActionRef(data))
+	return rewriteNodeSetupStep(GenerateNodeJsSetupStep(), resolveNodeSetupActionRef(data), resolveNodeSetupVersion(data))
 }
 
-// rewriteNodeSetupStepUses returns a copy of step with its `uses:` line replaced
-// by actionRef. The step is returned unchanged when actionRef is empty.
-func rewriteNodeSetupStepUses(step GitHubActionStep, actionRef string) GitHubActionStep {
-	if actionRef == "" {
+// rewriteNodeSetupStep returns a copy of step with its action and version overrides.
+func rewriteNodeSetupStep(step GitHubActionStep, actionRef, version string) GitHubActionStep {
+	quotedVersion := ""
+	if version != "" {
+		var ok bool
+		quotedVersion, ok = quoteYAMLSingleQuotedString(version)
+		if !ok {
+			version = ""
+		}
+	}
+	if actionRef == "" && version == "" {
 		return step
 	}
 	rewritten := make(GitHubActionStep, 0, len(step))
 	for _, line := range step {
-		if strings.HasPrefix(strings.TrimSpace(line), "uses:") {
+		if actionRef != "" && strings.HasPrefix(strings.TrimSpace(line), "uses:") {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
 			line = indent + "uses: " + actionRef
+		} else if version != "" && strings.HasPrefix(strings.TrimSpace(line), "node-version:") {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			line = fmt.Sprintf("%snode-version: %s", indent, quotedVersion)
 		}
 		rewritten = append(rewritten, line)
 	}
 	return rewritten
 }
 
-// applyNodeSetupActionOverride rewrites the `uses:` line of any "Setup Node.js"
-// step in steps to honor the runtimes.node action override. Steps are returned
-// unchanged when no override is configured.
-func applyNodeSetupActionOverride(steps []GitHubActionStep, data *WorkflowData) []GitHubActionStep {
+func quoteYAMLSingleQuotedString(value string) (string, bool) {
+	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return "", false
+	}
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'", true
+}
+
+// applyNodeSetupOverrides rewrites the action and version of any "Setup Node.js"
+// step to honor runtimes.node overrides.
+func applyNodeSetupOverrides(steps []GitHubActionStep, data *WorkflowData) []GitHubActionStep {
 	actionRef := resolveNodeSetupActionRef(data)
-	if actionRef == "" {
+	version := resolveNodeSetupVersion(data)
+	if actionRef == "" && version == "" {
 		return steps
 	}
-	nodejsLog.Printf("Applying runtimes.node action override to Setup Node.js step: %s", actionRef)
+	nodejsLog.Printf("Applying runtimes.node overrides to Setup Node.js step: action=%s version=%q", actionRef, version)
 	result := make([]GitHubActionStep, 0, len(steps))
 	for _, step := range steps {
 		if extractStepName(strings.Join(step, "\n")) == "Setup Node.js" {
-			step = rewriteNodeSetupStepUses(step, actionRef)
+			step = rewriteNodeSetupStep(step, actionRef, version)
 		}
 		result = append(result, step)
 	}
