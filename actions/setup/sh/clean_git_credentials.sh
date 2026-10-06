@@ -52,6 +52,24 @@ clean_git_config() {
     echo "Removed $key from git config"
   done || true
 
+  # Checkout stores persisted credentials in a separate config reached via includeIf.
+  while IFS= read -r -d '' entry; do
+    local key="${entry%%$'\n'*}" include_path="${entry#*$'\n'}"
+    if [[ "$include_path" =~ (^|/)git-credentials-[0-9a-f-]+\.config$ ]] &&
+      git config --file "${GIT_CONFIG_PATH}" --fixed-value --get-all "$key" "$include_path" >/dev/null; then
+      git config --file "${GIT_CONFIG_PATH}" --fixed-value --unset-all "$key" "$include_path"
+      if [[ -n "${RUNNER_TEMP:-}" && "$include_path" = /* ]]; then
+        local temp_dir resolved_path
+        temp_dir=$(realpath -m -- "$RUNNER_TEMP")
+        resolved_path=$(realpath -m -- "$include_path")
+        if [[ "$resolved_path" == "$temp_dir"/* ]]; then
+          rm -f -- "$include_path"
+        fi
+      fi
+      echo "Removed checkout credential include from git config"
+    fi
+  done < <(git config --file "${GIT_CONFIG_PATH}" --null --get-regexp '^includeif\..*\.path$' 2>/dev/null)
+
   # Remove any credentials from remote URLs (https://username:password@github.com format)
   # Replace authenticated URLs with unauthenticated ones
   if git config --file "${GIT_CONFIG_PATH}" --get-regexp '^remote\..*\.url$' 2>/dev/null | grep -q '@'; then
