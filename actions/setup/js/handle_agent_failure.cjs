@@ -2467,7 +2467,7 @@ function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
  * @param {string} threshold - Configured daily workflow threshold
  * @returns {string} Formatted context string, or empty string if no failure
  */
-function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) {
+function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold, estimatedAIC = "") {
   if (!hasDailyAICExceeded) {
     return "";
   }
@@ -2475,11 +2475,22 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) 
   const templatePath = getPromptPath("daily_workflow_aic_exceeded.md");
   const formattedTotalAIC = formatAICCredits(totalAIC);
   const formattedThreshold = formatAICCredits(threshold);
+  const total = Number(totalAIC);
+  const estimated = Number(estimatedAIC);
+  const hasBreakdown = estimatedAIC !== "" && Number.isFinite(total) && Number.isFinite(estimated) && estimated >= 0 && estimated <= total;
+  const estimateGuidance = !hasBreakdown
+    ? "The accounting breakdown is unavailable for this run. The agent will resume when the guardrail total falls below the threshold."
+    : estimated > 0
+      ? "Estimated credits represent conservative per-run maximums where accounting is unavailable, not confirmed consumption. Subsequent scans retry unresolved accounting and replace estimates if recorded usage becomes available. Otherwise, these estimates stop counting when the affected runs leave the rolling 24-hour window."
+      : "The agent will resume automatically once the rolling 24-hour total falls below the threshold. No action is required if the current limit is appropriate for your usage.";
   return (
     "\n" +
     renderTemplateFromFile(templatePath, {
       total_aic: formattedTotalAIC || "unknown",
+      recorded_aic: hasBreakdown ? formatAICCredits(total - estimated) || "0" : "unknown",
+      estimated_aic: hasBreakdown ? formatAICCredits(estimated) || "0" : "unknown",
       threshold: formattedThreshold || "unknown",
+      estimate_guidance: estimateGuidance,
     })
   );
 }
@@ -3927,6 +3938,7 @@ async function main() {
     const dailyAICContinueOnError = process.env.GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR === "true";
     const dailyAICGuardrailErrorIsFailure = hasDailyAICGuardrailError && !dailyAICContinueOnError;
     const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL || "";
+    const dailyAICEstimated = process.env.GH_AW_DAILY_AI_CREDITS_ESTIMATED || "";
     const dailyAICThreshold = process.env.GH_AW_DAILY_AI_CREDITS_THRESHOLD || "";
     // Cache-memory availability flag — set when cache-memory is configured for the workflow.
     // Used to detect cache-miss misconfigurations reported by the agent.
@@ -4549,7 +4561,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
-        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues
@@ -4791,7 +4803,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
-        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues

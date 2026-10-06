@@ -24,6 +24,7 @@ func (c *Compiler) addActivationFeedbackAndValidationSteps(ctx *activationJobBui
 		ctx.outputs["daily_ai_credits_guardrail_status"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_status || '' }}"
 		ctx.outputs["daily_ai_credits_guardrail_error"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_guardrail_error || '' }}"
 		ctx.outputs["daily_ai_credits_total"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}"
+		ctx.outputs["daily_ai_credits_estimated"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_estimated || '' }}"
 		ctx.outputs["daily_ai_credits_threshold"] = "${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_threshold || '' }}"
 	}
 	c.addActivationReactionStep(ctx)

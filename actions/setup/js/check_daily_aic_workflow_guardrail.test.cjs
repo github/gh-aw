@@ -297,6 +297,24 @@ describe("check_daily_aic_workflow_guardrail", () => {
     expect(markdown).not.toContain("| Min / Max AIC |  /  |");
   });
 
+  it("separates recorded consumption from unresolved estimates in the activation summary", () => {
+    const markdown = exports.renderDailyAICSummary(
+      "PR labeling",
+      "author",
+      5000,
+      [
+        { id: 1, html_url: "https://example.test/1", created_at: "2026-05-31T10:00:00Z", conclusion: "success", aic: 809.28, source: "recorded" },
+        { id: 2, html_url: "https://example.test/2", created_at: "2026-05-31T11:00:00Z", conclusion: "cancelled", aic: 5000, source: "estimated" },
+      ],
+      null,
+      { candidateRunsCount: 2, inspectedRunsCount: 2, truncatedByRateLimit: false }
+    );
+    expect(markdown).toContain("| Recorded AIC | 810 |");
+    expect(markdown).toContain("| Estimated AIC (unresolved accounting) | 5K |");
+    expect(markdown).toContain("| [#2](https://example.test/2) | 2026-05-31T11:00:00Z | cancelled | 5K | Estimated |");
+    expect(markdown).toContain("Subsequent scans retry unresolved accounting");
+  });
+
   it("renders a daily AI Credits details summary with stats and prior runs", () => {
     const markdown = exports.renderDailyAICSummary(
       "Nightly triage",

@@ -149,6 +149,10 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "daily_ai_credits_total: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}") {
 		t.Fatal("expected activation job to expose the aggregated AI Credits total output")
 	}
+	if !strings.Contains(lockStr, "daily_ai_credits_estimated: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_estimated || '' }}") ||
+		!strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}") {
+		t.Fatal("expected estimated credits to reach the conclusion report")
+	}
 	if strings.Contains(lockStr, "daily_ai_credits_issue_url") {
 		t.Fatal("expected activation job to avoid surfacing a separate daily AI Credits issue URL")
 	}
