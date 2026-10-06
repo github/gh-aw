@@ -123,6 +123,41 @@ describe("complete daily AIC scan observations", () => {
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"scan_cache"'));
   });
 
+  it("recounts version 1 zero-credit observations from completed Agent and Detection jobs", async () => {
+    const prior = scanCacheEntry(run(1), 0, repository, 7, now);
+    prior.coverage_version = 1;
+    writeEntries([prior]);
+    const f = fixture([run(1)]);
+    f.getRunAIC = guardrail.getRunAIC;
+    f.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue(
+      response({
+        jobs: [
+          { id: 1, name: "Agent", run_attempt: 1, status: "completed", conclusion: "success", started_at: time, completed_at: time },
+          { id: 2, name: "Detection", run_attempt: 1, status: "completed", conclusion: "success", started_at: time, completed_at: time },
+        ],
+      })
+    );
+    f.artifactClient = {
+      listArtifacts: vi.fn(async () => ({ artifacts: [{ id: 10, name: "usage", createdAt: new Date(time) }] })),
+      downloadArtifact: vi.fn(async (_id, options) => {
+        for (const [name, aic] of [
+          ["agent", 18.02604],
+          ["detection", 30.08748],
+        ]) {
+          const file = path.join(options.path, name, "token_usage.jsonl");
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, JSON.stringify({ aic }));
+        }
+        return { downloadPath: options.path };
+      }),
+    };
+    const result = await scanDailyAIC(f);
+    expect(result.cacheHits).toBe(0);
+    expect(result.countedRuns[0].aic).toBeCloseTo(48.11352);
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)).toMatchObject({ coverage_version: 2, source: "recorded" });
+    expect((await scanDailyAIC(f)).cacheHits).toBe(1);
+  });
+
   it.each(["missing", "metadata-only", "malformed", "unknown-model", "old-attempt", "detection", "evals", "invalid-numeric"])("conservatively assumes max AI Credits when %s usage cannot be resolved", async kind => {
     const f = fixture([run(1)]);
     f.getRunAIC = guardrail.getRunAIC;

@@ -105,6 +105,25 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
+it("counts compiler-generated Agent, Detection and Evals jobs using their lowercase accounting paths", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":18.02604}',
+      "detection/token_usage.jsonl": '{"aic":30.08748}',
+      "evals/token_usage.jsonl": '{"aic":1}',
+    },
+    [job("Agent"), job("Detection"), job("Evals")]
+  );
+  await expect(f.result).resolves.toBeCloseTo(49.11352);
+  expect(f.client.listArtifacts).toHaveBeenCalledOnce();
+  expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('"reason":"no_billable_jobs"'));
+});
+
+it("treats differently cased names for the same component as ambiguous", async () => {
+  const f = evaluate({}, [job("Agent", { id: 1 }), job("agent", { id: 2 })]);
+  await expect(f.result).rejects.toThrow("Ambiguous daily AIC component jobs");
+});
+
 it("still requires accounting when detection/token_usage.jsonl is missing (not empty)", async () => {
   const f = evaluate(
     {

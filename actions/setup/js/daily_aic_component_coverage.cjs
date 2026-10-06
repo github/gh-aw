@@ -28,16 +28,17 @@ async function loadBillableJobs({ github, budget }, owner, repo, run) {
     const jobs = response.data.jobs;
     if (!Array.isArray(jobs)) throw new Error("Incomplete daily AIC job metadata");
     for (const job of jobs) {
-      if (!Object.hasOwn(COMPONENT_FILES, job.name)) continue;
+      const name = typeof job.name === "string" ? job.name.toLowerCase() : "";
+      if (!Object.hasOwn(COMPONENT_FILES, name)) continue;
       if (!Number.isSafeInteger(job.run_attempt) || job.run_attempt < 1 || job.run_attempt > run.run_attempt || job.status !== "completed" || !job.conclusion) {
         throw new Error("Incomplete daily AIC component attempt metadata");
       }
-      const prior = components.get(job.name);
+      const prior = components.get(name);
       if (prior && job.run_attempt === prior.run_attempt && job.id !== prior.id) {
         throw new Error("Ambiguous daily AIC component jobs");
       }
       if (!prior || (prior.conclusion === "skipped" && job.conclusion !== "skipped") || (job.conclusion !== "skipped" && job.run_attempt > prior.run_attempt) || (prior.conclusion === "skipped" && job.run_attempt > prior.run_attempt)) {
-        components.set(job.name, job);
+        components.set(name, job);
       }
     }
     if (jobs.length < 100) {
