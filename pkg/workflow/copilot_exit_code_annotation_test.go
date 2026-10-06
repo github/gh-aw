@@ -128,6 +128,26 @@ func TestCopilotExecutionStep_ContainsExitCodeAnnotation(t *testing.T) {
 	}
 }
 
+func TestCompiledDirectExecution_RegistersExitTrapBeforeEvidenceWrites(t *testing.T) {
+	var compiled strings.Builder
+	NewCompiler().generateEngineExecutionSteps(
+		&compiled,
+		&WorkflowData{Name: "direct"},
+		NewClaudeEngine(),
+		"/tmp/gh-aw/test.log",
+	)
+
+	script := compiled.String()
+	initializationIndex := strings.Index(script, "gh_aw_exit_code=0")
+	trapIndex := strings.Index(script, "trap 'gh_aw_exit_code=")
+	evidenceIndex := strings.Index(script, `evidence_tmp="/tmp/gh-aw/agent_execution.json.tmp"`)
+	require.NotEqual(t, -1, initializationIndex, "compiled direct execution must initialize the exit code:\n%s", script)
+	require.NotEqual(t, -1, trapIndex, "compiled direct execution must register the exit trap:\n%s", script)
+	require.NotEqual(t, -1, evidenceIndex, "compiled direct execution must write start evidence:\n%s", script)
+	assert.Less(t, initializationIndex, trapIndex, "exit code initialization must precede trap registration")
+	assert.Less(t, trapIndex, evidenceIndex, "trap registration must precede execution evidence writes")
+}
+
 func TestAllAgentExecutionSteps_ContainExitCodeAnnotation(t *testing.T) {
 	workflowData := &WorkflowData{Name: "agent"}
 	tests := []struct {

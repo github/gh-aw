@@ -457,8 +457,7 @@ func yamlStringValue(value string) string {
 	}
 	// Values starting with YAML flow indicators need quoting to be treated as strings.
 	// '{' would be parsed as a YAML flow mapping, '[' as a YAML flow sequence.
-	first := value[0]
-	if first != '{' && first != '[' {
+	if !strings.HasPrefix(value, "{") && !strings.HasPrefix(value, "[") {
 		return value
 	}
 	// Single-quote the value, escaping any embedded single quotes by doubling them.
