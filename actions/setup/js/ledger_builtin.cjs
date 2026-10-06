@@ -15,24 +15,10 @@ const OPERATIONS = Object.freeze({
 const MAX_REPLAY_CELL_BYTES = 65536;
 const NOTE_LIMITS = { subject: 512, note: 4096, reason: 1024, citations: 32, citationBytes: 2048 };
 const NOTE_STATE_COLUMNS = { note_id: "text", upvotes: "integer", downvotes: "integer", net_votes: "integer", last_vote_at: "text", last_positive_vote_at: "text" };
-const NOTE_STATE_VIEW = `CREATE VIEW note_state AS
-  WITH vote_state AS (
-    SELECT note_id,
-      sum(CASE WHEN vote = 'up' THEN 1 ELSE 0 END) AS upvotes,
-      sum(CASE WHEN vote = 'down' THEN 1 ELSE 0 END) AS downvotes,
-      max(created_at) AS last_vote_at,
-      max(CASE WHEN vote = 'up' THEN created_at END) AS last_positive_vote_at
-    FROM note_votes
-    GROUP BY note_id
-  )
-  SELECT c.id AS note_id,
-    coalesce(v.upvotes, 0) AS upvotes,
-    coalesce(v.downvotes, 0) AS downvotes,
-    coalesce(v.upvotes, 0) - coalesce(v.downvotes, 0) AS net_votes,
-    v.last_vote_at,
-    v.last_positive_vote_at
-  FROM notes c
-  LEFT JOIN vote_state v ON v.note_id = c.id`;
+
+function emptyVoteState() {
+  return { upvotes: 0, downvotes: 0, last_vote_at: null, last_positive_vote_at: null };
+}
 
 function validateCitation(citation) {
   if (!citation || typeof citation !== "object" || Array.isArray(citation)) return false;
@@ -187,6 +173,20 @@ function createReducer(config) {
     if (config.type === "notes") {
       const noteRows = [...notes].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
       const voteRows = [...votes].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      const voteState = new Map();
+      for (const [, { record, timestamp }] of voteRows) {
+        const state = voteState.get(record.note_id) || emptyVoteState();
+        if (record.vote === "up") {
+          state.upvotes++;
+          if (timestamp !== null && (state.last_positive_vote_at === null || timestamp > state.last_positive_vote_at)) state.last_positive_vote_at = timestamp;
+        } else if (record.vote === "down") {
+          state.downvotes++;
+        } else {
+          throw new TypeError("Vote requires an up or down vote");
+        }
+        if (timestamp !== null && (state.last_vote_at === null || timestamp > state.last_vote_at)) state.last_vote_at = timestamp;
+        voteState.set(record.note_id, state);
+      }
       const tables = {
         notes: {
           columns: { id: "text", subject: "text", note: "text", reason: "text", created_at: "text", record_sha: "text" },
@@ -211,6 +211,21 @@ function createReducer(config) {
           columns: { record_id: "text", note_id: "text", vote: "text", reason: "text", created_at: "text" },
           primaryKey: ["record_id"],
           rows: voteRows.map(([, { record, recordId, timestamp }]) => ({ record_id: recordId, note_id: record.note_id, vote: record.vote, reason: record.reason ?? null, created_at: timestamp })),
+        },
+        note_state: {
+          columns: NOTE_STATE_COLUMNS,
+          primaryKey: ["note_id"],
+          rows: noteRows.map(([note_id]) => {
+            const state = voteState.get(note_id) || emptyVoteState();
+            return {
+              note_id,
+              upvotes: state.upvotes,
+              downvotes: state.downvotes,
+              net_votes: state.upvotes - state.downvotes,
+              last_vote_at: state.last_vote_at,
+              last_positive_vote_at: state.last_positive_vote_at,
+            };
+          }),
         },
       };
       return { version: 1, tables };
@@ -255,4 +270,4 @@ function replayBuiltin(config, records) {
   return reducer.output();
 }
 
-module.exports = { NOTE_STATE_COLUMNS, NOTE_STATE_VIEW, OPERATIONS, createReducer, replayBuiltin, validateOperation };
+module.exports = { NOTE_STATE_COLUMNS, OPERATIONS, createReducer, replayBuiltin, validateOperation };

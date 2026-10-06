@@ -4,6 +4,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const { parseCopilotSDKToolConfig, buildCopilotSDKSessionToolConfig, isReservedSDKPermission } = require("./copilot_sdk_tool_config.cjs");
 const { runWithCopilotSDK } = require("./copilot_sdk_session.cjs");
+const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
 
 function validToolConfig(overrides = {}) {
   return {
@@ -13,6 +14,7 @@ function validToolConfig(overrides = {}) {
       edit: false,
       webFetch: true,
       webSearch: false,
+      dynamicWorkflows: false,
       mcp: true,
       cliProxy: false,
       ...(overrides.capabilities ?? {}),
@@ -70,6 +72,12 @@ describe("parseCopilotSDKToolConfig", () => {
     expect(parseCopilotSDKToolConfig(JSON.stringify({ ...validToolConfig(), explicitlyDisabledTools: null })).explicitlyDisabledTools).toEqual([]);
   });
 
+  it("keeps workflows disabled in older version-1 contracts", () => {
+    const config = validToolConfig();
+    delete config.capabilities.dynamicWorkflows;
+    expect(parseCopilotSDKToolConfig(JSON.stringify(config)).capabilities.dynamicWorkflows).toBe(false);
+  });
+
   it("parses a configured aggregate tool-call limit", () => {
     expect(parseCopilotSDKToolConfig(JSON.stringify({ ...validToolConfig(), maxToolCalls: "12" })).maxToolCalls).toBe(12);
   });
@@ -78,6 +86,7 @@ describe("parseCopilotSDKToolConfig", () => {
     ["invalid JSON", "{", "must be valid JSON"],
     ["unsupported version", JSON.stringify({ ...validToolConfig(), version: 2 }), "unsupported"],
     ["missing capability", JSON.stringify({ ...validToolConfig(), capabilities: { bash: false } }), "capabilities.edit"],
+    ["malformed workflow capability", JSON.stringify(validToolConfig({ capabilities: { dynamicWorkflows: "true" } })), "capabilities.dynamicWorkflows"],
     ["duplicate permission", JSON.stringify(validToolConfig({ permissions: { allowedTools: ["read", "read"] } })), "duplicate"],
     ["empty permissions", JSON.stringify(validToolConfig({ permissions: { allowedTools: [] } })), "must not be empty"],
     ["zero tool-call limit", JSON.stringify({ ...validToolConfig(), maxToolCalls: 0 }), "positive safe integer"],
@@ -91,6 +100,8 @@ describe("parseCopilotSDKToolConfig", () => {
     ["edit", { capabilities: { edit: true }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch"] } }, "edit visibility"],
     ["web_fetch", { capabilities: { webFetch: false }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch"] } }, "web_fetch visibility"],
     ["web_search", { capabilities: { webSearch: true }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch"] } }, "web_search visibility"],
+    ["workflow", { capabilities: { dynamicWorkflows: true }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch"] } }, "workflow visibility"],
+    ["disabled workflow permission", { capabilities: { dynamicWorkflows: false }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch", "workflow"] } }, "workflow visibility"],
     ["MCP", { capabilities: { mcp: false }, permissions: { allowedTools: ["read", "safeoutputs", "web_fetch"] } }, "MCP permissions"],
   ])("rejects %s catalog/permission drift", (_name, partial, message) => {
     const value = validToolConfig({
@@ -133,6 +144,7 @@ describe("isReservedSDKPermission", () => {
     expect(isReservedSDKPermission("web_fetch")).toBe(true);
     expect(isReservedSDKPermission("web_fetch(get)")).toBe(false);
     expect(isReservedSDKPermission("web_search")).toBe(true);
+    expect(isReservedSDKPermission("workflow")).toBe(true);
     expect(isReservedSDKPermission("github")).toBe(false);
   });
 });
@@ -190,6 +202,27 @@ describe("buildCopilotSDKSessionToolConfig", () => {
     expect(config.availableTools.toArray()).not.toContain("builtin:web_search");
   });
 
+  it("admits workflow built-ins only with the enabled capability", () => {
+    const config = buildCopilotSDKSessionToolConfig(
+      validToolConfig({
+        capabilities: { dynamicWorkflows: true, mcp: false },
+        permissions: { allowedTools: ["read", "web_fetch", "workflow"] },
+      }),
+      fakeSDKTools
+    );
+    expect(config.availableTools.toArray()).toEqual(expect.arrayContaining(["builtin:run_dynamic_workflow", "builtin:dynamic_workflows_manage"]));
+    expect(config.availableTools.toArray()).not.toContain("mcp:*");
+  });
+
+  it("removes workflow built-ins from isolated tools when disabled", () => {
+    const config = buildCopilotSDKSessionToolConfig(validToolConfig(), {
+      ...fakeSDKTools,
+      BuiltInTools: { Isolated: [...fakeSDKTools.BuiltInTools.Isolated, "run_dynamic_workflow", "dynamic_workflows_manage"] },
+    });
+    expect(config.availableTools.toArray()).not.toContain("builtin:run_dynamic_workflow");
+    expect(config.availableTools.toArray()).not.toContain("builtin:dynamic_workflows_manage");
+  });
+
   it("preserves legacy SDK behavior only when the compiler contract is absent", () => {
     expect(buildCopilotSDKSessionToolConfig(null, {})).toEqual({});
   });
@@ -208,7 +241,54 @@ describe("buildCopilotSDKSessionToolConfig", () => {
   });
 });
 
+describe("workflow permission scope", () => {
+  it("keeps managed workflow approvals and unrelated MCP/custom tools denied", () => {
+    const handler = buildCopilotSDKPermissionHandler({ allowedTools: ["read", "workflow"] }, () => ({ kind: "approve-once" }));
+    expect(handler({ kind: "workflow", name: "review", operation: "run" })).toEqual({ kind: "approve-once" });
+    expect(handler({ kind: "workflow", name: "review", operation: "run", managedApprovalRequired: true }).kind).toBe("reject");
+    expect(handler({ kind: "mcp", serverName: "workflow", toolName: "other" }).kind).toBe("reject");
+    expect(handler({ kind: "custom-tool", toolName: "workflow" }).kind).toBe("reject");
+  });
+});
+
 describe("runWithCopilotSDK compiler-owned catalog", () => {
+  it.each([true, false])("wires workflow visibility and approvals into the session when enabled=%s", async enabled => {
+    const createSession = vi.fn().mockResolvedValue({
+      sessionId: `session-workflow-contract-${enabled}`,
+      on: () => {},
+      sendAndWait: vi.fn().mockResolvedValue({ data: { content: "ok" } }),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    });
+    class FakeCopilotClient {
+      start = vi.fn().mockResolvedValue(undefined);
+      createSession = createSession;
+      stop = vi.fn().mockResolvedValue(undefined);
+    }
+    const toolConfig = validToolConfig({
+      capabilities: { dynamicWorkflows: enabled },
+      permissions: { allowedTools: ["read", "safeoutputs", "web_fetch", ...(enabled ? ["workflow"] : [])] },
+    });
+    const result = await runWithCopilotSDK({
+      sdkUri: "http://127.0.0.1:3002",
+      prompt: "test prompt",
+      logger: () => {},
+      permissionConfig: toolConfig.permissions,
+      toolConfig,
+      sdkModule: {
+        ...fakeSDKTools,
+        CopilotClient: FakeCopilotClient,
+        RuntimeConnection: { forUri: vi.fn(() => ({})) },
+        approveAll: () => ({ kind: "approve-once" }),
+      },
+    });
+    expect(result.exitCode).toBe(0);
+    const sessionConfig = createSession.mock.calls[0][0];
+    expect(sessionConfig.availableTools.toArray().includes("builtin:run_dynamic_workflow")).toBe(enabled);
+    expect(sessionConfig.availableTools.toArray().includes("builtin:dynamic_workflows_manage")).toBe(enabled);
+    expect(sessionConfig.onPermissionRequest({ kind: "workflow", name: "review", operation: "run" }).kind).toBe(enabled ? "approve-once" : "reject");
+    expect(sessionConfig.onPermissionRequest({ kind: "shell", fullCommandText: "git status" }).kind).toBe("reject");
+  });
+
   it("passes one filtered catalog to the parent session for inherited subagent enforcement", async () => {
     const createSession = vi.fn().mockResolvedValue({
       sessionId: "session-tool-contract",
@@ -216,6 +296,7 @@ describe("runWithCopilotSDK compiler-owned catalog", () => {
       sendAndWait: vi.fn().mockResolvedValue({ data: { content: "ok" } }),
       disconnect: vi.fn().mockResolvedValue(undefined),
     });
+
     class FakeCopilotClient {
       start = vi.fn().mockResolvedValue(undefined);
       createSession = createSession;

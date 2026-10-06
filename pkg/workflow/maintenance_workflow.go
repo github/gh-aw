@@ -309,6 +309,10 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)
 	}
+	content, err = applyArtifactRetention(content, repoConfig)
+	if err != nil {
+		return fmt.Errorf("failed to configure maintenance artifact retention: %w", err)
+	}
 
 	// Write the maintenance workflow file
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")

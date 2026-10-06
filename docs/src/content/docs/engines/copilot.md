@@ -51,6 +51,20 @@ Analyze the repository and create a concise daily status report covering:
 
 Copilot supports the broadest set of `gh-aw` engine-specific features: native custom-agent selection with `engine.agent`, custom harnesses, `max-continuations`, bare mode, and per-command bash allowlisting. Copilot CLI provides native `tools.web-search` through its built-in `web_search` tool; declare `tools: web-search:` to enable it, including in workflows that do not use GitHub repository tools. See the [AI engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
+### Dynamic workflows
+
+Copilot CLI [dynamic workflows](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-dynamic-workflows) are enabled by default. gh-aw enables the CLI's `EXTENSIONS` feature flag, loads project extensions in prompt mode, and pre-approves workflow runs. SDK sessions honor the same switch through their tool catalog and permission handler, without granting additional shell or MCP access. Save reusable definitions and supporting files under `.github/extensions/<name>/extension.mjs`, and explicitly request the registered workflow by name in the prompt. Their agents remain subject to the configured tool permissions and sandbox policies.
+
+gh-aw's existing engine-config restoration snapshots the engine-declared folders, including Copilot's `.github/`, recursively from the activation checkout and restores them after agent checkouts, including when `checkout.pull-request: false` is set. Restoring the entire configuration directory prevents PR-head extension code, settings, and hooks from replacing trusted definitions. Use `ambient-folders` for supporting files elsewhere in the repository. Dynamic workflow availability also depends on the Copilot account; enabling extensions does not make workflows available with a BYOK provider.
+
+Set `engine.dynamic-workflows: false` to disable the CLI's extension feature flag and project extension loading, deny workflow runs, and restore engine configuration only when PR checkout requires it:
+
+```yaml
+engine:
+  id: copilot
+  dynamic-workflows: false
+```
+
 ## GitHub Agentic Workflows vs. Copilot CLI in GitHub Actions
 
 Running coding agent CLIs such as `copilot` directly in GitHub Actions without an adequate security architecture is not recommended. GitHub Agentic Workflows gives an appropriate security architecture and workflow portability across AI engines.

@@ -3306,6 +3306,53 @@ process.exit(1);`,
       return path.join(tempDir, "agent-output.json");
     }
 
+    it.each([
+      { used: 240.22396, expectedExit: 0, expectedAttempts: 1 },
+      { used: 239.9, expectedExit: 1, expectedAttempts: 2 },
+    ])("classifies proxy HTTP 403 with network-only audit and compiled cap at usage $used", ({ used, expectedExit, expectedAttempts }) => {
+      const tempDir = makeHarnessTempDir("copilot-proxy-403-compiled-cap-");
+      const auditDir = path.join(tempDir, "sandbox", "firewall", "logs");
+      const tokenUsageDir = path.join(auditDir, "api-proxy-logs");
+      fs.mkdirSync(tokenUsageDir, { recursive: true });
+      fs.writeFileSync(path.join(auditDir, "audit.jsonl"), `${JSON.stringify({ event: "http_access", status: 200 })}\n`);
+      fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), `${JSON.stringify({ status: 200, ai_credits_total: used })}\n`);
+      const configPath = path.join(tempDir, "awf-config.json");
+      fs.writeFileSync(configPath, JSON.stringify({ apiProxy: { enabled: true, maxAiCredits: 240 } }));
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+fs.appendFileSync(process.env.COPILOT_HARNESS_STUB_CALLS, "attempt\\n");
+process.stderr.write("Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).\\n");
+process.exit(1);`
+      );
+
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          COPILOT_HARNESS_STUB_CALLS: callsPath,
+          GH_AW_AGENT_OUTPUT: path.join(tempDir, "agent-output.json"),
+          GH_AW_AWF_CONFIG_PATH: configPath,
+          GH_AW_MAX_AI_CREDITS: "",
+          GH_AW_HARNESS_MAX_RETRIES: "3",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status).toBe(expectedExit);
+      expect(fs.readFileSync(callsPath, "utf8").trim().split("\n")).toHaveLength(expectedAttempts);
+      if (expectedExit === 0) {
+        expect(result.stderr).toContain("failureClass=ai_credits_exhausted");
+        expect(result.stderr).toContain("AI credits budget enforced");
+        expect(result.stderr).not.toContain("centralized Copilot billing");
+      } else {
+        expect(result.stderr).toContain("failureClass=authentication_failed");
+        expect(result.stderr).not.toContain("AI credits budget enforced");
+      }
+    });
+
     it("exits 0 when the agent outputs max_ai_credits_exceeded and the CLI exits non-zero", () => {
       const tempDir = makeHarnessTempDir("copilot-ai-credits-exceeded-");
       const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");

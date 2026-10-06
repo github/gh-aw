@@ -220,7 +220,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
         run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" COPILOT_GITHUB_TOKEN Codex https://github.github.com/gh-aw/reference/engines/#github-copilot-default
@@ -381,6 +381,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -404,7 +405,7 @@ jobs:
             /tmp/gh-aw/.codex/agents
             /tmp/gh-aw/.codex/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -980,6 +981,7 @@ jobs:
         timeout-minutes: 30
         run: |
           set -o pipefail
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           mkdir -p "$CODEX_HOME/logs" && touch /tmp/gh-aw/agent-step-summary.md
@@ -1221,7 +1223,7 @@ jobs:
         with:
           name: repo-memory-default
           path: /tmp/gh-aw/repo-memory/default
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
       - name: Verify metrics collection produced fresh data
         run: "set -euo pipefail\nmemory_dir=\"/tmp/gh-aw/repo-memory/default\"\nlatest=\"${memory_dir}/metrics/latest.json\"\n\nif [ ! -f \"$latest\" ]; then\n  echo \"ERROR: ${latest} was not written. The agent finished without collecting any metrics.\"\n  exit 1\nfi\n\nif ! jq -e . \"$latest\" >/dev/null 2>&1; then\n  echo \"ERROR: ${latest} does not contain valid JSON.\"\n  exit 1\nfi\n\nnew_timestamp=\"$(jq -r '.timestamp // empty' \"$latest\")\"\nif [ -z \"$new_timestamp\" ]; then\n  echo \"ERROR: ${latest} has no 'timestamp' field.\"\n  exit 1\nfi\n\nbaseline_timestamp=\"\"\nif [ -f /tmp/gh-aw/metrics-collector/baseline-timestamp.txt ]; then\n  baseline_timestamp=\"$(cat /tmp/gh-aw/metrics-collector/baseline-timestamp.txt)\"\nfi\nif [ -n \"$baseline_timestamp\" ] && [ \"$new_timestamp\" = \"$baseline_timestamp\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp is unchanged (${new_timestamp}). No new metrics were collected.\"\n  exit 1\nfi\n\nif ! new_epoch=\"$(date -u -d \"$new_timestamp\" +%s 2>/dev/null)\"; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not a parseable ISO 8601 date.\"\n  exit 1\nfi\nnow_epoch=\"$(date -u +%s)\"\nage=$(( now_epoch - new_epoch ))\nmax_age_seconds=86400   # the collection window is 24h\nmax_skew_seconds=3600   # tolerance for clock skew on future-dated timestamps\nif [ \"$age\" -gt \"$max_age_seconds\" ] || [ \"$age\" -lt \"-${max_skew_seconds}\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not from the current collection window.\"\n  exit 1\nfi\n\ndaily_count=\"$( { find \"${memory_dir}/metrics/daily\" -maxdepth 1 -name '*.json' -type f 2>/dev/null || true; } | wc -l)\"\nif [ \"$daily_count\" -eq 0 ]; then\n  echo \"ERROR: no daily metrics file was written under metrics/daily/.\"\n  exit 1\nfi\n\nworkflow_count=\"$(jq '.workflows | length' \"$latest\")\"\nif [ \"$workflow_count\" -eq 0 ]; then\n  echo \"ERROR: metrics/latest.json contains zero workflows. The collection loop did not run.\"\n  exit 1\nfi\n\necho \"Metrics collection verified: timestamp ${new_timestamp}, ${workflow_count} workflow(s), ${daily_count} daily file(s).\""
@@ -1256,6 +1258,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
     needs:
@@ -1547,6 +1550,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -1581,6 +1585,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -1869,6 +1874,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Conclude threat detection
         id: detection_conclusion
         if: always()
@@ -2110,3 +2116,4 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}

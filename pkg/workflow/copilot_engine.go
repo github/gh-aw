@@ -50,6 +50,7 @@ func NewCopilotEngine() *CopilotEngine {
 				BareMode:             true, // Copilot CLI supports --no-custom-instructions
 				BashCommandAllowlist: true, // Copilot enforces tools.bash allowlist via --allow-tool shell(cmd)
 				Plugins:              true, // Copilot CLI supports Agent Plugins
+				DynamicWorkflows:     true,
 			},
 			dedicatedLLMGatewayPort: constants.CopilotLLMGatewayPort,
 		},

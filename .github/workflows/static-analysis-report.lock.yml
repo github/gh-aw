@@ -223,7 +223,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Validate ANTHROPIC_API_KEY secret
         id: validate-secret
         run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" ANTHROPIC_API_KEY 'Claude Code' https://github.github.com/gh-aw/reference/engines/#anthropic-claude-code
@@ -382,6 +382,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -405,7 +406,7 @@ jobs:
             /tmp/gh-aw/.claude/agents
             /tmp/gh-aw/.claude/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -638,16 +639,6 @@ jobs:
           GH_AW_AGENT_FOLDERS: ".agents .claude .github"
           GH_AW_AGENT_FILES: "AGENTS.md CLAUDE.md"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh"
-      - name: Restore Claude workflows from activation artifact
-        run: |
-          if [ -d /tmp/gh-aw/base ]; then
-            src=/tmp/gh-aw/base/.claude
-            dst="$GITHUB_WORKSPACE/.claude"
-            rm -rf "$dst"
-            if [ -d "$src" ]; then
-              cp -a "$src" "$dst"
-            fi
-          fi
       - name: Restore inline sub-agents from activation artifact
         env:
           GH_AW_SUB_AGENT_DIR: ".claude/agents"
@@ -1105,6 +1096,7 @@ jobs:
         timeout-minutes: 45
         run: |
           set -o pipefail
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
           mkdir -p /tmp/gh-aw && (umask 177 && touch /tmp/gh-aw/claude-debug.log) && touch /tmp/gh-aw/agent-step-summary.md
@@ -1341,6 +1333,7 @@ jobs:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
@@ -1360,6 +1353,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -1390,6 +1384,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
     needs:
@@ -1680,6 +1675,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -1714,6 +1710,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -1981,6 +1978,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Conclude threat detection
         id: detection_conclusion
         if: always()
@@ -2120,6 +2118,7 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_cache_memory:
     needs:

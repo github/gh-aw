@@ -22,22 +22,8 @@ func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
 	if data.CheckoutDisabled || data.IsPullRequestTarget || isPRCheckoutDisabled(data) {
 		return false
 	}
-	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
+	if !canRestoreAgentConfigFolders(data) {
 		return false
-	}
-	// checkout_pr_branch and the subsequent base-folder restore operate on the
-	// workspace root, so neither may run when it belongs to another repository.
-	for _, checkout := range data.CheckoutConfigs {
-		if checkout == nil {
-			continue
-		}
-		if path.Clean(strings.ReplaceAll(checkout.Path, "\\", "/")) != "." && !strings.Contains(checkout.Path, "${{") {
-			continue
-		}
-		repository := strings.TrimSpace(checkout.Repository)
-		if checkout.Wiki || (repository != "" && repository != "${{ github.repository }}") {
-			return false
-		}
 	}
 	if data.CachedPermissions != nil {
 		return data.CachedPermissions.HasContentsReadAccess()
@@ -58,9 +44,9 @@ func isPRCheckoutDisabled(data *WorkflowData) bool {
 	return false
 }
 
-// Claude's activation snapshot belongs to the workflow repository. Do not copy it
+// The activation snapshot belongs to the workflow repository. Do not copy it
 // into a different repository checked out at the workspace root.
-func canRestoreClaudeWorkflows(data *WorkflowData) bool {
+func canRestoreAgentConfigFolders(data *WorkflowData) bool {
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
 		return false
 	}
@@ -144,36 +130,30 @@ func generateSaveBaseGitHubFoldersStep(folders, files []string) []string {
 }
 
 // generateRestoreBaseGitHubFoldersStep generates a step (for the agent job) that restores
-// agent config from the activation artifact after checkout_pr_branch.cjs has run.
+// engine-declared agent config folders and files from the activation artifact.
 // This prevents fork PRs from injecting malicious skill or instruction files.
-// The step also removes .github/mcp.json and only runs when the PR checkout step succeeded.
+// With afterPRCheckout set, restoration requires a successful PR checkout.
+// Otherwise it runs whenever the activation snapshot is available.
 //
 // folders: the agent config directories to restore (must match save step)
 // files:   the root instruction files to restore (must match save step)
-func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files []string) {
+func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files []string, afterPRCheckout bool) {
 	prLog.Print("Generating step to restore agent config folders from base branch")
 	yaml.WriteString("      - name: Restore agent config folders from base branch\n")
-	yaml.WriteString("        if: steps.checkout-pr.outcome == 'success'\n")
+	if afterPRCheckout {
+		yaml.WriteString("        if: steps.checkout-pr.outcome == 'success'\n")
+	}
 	yaml.WriteString("        env:\n")
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_FOLDERS: \"%s\"\n", strings.Join(folders, " "))
 	fmt.Fprintf(yaml, "          GH_AW_AGENT_FILES: \"%s\"\n", strings.Join(files, " "))
-	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
-}
-
-// Restore Claude's config from the activation artifact after workspace checkouts.
-// Copying the entire tree retains saved workflows and their nested support files,
-// without leaving untrusted settings or hooks alongside them.
-func generateRestoreClaudeWorkflowsStep(yaml *strings.Builder) {
-	yaml.WriteString("      - name: Restore Claude workflows from activation artifact\n")
-	yaml.WriteString("        run: |\n")
-	yaml.WriteString("          if [ -d /tmp/gh-aw/base ]; then\n")
-	yaml.WriteString("            src=/tmp/gh-aw/base/.claude\n")
-	yaml.WriteString("            dst=\"$GITHUB_WORKSPACE/.claude\"\n")
-	yaml.WriteString("            rm -rf \"$dst\"\n")
-	yaml.WriteString("            if [ -d \"$src\" ]; then\n")
-	yaml.WriteString("              cp -a \"$src\" \"$dst\"\n")
-	yaml.WriteString("            fi\n")
-	yaml.WriteString("          fi\n")
+	if afterPRCheckout {
+		yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
+	} else {
+		yaml.WriteString("        run: |\n")
+		yaml.WriteString("          if [ -d /tmp/gh-aw/base ]; then\n")
+		yaml.WriteString("            bash \"${RUNNER_TEMP}/gh-aw/actions/restore_base_github_folders.sh\"\n")
+		yaml.WriteString("          fi\n")
+	}
 }
 
 // generatePRReadyForReviewCheckout generates a step to checkout the PR branch when PR context is available

@@ -4,7 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { NOTE_STATE_VIEW, createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
+import { createReducer, replayBuiltin, validateOperation } from "./ledger_builtin.cjs";
 import { normalizeLedgerAppends } from "./ledger_transactions.cjs";
 import { finalId } from "./ledger_transactions.cjs";
 import { validateTransactions } from "./push_ledger_changes.cjs";
@@ -246,14 +246,29 @@ test("notes projection rejects malformed records and missing vote targets", () =
   assert.throws(() => reducer.apply(note, { id: "" }), /canonical record ID/);
 });
 
+test("note_state rejects votes mutated after validation instead of counting them as downvotes", () => {
+  const reducer = createReducer({ type: "notes" });
+  const noteId = finalId("notes", 0);
+  reducer.apply({ id: noteId, operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md" }] });
+  const vote = { id: finalId("notes", 1), operation: "vote", note_id: noteId, vote: "up" };
+  reducer.apply(vote);
+  for (const invalidVote of ["neutral", "", null, undefined]) {
+    vote.vote = invalidVote;
+    assert.throws(() => reducer.output(), /up or down vote/);
+  }
+  vote.vote = "down";
+  assert.deepEqual(reducer.output().tables.note_state.rows, [{ note_id: noteId, upvotes: 0, downvotes: 1, net_votes: -1, last_vote_at: null, last_positive_vote_at: null }]);
+  vote.vote = "up";
+  assert.deepEqual(reducer.output().tables.note_state.rows, [{ note_id: noteId, upvotes: 1, downvotes: 0, net_votes: 1, last_vote_at: null, last_positive_vote_at: null }]);
+});
+
 test("note_state derives zero votes and null last-vote timestamps", () => {
   const payload = { operation: "note", subject: "Source", note: "Assertion", reason: "Evidence", citations: [{ type: "repository", path: "README.md", start_line: 1 }] };
   const records = [{ id: finalId("envelope", 0), timestamp: "2026-01-01T00:00:00.000Z", sha: `sha256:${"a".repeat(64)}`, payload }];
   const output = replayBuiltin({ type: "notes" }, records);
   const db = new DatabaseSync(":memory:");
   try {
-    materializeReplay(db, "notes", "builtin:notes", records, output, 2);
-    db.exec(NOTE_STATE_VIEW);
+    materializeReplay(db, "notes", "builtin:notes", records, output, 3);
     assert.deepEqual({ ...db.prepare("SELECT * FROM note_state").get() }, { note_id: records[0].id, upvotes: 0, downvotes: 0, net_votes: 0, last_vote_at: null, last_positive_vote_at: null });
   } finally {
     db.close();

@@ -131,6 +131,36 @@ func TestSessionParserExecutionErrors(t *testing.T) {
 	require.Zero(t, *execution.ExitCode)
 }
 
+func TestSessionParserPolicyRefusals(t *testing.T) {
+	t.Parallel()
+	requireSessionTestNode(t)
+	for _, test := range []struct {
+		engine  string
+		content string
+		reason  string
+	}{
+		{"copilot", `{"object":"chat.completion","id":"filtered","choices":[{"finish_reason":"content_filter","message":{"role":"assistant","content":null,"refusal":null}}],"usage":{"prompt_tokens":10,"completion_tokens":0}}`, "content_filter"},
+		{"claude", `{"type":"assistant","message":{"id":"refused","content":[],"stop_reason":"refusal","stop_details":{"category":null,"explanation":null},"usage":{"input_tokens":10,"output_tokens":0}}}`, "refusal"},
+		{"codex", `{"type":"assistant.refusal","data":{"reason":"refusal","content":"Cannot provide that answer."}}`, "refusal"},
+	} {
+		t.Run(test.engine, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeSessionTestFile(t, root, "agent-stdio.log", test.content+"\n")
+			session, err := runSessionParser(context.Background(), "reconstruct", root, test.engine)
+			require.NoError(t, err)
+			require.NoError(t, validateSessionJSONL(session))
+			require.Contains(t, string(session), `"type":"assistant.refusal"`)
+			require.Contains(t, string(session), `"reason":"`+test.reason+`"`)
+			require.NotContains(t, string(session), `"type":"assistant.message"`)
+			writeSessionTestFile(t, root, "aw_session.jsonl", string(session))
+			markdown, err := runSessionParser(context.Background(), "markdown", filepath.Join(root, "aw_session.jsonl"))
+			require.NoError(t, err)
+			require.Contains(t, string(markdown), "Policy refusal: "+test.reason)
+		})
+	}
+}
+
 func TestSessionParserEngines(t *testing.T) {
 	t.Parallel()
 	requireSessionTestNode(t)

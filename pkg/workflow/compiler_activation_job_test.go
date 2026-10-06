@@ -90,6 +90,33 @@ func TestClaudeWorkflowsNotSavedWhenDynamicWorkflowsDisabled(t *testing.T) {
 	assert.NotContains(t, strings.Join(job.Steps, ""), "Save agent config folders for base branch restoration")
 }
 
+func TestCopilotDynamicWorkflowsSnapshotWithPRCheckoutDisabled(t *testing.T) {
+	disabled := false
+	for _, enabled := range []bool{true, false} {
+		t.Run(map[bool]string{true: "enabled", false: "disabled"}[enabled], func(t *testing.T) {
+			data := &WorkflowData{
+				Name: "Copilot workflows",
+				AI:   "copilot",
+				EngineConfig: &EngineConfig{
+					ID:               "copilot",
+					DynamicWorkflows: &enabled,
+				},
+				CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
+			}
+			job, err := NewCompiler().buildActivationJob(data, false, "", "copilot.lock.yml")
+			require.NoError(t, err)
+			steps := strings.Join(job.Steps, "")
+			if enabled {
+				save := extractWorkflowStepByName(t, steps, "Save agent config folders for base branch restoration")
+				assert.Contains(t, save, `GH_AW_AGENT_FOLDERS: ".agents .github"`)
+				assert.Contains(t, extractWorkflowStepByName(t, steps, "Upload activation artifact"), "/tmp/gh-aw/base")
+			} else {
+				assert.NotContains(t, steps, "Save agent config folders for base branch restoration")
+			}
+		})
+	}
+}
+
 func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

@@ -10,12 +10,13 @@ import (
 const copilotSDKToolConfigVersion = 1
 
 type copilotSDKToolCapabilities struct {
-	Bash      bool `json:"bash"`
-	Edit      bool `json:"edit"`
-	WebFetch  bool `json:"webFetch"`
-	WebSearch bool `json:"webSearch"`
-	MCP       bool `json:"mcp"`
-	CLIProxy  bool `json:"cliProxy"`
+	Bash             bool `json:"bash"`
+	Edit             bool `json:"edit"`
+	WebFetch         bool `json:"webFetch"`
+	WebSearch        bool `json:"webSearch"`
+	DynamicWorkflows bool `json:"dynamicWorkflows"`
+	MCP              bool `json:"mcp"`
+	CLIProxy         bool `json:"cliProxy"`
 }
 
 type copilotSDKPermissionConfig struct {
@@ -165,6 +166,11 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 	if workflowData.EngineConfig != nil {
 		maxToolCalls = workflowData.EngineConfig.MaxToolCalls
 	}
+	dynamicWorkflows := dynamicWorkflowsEnabled(NewCopilotEngine(), workflowData.EngineConfig)
+	sdkToolArgs := append([]string(nil), toolArgs...)
+	if dynamicWorkflows {
+		sdkToolArgs = append(sdkToolArgs, "--allow-tool", "workflow")
+	}
 	tools := workflowData.Tools
 	config := copilotSDKToolConfig{
 		Version:      copilotSDKToolConfigVersion,
@@ -175,12 +181,13 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 			WebFetch: isCopilotToolValueEnabled(tools, "web-fetch"),
 			// The Copilot SDK runtime exposes web_search as a built-in tool when the
 			// installed Copilot CLI is new enough to support it.
-			WebSearch: isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig),
-			MCP:       hasCopilotSDKMCPTools(workflowData),
-			CLIProxy:  workflowData.ParsedTools != nil && workflowData.ParsedTools.CLIProxy,
+			WebSearch:        isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig),
+			DynamicWorkflows: dynamicWorkflows,
+			MCP:              hasCopilotSDKMCPTools(workflowData),
+			CLIProxy:         workflowData.ParsedTools != nil && workflowData.ParsedTools.CLIProxy,
 		},
 		Permissions: copilotSDKPermissionConfig{
-			AllowedTools: extractCopilotAllowedTools(toolArgs),
+			AllowedTools: extractCopilotAllowedTools(sdkToolArgs),
 		},
 	}
 	for name := range workflowData.ExplicitlyDisabledTools {

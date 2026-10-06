@@ -395,9 +395,11 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
       case "mcp":
         // Server-only entries (for example: "github") allow all tools from that server.
         // Server+tool entries (for example: "github(get_file_contents)") allow only that tool.
-        return allowedToolEntries.has(request.serverName) || allowedToolEntries.has(`${request.serverName}(${request.toolName})`);
+        return (request.serverName !== "workflow" && allowedToolEntries.has(request.serverName)) || allowedToolEntries.has(`${request.serverName}(${request.toolName})`);
       case "custom-tool":
-        return allowedToolEntries.has(request.toolName);
+        return request.toolName !== "workflow" && allowedToolEntries.has(request.toolName);
+      case "workflow":
+        return request.managedApprovalRequired !== true && allowedToolEntries.has("workflow");
       default:
         return false;
     }

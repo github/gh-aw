@@ -51,16 +51,20 @@ const copilotSettingsPath = "$HOME/.copilot/settings.json"
 
 // copilotSettingsDefaultContent is the default JSON content written to the Copilot CLI
 // settings file when no additional settings are configured.
-const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false}}`
+const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}`
 
 type copilotSettings struct {
-	BuiltInAgents map[string]bool            `json:"builtInAgents"`
-	LSPServers    map[string]LSPServerConfig `json:"lspServers,omitempty"`
+	BuiltInAgents       map[string]bool            `json:"builtInAgents"`
+	EnabledFeatureFlags map[string]bool            `json:"enabledFeatureFlags"`
+	LSPServers          map[string]LSPServerConfig `json:"lspServers,omitempty"`
 }
 
 func buildCopilotSettingsContent(workflowData *WorkflowData) string {
 	settings := copilotSettings{
 		BuiltInAgents: map[string]bool{"rubberDuck": false},
+		EnabledFeatureFlags: map[string]bool{
+			"EXTENSIONS": workflowData == nil || workflowData.EngineConfig.DynamicWorkflowsEnabled(),
+		},
 	}
 	if workflowData != nil {
 		manager := NewLSPManager(workflowData.LSP)
@@ -68,13 +72,13 @@ func buildCopilotSettingsContent(workflowData *WorkflowData) string {
 	}
 	settingsBytes, err := json.Marshal(settings)
 	if err != nil {
-		return copilotSettingsDefaultContent
+		panic(fmt.Sprintf("BUG: failed to marshal Copilot settings: %v", err))
 	}
 	return string(settingsBytes)
 }
 
 // buildCopilotSettingsSetup returns shell commands that write the Copilot CLI settings
-// file before the agent runs, disabling the rubber-duck sub-agent.
+// file before the agent runs, configuring extensions and disabling the rubber-duck sub-agent.
 func buildCopilotSettingsSetup(settingsContent string, fixOwnershipForCustomCommand bool) string {
 	if settingsContent == "" {
 		settingsContent = copilotSettingsDefaultContent
@@ -294,6 +298,12 @@ func (e *CopilotEngine) buildCopilotFeatureArgs(workflowData *WorkflowData, copi
 		copilotExecLog.Printf("Adding %d tool permission arguments", len(toolArgs))
 	}
 	copilotArgs = append(copilotArgs, toolArgs...)
+	if dynamicWorkflowsEnabled(e, workflowData.EngineConfig) {
+		copilotArgs = append(copilotArgs, "--allow-tool", "workflow")
+	} else {
+		// Denial takes precedence over --allow-all-tools and explicit experimental flags.
+		copilotArgs = append(copilotArgs, "--deny-tool", "workflow")
+	}
 	// Add --add-dir for each configured memory backend.
 	if workflowData.CacheMemoryConfig != nil {
 		for _, cache := range workflowData.CacheMemoryConfig.Caches {
@@ -693,6 +703,7 @@ func (e *CopilotEngine) addCopilotFinalStepEnv(env map[string]string, workflowDa
 	// Always inject the Copilot integration ID for agentic workflows after all env merges
 	// so user-supplied env does not override this value.
 	env[constants.CopilotCLIIntegrationIDEnvVar] = constants.CopilotCLIIntegrationIDValue
+	env["GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS"] = strconv.FormatBool(dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
 	// Add HTTP MCP header secrets to env for passthrough
 	for varName, secretExpr := range collectHTTPMCPHeaderSecrets(workflowData.Tools) {
 		if _, exists := env[varName]; !exists {

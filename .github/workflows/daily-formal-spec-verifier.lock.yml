@@ -220,7 +220,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
@@ -386,6 +386,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -409,7 +410,7 @@ jobs:
             /tmp/gh-aw/.github/agents
             /tmp/gh-aw/.github/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -952,9 +953,10 @@ jobs:
         run: |
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
-          printf '%s' '{"builtInAgents":{"rubberDuck":false}}' > "$HOME/.copilot/settings.json"
+          printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}' > "$HOME/.copilot/settings.json"
           export XDG_CONFIG_HOME="$HOME"
           export GH_AW_MCP_CONFIG="$HOME/.copilot/mcp-config.json"
           GH_AW_COPILOT_SRC="$(command -v copilot 2>/dev/null || true)"
@@ -1017,8 +1019,8 @@ jobs:
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'auto' }}
           COPILOT_SDK_URI: http://127.0.0.1:3002
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json)","--allow-tool","shell(cat pkg/cli/*.go)","--allow-tool","shell(cat pkg/workflow/*.go | head -200)","--allow-tool","shell(cat specs/*.md)","--allow-tool","shell(cat)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20)","--allow-tool","shell(find specs -type f -name \"*.md\" | sort)","--allow-tool","shell(gh:*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(ls)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sed)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json)","shell(cat pkg/cli/*.go)","shell(cat pkg/workflow/*.go | head -200)","shell(cat specs/*.md)","shell(cat)","shell(date)","shell(echo)","shell(find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20)","shell(find specs -type f -name \"*.md\" | sort)","shell(gh:*)","shell(grep)","shell(head)","shell(ls)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sed)","shell(sort)","shell(tail)","shell(uniq)","shell(wc)","shell(yq)","write"]}}'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json)","--allow-tool","shell(cat pkg/cli/*.go)","--allow-tool","shell(cat pkg/workflow/*.go | head -200)","--allow-tool","shell(cat specs/*.md)","--allow-tool","shell(cat)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20)","--allow-tool","shell(find specs -type f -name \"*.md\" | sort)","--allow-tool","shell(gh:*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(ls)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sed)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--allow-tool","workflow","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":true,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json)","shell(cat pkg/cli/*.go)","shell(cat pkg/workflow/*.go | head -200)","shell(cat specs/*.md)","shell(cat)","shell(date)","shell(echo)","shell(find . -name \"*_test.go\" -path \"*/pkg/*\" | head -20)","shell(find specs -type f -name \"*.md\" | sort)","shell(gh:*)","shell(grep)","shell(head)","shell(ls)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sed)","shell(sort)","shell(tail)","shell(uniq)","shell(wc)","shell(yq)","workflow","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 3
@@ -1032,6 +1034,7 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: true
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
@@ -1231,7 +1234,7 @@ jobs:
         with:
           name: repo-memory-default
           path: /tmp/gh-aw/repo-memory/default
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
       - name: Commit cache-memory changes
         if: always()
@@ -1251,6 +1254,7 @@ jobs:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
@@ -1270,6 +1274,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -1301,6 +1306,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
     needs:
@@ -1601,6 +1607,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -1635,6 +1642,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -1807,6 +1815,7 @@ jobs:
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_AW: true
           GITHUB_COPILOT_INTEGRATION_ID: agentic-workflows
+          GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS: true
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
@@ -1920,6 +1929,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Conclude threat detection
         id: detection_conclusion
         if: always()
@@ -2164,6 +2174,7 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   update_cache_memory:
     needs:

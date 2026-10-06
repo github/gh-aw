@@ -775,6 +775,13 @@ function convertCopilotEventsToLegacyLogEntries(logEntries) {
         normalizedEntries.push({ type: "user", message: { content: [{ type: "text", text: data.content }] } });
         break;
 
+      case "assistant.refusal":
+        normalizedEntries.push({
+          type: "assistant",
+          message: { content: [{ type: "text", text: `[Policy refusal: ${data.reason}${data.partial === true ? ", partial" : ""}]\n${readString(data.content, data.explanation)}` }] },
+        });
+        break;
+
       case "assistant.message": {
         const text = readString(data.content, data.message);
         if (!text.trim()) break;

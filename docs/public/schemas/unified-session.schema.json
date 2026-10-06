@@ -13,6 +13,10 @@
       { "if": { "properties": { "type": { "const": "agent.execution" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AgentExecutionData" } } } },
       { "if": { "properties": { "type": { "const": "assistant.message" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      {
+        "if": { "properties": { "type": { "const": "assistant.refusal" } }, "required": ["type"] },
+        "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CAssistantRefusalData%2C(%22reason%22%7C%22content%22%7C%22policyCategory%22%7C%22explanation%22%7C%22partial%22)%3E" } } }
+      },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
@@ -226,6 +230,18 @@
         "reason": { "$ref": "#/definitions/JsonValue" },
         "error": { "$ref": "#/definitions/JsonValue" }
       },
+      "additionalProperties": false
+    },
+    "Pick<AssistantRefusalData,(\"reason\"|\"content\"|\"policyCategory\"|\"explanation\"|\"partial\")>": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string", "enum": ["refusal", "content_filter"] },
+        "content": { "$ref": "#/definitions/JsonValue" },
+        "policyCategory": { "type": ["string", "null"] },
+        "explanation": { "type": ["string", "null"] },
+        "partial": { "type": "boolean", "description": "True for an observed streaming fragment, not a finalized refusal." }
+      },
+      "required": ["reason"],
       "additionalProperties": false
     },
     "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },

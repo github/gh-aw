@@ -34,6 +34,9 @@ func TestCopilotEngine(t *testing.T) {
 	if !capabilities.MaxTurns {
 		t.Error("Expected copilot engine to support max-turns")
 	}
+	if !capabilities.DynamicWorkflows {
+		t.Error("Expected copilot engine to support dynamic workflows")
+	}
 
 	// Test declared output files (session files are copied to logs folder)
 	outputFiles := engine.GetDeclaredOutputFiles()

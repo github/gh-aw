@@ -1349,14 +1349,26 @@ func TestEngineDynamicWorkflowsFieldExtraction(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, config, _ := compiler.ExtractEngineConfig(map[string]any{"engine": tt.engine})
-			if !assert.NotNil(t, config) {
-				return
-			}
-			assert.Equal(t, tt.enabled, config.DynamicWorkflowsEnabled())
-		})
+	for _, engineID := range []string{"claude", "copilot"} {
+		for _, tt := range tests {
+			t.Run(engineID+"/"+tt.name, func(t *testing.T) {
+				engine := tt.engine
+				if object, ok := engine.(map[string]any); ok {
+					engineObject := map[string]any{"id": engineID}
+					if value, exists := object["dynamic-workflows"]; exists {
+						engineObject["dynamic-workflows"] = value
+					}
+					engine = engineObject
+				} else {
+					engine = engineID
+				}
+				_, config, _ := compiler.ExtractEngineConfig(map[string]any{"engine": engine})
+				if !assert.NotNil(t, config) {
+					return
+				}
+				assert.Equal(t, tt.enabled, config.DynamicWorkflowsEnabled())
+			})
+		}
 	}
 }
 
