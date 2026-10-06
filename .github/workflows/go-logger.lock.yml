@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"99693eb23f9d739d2b4612784d5a85c158abc18e39fb46ec78a4ad08e44a3a57","body_hash":"7537c6b7c90a4b57cbc354b5937131041f68a642c190dbcd778764e5574bdff4","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.288"}}
-# gh-aw-manifest: {"version":1,"secrets":["ANTHROPIC_API_KEY","COPILOT_GITHUB_TOKEN","GH_AW_CI_TRIGGER_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"b7ad1dad31e06c5925ef5d2fc7ad053ef454303e","version":"v7.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.37","digest":"sha256:ead1415a77e3892d261c313b467470ed58fbcf4da9fcaab1d31d579d1c57dae1","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.37@sha256:ead1415a77e3892d261c313b467470ed58fbcf4da9fcaab1d31d579d1c57dae1"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.37","digest":"sha256:347f28353370d542000e78a3df90821cd6e47bdb2c597bb512893c253eb50d28","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.37@sha256:347f28353370d542000e78a3df90821cd6e47bdb2c597bb512893c253eb50d28"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.37","digest":"sha256:3533f8a9c546566c59a63a289e90ac8eafc1ca79b64b6127f42085ee4883d50f","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.37@sha256:3533f8a9c546566c59a63a289e90ac8eafc1ca79b64b6127f42085ee4883d50f"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.37","digest":"sha256:e9cacf87f23aad7236d07668bfd351d852d4ddf854b19f21ed9d2ffce4e527b5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.37@sha256:e9cacf87f23aad7236d07668bfd351d852d4ddf854b19f21ed9d2ffce4e527b5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.14.0","digest":"sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b","pinned_image":"ghcr.io/github/github-mcp-server:v1.14.0@sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_pull_request","missing_data","missing_tool","noop","report_incomplete"]}],"threat_detection":{"mode":"enabled"}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"395898ce359d1f42234a834038098400237fdf5b2657dff521943eb5934be815","body_hash":"7537c6b7c90a4b57cbc354b5937131041f68a642c190dbcd778764e5574bdff4","strict":true,"agent_id":"claude","engine_versions":{"claude":"2.1.288"}}
+# gh-aw-manifest: {"version":1,"secrets":["ANTHROPIC_API_KEY","COPILOT_GITHUB_TOKEN","GH_AW_CI_TRIGGER_TOKEN","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9"},{"repo":"actions/setup-go","sha":"b7ad1dad31e06c5925ef5d2fc7ad053ef454303e","version":"v7"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.37","digest":"sha256:ead1415a77e3892d261c313b467470ed58fbcf4da9fcaab1d31d579d1c57dae1","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.37@sha256:ead1415a77e3892d261c313b467470ed58fbcf4da9fcaab1d31d579d1c57dae1"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.37","digest":"sha256:347f28353370d542000e78a3df90821cd6e47bdb2c597bb512893c253eb50d28","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.37@sha256:347f28353370d542000e78a3df90821cd6e47bdb2c597bb512893c253eb50d28"},{"image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.37","digest":"sha256:3533f8a9c546566c59a63a289e90ac8eafc1ca79b64b6127f42085ee4883d50f","pinned_image":"ghcr.io/github/gh-aw-firewall/cli-proxy:0.28.37@sha256:3533f8a9c546566c59a63a289e90ac8eafc1ca79b64b6127f42085ee4883d50f"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.37","digest":"sha256:e9cacf87f23aad7236d07668bfd351d852d4ddf854b19f21ed9d2ffce4e527b5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.37@sha256:e9cacf87f23aad7236d07668bfd351d852d4ddf854b19f21ed9d2ffce4e527b5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.28","digest":"sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.28@sha256:69920365d9f0143ed853743c319b2bd4614ca7f9537474ad8eff0c47da84c5a4"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:11c2c544876cdbaffefe0f7f1283b74838c209654b4934a78e23ed11f750490f"},{"image":"ghcr.io/github/github-mcp-server:v1.14.0","digest":"sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b","pinned_image":"ghcr.io/github/github-mcp-server:v1.14.0@sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b"}],"mcp_servers":[{"name":"safeoutputs","tools":["create_pull_request","missing_data","missing_tool","noop","report_incomplete"]}],"threat_detection":{"mode":"enabled"}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -50,10 +50,9 @@
 #   - actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
 #   - actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 #   - actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-#   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-#   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
-#   - actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-#   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+#   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+#   - actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+#   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
 #   - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
 #
 # Container images used:
@@ -175,7 +174,7 @@ jobs:
           GH_AW_INFO_CACHE_MEMORY: "true"
           GH_AW_INFO_FRONTMATTER_EMOJI: "📝"
           GH_AW_COMPILED_STRICT: "true"
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -187,7 +186,7 @@ jobs:
       - name: Restore daily AIC scan observations
         id: restore-daily-aic-cache-fallback
         if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_HAS_SLASH_COMMAND: "false"
           GH_AW_HAS_LABEL_COMMAND: "false"
@@ -203,7 +202,7 @@ jobs:
       - name: Check daily workflow token guardrail
         id: daily-ai-credits-workflow-guardrail
         if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_WORKFLOW_NAME: "Go Logger Enhancement"
           GH_AW_WORKFLOW_ID: "go-logger"
@@ -267,7 +266,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/save_base_github_folders.sh"
       - name: Create steering issue
         id: create-steering-issue
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_WORKFLOW_NAME: "Go Logger Enhancement"
         with:
@@ -281,7 +280,7 @@ jobs:
             await main();
       - name: Check workflow lock file
         id: check-lock-file
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_WORKFLOW_FILE: "go-logger.lock.yml"
           GH_AW_CONTEXT_WORKFLOW_REF: "${{ github.workflow_ref }}"
@@ -297,7 +296,7 @@ jobs:
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
@@ -328,7 +327,7 @@ jobs:
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
       - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ENGINE_ID: "claude"
@@ -341,7 +340,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
             await main();
       - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_ALLOWED_EXTENSIONS: ''
@@ -533,7 +532,7 @@ jobs:
           printf '{"version":1,"component":"agent","run_id":%s,"run_attempt":%s,"state":"not_started"}\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$evidence_tmp"
           mv "$evidence_tmp" "/tmp/gh-aw/agent_execution.json"
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -570,7 +569,7 @@ jobs:
         name: Build deterministic logger manifest
         run: "set -euo pipefail\ncache_dir=\"/tmp/gh-aw/cache-memory/go-logger\"\nout_dir=\"/tmp/gh-aw/agent/go-logger\"\nmkdir -p \"$cache_dir\" \"$out_dir\"\n\ncurrent_sha=\"$(git rev-parse HEAD)\"\ncurrent_files=\"$out_dir/current-files.txt\"\nprocessed_files=\"$cache_dir/processed-files.txt\"\nfind pkg -name '*.go' -type f ! -name '*_test.go' | sort > \"$current_files\"\n[ -f \"$processed_files\" ] || : > \"$processed_files\"\n\nnew_files=\"$out_dir/new-files.txt\"\ncomm -23 \"$current_files\" \"$processed_files\" > \"$new_files\" || true\n\nlast_sha=\"\"\nif [ -f \"$cache_dir/last-run.json\" ]; then\n  last_sha=\"$(jq -r '.commit_sha // empty' \"$cache_dir/last-run.json\" 2>/dev/null || true)\"\nfi\n\nfiles_needing_logger=\"$out_dir/files-needing-logger.txt\"\nfiles_missing_logger_import=\"$out_dir/files-missing-logger-import.txt\"\ncall_sites=\"$out_dir/call-sites.tsv\"\n: > \"$files_needing_logger\"\n: > \"$files_missing_logger_import\"\n: > \"$call_sites\"\n\nwhile IFS= read -r rel; do\n  [ -f \"$rel\" ] || continue\n  if ! grep -q \"var log = logger.New\" \"$rel\"; then\n    echo \"$rel\" >> \"$files_needing_logger\"\n  fi\n  if grep -q \"log\\\\.\" \"$rel\" && ! grep -q '\"github.com/github/gh-aw/pkg/logger\"' \"$rel\"; then\n    echo \"$rel\" >> \"$files_missing_logger_import\"\n  fi\ndone < \"$current_files\"\n\n# Bound manifest size: the agent only ever selects up to 5 files per PR, so\n# candidate call sites (the bulk of manifest.json) are only computed for a\n# capped pool of candidates instead of every file in pkg/. This keeps\n# manifest.json well under the 256KB / 25K-token read limits regardless of\n# how large the repository grows. New files (not yet processed) are\n# prioritized so they surface first.\ncandidate_pool_cap=40\ncall_sites_per_file_cap=10\ncandidate_files=\"$out_dir/candidate-files.txt\"\n{ comm -12 \"$new_files\" \"$files_needing_logger\" 2>/dev/null || true\n  comm -23 \"$files_needing_logger\" \"$new_files\" 2>/dev/null || true\n} | awk '!seen[$0]++' | head -n \"$candidate_pool_cap\" > \"$candidate_files\" || true\n\nwhile IFS= read -r rel; do\n  [ -f \"$rel\" ] || continue\n  while IFS=: read -r line_number match_line; do\n    function_name=\"$(printf '%s' \"$match_line\" | sed -E 's/^[[:space:]]*func[[:space:]]+([A-Za-z0-9_]+).*/\\\\1/')\"\n    printf \"%s\\\\t%s\\\\t%s\\\\n\" \"$rel\" \"$line_number\" \"$function_name\" >> \"$call_sites\"\n  done < <(grep -nE \"^[[:space:]]*func[[:space:]]+[A-Za-z0-9_]+\" \"$rel\" | head -n \"$call_sites_per_file_cap\" || true)\ndone < \"$candidate_files\"\n\n# Write each JSON payload to a file to avoid exceeding ARG_MAX with large datasets.\njq -R -s 'split(\"\\n\") | map(select(length > 0))' \"$files_needing_logger\" \\\n  > \"$out_dir/files-needing-logger.json\"\njq -R -s 'split(\"\\n\") | map(select(length > 0))' \"$files_missing_logger_import\" \\\n  > \"$out_dir/files-missing-logger-import.json\"\njq -R -s 'split(\"\\n\") | map(select(length > 0) | split(\"\\t\") | {file: .[0], line: (.[1] | tonumber), function: .[2]})' \"$call_sites\" \\\n  > \"$out_dir/candidate-call-sites.json\"\njq -R -s 'split(\"\\n\") | map(select(length > 0))' \"$candidate_files\" \\\n  > \"$out_dir/candidate-files.json\"\n\nfiles_needing_logger_count=\"$(wc -l < \"$files_needing_logger\" | tr -d ' ')\"\n\n# Build manifest by reading files via --slurpfile (no large args on argv).\n# `files_needing_logger` is capped to `candidate_files` (the bounded pool\n# analyzed above) so the agent's source-of-truth list matches the\n# candidates with call sites; `files_needing_logger_total` reports the\n# full uncapped backlog size for visibility.\njq -n \\\n  --slurpfile files_needing_logger \"$out_dir/candidate-files.json\" \\\n  --slurpfile missing_logger_import \"$out_dir/files-missing-logger-import.json\" \\\n  --slurpfile candidate_call_sites \"$out_dir/candidate-call-sites.json\" \\\n  --argjson files_needing_logger_total \"$files_needing_logger_count\" \\\n  '{files_needing_logger: $files_needing_logger[0], files_needing_logger_total: $files_needing_logger_total, missing_logger_import: $missing_logger_import[0], candidate_call_sites: $candidate_call_sites[0]}' \\\n  > \"$out_dir/manifest.json\"\n\n# Defense in depth: if manifest.json is still unexpectedly large (e.g. a\n# pathological file with very long lines), drop the largest field rather\n# than let the agent retry oversized reads until the step times out.\nmanifest_size=\"$(wc -c < \"$out_dir/manifest.json\" | tr -d ' ')\"\nmanifest_size_limit=200000\nif [ \"$manifest_size\" -gt \"$manifest_size_limit\" ]; then\n  echo \"::warning::manifest.json size ($manifest_size bytes) exceeds $manifest_size_limit bytes; dropping candidate_call_sites\" >&2\n  jq -c 'del(.candidate_call_sites) | .candidate_call_sites_truncated = true' \"$out_dir/manifest.json\" \\\n    > \"$out_dir/manifest.json.tmp\"\n  mv \"$out_dir/manifest.json.tmp\" \"$out_dir/manifest.json\"\nfi\n\nshould_run=true\nif [ \"$current_sha\" = \"$last_sha\" ] && [ ! -s \"$new_files\" ]; then\n  should_run=false\nfi\necho \"{\\\"should_run\\\": \\\"$should_run\\\", \\\"current_sha\\\": \\\"$current_sha\\\", \\\"last_sha\\\": \\\"$last_sha\\\", \\\"manifest\\\": \\\"$out_dir/manifest.json\\\", \\\"new_files\\\": \\\"$new_files\\\"}\" > \"$out_dir/preflight.json\"\necho \"should_run=$should_run\" >> \"$GITHUB_OUTPUT\"\n"
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           cache: true
           go-version-file: go.mod
@@ -588,7 +587,7 @@ jobs:
         id: checkout-pr
         if: |
           github.event.pull_request || github.event.issue.pull_request || github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
@@ -601,7 +600,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
             await main();
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           package-manager-cache: false
@@ -611,7 +610,7 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code@2.1.288
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
@@ -644,7 +643,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
       - name: Generate Safe Outputs Config
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
@@ -802,7 +801,7 @@ jobs:
                 }
               }
             }
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -921,7 +920,7 @@ jobs:
           MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}
           MCP_GATEWAY_DOMAIN: ${{ steps.start-mcp-gateway.outputs.gateway-domain }}
           MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1142,7 +1141,7 @@ jobs:
         env:
           GH_AW_AGENTIC_EXECUTION_OUTCOME: ${{ steps.agentic_execution.outcome }}
           GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: 30
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1168,7 +1167,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/stop_mcp_gateway.sh" "$GATEWAY_PID"
       - name: Redact secrets in logs
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1196,7 +1195,7 @@ jobs:
       - name: Ingest agent output
         id: collect_output
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,go.dev,golang.org,goproxy.io,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pkg.go.dev,ppa.launchpad.net,proxy.golang.org,s.symcb.com,s.symcd.com,security.ubuntu.com,storage.googleapis.com,sum.golang.org,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
@@ -1212,7 +1211,7 @@ jobs:
             await main();
       - name: Parse agent logs for step summary
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: /tmp/gh-aw/agent-stdio.log
           GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
@@ -1227,7 +1226,7 @@ jobs:
       - name: Parse MCP Gateway logs for step summary
         if: always()
         id: parse-mcp-gateway
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1246,7 +1245,7 @@ jobs:
         if: always()
         id: parse-token-usage
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1258,7 +1257,7 @@ jobs:
       - name: Print AWF reflect summary
         if: always()
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1269,7 +1268,7 @@ jobs:
             await main();
       - name: Generate observability summary
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1460,7 +1459,7 @@ jobs:
           path: /tmp/gh-aw/evals/
       - name: Process no-op messages
         id: noop
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_NOOP_MAX: "2"
@@ -1487,7 +1486,7 @@ jobs:
             await main();
       - name: Log detection run
         id: detection_runs
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Go Logger Enhancement"
@@ -1506,7 +1505,7 @@ jobs:
             await main();
       - name: Record missing tool
         id: missing_tool
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_MISSING_TOOL_CREATE_ISSUE: "true"
@@ -1523,7 +1522,7 @@ jobs:
             await main();
       - name: Record incomplete
         id: report_incomplete
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE: "true"
@@ -1541,7 +1540,7 @@ jobs:
       - name: Handle agent failure
         id: handle_agent_failure
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Go Logger Enhancement"
@@ -1603,7 +1602,7 @@ jobs:
       - name: Report failed jobs
         id: report_failed_jobs
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Go Logger Enhancement"
@@ -1622,7 +1621,7 @@ jobs:
       - name: Complete steering issue
         id: complete_steering_issue
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_STEERING_ISSUE_NUMBER: ${{ needs.activation.outputs.steering_issue_number }}
@@ -1650,7 +1649,7 @@ jobs:
       - name: Generate usage activity summary and unified session
         if: always()
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1838,7 +1837,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"
       - name: Setup threat detection
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           WORKFLOW_NAME: "Go Logger Enhancement"
           WORKFLOW_DESCRIPTION: "Analyzes and enhances Go logging practices across the codebase for improved debugging and observability"
@@ -1861,7 +1860,7 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.37 --rootless
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           package-manager-cache: false
@@ -1947,7 +1946,7 @@ jobs:
       - name: Render detection log
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -1967,7 +1966,7 @@ jobs:
         id: parse_detection_token_usage
         if: always()
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_TOKEN_USAGE_SUMMARY_TITLE: Threat Detection Token Usage
           GH_AW_AGENT_USAGE_PATH: /tmp/gh-aw/threat-detection/detection_usage.json
@@ -2086,7 +2085,7 @@ jobs:
           ls -la /tmp/gh-aw/evals/ 2>/dev/null || true
       - name: Setup BinEval evaluations
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"pr-created","question":"Did the agent create a pull request with Go logging improvements?"},{"id":"logging-changes-made","question":"Does the agent output confirm that logging statements were added or modified in Go source files?"},{"id":"validation-run","question":"Does the agent output show that it ran validation commands to verify the logging changes compile correctly?"}]'
           GH_AW_EVALS_MODEL: "evals"
@@ -2104,7 +2103,7 @@ jobs:
           mkdir -p /tmp/gh-aw/evals
           touch /tmp/gh-aw/evals/evals.log
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           package-manager-cache: false
@@ -2205,7 +2204,7 @@ jobs:
       - name: Parse MCP Gateway logs for step summary
         if: always()
         id: parse-mcp-gateway
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -2217,7 +2216,7 @@ jobs:
       - name: Parse BinEval results
         if: always()
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"pr-created","question":"Did the agent create a pull request with Go logging improvements?"},{"id":"logging-changes-made","question":"Does the agent output confirm that logging statements were added or modified in Go source files?"},{"id":"validation-run","question":"Does the agent output show that it ran validation commands to verify the logging changes compile correctly?"}]'
           GH_AW_EVALS_MODEL: "evals"
@@ -2234,7 +2233,7 @@ jobs:
       - name: Redact secrets in evals results
         id: redact_evals_results
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -2246,7 +2245,7 @@ jobs:
       - name: Render evals results to step summary
         if: always() && steps.redact_evals_results.outcome == 'success'
         continue-on-error: true
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const path = require('path');
@@ -2353,7 +2352,7 @@ jobs:
       - name: Push evals results to git
         id: push_evals_state
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -2502,7 +2501,7 @@ jobs:
           echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
       - name: Process Safe Outputs
         id: process_safe_outputs
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}

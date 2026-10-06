@@ -11,7 +11,7 @@ on:
   steps:
     - name: Detect recent compilation-related changes
       id: changes
-      uses: actions/github-script@v9.0.0
+      uses: actions/github-script@v9
       with:
         script: |
           const { owner, repo } = context.repo;

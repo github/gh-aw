@@ -73,7 +73,7 @@ jobs:
       issues: write
     steps:
       - name: Create issue on test failure
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.issues.create({

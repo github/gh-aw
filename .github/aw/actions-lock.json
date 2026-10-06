@@ -63,19 +63,19 @@
       "version": "main",
       "sha": "c9163b96f9720dc55e0de19b37028ae22dcfa42a"
     },
-    "actions/github-script@v9.0.0": {
+    "actions/github-script@v9": {
       "repo": "actions/github-script",
-      "version": "v9.0.0",
+      "version": "v9",
       "sha": "3a2844b7e9c422d3c10d287c895573f7108da1b3"
     },
-    "actions/setup-dotnet@v6.0.0": {
+    "actions/setup-dotnet@v6": {
       "repo": "actions/setup-dotnet",
-      "version": "v6.0.0",
+      "version": "v6",
       "sha": "a98b56852c35b8e3190ac28c8c2271da59106c68"
     },
-    "actions/setup-go@v7.0.0": {
+    "actions/setup-go@v7": {
       "repo": "actions/setup-go",
-      "version": "v7.0.0",
+      "version": "v7",
       "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
     },
     "actions/setup-java@v6.0.1": {
@@ -83,14 +83,14 @@
       "version": "v6.0.1",
       "sha": "de7274f081f381c8f8158605e0321c36c376e2e6"
     },
-    "actions/setup-node@v7.0.0": {
+    "actions/setup-node@v7": {
       "repo": "actions/setup-node",
-      "version": "v7.0.0",
+      "version": "v7",
       "sha": "820762786026740c76f36085b0efc47a31fe5020"
     },
-    "actions/setup-python@v7.0.0": {
+    "actions/setup-python@v7": {
       "repo": "actions/setup-python",
-      "version": "v7.0.0",
+      "version": "v7",
       "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97"
     },
     "actions/upload-artifact@v7.0.1": {
@@ -173,9 +173,9 @@
       "version": "v1",
       "sha": "5ac0f275b83d9d5a9342c6aae977ec32fa330daa"
     },
-    "super-linter/super-linter@v9.0.0": {
+    "super-linter/super-linter@v9": {
       "repo": "super-linter/super-linter",
-      "version": "v9.0.0",
+      "version": "v9",
       "sha": "2da136927bd4a73596db63044b504547c62cb854"
     }
   },

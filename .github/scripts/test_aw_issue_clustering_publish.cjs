@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, publish, publishDashboard, dashboardBody, collectDiscussions } = require("./aw_issue_clustering_publish.cjs");
+const { buildCorpus, refreshClosed, validatePlan, validateFile, island, reconcile, cleanupCompleted, publish, publishDashboard, dashboardBody, collectDiscussions, collectIssues } = require("./aw_issue_clustering_publish.cjs");
 
 const repo = "github/gh-aw";
 const cutoff = "2026-10-03T00:00:00Z";
@@ -469,6 +469,35 @@ function previewGithub(issues) {
     rest: { actions: { getWorkflowRun: async () => ({ data: { created_at: cutoff } }) }, issues: { listForRepo() {}, listLabelsForRepo() {} } },
   };
 }
+
+test("issue collection retries a transient API timeout without losing paginated results", async () => {
+  let closedCalls = 0;
+  const github = {
+    rest: { issues: { listForRepo() {} } },
+    paginate: async (fn, params) => {
+      if (params.state === "closed" && params.labels && ++closedCalls === 1) throw Object.assign(new Error("Connect Timeout Error"), { status: 500 });
+      return params.state === "open" ? [issue(1)] : params.labels ? [issue(2, { state: "closed" })] : [];
+    },
+  };
+  assert.deepEqual(
+    (await collectIssues(github, "github", "gh-aw", cutoff)).map(item => item.number),
+    [1, 2]
+  );
+  assert.equal(closedCalls, 2);
+});
+
+test("issue collection does not retry authorization errors", async () => {
+  let calls = 0;
+  const github = {
+    rest: { issues: { listForRepo() {} } },
+    paginate: async () => {
+      calls++;
+      throw Object.assign(new Error("Forbidden"), { status: 403 });
+    },
+  };
+  await assert.rejects(collectIssues(github, "github", "gh-aw"), /Forbidden/);
+  assert.equal(calls, 2);
+});
 
 test("github-script entry point revalidates live evidence and previews short deferrals without writes", async () => {
   const value = { clusters: [cluster([1])], deferred: [{ number: 2, reason: "Duplicate" }], shortfall_reason: "Only one actionable assignment is supported." };

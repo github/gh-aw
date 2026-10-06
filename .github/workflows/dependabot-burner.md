@@ -73,7 +73,7 @@ tools:
     - "rg .github/workflows"
 steps:
   - name: Prefetch dependabot burner context
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     env:
       BURN_OBJECTIVE: ${{ inputs.objective }}
     with:
