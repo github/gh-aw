@@ -36,18 +36,33 @@ changes, and review the combined proposals.
 
 ```mermaid
 flowchart LR
-    Inspect["Inspect current SDK usage"] --> Code["Propose code changes"]
+    Issue{{"Design Issue: completed"}} --> Inspect["Inspect current SDK usage"]
+    Inspect --> Code["Propose code changes"]
     Inspect --> Docs["Propose documentation changes"]
     Code --> Review["Review both verified proposals"]
     Docs --> Review
+    PR{{"Existing upstream SDK PR: merged"}} --> Review
     Review --> Handoff["Submit changes for human review"]
 ```
 
-Initially, only inspection is ready. Its checked report makes the code and
-documentation tasks ready; neither has to wait for the other. The combined
-review waits for both proposals to be available and verified. A step waiting
-for a PR to merge works similarly: it waits for a trusted check of that
-condition, not an agent's assertion that it probably happened.
+Once the design Issue is confirmed completed, inspection is the first ready
+task. Its checked report makes the code and documentation tasks ready; neither
+has to wait for the other. The combined
+review waits for both verified proposals **and** the existing upstream SDK PR
+to be merged. It cannot proceed on an agent's assertion that the merge probably
+happened.
+
+**Issues and PRs are nodes in the dependency graph, not just links on tasks.**
+They represent milestones that can hold up or unlock several tasks, including
+across repositories the queue is authorized to read. Unlike a task, an Issue
+or PR milestone does not need a worker or consume an assignment turn: a trusted
+check observes its condition. An Issue closed as "not planned" is not completed;
+a PR closed without merging is not merged.
+
+If an agent needs to investigate an Issue, fix its code, or update a PR, that
+action is a separate worker task attached to the resource. It still gets a
+normal assignment and task-specific output permissions. The milestone node
+tracks what happened to the resource; it is not a free way to run agent work.
 
 Out of the box, ready tasks are assigned in the order the queue accepted them,
 like a normal queue. The queue looks past tasks already assigned, waiting on
@@ -56,14 +71,54 @@ capacity permits. Several workers can run at once, so the first task assigned
 need not be the first task finished. GitHub still determines when a reserved
 worker run actually starts.
 
-If the organization explicitly configures priorities and team shares, the queue
-also balances assignment opportunities. Higher-priority work gets more turns
-under the default priority policy, while lower-priority work still has a share.
-Within those priorities, configured teams receive their agreed relative shares
-while their tasks remain eligible. This shares **assignments**, not equal
-computing minutes or guaranteed completion times; priority does not stop a job
-already running. Without that configuration, the queue does not secretly give
-each producer a separate turn.
+### Fairness: a large backlog does not buy all the turns
+
+The ordinary FIFO default is not an automatic quota for each team. If several
+teams need agreed shares of assignment opportunities, an operator explicitly
+configures their groups and shares; the queue does not secretly invent groups
+from whoever submitted the tasks.
+
+Imagine the migration expands to **500 ready tasks for Platform**, while
+Security has **10 ready checks**. With both teams in the same priority level
+and explicitly configured equal shares, the target is roughly half the
+assignments from that level for each team while both can accept more work and
+capacity is available. Platform does not get fifty times the turns just because
+its backlog is fifty times larger. This is a share over time, not a promise of
+perfect alternation, an exact ratio in every short window, or an immediate start.
+
+```mermaid
+flowchart LR
+    Platform["Platform: 500 ready migration tasks"] --> Policy["Same priority and explicitly configured equal shares"]
+    Security["Security: 10 ready checks"] --> Policy
+    Policy --> PlatformTurns["Platform receives its share of assignment turns"]
+    Policy --> SecurityTurns["Security receives its share of assignment turns"]
+```
+
+Fair does not have to mean equal. If Platform is allocated twice Security's
+share, the intended balance is about two Platform assignments for each Security
+assignment at that priority over time. The agreed allocation, not backlog size
+or an agent's insistence, determines the share. Each team's oldest eligible
+task goes first within its own turn.
+
+If Security has no tasks ready or is at its assignment limit, those opportunities
+can go to eligible work instead. Security does not bank unused turns to demand
+a catch-up burst later. Adding dispatchers, splitting a campaign into more
+tasks, or renaming its revision does not create a new share: the trusted policy
+controls the grouping, and earlier assignments remain accounted for.
+
+**Priority and fairness answer different questions.** Priority determines how
+assignment opportunities are divided between urgency levels; team shares divide
+opportunities within each level. Under the default weighted priority policy,
+urgent work gets more turns but ordinary work still has a share. An explicitly
+chosen strict-priority policy instead lets urgent work take every opportunity
+while it remains eligible, so ordinary work can wait indefinitely. Neither
+policy stops a job already running.
+
+**Assignment fairness is not equal computing time or cost.** A one-minute task
+and a one-hour task each count as one assignment. Equal team shares can still
+produce very different worker-minutes and completion rates. Likewise, three
+tasks sharing one setup-heavy worker run still count as three turns, and a
+failed assignment is not refunded; a new retry consumes another turn.
 
 The agent remains useful: it decides what tasks to propose, prepares their
 plans, and reacts to results. It does not get to bypass the queue, invent extra
@@ -106,6 +161,7 @@ For a developer or PM, the useful questions have concrete answers:
 | Question | What the queue explains |
 |---|---|
 | Why has this task not started? | Its prerequisite, retry delay, capacity/priority limit, or queued/unconfirmed GitHub launch |
+| Why did another team get the next turn? | The configured priority/team shares and recorded assignments, not simply which team has the bigger backlog |
 | What survived a failed run? | Each task's recorded completion, verified outputs, and remaining delivery problems |
 | What will happen next? | Which tasks are ready, which need another attempt, and which require operator action |
 | Did the campaign update lose old progress? | The old plans/results remain visible alongside the newly admitted tasks |
@@ -145,7 +201,12 @@ processing supplies the sole handle automatically for an immutable one-Claim
 assignment; a multi-Claim assignment requires an explicit handle on every
 message. This is enforced authorization, not a prompt convention.
 
-**Required DAG support:** Work is a schedulable DAG node. Immutable typed predecessor edges and trusted result/Issue/PR observations determine the ready frontier before priority/fairness selection. Independent Work has an empty dependency list and retains queue-like defaults.
+**Required DAG support:** Work, Issue, and Pull Request are first-class DAG node
+kinds. Work is scheduled; Issue/PR nodes are observed condition gates, not
+implicit worker assignments. Immutable typed predecessor edges and trusted
+result/Issue/PR observations determine the ready frontier before priority/fairness
+selection. Independent Work has an empty dependency list and retains queue-like
+defaults.
 
 **Diagram convention:** use Mermaid throughout relationship, information-flow,
 and lifecycle explanations. Keep diagrams consistent with the normative tables,
@@ -1640,10 +1701,29 @@ replacement nodes are admitted; terminal histories/edges are never rewritten.
 
 ### 7.16 First-class cross-repository Issue and PR dependencies
 
-The DAG has two vertex types: schedulable Work nodes and externally observed
-GitHub resource gates. An Issue/PR can also be a Work node's `subject`, but linking
-that subject does not mean “wait until it is closed.” Dependencies carry explicit
-conditions; subjects identify what the task operates on.
+The DAG MUST support three explicit node kinds:
+
+| Node kind | What makes it satisfy a dependency | Scheduled worker assignment |
+|---|---|---|
+| Work | Its completed Claim has a verified Result | Required to execute the task; each Claim consumes a fairness turn |
+| Issue | A trusted observation satisfies its declared Issue condition | None; observing the resource is not agent work |
+| Pull Request | A trusted observation satisfies its declared PR condition | None; observing the resource is not agent work |
+
+Issue and PR nodes are first-class vertices, not annotations on Work or a
+separate task board. They may be shared prerequisites for multiple Work nodes,
+including in explicitly allowed foreign repositories. Their resolved identities,
+conditions, edges, and accepted observations remain in the same canonical queue
+log; the existing typed `depends_on` references and `Observation` operations
+represent them without a second authoritative node registry.
+Per-graph node limits count all three kinds, deduplicating shared Issue/PR
+vertices by resolved resource identity and condition. Logical Claim/native-run
+limits and fairness charges apply only to scheduled Work.
+
+An Issue/PR can also be a Work node's `subject`, but linking that subject does
+not mean “wait until it is closed.” Dependencies carry explicit conditions;
+subjects identify what the task operates on. Investigating an Issue, preparing
+a fix, or updating a PR is scheduled Work whose effects require that Work's
+Claim; an external resource node alone never grants worker execution or writes.
 
 If queued Work creates a new Issue/PR, its verified Result supplies the typed
 resource identity. An agentic dispatcher can then admit downstream nodes using
@@ -2241,7 +2321,8 @@ scope of this change.
 | Explain/trace parity | The stored prefix reproduces the receipt's winner and reason with or without OTLP; multi-Claim operation positions are unambiguous |
 | Trace trust/privacy | Agent trace/provenance overrides are rejected; payloads do not leak and IDs are not metric labels |
 | DAG admission | Atomic forward-reference resolution; missing/self/cyclic/conflicting edges reject with an actionable path |
-| Ready frontier | Only nodes whose complete predecessor set has verified Results receive Claims; blocked roots do not consume service |
+| DAG node kinds | Work, Issue, and PR vertices render explicitly; shared resource/condition gates count once per graph and consume no Claims or native reservations; a subject link alone is not a prerequisite |
+| Ready frontier | Only Work whose Work predecessors have verified Results and Issue/PR predecessors have fresh satisfying observations receives Claims; blocked nodes consume no service |
 | Fork/join | A fork permits parallel sibling Claims; a join waits for every sibling, including after partial worker completion |
 | Result barrier | Completion without verified effect/output delivery never releases a dependent; verified recovery can publish the same result without rerunning effects |
 | Delivery failure | Terminal evidence plus bounded verification produces mutually exclusive Result or DeliveryFailure; failure never reopens ownership, reruns writes, or unblocks successors |
