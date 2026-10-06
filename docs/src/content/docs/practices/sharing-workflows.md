@@ -9,8 +9,6 @@ The recommended enterprise pattern is to maintain one central `agentic-workflows
 
 ## Sharing Layers
 
-Organizations usually combine a few independent sharing mechanisms: install complete workflows with `gh aw add`, import shared modules with `imports:`, and choose a versioning strategy that matches how quickly consumers should receive updates.
-
 ### 1. Copy and install whole workflows
 
 A repository can pull in a complete workflow from another repository:
@@ -19,7 +17,7 @@ A repository can pull in a complete workflow from another repository:
 gh aw add acme-org/agentic-workflows/ci-doctor@v1.2.0
 ```
 
-The `source:` field is automatically added to the installed workflow's frontmatter so the origin and version are tracked. Use `gh aw add-wizard` for interactive installation with guided prompts. Use `gh aw add` for scripted or CI-driven installation.
+The `source:` field is automatically added to the installed workflow's frontmatter so the origin and version are tracked. Use `gh aw add-wizard` for interactive installation; use `gh aw add` for scripted or CI use.
 
 See [Adding Existing Workflows](/gh-aw/guides/working-with-workflows/#adding-existing-workflows) for installation commands and options.
 
@@ -33,7 +31,7 @@ imports:
   - acme-org/shared-workflows/shared/mcp/tavily.md@v1.0.0
 ```
 
-Remote imports are cached under `.github/aw/imports/` by commit SHA after the first fetch. This enables reproducible offline compilation and avoids redundant downloads when multiple refs point to the same commit.
+Remote imports are cached under `.github/aw/imports/` by commit SHA after the first fetch, enabling reproducible offline compilation. The compiled `.lock.yml` records the exact commit SHA of every remote import, so the lock file and import cache together guarantee reproducibility regardless of upstream branch movement. Cached imports are reused until you explicitly update them.
 
 See [Imports Reference](/gh-aw/reference/imports/) for path formats, merge semantics, and field-specific behavior.
 
@@ -49,13 +47,11 @@ imports:
       severity: "high"
 ```
 
-This lets a single shared component serve multiple consuming workflows with different configurations without requiring separate copies.
+One shared component can serve many workflows with different configurations.
 
 See [Imports Reference](/gh-aw/reference/imports/#calling-a-parameterized-shared-workflow) for schema declaration and validation details.
 
 ### 4. Versioning and update flow
-
-Enterprise workflow sharing needs a clear versioning model:
 
 | Ref type | Behavior |
 | --- | --- |
@@ -79,15 +75,9 @@ Not all workflows are safe to share across organizations. Use `private: true` in
 
 See [Private Workflows](/gh-aw/reference/frontmatter/#private-workflows-private) for configuration details.
 
-### 6. Import caching and lock behavior
+### 6. Cross-repository execution model
 
-When a workflow is compiled, remote imports are resolved and locked. The compiled `.lock.yml` file records the exact commit SHA for every remote import, making runs reproducible regardless of upstream branch movement.
-
-Imports are cached locally under `.github/aw/imports/` by commit SHA. Cached imports are used for all subsequent compilations until you explicitly update them. This means the lock file and the import cache together form the reproducibility guarantee for shared workflows.
-
-### 7. Cross-repository execution model
-
-Separate from sharing workflow definitions, workflows can operate across repositories at runtime by reading files and metadata from other repositories, checking out target code for analysis or modification, and writing safe outputs to target repositories with explicit authentication and allowlists.
+Separately from sharing definitions, workflows can read other repositories, check out target code, and write safe outputs to target repositories using explicit authentication and allowlists.
 
 ```yaml
 safe-outputs:
@@ -100,13 +90,11 @@ Cross-repository operations require appropriate GitHub token permissions and exp
 
 ## Recommended Enterprise Pattern
 
-For most organizations, one central `agentic-workflows` repository should hold versioned workflow templates and shared components under `workflows/` and `shared/`. Consuming repositories install complete workflows with `gh aw add acme-org/agentic-workflows/<workflow>@<version>`, import common modules such as MCP configurations and safety policies through `imports:`, use tags for stable production consumers and branches for development integration, and mark internal-only workflows with `private: true`.
-
-This model gives platform teams centralized ownership and update control while giving consuming teams reproducibility through version pins and the ability to preserve local customizations through 3-way merge.
+Keep one central `agentic-workflows` repository with versioned templates and shared components under `workflows/` and `shared/`. Consumers install workflows with `gh aw add acme-org/agentic-workflows/<workflow>@<version>`, import common modules via `imports:`, use tags for stable production and branches for development, and mark internal-only workflows `private: true`. Platform teams keep ownership and update control; consumers get reproducibility through version pins and keep local customizations through 3-way merge.
 
 ## Governance Questions
 
-When workflows are shared across an organization, the important decisions are usually operational rather than technical: who owns the source workflow and reviews changes, how updates are tested and promoted, which repositories may consume or dispatch shared workflows, how secrets and permissions are standardized, and when a team may fork instead of staying on the shared version. Those decisions affect reliability more than the file format does.
+When workflows are shared across an organization, the key decisions are operational: who owns the source workflow and reviews changes, how updates are tested and promoted, which repositories may consume or dispatch shared workflows, how secrets and permissions are standardized, and when a team may fork instead of staying on the shared version.
 
 ## Learn More
 

@@ -17,6 +17,8 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
     delete process.env.GH_AW_AIC;
     delete process.env.GH_AW_MAX_AI_CREDITS;
     delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+    delete process.env.GH_AW_AGENT_CONCLUSION;
+    delete process.env.GH_AW_AWF_CONFIG_PATH;
     const mod = await import("./ai_credits_context.cjs");
     const exports = mod.default || mod;
     parseMaxAICreditsExceededFromAuditLog = exports.parseMaxAICreditsExceededFromAuditLog;
@@ -30,6 +32,8 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
     delete process.env.GH_AW_AIC;
     delete process.env.GH_AW_MAX_AI_CREDITS;
     delete process.env.GH_AW_AI_CREDITS_RATE_LIMIT_ERROR;
+    delete process.env.GH_AW_AGENT_CONCLUSION;
+    delete process.env.GH_AW_AWF_CONFIG_PATH;
   });
 
   function writeAuditLog(lines) {
@@ -48,6 +52,16 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
     const tokenUsageDir = path.join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs");
     fs.mkdirSync(tokenUsageDir, { recursive: true });
     fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), lines.map(l => JSON.stringify(l)).join("\n") + "\n", "utf8");
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+  }
+
+  function writeAWFConfig(maxAiCredits) {
+    fs.writeFileSync(path.join(tmpDir, "awf-config.json"), JSON.stringify({ apiProxy: { enabled: true, maxAiCredits } }));
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+  }
+
+  function writeAgentStdio(content) {
+    fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), content, "utf8");
     process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
   }
 
@@ -127,6 +141,30 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
       writeTokenUsageLog([{ status: 200, ai_credits_total: 299.9 }]);
       expect(parseMaxAICreditsExceededFromAuditLog()).toBe(false);
     });
+
+    it("uses the compiled AWF cap when the audit log contains only network access entries", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      expect(parseMaxAICreditsExceededFromAuditLog()).toBe(true);
+    });
+
+    it("reads an explicit AWF config path when agent output is not configured", () => {
+      writeAWFConfig(240);
+      process.env.GH_AW_AWF_CONFIG_PATH = path.join(tmpDir, "awf-config.json");
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      const auditPath = writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      delete process.env.GH_AW_AGENT_OUTPUT;
+      expect(parseMaxAICreditsExceededFromAuditLog(auditPath)).toBe(true);
+    });
+
+    it.each([0, -1])("does not infer budget exhaustion with disabled cap %s", maxAiCredits => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(maxAiCredits);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      expect(parseMaxAICreditsExceededFromAuditLog()).toBe(false);
+    });
   });
 
   describe("resolveAICreditsFailureState maxAICreditsExceeded", () => {
@@ -140,6 +178,62 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
       writeAuditLog([{ type: "request", ai_credits: 5000 }]);
       const result = resolveAICreditsFailureState();
       expect(result.maxAICreditsExceeded).toBe(false);
+    });
+
+    it("reports token totals against the compiled cap for a failed run with local proxy HTTP 403 evidence", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).");
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false })).toEqual({
+        aiCredits: "240.22396",
+        maxAICredits: "240",
+        aiCreditsRateLimitError: false,
+        maxAICreditsExceeded: true,
+      });
+    });
+
+    it("does not infer budget exhaustion from token totals without local proxy rejection evidence", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
+    });
+
+    it("does not treat an unrelated provider HTTP 403 as local proxy rejection evidence", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at https://api.github.com (HTTP 403).");
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
+    });
+
+    it("uses trusted token totals when only the conclusion environment supplies the cap", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      writeAgentStdio("Authentication failed with provider at http://api-proxy:10002 (HTTP 403).");
+      process.env.GH_AW_MAX_AI_CREDITS = "240";
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(true);
+    });
+
+    it("does not infer budget exhaustion from environment totals alone", () => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      process.env.GH_AW_AIC = "240.22396";
+      process.env.GH_AW_MAX_AI_CREDITS = "240";
+      process.env.GH_AW_AGENT_CONCLUSION = "failure";
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
+    });
+
+    it.each(["success", ""])("does not report budget failure for a completed run with conclusion %s", conclusion => {
+      writeAuditLog([{ event: "http_access", status: 200 }]);
+      writeAWFConfig(240);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 240.22396 }]);
+      process.env.GH_AW_AGENT_CONCLUSION = conclusion;
+      expect(resolveAICreditsFailureState({ logProvenance: false }).maxAICreditsExceeded).toBe(false);
     });
 
     it("maxAICreditsExceeded is independent of aiCreditsRateLimitError", () => {

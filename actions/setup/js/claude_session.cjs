@@ -1,6 +1,7 @@
 // @ts-check
 
 const { isSessionEvent, createSessionEvent, normalizeAgentSession, normalizeSessionUsage, accumulateSessionUsage, reconcileSessionUsage, isMetric, projectSessionResult } = require("./agent_session.cjs");
+const { getMessageRefusal } = require("./provider_refusal.cjs");
 
 /**
  * Claude input tokens exclude cache reads and cache writes.
@@ -81,11 +82,19 @@ function normalizeClaudeSession(records) {
 
   for (const record of records) {
     if (!record || typeof record !== "object" || Array.isArray(record)) continue;
-    const source = structuredClone(record);
+    let source = structuredClone(record);
     if (isSessionEvent(source)) {
-      events.push(source);
-      if (source.type === "session.result") terminalResults.push(source);
-      if (source.type === "tool.execution_start" && source.data.toolCallId !== undefined) tools.set(toolKey(source, source.data.toolCallId), source.data);
+      const mapped = normalizeAgentSession([source], { sourceEngine: "claude" })[0];
+      events.push(mapped);
+      if (mapped.type === "session.result") terminalResults.push(mapped);
+      if (mapped.type === "tool.execution_start" && mapped.data.toolCallId !== undefined) tools.set(toolKey(mapped, mapped.data.toolCallId), mapped.data);
+      continue;
+    }
+    if (["message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"].includes(source.type)) {
+      source = { ...source, type: "stream_event", event: source };
+    }
+    if (source.type === "message" && source.role === "assistant" && source.stop_reason === "refusal") {
+      events.push(...normalizeAgentSession([source], { sourceEngine: "claude" }));
       continue;
     }
     if (source.type === "system" && source.subtype === "init") {
@@ -96,7 +105,7 @@ function normalizeClaudeSession(records) {
       const raw = source.event;
       const channel = channelKey(source);
       if (raw.type === "message_start") {
-        const state = { id: raw.message?.id, blocks: new Map() };
+        const state = { id: raw.message?.id, blocks: new Map(), textEvents: [], refusalEvent: undefined };
         streams.set(channel, state);
         if (state.id !== undefined) streamedMessages.set(messageKey(source, state.id), state);
         reportUsage(source, state.id, raw.message?.usage);
@@ -105,14 +114,25 @@ function normalizeClaudeSession(records) {
       } else {
         let state = streams.get(channel);
         if (!state) {
-          state = { id: undefined, blocks: new Map() };
+          state = { id: undefined, blocks: new Map(), textEvents: [], refusalEvent: undefined };
           streams.set(channel, state);
         }
         if (raw.type === "message_delta") {
           reportUsage(source, state.id, raw.usage);
+          const refusal = getMessageRefusal(raw.delta);
+          if (refusal) {
+            const texts = [...state.blocks.values()].filter(block => block.type === "text").map(block => block.text);
+            state.refusalEvent = emit(source, "assistant.refusal", { ...sourceFields(source), ...refusal, ...(texts.length ? { content: texts.join("") } : {}) });
+            for (const textEvent of state.textEvents) {
+              const index = events.indexOf(textEvent);
+              if (index !== -1) events.splice(index, 1);
+            }
+            state.textEvents = [];
+          }
         } else if (raw.type === "content_block_start" && raw.content_block) {
           const block = raw.content_block;
           const event = emitBlock(source, block);
+          if (event?.type === "assistant.message") state.textEvents.push(event);
           state.blocks.set(raw.index, {
             type: block.type,
             text: block.type === "thinking" ? (block.thinking ?? "") : (block.text ?? ""),
@@ -130,7 +150,13 @@ function normalizeClaudeSession(records) {
           if (!block) continue;
           if (delta.type === "text_delta" && typeof delta.text === "string") {
             block.text += delta.text;
-            emitBlock(source, { type: "text", text: delta.text });
+            if (state.refusalEvent) {
+              const texts = [...state.blocks.values()].filter(value => value.type === "text").map(value => value.text);
+              if (texts.length) state.refusalEvent.data.content = texts.join("");
+            } else {
+              const event = emitBlock(source, { type: "text", text: delta.text });
+              if (event?.type === "assistant.message") state.textEvents.push(event);
+            }
           } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
             block.text += delta.thinking;
             emitBlock(source, { type: "thinking", thinking: delta.thinking });
@@ -164,7 +190,13 @@ function normalizeClaudeSession(records) {
       const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : [];
       const streamed = source.type === "assistant" && message?.id !== undefined ? streamedMessages.get(messageKey(source, message.id)) : undefined;
       if (streamed) native(source, "claude.assistant_snapshot");
+      const refusal = source.type === "assistant" ? getMessageRefusal(message) : undefined;
+      if (refusal) {
+        if (streamed?.refusalEvent) Object.assign(streamed.refusalEvent.data, refusal);
+        else emit(source, "assistant.refusal", { ...sourceFields(source), ...refusal });
+      }
       for (const [index, block] of blocks.entries()) {
+        if (refusal && block?.type === "text") continue;
         const observed = streamed?.blocks.get(index);
         if (!observed) {
           emitBlock(source, block);

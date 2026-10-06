@@ -210,7 +210,7 @@ jobs:
           name: smokecopilot-experiment
           path: /tmp/gh-aw/experiments
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -291,7 +291,7 @@ jobs:
           path: /tmp/gh-aw/agentic-workflow-usage-scan-v2.jsonl
           overwrite: true
           if-no-files-found: ignore
-          retention-days: 3
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '3' }}
       - name: Add eyes reaction for immediate feedback
         id: react
         if: github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.id == github.repository_id || github.event_name == 'workflow_dispatch' && (fromJSON(github.event.inputs.aw_context || '{}').event_type == 'issues' || fromJSON(github.event.inputs.aw_context || '{}').event_type == 'issue_comment' || fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request_review_comment' || fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request' || fromJSON(github.event.inputs.aw_context || '{}').event_type == 'discussion' || fromJSON(github.event.inputs.aw_context || '{}').event_type == 'discussion_comment')
@@ -538,6 +538,7 @@ jobs:
           name: info
           path: /tmp/gh-aw/aw_info.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Stage prompt files for artifact upload
         run: |
           mkdir -p /tmp/gh-aw/aw-prompts
@@ -561,7 +562,7 @@ jobs:
             /tmp/gh-aw/.github/agents
             /tmp/gh-aw/.github/skills
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
     needs: activation
@@ -878,7 +879,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"allowed_repos\":[\"github/gh-aw\"],\"discussions\":true,\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"],\"allowed_repos\":[\"github/gh-aw\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_check_run\":{\"max\":1,\"name\":\"Smoke Copilot\"},\"create_discussion\":{\"category\":\"announcements\",\"close_older_discussions\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"fallback_to_issue\":true,\"labels\":[\"ai-generated\"],\"max\":1},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"group\":true,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_pull_request_review_comment\":{\"max\":5,\"side\":\"RIGHT\"},\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"reply_to_pull_request_review_comment\":{\"max\":5},\"report_incomplete\":{},\"send-slack-message\":{\"description\":\"Send a message to Slack (stub for testing)\",\"inputs\":{\"message\":{\"description\":\"The message to send\",\"required\":false,\"type\":\"string\"}},\"output\":\"Slack message stub executed!\"},\"set_issue_type\":{},\"submit_pull_request_review\":{\"max\":1},\"upload_artifact\":{\"max-size-bytes\":104857600,\"max-uploads\":1,\"retention-days\":1,\"skip-archive\":true}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"allowed_repos\":[\"github/gh-aw\"],\"discussions\":true,\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"],\"allowed_repos\":[\"github/gh-aw\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_check_run\":{\"max\":1,\"name\":\"Smoke Copilot\"},\"create_discussion\":{\"category\":\"announcements\",\"close_older_discussions\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"fallback_to_issue\":true,\"labels\":[\"ai-generated\"],\"max\":1},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"group\":true,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_pull_request_review_comment\":{\"max\":5,\"side\":\"RIGHT\"},\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"reply_to_pull_request_review_comment\":{\"max\":5},\"report_incomplete\":{},\"send-slack-message\":{\"description\":\"Send a message to Slack (stub for testing)\",\"inputs\":{\"message\":{\"description\":\"The message to send\",\"required\":false,\"type\":\"string\"}},\"output\":\"Slack message stub executed!\"},\"set_issue_type\":{},\"submit_pull_request_review\":{\"max\":1},\"upload_artifact\":{\"max-size-bytes\":104857600,\"max-uploads\":1,\"retention-days\":\"${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}\",\"skip-archive\":true}}"
         with:
           script: |
             const path = require('path');
@@ -2253,6 +2254,7 @@ jobs:
         run: |
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
           printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true},"lspServers":{"typescript":{"command":"typescript-language-server","args":["--stdio"],"fileExtensions":{".cjs":"javascript",".js":"javascript",".mjs":"javascript",".ts":"typescript",".tsx":"typescriptreact"}}}}' > "$HOME/.copilot/settings.json"
@@ -2530,6 +2532,7 @@ jobs:
           name: cache-memory
           include-hidden-files: true
           path: /tmp/gh-aw/cache-memory
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       # Upload safe-outputs upload-artifact staging for the upload_artifact job
       - name: Upload upload-artifact staging
         if: always()
@@ -2537,7 +2540,7 @@ jobs:
         with:
           name: safe-outputs-upload-artifacts
           path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/
-          retention-days: 1
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
       - if: always()
         name: Stop Playwright title test server
@@ -2570,6 +2573,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -2605,6 +2609,7 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/audit/
             /tmp/gh-aw/sandbox/firewall/awf-reflect.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
     needs:
@@ -3020,6 +3025,7 @@ jobs:
             /tmp/gh-aw/usage/experiment/assignments.json
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Wait before retrying usage artifact upload
         if: always() && steps.upload-usage-artifact.outcome == 'failure'
         run: sleep 10
@@ -3054,6 +3060,7 @@ jobs:
             /tmp/gh-aw/usage/activity/summary.json
           if-no-files-found: ignore
           overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
     needs:
@@ -3213,6 +3220,7 @@ jobs:
         run: |
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
           printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}' > "$HOME/.copilot/settings.json"
@@ -3356,6 +3364,7 @@ jobs:
             /tmp/gh-aw/threat-detection/sandbox/firewall/logs/
             /tmp/gh-aw/threat-detection/sandbox/firewall/audit/
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Parse and conclude threat detection
         id: detection_conclusion
         if: always()
@@ -3512,6 +3521,7 @@ jobs:
         run: |
           set -o pipefail
           printf '%s' "$(date +%s%3N)" > /tmp/gh-aw/agent_cli_start_ms.txt
+          gh_aw_exit_code=0
           trap 'gh_aw_exit_code=$?; mkdir -p /tmp/gh-aw >/dev/null 2>&1 || true; printf "%s" "$gh_aw_exit_code" > /tmp/gh-aw/agent_execution_exit_code.txt || true; rm -f "$HOME/.copilot/settings.json"; if [ "$gh_aw_exit_code" -ne 0 ]; then echo "::error::Agent execution exited with code $gh_aw_exit_code"; fi' EXIT
           mkdir -p "$HOME/.copilot"
           printf '%s' '{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}' > "$HOME/.copilot/settings.json"
@@ -3666,6 +3676,7 @@ jobs:
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload evals accounting after failure
         if: always() && steps.redact_evals_results.outcome != 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -3675,6 +3686,7 @@ jobs:
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Restore actions folder
         if: always()
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -4044,7 +4056,7 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
           GH_AW_SAFE_OUTPUT_JOBS: "{\"send_slack_message\":\"\"}"
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"allowed_repos\":[\"github/gh-aw\"],\"discussions\":true,\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"],\"allowed_repos\":[\"github/gh-aw\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_check_run\":{\"max\":1,\"name\":\"Smoke Copilot\"},\"create_discussion\":{\"category\":\"announcements\",\"close_older_discussions\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"fallback_to_issue\":true,\"labels\":[\"ai-generated\"],\"max\":1},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"group\":true,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_pull_request_review_comment\":{\"max\":5,\"side\":\"RIGHT\"},\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"reply_to_pull_request_review_comment\":{\"max\":5},\"report_incomplete\":{},\"set_issue_type\":{},\"submit_pull_request_review\":{\"max\":1},\"upload_artifact\":{\"max-size-bytes\":104857600,\"max-uploads\":1,\"retention-days\":1,\"skip-archive\":true}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"allowed_repos\":[\"github/gh-aw\"],\"discussions\":true,\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"],\"allowed_repos\":[\"github/gh-aw\"]},\"comment_memory\":{\"max\":1,\"memory_id\":\"default\"},\"create_check_run\":{\"max\":1,\"name\":\"Smoke Copilot\"},\"create_discussion\":{\"category\":\"announcements\",\"close_older_discussions\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"fallback_to_issue\":true,\"labels\":[\"ai-generated\"],\"max\":1},\"create_issue\":{\"close_older_issues\":true,\"close_older_key\":\"smoke-copilot\",\"expires\":2,\"group\":true,\"labels\":[\"automation\",\"testing\"],\"max\":1},\"create_pull_request_review_comment\":{\"max\":5,\"side\":\"RIGHT\"},\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"reply_to_pull_request_review_comment\":{\"max\":5},\"report_incomplete\":{},\"set_issue_type\":{},\"submit_pull_request_review\":{\"max\":1},\"upload_artifact\":{\"max-size-bytes\":104857600,\"max-uploads\":1,\"retention-days\":\"${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}\",\"skip-archive\":true}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -4064,6 +4076,7 @@ jobs:
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   send_slack_message:
     needs:

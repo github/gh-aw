@@ -7,6 +7,21 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "artifact_retention_days": {
+      "description": "Retention in days for all gh-aw workflow artifacts, overriding per-artifact settings. Accepts an integer from 1 to 400 or a GitHub Actions expression resolving to that range. When omitted, uses vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS, then the existing per-artifact retention. GitHub repository, organization, and enterprise retention limits still apply.",
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 400
+        },
+        {
+          "type": "string",
+          "pattern": "^\\$\\{\\{[^{}\\r\\n]*[^\\s{}][^{}\\r\\n]*\\}\\}$"
+        }
+      ],
+      "examples": [7, 30, "${{ vars.ARTIFACT_RETENTION_DAYS || '7' }}"]
+    },
     "action_pins": {
       "description": "Mapping of action repository@version references to replacement repository@version references. Enables enterprises running in a private cloud to redirect actions to internal mirrors. Keys and values must use the format 'owner/repo@ref'.",
       "type": "object",

@@ -1,5 +1,6 @@
 import type {
   AgentExecutionData,
+  AssistantRefusalData,
   DetectionResultData,
   EventMetadata,
   JsonValue,
@@ -184,6 +185,7 @@ export interface UnifiedSessionEventDataMap {
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
   "user.message": Pick<MessageData, "content">;
   "assistant.message": Pick<MessageData, "content">;
+  "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
   "assistant.reasoning": Pick<MessageData, "content">;
   "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
   "tool.execution_complete": Pick<ToolExecutionCompleteData, "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError">;
