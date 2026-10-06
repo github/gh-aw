@@ -326,6 +326,10 @@ func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID s
 		setup.commandPrefix += codexBYOKAPIKeyExport() + " && "
 		return setup
 	}
+	if engineID == "claude" && NewClaudeEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
+		setup.commandPrefix += claudeCopilotAPIKeyExport() + " && "
+		return setup
+	}
 	if engineID != "copilot" {
 		return setup
 	}
@@ -499,7 +503,11 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 
 	// Compute which env vars to exclude from the AWF container. The API proxy
 	// handles authentication, so the raw credentials must not reach the container.
-	excludeEnvVarNames := ComputeAWFExcludeEnvVarNames(threatDetectionData, engineCoreSecretVarNames(engineID))
+	coreSecretVarNames := engineCoreSecretVarNames(engineID)
+	if engineID == "claude" {
+		coreSecretVarNames = claudeSecretEnvVarNames(threatDetectionData)
+	}
+	excludeEnvVarNames := ComputeAWFExcludeEnvVarNames(threatDetectionData, coreSecretVarNames)
 
 	// Compute allowed domains for the detection engine. The AWF firewall for the
 	// detection job must permit the engine's required API endpoints. Without this,

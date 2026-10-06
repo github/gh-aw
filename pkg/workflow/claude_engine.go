@@ -56,9 +56,9 @@ func (e *ClaudeEngine) GetModelEnvVarName() string {
 }
 
 // ResolveLLMProvider returns the effective provider for Claude inference.
-// Default is anthropic, overridable via engine.provider (or engine.model-provider).
+// A copilot/ model selects GitHub inference unless the provider is explicitly overridden.
 func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider {
-	return resolveEngineLLMProvider(workflowData, LLMProviderAnthropic)
+	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderAnthropic)
 }
 
 // GetAPMTarget returns "claude" so that apm-action packs Claude-specific primitives.
@@ -71,7 +71,7 @@ func (e *ClaudeEngine) GetAPMTarget() string {
 // is needed and only common MCP secrets are returned.
 func (e *ClaudeEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
 	provider := e.ResolveLLMProvider(workflowData)
-	if provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) {
+	if claudeSkipsStaticSecret(provider, workflowData) {
 		return collectCommonMCPSecrets(workflowData)
 	}
 	return append(llmProviderSecretNames(provider), collectCommonMCPSecrets(workflowData)...)
@@ -94,9 +94,14 @@ func (e *ClaudeEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHu
 		EngineName:  "Claude Code",
 		DocsURL:     llmProviderDocsURL(provider),
 		Skip: func(workflowData *WorkflowData) bool {
-			return provider == LLMProviderAnthropic && isAnthropicWIF(workflowData)
+			return claudeSkipsStaticSecret(provider, workflowData)
 		},
 	})
+}
+
+func claudeSkipsStaticSecret(provider LLMProvider, workflowData *WorkflowData) bool {
+	return provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) ||
+		provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData)
 }
 
 // isAnthropicWIF returns true when the workflow is configured to use Anthropic
@@ -383,20 +388,6 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 // or formats it as a plain bash command (when the firewall is disabled).
 func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claudeCommand string, logFile string) string {
 	if isFirewallEnabled(workflowData) {
-		// Get allowed domains: prefer the pre-warmed cache on WorkflowData (populated by
-		// computeAllowedDomainsForSanitization before GetExecutionSteps is called) to avoid
-		// re-running the expensive map+sort operation.
-		var allowedDomains string
-		if workflowData.CachedAllowedDomainsComputed {
-			allowedDomains = workflowData.CachedAllowedDomainsStr
-		} else {
-			allowedDomains = GetAllowedDomainsForEngine(constants.ClaudeEngine, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
-		}
-		// Add GHES/custom API target domains to the firewall allow-list when engine.api-target is set
-		if workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
-			allowedDomains = mergeAPITargetDomains(allowedDomains, workflowData.EngineConfig.APITarget)
-		}
-
 		// Build AWF command with all configuration.
 		// AWF v0.15.0+ uses chroot mode by default, providing transparent access to host binaries.
 		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
@@ -405,6 +396,9 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 		// We prepend GetNpmBinPathSetup() to the engine command so it runs inside the AWF container.
 		npmPathSetup := GetNpmBinPathSetup()
 		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
+		if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+			claudeCommandWithPath = claudeCopilotAPIKeyExport() + " && " + claudeCommandWithPath
+		}
 		if microVMCLIPath := GetMicroVMNpmCLIPathSetup(workflowData); microVMCLIPath != "" {
 			claudeCommandWithPath = fmt.Sprintf("%s && %s", microVMCLIPath, claudeCommandWithPath)
 		}
@@ -419,11 +413,11 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
 			LogFile:        logFile,
 			WorkflowData:   workflowData,
 			UsesTTY:        true, // Claude Code CLI requires TTY
-			AllowedDomains: allowedDomains,
+			AllowedDomains: e.claudeAllowedDomains(workflowData),
 			PathSetup:      "mkdir -p " + constants.TmpGhAwDir + " && (umask 177 && touch " + claudeDebugLogFile + ") && touch " + AgentStepSummaryPath, // Runs BEFORE AWF on the host
 			// Exclude every env var whose step-env value is a secret so the agent
 			// cannot read raw token values via bash tools (env / printenv).
-			ExcludeEnvVarNames:   ComputeAWFExcludeEnvVarNames(workflowData, llmProviderSecretNames(e.ResolveLLMProvider(workflowData))),
+			ExcludeEnvVarNames:   ComputeAWFExcludeEnvVarNames(workflowData, claudeSecretEnvVarNames(workflowData)),
 			RetryStartupFailures: true,
 		})
 	}
@@ -443,11 +437,29 @@ func (e *ClaudeEngine) buildClaudeFullCommand(workflowData *WorkflowData, claude
           %s | tee -a %s`, AgentCLIStartMsPath, AgentStepSummaryPath, logFile, constants.TmpGhAwDir, claudeDebugLogFile, claudeCommand, logFile)
 }
 
+func (e *ClaudeEngine) claudeAllowedDomains(data *WorkflowData) string {
+	domains := data.CachedAllowedDomainsStr
+	if !data.CachedAllowedDomainsComputed {
+		domains = GetAllowedDomainsForEngine(constants.ClaudeEngine, data.NetworkPermissions, data.Tools, data.Runtimes)
+	}
+	if data.EngineConfig != nil && data.EngineConfig.APITarget != "" {
+		domains = mergeAPITargetDomains(domains, data.EngineConfig.APITarget)
+	}
+	return domains
+}
+
+func claudeSecretEnvVarNames(data *WorkflowData) []string {
+	return append(engineCoreSecretVarNames("claude"), llmProviderSecretNames(NewClaudeEngine().ResolveLLMProvider(data))...)
+}
+
 // buildClaudeCommandEnv builds the environment variable map for the Claude execution step.
 func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[string]string {
 	provider := e.ResolveLLMProvider(workflowData)
 	env := buildClaudeBaseEnvMap(provider, workflowData)
 	env["GH_AW_LLM_PROVIDER"] = string(provider)
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.LLMProvider != "" {
+		env["GH_AW_LLM_PROVIDER_EXPLICIT"] = "1"
+	}
 	if isFirewallEnabled(workflowData) && provider != LLMProviderAnthropic {
 		env["ANTHROPIC_BASE_URL"] = llmProviderGatewayBaseURL(provider)
 	}
@@ -494,8 +506,7 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 // buildClaudeBaseEnvMap returns the initial Claude execution environment with static flags
 // and well-known GitHub Actions context values.
 func buildClaudeBaseEnvMap(provider LLMProvider, workflowData *WorkflowData) map[string]string {
-	return map[string]string{
-		"ANTHROPIC_API_KEY": llmProviderSecretExpression(provider, workflowData),
+	env := map[string]string{
 		"DISABLE_TELEMETRY": "1",
 		// Prevent telemetry/crash reporting and optional features that don't work in CI.
 		"DISABLE_ERROR_REPORTING": "1",
@@ -512,6 +523,19 @@ func buildClaudeBaseEnvMap(provider LLMProvider, workflowData *WorkflowData) map
 		"GITHUB_WORKSPACE":    "${{ github.workspace }}",
 		"RUNNER_TEMP":         "${{ runner.temp }}",
 	}
+	if provider == LLMProviderGitHub {
+		env["COPILOT_GITHUB_TOKEN"] = llmProviderSecretExpression(provider, workflowData)
+		env[constants.CopilotBYOKDummyAPIKeyEnvVar] = constants.CopilotBYOKDummyAPIKey
+		env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+	} else {
+		env["ANTHROPIC_API_KEY"] = llmProviderSecretExpression(provider, workflowData)
+	}
+	return env
+}
+
+func claudeCopilotAPIKeyExport() string {
+	// Set the placeholder only inside the sandbox so AWF does not provision an Anthropic provider.
+	return "export ANTHROPIC_API_KEY=\"$" + constants.CopilotBYOKDummyAPIKeyEnvVar + "\""
 }
 
 // applyClaudeTimeoutEnvVars sets MCP/Bash timeout env vars derived from workflow config.
@@ -559,7 +583,11 @@ func applyClaudeModelEnvVars(env map[string]string, workflowData *WorkflowData) 
 		env[constants.EnvVarModelFallback] = compilerenv.BuildModelOverrideExpression(claudeModelVar, compilerenv.DefaultModelClaude, constants.SonnetDefaultModel)
 	}
 	claudeLog.Printf("Setting %s env var for model: %s", constants.ClaudeCLIModelEnvVar, workflowData.Model)
-	env[constants.ClaudeCLIModelEnvVar] = workflowData.Model
+	model := strings.TrimSpace(workflowData.Model)
+	if provider, modelID, found := strings.Cut(model, "/"); found && strings.EqualFold(provider, "copilot") {
+		model = modelID
+	}
+	env[constants.ClaudeCLIModelEnvVar] = model
 }
 
 // GetLogParserScriptId returns the JavaScript script name for parsing Claude logs
