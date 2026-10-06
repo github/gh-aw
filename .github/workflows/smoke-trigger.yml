@@ -2,12 +2,17 @@ name: Smoke Trigger
 
 on:
   workflow_dispatch:
+    inputs:
+      dynamic-workflow:
+        description: Run only the Copilot CLI dynamic workflow smoke test
+        type: boolean
+        default: false
   pull_request:
     types: [labeled]
 
 jobs:
   call-smoke-workflow-call:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'smoke-workflow-call'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.dynamic-workflow) || github.event.label.name == 'smoke-workflow-call'
     uses: ./.github/workflows/smoke-workflow-call.lock.yml
     secrets: inherit
     permissions:
@@ -16,3 +21,13 @@ jobs:
       discussions: write
       issues: write
       pull-requests: write
+
+  call-smoke-copilot-dynamic-workflow:
+    if: (github.event_name == 'workflow_dispatch' && inputs.dynamic-workflow) || github.event.label.name == 'smoke-copilot-dynamic-workflow'
+    uses: ./.github/workflows/smoke-copilot-dynamic-workflow.lock.yml
+    secrets: inherit
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      copilot-requests: write
