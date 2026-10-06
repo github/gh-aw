@@ -462,6 +462,10 @@ Marker: ${{ needs.select.outputs.marker }}
 	if err != nil {
 		t.Fatal(err)
 	}
+	lock := string(lockContent)
+	if !strings.Contains(lock, "  activation:\n    name: Activation\n    needs: select") {
+		t.Fatalf("activation should depend on runtime-import referenced job; lock excerpt:\n%s", lock)
+	}
 	var compiledWorkflow map[string]any
 	if err := yaml.Unmarshal(lockContent, &compiledWorkflow); err != nil {
 		t.Fatalf("could not parse compiled workflow: %v", err)
@@ -478,7 +482,6 @@ Marker: ${{ needs.select.outputs.marker }}
 	if !ok || needs != "select" {
 		t.Errorf("activation should depend on runtime-import referenced job select; got needs: %#v", activation["needs"])
 	}
-	lock := string(lockContent)
 	if !strings.Contains(lock, "GH_AW_NEEDS_SELECT_OUTPUTS_ISSUE_NUMBERS: ${{ needs.select.outputs.issue_numbers }}") {
 		t.Errorf("lock file missing issue_numbers env mapping")
 	}

@@ -143,6 +143,14 @@ export interface ExecutionResultData {
   finishedAt?: JsonValue;
 }
 
+export interface DailyAICDecisionData {
+  status: "disabled" | "skipped" | "under_budget" | "exceeded" | "structural_error" | "transient_error";
+  exceeded?: boolean;
+  total?: number;
+  estimated?: number;
+  threshold?: number;
+}
+
 export interface WorkflowInfoData {
   engineId?: JsonValue;
   agentVersion?: JsonValue;
@@ -227,6 +235,7 @@ export interface UnifiedSessionEventDataMap {
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;
   "detection.result": DetectionResultData;
+  "guardrail.daily_aic": DailyAICDecisionData;
   "workflow.info": WorkflowInfoData;
   "github_api.rate_limit": GitHubApiRateLimitData;
   "session.collection_warning": CollectionWarningData;

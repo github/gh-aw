@@ -1109,7 +1109,7 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 			}
 
 			if tt.requestedVer == "v8" && !strings.Contains(result, "# v9 (source v8)") {
-				t.Errorf("Expected v8 fallback comment to record resolved version v9, got: %s", result)
+				t.Errorf("Expected v8 fallback comment to record resolved version v9.0.0, got: %s", result)
 			}
 		})
 	}

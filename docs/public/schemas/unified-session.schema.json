@@ -29,6 +29,7 @@
       { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
+      { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.guard.blocked" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
@@ -124,6 +125,18 @@
       "additionalProperties": false
     },
     "CollectionWarningData": { "type": "object", "properties": { "code": { "type": "string" }, "path": { "type": "string" }, "line": { "type": "number", "minimum": 1, "multipleOf": 1 } }, "required": ["code"], "additionalProperties": {} },
+    "DailyAICDecisionData": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error"] },
+        "exceeded": { "type": "boolean" },
+        "total": { "type": "number" },
+        "estimated": { "type": "number" },
+        "threshold": { "type": "number" }
+      },
+      "required": ["status"],
+      "additionalProperties": false
+    },
     "DetectionResultData": {
       "type": "object",
       "properties": {
