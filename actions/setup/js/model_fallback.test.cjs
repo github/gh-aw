@@ -2,7 +2,31 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
+const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
+
+describe("Claude model arguments", () => {
+  it.each(["github", "copilot", "github-copilot", "github_models", " COPILOT "])("normalizes repository-variable models for provider %s", provider => {
+    const env = { GH_AW_MODEL_AGENT_CLAUDE: "copilot/claude-haiku-4.5" };
+    const args = ["--print", "--model", env.GH_AW_MODEL_AGENT_CLAUDE];
+    expect(normalizeClaudeModelArgs(args, provider, env)).toEqual(["--print", "--model", "claude-haiku-4.5"]);
+    expect(args[2]).toBe("copilot/claude-haiku-4.5");
+    expect(env.GH_AW_MODEL_AGENT_CLAUDE).toBe("copilot/claude-haiku-4.5");
+  });
+
+  it("normalizes equals-form model flags while preserving explicit provider overrides", () => {
+    expect(normalizeClaudeModelArgs(["--model=copilot/claude-haiku-4.5"], "anthropic", { GH_AW_LLM_PROVIDER_EXPLICIT: "1" })).toEqual(["--model=claude-haiku-4.5"]);
+  });
+
+  it("rejects an unprovisioned dynamic provider switch", () => {
+    expect(() => normalizeClaudeModelArgs(["--model", "copilot/claude-haiku-4.5"], "anthropic", {})).toThrow("engine.model-provider: github");
+  });
+
+  it("preserves custom slugs, missing values and positional arguments after the separator", () => {
+    expect(normalizeClaudeModelArgs(["--model", "anthropic/custom-model"], "anthropic", {})).toEqual(["--model", "anthropic/custom-model"]);
+    expect(normalizeClaudeModelArgs(["--model"], "anthropic", {})).toEqual(["--model"]);
+    expect(normalizeClaudeModelArgs(["--", "--model=copilot/claude-haiku-4.5"], "anthropic", {})).toEqual(["--", "--model=copilot/claude-haiku-4.5"]);
+  });
+});
 
 describe("Codex model arguments", () => {
   it.each([{ flags: ["--model", "user-model"] }, { flags: ["-m", "user-model"] }, { flags: ["--model=user-model"] }, { flags: ["-m=user-model"] }, { flags: ["-muser-model"] }, { flags: ["--model="] }, { flags: ["-m="] }])(
