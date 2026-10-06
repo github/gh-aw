@@ -88,6 +88,7 @@ async function main(core, ctx, githubClient) {
     event_name: ctx.eventName,
     target_repo: process.env.GH_AW_INFO_TARGET_REPO || "",
     staged: process.env.GH_AW_INFO_STAGED === "true",
+    dry_run: process.env.GH_AW_INFO_DRY_RUN === "true",
     allowed_domains: allowedDomains,
     firewall_enabled: process.env.GH_AW_INFO_FIREWALL_ENABLED === "true",
     awf_version: process.env.GH_AW_INFO_AWF_VERSION || "",
@@ -98,6 +99,9 @@ async function main(core, ctx, githubClient) {
     },
     created_at: new Date().toISOString(),
   };
+  if (awInfo.dry_run) {
+    core.warning("Dry-run disables compiler-managed GitHub mutations only. Custom scripts/jobs, agent shell commands, external MCP servers, and custom credentials are not verified read-only.");
+  }
 
   if (process.env.GH_AW_INFO_FETCH_RUN_CREATED_AT === "true") {
     try {

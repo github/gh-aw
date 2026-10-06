@@ -14,7 +14,7 @@ type CompileConfig struct {
 	TrialLogicalRepoSlug      string   // Target repository for trial mode
 	UseSamples                bool     // Hidden: replace agentic step with a deterministic samples replay driver
 	Strict                    bool     // Enable strict mode validation
-	Dev                       bool     // Enable fail-closed development testing checks and staged safe outputs
+	DryRun                    bool     // Enable fail-closed development testing checks and staged safe outputs
 	EnvironmentOverride       string   // Override the environment on every generated job
 	RequireSelfHostedRunners  bool     // Require every generated job to select a self-hosted runner
 	Dependabot                bool     // Generate Dependabot manifests for npm dependencies

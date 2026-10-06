@@ -8,8 +8,8 @@ import (
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
-// DevelopmentRequiredBoolFlags lists checks that development compilation cannot disable.
-func DevelopmentRequiredBoolFlags() []string {
+// DryRunRequiredBoolFlags lists checks that development compilation cannot disable.
+func DryRunRequiredBoolFlags() []string {
 	return []string{
 		"strict", "staged", "validate", "validate-images", "actionlint", "zizmor",
 		"poutine", "runner-guard", "syft", "grype", "grant", "yamllint", "shellcheck", "models",
@@ -19,9 +19,9 @@ func DevelopmentRequiredBoolFlags() []string {
 // ValidateDevelopmentCompileFlags rejects explicit opt-outs while allowing omitted defaults.
 func ValidateDevelopmentCompileFlags(dev bool, flags map[string]bool) error {
 	if dev {
-		for _, name := range DevelopmentRequiredBoolFlags() {
+		for _, name := range DryRunRequiredBoolFlags() {
 			if enabled, supplied := flags[name]; supplied && !enabled {
-				return fmt.Errorf("--dev cannot be combined with --%s=false: development testing requires this check; remove --%s=false or omit --dev", name, name)
+				return fmt.Errorf("--dry-run cannot be combined with --%s=false: development testing requires this check; remove --%s=false or omit --dry-run", name, name)
 			}
 		}
 	}
@@ -29,7 +29,7 @@ func ValidateDevelopmentCompileFlags(dev bool, flags map[string]bool) error {
 }
 
 func applyDevelopmentCompileMode(config CompileConfig) CompileConfig {
-	if !config.Dev {
+	if !config.DryRun {
 		return config
 	}
 	config.Strict = true
@@ -50,10 +50,10 @@ func applyDevelopmentCompileMode(config CompileConfig) CompileConfig {
 }
 
 func validateDevelopmentCompileMode(config CompileConfig) error {
-	if !config.Dev {
+	if !config.DryRun {
 		return nil
 	}
-	if err := ValidateDevelopmentCompileFlags(config.Dev, config.ExplicitBoolFlags); err != nil {
+	if err := ValidateDevelopmentCompileFlags(config.DryRun, config.ExplicitBoolFlags); err != nil {
 		return err
 	}
 	for _, option := range []struct {
@@ -66,14 +66,14 @@ func validateDevelopmentCompileMode(config CompileConfig) error {
 		{config.AllowActionRefs, "--allow-action-refs"},
 	} {
 		if option.enabled {
-			return fmt.Errorf("--dev cannot be combined with %s: development testing requires emitted lock files, complete checks, and an unchanged safe-update baseline", option.name)
+			return fmt.Errorf("--dry-run cannot be combined with %s: development testing requires emitted lock files, complete checks, and an unchanged safe-update baseline", option.name)
 		}
 	}
 	return nil
 }
 
 func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Compiler, stats *CompilationStats, results *[]ValidationResult, scanErrors ...error) error {
-	if !config.Dev {
+	if !config.DryRun {
 		return nil
 	}
 	appendDevelopmentCompilerDiagnostics(compiler, stats, results)

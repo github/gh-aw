@@ -82,9 +82,9 @@ func (c *Compiler) SetForceStaged(force bool) {
 	c.forceStaged = force
 }
 
-// SetDevelopmentMode disables push jobs and conclusion issue/comment writes for local testing.
-func (c *Compiler) SetDevelopmentMode(enabled bool) {
-	c.developmentMode = enabled
+// SetDryRun stages safe outputs and disables compiler-managed GitHub mutations.
+func (c *Compiler) SetDryRun(enabled bool) {
+	c.dryRun = enabled
 }
 
 // SetEnvironmentOverride replaces the environment on every generated job.

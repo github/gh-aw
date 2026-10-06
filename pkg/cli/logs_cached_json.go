@@ -790,7 +790,7 @@ func (runs cachedLogsRuns) lookup(run WorkflowRun, filters runFilterOpts) (RunDa
 	}
 	// Compact logs JSON does not retain enough per-run evidence to safely
 	// re-evaluate these artifact-dependent filters.
-	if filters.runtime != "" || filters.noStaged || filters.firewallOnly || filters.noFirewall ||
+	if filters.runtime != "" || filters.noStaged || filters.dryRun || filters.noDryRun || filters.firewallOnly || filters.noFirewall ||
 		filters.safeOutputType != "" || filters.filteredIntegrity || filters.evalsOnly || filters.gradersOnly {
 		return RunData{}, false
 	}

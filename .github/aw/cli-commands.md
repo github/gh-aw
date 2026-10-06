@@ -52,8 +52,8 @@ Compile workflow `.md` files into GitHub Actions `.lock.yml` files.
 ```bash
 gh aw compile                     # Compile all workflows
 gh aw compile <workflow-name>     # Compile a specific workflow
-gh aw compile <workflow-name> --dev  # Strict/staged debugging checks; warnings are errors
-gh aw compile <workflow-name> --dev --environment gh-aw-debug  # Optional all-job environment override
+gh aw compile <workflow-name> --dry-run  # Strict/staged debugging checks; warnings are errors
+gh aw compile <workflow-name> --dry-run --environment gh-aw-debug  # Optional all-job environment override
 gh aw compile --strict            # Compile with strict mode validation
 gh aw compile --validate          # Enable workflow, image, and action SHA validation
 gh aw compile --fail-fast         # Stop at first error
@@ -75,7 +75,7 @@ Trigger a workflow on demand using `workflow_dispatch`.
 For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md):
 respect explicit no-dispatch contexts, and handle `403 Forbidden` from a
 permitted run attempt by stopping live debugging and returning to diagnosis/
-patching. Do not retry unchanged or bypass the denial. `--dev` is a compilation
+patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation
 profile, not run access or authorization; each live-test revision requires
 human validation.
 

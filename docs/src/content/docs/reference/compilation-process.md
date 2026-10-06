@@ -227,7 +227,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 | `gh aw compile my-workflow` | Compile specific workflow |
 | `gh aw compile --verbose` | Enable verbose output |
 | `gh aw compile --strict` | Enhanced security validation |
-| `gh aw compile my-workflow --dev` | Compile for development testing with staging, all analysis tools, and warnings as errors |
+| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, all analysis tools, and warnings as errors |
 | `gh aw compile my-workflow --environment gh-aw-debug` | Replace the environment on every generated job |
 | `gh aw compile --no-emit` | Validate without generating files |
 | `gh aw compile --actionlint --zizmor --poutine --grant` | Run security scanners |
@@ -250,7 +250,7 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 ### Development Testing Mode
 
-`--dev` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
+`--dry-run` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
 `--actionlint`, `--zizmor`, `--poutine`, `--runner-guard`, `--syft`, `--grype`,
 `--grant`, `--yamllint`, `--shellcheck`, and `--models`. These settings are
 forced regardless of frontmatter; explicitly disabling a required flag is rejected. Compiler warnings,
@@ -262,7 +262,7 @@ and the workflow declares `models` policies or `engine.models`. It does not prov
 live model availability.
 
 ```bash
-gh aw compile my-workflow --dev --environment gh-aw-debug
+gh aw compile my-workflow --dry-run --environment gh-aw-debug
 ```
 
 The optional `--environment NAME` replaces every job's environment in compiled
@@ -283,12 +283,18 @@ remain in the job's applicable secret scope; an environment name is not secret
 isolation and does not automatically export secrets into process environment
 variables.
 
-Development mode also disables every job whose ID starts with `push_` and
-conclusion-job issue/comment reporting. Failure handling, local diagnostics,
-step summaries, and usage artifacts remain enabled. No new memory-tool fields
-are required; ordinary compilation preserves existing persistence behavior.
+Dry-run mode stages safe outputs and disables compiler-managed GitHub mutations:
+push jobs, memory/cache persistence, reusable safe-output calls, work-queue
+operations, reactions, status/failure comments and issues, label removal, and
+issue locking. `aw_info.json` records the boolean `dry_run` flag. Failure handling,
+local diagnostics, step summaries, and run artifacts remain enabled. No new
+memory-tool fields are required; ordinary compilation preserves persistence.
 
-`--dev` cannot be combined with `--no-emit`, `--watch`, `--approve`, or
+Custom scripts/jobs, agent shell commands, external MCP servers, and custom
+credentials remain unverified and are explicitly reported at runtime. Dry-run is
+not an execution sandbox or a guarantee that those extensions cannot mutate GitHub.
+
+`--dry-run` cannot be combined with `--no-emit`, `--watch`, `--approve`, or
 `--allow-action-refs`, because those options bypass required checks or the trusted
 safe-update baseline. It is distinct from `--action-mode dev`, does not change
 action reference mode, and does not upload, push, dispatch, or run workflows.

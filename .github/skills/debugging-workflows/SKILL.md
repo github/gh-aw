@@ -488,10 +488,10 @@ gh aw logs --firewall
 
 ```bash
 # Strict/staged development compilation with checks and warnings as errors
-gh aw compile <workflow> --dev
+gh aw compile <workflow> --dry-run
 
 # Recommended when using a reviewed test environment
-gh aw compile <workflow> --dev --environment gh-aw-debug
+gh aw compile <workflow> --dry-run --environment gh-aw-debug
 ```
 
 ## Reference Commands
@@ -531,7 +531,7 @@ gh aw compile <workflow> --dev --environment gh-aw-debug
 | `gh aw status` | Show all workflow status |
 | `gh aw compile` | Compile all workflows |
 | `gh aw compile <workflow>` | Compile specific workflow |
-| `gh aw compile <workflow> --dev` | Enforce shared development-testing checks |
+| `gh aw compile <workflow> --dry-run` | Enforce shared development-testing checks |
 
 ### Active Debugging Commands (Permitted Contexts Only)
 

@@ -145,7 +145,7 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 				noEmit:         config.NoEmit,
 				strict:         config.Strict,
 				validate:       shouldValidate,
-				failOnWarnings: config.Dev,
+				failOnWarnings: config.DryRun,
 				// zizmor, poutine, actionlint disabled per-file (batched instead)
 			},
 		)
@@ -362,7 +362,7 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 				noEmit:         config.NoEmit,
 				strict:         config.Strict,
 				validate:       shouldValidate,
-				failOnWarnings: config.Dev,
+				failOnWarnings: config.DryRun,
 				// zizmor, poutine, actionlint disabled per-file (batched instead)
 			},
 		)
@@ -631,7 +631,7 @@ func runBatchContainerScanners(
 		if err := runBatchGrantOnLockFiles(opts.lockFilesForGrant, config.Verbose && !config.JSONOutput, config.Strict); err != nil {
 			opts.recordError("grant", err)
 			if config.Strict {
-				if !config.Dev {
+				if !config.DryRun {
 					stats.Errors++
 					*validationResults = append(*validationResults, ValidationResult{
 						Workflow: "grant",
@@ -689,7 +689,7 @@ func runBatchExternalTools(
 	stats *CompilationStats,
 	validationResults *[]ValidationResult,
 ) (strictGrantErr error, batchToolErr error) {
-	if config.Dev {
+	if config.DryRun {
 		opts.reportError = func(tool string, err error) {
 			appendDevelopmentBatchDiagnostics(tool, appendValidationErrors(nil, tool+"_error", err), stats, validationResults)
 		}

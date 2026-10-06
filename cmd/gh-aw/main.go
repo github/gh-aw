@@ -418,7 +418,7 @@ type compileCmdOptions struct {
 	scheduleSeed              string
 	priorManifestFile         string
 	environment               string
-	dev                       bool
+	dryRun                    bool
 	validate                  bool
 	watch                     bool
 	noEmit                    bool
@@ -463,7 +463,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	actionsRepo, _ := cmd.Flags().GetString("actions-repo")
 	ghAwRef, _ := cmd.Flags().GetString("gh-aw-ref")
 	environment, _ := cmd.Flags().GetString("environment")
-	dev, _ := cmd.Flags().GetBool("dev")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	validate, _ := cmd.Flags().GetBool("validate")
 	watch, _ := cmd.Flags().GetBool("watch")
 	dir, _ := cmd.Flags().GetString("dir")
@@ -508,7 +508,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		explicitBoolFlags: getExplicitDevelopmentBoolFlags(cmd),
 		engineOverride:    engineOverride, actionMode: actionMode, actionTag: actionTag, actionsRepo: actionsRepo, ghAwRef: ghAwRef,
 		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile,
-		environment: environment, dev: dev,
+		environment: environment, dryRun: dryRun,
 		validate: validate, watch: watch, noEmit: noEmit, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
 		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
 		zizmor: zizmor, poutine: poutine, actionlint: actionlint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
@@ -519,7 +519,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 
 func getExplicitDevelopmentBoolFlags(cmd *cobra.Command) map[string]bool {
 	flags := make(map[string]bool)
-	for _, name := range cli.DevelopmentRequiredBoolFlags() {
+	for _, name := range cli.DryRunRequiredBoolFlags() {
 		if cmd.Flags().Changed(name) {
 			flags[name], _ = cmd.Flags().GetBool(name)
 		}
@@ -554,7 +554,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		ActionsRepo: o.actionsRepo, Validate: o.validate, Watch: o.watch, WorkflowDir: o.workflowDir(),
 		NoEmit: o.noEmit, Purge: o.purge, TrialMode: o.trial, TrialLogicalRepoSlug: o.logicalRepo, Strict: o.strict,
 		RequireSelfHostedRunners: o.requireSelfHostedRunners,
-		EnvironmentOverride:      o.environment, Dev: o.dev,
+		EnvironmentOverride:      o.environment, DryRun: o.dryRun,
 		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
@@ -565,7 +565,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 
 func runCompileCmd(cmd *cobra.Command, args []string) error {
 	opts := getCompileCmdOptions(cmd)
-	if err := cli.ValidateDevelopmentCompileFlags(opts.dev, opts.explicitBoolFlags); err != nil {
+	if err := cli.ValidateDevelopmentCompileFlags(opts.dryRun, opts.explicitBoolFlags); err != nil {
 		return err
 	}
 	if cmd.Flags().Changed("environment") && opts.environment == "" {
@@ -809,7 +809,7 @@ func configureCompileBuildFlags() {
 	compileCmd.Flags().Bool("no-emit", false, "Validate workflow without generating lock files")
 	compileCmd.Flags().Bool("purge", false, "Delete .lock.yml files that were not regenerated during compilation (only when no specific files are provided)")
 	compileCmd.Flags().Bool("strict", false, "Override frontmatter to enforce strict mode validation for all workflows (enforces action pinning, network config, safe-outputs, disallows write permissions and deprecated fields). Note: Workflows default to strict mode unless frontmatter sets strict: false")
-	compileCmd.Flags().Bool("dev", false, "Compile for development testing with strict validation, staged safe outputs, all static analysis tools, image and model checks, and warnings as errors; does not upload or dispatch workflows")
+	compileCmd.Flags().Bool("dry-run", false, "Compile with strict validation and all checks; disable compiler-managed GitHub mutations, stage safe outputs, and record dry_run in aw_info.json; custom scripts and external MCP effects remain unverified; does not upload or dispatch workflows")
 	compileCmd.Flags().String("environment", "", "Override the environment on every generated job; fails for reusable-workflow caller jobs, which cannot declare an environment")
 	compileCmd.Flags().Bool("require-self-hosted-runners", false, "Fail compilation unless every generated workflow job selects a self-hosted runner")
 	compileCmd.Flags().Bool("trial", false, "Enable trial mode compilation (modifies workflows for trial execution)")

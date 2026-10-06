@@ -99,9 +99,9 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 		workflow.WithEngineOverride(config.EngineOverride),
 		workflow.WithFailFast(config.FailFast),
 	)
-	if config.activeModels != nil || config.Dev {
+	if config.activeModels != nil || config.DryRun {
 		compiler.SetConfiguredModelValidator(func(data *workflow.WorkflowData) []string {
-			return configuredModelValidationMessages(data, config.activeModels, config.Dev)
+			return configuredModelValidationMessages(data, config.activeModels, config.DryRun)
 		})
 	}
 	compileCompilerSetupLog.Print("Created compiler instance")
@@ -142,7 +142,7 @@ func configureCompilerFlags(compiler *workflow.Compiler, config CompileConfig) {
 	compiler.SetStrictMode(config.Strict)
 	compiler.SetAllowActionRefs(config.AllowActionRefs)
 	compiler.SetForceStaged(config.Staged)
-	compiler.SetDevelopmentMode(config.Dev)
+	compiler.SetDryRun(config.DryRun)
 	compiler.SetEnvironmentOverride(config.EnvironmentOverride)
 	compiler.SetRequireSelfHostedRunners(config.RequireSelfHostedRunners)
 

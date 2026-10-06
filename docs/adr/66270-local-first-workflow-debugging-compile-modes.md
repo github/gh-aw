@@ -1,4 +1,4 @@
-# ADR-66270: Support Local-First Workflow Debugging with Compile-Time `--dev` and `--environment`
+# ADR-66270: Support Local-First Workflow Debugging with Compile-Time `--dry-run` and `--environment`
 
 **Date**: 2026-10-06
 **Status**: Proposed
@@ -12,7 +12,7 @@ Only a hosted run exercises the real lock file, approvals, secrets, and runner b
 
 ### Decision
 
-Use local compilation and bounded component reproduction as the first debugging steps. `gh aw compile --dev` enables strict validation, staging, image/model/analysis checks, and all scanners, rejecting bypass options and explicitly disabled required flags. Warnings become failures; workflow-local diagnostics remain attached to their workflow, while batch diagnostics are reported separately. Development compilation disables `push_` jobs and conclusion issue/comment reporting without removing diagnostic handlers, summaries, or usage artifacts. It adds no memory-tool staging fields.
+Use local compilation and bounded component reproduction as the first debugging steps. `gh aw compile --dry-run` enables strict validation, staging, image/model/analysis checks, and all scanners, rejecting bypass options and explicitly disabled required flags. Warnings become failures; workflow-local diagnostics remain attached to their workflow, while batch diagnostics are reported separately. Dry-run disables compiler-managed GitHub mutations, including push jobs, memory/cache persistence, reusable safe-output calls, work-queue operations, reactions, comments/issues, label removal, and issue locking. `aw_info.json` records `dry_run`. Diagnostic handlers, summaries, and run artifacts remain enabled. No memory-tool staging fields are added. Custom scripts/jobs, agent shell commands, external MCP servers, and custom credentials remain explicitly unverified rather than being rejected.
 
 `gh aw compile --environment NAME` replaces the environment on every generated job, including approval jobs, with a validated literal name. Reusable-workflow caller jobs fail explicitly because GitHub Actions forbids an environment on them. Installed and embedded debugging instructions share `.github/aw/debug-agentic-workflow.md`, which unifies local diagnosis/patching, evidence triage, and bounded, human-validated live debugging. Neither flag authorizes workflow execution.
 
@@ -34,26 +34,26 @@ The override is a debugging-time concern rather than a persistent source setting
 
 #### Positive
 
-- One flag (`--dev`) requests the complete development check set without dispatch. Local diagnostics do not replace hosted CI or runtime verification.
+- One flag (`--dry-run`) requests the complete development check set without dispatch. Local diagnostics do not replace hosted CI or runtime verification.
 - Bypass options and explicitly disabled required checks are rejected; JSON diagnostics preserve failures without treating another workflow's warning as a local defect.
-- Push jobs and conclusion issue/comment reporting are disabled for development testing; diagnostic evidence remains available.
+- Compiler-managed GitHub mutations are disabled for dry-run testing; diagnostic evidence remains available.
 - `--environment` makes live verification explicitly scoped and reviewable, including on approval jobs, instead of relying on authors remembering to hand-edit lock files.
 - The reusable-workflow caller case fails loudly with actionable guidance rather than emitting a lock file that GitHub Actions would reject at run time.
 - Unifying installed and embedded routers on `debug-agentic-workflow.md` removes drift between the two instruction copies.
 
 #### Negative
 
-- Two new public CLI/MCP surfaces must be kept working and documented forever; `--dev` in particular is a bundle whose membership will need revisiting every time a new check is added.
-- `--dev` is slower and noisier than a plain compile, so authors may avoid it, and warning-as-error will fail on pre-existing findings unrelated to the change in flight (this PR already reports the progress gate blocked by pre-existing custom-linter findings).
+- Two new public CLI/MCP surfaces must be kept working and documented forever; `--dry-run` in particular is a bundle whose membership will need revisiting every time a new check is added.
+- `--dry-run` is slower and noisier than a plain compile, so authors may avoid it, and warning-as-error will fail on pre-existing findings unrelated to the change in flight (this PR already reports the progress gate blocked by pre-existing custom-linter findings).
 - `--environment` does not isolate secrets: authorized repository/organization/enterprise shared secrets remain in job scope, so the flag can create a false sense of containment if read as sandboxing.
-- Staging and disabled push jobs do not neutralize other custom scripts, cache saves, or MCP side effects, so a `--dev` compile is not proof that a workflow is safe to run.
+- Dry-run does not neutralize arbitrary custom scripts, agent shell commands, external MCP servers, or custom credentials, so it is not proof that a workflow is safe to run.
 - Replacing approval-job environments is a sharp edge that requires human review; misuse could route an approval to a weaker gate.
 
 #### Neutral
 
 - A protected test environment is recommended, not mandatory; the tooling does not enforce it.
-- Compilation grants no execution authorization — `--dev` and `--environment` deliberately change nothing about who may dispatch a workflow.
-- Failed `--dev` compilations can leave diagnostic artifacts on disk; these are diagnostics, not approved test inputs.
+- Compilation grants no execution authorization — `--dry-run` and `--environment` deliberately change nothing about who may dispatch a workflow.
+- Failed `--dry-run` compilations can leave diagnostic artifacts on disk; these are diagnostics, not approved test inputs.
 - Validation for this PR was formatting/build, impacted unit tests, focused compiler/CLI/MCP/environment tests, router-consistency tests, and tabletop multi-model instruction simulations — no hosted workflow was dispatched.
 
 ---

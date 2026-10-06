@@ -21,6 +21,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	c.jobManager = NewJobManager()
 
 	// Build all jobs
+	data = c.dryRunWorkflowData(data)
 	if err := c.buildJobs(data, markdownPath); err != nil {
 		compilerYamlLog.Printf("Failed to build jobs: %v", err)
 		return fmt.Errorf("job generation could not complete; check that each configured job has valid step fields such as run, uses, and with: %w", err)
@@ -28,7 +29,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 
 	compilerYamlLog.Printf("Built %d jobs successfully", len(c.jobManager.GetAllJobs()))
 
-	c.disableDevelopmentPushJobs()
+	c.disableDryRunPushJobs()
 
 	if err := c.applyEnvironmentOverride(); err != nil {
 		return err

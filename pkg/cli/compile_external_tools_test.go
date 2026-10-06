@@ -179,7 +179,7 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 	assert.Equal(t, 1, stats.Errors)
 
 	calls = nil
-	config.Dev = true
+	config.DryRun = true
 	config.JSONOutput = true
 	stats = &CompilationStats{Total: 2, Succeeded: 2}
 	validationResults = []ValidationResult{

@@ -49,14 +49,14 @@ func TestCompileCommandShortFlags(t *testing.T) {
 
 func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
 	t.Parallel()
-	for _, name := range cli.DevelopmentRequiredBoolFlags() {
+	for _, name := range cli.DryRunRequiredBoolFlags() {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			cmd := &cobra.Command{}
 			cmd.SetContext(context.Background())
-			cmd.Flags().Bool("dev", false, "")
+			cmd.Flags().Bool("dry-run", false, "")
 			cmd.Flags().Bool(name, false, "")
-			if err := cmd.ParseFlags([]string{"--dev", "--" + name + "=false"}); err != nil {
+			if err := cmd.ParseFlags([]string{"--dry-run", "--" + name + "=false"}); err != nil {
 				t.Fatal(err)
 			}
 			opts := getCompileCmdOptions(cmd)
@@ -70,7 +70,7 @@ func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
 				t.Fatal(err)
 			}
 			opts = getCompileCmdOptions(cmd)
-			if err := cli.ValidateDevelopmentCompileFlags(opts.dev, opts.explicitBoolFlags); err != nil {
+			if err := cli.ValidateDevelopmentCompileFlags(opts.dryRun, opts.explicitBoolFlags); err != nil {
 				t.Fatalf("explicitly enabling required check should be accepted: %v", err)
 			}
 		})
@@ -122,21 +122,24 @@ func TestCompileOptionsPropagateRequireSelfHostedRunners(t *testing.T) {
 
 func TestCompileDevelopmentAndEnvironmentFlags(t *testing.T) {
 	t.Parallel()
-	for name, defaultValue := range map[string]string{"dev": "false", "environment": ""} {
+	for name, defaultValue := range map[string]string{"dry-run": "false", "environment": ""} {
 		flag := compileCmd.Flags().Lookup(name)
 		if flag == nil || flag.DefValue != defaultValue {
 			t.Fatalf("expected --%s with default %q, got %v", name, defaultValue, flag)
 		}
+		if compileCmd.Flags().Lookup("dev") != nil {
+			t.Fatal("expected --dev to be replaced by --dry-run")
+		}
 	}
 	cmd := &cobra.Command{}
-	cmd.Flags().Bool("dev", false, "")
+	cmd.Flags().Bool("dry-run", false, "")
 	cmd.Flags().String("environment", "", "")
-	if err := cmd.ParseFlags([]string{"--dev", "--environment", "test: #1"}); err != nil {
+	if err := cmd.ParseFlags([]string{"--dry-run", "--environment", "test: #1"}); err != nil {
 		t.Fatal(err)
 	}
 	opts := getCompileCmdOptions(cmd)
 	config := opts.toCompileConfig(nil)
-	if !config.Dev || config.EnvironmentOverride != "test: #1" {
+	if !config.DryRun || config.EnvironmentOverride != "test: #1" {
 		t.Fatalf("development flags were not propagated: %+v", config)
 	}
 }

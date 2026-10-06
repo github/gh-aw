@@ -29,7 +29,7 @@ func TestCompileToolDevelopmentRejectsExplicitFalseChecks(t *testing.T) {
 			require.NoError(t, registerCompileTool(server, mockExec, ""))
 			session := connectInMemory(t, server)
 			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-				Name: "compile", Arguments: map[string]any{"dev": true, name: false},
+				Name: "compile", Arguments: map[string]any{"dry_run": true, name: false},
 			})
 			if err != nil {
 				assert.Contains(t, err.Error(), "--"+name+"=false")
@@ -53,7 +53,7 @@ func TestCompileToolDevelopmentPreservesBatchDiagnosticsOnFailure(t *testing.T) 
 	require.NoError(t, registerCompileTool(server, mockExec, ""))
 	session := connectInMemory(t, server)
 	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "compile", Arguments: map[string]any{"dev": true, "strict": true},
+		Name: "compile", Arguments: map[string]any{"dry_run": true, "strict": true},
 	})
 	require.NoError(t, err)
 	var decoded []ValidationResult
@@ -103,13 +103,13 @@ func TestCompileToolDevelopmentAndEnvironmentArguments(t *testing.T) {
 	_, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name: "compile",
 		Arguments: map[string]any{
-			"dev":         true,
+			"dry_run":     true,
 			"environment": "test: #1",
 			"workflows":   []string{"test.md"},
 		},
 	})
 	require.NoError(t, err)
-	assert.Contains(t, capturedArgs, "--dev")
+	assert.Contains(t, capturedArgs, "--dry-run")
 	index := slices.Index(capturedArgs, "--environment")
 	require.NotEqual(t, -1, index)
 	require.Greater(t, len(capturedArgs), index+1)
