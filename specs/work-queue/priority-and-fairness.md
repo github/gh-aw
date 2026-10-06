@@ -1792,6 +1792,246 @@ must have explicit latency/memory/API budgets and
 reject configurations outside its measured envelope; no universal throughput
 claim follows from the in-memory selector's complexity.
 
+### 7.18 Operational recovery scenarios
+
+These walkthroughs apply the existing [launch protocol](#78-dispatch-capacity-and-crash-recovery),
+[per-Claim settlement](#individual-finalization-and-effects), and
+[delivery barriers](#completion-is-not-yet-dependency-success). They introduce
+no incident ledger, mutable campaign manifest, or alternate retry scheduler.
+Every accepted recovery decision uses the same checked publisher and
+`work-queue.jsonl`; incident reports and telemetry remain diagnostic.
+
+Recovery needs authenticated evidence, not a healthy agent or a successful
+cleanup step in the failed workflow. A trusted reconciler or authorized operator
+uses the same publication boundary. If that boundary or its evidence sources
+are unavailable, report the blocker and retain authority/capacity conservatively.
+There is no timeout-based escape hatch.
+
+| Latest authoritative facts | Recovery rule |
+|---|---|
+| Request publication outcome unknown | Read the current chain and resolve the stable request ID before retrying; do not assume the write failed |
+| Reservation with no start marker | Resume one checked start, or CAS-cancel prelaunch and release; obey grant pauses |
+| Start marker but no validated binding/nonlaunch evidence | Reconcile the possible launch; retain the reservation, never resend the POST blindly |
+| Exact worker run/attempt terminal, Claim still open | Publish ClaimCancellation with trusted retry/exhaustion handling and release the group's reservation once |
+| Completion exists, Result absent | Preserve ownership, inspect delivery without replaying effects, then publish Result or guarded DeliveryFailure |
+| Result exists | Preserve it and its declared dependency semantics; an incident does not roll back successful siblings |
+
+#### GitHub Actions outage
+
+An Actions/API/runner outage does not establish that queued or running workers
+have stopped. GitHub's Git APIs may also be unavailable; distinguish failure to
+launch/observe from failure to read or publish the queue.
+
+When the ledger remains writable, an administrator MAY publish
+`Control(grants_paused)` to prevent additional Claims/start markers from
+accumulating. A start marker already committed before the pause may still lead
+to its one launch. Record an uncertain dispatch outcome where possible, with
+bounded sanitized evidence; do not refund its charge or free its reservation.
+If Git reads/publication also fail, fail closed for new grants and effects
+requiring fresh authorization. Local staged intents, cached state, and failed
+HTTP responses do not become authoritative replacements for the log.
+
+After service returns, first replay the current prefix and resolve uncertain
+publication requests. Reconcile each reserved/started/bound group individually:
+validate actual worker bindings, preserve live reservations, and close/release
+only with definitive nonlaunch or exact worker-terminal evidence. Recheck
+foreign-gate freshness and output artifact availability before future grants
+or Result publication. Resume grants only after the publisher/evidence access
+is healthy; unresolved groups retain their slots but need not stop independent
+work when capacity and policy permit.
+
+```mermaid
+flowchart TD
+    Outage["Actions or GitHub API unavailable"] --> Ledger{"Queue readable and writable?"}
+    Ledger -->|No| Block["Fail closed and retain last durable facts"]
+    Ledger -->|Yes| Pause["Optional logged grant pause and bounded uncertainty evidence"]
+    Block --> Restored["API and publisher access restored"]
+    Pause --> Restored
+    Restored --> Replay["Replay tip and resolve stable request IDs"]
+    Replay --> Observe["Reconcile each possible worker launch"]
+    Observe --> Live["Bound live or unresolved: keep reservation"]
+    Observe --> Stopped["Proven terminal or nonlaunch: settle open Claims and release once"]
+    Stopped --> Barrier["Verify completed members without replaying effects"]
+```
+
+**Operator-visible outcome:** backlog, retained reservations, unresolved launch
+IDs, and pending delivery barriers remain distinguishable. Exhausting a bounded
+observation budget reports `launch_unresolved` or unavailable evidence, not
+success, an empty queue, or an automatic capacity reset.
+
+#### Operator accidentally stops a run
+
+Cancelling a **dispatcher** does not cancel a worker it may already have
+launched. If no start marker exists, checked recovery can resume or definitively
+cancel prelaunch. If a marker exists, reconcile the possible worker launch even
+when the dispatcher is terminal. Its conclusion is not worker-terminal evidence.
+
+Cancelling a **worker** is a request until the exact bound `(run_id, attempt=1)`
+is observed terminal. Do not depend on its cancelled cleanup job running.
+Trusted recovery then cancels only still-open Claims and releases the shared
+native reservation once. A ClaimCancellation preserves the Work's original
+queue position and accounting identity, applies bounded retry/backoff, and
+allows a later ordinary fair grant; it does not refund the failed Claim.
+
+For `[c1,c2,c3]`, suppose c1 already has a verified Result, c2 is still open,
+and c3 was intentionally cancelled. Preserve c1 and c3's facts, cancel only c2,
+and let the DAG continue from c1 wherever its declared predecessors suffice.
+If c1 has Completion but no Result, reconcile its delivery barrier rather than
+retry c1 or classify the whole assignment as failed.
+
+```mermaid
+flowchart TD
+    Stop["Operator cancellation"] --> Which{"Dispatcher or worker?"}
+    Which -->|Dispatcher| Launch["Resolve its possible worker launch"]
+    Launch --> Keep["Dispatcher termination alone cannot release capacity"]
+    Which -->|Worker| Evidence["Await exact bound worker-terminal evidence"]
+    Evidence --> Open["Cancel only still-open Claims"]
+    Evidence --> Done["Preserve completed members and verify pending delivery"]
+    Evidence --> Release["Release shared native reservation once"]
+    Open --> Fair["Backoff, then new fair Claim and new worker run"]
+    Done --> DAG["Verified Results release only their declared successors"]
+```
+
+**Operator-visible outcome:** the native cancelled conclusion and each Claim's
+durable outcome are shown separately. GitHub's **Re-run** button is not a queue
+retry: attempt 2 cannot reuse the old assignment's authority. Recovery of the
+original attempt's facts is allowed; new execution requires a fresh fair Claim
+and a new dispatch binding.
+
+#### Agent crashes, loses connectivity, or cannot start
+
+Distinguish a transient network/LLM-provider failure from a deterministic
+configuration error, and an agent-process failure from native-run termination.
+The trusted wrap-up may still run after the agent exits. If it does, it uses
+the normal per-Claim intent/output gates; a staged finish alone is never proof
+of durable success.
+
+If wrap-up cannot publish before terminal recovery, still-open Claims become
+ClaimCancellation, not implicit Completion. For a transient failure, the Work
+becomes eligible after trusted backoff and receives a new Claim through ordinary
+scheduling, subject to the finite attempt budget. A paused grant path can limit
+churn during a provider-wide incident without stopping cancellation, delivery
+verification, or release.
+
+Misconfigured credentials, invalid immutable plans, or unsupported model/recipe
+settings must not enter an indefinite immediate retry loop. Restore equivalent
+credentials through the approved credential-generation Control when that is the
+fault. Otherwise diagnose the non-transient error and publish WorkCancellation
+for unrecoverable Work, including on attempt exhaustion. Admit corrected Work as
+new immutable nodes with ordinary positions/charges; do not edit the original
+payload or create a new accounting key. Changes to approved routing/trust
+scope require the drained Policy transition, not a recovery override.
+
+```mermaid
+flowchart TD
+    Crash["Agent or provider failure"] --> Wrap{"Trusted wrap-up can publish?"}
+    Wrap -->|Yes| Normal["Normal staged-intent and output gates"]
+    Normal --> Preserve["Keep durable outcomes and released DAG branches"]
+    Wrap -->|No| Native["Await exact native-terminal evidence"]
+    Native --> Facts{"Per-Claim durable state?"}
+    Facts -->|Open| Cancel["ClaimCancellation"]
+    Cancel --> Cause{"Transient and within retry budget?"}
+    Cause -->|Yes| Retry["Trusted backoff and future fair grant"]
+    Cause -->|No| Diagnose["Repair approved environment or publish WorkCancellation"]
+    Facts -->|Completed| Verify["Inspect delivery without rerunning effects"]
+    Verify --> Result["Verified Result"]
+    Verify --> Failure["Terminal evidence and exhausted budget: DeliveryFailure"]
+    Facts -->|Result exists| Preserve
+```
+
+A crash after Completion is a different recovery class from a crash before it.
+Inspect each completed member independently: verified delivery permits Result;
+otherwise terminal evidence plus bounded reconciliation permits DeliveryFailure.
+Missing receipts are `unknown`, not proof of no effects. Any replacement for
+partial/unknown delivery requires the trusted remediation disposition in
+section 7.15. A provider outage is not permission to replay GitHub writes.
+
+**Operator-visible outcome:** diagnostics distinguish agent/provider failure,
+native liveness, attempt exhaustion, missing artifact/effect evidence, and
+delivery failure. No agent error string by itself closes ownership or releases
+capacity, and successful siblings survive the failed member.
+
+#### Campaign is revised while work is in flight
+
+A campaign revision changes plans/inputs, not previously admitted Work,
+assignments, or scheduling policy. Represent revisions through new immutable
+Work definitions, revision-qualified node keys, and bounded diagnostic payload
+metadata. For example, graph `campaign-x` can contain `r1/prepare`,
+`r1/analyze`, and later `r2/analyze`. Keep the same authorized pool/accounting
+identity and existing service debt; a revision label is not a new entitlement.
+Pin each node's execution plan/ref at admission and obey the existing graph,
+byte, and batch-compatibility limits.
+
+**Default: let existing Claims finish their admitted revision.** Updating the
+dispatcher or campaign source does not update their payloads, append members
+to their assignments, or redirect their outputs to new-revision nodes. New
+revision nodes get new identities and FIFO positions and compete through
+normal scheduling. A revised worker/workflow ref outside the current approved
+Policy requires a drained Policy change before admission or launch.
+
+If old pending work is obsolete, an authorized operator must make that
+disposition explicit; trusted producers admit the new nodes:
+
+| Old revision state | Revision handling |
+|---|---|
+| Available or blocked, not completed | Publish WorkCancellation for obsolete nodes and explicitly dispose of obsolete descendants; admit new nodes with their intended immutable edges |
+| Claimed, not completed | WorkCancellation may revoke its future queue effects; request native cancellation if needed and retain the group reservation until proven terminal/nonlaunch |
+| Completed, delivery pending | Preserve Completion and reconcile Result/DeliveryFailure; revision does not revoke its one-shot authorization or reopen Work |
+| Verified Result | Preserve the Result; reuse it only through explicitly admitted edges whose input contract still accepts it |
+| DeliveryFailure or WorkCancellation | New nodes must not treat that predecessor as successful; use an approved replacement/new branch, never rewire the old DAG |
+
+Cancellation and Completion race through the same CAS-validated prefix.
+If Completion wins, the completed-state rule applies; a revision request cannot
+retroactively cancel it. A group containing still-valid siblings remains one
+native run: cancelling that run also interrupts those siblings, whose durable
+facts survive and whose still-open Claims follow the ordinary recovery rules.
+
+```mermaid
+flowchart LR
+    Revision["Campaign r2 proposed"] --> Checked["Trusted admission under current Policy"]
+    Checked --> New["New revision-qualified Work and immutable edges"]
+    Old["r1 Claims and stored plans"] --> Finish["Finish r1 or explicitly cancel obsolete Work"]
+    Finish --> Facts["Keep existing r1 Results and pending delivery diagnosis"]
+    Facts --> Reuse["Optional declared reuse of compatible verified inputs"]
+    Reuse --> New
+    New --> Fair["Same accounting identity and ordinary fair grants"]
+    Cancelled["Obsolete r1 nodes explicitly WorkCancelled"] --> Blocked["Old dependent edges stay blocked or are explicitly cancelled"]
+```
+
+Reuse across revisions in the same graph is an explicit edge to a compatible
+verified predecessor, not a mutable "latest result" lookup. A new `graph_id`
+cannot acquire a cross-graph Work edge: admit its own roots and follow the
+existing input-resolution contract. Missing/incompatible old artifacts remain
+explicit input errors.
+
+For a **strict cutover**, pause admission and grants before admitting/granting
+new-revision execution. Quiesce old producers and delivery of their uncommitted
+intents, explicitly dispose of obsolete nonterminal Work, and reconcile every
+old possibly launched group to definitive nonlaunch or exact native termination.
+Settle old completed-node delivery barriers, apply a drained Policy change if
+required, then resume admission for checked new nodes while retaining the grant
+pause until the update is complete. Keep grants paused through bounded
+multi-commit updates when operation limits prevent one transaction. A pause
+alone is not a fence for already-started launches; unresolved groups make strict
+cutover pending, not complete. Revision does not roll back effects already
+delivered.
+
+Any required Policy change needs **queue-wide** quiescence under section 7.10;
+draining only the revised campaign is insufficient.
+
+Overlapping revisions are safe only when their domain-specific resource/effect
+contracts permit it. Queue ownership does not serialize all writes to a shared
+Issue, PR, or branch. Use strict cutover when old/new writes are incompatible;
+do not invent a force-release, shared authorization, or implicit compensation.
+Different identities for a routine revision must not misuse `replacement_of`,
+which is reserved for the delivery-failure remediation contract.
+
+**Operator-visible outcome:** explain/trace distinguishes each revision's graph/
+node and immutable ref, surviving old Results, explicit cancellations, new
+positions, and pending cutover reservations/barriers. These facts are recorded
+by Work/lifecycle/Control operations in the same log; there is no authoritative
+active-revision pointer in a separate campaign file.
+
 ## 8. Validation and evaluation plan
 
 ### 8.1 Small design experiments performed for this report
@@ -1869,6 +2109,10 @@ scope of this change.
 | Backend gating | Any backend lacking scheduler serialization is rejected for queue operation; no advisory/unscheduled-FIFO fallback |
 | Policy epochs | Reject changes while nonterminal Work/reservations or unresolved delivery barriers exist; drained epoch transition resets derived ticks explicitly and preserves old history |
 | Operational controls | Pause/resume and equivalent-scope credential rotation work on a non-drained queue without resetting debt, freeing slots, or blocking trusted closure/recovery |
+| Platform outage recovery | Lost publication/dispatch responses resolve by request identity and trusted native evidence; unavailable APIs retain reservations and block unverified effects |
+| Accidental run cancellation | Dispatcher cancellation is not worker termination; worker-terminal recovery preserves completed siblings, cancels only open Claims, and rejects rerun authority |
+| Agent fault classification | Transient failures back off within a finite budget; deterministic errors/exhaustion require repair or explicit WorkCancellation; completed members never replay effects |
+| In-flight campaign revision | Stored plans/assignments and old edges remain immutable; new nodes preserve accounting scope, and strict cutover waits for old native and delivery evidence |
 | Late binding | If snapshot predicts A but trusted processing selects B, launch B with B's stored plan/profile; never carry A's inputs forward |
 | Agentic intent status | Staging creates no Claim or launch; snapshot/staged/durable/granted/bound states are distinguishable |
 | Batch idempotency | Replaying one committed batch returns the same Claims and handles launches conservatively; different request parameters with the same ID fail |
@@ -1912,6 +2156,8 @@ terminal DeliveryFailure/replacement procedure, and resource budgets are
 FairWorkQueue.tla**. Current checks cover neither sustained grant-share error nor
 eventual-service properties. Bounded checks do not imply an unbounded proof or
 runtime refinement. The current model documentation makes that distinction.
+The operational outage/cancellation/fault/campaign walkthroughs in section 7.18
+are likewise runtime acceptance scenarios, not new formal verification results.
 [R14], [R16]
 
 [`ClaimScopedWorker.tla`](ClaimScopedWorker.tla) separately checks the bounded
