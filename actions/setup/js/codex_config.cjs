@@ -8,6 +8,22 @@ function isTable(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+/** @param {unknown} catalog @returns {Record<string, unknown>} */
+function directToolCatalog(catalog) {
+  if (!isTable(catalog) || !Array.isArray(catalog.models) || catalog.models.length === 0) {
+    throw new Error("Invalid bundled Codex model catalog: expected a nonempty models array");
+  }
+  return {
+    ...catalog,
+    models: catalog.models.map(model => {
+      if (!isTable(model) || typeof model.slug !== "string" || !model.slug) {
+        throw new Error("Invalid bundled Codex model catalog: each model must have a slug");
+      }
+      return { ...model, tool_mode: "direct" };
+    }),
+  };
+}
+
 /** @param {Record<string, unknown>} base @param {Record<string, unknown>} overrides @returns {Record<string, unknown>} */
 function mergeConfig(base, overrides) {
   const keys = [...new Set([...Object.keys(base), ...Object.keys(overrides)])].sort();
@@ -155,4 +171,4 @@ function buildConfig(servers, urlPrefix) {
   return expanded;
 }
 
-module.exports = { isTable, mergeConfig, tomlValue, serializeConfig, buildConfig, loadCompiledConfig, expandConfigEnv };
+module.exports = { isTable, directToolCatalog, mergeConfig, tomlValue, serializeConfig, buildConfig, loadCompiledConfig, expandConfigEnv };
