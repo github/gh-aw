@@ -26,8 +26,7 @@ import (
 
 var copilotSetupLog = logger.New("cli:copilot_setup")
 
-// installScriptTempPath is the temporary file path used for the downloaded gh-aw install script.
-const installScriptTempPath = "/tmp/gh-aw/install-gh-aw.sh"
+const installScriptTempVariable = "$install_script"
 
 // copilotSetupStepsStaticSHA is the pinned commit SHA of install-gh-aw.sh used in the static
 // YAML test template and as the fallback when ResolveGhAwRef is unavailable.
@@ -72,16 +71,16 @@ func resolveInstallScriptSHA256(ctx context.Context, commitSHA string) string {
 // sha256CheckLine returns a YAML-indented shell command (with trailing newline) that verifies
 // digest against path using sha256sum. Returns an empty string if either parameter is invalid.
 // digest must be a 64-char lowercase hex string (sha256HexRegex); path must contain only
-// safe filesystem characters (no spaces, quotes, or shell metacharacters).
+// safe filesystem characters or be the generated install_script shell variable.
 func sha256CheckLine(digest, path string) string {
 	if !sha256HexRegex.MatchString(digest) {
 		return ""
 	}
-	if path == "" || strings.ContainsAny(path, " \t\n\"'\\$`;&|<>(){}*?") {
+	if path == "" || (path != installScriptTempVariable && strings.ContainsAny(path, " \t\n\"'\\$`;&|<>(){}*?")) {
 		copilotSetupLog.Printf("sha256CheckLine: unsafe path %q, skipping", path)
 		return ""
 	}
-	return fmt.Sprintf(`          echo "%s  %s" | sha256sum -c -`+"\n", digest, path)
+	return fmt.Sprintf(`          printf '%%s  %%s\n' %q %q | sha256sum -c -`+"\n", digest, path)
 }
 
 // If a resolver is provided and mode is release or action, attempts to resolve the SHA for a SHA-pinned reference.
@@ -178,9 +177,10 @@ jobs:
     steps:
       - name: Install gh-aw extension
         run: |
-          mkdir -p /tmp/gh-aw
-          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/%s/install-gh-aw.sh -o %s
-%s          bash %s
+         install_script="$(mktemp)"
+         trap 'rm -f "$install_script"' EXIT
+         curl -fsSL https://raw.githubusercontent.com/github/gh-aw/%s/install-gh-aw.sh -o "$install_script"
+%s          bash "$install_script"
 `
 
 // generateCopilotSetupStepsYAML generates the copilot-setup-steps.yml content based on action mode
@@ -197,7 +197,7 @@ func generateCopilotSetupStepsYAML(ctx context.Context, actionMode workflow.Acti
 
 	// Default (dev/script mode): resolve the repository default branch via the
 	// GitHub API, then pin it to a SHA so the downloaded script is immutable.
-	// Fall back to the mutable branch ref if unavailable.
+	// Fall back to the known immutable SHA and checksum if resolution fails.
 	defaultBranch := "main"
 	if branch, err := resolveGhAwDefaultBranchForCopilotSetup(ctx, "github/gh-aw"); err != nil {
 		copilotSetupLog.Printf("Could not resolve github/gh-aw default branch for dev-mode template, falling back to %q: %v", defaultBranch, err)
@@ -206,30 +206,32 @@ func generateCopilotSetupStepsYAML(ctx context.Context, actionMode workflow.Acti
 	} else {
 		copilotSetupLog.Printf("Could not resolve github/gh-aw default branch for dev-mode template: empty branch returned, falling back to %q", defaultBranch)
 	}
-	installRef := "refs/heads/" + defaultBranch
-	installSHA256 := ""
-	if sha, err := resolveGhAwRefForCopilotSetup(ctx, defaultBranch); err == nil && sha != "" {
-		installRef = sha
+	installRef := copilotSetupStepsStaticSHA
+	installSHA256 := copilotSetupStepsStaticSHA256
+	if sha, err := resolveGhAwRefForCopilotSetup(ctx, defaultBranch); err == nil && gitutil.IsValidFullSHA(sha) {
 		// Fetch the script to compute an explicit SHA256 integrity check line.
-		installSHA256 = resolveInstallScriptSHA256ForCopilotSetup(ctx, sha)
+		if digest := resolveInstallScriptSHA256ForCopilotSetup(ctx, sha); sha256HexRegex.MatchString(digest) {
+			installRef = sha
+			installSHA256 = digest
+		} else {
+			copilotSetupLog.Printf("Could not resolve install-gh-aw.sh SHA256 at %s; using the static pinned installer", sha)
+		}
 	} else {
-		copilotSetupLog.Printf("Could not resolve github/gh-aw %s SHA for dev-mode template, falling back to mutable ref: %v", defaultBranch, err)
+		copilotSetupLog.Printf("Could not resolve github/gh-aw %s SHA for dev-mode template, using the static pinned installer: %v", defaultBranch, err)
 	}
-	sha256Cmd := sha256CheckLine(installSHA256, installScriptTempPath)
-	return fmt.Sprintf(copilotSetupScriptTemplate, installRef, installScriptTempPath, sha256Cmd, installScriptTempPath)
+	sha256Cmd := sha256CheckLine(installSHA256, installScriptTempVariable)
+	return fmt.Sprintf(copilotSetupScriptTemplate, installRef, sha256Cmd)
 }
 
 // copilotSetupStepsYAML is a static dev-mode template used only for YAML validity tests.
 // It is built from copilotSetupStepsStaticSHA and copilotSetupStepsStaticSHA256 so that
 // scripts/update-install-script-hashes.sh can refresh both values in a single place.
 // The runtime function generateCopilotSetupStepsYAML resolves the ref dynamically
-// from the repository default branch via the GitHub API.
+// from the repository default branch via the GitHub API, falling back to the static pin.
 var copilotSetupStepsYAML = fmt.Sprintf(
 	copilotSetupScriptTemplate,
 	copilotSetupStepsStaticSHA,
-	installScriptTempPath,
-	sha256CheckLine(copilotSetupStepsStaticSHA256, installScriptTempPath),
-	installScriptTempPath,
+	sha256CheckLine(copilotSetupStepsStaticSHA256, installScriptTempVariable),
 )
 
 // copilotSetupStepsJobName is the job name GitHub Copilot coding agent looks for in
@@ -519,22 +521,29 @@ func renderCopilotSetupUpdateInstructions(ctx context.Context, filePath string, 
 		fmt.Fprintln(os.Stderr, "        with:")
 		fmt.Fprintln(os.Stderr, "          version: "+version)
 	} else {
-		// Dev/script mode: try to resolve main to a pinned SHA so the instructions emit an
-		// immutable URL; fall back to the mutable branch ref if resolution is unavailable.
-		installRef := "refs/heads/main"
-		installSHA256 := ""
-		if sha, err := workflow.ResolveGhAwRef(ctx, "main"); err == nil && sha != "" {
-			installRef = sha
-			installSHA256 = resolveInstallScriptSHA256(ctx, sha)
+		// Dev/script mode: try to resolve main to a pinned SHA and checksum; fall back to
+		// the known immutable SHA and checksum if resolution is unavailable.
+		installRef := copilotSetupStepsStaticSHA
+		installSHA256 := copilotSetupStepsStaticSHA256
+		if sha, err := workflow.ResolveGhAwRef(ctx, "main"); err == nil && gitutil.IsValidFullSHA(sha) {
+			if digest := resolveInstallScriptSHA256(ctx, sha); sha256HexRegex.MatchString(digest) {
+				installRef = sha
+				installSHA256 = digest
+			} else {
+				copilotSetupLog.Printf("Could not resolve install-gh-aw.sh SHA256 at %s; using the static pinned installer", sha)
+			}
+		} else {
+			copilotSetupLog.Printf("Could not resolve github/gh-aw main SHA for install instructions, using the static pinned installer: %v", err)
 		}
 		fmt.Fprintln(os.Stderr, "      - name: Install gh-aw extension")
 		fmt.Fprintln(os.Stderr, "        run: |")
-		fmt.Fprintln(os.Stderr, "          mkdir -p /tmp/gh-aw")
-		fmt.Fprintln(os.Stderr, "          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/"+installRef+"/install-gh-aw.sh -o "+installScriptTempPath)
-		if line := sha256CheckLine(installSHA256, installScriptTempPath); line != "" {
+		fmt.Fprintln(os.Stderr, "          install_script=\"$(mktemp)\"")
+		fmt.Fprintln(os.Stderr, `          trap 'rm -f "$install_script"' EXIT`)
+		fmt.Fprintln(os.Stderr, `          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/`+installRef+`/install-gh-aw.sh -o "$install_script"`)
+		if line := sha256CheckLine(installSHA256, installScriptTempVariable); line != "" {
 			fmt.Fprint(os.Stderr, line) // sha256CheckLine includes trailing newline
 		}
-		fmt.Fprintln(os.Stderr, "          bash "+installScriptTempPath)
+		fmt.Fprintln(os.Stderr, `          bash "$install_script"`)
 	}
 	fmt.Fprintln(os.Stderr)
 }

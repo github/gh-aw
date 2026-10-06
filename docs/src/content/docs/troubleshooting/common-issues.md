@@ -11,12 +11,7 @@ Frequently encountered issues, organized by workflow stage and component.
 
 ### Extension Installation Fails
 
-If `gh extension install github/gh-aw` fails, use the standalone installer (works in Codespaces and restricted networks). Pass a tag as the second argument to pin a version ([releases](https://github.com/github/gh-aw/releases)). Verify with `gh extension list`.
-
-```bash wrap
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s -- v0.40.0
-```
+If `gh extension install github/gh-aw` fails, use the [standalone installer](/gh-aw/setup/cli/#alternative-standalone-installer), which verifies a checksum for the downloaded installer before running it. Pass a tag to the verified installer to pin the release ([releases](https://github.com/github/gh-aw/releases)). Verify with `gh extension list`.
 
 ## Organization Policy Issues
 

@@ -53,13 +53,30 @@ gh extension install github/gh-aw@v0.2.0
 If extension installation fails, use the standalone installer instead:
 
 ```bash wrap
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash                # Latest
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s v0.1.0      # Pinned
+set -euo pipefail
+INSTALLER=$(mktemp)
+trap 'rm -f "$INSTALLER"' EXIT
+curl -fsSL https://raw.githubusercontent.com/github/gh-aw/4c53fac4c30c2d9f27ea6fab5e5ce0f15a21e78e/install-gh-aw.sh -o "$INSTALLER"
+if command -v sha256sum >/dev/null 2>&1; then
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | sha256sum -c -
+else
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | shasum -a 256 -c -
+fi
+bash "$INSTALLER"                     # Latest release
+bash "$INSTALLER" v0.40.0             # Pinned release
 ```
 
 ```powershell wrap
-Invoke-WebRequest https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.ps1 -OutFile install-gh-aw.ps1; pwsh -File ./install-gh-aw.ps1          # Latest
-Invoke-WebRequest https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.ps1 -OutFile install-gh-aw.ps1; pwsh -File ./install-gh-aw.ps1 v0.1.0  # Pinned
+$installer = [System.IO.Path]::GetTempFileName()
+try {
+  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/github/gh-aw/4c53fac4c30c2d9f27ea6fab5e5ce0f15a21e78e/install-gh-aw.ps1" -OutFile $installer
+  $actualHash = (Get-FileHash -Algorithm SHA256 $installer).Hash
+  if ($actualHash -ne "82d4154dd848803260d0b621d864d639c2bd21b5c39c2b1dd313d34c6419fcdb") { throw "Installer SHA-256 mismatch" }
+  & pwsh -NoProfile -File $installer                 # Latest release
+  # Use `& pwsh -NoProfile -File $installer v0.40.0` to pin a release
+} finally {
+  Remove-Item -Force $installer -ErrorAction SilentlyContinue
+}
 ```
 
 This installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and supports Linux, macOS, FreeBSD, Windows, and Android (Termux), including environments behind corporate firewalls.

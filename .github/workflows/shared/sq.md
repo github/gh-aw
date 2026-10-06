@@ -2,9 +2,27 @@
 steps:
   - name: Install sq from GitHub releases
     run: |
-      # Install sq binary from official install script
-      # This downloads the latest release from GitHub and installs it to /usr/local/bin
-      /bin/sh -c "$(curl -fsSL https://sq.io/install.sh)"
+      SQ_VERSION=0.55.0
+      case "$(uname -m)" in
+        x86_64)
+          SQ_ARCH=amd64
+          SQ_PACKAGE_SHA256=1c52790bf6953e64a29b5f6a3aaf228cce9ab2a8e00b26e6099de408def69ed7
+          ;;
+        aarch64|arm64)
+          SQ_ARCH=arm64
+          SQ_PACKAGE_SHA256=3eab66e917050cbee5bde44adc14dfbc665a498c845b6fbfa5df999ac357ccfb
+          ;;
+        *)
+          echo "Unsupported architecture for sq: $(uname -m)" >&2
+          exit 1
+          ;;
+      esac
+      SQ_PACKAGE="sq_${SQ_VERSION}_linux_${SQ_ARCH}.deb"
+      SQ_PACKAGE_PATH="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sq.XXXXXX")"
+      trap 'rm -f "$SQ_PACKAGE_PATH"' EXIT
+      curl -fsSL "https://github.com/neilotoole/sq/releases/download/v${SQ_VERSION}/${SQ_PACKAGE}" -o "$SQ_PACKAGE_PATH"
+      printf '%s  %s\n' "$SQ_PACKAGE_SHA256" "$SQ_PACKAGE_PATH" | sha256sum -c -
+      sudo apt-get install -y "$SQ_PACKAGE_PATH"
       
   - name: Verify sq installation
     run: |
@@ -28,7 +46,7 @@ This shared configuration provides setup for `sq`, a command-line tool that offe
 
 ### Installation
 
-The shared workflow installs the sq binary directly from GitHub releases using the official install script. This downloads the latest version and installs it to `/usr/local/bin`.
+The shared workflow installs sq v0.55.0 from its official GitHub release. It verifies the downloaded Debian package against the release SHA256 before installing it.
 
 ### Usage in Workflows
 

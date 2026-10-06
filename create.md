@@ -16,10 +16,19 @@ If it is installed, run:
 gh extension upgrade aw
 ```
 
-to upgrade to latest. If it is not installed, run the installation script from the main branch of the gh-aw repository:
+to upgrade to latest. If it is not installed, run the pinned and verified standalone installer:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+set -euo pipefail
+INSTALLER=$(mktemp)
+trap 'rm -f "$INSTALLER"' EXIT
+curl -fsSL https://raw.githubusercontent.com/github/gh-aw/4c53fac4c30c2d9f27ea6fab5e5ce0f15a21e78e/install-gh-aw.sh -o "$INSTALLER"
+if command -v sha256sum >/dev/null 2>&1; then
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | sha256sum -c -
+else
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | shasum -a 256 -c -
+fi
+bash "$INSTALLER"
 ```
 
 **What this does**: Downloads and installs the gh-aw binary to `~/.local/share/gh/extensions/gh-aw/`

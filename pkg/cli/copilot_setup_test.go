@@ -92,10 +92,11 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 						Steps: []workflow.WorkflowStep{
 							{
 								Name: "Install gh-aw extension",
-								Run: "mkdir -p /tmp/gh-aw\n" +
-									"curl -fsSL https://raw.githubusercontent.com/github/gh-aw/" + copilotSetupStepsStaticSHA + "/install-gh-aw.sh -o " + installScriptTempPath + "\n" +
-									"echo \"" + copilotSetupStepsStaticSHA256 + "  " + installScriptTempPath + "\" | sha256sum -c -\n" +
-									"bash " + installScriptTempPath,
+								Run: "install_script=\"$(mktemp)\"\n" +
+									"trap 'rm -f \"$install_script\"' EXIT\n" +
+									"curl -fsSL https://raw.githubusercontent.com/github/gh-aw/" + copilotSetupStepsStaticSHA + "/install-gh-aw.sh -o \"$install_script\"\n" +
+									"printf '%s  %s\\n' \"" + copilotSetupStepsStaticSHA256 + "\" \"$install_script\" | sha256sum -c -\n" +
+									"bash \"$install_script\"",
 							},
 						},
 					},
@@ -673,8 +674,11 @@ func TestEnsureCopilotSetupSteps_CreateWithDevMode(t *testing.T) {
 			t.Errorf("Expected download-to-file pattern, not direct curl|bash pipe on line %q (RGS-018 security fix)", line)
 		}
 	}
-	if !strings.Contains(contentStr, "-o "+installScriptTempPath) {
-		t.Errorf("Expected download to temp file %s in dev mode", installScriptTempPath)
+	if !strings.Contains(contentStr, `-o "`+installScriptTempVariable+`"`) {
+		t.Errorf("Expected download to a mktemp file in dev mode")
+	}
+	if !strings.Contains(contentStr, `trap 'rm -f "$install_script"' EXIT`) {
+		t.Error("Expected the temporary installer to be removed on exit")
 	}
 }
 
@@ -730,12 +734,12 @@ func TestGenerateCopilotSetupStepsYAMLDevModeUsesDefaultBranchFromGitHubAPI(t *t
 	if strings.Contains(content, "refs/heads/main") {
 		t.Fatalf("expected generated content not to hard-code refs/heads/main, got:\n%s", content)
 	}
-	if !strings.Contains(content, sha256Digest+"  "+installScriptTempPath) {
+	if !strings.Contains(content, `printf '%s  %s\n' "`+sha256Digest+`" "`+installScriptTempVariable+`" | sha256sum -c -`) {
 		t.Fatalf("expected generated content to include SHA256 integrity check, got:\n%s", content)
 	}
 }
 
-func TestGenerateCopilotSetupStepsYAMLDevModeFallsBackToDefaultBranchRef(t *testing.T) {
+func TestGenerateCopilotSetupStepsYAMLDevModeFallsBackToStaticPinnedInstaller(t *testing.T) {
 	const defaultBranch = "stable"
 
 	originalDefaultBranch := resolveGhAwDefaultBranchForCopilotSetup
@@ -762,11 +766,14 @@ func TestGenerateCopilotSetupStepsYAMLDevModeFallsBackToDefaultBranchRef(t *test
 
 	content := generateCopilotSetupStepsYAML(context.Background(), workflow.ActionModeDev, "dev", nil)
 
-	if !strings.Contains(content, "https://raw.githubusercontent.com/github/gh-aw/refs/heads/"+defaultBranch+"/install-gh-aw.sh") {
-		t.Fatalf("expected install script URL to fall back to default branch ref, got:\n%s", content)
+	if !strings.Contains(content, "https://raw.githubusercontent.com/github/gh-aw/"+copilotSetupStepsStaticSHA+"/install-gh-aw.sh") {
+		t.Fatalf("expected install script URL to fall back to the static commit SHA, got:\n%s", content)
 	}
-	if strings.Contains(content, "sha256sum -c -") {
-		t.Fatalf("did not expect SHA256 integrity check without resolved SHA, got:\n%s", content)
+	if !strings.Contains(content, copilotSetupStepsStaticSHA256) || !strings.Contains(content, "sha256sum -c -") {
+		t.Fatalf("expected static SHA256 integrity check with static commit fallback, got:\n%s", content)
+	}
+	if strings.Contains(content, "refs/heads/") {
+		t.Fatalf("did not expect a mutable branch reference, got:\n%s", content)
 	}
 }
 
@@ -1074,10 +1081,11 @@ func TestEnsureCopilotSetupSteps_SkipsUpdateWhenDownloadVerifyExists(t *testing.
 		"    steps:\n" +
 		"      - name: Install gh-aw extension\n" +
 		"        run: |\n" +
-		"          mkdir -p /tmp/gh-aw\n" +
-		"          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/" + copilotSetupStepsStaticSHA + "/install-gh-aw.sh -o " + installScriptTempPath + "\n" +
-		"          echo \"" + copilotSetupStepsStaticSHA256 + "  " + installScriptTempPath + "\" | sha256sum -c -\n" +
-		"          bash " + installScriptTempPath + "\n"
+		"          install_script=\"$(mktemp)\"\n" +
+		"          trap 'rm -f \"$install_script\"' EXIT\n" +
+		"          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/" + copilotSetupStepsStaticSHA + "/install-gh-aw.sh -o \"$install_script\"\n" +
+		"          printf '%s  %s\\n' \"" + copilotSetupStepsStaticSHA256 + "\" \"$install_script\" | sha256sum -c -\n" +
+		"          bash \"$install_script\"\n"
 
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
 	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {

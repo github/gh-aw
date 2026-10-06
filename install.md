@@ -12,10 +12,19 @@ Configure this repository to use agentic workflows by:
 
 ## Step 1: Install gh-aw CLI Extension
 
-Run the installation script from the main branch of the gh-aw repository:
+Download the installer from an immutable commit and verify its SHA-256 before running it:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+set -euo pipefail
+INSTALLER=$(mktemp)
+trap 'rm -f "$INSTALLER"' EXIT
+curl -fsSL https://raw.githubusercontent.com/github/gh-aw/4c53fac4c30c2d9f27ea6fab5e5ce0f15a21e78e/install-gh-aw.sh -o "$INSTALLER"
+if command -v sha256sum >/dev/null 2>&1; then
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | sha256sum -c -
+else
+  printf '%s  %s\n' 248ccebcb998c6a506548156e1bf9f02429cbbaec407d5adbdfd316ab0f866a0 "$INSTALLER" | shasum -a 256 -c -
+fi
+bash "$INSTALLER"
 ```
 
 **What this does**: Downloads and installs the gh-aw binary to `~/.local/share/gh/extensions/gh-aw/`
@@ -103,7 +112,7 @@ After successful initialization, the user can:
 
 ## Reference
 
-- **Installation script**: `https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh`
+- **Verified installation script**: `https://raw.githubusercontent.com/github/gh-aw/4c53fac4c30c2d9f27ea6fab5e5ce0f15a21e78e/install-gh-aw.sh`
 - **Documentation**: `https://github.github.com/gh-aw/`
 - **Repository**: `https://github.com/github/gh-aw`
 - **Detailed setup guide**: See `install.md` in the gh-aw repository

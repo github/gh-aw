@@ -118,6 +118,15 @@ func TestEnsureDevcontainerConfig(t *testing.T) {
 	if config.PostCreateCommand == "" {
 		t.Error("Expected postCreateCommand to be set")
 	}
+	if !strings.Contains(config.PostCreateCommand, copilotSetupStepsStaticSHA) ||
+		!strings.Contains(config.PostCreateCommand, copilotSetupStepsStaticSHA256) ||
+		!strings.Contains(config.PostCreateCommand, "mktemp") ||
+		!strings.Contains(config.PostCreateCommand, "sha256sum -c -") {
+		t.Errorf("Expected postCreateCommand to download and verify a pinned installer using a temporary file, got %q", config.PostCreateCommand)
+	}
+	if strings.Contains(config.PostCreateCommand, "| bash") {
+		t.Errorf("Expected postCreateCommand not to pipe an installer to bash, got %q", config.PostCreateCommand)
+	}
 
 	unchangedModTime := time.Unix(123456789, 0)
 	if err := os.Chtimes(devcontainerPath, unchangedModTime, unchangedModTime); err != nil {

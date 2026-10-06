@@ -3,3 +3,8 @@
 # This repository is maintained by:
 
 - @dsyme @eaftan @pelikhan @krzysztof-cieslak
+
+/pkg/parser/ @dsyme @eaftan @pelikhan @krzysztof-cieslak
+/pkg/workflow/ @dsyme @eaftan @pelikhan @krzysztof-cieslak
+/pkg/cli/ @dsyme @eaftan @pelikhan @krzysztof-cieslak
+/cmd/gh-aw/ @dsyme @eaftan @pelikhan @krzysztof-cieslak
