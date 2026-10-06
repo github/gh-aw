@@ -169,6 +169,11 @@ func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
 		c.IncrementWarningCount()
 		return
 	}
+	if images := getSandboxAgentImages(data); images[awfImageRoleAPIProxy] == modelRoutingDefaultImages[awfImageRoleAPIProxy] {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
+			"sub-agent model routing requires an AWF apiProxy image with routing.candidateModels support (v0.28.33+); the default routed image is older. Pin current AWF images in sandbox.agent.images."))
+		c.IncrementWarningCount()
+	}
 	candidates, err := resolveModelRoutingAllowedModels(data.EngineConfig.ModelRouting)
 	if err != nil {
 		return

@@ -122,6 +122,7 @@ Work.
 		{Name: "external.md", Model: "claude-sonnet-4.6"},
 	}, data.SubAgentModels)
 	require.Contains(t, stderr, `sub-agent "blocked" model "gpt-5.4-mini"`)
+	require.Contains(t, stderr, "default routed image is older")
 	require.GreaterOrEqual(t, compiler.GetWarningCount(), 1)
 	configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
 		EngineName: "copilot", AllowedDomains: "github.com", WorkflowData: data,
