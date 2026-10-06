@@ -276,6 +276,11 @@
           "additionalProperties": false,
           "required": ["objective", "task"],
           "properties": {
+            "candidateModels": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            },
             "objective": {
               "type": "object",
               "additionalProperties": false,

@@ -51,6 +51,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
 - `panic-in-library-code` — reports `panic()` calls in library packages (`pkg/*`) where errors should be returned instead.
 - `rawloginlib` — reports direct usage of the standard `log` package in library packages, where `pkg/logger` should be used.
+- `reflectdeepequalusage` — reports `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions.
 - `regexpcompileinfunction` — reports `regexp.Compile` / `regexp.MustCompile` and their POSIX variants called inside functions that should be package-level.
 - `regexpdynamicpattern` — reports regexp compile calls whose pattern is not a compile-time constant string.
 - `seenmapbool` — reports `map[string]bool` used as a set (values always `true`) that should use `map[string]struct{}` instead.
@@ -87,7 +88,7 @@ This package currently provides custom Go analyzers in the following subpackages
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
-`seenmapbool`, `slicemakezerolength`, `sortslice`, `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and
+`reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and
 `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
@@ -155,6 +156,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
 | `panic-in-library-code` | Custom `go/analysis` analyzer that flags `panic()` usage in library packages |
 | `rawloginlib` | Custom `go/analysis` analyzer that flags standard-library `log` package calls in library packages |
+| `reflectdeepequalusage` | Custom `go/analysis` analyzer that flags `reflect.DeepEqual()` calls that should use typed equality operators or type-specific comparison functions |
 | `regexpcompileinfunction` | Custom `go/analysis` analyzer that flags regexp compilation inside function bodies |
 | `regexpdynamicpattern` | Custom `go/analysis` analyzer that flags regexp compile calls with non-constant patterns |
 | `seenmapbool` | Custom `go/analysis` analyzer that flags `map[string]bool` used as a set that should use `map[string]struct{}` |

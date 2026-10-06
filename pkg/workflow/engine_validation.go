@@ -221,7 +221,7 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 		return "", nil // No engine specification found anywhere; will use default
 	}
 
-	if len(allEngines) > 1 {
+	if len(allEngines) > 1 && !canMergeModelRoutingEngineSpecifications(mainEngineSetting, allEngines) {
 		return "", fmt.Errorf("multiple engine fields found (%d engine specifications detected). Only one engine field is allowed across the main workflow and all included files. Remove duplicate engine specifications to keep only one.\n\nExample:\nengine: copilot\n\nSee: %s", len(allEngines), constants.DocsEnginesURL)
 	}
 
@@ -259,6 +259,34 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 	}
 
 	return "", fmt.Errorf("invalid engine configuration in included file, missing or invalid 'id' field. Expected string, object with 'id' field, or inline definition with 'runtime.id'.\n\nExample (string):\nengine: copilot\n\nExample (object with id):\nengine:\n  id: copilot\n  model: gpt-4\n\nExample (inline runtime definition):\nengine:\n  runtime:\n    id: codex\n\nSee: %s", constants.DocsEnginesURL)
+}
+
+func canMergeModelRoutingEngineSpecifications(mainEngineSetting string, engineSpecs []string) bool {
+	engineID := mainEngineSetting
+	mainEngineSeen := false
+	for _, engineJSON := range engineSpecs {
+		if mainEngineSetting != "" && engineJSON == mainEngineSetting && !mainEngineSeen {
+			mainEngineSeen = true
+			continue
+		}
+		var engine map[string]any
+		if err := json.Unmarshal([]byte(engineJSON), &engine); err != nil {
+			return false
+		}
+		if _, ok := engine["model-routing"].(map[string]any); !ok {
+			return false
+		}
+		id, ok := engine["id"].(string)
+		if !ok || id == "" {
+			return false
+		}
+		if engineID == "" {
+			engineID = id
+		} else if !strings.EqualFold(engineID, id) {
+			return false
+		}
+	}
+	return engineID != ""
 }
 
 // EngineHasValidateSecretStep checks if the engine provides a validate-secret step.

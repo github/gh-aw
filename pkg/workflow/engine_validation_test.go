@@ -176,6 +176,20 @@ func TestValidateSingleEngineSpecification(t *testing.T) {
 	}
 }
 
+func TestValidateSingleEngineSpecificationMergesRoutingForSameEngine(t *testing.T) {
+	routing := `{"id":"copilot","model-routing":{"goal":"cost","mode":"balanced","allowed-models":["gpt-6-sol"]}}`
+	engine, err := (&Compiler{}).validateSingleEngineSpecification("copilot", []string{routing})
+	require.NoError(t, err)
+	require.Equal(t, "copilot", engine)
+
+	_, err = (&Compiler{}).validateSingleEngineSpecification("claude", []string{routing})
+	require.ErrorContains(t, err, "multiple engine fields found")
+
+	engine, err = (&Compiler{}).validateSingleEngineSpecification("", []string{routing, routing})
+	require.NoError(t, err)
+	require.Equal(t, "copilot", engine)
+}
+
 // TestValidateSingleEngineSpecificationErrorMessageQuality verifies error messages follow the style guide
 func TestValidateSingleEngineSpecificationErrorMessageQuality(t *testing.T) {
 	compiler := NewCompiler()

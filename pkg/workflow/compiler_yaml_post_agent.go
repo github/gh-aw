@@ -219,7 +219,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// receive a valid (empty) JSON file instead of an ENOENT error.
 	// The placeholder is only written if the engine did not already write the file.
 	if data.SafeOutputs != nil {
-		c.generateAgentOutputPlaceholderStep(yaml)
+		c.generateAgentOutputPlaceholderStep(yaml, data)
 	}
 
 	// Add post-execution cleanup step for Copilot engine
