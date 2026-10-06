@@ -5,13 +5,13 @@
 package reflectdeepequalusage
 
 import (
-	"fmt"
 	"go/ast"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
+	"github.com/github/gh-aw/pkg/linters/internal/coverage"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -25,6 +25,12 @@ var Analyzer = analyzerutil.New(
 	"reports reflect.DeepEqual() usage in conditionals or comparisons that should use typed equality operators or type-specific comparison functions for performance and type safety",
 	run,
 )
+
+var hotThreshold *int
+
+func init() {
+	hotThreshold = coverage.RegisterHotThresholdFlag(Analyzer)
+}
 
 // URL points to documentation for this linter.
 var _ = func() struct{} {
@@ -68,12 +74,14 @@ func analyzeCall(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.Gener
 		return
 	}
 
+	if !coverage.ShouldApply(pass, call.Pos(), *hotThreshold) {
+		return
+	}
+
 	pkgLog.Printf("flagging reflect.DeepEqual() call at %s:%d", pos.Filename, pos.Line)
 	pass.Report(analysis.Diagnostic{
-		Pos: call.Pos(),
-		End: call.End(),
-		Message: fmt.Sprintf(
-			"reflect.DeepEqual() is inefficient and should not be used in conditionals; prefer typed equality operators or type-specific comparison functions",
-		),
+		Pos:     call.Pos(),
+		End:     call.End(),
+		Message: "reflect.DeepEqual() is inefficient and should not be used in conditionals; prefer typed equality operators or type-specific comparison functions",
 	})
 }

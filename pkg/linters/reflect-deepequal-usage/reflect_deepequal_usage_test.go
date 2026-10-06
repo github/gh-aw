@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/github/gh-aw/pkg/linters/reflect-deepequal-usage"
+	reflectdeepequalusage "github.com/github/gh-aw/pkg/linters/reflect-deepequal-usage"
 )
 
 func TestReflectDeepEqualUsage(t *testing.T) {
