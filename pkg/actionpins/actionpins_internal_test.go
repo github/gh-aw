@@ -487,15 +487,69 @@ func TestFindVersionBySHA_ReturnsVersionForKnownSHA(t *testing.T) {
 func TestGetActionPinsByRepo_ReturnsCopy(t *testing.T) {
 	t.Parallel()
 
-	pins := GetActionPinsByRepo("actions/checkout")
-	require.NotEmpty(t, pins, "prerequisite: embedded pins must exist for actions/checkout")
+	const repo = "actions-ecosystem/action-add-labels"
+	original := GetActionPinsByRepo(repo)
+	require.NotEmpty(t, original, "prerequisite: embedded pins must exist for "+repo)
 
-	original := pins[0]
+	pins := GetActionPinsByRepo(repo)
+	require.NotEmpty(t, pins, "prerequisite: embedded pins must exist for "+repo)
+
+	pinIndex := -1
+	var inputKey string
+	var input *ActionYAMLInput
+	for i := range pins {
+		for name, candidate := range pins[i].Inputs {
+			if candidate != nil {
+				pinIndex = i
+				inputKey = name
+				input = candidate
+				break
+			}
+		}
+		if input != nil {
+			break
+		}
+	}
+	require.NotNil(t, input, "prerequisite: embedded pins must include an action input")
+
+	input.Description = "mutated description"
+	delete(pins[pinIndex].Inputs, inputKey)
 	pins[0] = ActionPin{Repo: "mutated/repo", Version: "mutated", SHA: "mutated"}
 
-	fresh := GetActionPinsByRepo("actions/checkout")
+	fresh := GetActionPinsByRepo(repo)
 	require.NotEmpty(t, fresh, "prerequisite: embedded pins must remain available")
-	assert.Equal(t, original, fresh[0], "mutating a returned slice must not change the cached pins")
+	assert.Equal(t, original[0], fresh[0], "mutating a returned slice must not change the cached pins")
+	assert.Equal(t, original[pinIndex], fresh[pinIndex], "mutating nested inputs must not change cached pins")
+}
+
+func TestGetLatestActionPinByRepo_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	const repo = "actions-ecosystem/action-add-labels"
+	original, ok := GetLatestActionPinByRepo(repo)
+	require.True(t, ok, "prerequisite: embedded pins must exist for "+repo)
+
+	pin, ok := GetLatestActionPinByRepo(repo)
+	require.True(t, ok, "prerequisite: embedded pins must exist for "+repo)
+	require.NotEmpty(t, pin.Inputs, "prerequisite: embedded pins must include action inputs")
+
+	var inputKey string
+	var input *ActionYAMLInput
+	for name, candidate := range pin.Inputs {
+		if candidate != nil {
+			inputKey = name
+			input = candidate
+			break
+		}
+	}
+	require.NotNil(t, input, "prerequisite: embedded pins must include a non-nil action input")
+
+	input.Description = "mutated description"
+	delete(pin.Inputs, inputKey)
+
+	fresh, ok := GetLatestActionPinByRepo(repo)
+	require.True(t, ok, "prerequisite: embedded pins must remain available")
+	assert.Equal(t, original, fresh, "mutating a returned pin's inputs must not change the cached pin")
 }
 
 func TestGetLatestActionPinReference_ReturnsFormattedReferenceOrEmpty(t *testing.T) {
