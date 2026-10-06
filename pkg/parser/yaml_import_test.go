@@ -69,7 +69,7 @@ func TestIsActionDefinitionFile(t *testing.T) {
 			filename: "action.yml",
 			content: `name: Test Action
 runs:
-  using: node20
+  using: node24
   main: index.js`,
 			expected: true,
 		},
@@ -78,7 +78,7 @@ runs:
 			filename: "action.yaml",
 			content: `name: Test Action
 runs:
-  using: node20
+  using: node24
   main: index.js`,
 			expected: true,
 		},
@@ -170,7 +170,7 @@ jobs:
 	t.Run("reject action definition", func(t *testing.T) {
 		actionContent := `name: Test Action
 runs:
-  using: node20
+  using: node24
   main: index.js`
 
 		actionFile := filepath.Join(tmpDir, "action.yml")

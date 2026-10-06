@@ -74,6 +74,46 @@ describe("OpenCode JSON session parser", () => {
     expect(result.logEntries.at(-1).data).toMatchObject({ errors: [error], status: "error" });
   });
 
+  it.each([
+    { status: "completed", metadata: { exit: 2 }, success: false },
+    { status: "completed", metadata: { exit: 0 }, success: true },
+    { status: "completed", metadata: { exit: 0 }, error: "Command rejected", success: false },
+    { status: "error", metadata: { exit: 0 }, success: false },
+    { status: "completed", metadata: { exit: 0 }, nativeSuccess: false, success: false },
+  ])("gives failures precedence over completed status and zero exit: %j", ({ status, metadata, error, nativeSuccess, success }) => {
+    const state = { status, input: { command: "make build" }, output: "command output", metadata, ...(error !== undefined ? { error } : {}), ...(nativeSuccess !== undefined ? { success: nativeSuccess } : {}) };
+    const result = parseOpenCodeLog(jsonl([record("tool_use", { callID: "call_exit", tool: "bash", state })]));
+    const completion = result.logEntries.find(event => event.type === "tool.execution_complete");
+    expect(completion.data).toMatchObject({ toolCallId: "call_exit", toolName: "bash", output: "command output", status: success ? "completed" : "error", success, exitCode: metadata.exit, metadata });
+    expect(completion.part.state).toEqual(state);
+    if (error !== undefined) expect(completion.data.error).toBe(error);
+  });
+
+  it("retains native exit metadata and payload additions in the canonical completion", () => {
+    const metadata = { exit: 2, truncated: false, output: "make: build failed\n" };
+    const content = jsonl([record("tool_use", { callID: "call_build", tool: "bash", state: { status: "completed", input: { command: "make build" }, output: metadata.output, metadata } }, { data: { traceId: "trace_fixture" } })]);
+    const result = parseOpenCodeLog(content);
+    const completion = result.logEntries.find(event => event.type === "tool.execution_complete");
+    expect(completion.data).toMatchObject({ success: false, status: "error", exitCode: 2, metadata, traceId: "trace_fixture" });
+    expect(completion.part.state.metadata).toEqual(metadata);
+    expect(result.markdown).toContain("Tools: 0/1 succeeded");
+    expect(result.markdown).toContain("Failed Tools: 1");
+    expect(result.markdown).toContain("✗ $ make build");
+    expect(parseEngineSession(content, "opencode")).toEqual(result.logEntries);
+    expect(parseCustomLog(content).logEntries).toEqual(result.logEntries);
+    expect(parseOpenCodeLog(jsonl(result.logEntries)).logEntries).toEqual(result.logEntries);
+  });
+
+  it("does not invent an exit code for absent or malformed native metadata", () => {
+    for (const metadata of [undefined, {}, { exit: "2" }, { exit: 1.5 }, { exit: null }]) {
+      const result = parseOpenCodeLog(jsonl([record("tool_use", { callID: "call_no_exit", tool: "bash", state: { status: "completed", input: {}, output: "ok", ...(metadata !== undefined ? { metadata } : {}) } })]));
+      const completion = result.logEntries.find(event => event.type === "tool.execution_complete");
+      expect(completion.data).not.toHaveProperty("exitCode");
+      expect(completion.data.success).toBe(true);
+      if (metadata !== undefined) expect(completion.data.metadata).toEqual(metadata);
+    }
+  });
+
   it.each(["", "prompt with a secret and max-turns", '{"type":"text","text":"not OpenCode"}', '{"type":"error","message":"not OpenCode"}', '{"sessionID":"s","type":"text","part":null}', '{"sessionID":"s","type":"text","part":[]}'])(
     "rejects unsupported input without publishing raw data: %s",
     content => {

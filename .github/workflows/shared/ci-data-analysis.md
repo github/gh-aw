@@ -67,14 +67,14 @@ steps:
       jq -r '"- runs analyzed: \(.total_runs)\n- avg duration (sec): \(.avg_duration_seconds // "n/a")\n- recent failure records: \(.top_recent_failures | length)"' /tmp/gh-aw/agent/ci-summary.json >> "$GITHUB_STEP_SUMMARY"
   
   - name: Setup Node.js
-    uses: actions/setup-node@v7.0.0
+    uses: actions/setup-node@v7
     with:
       node-version: "24"
       cache: npm
       cache-dependency-path: actions/setup/js/package-lock.json
   
   - name: Setup Go
-    uses: actions/setup-go@v7.0.0
+    uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
       cache: true

@@ -545,13 +545,14 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
  * @param {string} workflowName
  * @param {string} actorLogin
  * @param {number} threshold
- * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number}>} countedRuns
+ * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number, source?:string}>} countedRuns
  * @param {{remaining:number,limit:number,used:number,reset:string} | null} rateLimit
  * @param {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} meta
  * @returns {string}
  */
 function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, meta) {
   const stats = calculateDailyAICStats(countedRuns);
+  const estimatedAIC = countedRuns.reduce((sum, run) => sum + (run.source === "estimated" ? run.aic : 0), 0);
   const remainingBudget = Math.max(0, threshold - stats.total);
   const usagePercent = threshold > 0 ? ((stats.total / threshold) * 100).toFixed(2) : "0.00";
   const runRows =
@@ -559,9 +560,12 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
       ? countedRuns
           .slice()
           .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || ""))
-          .map(run => `| [#${run.id}](${run.html_url || ""}) | ${escapeMarkdownCell(run.created_at || "")} | ${escapeMarkdownCell(run.conclusion || "unknown")} | ${formatAICCredits(run.aic)} |`)
+          .map(
+            run =>
+              `| [#${run.id}](${run.html_url || ""}) | ${escapeMarkdownCell(run.created_at || "")} | ${escapeMarkdownCell(run.conclusion || "unknown")} | ${formatAICCredits(run.aic)} | ${run.source === "estimated" ? "Estimated" : "Recorded"} |`
+          )
           .join("\n")
-      : "| _none_ | — | — | 0 |";
+      : "| _none_ | — | — | 0 | — |";
 
   const noRunData = stats.count === 0;
   const totalAICFormatted = formatAICCredits(stats.total) || "0";
@@ -584,6 +588,8 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
     "| Statistic | Value |",
     "| --- | ---: |",
     `| 24h total AIC | ${totalAICFormatted} |`,
+    `| Recorded AIC | ${formatAICCredits(stats.total - estimatedAIC) || "0"} |`,
+    `| Estimated AIC (unresolved accounting) | ${formatAICCredits(estimatedAIC) || "0"} |`,
     `| Threshold | ${formatAICCredits(threshold)} |`,
     `| Threshold used | ${usagePercent}% |`,
     `| Remaining headroom | ${formatAICCredits(remainingBudget) || "0"} |`,
@@ -595,9 +601,15 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
     "",
     "Previous runs counted in the last 24 hours:",
     "",
-    "| Run | Created | Conclusion | AIC |",
-    "| --- | --- | --- | ---: |",
+    "| Run | Created | Conclusion | AIC | Source |",
+    "| --- | --- | --- | ---: | --- |",
     runRows,
+    ...(estimatedAIC > 0
+      ? [
+          "",
+          "Estimated credits are conservative per-run maximums, not measured consumption. Subsequent scans retry unresolved accounting; if it remains unavailable, estimates stop counting when their runs leave the rolling 24-hour window.",
+        ]
+      : []),
     ...(noteLines.length > 0 ? ["", ...noteLines] : []),
   ].join("\n");
 }
@@ -606,7 +618,7 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
  * @param {string} workflowName
  * @param {string} actorLogin
  * @param {number} threshold
- * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number}>} countedRuns
+ * @param {Array<{id:number, html_url:string, created_at:string, conclusion:string, aic:number, source?:string}>} countedRuns
  * @param {{remaining:number,limit:number,used:number,reset:string} | null} rateLimit
  * @param {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} meta
  * @returns {Promise<void>}
@@ -628,6 +640,7 @@ async function appendDailyAICSummary(workflowName, actorLogin, threshold, counte
 async function main(options = {}) {
   core.setOutput("daily_ai_credits_exceeded", "false");
   core.setOutput("daily_ai_credits_total", "");
+  core.setOutput("daily_ai_credits_estimated", "");
   core.setOutput("daily_ai_credits_threshold", "");
   core.setOutput("daily_ai_credits_guardrail_status", "not_run");
   core.setOutput("daily_ai_credits_guardrail_error", "");
@@ -692,6 +705,7 @@ async function main(options = {}) {
         truncatedByRateLimit: false,
       };
       core.setOutput("daily_ai_credits_total", String(totalAIC));
+      core.setOutput("daily_ai_credits_estimated", "0");
       core.setOutput("daily_ai_credits_threshold", String(threshold));
       logDailyGuardrail("Completed repo-memory AIC ledger read", {
         countedRuns: countedRuns.length,
@@ -726,10 +740,12 @@ async function main(options = {}) {
       cachePath: options.cachePath,
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
+    const estimatedAIC = countedRuns.reduce((sum, run) => sum + (run.source === "estimated" ? run.aic : 0), 0);
     actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || current.triggering_actor?.login || current.actor?.login || process.env.GITHUB_ACTOR || "";
     const rateLimit = budget.snapshot();
 
     core.setOutput("daily_ai_credits_total", String(totalAIC));
+    core.setOutput("daily_ai_credits_estimated", String(estimatedAIC));
     core.setOutput("daily_ai_credits_threshold", String(threshold));
 
     /** @type {{candidateRunsCount:number,inspectedRunsCount:number,truncatedByRateLimit:boolean}} */

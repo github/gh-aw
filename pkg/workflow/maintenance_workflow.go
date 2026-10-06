@@ -288,6 +288,13 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		strings.TrimSpace(compileGitHubTokenSecret) != "",
 	)
 	copilotOrgBilling := allCopilotWorkflowsUseOrgBilling(workflowDataList)
+	hasCacheMemory := false
+	for _, data := range workflowDataList {
+		if data != nil && data.CacheMemoryConfig != nil && len(data.CacheMemoryConfig.Caches) > 0 {
+			hasCacheMemory = true
+			break
+		}
+	}
 	content, err := buildMaintenanceWorkflowYAML(ctx, buildMaintenanceWorkflowYAMLOptions{
 		cronSchedule:        cronSchedule,
 		scheduleDesc:        scheduleDesc,
@@ -305,6 +312,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		createCompilePR:     enableCompileCreatePullRequest,
 		copilotOrgBilling:   copilotOrgBilling,
 		compactionLedgers:   compactionLedgers,
+		hasCacheMemory:      hasCacheMemory,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)

@@ -28,7 +28,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 		// Conclusion/notify job depends on activation, reuse its trace ID
 		notifyTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		notifyParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, notifyTraceID, notifyParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("conclusion", data, setupActionRef, SetupActionDestination, false, notifyTraceID, notifyParentSpanID, "")...)
 	}
 
 	// Add GitHub App token minting step if app is configured
@@ -39,6 +39,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
+			"conclusion",
 			data.SafeOutputs.GitHubApp,
 			permissions,
 			appTokenFallbackRepo,
@@ -361,6 +362,7 @@ func buildAgentFailureActivationStatusVars(data *WorkflowData) []string {
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.%s.outputs.daily_ai_credits_guardrail_status }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.%s.outputs.daily_ai_credits_guardrail_error }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.%s.outputs.daily_ai_credits_total }}\n", constants.ActivationJobName))
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.%s.outputs.daily_ai_credits_estimated }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.%s.outputs.daily_ai_credits_threshold }}\n", constants.ActivationJobName))
 		envVars = append(envVars, fmt.Sprintf("          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: %q\n", strconv.FormatBool(data.MaxDailyAICContinueOnError)))
 	}

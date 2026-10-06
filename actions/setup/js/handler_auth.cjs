@@ -46,7 +46,7 @@ async function createAuthenticatedGitHubClient(config) {
     return github;
   }
   core.info("Using per-handler github-token for cross-repository authentication");
-  return global.getOctokit(token);
+  return global.getOctokit(token, /** @type {any} */ { credentialSource: "pat" });
 }
 
 module.exports = { createAuthenticatedGitHubClient };

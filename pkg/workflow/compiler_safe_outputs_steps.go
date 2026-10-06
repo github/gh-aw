@@ -123,6 +123,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 		return nil, err
 	}
 	c.addSafeOutputTokenEnvVars(&steps, data)
+	steps = append(steps, fmt.Sprintf("          GH_AW_GITHUB_TOKEN_SOURCE: %s\n", c.safeOutputGitHubTokenSource(data)))
 	if workQueueStorage(data) == "issues" &&
 		data.SafeOutputs != nil &&
 		data.SafeOutputs.DispatchWorkflow != nil &&
@@ -151,7 +152,7 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	c.addSafeOutputGitHubTokenForConfig(&steps, data, configToken)
 
 	steps = append(steps, "          script: |\n")
-	steps = append(steps, generateGitHubScriptWithRequire("process_safe_outputs.cjs"))
+	steps = append(steps, generateGitHubScriptWithCredentialSource("process_safe_outputs.cjs", true))
 
 	return steps, nil
 }
@@ -182,7 +183,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 		}
 		stepID := handler.Key + "-app-token"
 		consolidatedSafeOutputsStepsLog.Printf("Adding per-handler GitHub App token minting step for %s", handler.Key)
-		steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			handlerApp,
 			handlerPermissions,
 			"",
@@ -193,7 +195,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 	}
 	if commentMemory := data.CommentMemoryConfig; commentMemory != nil && commentMemory.GitHubApp != nil &&
 		!isHandlerStaged(templatableBoolIsTrue(data.SafeOutputs.Staged), commentMemory.Staged) {
-		steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			commentMemory.GitHubApp,
 			NewPermissionsIssuesWrite(),
 			"",
@@ -218,7 +221,8 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 			}
 			stepID := dispatchRepositoryToolAppTokenStepID(toolKey)
 			consolidatedSafeOutputsStepsLog.Printf("Adding dispatch-repository GitHub App token minting step for %s", toolKey)
-			steps = append(steps, c.buildGitHubAppTokenMintStepWithMeta(
+			steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+				"safe_outputs",
 				tool.GitHubApp,
 				NewPermissionsContentsWrite(),
 				"",

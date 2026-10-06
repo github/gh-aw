@@ -26,7 +26,7 @@ func steeringIssueFallbackToken(data *WorkflowData) string {
 	return resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken)
 }
 
-func (c *Compiler) buildSteeringIssueTokenSteps(data *WorkflowData, app *GitHubAppConfig, permissions *Permissions, stepName string, stepID string) ([]string, string) {
+func (c *Compiler) buildSteeringIssueTokenSteps(data *WorkflowData, jobName string, app *GitHubAppConfig, permissions *Permissions, stepName string, stepID string) ([]string, string) {
 	token := steeringIssueFallbackToken(data)
 	if app == nil {
 		return nil, token
@@ -34,7 +34,7 @@ func (c *Compiler) buildSteeringIssueTokenSteps(data *WorkflowData, app *GitHubA
 
 	var steps []string
 	if stepName != "" {
-		steps = c.buildGitHubAppTokenMintStepWithMeta(app, permissions, "", "", stepName, stepID)
+		steps = c.buildGitHubAppTokenMintStepForJob(jobName, app, permissions, "", "", stepName, stepID)
 	}
 	appToken := fmt.Sprintf("${{ steps.%s.outputs.token }}", stepID)
 	if app.shouldIgnoreMissingKey() {
@@ -51,6 +51,7 @@ func (c *Compiler) addActivationSteeringIssueStep(ctx *activationJobBuildContext
 	permissions := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{PermissionIssues: PermissionWrite})
 	tokenSteps, token := c.buildSteeringIssueTokenSteps(
 		ctx.data,
+		"activation",
 		steeringIssueApp(ctx.data),
 		permissions,
 		"Generate GitHub App token (create steering issue)",
@@ -81,7 +82,7 @@ func (c *Compiler) buildConclusionSteeringIssueTokenSteps(data *WorkflowData) ([
 	app := steeringIssueApp(data)
 	stepID := "safe-outputs-app-token"
 	stepName := ""
-	return c.buildSteeringIssueTokenSteps(data, app, NewPermissionsFromMap(map[PermissionScope]PermissionLevel{PermissionIssues: PermissionWrite}), stepName, stepID)
+	return c.buildSteeringIssueTokenSteps(data, "conclusion", app, NewPermissionsFromMap(map[PermissionScope]PermissionLevel{PermissionIssues: PermissionWrite}), stepName, stepID)
 }
 
 func (c *Compiler) buildConclusionSteeringIssueStep(data *WorkflowData, mainJobName, token string) []string {

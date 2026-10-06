@@ -572,7 +572,7 @@ engine:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version: "24"
 ---
 
 Review this PR`,
@@ -584,7 +584,7 @@ Review this PR`,
 						map[string]any{
 							"name": "Setup Node",
 							"uses": "actions/setup-node@v4",
-							"with": map[string]any{"node-version": "20"},
+							"with": map[string]any{"node-version": "24"},
 						},
 					},
 				},

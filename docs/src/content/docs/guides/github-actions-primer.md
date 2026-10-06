@@ -68,7 +68,7 @@ steps:
   # Action with inputs
   - uses: actions/setup-node@v4
     with:
-      node-version: '20'
+      node-version: '24'
 ```
 
 ## Security Model

@@ -143,7 +143,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 
 	// Install the engine in the detection job. The detection job runs on a separate fresh
 	// runner where the agent's installed tools are not available, so we must install them here.
-	installSteps := applyNodeSetupActionOverride(engine.GetInstallationSteps(threatDetectionData), data)
+	installSteps := applyNodeSetupOverrides(engine.GetInstallationSteps(threatDetectionData), data)
 
 	// Ensure node is on PATH when the engine's execution wraps the CLI with a harness
 	// script (see engineRequiresNodeHarness). The detection job does not go through

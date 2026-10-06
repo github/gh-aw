@@ -190,7 +190,7 @@ The canonical JSON includes all frontmatter fields plus version information:
   "on": {"schedule": "daily"},
   "permissions": {"actions": "read", "contents": "read"},
   "post-steps": [],
-  "runtimes": {"node": {"version": "20"}},
+  "runtimes": {"node": {"version": "24"}},
   "mcp-scripts": {},
   "safe-outputs": {"create-discussion": {"category": "audits"}},
   "services": {},

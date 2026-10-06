@@ -896,7 +896,7 @@ func TestGetDomainsFromRuntimes(t *testing.T) {
 		{
 			name: "node runtime adds node ecosystem domains",
 			runtimes: map[string]any{
-				"node": map[string]any{"version": "20"},
+				"node": map[string]any{"version": "24"},
 			},
 			expectContains: []string{"registry.npmjs.org", "nodejs.org", "yarnpkg.com"},
 		},
@@ -911,7 +911,7 @@ func TestGetDomainsFromRuntimes(t *testing.T) {
 			name: "multiple runtimes add all ecosystem domains",
 			runtimes: map[string]any{
 				"go":   map[string]any{"version": "1.22"},
-				"node": map[string]any{"version": "20"},
+				"node": map[string]any{"version": "24"},
 			},
 			expectContains: []string{"proxy.golang.org", "registry.npmjs.org"},
 		},
@@ -1036,7 +1036,7 @@ func TestGetCopilotAllowedDomainsWithToolsAndRuntimes(t *testing.T) {
 			},
 		}
 		runtimes := map[string]any{
-			"node": map[string]any{"version": "20"},
+			"node": map[string]any{"version": "24"},
 		}
 
 		result := GetAllowedDomainsForEngine(constants.CopilotEngine, network, tools, runtimes)

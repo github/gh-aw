@@ -179,7 +179,7 @@ func getFieldExample(fieldPath string, err error) string {
 		"outputs":         "Example: outputs:\\n  build-id: ${{ steps.build.outputs.id }}",
 		"needs":           "Example: needs: build or needs: [build, test]",
 		"uses":            "Example: uses: ./.github/workflows/reusable.yml",
-		"with":            "Example: with:\\n  node-version: '20'",
+		"with":            "Example: with:\\n  node-version: '24'",
 		"secrets":         "Example: secrets:\\n  token: ${{ secrets.GITHUB_TOKEN }}",
 	}
 
