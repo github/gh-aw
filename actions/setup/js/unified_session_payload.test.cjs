@@ -4,6 +4,10 @@ import { mergeSessionSources } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeCodexSession } from "./codex_session.cjs";
+import { normalizeClaudeSession } from "./claude_session.cjs";
+import { normalizeCopilotSession } from "./copilot_session.cjs";
+import { normalizeGeminiSession } from "./gemini_session.cjs";
+import { collapseStreamedMessages } from "./agent_session_render.cjs";
 import { reconcileSessionUsage, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
 
 describe("essential unified session payloads", () => {
@@ -24,6 +28,42 @@ describe("essential unified session payloads", () => {
     expect(Buffer.byteLength(JSON.stringify(compact))).toBeLessThan(Buffer.byteLength(JSON.stringify(message)) / 2);
     expect(message).toEqual(original);
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+  });
+
+  it.each(["assistant.message", "assistant.reasoning"])("retains supplied %s stream boundaries without copying opaque payloads", type => {
+    const source = {
+      type,
+      session_id: "session",
+      parent_tool_use_id: "parent-tool",
+      agentId: "child",
+      message: { id: "message", content: "PRIVATE_NATIVE_SNAPSHOT" },
+      data: { content: "exact text", delta: true, partial: false, contentIndex: 0, channel: "channel", opaque: "PRIVATE_EXTENSION" },
+    };
+    const compact = normalizeUnifiedSessionEvent(source);
+    expect(compact.data).toEqual({ content: "exact text", delta: true, partial: false, contentIndex: 0, channel: "channel", sessionId: "session", parentToolUseId: "parent-tool", agentId: "child", messageId: "message" });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(JSON.stringify(compact)).not.toContain("PRIVATE_");
+  });
+
+  it("keeps Copilot, Claude and Gemini streaming evidence through collection and compaction", () => {
+    const claude = event => ({ type: "stream_event", session_id: "session", event });
+    const traces = [
+      normalizeCopilotSession(["Hello", " ", "world."].map((deltaContent, index) => ({ type: "assistant.message_delta", id: `event-${index}`, data: { messageId: "answer", deltaContent } }))),
+      normalizeClaudeSession([
+        claude({ type: "message_start", message: { id: "answer" } }),
+        claude({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }),
+        ...["Hello", " ", "world."].map(text => claude({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })),
+        claude({ type: "message_stop" }),
+      ]),
+      normalizeGeminiSession(["Hello", " ", "world."].map((content, timestamp) => ({ type: "message", role: "assistant", timestamp, delta: true, content }))),
+    ];
+    for (const events of traces) {
+      const compact = mergeSessionSources([{ component: "agent", phase: "agent", path: "stream.jsonl", events }]);
+      const projected = collapseStreamedMessages(compact);
+      expect(projected.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello world."]);
+      const output = generatePlainTextSummary(compact);
+      expect(output.match(/agent\/agent assistant\.message Hello world\./g)).toHaveLength(1);
+    }
   });
 
   it.each([

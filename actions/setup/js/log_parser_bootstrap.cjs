@@ -3,7 +3,7 @@
 
 const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview } = require("./log_parser_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
+const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
 const { projectSessionResult, isTokenCount, observedSessionModel } = require("./agent_session.cjs");
@@ -104,6 +104,55 @@ function escapeHtml(text) {
 }
 
 /**
+ * Keep retry conversations separate while selecting only the final attempt for accounting.
+ * Replicated snapshots of the same session are represented by their fullest observation.
+ * @param {string} directory
+ * @param {(content: string) => any} parseLog
+ * @returns {Array<{content: string, result: any, events: Array<any>, source: string, startTime: number}>}
+ */
+function readCopilotSessions(directory, parseLog) {
+  const fs = require("fs");
+  const path = require("path");
+  const files = [];
+  const walk = (current, depth = 0) => {
+    if (depth > 8) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch (error) {
+      throw new Error(`${ERR_SYSTEM}: Failed to enumerate Copilot session directory ${current}: ${getErrorMessage(error)}`, { cause: error });
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      const file = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(file, depth + 1);
+      else if (entry.isFile() && entry.name === "events.jsonl") files.push(file);
+    }
+  };
+  walk(directory);
+  const sessions = new Map();
+  for (const file of files) {
+    let content;
+    try {
+      content = fs.readFileSync(file, "utf8");
+    } catch (error) {
+      throw new Error(`${ERR_SYSTEM}: Failed to read Copilot session events ${file}: ${getErrorMessage(error)}`, { cause: error });
+    }
+    const result = parseLog(content);
+    const events = result?.logEntries;
+    if (!Array.isArray(events) || !events.length) continue;
+    const start = events.find(event => event.type === "session.start" || event.type === "session.init");
+    const identity = start?.data?.sessionId ?? file;
+    const startTime = Date.parse(start?.data?.startTime ?? start?.timestamp) || 0;
+    const relative = path.relative(directory, file).split(path.sep).join("/");
+    const source = directory.split(path.sep).slice(-3).join("/") === "sandbox/agent/logs" ? `sandbox/agent/logs/${relative}` : relative;
+    const session = { content, result, events, source, startTime };
+    const previous = sessions.get(identity);
+    if (!previous || events.length > previous.events.length) sessions.set(identity, session);
+  }
+  return [...sessions.values()].sort((left, right) => left.startTime - right.startTime || left.source.localeCompare(right.source));
+}
+
+/**
  * Bootstrap helper for log parser entry points.
  * Handles common logic for environment variable lookup, file existence checks,
  * content reading (file or directory), and summary emission.
@@ -112,12 +161,15 @@ function escapeHtml(text) {
  * @param {(content: string) => string|{markdown: string, mcpFailures?: string[], maxTurnsHit?: boolean, logEntries?: Array<any>}} options.parseLog - Parser function that takes log content and returns markdown or result object
  * @param {string} options.parserName - Name of the parser (e.g., "Codex", "Claude", "Copilot")
  * @param {boolean} [options.supportsDirectories=false] - Whether the parser supports reading from directories
+ * @param {string} [options.artifactDir] - Root for session artifacts, defaults to the workflow runtime directory
  * @returns {Promise<void>}
  */
 async function runLogParser(options) {
   const fs = require("fs");
   const path = require("path");
   const { parseLog, parserName, supportsDirectories = false } = options;
+  const artifactDir = options.artifactDir ?? path.dirname(AGENT_STDIO_LOG_PATH);
+  const agentStdioPath = path.join(artifactDir, "agent-stdio.log");
 
   /**
    * Recursively searches a directory tree for the first events.jsonl file.
@@ -213,6 +265,7 @@ async function runLogParser(options) {
     }
 
     let content = "";
+    let copilotSessions = [];
 
     // Check if logPath is a directory or a file
     const stat = fs.statSync(logPath);
@@ -223,8 +276,13 @@ async function runLogParser(options) {
       }
 
       // Prefer events.jsonl (structured Copilot session format) over debug .log files
-      const eventsJsonlPath = findEventsJsonlRecursive(logPath);
-      if (eventsJsonlPath) {
+      if (parserName === "Copilot") copilotSessions = readCopilotSessions(logPath, parseLog);
+      const eventsJsonlPath = copilotSessions.length ? null : findEventsJsonlRecursive(logPath);
+      if (copilotSessions.length) {
+        const finalSession = copilotSessions[copilotSessions.length - 1];
+        core.info(`Using ${copilotSessions.length} Copilot sessions; final attempt: ${finalSession.source}`);
+        content = finalSession.content;
+      } else if (eventsJsonlPath) {
         core.info(`Using Copilot session events from: ${eventsJsonlPath}`);
         content = fs.readFileSync(eventsJsonlPath, "utf8");
       } else {
@@ -258,8 +316,8 @@ async function runLogParser(options) {
       content = fs.readFileSync(logPath, "utf8");
     }
 
-    const result = parseLog(content);
-    const publicationMasks = new Set(collectAddMaskedValues(content));
+    const result = copilotSessions.length ? copilotSessions[copilotSessions.length - 1].result : parseLog(content);
+    const publicationMasks = new Set(collectAddMaskedValues(copilotSessions.length ? copilotSessions.map(session => session.content).join("\n") : content));
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
     // Handle result that may be a simple string or an object with metadata
@@ -277,6 +335,20 @@ async function runLogParser(options) {
       maxTurnsHit = result.maxTurnsHit || false;
       logEntries = result.logEntries || null;
     }
+    const conversationEntries = copilotSessions.length
+      ? copilotSessions.flatMap(session =>
+          session.events.map((event, index) => ({
+            ...event,
+            provenance: {
+              component: "agent",
+              phase: "agent",
+              path: session.source,
+              index,
+              ...(event.provenance ? { native: event.provenance } : {}),
+            },
+          }))
+        )
+      : logEntries;
 
     // Enrich agent-stdio.log with a normalized result entry when the engine does not
     // write one directly (e.g. Copilot, Pi).  The OTEL conclusion span
@@ -302,7 +374,7 @@ async function runLogParser(options) {
           num_turns: resultEntry.num_turns,
           usage: Object.keys(usage).length ? usage : undefined,
         };
-        const stdioLogPath = AGENT_STDIO_LOG_PATH;
+        const stdioLogPath = agentStdioPath;
         try {
           let alreadyHasResult = false;
           let newline = "";
@@ -349,7 +421,7 @@ async function runLogParser(options) {
 
     // Redact add-mask values from agent-stdio.log before it is uploaded as an
     // artifact so plaintext secrets do not persist outside live job logs.
-    const stdioLogPath = AGENT_STDIO_LOG_PATH;
+    const stdioLogPath = agentStdioPath;
     try {
       if (fs.existsSync(stdioLogPath)) {
         const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -369,15 +441,15 @@ async function runLogParser(options) {
 
     if (Array.isArray(logEntries)) {
       try {
-        const exitPath = "/tmp/gh-aw/agent_execution_exit_code.txt";
+        const exitPath = path.join(artifactDir, "agent_execution_exit_code.txt");
         const execution = collectAgentExecution({
           content,
           events: logEntries,
           observations: logEntries.filter(isAgentExecutionEvent).map(event => event.data),
           ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
         });
-        const canonicalEntries = [...logEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
-        writeSessionArtifact("/tmp/gh-aw/agent-session.jsonl", canonicalEntries, [...publicationMasks]);
+        const canonicalEntries = [...conversationEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
+        writeSessionArtifact(path.join(artifactDir, "agent-session.jsonl"), canonicalEntries, [...publicationMasks]);
         core.info(`[log-parser] Persisted ${canonicalEntries.length} canonical session events`);
       } catch (err) {
         core.warning(`[log-parser] Failed to persist canonical agent session: ${getErrorMessage(err)}`);
@@ -400,7 +472,7 @@ async function runLogParser(options) {
     if (markdown) {
       // Generate lightweight plain text summary for core.info and Copilot CLI style for step summary
       if (logEntries && Array.isArray(logEntries) && logEntries.length > 0) {
-        const publicationEntries = redactSessionForPublication(logEntries, redactPublication);
+        const publicationEntries = redactSessionForPublication(conversationEntries, redactPublication);
         const model = observedSessionModel(logEntries);
 
         const plainTextSummary = generatePlainTextSummary(publicationEntries, {
@@ -542,5 +614,6 @@ async function runLogParser(options) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     runLogParser,
+    readCopilotSessions,
   };
 }

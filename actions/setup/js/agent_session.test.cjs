@@ -144,6 +144,21 @@ describe("Unified Agent Session 1.0.0 conformance", () => {
     expect(convertCopilotEventsToLegacyLogEntries(events)[1].message.content[0].content).toBe(sessionOutputText(value));
   });
 
+  it("projects text-block arrays without treating ordinary structured arrays as MCP content", () => {
+    const blocks = freeze([
+      { type: "text", text: "line one" },
+      { type: "text", text: "line two" },
+    ]);
+    expect(sessionOutputText(blocks)).toBe("line one\nline two");
+    for (const value of [[], [false, 0, null], [{ text: "ordinary data" }], [{ type: "text", text: "partial" }, { value: 0 }]]) {
+      expect(sessionOutputText(value)).toBe(JSON.stringify(value, null, 2));
+    }
+    expect(blocks).toEqual([
+      { type: "text", text: "line one" },
+      { type: "text", text: "line two" },
+    ]);
+  });
+
   it("T-UAS-022/024: supplied mismatched IDs never pair by name, and orphan IDs remain intact", () => {
     const events = [
       { type: "tool.execution_start", data: { toolCallId: "start", toolName: "lookup", input: { secret: "do-not-invent" } } },
