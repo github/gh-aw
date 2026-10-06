@@ -61,6 +61,14 @@ func resolveEngineLLMProvider(workflowData *WorkflowData, defaultProvider LLMPro
 	return provider
 }
 
+func resolveEngineLLMProviderFromModel(workflowData *WorkflowData, defaultProvider LLMProvider) LLMProvider {
+	if workflowData != nil && (workflowData.EngineConfig == nil || workflowData.EngineConfig.LLMProvider == "") &&
+		strings.HasPrefix(strings.ToLower(strings.TrimSpace(workflowData.Model)), "copilot/") {
+		return LLMProviderGitHub
+	}
+	return resolveEngineLLMProvider(workflowData, defaultProvider)
+}
+
 func llmProviderProfileFor(provider LLMProvider) llmProviderProfile {
 	switch provider {
 	case LLMProviderGitHub:
