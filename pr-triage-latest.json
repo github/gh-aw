@@ -1,15 +1,25 @@
 {
-  "run_date": "2026-10-06T01:01:08Z",
-  "run_id": 37396829054,
+  "run_date": "2026-10-06T06:41:43Z",
+  "run_id": 37425001639,
   "source": "github-mcp-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 2,
-  "category_counts": {"bug": 1},
-  "risk_counts": {"high": 1},
-  "priority_counts": {"medium": 1},
-  "action_counts": {"batch_review": 1},
+  "cooldown_skipped": 8,
+  "category_counts": {
+    "bug": 1
+  },
+  "risk_counts": {
+    "high": 1
+  },
+  "priority_counts": {
+    "medium": 1
+  },
+  "action_counts": {
+    "batch_review": 1
+  },
   "batches": [],
-  "selected_candidates": [56568],
+  "selected_candidates": [
+    56568
+  ],
   "prs": [
     {
       "number": 56568,
@@ -18,7 +28,11 @@
       "risk": "high",
       "priority": "medium",
       "score": 68,
-      "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
+      "score_breakdown": {
+        "impact": 35,
+        "urgency": 22,
+        "quality": 11
+      },
       "action": "batch_review",
       "batch": null,
       "notes": "High-risk signed-commit fallback fix with explicit request-for-changes feedback and no CI run signal; keep it in a focused review batch."
