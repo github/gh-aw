@@ -2625,7 +2625,7 @@ jobs:
           test -s "$COVERAGE_FILE"
       - name: Upload code coverage report
         id: upload_code_coverage
-        uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
+        uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
         with:
           file: /tmp/gh-aw/upload-code-coverage/${{ needs.safe_outputs.outputs.upload_code_coverage_file }}
           language: ${{ needs.safe_outputs.outputs.upload_code_coverage_language }}
