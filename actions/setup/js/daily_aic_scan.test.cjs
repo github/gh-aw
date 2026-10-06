@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { scanDailyAIC } = require("./daily_aic_scan.cjs");
 const { createAPIBudget, apiError, retryNotBefore, safeResponseHeaders } = require("./daily_aic_api_budget.cjs");
 const { readScanCache, scanCacheEntry, AIC_SCAN_CACHE_FILE_PATH } = require("./daily_aic_cache_helpers.cjs");
-const { mainWithPaths: restore, isTrustedProducer } = require("./restore_aic_scan_cache.cjs");
+const { main: restoreMain, mainWithPaths: restore, isTrustedProducer } = require("./restore_aic_scan_cache.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const guardrail = require("./check_daily_aic_workflow_guardrail.cjs");
 
@@ -361,8 +361,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
       rest: {
         actions: {
           getWorkflowRun: async () => response(current),
-          listWorkflowRuns: async () => response({ workflow_runs: [producer(50), producer(51), producer(52)] }),
-          listWorkflowRunArtifacts: list,
+          listArtifactsForRepo: list,
         },
       },
     };
@@ -374,14 +373,18 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     vi.spyOn(Date, "now").mockReturnValue(now);
     const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
     const producer = { ...current, id: 50, event: "pull_request_target", repository: { full_name: repository } };
+    const artifact = { id: 100, name: "aic-usage-scan-v2", expired: false, workflow_run: { id: 50 }, created_at: new Date(now).toISOString() };
     global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    const getWorkflowRun = vi.fn(async ({ run_id }) => response(run_id === 99 ? current : producer));
     global.github = {
       auth: async () => ({ token: "synthetic" }),
       rest: {
         actions: {
-          getWorkflowRun: async () => response(current),
-          listWorkflowRuns: async () => response({ workflow_runs: [producer] }),
-          listWorkflowRunArtifacts: vi.fn(async () => response({ artifacts: [{ id: 100, name: "aic-usage-scan-v2", expired: false }] })),
+          getWorkflowRun,
+          listArtifactsForRepo: vi.fn(async () => response({ total_count: 1, artifacts: [artifact] })),
+          listWorkflowRuns: vi.fn(async () => {
+            throw new Error("Workflow-specific endpoint is unavailable");
+          }),
         },
       },
     };
@@ -396,6 +399,72 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect((await scanDailyAIC(f)).cacheHits).toBe(3);
     expect(f.getRunAIC).not.toHaveBeenCalled();
     expect(downloadArtifact).toHaveBeenCalledOnce();
+    expect(global.github.rest.actions.listArtifactsForRepo).toHaveBeenCalledWith(expect.objectContaining({ name: "aic-usage-scan-v2" }));
+    expect(getWorkflowRun).toHaveBeenCalledWith({ owner: "example", repo: "project", run_id: 50 });
+  });
+
+  it("skips untrusted artifacts before downloading and searches the next page", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    const untrusted = { id: 50, ...current, event: "pull_request", repository: { full_name: repository } };
+    const trusted = { id: 51, ...current, event: "pull_request_target", repository: { full_name: repository } };
+    const artifacts = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: "aic-usage-scan-v2", expired: index !== 0, workflow_run: { id: 50 }, created_at: new Date(now).toISOString() }));
+    const listArtifactsForRepo = vi.fn(async ({ page }) => response({ total_count: 101, artifacts: page === 1 ? artifacts : [{ id: 101, name: "aic-usage-scan-v2", workflow_run: { id: 51 }, created_at: new Date(now).toISOString() }] }));
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: vi.fn(async ({ run_id }) => response(run_id === 99 ? current : run_id === 50 ? untrusted : trusted)),
+          listArtifactsForRepo,
+        },
+      },
+    };
+    const downloadArtifact = vi.fn(async (_id, options) => {
+      fs.writeFileSync(path.join(options.path, path.basename(AIC_SCAN_CACHE_FILE_PATH)), JSON.stringify(scanCacheEntry(run(2), 4, repository, 7, now)));
+      return { downloadPath: options.path };
+    });
+    await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(listArtifactsForRepo).toHaveBeenCalledTimes(2);
+    expect(downloadArtifact).toHaveBeenCalledOnce();
+    expect(downloadArtifact).toHaveBeenCalledWith(101, expect.anything());
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).size).toBe(1);
+  });
+
+  it.each([403, 500])("does not fail activation when cache discovery fails with HTTP %i", async status => {
+    vi.stubEnv("GITHUB_EVENT_NAME", "pull_request");
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: async () => response({ workflow_id: 7, path: ".github/workflows/example.yml" }),
+          listArtifactsForRepo: vi.fn(async () => {
+            throw apiError(status, { "x-ratelimit-remaining": "0" }, "private error");
+          }),
+        },
+      },
+    };
+    await expect(restoreMain()).resolves.toBeUndefined();
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
+    expect(fs.existsSync(cachePath)).toBe(false);
+  });
+
+  it("does not fail activation when the initial run lookup is rate-limited", async () => {
+    vi.stubEnv("GITHUB_EVENT_NAME", "pull_request");
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99 };
+    global.github = {
+      rest: {
+        actions: {
+          getWorkflowRun: vi.fn(async () => {
+            throw apiError(403, { "x-ratelimit-remaining": "0" }, "private error");
+          }),
+        },
+      },
+    };
+    await expect(restoreMain()).resolves.toBeUndefined();
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
+    expect(core.warning.mock.calls[0][0]).not.toContain("private error");
   });
 
   it("rejects contributor workflow artifacts and non-default-branch dispatch snapshots", () => {

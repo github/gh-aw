@@ -5,7 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
-const { AIC_SCAN_CACHE_FILE_PATH, AIC_SCAN_CACHE_ARTIFACT_NAME, readScanCache } = require("./daily_aic_cache_helpers.cjs");
+const { AIC_SCAN_CACHE_FILE_PATH, AIC_SCAN_CACHE_ARTIFACT_NAME, CACHE_RETENTION_MS, readScanCache } = require("./daily_aic_cache_helpers.cjs");
 const { createAPIBudget, retryNotBefore } = require("./daily_aic_api_budget.cjs");
 
 function isTrustedProducer(run, current, repository, defaultBranch) {
@@ -24,49 +24,42 @@ async function mainWithPaths(cachePath = AIC_SCAN_CACHE_FILE_PATH, options = {})
   budget.observe(currentResponse);
   const current = currentResponse.data;
   if (!current.workflow_id) throw new Error("Cannot resolve workflow for daily AIC snapshot restore");
-  let runsResponse;
-  try {
-    runsResponse = await github.rest.actions.listWorkflowRuns({
-      owner,
-      repo,
-      workflow_id: current.workflow_id,
-      per_page: 10,
-    });
-  } catch (error) {
-    if (error?.status !== 404) throw error;
-    core.info("[daily-aic-cache] Workflow-specific history unavailable; leave accounting to the authoritative scan.");
-    return;
-  }
-  budget.observe(runsResponse);
   const defaultBranch = context.payload.repository?.default_branch;
   const auth = await github.auth({ type: "token" });
   if (!auth || typeof auth !== "object" || !("token" in auth) || typeof auth.token !== "string" || !auth.token) {
     throw new Error("No token available to restore daily AIC observations");
   }
   const token = auth.token;
-  for (const run of runsResponse.data.workflow_runs) {
-    if (run.id === context.runId || !isTrustedProducer(run, current, repository, defaultBranch)) continue;
-    const response = await github.rest.actions.listWorkflowRunArtifacts({ owner, repo, run_id: run.id, per_page: 100 });
+  for (let page = 1; ; page++) {
+    const response = await github.rest.actions.listArtifactsForRepo({ owner, repo, name: AIC_SCAN_CACHE_ARTIFACT_NAME, per_page: 100, page });
     budget.observe(response);
-    const artifact = response.data.artifacts.find(item => item.name === AIC_SCAN_CACHE_ARTIFACT_NAME && !item.expired);
-    if (!artifact) continue;
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-scan-restore-"));
-    try {
-      const download = await client.downloadArtifact(artifact.id, {
-        path: directory,
-        findBy: { token, workflowRunId: run.id, repositoryOwner: owner, repositoryName: repo },
-      });
-      const file = path.join(download.downloadPath || directory, path.basename(AIC_SCAN_CACHE_FILE_PATH));
-      if (!fs.existsSync(file)) continue;
-      const entries = readScanCache(fs.readFileSync(file, "utf8"), repository, current.workflow_id);
-      if (entries.size === 0) continue;
-      fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-      fs.writeFileSync(cachePath, [...entries.values()].map(entry => JSON.stringify(entry)).join("\n") + "\n", "utf8");
-      core.info(`[daily-aic-cache] Restored verified scan observations: ${JSON.stringify({ producerRunId: run.id, artifactId: artifact.id, entries: entries.size })}`);
-      return;
-    } finally {
-      fs.rmSync(directory, { recursive: true, force: true });
+    for (const artifact of response.data.artifacts) {
+      const createdAt = artifact.created_at ? Date.parse(artifact.created_at) : NaN;
+      if (Number.isFinite(createdAt) && createdAt < Date.now() - CACHE_RETENTION_MS) return;
+      if (artifact.name !== AIC_SCAN_CACHE_ARTIFACT_NAME || artifact.expired || !artifact.workflow_run?.id || artifact.workflow_run.id === context.runId) continue;
+      const runResponse = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: artifact.workflow_run.id });
+      budget.observe(runResponse);
+      const run = runResponse.data;
+      if (!isTrustedProducer(run, current, repository, defaultBranch)) continue;
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-scan-restore-"));
+      try {
+        const download = await client.downloadArtifact(artifact.id, {
+          path: directory,
+          findBy: { token, workflowRunId: run.id, repositoryOwner: owner, repositoryName: repo },
+        });
+        const file = path.join(download.downloadPath || directory, path.basename(AIC_SCAN_CACHE_FILE_PATH));
+        if (!fs.existsSync(file)) continue;
+        const entries = readScanCache(fs.readFileSync(file, "utf8"), repository, current.workflow_id);
+        if (entries.size === 0) continue;
+        fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+        fs.writeFileSync(cachePath, [...entries.values()].map(entry => JSON.stringify(entry)).join("\n") + "\n", "utf8");
+        core.info(`[daily-aic-cache] Restored verified scan observations: ${JSON.stringify({ producerRunId: run.id, artifactId: artifact.id, entries: entries.size })}`);
+        return;
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
     }
+    if (page * 100 >= response.data.total_count) break;
   }
   core.info("[daily-aic-cache] No trusted scan snapshot found; resolve the complete window from usage artifacts.");
 }
@@ -79,7 +72,7 @@ async function main() {
   } catch (error) {
     const retryAt = retryNotBefore(error?.response?.headers);
     if (retryAt) core.info(`[daily-aic-cache] No further API requests before ${retryAt}`);
-    throw error;
+    core.warning("[daily-aic-cache] Snapshot restore unavailable; continuing without cached observations.");
   }
 }
 
