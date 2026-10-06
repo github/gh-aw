@@ -26,20 +26,31 @@ from the existing bounded model evidence.
 
 **Required worker batching:** one worker dispatch MAY carry several scheduler-selected Claims. The inbound assignment is always a bounded array, even for one Claim. Each Claim has independent finish intent, terminal state, and effect authorization; completing one must not require completing the rest.
 
+**Required output attribution:** every safe-output message from a queue worker
+MUST resolve to exactly one assigned Claim before any handler runs. Trusted
+processing supplies the sole handle automatically for an immutable one-Claim
+assignment; a multi-Claim assignment requires an explicit handle on every
+message. This is enforced authorization, not a prompt convention.
+
 **Required DAG support:** Work is a schedulable DAG node. Immutable typed predecessor edges and trusted result/Issue/PR observations determine the ready frontier before priority/fairness selection. Independent Work has an empty dependency list and retains queue-like defaults.
+
+**Diagram convention:** use Mermaid throughout relationship, information-flow,
+and lifecycle explanations. Keep diagrams consistent with the normative tables,
+guards, and algorithms; diagrams do not introduce separate state or authority.
 
 ## 1. Recommendation
 
 Introduce a **mandatory, trusted, hierarchical grant scheduler for every queue**, rather than making priority and fairness additional agent-controlled sort keys:
 
-```text
-dependency/resource/capacity eligibility
-    -> priority-class policy
-    -> weighted fairness among trusted accounting keys
-    -> oldest ready DAG node within the selected key
-    -> one committed Claim that grants, charges, and reserves capacity
-    -> dispatch
-    -> existing worker admission and final safe-output authorization
+```mermaid
+flowchart LR
+    Ready["Dependency and logical-capacity eligibility"] --> Class["Priority-class policy"]
+    Class --> Key["Weighted accounting-key selection"]
+    Key --> FIFO["Oldest eligible node in that bucket"]
+    FIFO --> Pack["Admit the packable fair prefix"]
+    Pack --> Grant["Commit Claims: grant, charge, reserve"]
+    Grant --> Launch["Dispatch and bind native run"]
+    Launch --> Gate["Per-Claim finish and safe-output gate"]
 ```
 
 Out of the box, resolve every submission to **priority 3 and one default accounting bucket**, then select the oldest available Work. The mandatory hierarchical scheduler therefore behaves like an ordinary FIFO queue without requiring configuration.
@@ -70,6 +81,7 @@ The earlier specification had the right trust boundary, but too much protocol ma
 | Rational wire state, arbitrary hierarchy, and live weight rebasing expanded the first release | Use exact integer ticks, two scheduling levels, and policy changes only after the queue drains |
 | An agent could prepare inputs for a snapshot winner that changes before publication | Store Work-specific plans at submission; stage `dispatch_next(pool, max_claims, max_dispatches)` and bind selected Work late |
 | Multiple Claims in one worker could be confused with one fairness unit or one terminal result | Charge every Claim, reserve one native dispatch slot, and finalize/effect-gate each assigned handle independently |
+| Single-Claim users should not manage redundant attribution, while mixed outcomes must remain valid | Automatically scope one-Claim outputs; enforce explicit multi-Claim scopes and settle completed/cancelled members independently through DAG Results |
 | “Read,” “staged,” “granted,” and “launched” could look equally successful | Give each an explicit status; expose partial batches, blocking reasons, and uncertain launches |
 | Tracing risked becoming a second authority or a new observability subsystem | Reuse existing OTLP/context plumbing; correlate by request/commit/Claim IDs and derive receipts from the canonical log |
 | Packing restrictions could silently change who competes | Select from scheduling eligibility first; admit only a packable fair prefix, without advancing debt for a rejected winner |
@@ -335,6 +347,7 @@ With no priority/fairness options, the effective policy MUST be:
 | Next Work | First-committed enqueue position among currently eligible Work |
 | Producer grouping | No automatic per-user, per-workflow, per-run, or per-instance buckets |
 | Outstanding capacity | The default bucket can use the pool's available reservation capacity; no smaller per-key cap unless explicitly configured |
+| Claims per worker dispatch | `1`; a setup-heavy approved profile may explicitly enable larger bounded batches |
 | Durable authority | Scheduled Claims grant/charge logical slots and identify shared native dispatch reservations in the same log |
 
 For Work A, B, and C accepted in that order, successive grants MUST select A, B, and C while all remain eligible. Other workflows submitting to the same unconfigured queue share that order; the scheduler MUST NOT secretly interleave producers or prioritize frequent/rare producers.
@@ -422,6 +435,25 @@ Unused shares may be borrowed only within the unchanged competition set.
 Eligibility/admissibility are not authority, and an agent's snapshot cannot
 establish either at publication time. A no-grant response identifies the winner
 and blocking constraint where disclosure is authorized, not an empty queue.
+
+```mermaid
+flowchart TD
+    State["Fresh authoritative projection"] --> Pick["Pure planNext"]
+    Pick --> Winner{"Scheduling-eligible winner exists?"}
+    Winner -->|No| Stop["Stop and report prefix plus limiting reason"]
+    Winner -->|Yes| Fits{"Winner fits a compatible group and all budgets?"}
+    Fits -->|No| Stop
+    Fits -->|Yes| Apply["Append tentative Claim; apply charge and pass transitions"]
+    Apply --> More{"Claim budget remains?"}
+    More -->|Yes| Pick
+    More -->|No| Stop
+    Stop --> Nonempty{"Any Claims admitted?"}
+    Nonempty -->|No| NoGrant["Explicit no-grant outcome; no debt change"]
+    Nonempty -->|Yes| CAS["Publish atomic prefix with CAS"]
+    CAS -->|Conflict| Reload["Discard whole prefix; refresh"]
+    Reload --> State
+    CAS -->|Accepted| Durable["Durable fair grant"]
+```
 
 ### 7.4 Accounting unit
 
@@ -566,6 +598,24 @@ reopen terminal Work or create another authorization. Define Work's frozen
 ownership facts separately from these lifecycle records and preserve
 single-winner, one-shot authorization per Claim.
 
+```mermaid
+flowchart TB
+    Agent["Agent: plans and staged intents, no queue credentials"]
+    Snapshot["Immutable activation snapshot"]
+    Snapshot --> Agent
+    Agent --> Intents["Submit / dispatch_next / finish / scoped outputs"]
+    Intents --> Publisher["Trusted schema, role, scope and CAS checks"]
+    Resolver["Trusted foreign-resource resolver"] --> Observations["Typed observations"]
+    Observations --> Publisher
+    Publisher --> Ledger[("Only authority: work-queue.jsonl")]
+    Ledger --> Replay["Validated replay projection"]
+    Replay --> Publisher
+    Replay -.-> Snapshot
+    Replay -.-> Explain["Read / explain / receipts"]
+    Replay -.-> Trace["Correlated traces and metrics"]
+    Admin["Authenticated Policy / Control intents"] --> Publisher
+```
+
 ### 7.7 Trusted publication and concurrent dispatchers
 
 Keep one pure `planNext(state, pool, as_of)` function, a deterministic prefix packer, and one checked publication path. Process `dispatch_next(pool, max_claims, max_dispatches)`:
@@ -600,6 +650,27 @@ Two dispatchers proposing against the same branch version cannot both publish th
 Once a Claim batch has committed, its selected Work and Claims MUST remain immutable; do not rebind an already granted request on later retries. Recover by stable request/Claim identity, not by choosing a new winner.
 
 Returning a committed request is not permission to relaunch completed, cancelled, or released Claims. Reconcile the batch's current lifecycle first and report its current state. Claim creation and external launch have separate idempotency boundaries.
+
+```mermaid
+sequenceDiagram
+    participant D1 as Trusted dispatcher 1
+    participant D2 as Trusted dispatcher 2
+    participant L as Canonical queue ledger
+    D1->>L: Read tip H and replay
+    D2->>L: Read tip H and replay
+    D1->>L: CAS fair Claim prefix against H
+    L-->>D1: Accepted, new tip H1
+    D2->>L: CAS tentative prefix against H
+    L-->>D2: Conflict, no grant or charge
+    D2->>L: Refresh H1 and replay accepted charges
+    Note over D2: Discard old winner and packing
+    alt A fresh admissible winner exists
+        D2->>L: CAS recomputed fair prefix against H1
+        L-->>D2: Accepted, new tip H2
+    else No admissible winner
+        Note over D2: Return an explicit blocking outcome without writing a Claim
+    end
+```
 
 An evaluation with no Claims need not write an empty commit or advance service state. It returns `no_work`, `capacity_blocked`, or `no_eligible_work` with the inspected tip. Such a response grants nothing and does not consume an idempotency key; a later reevaluation may see different availability. At most one committed nonempty result is permitted per logical request.
 Include the specific packing/control/ledger limiting code when that is the
@@ -638,8 +709,29 @@ The grant is the scheduler's linearization point, not the GitHub Actions launch.
 
 Keep these derived states distinct:
 
-```text
-reserved -> launch requested/uncertain -> run bound -> terminal reconciled -> released
+```mermaid
+stateDiagram-v2
+    [*] --> Reserved: Fair Claim prefix committed
+    Reserved --> Started: CAS start marker and select one sender
+    Reserved --> Released: Definitive prelaunch cancellation
+    Started --> Bound: Validate returned run ID or trusted activation
+    Started --> Uncertain: Lost or unexpected POST response
+    Started --> Released: Definitive nonlaunch evidence
+    Uncertain --> Bound: Trusted binding recovery
+    Uncertain --> Released: Definitive nonlaunch evidence
+    Uncertain --> Unresolved: Reconciliation budget exhausted
+    Unresolved --> Bound: Later authenticated run evidence
+    Unresolved --> Released: Later definitive nonlaunch evidence
+    Bound --> Terminal: Exact native run and attempt terminated
+    Terminal --> Released: Close open Claims and release once
+    Released --> [*]
+    note right of Unresolved
+        Keep the reservation.
+        No blind POST retry or timeout release.
+    end note
+    note right of Terminal
+        Result barriers settle independently.
+    end note
 ```
 
 A group's first Claim creates its native reservation; all its Claims reference one `dispatch_id`. Record `Dispatch(started)` once for that group before the single API call. Record `Dispatch(bound, run_id)` for the actual worker run, binding every immutable assigned Claim. Retries reconcile the group and must not split it or launch one copy per Claim.
@@ -771,7 +863,7 @@ Suggested behavior:
 | Explicit Work selection | No direct-claim selector, preferred-Work assertion, arbitrary filter, or target-specific queue bypass in version 1 |
 | Administrative priority/weight change | Append an authorized Policy transaction only after quiescence; no Control-based debt reset or out-of-policy grant override |
 | Operational recovery | Authorized Control operations pause/resume admission/grants or rotate equivalent credentials without resetting passes; reconcile launch and delivery barriers, never force-release |
-| Worker finish | Accept outcome plus an assigned local handle; resolve authority from the immutable array, never accept arbitrary Work/Claim identities |
+| Worker finish and safe outputs | Resolve the sole assignment handle automatically; require explicit handles for multiple Claims and reject foreign/ambiguous scopes before handlers |
 | Audit/logs | Expose policy epoch, selection reason, blocked reason, grants, launch outcomes, and reservations without leaking submitted identifiers |
 | Operator CLI | Use the same QueueCommit codec, selector, and publisher on its configured queue; no direct-claim, legacy-format, or unscheduled bypass |
 
@@ -844,7 +936,7 @@ bounded operation are specified in section 7.17.
 | Layer | Required contract | Present evidence / release obligation |
 |---|---|---|
 | Algorithmic fairness | Deterministic unit-grant proportional service for fixed continuously eligible weighted competitors; conditional eventual service below | Disposable exact-ratio examples exist; independent deviation bounds and temporal properties remain to be established |
-| Protocol safety | Current-only mandatory scheduling, causal replay, fresh fair-prefix grants, one charge/Claim and native reservation/group, no fork/bypass, isolated one-shot effects | Bounded successor checks cover an abstract subset; packing, writer provenance, Control, and DeliveryFailure refinements are not yet modeled |
+| Protocol safety | Current-only mandatory scheduling, causal replay, fresh fair-prefix grants, one charge/Claim and native reservation/group, no fork/bypass, isolated one-shot effects | Bounded successor and Claim-scope checks cover abstract subsets; packing, writer provenance, Control, and DeliveryFailure refinements are not yet modeled |
 | Implementation conformance | Runtime/operator codecs, selector, publisher, binder, and recovery enforce the same contract on real APIs | No replacement runtime implementation or conformance result exists |
 | Operational evidence | Reproducible source/tool identities and explicit passed/violation/incomplete verdicts | Exhausted finite cases are documented separately from two unfinished searches; artifact collection is not a proof |
 
@@ -907,7 +999,7 @@ These proposed tool names are not currently implemented:
 | `work_queue_explain` | Explain a candidate/Claim using that same snapshot; never claim fresh durable state |
 | `work_queue_submit` | Stage payload, approved worker profile, and optional permitted metadata |
 | `work_queue_dispatch_next` | Stage `{pool, max_claims, max_dispatches}`; accept no Work selector, filter, authority, or trace override |
-| `work_queue_claim_finish` | Stage `{claim_handle, outcome}` for one member of the trusted inbound array |
+| `work_queue_claim_finish` | Stage `{claim_handle?, outcome}` for one member; only a one-Claim assignment may omit the handle |
 
 The agent-side MCP server continues to read its immutable activation artifact and write only staged-intent files. It receives no queue Git credentials and never publishes a `QueueCommit`. Trusted safe-output processing binds staged intent handles to stable request IDs/fingerprints; retries reuse those handles, while different logical requests have different IDs.
 
@@ -927,34 +1019,45 @@ Producer/accounting scope is validated at submission, with priority 3/default ke
 
 The following example assumes the compiler permits a three-Claim batch:
 
-```text
-activation:
-    capture queue snapshot and trace/caller context
-
-dispatcher agent:
-    inspect snapshot and explain predicted next Work
-    identify new useful tasks
-    stage submissions with their own plans and approved profiles
-    stage dispatch_next(pool="default", max_claims=3, max_dispatches=1)
-
-trusted safe outputs:
-    admit validated submissions in explicit intent order
-    evaluate dispatch_next against the current durable prefix
-    atomically commit up to 3 scheduled Claims under limits
-    admit each selected Work only if the fair-prefix packer can fit its own payload
-    bind the accepted Claim array to the approved worker assignment
-    record its launch marker, dispatch once, and bind the returned run identity
-    produce a request/Claim receipt
-
-workers:
-    trusted activation validates or recovers its run/attempt binding, then captures the snapshot
-    accept a bounded trusted Claim array with local handles
-    solve assigned tasks and stage finish/effects for each handle independently
-    finalize each Claim independently; unfinished handles do not authorize effects
-
-next dispatcher activation:
-    inspect durable progress and prior receipts
-    adapt task generation, plans, or bounded demand
+```mermaid
+sequenceDiagram
+    participant D as Dispatcher agent
+    participant P as Trusted processor
+    participant L as Canonical queue ledger
+    participant G as GitHub Actions
+    participant A as Trusted worker activation
+    participant W as Worker agent
+    D->>P: Stage Work plans and dispatch_next request
+    P-->>D: Intent IDs, status staged
+    Note over D,P: Durable selection happens after the dispatcher agent phase
+    P->>L: Refresh, replay and admit validated Work
+    P->>L: CAS fair packable Claim prefix
+    L-->>P: Immutable assigned handles and native reservation
+    P->>L: CAS launch start marker
+    P->>G: Send one dispatch with immutable assignment
+    G-->>P: Native run ID
+    P->>L: Validate and bind run
+    G->>A: Activate worker with native context
+    A->>L: Validate or recover binding and capture snapshot
+    A->>W: Deliver trusted Claim array
+    loop Each assigned handle
+        W->>P: Stage scoped output and completed/cancelled intent
+        P-->>W: Staged acknowledgement, not durable completion
+    end
+    Note over W,P: Per-Claim processing begins after the worker agent phase
+    loop Settle each Claim independently
+        alt Completed intent
+            P->>L: Publish and verify Completion
+            P->>G: Execute only this Claim's authorized outputs
+            P->>L: Publish verified Result
+        else Cancelled or omitted finish
+            P->>L: Publish ClaimCancellation
+            Note over P: Suppress this Claim's outputs and preserve siblings
+        end
+    end
+    G-->>P: Exact native termination evidence
+    P->>L: Release shared native reservation
+    L-->>D: Next activation sees Results, blocking paths and receipts
 ```
 
 There is no promise that the dispatcher can observe a durable grant during the same agent turn: publication happens later in safe outputs. Persist the derived receipt as a workflow artifact/step summary and expose it to subsequent activations. A same-turn durable acquire-and-respond API would require a different trusted orchestration boundary and is outside this design.
@@ -1085,7 +1188,14 @@ agent-supplied run ID. Reject scalar assignments and agent-provided replacements
 }
 ```
 
-The sketch omits other required provenance fields for readability. Handles are generated by trusted processing and scoped to this immutable assignment. `work_queue_claim_finish({"claim_handle":"h1","outcome":"completed"})` identifies one assigned Claim, not the entire dispatch. Repeating the same outcome is idempotent; conflicting outcomes fail explicitly. Unknown handles, arbitrary Claim IDs, or handles from another assignment cannot authorize a mutation.
+The sketch omits other required provenance fields for readability. Handles are
+generated by trusted processing and scoped to this immutable assignment.
+`work_queue_claim_finish({"claim_handle":"h1","outcome":"completed"})` identifies
+one assigned Claim, not the entire dispatch. For a one-Claim assignment,
+`work_queue_claim_finish({"outcome":"completed"})` binds its sole handle
+automatically. The canonical terminal outcome remains `completed` (finished);
+the protocol does not introduce a second `finished` wire value. Repeating the
+same outcome is idempotent; conflicting outcomes fail explicitly.
 
 #### Fair admission before packing
 
@@ -1100,6 +1210,14 @@ in the Claim commit.
 If the next fair winner cannot fit and no new dispatch is permitted, stop the prefix with `dispatch_budget_blocked`; never skip it to fill a preferred profile. For example, profile order X/Y/X with a one-dispatch budget admits the first X only, not both X tasks. A compatible A/B/A fairness sequence can share one worker and is still charged three Claims, not one launch. Workers process assignment order by default, but may finish independently or in parallel.
 
 Track distinct limits and metrics: outstanding Claims per pool/account, outstanding worker dispatches per pool, per-request Claim count, per-run launch count, and per-profile assignment size. Closing a Claim frees its logical slot; finishing one Claim cannot release the shared native slot or erase the others.
+
+Batching is an explicit worker-profile optimization for substantial reusable
+setup overhead, such as a large repository requiring ten minutes or more to
+prepare. Default `max-claims-per-dispatch` to 1; enable larger bounded batches
+only for compatible independent Work whose setup/context can be reused.
+The sixteen-Claim engineering ceiling is not the default batch size. Measure
+setup savings separately from execution latency, failure coupling, and waiting
+time for already-reserved Claims.
 
 #### Batch trust domain
 
@@ -1129,21 +1247,132 @@ does not span them.
 
 #### Individual finalization and effects
 
-Every worker-generated external mutation MUST carry an explicit `claim_handle`. A transient global “current Claim” switch is not sufficient: concurrent preparation could associate an output with the wrong Claim. Read-only diagnostics may be unscoped; queued Work effects may not. The trusted processor resolves the handle against the inbound array and validates the actual worker run and effective ownership for that Claim.
+Every worker safe-output message, including no-op/preview messages, MUST have
+exactly one canonical `claim_handle`. Resolve the agent's optional selector
+against the **original immutable assignment**, not the remaining open/effective
+Claims:
+
+| Original assignment / selector | Trusted resolution |
+|---|---|
+| One Claim, selector omitted | Attach its sole handle automatically |
+| One Claim, correct explicit selector | Preserve that handle |
+| Several Claims, valid explicit selector | Preserve that member's handle |
+| Several Claims, selector omitted | Reject `claim_scope_required`, even if only one Claim remains open |
+| Unknown, malformed, foreign, or conflicting selector | Reject `claim_scope_invalid`; never replace it with the sole/first/current handle |
+| Missing/invalid assignment or native binding | Reject worker authorization; no implicit unassigned execution |
+
+Omitted means absent, not `null`, an empty string, or an arbitrary Claim ID.
+Use this same normalizer for finish intents and worker-generated submit/dispatch
+intents. After normalization, persist the handle in the trusted message/receipt;
+never rely on a transient global "current Claim" switch. Changing completion
+state cannot make an originally ambiguous message unambiguous.
+
+Compiler-generated message schemas, trusted artifact ingestion, and the common
+pre-handler gate MUST enforce this contract for **every** safe-output type.
+New/custom handlers cannot opt out. Attribution occurs before type-specific
+handler execution, then execution rechecks the actual run/attempt binding,
+effective ownership, this Claim's verified Completion, and its own permitted
+resource scope. A correct handle associates a message; it does not authorize
+effects for an open/cancelled Claim.
+Finish is a scoped protocol intent that checks effective open ownership before
+creating Completion/ClaimCancellation; it does not require a Completion that
+has not yet been written. Read-only previews retain the canonical handle and
+`staged_preview` status without authorizing effects or publishing terminal facts.
+
+Safe outputs are partitioned by resolved handle. Temporary-ID namespaces,
+prepared mutations, verification evidence, and Result descriptors retain that
+same scope; a handler cannot borrow another member's authorization or silently
+resolve another Claim's temporary ID. Cross-node data exchange uses declared
+verified DAG Results, not ambient sibling state.
+
+Reject malformed/unattributable messages with explicit per-message errors and
+invoke none of their handlers. Already durable completions remain valid, and
+unrelated valid members can still settle independently; a scope error must not
+cause batch-wide rollback or authorize a fallback. Read-only tool queries,
+runner diagnostics, and run-level telemetry are not safe-output messages and
+may remain unscoped. Group diagnostics must not create anonymous issue/comment
+outputs.
+
+Unassigned dispatchers may propose compiler-authorized queue-control intents
+(Work admission/dispatch_next), not worker-result safe outputs. Their authority
+is the trusted dispatcher role/request; this narrow control path cannot carry
+arbitrary GitHub mutation payloads or be selected by an agent to bypass Claim
+attribution. A worker-originated control intent still carries its Claim scope.
+
+```mermaid
+flowchart TD
+    Output["Any queue-worker safe-output message"] --> Assignment{"Valid immutable assignment?"}
+    Assignment -->|No| Invalid["Reject assignment or scope; run no handler"]
+    Assignment -->|Yes| Explicit{"Selector supplied?"}
+    Explicit -->|No| Single{"Original assignment has exactly one Claim?"}
+    Single -->|Yes| Auto["Trusted normalizer attaches sole handle"]
+    Single -->|No| Invalid
+    Explicit -->|Yes| Member{"Valid handle from this assignment?"}
+    Member -->|No| Invalid
+    Member -->|Yes| Canonical["Canonical Claim-scoped message"]
+    Auto --> Canonical
+    Canonical --> Authority{"Same Claim has verified Completion and valid run authority?"}
+    Authority -->|Yes| Handler["Run scoped handler; retain Claim on evidence and Result"]
+    Authority -->|No| Block["Suppress cancelled outputs; block open or invalid authority"]
+```
 
 Finish calls stage individual intents during the agent phase. Trusted safe-output processing publishes each Claim's Completion or ClaimCancellation in its **own checked commit**, then independently gates its scoped effects. There is no “all Claims finished” commit barrier. Staging is not durable completion: progress survives failure once its Completion is published, not merely when the agent calls the tool. Immediate durable acknowledgements during the agent turn would require a separate trusted execution boundary and are not claimed here.
 
 | Per-Claim state | Trusted action |
 |---|---|
 | Effective + completed intent | Persist Completion, verify it, and authorize only this handle's effects once |
-| Effective + cancelled intent | Cancel this Claim, close its logical slot, and execute none of its effects |
-| Effective + no finish intent at wrap-up | Cancel this Claim only; no implicit completion or effects |
+| Effective + cancelled intent | Cancel this Claim, close its logical slot, execute none of its effects, and report its scoped outputs as suppressed |
+| Effective + no finish intent at wrap-up | Cancel this Claim only; no implicit completion or effects; report suppression if outputs were staged |
 | Losing/terminal/invalid handle | Reject or stage that handle's effects; never borrow another Claim's authorization |
 | Reconciliation uncertain | Fail closed for unverified effects; preserve already committed Completions |
 
 Admission can mark individual members ineligible without discarding unrelated effective members, provided the shared native binding is valid. A globally invalid assignment/binding fails the entire worker. After some Claims finish, a crash or terminal-run recovery cancels only still-open members and releases the native slot with terminal evidence. It cannot reopen or roll back completed Work.
 
 For assignment `[c1,c2,c3]`, completing c1, cancelling c2, and leaving c3 unfinished produces one terminal Work completion, two Claim cancellations, and effects only for c1. If failure occurs after c1's Completion but before processing c2/c3, c1 remains completed and recovery settles only c2/c3. The existing Completion-to-effects crash gap applies independently to c1.
+
+#### Mixed outcomes are a normal result
+
+A worker MAY finish any subset and cancel the rest, including a mixture such as
+`c1=completed, c2=cancelled, c3=completed`. This is a valid settled assignment,
+not a failed batch or an all-or-nothing transaction. Process each member's
+finish, output gate, and Result independently. Intentional cancellation of c2
+does not block c1/c3's effects, roll back their Completions/Results, or make
+missing c2 outputs a delivery error for another Claim.
+
+Derived receipts distinguish `completed`, `completed_with_cancellations`, and
+`cancelled` when all members are settled; unresolved scopes/delivery/launches
+remain explicit errors or pending states. The native workflow conclusion is
+diagnostic, never a substitute for those per-Claim facts. Release its native
+slot only with termination evidence, regardless of the finished/cancelled mix.
+
+The DAG, not batch success, determines continuation. For Work A/B/C assigned to
+c1/c2/c3, a successor depending on A and C can become ready once their verified
+Results exist, even if c2 was cancelled. A successor depending on B waits.
+ClaimCancellation returns B to `available` with its original position and
+bounded retry/backoff; a future fair grant can complete it. It is not
+WorkCancellation or a failed dependency. Only explicit terminal
+WorkCancellation/DeliveryFailure makes that branch failed, and successors are
+not silently cancelled.
+
+```mermaid
+flowchart TB
+    Batch["One worker assignment: c1, c2, c3"]
+    Batch --> A["Work A / c1 completed"]
+    Batch --> B["Work B / c2 cancelled"]
+    Batch --> C["Work C / c3 completed"]
+    A --> OA["Only c1's authorized outputs"] --> RA["Verified Result A"]
+    C --> OC["Only c3's authorized outputs"] --> RC["Verified Result C"]
+    RA --> J["Successor J needs A and C: ready"]
+    RC --> J
+    B --> Available["B available again; no Result B"]
+    Available --> Waiting["Successor K needs B: waiting"]
+    Available --> Retry["Future fair grant: new Claim for B"]
+    Retry --> RB["Future verified Result B"]
+    RB --> K["Successor K becomes ready"]
+    Waiting -.-> K
+    Batch --> Native["One shared native reservation"]
+    Native --> Terminated["Trusted run termination"] --> Release["Release native slot"]
+```
 
 The formal invariant is now **at most one Completion and one authorization pass per Claim**, not at most one Completion per worker run. Effect records are bound to `(actual worker run, Claim)`; completing c1 must never authorize c2's writes. Trace and receipt views expose both group-level launch/binding and per-Claim finish/effect state.
 
@@ -1152,10 +1381,18 @@ The formal invariant is now **at most one Completion and one authorization pass 
 The queue is a DAG scheduler, not an agent-maintained checklist. It tracks Work
 ownership separately from readiness:
 
-```text
-admitted node -> waiting for predecessors -> ready frontier
-             -> fair Claim -> worker -> Completion
-             -> scoped effects verified -> Result -> release successors
+```mermaid
+flowchart LR
+    Node["Admitted node"] --> Wait["Wait for predecessor Results and external gates"]
+    Wait --> Ready["Ready frontier"] --> Claim["Fair Claim"]
+    Claim --> Completion["Completion: terminal ownership"]
+    Claim --> Cancel["ClaimCancellation"] --> Available["Available for a new fair attempt"]
+    Completion --> Pending["Delivery barrier pending"]
+    Pending --> Verified["Scoped delivery verified"] --> Result["Result"]
+    Result --> Successors["Declared successors can become ready"]
+    Pending --> Failure["Terminal evidence and bounded reconciliation: DeliveryFailure"]
+    Failure --> Blocked["Affected successors remain blocked"]
+    Failure --> Replacement["Approved replacement node; old edges unchanged"]
 ```
 
 The existing ownership states remain useful: a waiting node can be `available`
@@ -1440,6 +1677,21 @@ effects; queue assignment alone does not promise a remote Issue will remain
 closed. Trace the observation time and policy age rather than imply global
 real-time consistency.
 
+```mermaid
+flowchart TB
+    Issue["Foreign Issue: exact identity and completed/closed predicate"]
+    PR["Foreign PR: exact identity and merged predicate"]
+    Issue --> Reader["Allowlisted metadata reads with scoped credentials"]
+    PR --> Reader
+    Reader --> Observation["Normalize identity, condition, freshness and credential generation"]
+    Observation --> Ledger[("Canonical work-queue.jsonl")]
+    Parent["Verified predecessor Work Result"] --> Ledger
+    Ledger --> Gate{"All declared Results and fresh satisfying observations exist?"}
+    Gate -->|Yes| Eligible["Node joins the scheduling-eligible frontier"]
+    Gate -->|No| Waiting["Node waits with an explicit blocking path"]
+    Eligible --> Fair["Fair selection, then batch admissibility"]
+```
+
 Cycle validation covers immutable Work edges. The queue cannot statically prove
 that an agent's future external effect will not create an indirect wait cycle,
 such as Work waiting for an Issue closure that only that same Work would cause.
@@ -1467,6 +1719,18 @@ projection was computed correctly. Unless trusted cache integrity and derivation
 can be established, rebuild the projection by cold replay; untrusted activation
 or agent-produced cache contents cannot seed publication.
 No projection checkpoint authorizes removing unique log records.
+
+```mermaid
+flowchart LR
+    Ledger[("Canonical retained ledger")] --> Validate["Validate full prefix or trusted extension"]
+    Validate --> Projection["Disposable replay projection"]
+    Projection --> Indexes["Ready, dependency, request and fairness indexes"]
+    Indexes --> Decision["Same pure selector and explanation"]
+    Cache["Optional derivative cache"] -.-> Integrity{"Trusted integrity and derivation established?"}
+    Integrity -->|Yes, prefix checked| Projection
+    Integrity -->|No| Validate
+    Lost["Cache deleted"] --> Validate
+```
 
 Cold load of N ledger bytes is at least linear in N; an implementation that
 fetches/replays its entire growing log after every mutation has approximately
@@ -1610,6 +1874,10 @@ scope of this change.
 | Batch idempotency | Replaying one committed batch returns the same Claims and handles launches conservatively; different request parameters with the same ID fail |
 | Shared worker assignment | Several fairly selected Claims share one API dispatch/native binding and retain distinct handles and charges |
 | Independent finish | Complete c1, cancel c2, omit c3; only c1 completes/authorizes effects, and published c1 survives later failure |
+| Mixed terminal outcomes | Finish c1/c3 and cancel c2; their Results release a join needing only c1/c3, while a c2-dependent node waits for a future successful attempt |
+| Automatic single-Claim attribution | Missing selector binds the original sole handle on every safe-output/finish type; an incorrect explicit selector is never overwritten |
+| Multi-Claim attribution | Missing/foreign/malformed selectors fail before handlers; settling all but one member never enables automatic attribution |
+| Handler coverage | Built-in/custom/preview/no-op safe outputs and temporary IDs use the same Claim gate; no unscoped handler or cross-Claim reference bypass |
 | Effect isolation | Missing/unknown/wrong handles and c2 effects cannot use c1's Completion authorization |
 | Stable packing | Incompatible next profile stops a bounded prefix rather than being skipped; compatible Claims share a bounded group |
 | Eligibility versus packing | X/Y/X under a one-dispatch request admits only the first X; a rejected Y changes no clocks, active sets, charges, or reservations |
@@ -1645,6 +1913,16 @@ FairWorkQueue.tla**. Current checks cover neither sustained grant-share error no
 eventual-service properties. Bounded checks do not imply an unbounded proof or
 runtime refinement. The current model documentation makes that distinction.
 [R14], [R16]
+
+[`ClaimScopedWorker.tla`](ClaimScopedWorker.tla) separately checks the bounded
+scope-normalization and mixed-outcome contract. Its focused scenarios distinguish
+automatic single-Claim attribution from required multi-Claim selectors, preserve
+cancelled members' lack of effects/Results, and admit successors only from their
+own predecessor Results. Two positive cases exhaust 120,976 distinct states;
+the five negative controls and two guarded witnesses have exact named expected
+outcomes described in the [reproduction guide](README.md#claim-scoped-safe-outputs-and-mixed-dag-outcomes).
+It does not model no-write task contracts or establish runtime handler coverage,
+schema/transport conformance, scheduler fairness, or an unbounded liveness proof.
 
 #### Independent fairness release gate
 
@@ -1730,7 +2008,7 @@ This research intentionally changes no repository implementation. A follow-up im
 | `work_queue_issues_store.cjs` | Reject queue operation until the backend can enforce equivalent mandatory scheduling serialization |
 | `work_queue_mcp_server.cjs` and snapshots | Bounded read/explain plus staged submit/dispatch-next intents; explicit snapshot/staged provenance |
 | Queue policy initialization and submission defaults | Mandatory policy with one default class/key, no implicit producer grouping, and oldest-available default grants |
-| Worker finish/reconciliation and compiler integration | Bounded trust-compatible assignment arrays, explicit Claim handles, independent gates/Result or DeliveryFailure, actual run/attempt binding, shared native reservation |
+| Worker finish/reconciliation and compiler integration | Automatic one-Claim / enforced explicit multi-Claim attribution on every safe-output type, bounded trust-compatible arrays, mixed outcomes, independent gates/Result or DeliveryFailure, actual run/attempt binding |
 | Operational control and writer deployment | Authenticated branch restrictions/roles, pause/resume, equivalent-scope credential cutover, retained-history/recovery budgets |
 | `pkg/workqueue/` and `pkg/cli/work_command.go` | Shared envelope/selection fixtures, current-only records, explain/trace views, no direct-claim bypass; preserve configured authority boundaries |
 | `pkg/cli/logs_work_queue*.go` and summaries | Bounded request/Claim receipts, stable statuses, current-protocol validation, escaped diagnostics |
@@ -1770,7 +2048,8 @@ The live Temporal and Slurm manuals may change. HTCondor links use the verified 
 No GitHub Actions workflow was triggered and no scheduler/evaluator results were
 rewritten. Runtime/compiler implementation remains unchanged. The existing
 successor TLA+ model and formal runner cover the scope recorded in section 8.2;
-this review revision does not extend their checked behavior.
+this review revision adds only the focused Claim-scope/mixed-outcome model to
+that evidence, not the other previously unmodeled lifecycle refinements.
 
 ## 11. Sources
 

@@ -320,7 +320,7 @@ remain regression evidence for the existing implementation, not an operational
 legacy mode in the replacement.
 
 For a focused successor check, set `TLC_MODEL_FILTER=FairWorkQueue`. Omit this
-filter to run the complete original and successor suite. Set
+filter to run the complete original, successor, and Claim-scope suite. Set
 `TLC_CONFIG_FILTER=FairBatch` to run one named configuration; unknown or
 incompatible filters fail rather than returning a no-op success.
 
@@ -398,6 +398,64 @@ checks do not substitute for the two incomplete searches.
 Re-run a named case with `TLC_CONFIG_FILTER`. To resume a retained TLC checkpoint,
 use the same jar/model/configuration and worker count with
 `-recover /path/to/checkpoint-directory`; the checks here used two workers.
+
+### Claim-scoped safe outputs and mixed DAG outcomes
+
+[`ClaimScopedWorker.tla`](ClaimScopedWorker.tla) separately formalizes
+[enforced output attribution](priority-and-fairness.md#individual-finalization-and-effects)
+and [mixed outcomes](priority-and-fairness.md#mixed-outcomes-are-a-normal-result).
+Its fixed trusted assignment contains one or three Claims. Omitted selectors
+normalize automatically only for an originally one-Claim assignment; explicit
+foreign handles and missing multi-Claim selectors are rejected. A multi-Claim
+assignment never becomes implicitly single-Claim when other members close.
+
+```mermaid
+flowchart LR
+    Single["One-Claim assignment"] --> Auto["Omitted selector: attach sole handle"]
+    Multi["Multi-Claim assignment"] --> Explicit["Explicit member handle required"]
+    Auto --> Scope["Canonical Claim-scoped output"]
+    Explicit --> Scope
+    Scope --> Finished["Same Claim's verified Completion"]
+    Finished --> Effects["Authorized effects and verified Result"]
+    Cancelled["Cancelled Claim"] --> NoEffects["No effects or Result from this attempt"]
+    Effects --> DAG["Only declared Result-dependent successors become ready"]
+```
+
+All closures and Results are facts in one abstract log. Safe outputs preserve
+their resolved Claim and original selector; effects require that same Claim's
+Completion. Cancelled Claims cannot emit effects or Results. The mixed witness
+finishes Claims 1/3, cancels Claim 2 despite its staged output, and admits the
+successor requiring Results 1/3 while the Claim-2-dependent successor waits.
+Cancellation is not batch failure or terminal WorkCancellation; the existing
+`FairWorkQueue` model separately covers returning that Work to availability.
+
+Run this focused suite with `TLC_MODEL_FILTER=ClaimScopedWorker`, or select a
+single configuration with `TLC_CONFIG_FILTER`.
+
+| Configuration | Expected result |
+|---|---|
+| `ClaimScopeSingle.cfg` | Automatic/explicit one-Claim attribution, foreign-selector rejection, closure/effect/Result safety |
+| `ClaimScopeMixed.cfg` | Three independently completed/cancelled/omitted Claims; scoped outputs and Result-only DAG admission |
+| `BrokenMissingClaimScope.cfg` | Assign an omitted multi-Claim selector to the first member; `OutputScope` fails |
+| `BrokenForeignClaimScope.cfg` | Replace a foreign explicit selector with the sole handle; `OutputScope` fails |
+| `BrokenLastOpenClaimScope.cfg` | Infer an omitted selector from the last open member of a multi-Claim assignment; `OutputScope` fails |
+| `BrokenCancelledClaimOutput.cfg` | Execute a cancelled member's staged output; `EffectAuthorization` fails |
+| `BrokenMixedDAGAdmission.cfg` | Use Claim closure instead of verified Results to admit a successor; `DAGAuthorization` fails |
+| `SingleClaimScopeWitness.cfg` | Guarded model reaches a sole-Claim effect with automatically attached scope; false `NoAutomaticScope` fails without violating Safety |
+| `MixedClaimDAGWitness.cfg` | Guarded model reaches finished/cancelled/finished members, scoped effects only for 1/3, and the corresponding ready successor; false `NoMixedDAGProgress` fails without violating Safety |
+
+The two positive cases exhaust 144 and 120,832 distinct states respectively
+(depths 12 and 25), totaling 120,976 on 2026-10-05 with the pinned TLC/Java setup.
+The controls/witnesses require their exact named violations, not parser/tool
+errors. These checks do not substitute for the two unfinished searches above.
+
+The model abstracts an already validated assignment/native binding, one required
+scoped handler batch per root, trusted delivery verification, and two fixed
+successor dependency sets. It does not model concrete output schemas, every
+handler type, no-write task contracts, temporary-ID codecs, Git CAS, retries in a
+new assignment, actual API delivery, fair scheduling, or liveness. Handler-wide
+enforcement remains a replacement runtime conformance obligation, not a deployed
+feature established by this model.
 
 ### Daily evidence collection
 

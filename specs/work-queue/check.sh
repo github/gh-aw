@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue or FairWorkQueue when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, or ClaimScopedWorker when set." >&2
         exit 1
         ;;
 esac
@@ -84,6 +84,15 @@ run_model BrokenPRClosedAsMerged ExternalTruth Invariant 12 FairWorkQueue
 run_model BatchedAssignmentWitness NoBatchedAssignment Invariant 12 FairWorkQueue
 run_model PartialCompletionWitness NoPartialCompletion Invariant 12 FairWorkQueue
 run_model DAGJoinWitness NoJoinClaim Invariant 12 FairWorkQueue
+run_model ClaimScopeSingle "" Invariant 0 ClaimScopedWorker
+run_model ClaimScopeMixed "" Invariant 0 ClaimScopedWorker
+run_model BrokenMissingClaimScope OutputScope Invariant 12 ClaimScopedWorker
+run_model BrokenForeignClaimScope OutputScope Invariant 12 ClaimScopedWorker
+run_model BrokenLastOpenClaimScope OutputScope Invariant 12 ClaimScopedWorker
+run_model BrokenCancelledClaimOutput EffectAuthorization Invariant 12 ClaimScopedWorker
+run_model BrokenMixedDAGAdmission DAGAuthorization Invariant 12 ClaimScopedWorker
+run_model SingleClaimScopeWitness NoAutomaticScope Invariant 12 ClaimScopedWorker
+run_model MixedClaimDAGWitness NoMixedDAGProgress Invariant 12 ClaimScopedWorker
 if [ "$RUN_COUNT" -eq 0 ]; then
     echo "No configuration matches the requested TLC filters." >&2
     exit 1
