@@ -92,7 +92,7 @@ MCP servers can persist temporary state by reading and writing files under `/tmp
 
 ## Behavior
 
-GitHub Actions cache evicts unused entries after 7 days and provides a 10GB per-repository limit with LRU eviction. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime.
+GitHub Actions cache evicts unused entries after 7 days and provides a 10GB per-repository limit with LRU eviction. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime. The repository-wide [artifact retention policy](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention) overrides this per-cache artifact setting when configured.
 
 Cache memory is branch-scoped: runs restore from the same branch first, then can fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves create a branch-local cache lineage.
 

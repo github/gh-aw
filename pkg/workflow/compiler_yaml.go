@@ -95,6 +95,22 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) {
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
 
+	repoConfig, err := c.loadRepoConfig()
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if data.SafeOutputs != nil && data.SafeOutputs.UploadArtifact != nil {
+		upload := data.SafeOutputs.UploadArtifact
+		originalRetention := upload.RetentionDays
+		defer func() { upload.RetentionDays = originalRetention }()
+		fallback := "30"
+		if upload.RetentionDays != nil {
+			fallback = *upload.RetentionDays
+		}
+		retention := artifactRetentionDays(repoConfig, fallback)
+		upload.RetentionDays = &retention
+	}
+
 	// Compute frontmatter hash BEFORE building jobs so that the stable hash is
 	// available to heredoc-delimiter generation throughout job construction.
 	// Using the hex-encoded SHA-256 frontmatter hash string as an HMAC key keeps
@@ -174,7 +190,10 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	var body strings.Builder
 	body.Grow(initialBuilderCapacity)
 	c.generateWorkflowBody(&body, data)
-	bodyContent := body.String()
+	bodyContent, err := applyArtifactRetention(body.String(), repoConfig)
+	if err != nil {
+		return "", nil, nil, err
+	}
 
 	// Collect secrets and external action references from the generated body.
 	// These are returned to the caller so they can be used for safe update enforcement
@@ -194,7 +213,10 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 			body.Reset()
 			body.Grow(initialBuilderCapacity)
 			c.generateWorkflowBody(&body, data)
-			bodyContent = body.String()
+			bodyContent, err = applyArtifactRetention(body.String(), repoConfig)
+			if err != nil {
+				return "", nil, nil, err
+			}
 			compilerYamlLog.Printf("Regenerated workflow body with on.workflow_call.secrets declarations")
 		}
 	}
@@ -216,7 +238,7 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 		yamlContent = c.replaceIssueNumberReferences(yamlContent)
 	}
 
-	yamlContent, err := finalizeRunnerTempSafety(yamlContent)
+	yamlContent, err = finalizeRunnerTempSafety(yamlContent)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("runner temp safety rewriting could not complete; ensure generated run/script steps are valid shell or JavaScript commands: %w", err)
 	}

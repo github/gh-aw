@@ -579,7 +579,11 @@ async function getArtifactClient() {
 async function main(config = {}) {
   const maxUploads = typeof config["max-uploads"] === "number" ? config["max-uploads"] : 1;
   // retention-days and skip-archive are fixed workflow configuration; the agent cannot override them.
-  const retentionDays = typeof config["retention-days"] === "number" ? config["retention-days"] : 30;
+  const configuredRetention = config["retention-days"] ?? 30;
+  const retentionDays = typeof configuredRetention === "number" || typeof configuredRetention === "string" ? Number(configuredRetention) : NaN;
+  if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 400) {
+    throw new Error(`${ERR_VALIDATION}: upload_artifact retention-days must resolve to an integer between 1 and 400, got ${JSON.stringify(configuredRetention)}`);
+  }
   const skipArchive = config["skip-archive"] === true;
   const maxSizeBytes = typeof config["max-size-bytes"] === "number" ? config["max-size-bytes"] : 104857600;
   const defaultIfNoFiles = typeof config["default-if-no-files"] === "string" ? config["default-if-no-files"] : "error";
