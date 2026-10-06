@@ -376,6 +376,11 @@ func TestLoadRepoConfig_DisabledJobsRejectsInvalidOrDuplicateValues(t *testing.T
 			awJSON:   `{"maintenance": {"disabled_jobs": ["apply_safe_outputz"]}}`,
 			contains: "unrecognized maintenance.disabled_jobs entry",
 		},
+		{
+			name:     "operation name is not a job ID",
+			awJSON:   `{"maintenance": {"disabled_jobs": ["validate"]}}`,
+			contains: `unrecognized maintenance.disabled_jobs entry "validate"`,
+		},
 	}
 
 	for _, tt := range tests {

@@ -171,7 +171,7 @@
               "items": {
                 "type": "string",
                 "minLength": 1,
-                "examples": ["close-expired-entities", "apply_safe_outputs", "label_disable_agentic_workflow", "label_apply_safe_outputs"]
+                "examples": ["close-expired-entities", "apply_safe_outputs", "run_operation", "validate_workflows", "cleanup-cache-memory"]
               },
               "uniqueItems": true
             },
