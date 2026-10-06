@@ -235,6 +235,7 @@ function resolvePiApiForModel(options) {
  * @returns {boolean|undefined}
  */
 function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
+  if (reflectData?.models_fetch_complete !== true) return undefined;
   const normalizedProvider = normalizeReflectProviderName(provider);
   const aliases = REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
   const endpoint = reflectData?.endpoints?.find(endpoint => endpoint?.configured === true && aliases.has(normalizeReflectProviderName(endpoint.provider)));
@@ -248,10 +249,6 @@ function resolvePiReasoningForModel({ provider, modelId, reflectData }) {
     return efforts.some(effort => effort !== "none");
   }
   if (supports?.reasoningEffort === false) return false;
-  // Copilot omits reasoning_effort for models without effort control.
-  if (normalizedProvider === "github" && supports && typeof supports === "object" && !Array.isArray(supports) && !Object.hasOwn(supports, "reasoning_effort") && !Object.hasOwn(supports, "reasoningEffort")) {
-    return false;
-  }
   return undefined;
 }
 

@@ -283,7 +283,7 @@ describe("pi_models_json.cjs", () => {
         piModelsJson.resolvePiReasoningForModel({
           provider: "github",
           modelId: "Claude-Haiku-4.5?effort=high",
-          reflectData: { endpoints: [{ provider: "copilot", configured: true, routing_models: [{ model_id: "claude-haiku-4.5", supported_reasoning_efforts: efforts }] }] },
+          reflectData: { models_fetch_complete: true, endpoints: [{ provider: "copilot", configured: true, routing_models: [{ model_id: "claude-haiku-4.5", supported_reasoning_efforts: efforts }] }] },
         })
       ).toBe(reasoning);
     });
@@ -293,7 +293,7 @@ describe("pi_models_json.cjs", () => {
       [{ capabilities: { supports: { reasoning_effort: [] } } }, false],
       [{ capabilities: { supports: { reasoning_effort: ["medium"] } } }, true],
       [{ capabilities: { supports: { reasoningEffort: false } } }, false],
-      [{ capabilities: { supports: { streaming: true } } }, false],
+      [{ capabilities: { supports: { streaming: true } } }, undefined],
       [{ capabilities: { supports: { reasoning_effort: null } } }, undefined],
       [{}, undefined],
     ])("uses reflected provider capabilities %j", (metadata, reasoning) => {
@@ -301,7 +301,61 @@ describe("pi_models_json.cjs", () => {
         piModelsJson.resolvePiReasoningForModel({
           provider: "github",
           modelId: "custom-model",
-          reflectData: { endpoints: [{ provider: "copilot", configured: true, model_metadata: [{ id: "custom-model", ...metadata }] }] },
+          reflectData: { models_fetch_complete: true, endpoints: [{ provider: "copilot", configured: true, model_metadata: [{ id: "custom-model", ...metadata }] }] },
+        })
+      ).toBe(reasoning);
+    });
+
+    it("returns undefined when a matched Copilot model has no capabilities.supports", () => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "custom-model",
+          reflectData: { models_fetch_complete: true, endpoints: [{ provider: "copilot", configured: true, model_metadata: [{ id: "custom-model" }] }] },
+        })
+      ).toBeUndefined();
+    });
+
+    it.each([undefined, null, {}, { models_fetch_complete: false }, { models_fetch_complete: true }])("returns undefined for unavailable reflection or absent metadata: %j", reflectData => {
+      expect(piModelsJson.resolvePiReasoningForModel({ provider: "github", modelId: "custom-model", reflectData })).toBeUndefined();
+    });
+
+    it.each([undefined, false])("ignores populated reasoning metadata when discovery completion is %s", models_fetch_complete => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "custom-model",
+          reflectData: {
+            models_fetch_complete,
+            endpoints: [
+              { provider: "copilot", configured: true, routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: [] }], model_metadata: [{ id: "custom-model", capabilities: { supports: { reasoningEffort: false } } }] },
+            ],
+          },
+        })
+      ).toBeUndefined();
+    });
+
+    it.each([
+      [[], ["high"], false],
+      [["high"], [], true],
+      [undefined, [], false],
+      [undefined, ["high"], true],
+    ])("prefers routing efforts %j over model efforts %j", (routingEfforts, modelEfforts, reasoning) => {
+      expect(
+        piModelsJson.resolvePiReasoningForModel({
+          provider: "github",
+          modelId: "custom-model",
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [
+              {
+                provider: "copilot",
+                configured: true,
+                routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: routingEfforts }],
+                model_metadata: [{ id: "custom-model", supportedReasoningEfforts: modelEfforts, capabilities: { supports: { reasoning_effort: ["medium"], reasoningEffort: false } } }],
+              },
+            ],
+          },
         })
       ).toBe(reasoning);
     });
@@ -312,6 +366,7 @@ describe("pi_models_json.cjs", () => {
           provider: "github",
           modelId: "custom-model",
           reflectData: {
+            models_fetch_complete: true,
             endpoints: [
               { provider: "openai", configured: true, routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: ["high"] }] },
               { provider: "copilot", configured: false, routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: ["high"] }] },
@@ -327,7 +382,7 @@ describe("pi_models_json.cjs", () => {
         piModelsJson.resolvePiReasoningForModel({
           provider: "anthropic",
           modelId: "custom-model",
-          reflectData: { endpoints: [{ provider: "anthropic", configured: true, model_metadata: [{ id: "custom-model", capabilities: { supports: { streaming: true } } }] }] },
+          reflectData: { models_fetch_complete: true, endpoints: [{ provider: "anthropic", configured: true, model_metadata: [{ id: "custom-model", capabilities: { supports: { streaming: true } } }] }] },
         })
       ).toBeUndefined();
     });
@@ -371,6 +426,7 @@ describe("pi_models_json.cjs", () => {
     it.each([
       [[], false],
       [["high"], true],
+      [undefined, false],
     ])("writes reflected reasoning support for arbitrary models with efforts %j", async (efforts, reasoning) => {
       process.env.GH_AW_PI_MODEL_ID = "custom-model";
       process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
@@ -385,13 +441,62 @@ describe("pi_models_json.cjs", () => {
         vi.fn().mockResolvedValue({
           ok: true,
           status: 200,
-          json: async () => ({ endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["custom-model"], routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: efforts }] }] }),
+          json: async () => ({
+            models_fetch_complete: true,
+            endpoints: [
+              {
+                provider: "copilot",
+                configured: true,
+                port: 10002,
+                models: ["custom-model"],
+                routing_models: [{ model_id: "custom-model", supported_reasoning_efforts: efforts }],
+                model_metadata: [{ id: "custom-model", capabilities: { supports: { reasoningEffort: false } } }],
+              },
+            ],
+          }),
         })
       );
       await piModelsJson.main({ loadSDK, loadModelsJson: () => ({ providers: {} }) });
       const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
       expect(written.providers["aw-gateway"].models[0].reasoning).toBe(reasoning);
       expect(stderrOutput.join("")).toContain(`resolved reasoning=${reasoning} from AWF /reflect`);
+    });
+
+    it.each([
+      [true, { id: "custom-model", capabilities: { supports: { streaming: true } } }],
+      [true, { id: "custom-model" }],
+      [true, undefined],
+      [false, { id: "custom-model", capabilities: { supports: { reasoningEffort: false } } }],
+      [undefined, { id: "custom-model", capabilities: { supports: { reasoningEffort: false } } }],
+    ])("preserves catalog and explicit reasoning with discovery=%s and metadata=%j", async (models_fetch_complete, modelMetadata) => {
+      process.env.GH_AW_PI_MODEL_ID = "custom-model";
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            models_fetch_complete,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["custom-model"], model_metadata: modelMetadata ? [modelMetadata] : [] }],
+          }),
+        })
+      );
+      for (const configuredReasoning of [undefined, true, false]) {
+        process.env.GH_AW_PI_CONFIG = JSON.stringify({ model: configuredReasoning === undefined ? {} : { reasoning: configuredReasoning } });
+        await piModelsJson.main({
+          loadSDK: async () => ({ ModelRuntime: { create: async () => ({ getModel: () => ({ reasoning: true }) }) } }),
+          loadModelsJson: () => ({ providers: {} }),
+        });
+        const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+        expect(written.providers["aw-gateway"].models[0].reasoning).toBe(configuredReasoning ?? true);
+      }
+      expect(stderrOutput.join("")).toContain("reasoning metadata unavailable; retaining Pi model configuration");
     });
 
     it("preserves native thinking, vision, token limits, pricing, and cache metadata", async () => {
