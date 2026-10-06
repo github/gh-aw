@@ -1,9 +1,9 @@
 {
-  "run_date": "2026-10-06T12:40:06Z",
-  "run_id": 37464264981,
+  "run_date": "2026-10-06T18:34:19Z",
+  "run_id": 37511578201,
   "source": "github-mcp-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 3,
+  "cooldown_skipped": 4,
   "category_counts": {
     "bug": 1
   },
@@ -35,7 +35,9 @@
       },
       "action": "batch_review",
       "batch": null,
-      "notes": "High-risk signed-commit fallback fix with explicit request-for-changes feedback and no CI signal; keep it in a focused review batch."
+      "notes": "High-risk signed-commit fallback fix with explicit review changes requested and no CI signal; keep it in a focused review batch.",
+      "ci_status": "unknown",
+      "review_status": "changes_requested"
     }
   ]
 }

@@ -1,16 +1,12 @@
-### PR Triage Summary
+# PR Triage Summary
 
+- Run: 2026-10-06T18:34:19Z
 - Eligible PRs: 1
-- Category mix: bug=1
-- Risk mix: high=1
-- Priority mix: medium=1
-- Action mix: batch_review=1
-- Batch clusters: none
+- Skipped by cooldown: 3
+- Category: bug
+- Risk: high
+- Priority: medium
+- Action: batch_review
 
-Top priority:
-1. #56568 — batch_review (68)
-
-### Notes
-- Review status: request changes from automated review; no check-runs reported for this PR.
-- Signal: behavior change affects signed-commit enforcement and can alter repository policy semantics on genuine conflicts.
-- Recommended action: keep in a small batch while the signed-commit safety concerns are resolved.
+## Candidate
+- #56568 — Fall back to unsigned push instead of failing when a rebase hits a genuine merge conflict in `pushSignedCommits`
