@@ -245,10 +245,12 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const observedEngine = sources.at(-1)?.events[0]?.data.engine_id;
     if (engine === undefined && typeof observedEngine === "string") engine = observedEngine;
   }
-  for (const [fileName, type] of [
+  /** @type {Array<[string, `${string}.${string}`]>} */
+  const prompts = [
     ["system.txt", "prompt.system"],
     ["user.txt", "prompt.user"],
-  ]) {
+  ];
+  for (const [fileName, type] of prompts) {
     const file = path.join(rootDir, "aw-prompts", fileName);
     if (exists(file)) sources.push({ component: "prompt", phase: "activation", path: path.relative(rootDir, file), events: [{ type, data: { content: read(file) } }] });
   }
