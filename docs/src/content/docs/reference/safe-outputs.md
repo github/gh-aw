@@ -1738,6 +1738,8 @@ jobs:
 
 Controls whether workflow failures are reported as GitHub issues (default: `true`).
 
+Failure reports keep error diagnostics in fenced code blocks inside collapsed details sections. Raw engine logs and arbitrary log tails are not included because they may contain secrets; inspect the linked workflow run for full logs.
+
 #### Simple Boolean (Opt-Out All Failures)
 
 Set to `false` to suppress automatic failure issue creation for a specific workflow:

@@ -117,9 +117,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
       }
     })
     .join("\n");
+  // Extract denied commands without copying harness configuration or transcript data.
   const attributedDiagnostics = agentErrorDiagnosticText(safeStdio);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
-  if (attributedDiagnostics) diagnostics.add(attributedDiagnostics);
   const details = [...diagnostics].slice(0, 20).join("\n");
   const sanitized = sanitizeContent(redact(details), { maxLength: 8000 });
   return {

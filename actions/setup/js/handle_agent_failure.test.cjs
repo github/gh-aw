@@ -3003,7 +3003,8 @@ describe("handle_agent_failure", () => {
     it("reports a nonzero driver exit even when the stdio log is missing", () => {
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "127");
       const result = buildEngineFailureContext();
-      expect(result).toContain("Driver exit code:** 127");
+      expect(result).toContain("```text\nDriver exit code: 127\n```");
+      expect(result).toContain("<details>\n<summary>Error details:</summary>");
       expect(result).toContain("terminated before producing output");
     });
 
@@ -3011,7 +3012,7 @@ describe("handle_agent_failure", () => {
       fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), "1");
       fs.writeFileSync(stdioLogPath, "Error: Refusing to use symlink as bind mountpoint: /usr/local/bin/npm\n");
       const result = buildEngineFailureContext();
-      expect(result).toContain("Driver exit code:** 1");
+      expect(result).toContain("Driver exit code: 1");
       expect(result).toContain("Refusing to use symlink as bind mountpoint");
     });
 
@@ -3038,6 +3039,7 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("Engine Failure");
       expect(result).toContain("quota exceeded");
       expect(result).toContain("Error details:");
+      expect(result).toContain("<details>\n<summary>Error details:</summary>\n\n```text\nquota exceeded\n```\n\n</details>");
       expect(result).toContain("> [!WARNING]");
     });
 
@@ -3135,16 +3137,17 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("Last agent output");
     });
 
-    it("strips ::add-mask:: command lines and redacts masked values from the last agent output", () => {
+    it("omits masked log tails and mask commands", () => {
       const logLines = ["   The Docker agent cgroup cannot be passed through.", "token is 79aab19823c27dbc1f3fcd49f16666ca8ab130b4b234b54f286cfcae347a844d", "::add-mask::79aab19823c27dbc1f3fcd49f16666ca8ab130b4b234b54f286cfcae347a844d"];
       fs.writeFileSync(stdioLogPath, logLines.join("\n") + "\n");
 
       const result = buildEngineFailureContext();
 
-      expect(result).toContain("Last agent output");
+      expect(result).not.toContain("Last agent output");
       expect(result).not.toContain("::add-mask::");
       expect(result).not.toContain("79aab19823c27dbc1f3fcd49f16666ca8ab130b4b234b54f286cfcae347a844d");
-      expect(result).toContain("token is ***");
+      expect(result).not.toContain("token is");
+      expect(result).toContain("Raw agent output is omitted");
     });
 
     it("surfaces the harness terminal error instead of infrastructure noise", () => {
@@ -3167,7 +3170,7 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("pids.max/pids.current");
     });
 
-    it("filters indented AWF infrastructure continuation lines from the fallback tail", () => {
+    it("omits infrastructure continuation lines and arbitrary agent output", () => {
       const logLines = [
         "[WARN] ⚠️  --pids-limit/container.pidsLimit is not supported by this microVM runtime and will be ignored.",
         "   The Docker agent cgroup cannot be passed through, so pids.max/pids.current are unavailable.",
@@ -3177,8 +3180,8 @@ describe("handle_agent_failure", () => {
 
       const result = buildEngineFailureContext();
 
-      expect(result).toContain("Last agent output");
-      expect(result).toContain("agent produced this final line");
+      expect(result).not.toContain("Last agent output");
+      expect(result).not.toContain("agent produced this final line");
       expect(result).not.toContain("pids.max/pids.current");
     });
 
@@ -3208,6 +3211,14 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("sup3rs3cr3t");
     });
 
+    it("cannot close the error code fence with embedded Markdown", () => {
+      fs.writeFileSync(stdioLogPath, "Error: ``` **untrusted error**\n");
+      const result = buildEngineFailureContext();
+      expect(result).toContain("<details>\n<summary>Error details:</summary>");
+      expect(result).toContain("````text\n");
+      expect(result).toMatch(/````\n\n<\/details>/);
+    });
+
     it("detects Error: prefix pattern (Node.js style)", () => {
       fs.writeFileSync(stdioLogPath, "Error: connect ECONNREFUSED 127.0.0.1:8080\n");
       const result = buildEngineFailureContext();
@@ -3215,7 +3226,7 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("connect ECONNREFUSED 127.0.0.1:8080");
     });
 
-    it("suppresses recovered no-deferred-marker retry errors and surfaces the terminal failure tail", () => {
+    it("suppresses recovered no-deferred-marker retry errors without publishing the log tail", () => {
       const logLines = [
         "[claude-harness] attempt 1: partial execution — will retry with --continue",
         "Error: No deferred tool marker found in the resumed session. Either the session was not deferred, the marker is stale (tool already ran), or it exceeds the tail-scan window. Provide a prompt to continue the conversation.",
@@ -3229,8 +3240,9 @@ describe("handle_agent_failure", () => {
       const result = buildEngineFailureContext();
 
       expect(result).toContain("Engine Failure");
-      expect(result).toContain("Last agent output");
-      expect(result).toContain("Connection error");
+      expect(result).not.toContain("Last agent output");
+      expect(result).not.toContain("Connection error");
+      expect(result).toContain("Review the workflow run logs");
       expect(result).not.toContain("No deferred tool marker");
       expect(result).not.toContain("Error details:");
     });
@@ -3357,33 +3369,30 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("auth failed");
     });
 
-    it("falls back to last lines when no known error patterns match", () => {
+    it("links to diagnostics rather than copying logs when no known error patterns match", () => {
       const logLines = ["Starting agent...", "Running tool: list_branches", '{"branches": ["main"]}', "Running tool: get_file_contents", "Agent interrupted"];
       fs.writeFileSync(stdioLogPath, logLines.join("\n") + "\n");
       const result = buildEngineFailureContext();
       expect(result).toContain("Engine Failure");
-      expect(result).toContain("Last agent output");
-      expect(result).toContain("Agent interrupted");
+      expect(result).not.toContain("Last agent output");
+      for (const line of logLines) expect(result).not.toContain(line);
+      expect(result).toContain("Review the workflow run logs");
     });
 
-    it("fallback includes at most 10 non-empty lines", () => {
+    it("does not publish any raw log lines, including unregistered secrets", () => {
       const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
       fs.writeFileSync(stdioLogPath, lines.join("\n") + "\n");
       const result = buildEngineFailureContext();
-      expect(result).toContain("line 20");
-      expect(result).toContain("line 11");
-      // Lines 1-10 should not appear in the tail
-      expect(result).not.toContain("line 10\n");
-      expect(result).not.toContain("line 1\n");
+      for (const line of lines) expect(result).not.toContain(line);
     });
 
-    it("fallback ignores empty lines when counting tail", () => {
+    it("does not publish short logs separated by empty lines", () => {
       const lines = ["line 1", "", "line 2", "", "line 3", "", "", "line 4"];
       fs.writeFileSync(stdioLogPath, lines.join("\n") + "\n");
       const result = buildEngineFailureContext();
-      expect(result).toContain("Last agent output");
-      expect(result).toContain("line 4");
-      expect(result).toContain("line 1");
+      expect(result).not.toContain("Last agent output");
+      expect(result).not.toContain("line 4");
+      expect(result).not.toContain("line 1");
     });
 
     it("shows startup-failure message when log contains only AWF infrastructure lines", () => {
@@ -3412,9 +3421,7 @@ describe("handle_agent_failure", () => {
       expect(result).not.toContain("Process exiting with code");
     });
 
-    it("filters infrastructure lines from fallback tail when mixed with real agent output", () => {
-      // Real agent output followed by AWF infrastructure shutdown lines.
-      // Only the real agent output should appear in the fallback.
+    it("does not publish mixed infrastructure and agent logs", () => {
       const logLines = [
         "Starting agent...",
         "● list_files",
@@ -3427,9 +3434,9 @@ describe("handle_agent_failure", () => {
       ];
       fs.writeFileSync(stdioLogPath, logLines.join("\n") + "\n");
       const result = buildEngineFailureContext();
-      expect(result).toContain("Last agent output");
-      expect(result).toContain("Starting agent");
-      expect(result).toContain("Found 12 files");
+      expect(result).not.toContain("Last agent output");
+      expect(result).not.toContain("Starting agent");
+      expect(result).not.toContain("Found 12 files");
       // Infrastructure lines must be excluded from the displayed output
       expect(result).not.toContain("awf-squid");
       expect(result).not.toContain("Command completed with exit code");
@@ -3548,6 +3555,8 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("EAI_AGAIN");
       expect(result).toContain("awmg-cli-proxy");
       expect(result).toContain("dependency failed to start: container awf-cli-proxy is unhealthy");
+      expect(result).toContain("<details>\n<summary>Error details:</summary>\n\n```text\n");
+      expect(result).toContain("\n```\n\n</details>");
       expect(result).toContain("https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md");
       expect(result).not.toContain("Last agent output");
       expect(result).not.toContain("Engine Failure");
@@ -4688,6 +4697,47 @@ describe("handle_agent_failure", () => {
   // buildMissingToolContext
   // ──────────────────────────────────────────────────────
 
+  describe("buildReportIncompleteContext", () => {
+    it("keeps all reasons and multiline diagnostics inside collapsed code", () => {
+      const { buildReportIncompleteContext } = require("./handle_agent_failure.cjs");
+      const result = buildReportIncompleteContext([
+        { type: "report_incomplete", reason: "engine_driver_failure", details: "Driver exit code: 1\nTool failed" },
+        { type: "report_incomplete", reason: "infrastructure_error" },
+      ]);
+      expect(result).toContain("Task Could Not Be Completed");
+      expect(result).toContain("<details>\n<summary>Error details:</summary>\n\n```text\nengine_driver_failure\nDriver exit code: 1\nTool failed\n\ninfrastructure_error\n```\n\n</details>");
+      expect(result).not.toContain("**Reasons:**");
+      expect(result).toContain("structured incompletion signal");
+    });
+
+    it("uses a fence longer than backticks in incomplete error details", () => {
+      const { buildReportIncompleteContext } = require("./handle_agent_failure.cjs");
+      const result = buildReportIncompleteContext([{ type: "report_incomplete", reason: "tool_failure", details: "Error with ``` and ```` delimiters" }]);
+      expect(result).toContain("`````text\n");
+      expect(result).toMatch(/`````\n\n<\/details>/);
+    });
+
+    it("redacts configured secrets before bounding incomplete diagnostics", () => {
+      vi.stubEnv("GH_AW_SECRET_NAMES", "ERROR_RENDERING_TEST");
+      vi.stubEnv("SECRET_ERROR_RENDERING_TEST", "private-error-rendering-value");
+      try {
+        const { buildReportIncompleteContext } = require("./handle_agent_failure.cjs");
+        const result = buildReportIncompleteContext([{ type: "report_incomplete", reason: "tool_failure", details: `private-error-rendering-value\n${"x".repeat(9000)}` }]);
+        expect(result).not.toContain("private-error-rendering-value");
+        expect(result).toContain("[Content truncated due to length]");
+        expect(result).toContain("\n```\n\n</details>");
+        expect(result.length).toBeLessThan(9000);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("returns no details section when there are no incompletion signals", () => {
+      const { buildReportIncompleteContext } = require("./handle_agent_failure.cjs");
+      expect(buildReportIncompleteContext([])).toBe("");
+    });
+  });
+
   describe("buildMissingToolContext", () => {
     let buildMissingToolContext;
     const fs = require("fs");
@@ -5412,11 +5462,12 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("quota exceeded");
     });
 
-    it("still uses fallback tail when no terminal_reason and no error patterns", () => {
+    it("reports unexpected termination without including a raw log tail", () => {
       fs.writeFileSync(stdioLogPath, "Starting agent...\nAgent interrupted unexpectedly\n");
       const result = buildEngineFailureContext();
       expect(result).toContain("Engine Failure");
-      expect(result).toContain("Agent interrupted unexpectedly");
+      expect(result).not.toContain("Agent interrupted unexpectedly");
+      expect(result).toContain("Raw agent output is omitted");
     });
   });
 
