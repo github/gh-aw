@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
+const { normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -252,7 +253,14 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
   if (!agentEvents) {
-    for (const file of native) agentEvents += add(file, "agent", "agent", undefined);
+    for (const file of native) {
+      add(file, "agent", "agent", undefined);
+      const source = sources.at(-1);
+      if (source?.path === path.relative(rootDir, file)) {
+        source.events = normalizeCopilotSession(source.events);
+        agentEvents += source.events.length;
+      }
+    }
   }
   if (!agentEvents) {
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);

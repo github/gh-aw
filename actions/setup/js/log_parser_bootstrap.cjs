@@ -23,7 +23,6 @@ const CLAUDE_HTTP_5XX_REQUEST_ERROR_PATTERN = /(?:http|fetch|request)\s+(?:faile
 const CLAUDE_HTTP_5XX_STATUS_PATTERN = new RegExp([CLAUDE_HTTP_5XX_PROTOCOL_PATTERN.source, CLAUDE_HTTP_5XX_STATUS_FIELD_PATTERN.source, CLAUDE_HTTP_5XX_REQUEST_ERROR_PATTERN.source].join("|"), "i");
 const STARTUP_DIAGNOSTIC_LINE_PATTERN = /(?:ERR_|Error:|CAPIError|Authentication failed|rate[_ -]?limit|429|\b5\d{2}\b|overloaded|inference)/i;
 const MAX_DIAGNOSTIC_TAIL_LINES = 8;
-const AGENT_STDIO_LOG_PATH = "/tmp/gh-aw/agent-stdio.log";
 
 /**
  * Build startup diagnostics for Claude failures with no structured entries.
@@ -112,12 +111,14 @@ function escapeHtml(text) {
  * @param {(content: string) => string|{markdown: string, mcpFailures?: string[], maxTurnsHit?: boolean, logEntries?: Array<any>}} options.parseLog - Parser function that takes log content and returns markdown or result object
  * @param {string} options.parserName - Name of the parser (e.g., "Codex", "Claude", "Copilot")
  * @param {boolean} [options.supportsDirectories=false] - Whether the parser supports reading from directories
+ * @param {string} [options.rootDir="/tmp/gh-aw"] - Runtime artifact directory
  * @returns {Promise<void>}
  */
 async function runLogParser(options) {
   const fs = require("fs");
   const path = require("path");
-  const { parseLog, parserName, supportsDirectories = false } = options;
+  const { parseLog, parserName, supportsDirectories = false, rootDir = "/tmp/gh-aw" } = options;
+  const stdioLogPath = path.join(rootDir, "agent-stdio.log");
 
   /**
    * Recursively searches a directory tree for the first events.jsonl file.
@@ -207,59 +208,66 @@ async function runLogParser(options) {
       return;
     }
 
-    if (!fs.existsSync(logPath)) {
+    const copilotStdioFallback = parserName === "Copilot" && supportsDirectories && fs.existsSync(stdioLogPath);
+    if (!fs.existsSync(logPath) && !copilotStdioFallback) {
       core.info(`Log path not found: ${logPath}`);
       return;
     }
 
-    let content = "";
+    /** @type {Array<{source: string, read: () => string}>} */
+    const candidates = [];
+    const publicationMasks = new Set();
 
     // Check if logPath is a directory or a file
-    const stat = fs.statSync(logPath);
-    if (stat.isDirectory()) {
+    const stat = fs.existsSync(logPath) ? fs.statSync(logPath) : undefined;
+    if (!stat || stat.isDirectory()) {
       if (!supportsDirectories) {
         core.info(`Log path is a directory but ${parserName} parser does not support directories: ${logPath}`);
         return;
       }
 
       // Prefer events.jsonl (structured Copilot session format) over debug .log files
-      const eventsJsonlPath = findEventsJsonlRecursive(logPath);
+      const eventsJsonlPath = stat ? findEventsJsonlRecursive(logPath) : null;
       if (eventsJsonlPath) {
-        core.info(`Using Copilot session events from: ${eventsJsonlPath}`);
-        content = fs.readFileSync(eventsJsonlPath, "utf8");
-      } else {
+        candidates.push({ source: eventsJsonlPath, read: () => fs.readFileSync(eventsJsonlPath, "utf8") });
+      }
+      if (copilotStdioFallback) candidates.push({ source: stdioLogPath, read: () => fs.readFileSync(stdioLogPath, "utf8") });
+      if (stat && (!eventsJsonlPath || parserName === "Copilot")) {
         // Read all log files from the directory and concatenate them
         const files = fs.readdirSync(logPath);
         const logFiles = files.filter(file => file.endsWith(".log") || file.endsWith(".txt"));
 
-        if (logFiles.length === 0) {
-          core.info(`No log files found in directory: ${logPath}`);
-          return;
-        }
-
         // Sort log files by name to ensure consistent ordering
         logFiles.sort();
 
-        // Concatenate all log files
-        for (const file of logFiles) {
-          const filePath = path.join(logPath, file);
-          const fileContent = fs.readFileSync(filePath, "utf8");
-
-          // Add a newline before this file if the previous content doesn't end with one
-          if (content.length > 0 && !content.endsWith("\n")) {
-            content += "\n";
-          }
-
-          content += fileContent;
+        if (logFiles.length) {
+          candidates.push({
+            source: logPath,
+            read: () => logFiles.map(file => fs.readFileSync(path.join(logPath, file), "utf8")).join("\n"),
+          });
         }
+      }
+      if (!candidates.length) {
+        core.info(`No log files found in directory: ${logPath}`);
+        return;
       }
     } else {
       // Read the single log file
-      content = fs.readFileSync(logPath, "utf8");
+      candidates.push({ source: logPath, read: () => fs.readFileSync(logPath, "utf8") });
     }
 
-    const result = parseLog(content);
-    const publicationMasks = new Set(collectAddMaskedValues(content));
+    let content = "";
+    let result;
+    for (const [index, candidate] of candidates.entries()) {
+      content = candidate.read();
+      for (const value of collectAddMaskedValues(content)) publicationMasks.add(value);
+      result = parseLog(content);
+      if (parserName !== "Copilot" || (typeof result === "object" && result?.logEntries?.length)) {
+        if (parserName === "Copilot") core.info(`Using Copilot session log from: ${candidate.source}`);
+        break;
+      }
+      if (index < candidates.length - 1) core.warning(`No structured Copilot session events parsed from ${candidate.source}; trying ${candidates[index + 1].source}`);
+    }
     const redactPublication = text => applyAddMaskRedaction(redactStepSummaryContent(text), [...publicationMasks]);
 
     // Handle result that may be a simple string or an object with metadata
@@ -302,7 +310,6 @@ async function runLogParser(options) {
           num_turns: resultEntry.num_turns,
           usage: Object.keys(usage).length ? usage : undefined,
         };
-        const stdioLogPath = AGENT_STDIO_LOG_PATH;
         try {
           let alreadyHasResult = false;
           let newline = "";
@@ -349,7 +356,6 @@ async function runLogParser(options) {
 
     // Redact add-mask values from agent-stdio.log before it is uploaded as an
     // artifact so plaintext secrets do not persist outside live job logs.
-    const stdioLogPath = AGENT_STDIO_LOG_PATH;
     try {
       if (fs.existsSync(stdioLogPath)) {
         const stdioContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -369,7 +375,7 @@ async function runLogParser(options) {
 
     if (Array.isArray(logEntries)) {
       try {
-        const exitPath = "/tmp/gh-aw/agent_execution_exit_code.txt";
+        const exitPath = path.join(rootDir, "agent_execution_exit_code.txt");
         const execution = collectAgentExecution({
           content,
           events: logEntries,
@@ -377,7 +383,7 @@ async function runLogParser(options) {
           ...(fs.existsSync(exitPath) ? { exitCode: parseAgentExitCode(fs.readFileSync(exitPath, "utf8")) } : {}),
         });
         const canonicalEntries = [...logEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
-        writeSessionArtifact("/tmp/gh-aw/agent-session.jsonl", canonicalEntries, [...publicationMasks]);
+        writeSessionArtifact(path.join(rootDir, "agent-session.jsonl"), canonicalEntries, [...publicationMasks]);
         core.info(`[log-parser] Persisted ${canonicalEntries.length} canonical session events`);
       } catch (err) {
         core.warning(`[log-parser] Failed to persist canonical agent session: ${getErrorMessage(err)}`);
@@ -444,7 +450,9 @@ async function runLogParser(options) {
         // Suppress the "parsed successfully" message for Claude since it always produces
         // logEntries when healthy — absence of entries means the parse fell back and is
         // about to emit a guardrail warning/failure below.
-        if (parserName !== "Claude") {
+        if (parserName === "Copilot") {
+          core.warning("Copilot produced no structured session events; publishing log diagnostics only");
+        } else if (parserName !== "Claude") {
           core.info(`${parserName} log parsed successfully`);
         }
 
