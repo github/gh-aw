@@ -4,6 +4,8 @@
  * @typedef {import("./types/agent_session").SessionEvent} SessionEvent
  */
 
+const { getMessageRefusal, getProviderRefusals } = require("./provider_refusal.cjs");
+
 const USAGE_ALIASES = {
   input_tokens: "inputTokens",
   output_tokens: "outputTokens",
@@ -137,8 +139,25 @@ function normalizeAgentSession(entries, { sourceEngine } = {}) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const emit = (type, data, block = {}) => events.push(createSessionEvent(entry, type, { ...block, ...data }));
     if (isSessionEvent(entry)) {
-      events.push(structuredClone(entry));
+      const refusal = entry.type === "assistant.message" ? getMessageRefusal(entry.data) : undefined;
+      events.push(refusal ? createSessionEvent(entry, "assistant.refusal", refusal) : structuredClone(entry));
       if (entry.type === "tool.execution_start" && entry.data.toolCallId !== undefined) toolUses.set(entry.data.toolCallId, entry.data);
+      continue;
+    }
+    const refusals = getProviderRefusals(entry);
+    if (refusals.length) {
+      for (const refusal of refusals) emit("assistant.refusal", refusal);
+      const response = entry.response ?? entry;
+      const usage = normalizeSessionUsage(
+        response.usage && Array.isArray(response.choices)
+          ? {
+              input_tokens: response.usage.prompt_tokens,
+              output_tokens: response.usage.completion_tokens,
+              cache_read_input_tokens: response.usage.prompt_tokens_details?.cached_tokens,
+            }
+          : response.usage
+      );
+      if (usage) emit("session.result", { usage: entry.type === "message" ? { ...usage, input_tokens_include_cache: false } : usage });
       continue;
     }
     if (entry.type === "system" && entry.subtype === "init") {
@@ -155,10 +174,14 @@ function normalizeAgentSession(entries, { sourceEngine } = {}) {
     } else if (entry.type === "assistant" || entry.type === "user" || (entry.type === "system" && entry.subtype)) {
       const content = typeof entry.message === "string" ? entry.message : entry.message?.content;
       const blocks = typeof content === "string" ? [{ type: "text", text: content }] : Array.isArray(content) ? content : [];
+      const refusal = entry.type === "assistant" ? getMessageRefusal(entry.message) : undefined;
+      if (refusal) emit("assistant.refusal", refusal);
       for (const block of blocks) {
         if (!block || typeof block !== "object") continue;
         if (block.type === "text" && typeof block.text === "string") {
-          emit(entry.type === "user" ? "user.message" : "assistant.message", { content: block.text }, block);
+          if (!refusal) emit(entry.type === "user" ? "user.message" : "assistant.message", { content: block.text }, block);
+        } else if (entry.type === "assistant" && block.type === "refusal" && typeof block.refusal === "string") {
+          if (!refusal) emit("assistant.refusal", { reason: "refusal", content: block.refusal }, block);
         } else if (block.type === "thinking" && typeof block.thinking === "string") {
           emit("assistant.reasoning", { content: block.thinking }, block);
         } else if (block.type === "tool_use") {

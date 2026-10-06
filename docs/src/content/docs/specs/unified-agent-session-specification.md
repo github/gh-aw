@@ -3,7 +3,7 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical engine traces and essential unified session payloads across gh-aw runtime components.
 sidebar:
   order: 1365
-version: "1.5.0"
+version: "1.6.0"
 status: Draft
 publication_date: "2026-10-05"
 editors:
@@ -13,7 +13,7 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 1.5.0<br>
+**Version**: 1.6.0<br>
 **Status**: Draft<br>
 **Publication Date**: 2026-10-05<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 1.5.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 1.6.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -94,7 +94,7 @@ JSONL accounting, activity summary, and result files remain available.
 | Term | Meaning |
 | --- | --- |
 | Canonical event | An object with a dot-namespaced `type`, a `data` object, and any supplied native metadata. |
-| Core event | One of the seven common agent event types in Sections 4.1–4.6. Runtime observations and file metadata have additional declared signatures. |
+| Core event | One of the eight common agent event types in Sections 4.1–4.6. Runtime observations and file metadata have additional declared signatures. |
 | Native extension event | A native event with another dot-namespaced type, such as `session.shutdown` or `assistant.message_delta`, retaining its original payload. |
 | Legacy entry | A supported pre-event record, such as `system`/`init`, `assistant`, `user`, or `result`. |
 | Raw engine record | An engine-specific record that still needs mapping, such as Gemini `tool_result` or Codex `item.completed`. |
@@ -219,6 +219,7 @@ opaque because its essential fields are not defined by this specification.
 | --- | --- |
 | Agent initialization | Engine, model, session ID, working directory; no tool inventories or duplicated provider metadata. |
 | Agent messages and reasoning | Exact `content`, without duplicate text blocks or the original message envelope. |
+| Agent policy refusals | Structured `reason`, exact available `content`, `policyCategory`, `explanation`, and streaming `partial` flag; no duplicated provider envelope. |
 | Agent tool lifecycle | Correlation IDs, tool/server names, one `input` or `output` field, command, outcome/error signals, duration, and exit code. |
 | Agent accounting | Turns, duration, cost, observed terminal `status` and `sourceType`, normalized `usage` including reported reasoning tokens, errors, and permission denials. |
 | Agent execution diagnostics | Unique harness/compiler `categories`, native `errorCodes` and `errorTypes`, and the observed final process `exitCode`; no diagnostic messages or duplicated engine envelopes. |
@@ -450,7 +451,7 @@ Legacy mappings include `session_id` → `sessionId`, `mcp_servers` → `mcpServ
 
 Retention in the trace does not authorize publication in a summary; Section 8.1 defines the separate presentation boundary.
 
-### 4.3 `assistant.message` and `assistant.reasoning`
+### 4.3 `assistant.message`, `assistant.reasoning`, and `assistant.refusal`
 
 **T-UAS-011 — Assistant channels.** Supported assistant text MUST map to `assistant.message`, and supported reasoning or thinking text MUST map to `assistant.reasoning`, with exact text in `data.content`. Normalizers MUST NOT merge these channels or reinterpret session/provider errors as ordinary assistant answers.
 
@@ -460,6 +461,28 @@ Retention in the trace does not authorize publication in a summary; Section 8.1 
 | `assistant.reasoning` | `content` | Source reasoning/thinking string when available. |
 
 Older readers' bare `reasoning` alias can remain a compatibility input. New canonical reasoning events use `assistant.reasoning`. Reasoning is not required from an engine that does not expose it.
+
+**T-UAS-069 — Structured policy refusals.** A supported provider refusal or content-filter signal MUST map to `assistant.refusal`, not an empty or successful `assistant.message`. Parsers MUST NOT infer a refusal from natural-language disclaimers, arbitrary nested user/tool payloads, permission denials, authentication errors, or token truncation. A refusal is a provider response observation, not evidence that the workflow failed or the request actually violated a policy.
+
+| Field | Value and availability |
+| --- | --- |
+| `reason` | Required: `refusal` for an explicit model/classifier refusal; `content_filter` for provider-filtered output. |
+| `content` | Exact refusal text or available filtered partial text. Absent when unavailable; an explicitly empty string remains empty. Supplied native structured content or `null` remains supported without destructive coercion. |
+| `policyCategory` | Anthropic `stop_details.category`, when supplied; string or `null`. Categories remain open to future provider values. |
+| `explanation` | Exact Anthropic `stop_details.explanation`, when supplied; string or `null`. Its wording is not a classification signal. |
+| `partial` | `true` for an observed OpenAI streaming fragment; absence does not imply that a truncated log contains the complete refusal. |
+
+Supported signals follow the [OpenAI Chat API reference](https://developers.openai.com/api/reference/resources/chat), [OpenAI Responses streaming reference](https://developers.openai.com/api/reference/resources/responses/streaming-events), and [Anthropic refusal specification](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback):
+
+| Transport | Refusal evidence |
+| --- | --- |
+| OpenAI Chat Completions | A string `choices[].message.refusal`, a `refusal` content part, or `choices[].finish_reason: "content_filter"` even with null or absent message text. Streaming `delta.refusal` is partial evidence. |
+| OpenAI Responses | Output-message content parts with `type: "refusal"` and string `refusal`; `response.refusal.delta`/`done`, refusal-bearing content-part/output-item events, and terminal response snapshots; `incomplete_details.reason: "content_filter"` distinguishes filtering from token limits. |
+| Anthropic Messages / Claude SDK | `stop_reason: "refusal"` in an assistant response, including a Claude SDK assistant envelope or streaming `message_delta.delta`. Available policy details and usage remain retained. |
+
+Refusals can be successful HTTP responses with no content. The transport does not identify the model provider: the CI sample in `fixtures/provider_refusals.cjs` is a Claude response delivered through OpenAI-compatible Chat Completions. Existing native model, request, timestamp, and source metadata MUST remain preserved. A streamed Claude refusal marker can follow already observed partial text; the later assistant snapshot MUST NOT create a second refusal marker. Readers MUST label refusal observations distinctly and MUST NOT treat partial text as a completed answer.
+
+The sanitized CI fixture comes from [githubnext/gh-aw-rai run 37397159182](https://github.com/githubnext/gh-aw-rai/actions/runs/37397159182), agent artifact `sandbox/agent/logs/process-1791248741707-407.2.log`. It captures `finish_reason: "content_filter"` with both `message.content` and `message.refusal` null. `provider_refusal.test.cjs` covers that shape, provider-documented variants, false positives, metadata, accounting, canonical round trips, and publication.
 
 ### 4.4 `tool.execution_start`
 
@@ -1285,7 +1308,7 @@ These links identify inspected implementation surfaces. They are not external en
 
 ### 12.1 Appendix A: Complete canonical example
 
-This example includes all seven common agent types, native metadata, an extension, structured/false/zero outputs, explicit failure, and reported zero cost. It is a parser trace, not a unified file, so it has no collector header or provenance. All identifiers and metrics represent supplied example source evidence. The user prompt is retained internally but omitted from default summaries.
+This example includes the seven non-refusal common agent types, native metadata, an extension, structured/false/zero outputs, explicit failure, and reported zero cost. It is a parser trace, not a unified file, so it has no collector header or provenance. All identifiers and metrics represent supplied example source evidence. The user prompt is retained internally but omitted from default summaries.
 
 ```json
 [
@@ -1520,6 +1543,13 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 1.6.0 — Draft (2026-10-05)
+
+- Added `assistant.refusal` and T-UAS-069 for structured OpenAI/Anthropic refusal and content-filter signals.
+- Preserved exact available text, optional policy details, and partial-stream evidence in canonical and essential unified payloads.
+- Added provider-documentation fixtures and a sanitized content-filter regression from the RAI validation run.
+- Retained numeric serialization-format version 1.
 
 ### Version 1.5.0 — Draft (2026-10-05)
 

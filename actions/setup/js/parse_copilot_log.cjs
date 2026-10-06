@@ -6,6 +6,7 @@
 const { createEngineLogParser, generateConversationMarkdown, generateInformationSection, buildStepSummaryDetailsSection, formatInitializationSummary, formatToolUse, AWF_INFRA_LINE_RE } = require("./log_parser_shared.cjs");
 const { projectSessionResult, createSessionEvent, accumulateSessionUsage, isTokenCount, normalizeAgentSession, normalizeSessionUsage } = require("./agent_session.cjs");
 const { normalizeCopilotSession } = require("./copilot_session.cjs");
+const { getMessageRefusal } = require("./provider_refusal.cjs");
 
 const main = createEngineLogParser({
   parserName: "Copilot",
@@ -254,6 +255,10 @@ function parseDebugLogFormat(logContent) {
       entries.push(createSessionEvent(source, "session.init", { sourceEngine: "copilot", modelInfo: value }));
       return;
     }
+    if (value.object === "response") {
+      entries.push(...normalizeAgentSession([source], { sourceEngine: "copilot" }));
+      return;
+    }
     if (typeof value.type === "string" || Array.isArray(value)) {
       entries.push(...(Array.isArray(value) ? value : [value]));
       return;
@@ -262,9 +267,15 @@ function parseDebugLogFormat(logContent) {
     if (typeof value.model === "string") entries.push(createSessionEvent(source, "session.init", { sourceEngine: "copilot", model: value.model }));
     for (const choice of Array.isArray(value.choices) ? value.choices : []) {
       const message = choice?.message;
+      if (!message && choice?.finish_reason === "content_filter") {
+        entries.push(createSessionEvent(source, "assistant.refusal", { reason: "content_filter" }));
+        continue;
+      }
       if (!message || (message.role !== undefined && message.role !== "assistant")) continue;
       if (typeof message.reasoning_text === "string") entries.push(createSessionEvent(source, "assistant.reasoning", { content: message.reasoning_text }));
-      if (typeof message.content === "string") entries.push(createSessionEvent(source, "assistant.message", { content: message.content }));
+      const refusal = getMessageRefusal(message, choice.finish_reason);
+      if (refusal) entries.push(createSessionEvent(source, "assistant.refusal", refusal));
+      else if (typeof message.content === "string") entries.push(createSessionEvent(source, "assistant.message", { content: message.content }));
       for (const tool of Array.isArray(message.tool_calls) ? message.tool_calls : []) {
         if (!tool?.function) continue;
         let input = tool.function.arguments;
