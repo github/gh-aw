@@ -149,6 +149,9 @@ func (c *Compiler) ParseWorkflowString(content string, virtualPath string) (*Wor
 	if err != nil {
 		return nil, err
 	}
+	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, engineSetup.engineConfig, toolsResult.tools); err != nil {
+		return nil, err
+	}
 
 	// Build initial workflow data structure
 	workflowData := c.buildInitialWorkflowData(parseResult.frontmatterResult, toolsResult, engineSetup, engineSetup.importsResult)

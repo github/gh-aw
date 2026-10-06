@@ -107,8 +107,8 @@ Not all features are available across all engines. The table below summarizes pe
 | `max-turns` (top-level AWF invocation cap; `max-runs` deprecated) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `engine.max-turns` (deprecated nested alias) | ❌ | ✅ | ❌ | ❌ | ❌ |
 | `max-continuations` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `tools.web-fetch` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `tools.web-search` | ✅ (native, opt-in) | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
+| `tools.web-fetch` | SDK custom tool only | ✅ | ✅ | ✅ | ✅ |
+| `tools.web-search` | via MCP only | ✅ (native) | ✅ (native, opt-in) | via MCP | ❌ |
 | `engine.agent` (native custom-agent selection) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | `engine.api-target` (custom endpoint) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `engine.bare` (disable context loading) | ✅ | ✅ | ❌ | ❌ | ✅ |
@@ -117,7 +117,7 @@ Not all features are available across all engines. The table below summarizes pe
 | Native MCP server integration | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Agent Plugins (`plugins`) | ✅ | ✅ | ✅ | ❌ | ❌ |
 
-`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude, Codex, and Copilot have native web search support. Copilot requires explicit `tools.web-search`; Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
+`max-turns` (default `500`, legacy alias `max-runs`) and `max-ai-credits` (default `1000`) are top-level frontmatter fields supported by all engines. `engine.max-turns` is a deprecated nested alias that still limits Claude iterations when present; `max-continuations` enables Copilot continuation mode. Claude and Codex have native web search support. Copilot's offline BYOK mode disables native web tools: use an MCP server for search, or `engine.copilot-sdk: true` for the custom proxy-aware `tools.web-fetch` implementation. Codex enables shared search/browsing through either `tools.web-search` or `tools.web-fetch`. Gemini can use a third-party MCP server for search. Top-level `plugins` is experimental, uses the [Agent Plugins](https://agent-plugins.org) format, and is supported by Copilot, Claude, Codex, and any imported engine definition that declares a `behaviors.plugins` block (such as the shared Cursor and Kiro engines). See [Using Web Search](/gh-aw/reference/web-search/) and [Agent Plugins](/gh-aw/reference/frontmatter/#agent-plugins-plugins).
 
 ## Shared imported engines
 
