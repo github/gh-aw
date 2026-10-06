@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "module";
 import { getOctokit } from "@actions/github";
+import fs from "node:fs";
 
 const require = createRequire(import.meta.url);
 const { setupGlobals } = require("./setup_globals.cjs");
@@ -74,6 +75,35 @@ describe("setupGlobals API version", () => {
   it("continues to reject OAuth tokens", () => {
     setupClient();
     expect(() => global.getOctokit("gho_test")).toThrow("OAuth tokens are not suitable for automation");
+  });
+
+  it.each([
+    ["github_actions", "ghs_actions", true],
+    ["pat", "github_pat_example", false],
+    ["app", "ghs_installation", false],
+    ["unknown", "opaque-token", false],
+  ])("logs only the %s credential category for per-handler API calls", async (source, token, actionsToken) => {
+    const previousToken = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = actionsToken ? token : "different-token";
+    const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => undefined);
+    try {
+      const fetch = vi.fn().mockResolvedValue(
+        new Response("{}", {
+          status: 200,
+          headers: { "x-ratelimit-limit": "5000", "x-ratelimit-remaining": "4999" },
+        })
+      );
+      const client = getOctokit("test-token", { request: { fetch } });
+      setupGlobals({}, client, {}, {}, {}, getOctokit);
+      await global.getOctokit(token, { request: { fetch } }).rest.repos.get({ owner: "owner", repo: "repo" });
+      const entries = append.mock.calls.map(([, content]) => JSON.parse(content.trim()));
+      expect(entries).toMatchObject([{ source: "response_headers", credentialSource: source, operation: "repos.get", remaining: 4999 }]);
+      expect(JSON.stringify(entries)).not.toContain(token);
+    } finally {
+      append.mockRestore();
+      if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = previousToken;
+    }
   });
 
   it("lets per-request headers override per-handler defaults", async () => {

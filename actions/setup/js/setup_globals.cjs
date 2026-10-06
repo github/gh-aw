@@ -31,6 +31,19 @@ function applyGitHubApiVersion(headers, defaults = {}) {
 }
 
 /**
+ * Identify only recognizable credential types; never persist or display tokens.
+ * @param {string} token
+ * @returns {string}
+ */
+function credentialSource(token) {
+  if (typeof token !== "string") return "unknown";
+  if (process.env.GITHUB_TOKEN && token === process.env.GITHUB_TOKEN) return "github_actions";
+  if (token.startsWith("github_pat_") || token.startsWith("ghp_")) return "pat";
+  if (token.startsWith("ghs_") || token.startsWith("ghu_")) return "app";
+  return "unknown";
+}
+
+/**
  * Stores GitHub Actions builtin objects (core, github, context, exec, io, getOctokit) in the global scope
  * This must be called before requiring any script that depends on these globals
  *
@@ -84,7 +97,7 @@ function setupGlobals(coreModule, githubModule, contextModule, execModule, ioMod
     client.hook.before("request", requestOptions => {
       applyGitHubApiVersion(requestOptions.headers, options.headers);
     });
-    return client;
+    return createRateLimitAwareGithub(client, credentialSource(token));
   };
 }
 

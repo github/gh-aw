@@ -90,8 +90,9 @@ function parseResetTimestamp(resetHeader) {
  *
  * @param {{ headers?: Record<string, string | undefined> }} response - The github.rest response object
  * @param {string} operation - Human-readable description of the operation (e.g. "issues.listComments")
+ * @param {string} [credentialSource] - Known credential category, never a token
  */
-function logRateLimitFromResponse(response, operation) {
+function logRateLimitFromResponse(response, operation, credentialSource) {
   const headers = response?.headers;
   if (!headers) return;
 
@@ -110,6 +111,7 @@ function logRateLimitFromResponse(response, operation) {
     source: "response_headers",
     operation,
   };
+  if (credentialSource) entry.credentialSource = credentialSource;
 
   if (resource) entry.resource = resource;
   if (limit !== undefined) entry.limit = parseInt(limit, 10);
@@ -233,9 +235,10 @@ function logRetryEvent(error, operation, attempt, delayMs) {
  * ```
  *
  * @param {any} github - The github object injected by actions/github-script
+ * @param {string} [credentialSource] - Known credential category, never a token
  * @returns {any} A proxied github object with automatic rate-limit logging
  */
-function createRateLimitAwareGithub(github) {
+function createRateLimitAwareGithub(github, credentialSource) {
   /**
    * Wrap a single REST namespace (e.g. github.rest.issues) so each method
    * call intercepts the response and logs rate-limit headers.
@@ -251,7 +254,7 @@ function createRateLimitAwareGithub(github) {
         if (typeof fn !== "function") return fn;
         const wrapper = async (/** @type {any[]} */ ...args) => {
           const response = await fn.apply(target, args);
-          logRateLimitFromResponse(response, `${namespaceName}.${String(method)}`);
+          logRateLimitFromResponse(response, `${namespaceName}.${String(method)}`, credentialSource);
           return response;
         };
         // Wrap the wrapper in a Proxy so that Octokit-specific property accesses

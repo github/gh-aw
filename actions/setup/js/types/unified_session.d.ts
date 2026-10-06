@@ -156,6 +156,20 @@ export interface WorkflowInfoData {
   runId?: JsonValue;
 }
 
+export interface GitHubApiRateLimitData {
+  source?: JsonValue;
+  credentialSource?: JsonValue;
+  operation?: JsonValue;
+  resource?: JsonValue;
+  limit?: JsonValue;
+  remaining?: JsonValue;
+  used?: JsonValue;
+  reset?: JsonValue;
+  attempt?: JsonValue;
+  delayMs?: JsonValue;
+  status?: JsonValue;
+}
+
 export interface CollectionWarningData {
   code: string;
   path?: string;
@@ -214,6 +228,7 @@ export interface UnifiedSessionEventDataMap {
   "execution.result": ExecutionResultData;
   "detection.result": DetectionResultData;
   "workflow.info": WorkflowInfoData;
+  "github_api.rate_limit": GitHubApiRateLimitData;
   "session.collection_warning": CollectionWarningData;
   "session.collection": CollectionData;
 }

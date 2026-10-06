@@ -209,6 +209,51 @@ describe("Unified conclusion session", () => {
     expect(events.find(event => event.type === "workflow.info").data).not.toHaveProperty("secret");
   });
 
+  it("collects rate-limit state and provenance without duplicating the copied artifact or leaking unknown fields", () => {
+    const rateLimits = [
+      {
+        timestamp: "2026-10-02T00:00:01Z",
+        source: "response_headers",
+        credentialSource: "pat",
+        operation: "issues.get",
+        resource: "core",
+        limit: 5000,
+        remaining: 4999,
+        used: 1,
+        reset: "2026-10-02T01:00:00Z",
+        authorization: "do not publish",
+      },
+      { timestamp: "2026-10-02T00:00:02Z", source: "rate_limit_api", resource: "graphql", limit: 5000, remaining: 4998, used: 2 },
+      { timestamp: "2026-10-02T00:00:03Z", source: "retry", credential_source: "app", status: 403, attempt: 1, delay_ms: 1000 },
+    ];
+    write("github_rate_limits.jsonl", rateLimits);
+    write("usage/github_rate_limits.jsonl", rateLimits);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const observed = events.filter(event => event.type === "github_api.rate_limit");
+    expect(observed).toHaveLength(3);
+    expect(observed[0]).toEqual({
+      type: "github_api.rate_limit",
+      timestamp: rateLimits[0].timestamp,
+      data: { source: "response_headers", credentialSource: "pat", operation: "issues.get", resource: "core", limit: 5000, remaining: 4999, used: 1, reset: "2026-10-02T01:00:00Z" },
+      provenance: { component: "github_api", phase: "workflow", path: "github_rate_limits.jsonl", index: 0, timestampMs: Date.parse(rateLimits[0].timestamp) },
+    });
+    expect(observed[1].data).not.toHaveProperty("credentialSource");
+    expect(observed[2].data).toMatchObject({ source: "retry", credentialSource: "app", status: 403, attempt: 1, delayMs: 1000 });
+    expect(events.at(-1).data.sources).toContainEqual({ component: "github_api", phase: "workflow", path: "github_rate_limits.jsonl", events: 3, timestampUnit: "milliseconds" });
+  });
+
+  it("uses the usage copy when needed and skips malformed rate-limit lines without losing valid entries", () => {
+    write("usage/github_rate_limits.jsonl", '{"source":"rate_limit_api","remaining":0}\ninvalid\n{"source":"response_headers","credentialSource":"github_actions","limit":5000}\n');
+    const warnings = [];
+    const { events } = collectUnifiedSession({ rootDir: root, warn: message => warnings.push(message) });
+    expect(events.filter(event => event.type === "github_api.rate_limit")).toMatchObject([
+      { data: { source: "rate_limit_api", remaining: 0 }, provenance: { path: "usage/github_rate_limits.jsonl", index: 0 } },
+      { data: { source: "response_headers", credentialSource: "github_actions", limit: 5000 }, provenance: { path: "usage/github_rate_limits.jsonl", index: 1 } },
+    ]);
+    expect(warnings).toEqual([expect.stringContaining("usage/github_rate_limits.jsonl:2")]);
+    expect(collectUnifiedSession({ rootDir: root }).events.filter(event => event.type === "github_api.rate_limit")).toHaveLength(2);
+  });
+
   it("resolves detection and eval AIC per observation without adding overlapping checkpoints", () => {
     write("threat-detection/detection_usage.jsonl", [
       { provider: "openai", model: "gpt-4o-mini", input_tokens: 1000, output_tokens: 100 },
