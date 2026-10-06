@@ -280,9 +280,9 @@ type engineTopLevelConfig struct {
 }
 
 // DynamicWorkflowsEnabled reports whether dynamic workflows are enabled in the engine configuration.
-// The feature defaults to enabled when the engine setting is omitted.
+// The feature requires explicit opt-in for every engine.
 func (e *EngineConfig) DynamicWorkflowsEnabled() bool {
-	return e == nil || e.DynamicWorkflows == nil || *e.DynamicWorkflows
+	return e != nil && e.DynamicWorkflows != nil && *e.DynamicWorkflows
 }
 
 // GetMaxAICredits returns the configured engine AI credits budget, falling back to the default.

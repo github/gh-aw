@@ -2859,7 +2859,7 @@ engine:
   bare: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
-  # true.
+  # false. Copilot dynamic workflows are experimental.
   # (optional)
   dynamic-workflows: true
 
@@ -3020,7 +3020,7 @@ engine:
   bare: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
-  # true.
+  # false. Copilot dynamic workflows are experimental.
   # (optional)
   dynamic-workflows: true
 
@@ -21318,7 +21318,7 @@ safe-outputs:
       bare: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
-      # true.
+      # false. Copilot dynamic workflows are experimental.
       # (optional)
       dynamic-workflows: true
 
@@ -21479,7 +21479,7 @@ safe-outputs:
       bare: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
-      # true.
+      # false. Copilot dynamic workflows are experimental.
       # (optional)
       dynamic-workflows: true
 
