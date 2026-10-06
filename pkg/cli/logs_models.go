@@ -441,6 +441,7 @@ type AwInfo struct {
 	CLIVersion      string              `json:"cli_version,omitempty"` // gh-aw CLI version
 	WorkflowName    string              `json:"workflow_name"`
 	Staged          bool                `json:"staged"`
+	DryRun          bool                `json:"dry_run"`
 	AwfVersion      string              `json:"awf_version,omitempty"`      // AWF firewall version (new name)
 	FirewallVersion string              `json:"firewall_version,omitempty"` // AWF firewall version (old name, for backward compatibility)
 	AwmgVersion     string              `json:"awmg_version,omitempty"`     // MCP gateway version

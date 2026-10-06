@@ -14,6 +14,8 @@ type CompileConfig struct {
 	TrialLogicalRepoSlug      string   // Target repository for trial mode
 	UseSamples                bool     // Hidden: replace agentic step with a deterministic samples replay driver
 	Strict                    bool     // Enable strict mode validation
+	DryRun                    bool     // Enable fail-closed development testing checks and staged safe outputs
+	EnvironmentOverride       string   // Override the environment on every generated job
 	RequireSelfHostedRunners  bool     // Require every generated job to select a self-hosted runner
 	Dependabot                bool     // Generate Dependabot manifests for npm dependencies
 	ForceOverwrite            bool     // Force overwrite of existing files (dependabot.yml)
@@ -45,14 +47,18 @@ type CompileConfig struct {
 	PriorManifestFile         string   // Path to a JSON file containing pre-cached manifests (map[lockFile]*GHAWManifest) collected at MCP server startup; takes precedence over git HEAD / filesystem reads for safe update enforcement
 	GHESCompat                bool     // Enable GHES-compatible v3 artifact actions (overrides aw.json ghes field)
 	activeModels              *activeModelInventory
+
+	// ExplicitBoolFlags records user-supplied flags, including false, separately from omitted defaults.
+	ExplicitBoolFlags map[string]bool
 }
 
 func (c CompileConfig) shellcheckEnabled() bool {
 	return c.Shellcheck
 }
 
-// ValidationResult represents the validation result for a single workflow
+// ValidationResult represents workflow validation or a batch-scoped compiler/scanner diagnostic.
 type ValidationResult struct {
+	Scope        string            `json:"scope,omitempty"` // "batch" for diagnostics not attributable to a single workflow
 	Workflow     string            `json:"workflow"`
 	Valid        bool              `json:"valid"`
 	Errors       []ValidationIssue `json:"errors"`

@@ -216,6 +216,8 @@ func logsTargetContinuationOptions(opts LogsDownloadOptions) continuationOptions
 		startDate:             opts.StartDate,
 		endDate:               opts.EndDate,
 		engine:                opts.Engine,
+		dryRun:                opts.DryRun,
+		noDryRun:              opts.NoDryRun,
 		branch:                opts.Ref,
 		afterRunID:            opts.AfterRunID,
 		ignoreWorkflowRuns:    opts.IgnoreWorkflowRuns,
