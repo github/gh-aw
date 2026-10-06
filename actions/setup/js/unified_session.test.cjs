@@ -457,6 +457,25 @@ describe("Unified conclusion session", () => {
     expect(markdown).not.toContain("unknown extension must not become an answer");
   });
 
+  it("projects historical canonical Copilot task summaries without native files or indexed provenance", () => {
+    const summary = "Observed historical final answer\n\nSecond paragraph.";
+    write("aw_info.json", { engine_id: "copilot" });
+    write("agent-session.jsonl", [
+      { type: "session.init", data: { sessionId: "historical", sourceEngine: "copilot" } },
+      { type: "assistant.message", data: { content: "" } },
+      { type: "session.task_complete", id: "complete", timestamp: "2026-10-02T00:00:01Z", data: { summary, sourceDetail: "observed metadata" } },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    const answers = events.filter(event => event.type === "assistant.message" && event.data.content);
+    expect(answers.map(event => event.data.content)).toEqual([summary]);
+    expect(answers[0].id).toBe("complete");
+    expect(answers[0].provenance.path).toBe("agent-session.jsonl");
+    expect(events.find(event => event.type === "session.task_complete").data.sourceDetail).toBe("observed metadata");
+    const markdown = require("./session_cli.cjs").sessionCLI(["markdown", write("usage/aw_session.jsonl", events)]);
+    expect(markdown).toContain("Observed historical final answer");
+    expect(markdown).toContain("Second paragraph.");
+  });
+
   it("does not reproject canonical Copilot initialization after native provenance indexing", () => {
     const native = [{ type: "session.start", id: "start", timestamp: "2026-10-02T00:00:00Z", data: { sessionId: "session", startTime: "2026-10-02T00:00:00Z" } }];
     const canonical = require("./copilot_session.cjs")
