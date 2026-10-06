@@ -150,7 +150,7 @@ describe("runtime mask publication boundary", () => {
     await redactSources();
     expect(fs.existsSync(failing)).toBe(false);
     expectSafe(JSON.parse(fs.readFileSync(remaining, "utf8")));
-    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after runtime mask redaction failed"));
+    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after secret redaction failed"));
     expectSafe(core.warning.mock.calls.flat());
     expectSafe(core.setFailed.mock.calls.flat());
   });
