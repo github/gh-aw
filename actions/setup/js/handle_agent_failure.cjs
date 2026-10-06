@@ -284,6 +284,7 @@ function parseHTMLCommentMetadata(body, markerKey) {
 function buildFailureMatchCategories(options) {
   const categories = [];
 
+  if (options.transportWedge) categories.push("transport_wedge");
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
   if (options.hasAssignCopilotFailures) categories.push("assign_copilot_failures");
@@ -330,11 +331,16 @@ function buildFailureMatchCategories(options) {
   return categories.sort();
 }
 
+function hasMCPTransportWedge(logContent) {
+  return /\[codex-harness\][^\n]*runtime guard requested termination \(transport_wedge: MCP tool call timed out after \d+s\)/.test(logContent);
+}
+
 /**
  * Build a precise failure issue title for known failure classes.
  * Falls back to the generic failure title when no specific class matches.
  * @param {Object} options
  * @param {string} options.workflowName
+ * @param {boolean} [options.transportWedge]
  * @param {boolean} options.isTimedOut
  * @param {boolean} options.hasMissingSafeOutputs
  * @param {boolean} options.hasReportIncomplete
@@ -391,6 +397,7 @@ function buildFailureIssueTitle(options) {
     const agentName = sanitizeContent(options.copilotAgentNotFound, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH).replace(/\s+/g, " ").trim();
     return `[aw] ${workflowName} could not find configured Copilot agent "${agentName}"`;
   }
+  if (options.transportWedge) return `[aw] ${workflowName} stalled on an MCP tool call`;
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -4284,10 +4291,19 @@ async function main() {
 
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
+    let transportWedge = false;
+    if (agentConclusion === "failure") {
+      try {
+        transportWedge = hasMCPTransportWedge(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
+      } catch {
+        core.debug("Engine log unavailable for MCP watchdog classification");
+      }
+    }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasMissingSafeOutputs,
@@ -4316,6 +4332,7 @@ async function main() {
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasAssignmentErrors,
@@ -5027,6 +5044,7 @@ module.exports = {
   CASCADE_ROLLUP_TITLE,
   FAILURE_TITLE_PATTERN,
   buildFailureMatchCategories,
+  hasMCPTransportWedge,
   buildFailureIssueTitle,
   FAILURE_CATEGORIES_PATH,
 };

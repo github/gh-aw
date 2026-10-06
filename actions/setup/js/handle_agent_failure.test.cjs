@@ -420,6 +420,7 @@ describe("handle_agent_failure", () => {
 
     it("falls back to generic failed title when no specific condition matches", () => {
       expect(buildFailureIssueTitle(baseOptions)).toBe("[aw] Test Workflow failed");
+      expect(buildFailureIssueTitle({ ...baseOptions, transportWedge: true })).toBe("[aw] Test Workflow stalled on an MCP tool call");
     });
 
     it.each([
@@ -6310,6 +6311,16 @@ describe("handle_agent_failure", () => {
         isTimedOut: true,
       });
       expect(categories).toContain("timed_out");
+    });
+
+    it("classifies an MCP watchdog failure without a generic agent failure", () => {
+      expect(buildFailureMatchCategories({ agentConclusion: "failure", transportWedge: true })).toEqual(["transport_wedge"]);
+    });
+
+    it("recognizes only the harness MCP watchdog termination record", () => {
+      const { hasMCPTransportWedge } = require("./handle_agent_failure.cjs");
+      expect(hasMCPTransportWedge("[codex-harness] 2026-01-01 attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)")).toBe(true);
+      expect(hasMCPTransportWedge("transport_wedge: MCP tool call timed out after 120s")).toBe(false);
     });
 
     it("returns missing_safe_outputs category", () => {

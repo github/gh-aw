@@ -41,6 +41,7 @@ const {
   DEFAULT_CONTEXT_REBUILD_POLL_INTERVAL_MS,
   DEFAULT_CONTEXT_REBUILD_TERM_GRACE_MS,
   resolvePostResultWatchdogIdleTimeoutMs,
+  createMCPCallWatchdog,
   DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
   MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
   MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS,
@@ -117,6 +118,30 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  describe("MCP call watchdog", () => {
+    it("times out only an outstanding MCP call, not other output or completed calls", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(120_000, () => time);
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "1", name: "search_repositories" } }));
+      time = 119_999;
+      watchdog.observe(JSON.stringify({ type: "item.completed", item: { type: "agent_message", id: "other" } }));
+      expect(watchdog.expired()).toBe(false);
+      time = 120_000;
+      expect(watchdog.expired()).toBe(true);
+      watchdog.observe(JSON.stringify({ type: "item.completed", item: { type: "mcp_tool_call", id: "1" } }));
+      expect(watchdog.expired()).toBe(false);
+    });
+
+    it("clears failed calls and ignores malformed events", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(100, () => time);
+      watchdog.observe("{");
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "2" } }));
+      watchdog.observe(JSON.stringify({ type: "item.failed", item: { type: "mcp_tool_call", id: "2" } }));
+      time = 200;
+      expect(watchdog.expired()).toBe(false);
+    });
+  });
   describe("native exec orchestration", () => {
     it("preserves a native argument-parse exit without retrying a deterministic startup error", () => {
       const { result, calls } = runHarnessFixture(`process.stderr.write("error: unexpected argument '--invalid' found\\n\\nUsage: codex exec [OPTIONS] [PROMPT]\\n");process.exit(2);`);

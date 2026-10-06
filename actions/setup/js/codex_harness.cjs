@@ -91,6 +91,28 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
+const DEFAULT_MCP_CALL_WATCHDOG_MS = 120_000;
+
+function createMCPCallWatchdog(timeoutMs, now = Date.now) {
+  const pending = new Map();
+  return {
+    observe(line) {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        return;
+      }
+      const item = event?.item;
+      if (item?.type !== "mcp_tool_call" || typeof item.id !== "string") return;
+      if (event.type === "item.started") pending.set(item.id, now());
+      if (event.type === "item.completed" || event.type === "item.failed") pending.delete(item.id);
+    },
+    expired() {
+      return [...pending.values()].some(start => now() - start >= timeoutMs);
+    },
+  };
+}
 
 // Codex's `turn.failed` event nests the actual provider error as a JSON string inside
 // `error.message` (sometimes doubly-nested, e.g. `error.message` -> `{"error": {...}}`).
@@ -808,6 +830,9 @@ async function main() {
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async attempt => {
       const terminalErrors = [];
+      const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
+      const mcpWatchdogTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + 60_000 : DEFAULT_MCP_CALL_WATCHDOG_MS;
+      const mcpWatchdog = createMCPCallWatchdog(mcpWatchdogTimeoutMs);
       let nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
       // Track the file size before this attempt so the watchdog only arms on output
       // written by this attempt, not by a previous retry.
@@ -823,6 +848,7 @@ async function main() {
         stdin: resumeArgs ? resumePrompt : promptInput.stdin,
         maxCollectedOutputBytes: 4 * 1024 * 1024,
         onStdoutLine: line => {
+          mcpWatchdog.observe(line);
           try {
             const event = JSON.parse(line);
             if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
@@ -832,27 +858,25 @@ async function main() {
             }
           } catch {}
         },
-        runtimeGuard:
-          contextRebuildCircuitBreaker.enabled || softTimeoutGuard
-            ? {
-                pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
-                termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
-                shouldTerminate: async () => {
-                  if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
-                  if (!contextRebuildCircuitBreaker.enabled) return false;
-                  if (Date.now() < nextContextCheckAt) return false;
-                  nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
-                  return evaluateContextRebuildCircuitBreakerForAttempt(
-                    await readWorkingSetFromTokenUsage(tokenUsagePaths),
-                    {
-                      maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
-                      minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
-                    },
-                    { safeOutputsPath, safeOutputsByteOffset, logger: log }
-                  );
-                },
-              }
-            : undefined,
+        runtimeGuard: {
+          pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
+          termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+          shouldTerminate: async () => {
+            if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
+            if (mcpWatchdog.expired()) return { terminate: true, reason: `transport_wedge: MCP tool call timed out after ${Math.round(mcpWatchdogTimeoutMs / 1000)}s` };
+            if (!contextRebuildCircuitBreaker.enabled) return false;
+            if (Date.now() < nextContextCheckAt) return false;
+            nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
+            return evaluateContextRebuildCircuitBreakerForAttempt(
+              await readWorkingSetFromTokenUsage(tokenUsagePaths),
+              {
+                maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
+                minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
+              },
+              { safeOutputsPath, safeOutputsByteOffset, logger: log }
+            );
+          },
+        },
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () =>
@@ -1108,6 +1132,7 @@ if (typeof module !== "undefined" && module.exports) {
     injectModelFlagAfterExec,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
+    createMCPCallWatchdog,
     POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
