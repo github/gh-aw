@@ -128,7 +128,7 @@ func modelRoutingDefaultImages(workflowData *WorkflowData, configuredImages map[
 	}
 
 	if _, configured := configuredImages[awfImageRoleRouter]; !configured {
-		image := "ghcr.io/githubnext/gh-aw-router:" + string(constants.DefaultRouterVersion)
+		image := constants.DefaultRouterRegistry + ":" + string(constants.DefaultRouterVersion)
 		pin, found := lookupContainerPin(image, workflowData.ActionCache)
 		if !found || pin.PinnedImage == "" {
 			missing = append(missing, image)
