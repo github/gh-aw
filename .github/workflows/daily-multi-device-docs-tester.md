@@ -65,7 +65,7 @@ imports:
   - shared/otlp.md
 pre-agent-steps:
   - name: Checkout agentics workflows
-    uses: actions/checkout@v7
+    uses: actions/checkout@v7.0.1
     with:
       repository: githubnext/agentics
       path: .agentics
