@@ -13,7 +13,7 @@
     "@vitest/ui": "^5.0.1",
     "ajv": "^8.17.1",
     "minimatch": ">=10.2.6",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "ts-json-schema-generator": "2.4.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
