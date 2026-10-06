@@ -390,6 +390,30 @@ Re-run a named case with `TLC_CONFIG_FILTER`. To resume a retained TLC checkpoin
 use the same jar/model/configuration and worker count with
 `-recover /path/to/checkpoint-directory`; the checks here used two workers.
 
+### Daily evidence collection
+
+[`daily-work-queue-formal-verification.md`](../../.github/workflows/daily-work-queue-formal-verification.md)
+collects `FairDAGGitHub` and `QueueOrdering` on separate parallel runners daily,
+with manual dispatch available. Each verification job has a five-hour limit.
+Its deterministic collector interrupts TLC after 4h40m, preserving time to
+finalize and upload the artifact instead of losing it to a job timeout.
+
+Artifacts are retained for 30 days and named
+`work-queue-formal-<configuration>-<run-id>-<attempt>`. They contain exact
+model/config snapshots and hashes, Java/TLC provenance, command, raw log,
+normalized verdict/counts, and checkpoint inventory. A full state archive is
+included only when a completed checkpoint fits the 256 MiB uncompressed cap;
+otherwise the explicit omission reason is retained. Large state directories
+are never uploaded indiscriminately.
+
+A read-only agent writes a separate `work-queue-formal-handoff-<run-id>-<attempt>`
+artifact for subsequent agents. It does not rerun the checker, modify the model,
+or reinterpret timeouts/partial searches as successful verification. Setup
+failures keep an explicit `setup_incomplete` record; artifact availability
+remains visible even if agent analysis fails.
+GitHub resource safe outputs are preview-only; the deterministic verification
+and handoff artifact uploads remain real.
+
 `Safety` includes state types, single open owner per Work, causal history,
 recomputed selection, logical/native capacities, exact Claim charge counts,
 one dispatch request per group, assignment integrity, one effect authorization
