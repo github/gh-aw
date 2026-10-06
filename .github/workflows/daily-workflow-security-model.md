@@ -22,7 +22,7 @@ env:
   PYTHONDONTWRITEBYTECODE: "1"
 steps:
   - name: Set up Go for the compiled-profile verifier
-    uses: actions/setup-go@v7.0.0
+    uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
       cache: true

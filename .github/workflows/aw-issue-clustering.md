@@ -53,7 +53,7 @@ jobs:
           set -euo pipefail
           node --test .github/scripts/test_aw_issue_clustering*.cjs
       - name: Close resolved AW sources before recomputing assignments
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -66,7 +66,7 @@ jobs:
               .write();
 steps:
   - name: Collect complete AW backlog and report evidence
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       script: |
@@ -103,7 +103,7 @@ safe-outputs:
         - name: Set up safe-output helpers
           uses: ./actions/setup
         - name: Revalidate live provenance and publish essential assignments
-          uses: actions/github-script@v9.0.0
+          uses: actions/github-script@v9
           env:
             GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
           with:
