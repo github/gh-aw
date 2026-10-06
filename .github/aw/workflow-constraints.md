@@ -41,10 +41,12 @@ Suggested response:
 - Keep the main agent job read-only.
 - Do not add GitHub write permissions to the agent job.
 - Route GitHub writes through `safe-outputs:`.
+- Do not create issues directly through agent tools, `gh`, or GitHub APIs; use `safe-outputs.create-issue`, check for an existing issue first, and use `noop` when no issue is needed.
 - Prefer `tools.github.mode: gh-proxy` with `gh` for GitHub reads.
 - Prefer `tools.cli-proxy: true` with mounted `mcp-clis` commands for non-GitHub MCP tools.
 - Constrain `network.allowed:` to the minimum required ecosystems or domains.
 - Use `${{ steps.sanitized.outputs.text }}` for untrusted user content.
+- Never pass `${{ secrets.* }}` or other credentials to `post-steps:` or custom secret-scanning steps, or write secret values to logs or artifacts. Use supported declarative authentication for agent tools, or run credential-dependent scanning in a separate least-privilege non-agent job without exposing secret values.
 
 ## Safer Alternatives First
 
@@ -63,6 +65,7 @@ When a requested feature increases risk:
 - shell injection: interpolating `${{ github.event.* }}` or other untrusted expressions directly into `run:` scripts; pass untrusted values through environment variables instead
 - placing OIDC/secret bootstrap in `pre-steps` instead of earlier `setup-steps`
 - using `post-steps:` for agent-driven write actions
+- placing credentials in `post-steps:` or custom secret-scanning steps
 
 ## Self-Hosted Runner Compatibility
 
