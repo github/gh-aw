@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { isSessionEvent } = require("./agent_session.cjs");
+const { hasCopilotConversation, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeUnifiedSessionEvent } = require("./unified_session_payload.cjs");
@@ -133,6 +134,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   /** @type {SessionSource[]} */
   const sources = [];
   const masks = new Set();
+  const incompleteSources = new Set();
   /** @type {SessionEvent[]} */
   const warnings = [];
   const report = (file, code, line) => {
@@ -178,6 +180,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       try {
         values.push(JSON.parse(raw));
       } catch {
+        incompleteSources.add(file);
         report(file, "malformed_jsonl", index + 1);
       }
     }
@@ -195,12 +198,16 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     const events = [];
     for (const record of records(file)) {
       if (!record || typeof record !== "object" || Array.isArray(record)) {
+        incompleteSources.add(file);
         report(file, "non_object_record", undefined);
         continue;
       }
       if (component === "agent") {
         if (isSessionEvent(record)) events.push(record);
-        else report(file, "non_canonical_agent_event", undefined);
+        else {
+          incompleteSources.add(file);
+          report(file, "non_canonical_agent_event", undefined);
+        }
       } else if (type) {
         events.push({ type, data: record, ...(record.timestamp !== undefined ? { timestamp: record.timestamp } : {}), ...(record.created_at !== undefined ? { created_at: record.created_at } : {}) });
       } else if (component === "mcp" || component === "firewall") events.push(normalizeRuntimeEvent(component, record));
@@ -261,7 +268,19 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
   if (!agentEvents) {
-    for (const file of native) agentEvents += add(file, "agent", "agent", undefined);
+    for (const file of native) {
+      add(file, "agent", "agent", undefined);
+      const source = sources.at(-1);
+      if (source?.path === path.relative(rootDir, file)) {
+        source.events = normalizeCopilotSession(source.events);
+        if (!incompleteSources.has(file) && hasCopilotConversation(source.events)) {
+          agentEvents += source.events.length;
+        } else {
+          if (!incompleteSources.has(file)) report(file, "native_session_unusable", undefined);
+          source.events = [];
+        }
+      }
+    }
   }
   if (!agentEvents) {
     const file = choose(["pi-streaming.jsonl", "agent-stdio.log"]);
