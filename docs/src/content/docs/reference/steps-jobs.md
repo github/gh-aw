@@ -95,6 +95,8 @@ post-steps:
 ```
 
 Useful for artifact uploads, summaries, cleanup, or triggering downstream workflows.
+Post-steps must not create issues directly or read the agent's safe-output file (`agent_output.json`).
+Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish agent-generated issues instead.
 
 ## Custom Jobs (`jobs:`)
 
