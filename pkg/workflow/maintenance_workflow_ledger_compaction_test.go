@@ -140,6 +140,7 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	for name := range jobs {
 		assert.False(t, strings.HasPrefix(name, "ledger_compaction_plan_") || strings.HasPrefix(name, "ledger_compaction_apply_"), "unexpected per-ledger job %s", name)
 	}
+
 	assert.Contains(t, plan, "contents: read")
 	assert.NotContains(t, plan, "contents: write")
 	assert.NotContains(t, plan, "secrets.GITHUB_TOKEN")
@@ -180,6 +181,28 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	assert.Contains(t, yaml, "ledger:")
 	assert.Contains(t, jobs["run_operation"], "'compact_ledger'", "the generic operation job must not handle compact_ledger")
 	assert.Contains(t, yaml, "schedule:")
+}
+
+func TestMaintenanceActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	data := &WorkflowData{
+		Name: "test",
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{Expires: 48},
+		},
+	}
+	err := GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+		WorkflowDataList: []*WorkflowData{data},
+		WorkflowDir:      dir,
+		Version:          "v1.0.0",
+		ActionMode:       ActionModeDev,
+		RepoConfig:       &RepoConfig{ActionPinPrefixes: map[string]string{"actions/": "mirror/actions-"}},
+	})
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(dir, "agentics-maintenance.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "uses: mirror/actions-")
+	assert.NotContains(t, string(content), "uses: actions/")
 }
 
 func TestGenerateMaintenanceWorkflow_NoLedgerCompactionInputsWithoutLedgers(t *testing.T) {

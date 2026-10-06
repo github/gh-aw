@@ -3,9 +3,41 @@ package actionpins
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 )
+
+// applyActionPinPrefix rewrites only the repository in a resolved reference.
+// The source action is resolved before this is called, so mirrors need no API access.
+func applyActionPinPrefix(repo, pinnedRef string, ctx *PinContext) string {
+	if pinnedRef == "" || ctx == nil || len(ctx.PrefixMappings) == 0 {
+		return pinnedRef
+	}
+
+	longest := ""
+	for prefix := range ctx.PrefixMappings {
+		if strings.HasPrefix(repo, prefix) && len(prefix) > len(longest) {
+			longest = prefix
+		}
+	}
+	if longest == "" {
+		return pinnedRef
+	}
+	resolvedRepo, suffix, ok := strings.Cut(pinnedRef, "@")
+	if !ok || resolvedRepo != repo {
+		return pinnedRef
+	}
+	mappedRepo := ctx.PrefixMappings[longest] + strings.TrimPrefix(repo, longest)
+	ctx.emitOnce("prefix:"+repo, fmt.Sprintf("Action pin mapping applied: %s → %s", repo, mappedRepo), console.FormatInfoMessage)
+	return mappedRepo + "@" + suffix
+}
+
+// ApplyResolvedActionPinPrefix substitutes a mirror repository in a resolved
+// action reference while retaining the pinned SHA and version comment.
+func ApplyResolvedActionPinPrefix(repo, pinnedRef string, ctx *PinContext) string {
+	return applyActionPinPrefix(repo, pinnedRef, ctx)
+}
 
 var containerDigestPinPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9/:_.-]*@sha256:[a-f0-9]{64}$`)
 

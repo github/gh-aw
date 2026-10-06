@@ -165,6 +165,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 			return err
 		}
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig.IsAutoUpgradeEnabled(),
@@ -226,6 +227,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		// for safe_outputs, create_labels, and validate operations.
 		if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 			workflowDataList: workflowDataList,
+			repoConfig:       repoConfig,
 			workflowDir:      workflowDir,
 			version:          version,
 			actionMode:       actionMode,
@@ -239,6 +241,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		}
 
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),
@@ -321,6 +324,9 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	if err != nil {
 		return fmt.Errorf("failed to configure maintenance artifact retention: %w", err)
 	}
+	if repoConfig != nil {
+		content = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil)
+	}
 
 	// Write the maintenance workflow file
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")
@@ -338,6 +344,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	// Generate side-repo maintenance workflows for any SideRepoOps targets detected.
 	if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 		workflowDataList: workflowDataList,
+		repoConfig:       repoConfig,
 		workflowDir:      workflowDir,
 		version:          version,
 		actionMode:       actionMode,
@@ -351,6 +358,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+		RepoConfig:      repoConfig,
 		Context:         ctx,
 		WorkflowDir:     workflowDir,
 		Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),

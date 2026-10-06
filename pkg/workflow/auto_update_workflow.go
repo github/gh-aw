@@ -60,6 +60,7 @@ type GenerateAutoUpdateWorkflowOptions struct {
 	CustomCron string
 	// UpgradeOptions contains supported command-line options passed to gh aw upgrade.
 	UpgradeOptions []string
+	RepoConfig     *RepoConfig
 }
 
 // GenerateAutoUpdateWorkflow generates or removes the agentic-auto-upgrade.yml workflow
@@ -126,6 +127,9 @@ func GenerateAutoUpdateWorkflow(opts GenerateAutoUpdateWorkflowOptions) error { 
 	)
 	if err != nil {
 		return fmt.Errorf("failed to finalize auto-update workflow YAML: %w", err)
+	}
+	if opts.RepoConfig != nil {
+		content = mapPinnedUsesInYAML(content, opts.RepoConfig.ActionPins, opts.RepoConfig.ActionPinPrefixes, nil)
 	}
 
 	autoUpdateWorkflowLog.Printf("Writing auto-update workflow to %s", outputFile)

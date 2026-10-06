@@ -1998,3 +1998,28 @@ func TestApplyActionPinToTypedStep_NoOutdatedWarningForCurrentVersion(t *testing
 		t.Errorf("expected no outdated warning for current version, got: %q", output)
 	}
 }
+
+func TestMapPinnedUsesInYAML(t *testing.T) {
+	checkout := getActionPin("actions/checkout")
+	upload := getActionPin("actions/upload-artifact")
+	version := latestActionVersionForRepo(t, "actions/checkout")
+	sha := strings.SplitN(strings.TrimPrefix(checkout, "actions/checkout@"), " ", 2)[0]
+	input := "      - name: Checkout\n        uses: " + checkout + "\n" +
+		"      - name: Upload\n        uses: " + upload + "\n" +
+		"        run: |\n          uses: " + checkout + "\n"
+	mapped := mapPinnedUsesInYAML(input,
+		map[string]string{"actions/checkout@" + version: "internal/checkout@" + sha},
+		map[string]string{"actions/": "mirror/actions-"}, nil)
+	if strings.Contains(mapped, "\n        uses: actions/") {
+		t.Fatalf("unmapped action remains in generated steps:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "        uses: internal/checkout@"+sha) {
+		t.Fatalf("exact mapping should take precedence:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "        uses: "+strings.Replace(upload, "actions/upload-artifact@", "mirror/actions-upload-artifact@", 1)) {
+		t.Fatalf("prefix should preserve SHA and version comment:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "          uses: "+checkout) {
+		t.Fatalf("run script must not be changed:\n%s", mapped)
+	}
+}

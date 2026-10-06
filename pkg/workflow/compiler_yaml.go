@@ -231,6 +231,7 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	yaml.WriteString(bodyContent)
 
 	yamlContent := yaml.String()
+	yamlContent = mapPinnedUsesInYAML(yamlContent, data.ActionPinMappings, data.ActionPinPrefixes, data.ActionPinWarnings)
 
 	// If we're in non-cloning trial mode and this workflow has issue triggers,
 	// replace github.event.issue.number with inputs.issue_number

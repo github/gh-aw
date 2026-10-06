@@ -170,6 +170,7 @@ type generateAllSideRepoMaintenanceWorkflowsOptions struct {
 	resolver         SHAResolver
 	hasExpires       bool
 	minExpiresDays   int
+	repoConfig       *RepoConfig
 }
 
 // generateAllSideRepoMaintenanceWorkflows detects SideRepoOps targets and
@@ -205,6 +206,7 @@ func generateSideRepoMaintenanceFiles(ctx context.Context, targets []SideRepoTar
 			resolver:       opts.resolver,
 			hasExpires:     opts.hasExpires,
 			minExpiresDays: opts.minExpiresDays,
+			repoConfig:     opts.repoConfig,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate side-repo maintenance workflow for %s: %w", target.Repository, err)
@@ -249,6 +251,7 @@ type generateSideRepoMaintenanceWorkflowOptions struct {
 	resolver       SHAResolver
 	hasExpires     bool
 	minExpiresDays int
+	repoConfig     *RepoConfig
 }
 
 // generateSideRepoMaintenanceWorkflow generates a workflow_call-based maintenance
@@ -264,6 +267,9 @@ func generateSideRepoMaintenanceWorkflow(
 	content, err := buildSideRepoMaintenanceWorkflowYAML(renderCtx)
 	if err != nil {
 		return fmt.Errorf("failed to finalize side-repo maintenance workflow YAML: %w", err)
+	}
+	if opts.repoConfig != nil {
+		content = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, nil)
 	}
 	maintenanceLog.Printf("Writing side-repo maintenance workflow to %s", renderCtx.outPath)
 	if err := os.WriteFile(renderCtx.outPath, []byte(content), constants.FilePermPublic); err != nil {

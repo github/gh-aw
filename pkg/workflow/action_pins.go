@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	actionpins "github.com/github/gh-aw/pkg/actionpins"
@@ -13,6 +14,7 @@ import (
 )
 
 var actionPinsLog = logger.New("workflow:action_pins")
+var pinnedUsesLine = regexp.MustCompile(`(?m)^( {8}uses: +)(actions/[A-Za-z0-9._/-]+)@([a-fA-F0-9]{40})([ \t]*(?:#[ \t]*([^\r\n]*))?)$`)
 
 // Type aliases — callers within pkg/workflow use these names directly.
 
@@ -87,7 +89,7 @@ func getActionPinForData(repo string, data *WorkflowData) string {
 func (c *Compiler) getActionPin(repo string) string {
 	if c.ghesArtifactCompat {
 		if pin, ok := actionpins.ResolveGHESActionPin(repo); ok {
-			return pin
+			return c.mapGeneratedActionPin(repo, pin)
 		}
 	}
 
@@ -105,7 +107,7 @@ func (c *Compiler) getActionPin(repo string) string {
 				if cachedVersion == nil {
 					actionPinsLog.Printf("Ignoring cache entry with unparseable cached version for compiler-generated action %s: cache=%s embedded=%s",
 						repo, entry.Version, latestEmbedded.Version)
-					return actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version)
+					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version))
 				}
 				if embeddedVersion == nil {
 					actionPinsLog.Printf("Using cached version for compiler-generated action %s because embedded version is unparseable: cache=%s embedded=%s",
@@ -113,12 +115,12 @@ func (c *Compiler) getActionPin(repo string) string {
 					if resolver != nil {
 						resolver.MarkCacheKeyAsUsed(cacheKey)
 					}
-					return actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version)
+					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version))
 				}
 				if embeddedVersion.IsNewer(cachedVersion) {
 					actionPinsLog.Printf("Ignoring stale cache entry for compiler-generated action %s: cache=%s embedded=%s",
 						repo, entry.Version, latestEmbedded.Version)
-					return actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version)
+					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version))
 				}
 				// Equal or newer cached versions intentionally fall through to the cache entry below.
 			}
@@ -131,7 +133,56 @@ func (c *Compiler) getActionPin(repo string) string {
 	}
 
 	// Fall back to embedded pins if no suitable cache entry exists
-	return getActionPin(repo)
+	return c.mapGeneratedActionPin(repo, getActionPin(repo))
+}
+
+func (c *Compiler) mapGeneratedActionPin(repo, pin string) string {
+	if pin == "" {
+		return pin
+	}
+	// Resolve against the original repository first; the cache/embedded pin has
+	// already been selected by the caller.
+	version := strings.TrimSpace(strings.TrimPrefix(pin, repo+"@"))
+	_, version, _ = strings.Cut(version, " # ")
+	ctx := &actionpins.PinContext{
+		Mappings:       c.getActionPinMappings(),
+		PrefixMappings: c.getActionPinPrefixes(),
+		Warnings:       c.actionPinWarnings,
+	}
+	if mapped, ok := ctx.Mappings[actionpins.FormatCacheKey(repo, version)]; ok {
+		if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
+			return ref
+		}
+		actionPinsLog.Printf("Unable to resolve mapped action %s to %s", repo, mapped)
+		return pin
+	}
+	return actionpins.ApplyResolvedActionPinPrefix(repo, pin, ctx)
+}
+
+// mapPinnedUsesInYAML covers standalone generators which build action steps
+// without a Compiler or WorkflowData. Only resolved uses references are changed.
+func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, warnings map[string]bool) string {
+	if len(mappings) == 0 && len(prefixes) == 0 {
+		return content
+	}
+	if warnings == nil {
+		warnings = make(map[string]bool)
+	}
+	ctx := &actionpins.PinContext{Mappings: mappings, PrefixMappings: prefixes, Warnings: warnings}
+	return pinnedUsesLine.ReplaceAllStringFunc(content, func(line string) string {
+		const indentation = "        uses: "
+		reference := strings.TrimPrefix(line, indentation)
+		repo, suffix, _ := strings.Cut(reference, "@")
+		_, version, _ := strings.Cut(suffix, " # ")
+		version = strings.TrimSpace(version)
+		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
+			if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
+				return indentation + ref
+			}
+			return line
+		}
+		return indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
+	})
 }
 
 // getCachedActionPinFromResolver returns the pinned action reference for repo,

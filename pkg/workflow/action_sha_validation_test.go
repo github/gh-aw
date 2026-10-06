@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -398,4 +399,73 @@ jobs:
 	// The test verifies the code compiles and runs without errors
 	// In CI with gh CLI access, the cache would be saved if updates were found
 	t.Logf("Validation completed successfully")
+}
+
+func TestCompiledWorkflowAppliesActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-"}}`)
+	path := filepath.Join(dir, "test.md")
+	content := "---\non: push\nengine: copilot\npermissions:\n  contents: read\n---\n\n# Test\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	compiler.gitRoot = dir
+	if err := compiler.CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(lock), "uses: mirror/actions-") || strings.Contains(string(lock), "uses: actions/") {
+		t.Fatalf("expected all compiler-emitted actions to use the mirror: %s", lock)
+	}
+}
+
+func TestCompiledWorkflowAppliesExactMappingsToGeneratedActions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.md")
+	content := "---\non: push\nengine: copilot\npermissions:\n  contents: read\n---\n\n# Test\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	compile := func() string {
+		t.Helper()
+		c := NewCompiler()
+		c.gitRoot = dir
+		if err := c.CompileWorkflow(path); err != nil {
+			t.Fatal(err)
+		}
+		lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(lock)
+	}
+	baseline := compile()
+	pinLines := regexp.MustCompile(`(?m)^        uses: (actions/[A-Za-z0-9._/-]+)@([a-f0-9]{40}) # (\S+)`)
+	matches := pinLines.FindAllStringSubmatch(baseline, -1)
+	if len(matches) == 0 {
+		t.Fatal("expected generated actions in baseline workflow")
+	}
+	mappings := make(map[string]string)
+	for _, match := range matches {
+		mappings[match[1]+"@"+match[3]] = "internal/" + strings.ReplaceAll(match[1], "/", "-") + "@" + match[2]
+	}
+	config, err := json.Marshal(map[string]any{"action_pins": mappings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeAWJSON(t, dir, string(config))
+	mapped := compile()
+	if strings.Contains(mapped, "uses: actions/") {
+		t.Fatalf("compiler emitted unmapped actions:\n%s", mapped)
+	}
+	for _, target := range mappings {
+		if !strings.Contains(mapped, "uses: "+target) {
+			t.Errorf("mapped action missing: %s", target)
+		}
+	}
 }

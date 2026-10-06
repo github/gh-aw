@@ -670,6 +670,18 @@ func TestLoadRepoConfig_ActionPins(t *testing.T) {
 	})
 }
 
+func TestLoadRepoConfig_ActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-"}}`)
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "mirror/actions-", cfg.ActionPinPrefixes["actions/"])
+
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-@v4"}}`)
+	_, err = LoadRepoConfig(dir)
+	require.Error(t, err, "prefix values must not contain action versions")
+}
+
 func TestValidateCronExpression(t *testing.T) {
 	valid := []string{
 		"0 9 * * 1",

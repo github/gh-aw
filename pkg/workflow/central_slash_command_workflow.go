@@ -93,6 +93,9 @@ func GenerateCentralSlashCommandWorkflow(ctx context.Context, workflowDataList [
 	if err != nil {
 		return err
 	}
+	if repoConfig != nil {
+		content = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, nil)
+	}
 
 	if err := os.WriteFile(triggerFile, []byte(content), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("failed to write centralized slash-command workflow: %w", err)
