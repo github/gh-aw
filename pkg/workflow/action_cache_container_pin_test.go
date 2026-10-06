@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -165,16 +166,16 @@ func TestContainerPinMarshalSortedOutput(t *testing.T) {
 // TestPruneStaleContainerPins verifies that PruneStaleContainerPins removes
 // entries not present in the known-image set and preserves entries that are.
 //
-// gh-aw-firewall (AWF) images are a deliberate exception: they are exempt from
-// pruning even when no longer referenced by any local lock file, so that bumping
-// constants.DefaultFirewallVersion never drops the previous version's embedded
-// digest pin (regression of gh-aw#38561 / #43307 / #44040 / #51248).
+// Canonical AWF and router images are exempt from pruning even when no longer
+// referenced by any local lock file, so historical versions retain their embedded
+// digest pins.
 func TestPruneStaleContainerPins(t *testing.T) {
 	cache := NewActionCache(t.TempDir())
 
-	// Populate with three pins.
+	// Populate with stale and current canonical pins, plus ordinary pins.
 	cache.SetContainerPin("ghcr.io/github/gh-aw-firewall/agent:0.27.0", "sha256:old", "ghcr.io/github/gh-aw-firewall/agent:0.27.0@sha256:old")
 	cache.SetContainerPin("ghcr.io/github/gh-aw-firewall/agent:0.27.2", "sha256:new", "ghcr.io/github/gh-aw-firewall/agent:0.27.2@sha256:new")
+	cache.SetContainerPin(constants.DefaultRouterRegistry+":0.1.2", "sha256:router-old", constants.DefaultRouterRegistry+":0.1.2@sha256:router-old")
 	cache.SetContainerPin("node:lts-alpine", "sha256:node", "node:lts-alpine@sha256:node")
 	cache.SetContainerPin("stale-registry.example.com/other:v1", "sha256:stale", "stale-registry.example.com/other:v1@sha256:stale")
 
@@ -187,10 +188,14 @@ func TestPruneStaleContainerPins(t *testing.T) {
 	pruned := cache.PruneStaleContainerPins(knownImages)
 	assert.Equal(t, 1, pruned, "only the non-firewall stale pin should be pruned")
 
-	// gh-aw-firewall images are exempt from pruning, so the old version must survive.
+	// Canonical images are exempt from pruning, so historical versions must survive.
 	pin, ok := cache.GetContainerPin("ghcr.io/github/gh-aw-firewall/agent:0.27.0")
 	require.True(t, ok, "stale old-version gh-aw-firewall pin must be retained")
 	assert.Equal(t, "sha256:old", pin.Digest)
+
+	pin, ok = cache.GetContainerPin(constants.DefaultRouterRegistry + ":0.1.2")
+	require.True(t, ok, "stale gh-aw-router pin must be retained")
+	assert.Equal(t, "sha256:router-old", pin.Digest)
 
 	// Non-firewall stale pin should be gone.
 	_, ok = cache.GetContainerPin("stale-registry.example.com/other:v1")

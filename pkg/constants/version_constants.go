@@ -64,7 +64,10 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.31"
+const DefaultFirewallVersion Version = "v0.28.37"
+
+// DefaultRouterVersion is the default version of the gh-aw model router image.
+const DefaultRouterVersion Version = "0.1.3"
 
 // AWFModelRoutingMinVersion is the first AWF version that exposes task routing
 // selections through /reflect and accepts apiProxy.routing.

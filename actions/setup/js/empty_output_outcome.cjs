@@ -3,12 +3,12 @@
 const fs = require("fs");
 const path = require("path");
 const { collectUnifiedSession } = require("./unified_session.cjs");
-const { agentErrorDiagnosticText } = require("./agent_execution.cjs");
+const { agentErrorDiagnosticText, agentErrorSummaryText } = require("./agent_execution.cjs");
 const { extractDeniedCommands } = require("./permission_denied_helpers.cjs");
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
-const { collectArtifactSecretValues, redactManifestValue } = require("./safe_output_manifest.cjs");
-const { collectAddMaskedValues, redactMaskedValues } = require("./add_mask_redaction.cjs");
-const { sanitizeContent } = require("./sanitize_content.cjs");
+const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
+const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
+const { redactDiagnosticText, redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 
 // Keep cause titles and the category allow-list in sync; schema and docs list these causes too.
 const EMPTY_OUTPUT_CAUSES = Object.freeze({
@@ -45,7 +45,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   }
   maskedValues.push(...collectAddMaskedValues(stdio));
   const secrets = collectArtifactSecretValues();
-  const redact = value => redactMaskedValues(String(redactManifestValue(value, secrets)), maskedValues);
+  const redact = value => redactDiagnosticText(String(value), { secrets, maskedValues });
   const redactJson = value => JSON.stringify(value, (_key, nested) => (typeof nested === "string" ? redact(nested) : nested));
   let safeoutputsCliError = false;
   try {
@@ -117,11 +117,13 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
       }
     })
     .join("\n");
+  // Extract denied commands without copying harness configuration or transcript data.
   const attributedDiagnostics = agentErrorDiagnosticText(safeStdio);
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
-  if (attributedDiagnostics) diagnostics.add(attributedDiagnostics);
+  const engineSummary = agentErrorSummaryText(safeStdio);
+  if (engineSummary) diagnostics.add(engineSummary);
   const details = [...diagnostics].slice(0, 20).join("\n");
-  const sanitized = sanitizeContent(redact(details), { maxLength: 8000 });
+  const sanitized = redactAndBoundDiagnostics(details, { secrets, maskedValues });
   return {
     type: "report_incomplete",
     reason,
