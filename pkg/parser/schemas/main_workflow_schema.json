@@ -12438,6 +12438,14 @@
               "type": "object",
               "description": "Advanced configuration for @mention filtering with fine-grained control",
               "properties": {
+                "github-token": {
+                  "$ref": "#/$defs/github_token_same_job",
+                  "description": "Dedicated token for resolving mention allowlists in the trusted safe_outputs job. It is not exposed to agent-job ingestion and does not inherit other safe-output credentials or affect write operations."
+                },
+                "github-app": {
+                  "$ref": "#/$defs/github_app",
+                  "description": "Dedicated GitHub App for resolving mention allowlists in the trusted safe_outputs job. Its token is read-only, takes precedence over mentions.github-token, and does not inherit safe-outputs.github-app."
+                },
                 "allowed-collaborators": {
                   "type": "boolean",
                   "description": "Allow mentions of repository collaborators (users with repository access, excluding bots). Default: true",
@@ -12464,7 +12472,7 @@
                 },
                 "allowed-teams": {
                   "type": "array",
-                  "description": "List of team slugs whose members are always allowed to be mentioned. Accepts 'team-slug' (resolved against the current org) or 'org/team-slug' format. Team members are fetched from the GitHub API at runtime; bots are excluded. IMPORTANT: requires read:org scope \u2014 not available with the default GITHUB_TOKEN. Use a classic PAT with read:org, a fine-grained PAT with Members:Read, or a GitHub App with the Members:Read permission. Without the required scope, team lookups fail with a warning and those members are skipped.",
+                  "description": "List of team slugs whose members are always allowed to be mentioned. Accepts 'team-slug' (resolved against the current org) or 'org/team-slug' format. Team members are resolved in the trusted safe_outputs job; bots are excluded. Requires the mention-resolution token to have read:org scope, which the default github.token does not provide. Configure safe-outputs.mentions.github-token with a classic PAT or fine-grained PAT with Members:Read, or safe-outputs.mentions.github-app with the Members:Read permission. Without the required scope, team lookups fail with a warning and those members are skipped.",
                   "items": {
                     "type": "string",
                     "minLength": 1

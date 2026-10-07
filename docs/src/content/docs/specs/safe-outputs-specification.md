@@ -319,7 +319,7 @@ The Safe Outputs MCP Gateway implements defense-in-depth through strict architec
 
 **Requirement AR1: Agent Isolation**
 
-Agents MUST execute without GitHub write permissions. Only read-level tokens SHALL be accessible to agent processes. Write-capable tokens MUST reside exclusively in safe output job contexts.
+Agents MUST execute without GitHub write permissions. Only read-level tokens SHALL be accessible to agent processes. Safe-output write credentials MUST remain confined to downstream safe-output processing jobs. Mention/team allowlist resolution MUST be deferred to the trusted `safe_outputs` job; ingestion in the `agent` job MUST perform no privileged mention or team lookups and MUST NOT receive mention-specific credentials.
 
 **Verification**:
 
@@ -396,14 +396,14 @@ Safe Output Processors MAY target external APIs. Credentials for each external s
 
 - **Method**: Manual security audit and code review
 - **Tool**: Security review of workflow structure and GitHub Actions architecture
-- **Criteria**: No GITHUB_TOKEN or credentials are accessible from agent job context; tokens only exist in safe output job contexts
+- **Criteria**: Safe-output and mention-resolution credentials are inaccessible to agent processes; mention resolution occurs only in trusted safe-output processing after the agent artifact has been transferred
 - **Manual Check**: Audit all communication channels (artifacts, environment variables, network, filesystem) to confirm no credential leakage
 
 **Formal Definition**:
 
 ```
 ∀ t ∈ [agent_start, agent_end]:
-  accessible_credentials(agent_context, t) ∩ safe_output_credentials = ∅
+  accessible_credentials(agent_context, t) ∩ (safe_output_credentials ∪ mention_resolution_credentials) = ∅
 ```
 
 **Requirement AR5: Steering Issue Provenance**
@@ -2129,10 +2129,22 @@ Requirements:
 
 Requirements:
 
-- Detect @mentions: `@[a-zA-Z0-9_-]+`
-- Check against allowed-aliases list
-- Neutralize unauthorized: `@user` becomes `@ user` (add space)
+- Ingestion MUST preserve mentions for mention-aware output types without performing allowlist lookups.
+- The trusted safe-output processor MUST detect @mentions: `@[a-zA-Z0-9_-]+`
+- Check each mention against the resolved allowed-aliases list
+- Neutralize unauthorized mentions before publication
 - Preserve mentions in code blocks
+
+**Ingestion credential requirements**:
+
+- Ingestion MUST use only the default GitHub Actions context and MUST NOT resolve collaborators, comment authors, or team membership. It MUST preserve mention candidates for the trusted safe-output processor to filter before any write operation.
+- Mention resolution MUST run in the trusted `safe_outputs` job. Its lookup token MUST come only from `safe-outputs.mentions.github-app`, then `safe-outputs.mentions.github-token`, then `github.token`; it MUST NOT inherit `safe-outputs.github-token`, `safe-outputs.github-app`, per-output credentials, or `GH_AW_GITHUB_TOKEN`.
+- When `safe-outputs.mentions.github-app` is configured, the compiler MUST mint its dedicated installation token in `safe_outputs` before **Process Safe Outputs**. The token MUST use the configured installation owner and repository scope, request `issues: read` whenever `add-comment` is enabled, and request `members: read` when `mentions.allowed-teams` is configured. Explicit permission overrides MAY select only `read` or `none`; the compiler MUST reject `write` and other levels.
+- With `ignore-if-missing: true`, missing app credentials MUST skip minting and mention resolution MUST fall back to `safe-outputs.mentions.github-token`, then `github.token`. Mention credentials MUST NOT change downstream safe-output write credentials.
+- Allowed team members' raw `@login` mentions MUST remain unmodified during untrusted ingestion and MUST be filtered in the trusted safe-output processor before publication.
+- A mention token referencing `steps.<id>.outputs.*` MUST be produced by an earlier step in the `safe_outputs` job.
+- Mention credentials MUST NOT be serialized into agent-visible validation or handler configuration.
+- Compiler debug logging SHOULD identify the mention-resolution token source without logging credential values or token expressions.
 
 **Transformation T6: Markdown Safety**
 
