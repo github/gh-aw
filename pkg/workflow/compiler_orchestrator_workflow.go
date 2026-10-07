@@ -101,6 +101,9 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
+	if err := c.validateCopilotWebToolsSupport(engineSetup.agenticEngine, engineSetup.engineConfig, toolsResult.tools); err != nil {
+		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
 	ctx.engineSetup = engineSetup
 	ctx.toolsResult = toolsResult
 	ctx.workflowData = c.buildInitialWorkflowData(ctx.frontmatter, toolsResult, engineSetup, engineSetup.importsResult)
@@ -252,6 +255,7 @@ func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {
 	workflowData.ActionResolver = actionResolver
 	workflowData.ActionPinWarnings = c.actionPinWarnings
 	workflowData.ActionPinMappings = c.getActionPinMappings()
+	workflowData.ActionPinPrefixes = c.getActionPinPrefixes()
 	workflowData.ContainerPinMappings = c.getContainerPinMappings()
 }
 

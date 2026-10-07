@@ -93,14 +93,13 @@ func TestBuildCopilotSDKToolConfigPreservesTriState(t *testing.T) {
 			args: []string{
 				"--allow-tool", "write",
 				"--allow-tool", "web_fetch",
-				"--allow-tool", "web_search",
 				"--allow-tool", "shell",
 				"--allow-tool", "github",
 			},
 			capabilities: copilotSDKToolCapabilities{
-				Bash: true, Edit: true, WebFetch: true, WebSearch: true, MCP: true, CLIProxy: true,
+				Bash: true, Edit: true, WebFetch: true, MCP: true, CLIProxy: true,
 			},
-			permissions: []string{"github", "read", "shell", "web_fetch", "web_search", "write"},
+			permissions: []string{"github", "read", "shell", "web_fetch", "write"},
 		},
 		{
 			name: "empty bash allowlist is explicitly disabled",

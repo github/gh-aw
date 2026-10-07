@@ -41,7 +41,7 @@ func recordPinResolutionFailure(ctx *PinContext, actionRepo, version string, err
 // ResolveActionPin returns the pinned action reference for a given action@version.
 // It consults ctx.Resolver first, then falls back to embedded pins.
 // If ctx is nil, only embedded pins are consulted.
-func ResolveActionPin(actionRepo, version string, ctx *PinContext) (string, error) {
+func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result string, err error) {
 	if ctx == nil {
 		ctx = &PinContext{}
 	}
@@ -49,6 +49,10 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (string, erro
 
 	// Apply repository/version mapping from aw.json action_pins before resolution.
 	originalRepo, originalVersion := actionRepo, version
+	_, exactMapped := ctx.Mappings[FormatCacheKey(actionRepo, version)]
+	if !exactMapped {
+		defer func() { result = applyActionPinPrefix(originalRepo, result, ctx) }()
+	}
 	actionRepo, version = applyActionPinMapping(actionRepo, version, ctx)
 	mapped := actionRepo != originalRepo || version != originalVersion
 

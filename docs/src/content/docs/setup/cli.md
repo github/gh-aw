@@ -88,8 +88,6 @@ See the [setup-cli action README](https://github.com/github/gh-aw/blob/main/acti
 
 For invalid nested command paths, `gh aw` now fails explicitly instead of falling back to parent help output. For example, `gh aw secrets gh --help` returns an unknown-command error rather than reprinting `gh aw secrets` help.
 
-Use `gh aw version` to print the current version.
-
 ### The `--push` Flag
 
 `gh aw run --push` stages workflow files (including transitive imports), commits them, and pushes before dispatching the workflow. It refuses to proceed when unrelated files are already staged.
@@ -100,13 +98,7 @@ For `init`, `update`, and `upgrade`, use `--create-pull-request` instead.
 
 Commands are organized by workflow lifecycle: creating, building, testing, monitoring, and managing workflows.
 
-Use this table to choose between the similarly named setup commands:
-
-| Command | Best fit |
-|---------|----------|
-| [`gh aw add-wizard`](#add-wizard) | Guided, interactive setup for an existing workflow, including prompts for engine auth and secrets |
-| [`gh aw add`](#add) | Direct, non-interactive installation of an existing local, remote, or packaged workflow |
-| [`gh aw new`](#new) | Scaffold a new workflow template in this repository before writing custom instructions |
+To choose between the setup commands: [`add-wizard`](#add-wizard) is guided and interactive (prompts for engine auth and secrets), [`add`](#add) installs a local, remote, or packaged workflow non-interactively, and [`new`](#new) scaffolds a new workflow template.
 
 ### Getting Workflows
 
@@ -529,18 +521,15 @@ DEBUG=cli:logs_github_api,cli:logs_download gh aw logs --verbose --json
 
 ```bash wrap
 gh aw logs ci-failure-doctor               # Workflow ID
-gh aw logs CI-FAILURE-DOCTOR               # Case-insensitive ID
-gh aw logs "CI Failure Doctor"             # Display name
-gh aw logs "ci failure doctor"             # Case-insensitive display name
+gh aw logs "ci failure doctor"             # Display name (case-insensitive)
 ```
 
 `--cache-before` deletes cached `run-{ID}` folders older than a cutoff before downloading. It accepts the same relative and absolute date formats as `--start-date` and `--end-date`; the deprecated hidden alias `--after` still works. The command reads the run creation time from `run_summary.json` when present, otherwise it falls back to the directory modification time.
 
 ```bash wrap
-gh aw logs --cache-before -1w                        # Evict local cache older than 1 week, then proceed with normal run download
-gh aw logs --cache-before -30d                       # Evict local cache entries older than 30 days
-gh aw logs --cache-before 2024-01-01                 # Evict local cache entries from before a specific date
-gh aw logs my-workflow --cache-before -1mo -c 20     # Evict local cache older than 1 month, then download 20 runs of a specific workflow
+gh aw logs --cache-before -1w                        # Evict cache older than 1 week, then download as normal
+gh aw logs --cache-before 2024-01-01                 # Evict cache entries before a specific date
+gh aw logs my-workflow --cache-before -1mo -c 20     # Evict, then download 20 runs of one workflow
 ```
 
 `--train` writes `drain3_weights.json` to the logs output directory using downloaded runs. Those weights improve anomaly detection in later `gh aw audit` and `gh aw logs` runs. To embed them as defaults, copy the file to `pkg/agentdrain/data/default_weights.json` and rebuild.
@@ -553,7 +542,6 @@ gh aw logs my-workflow --train -c 50  # Train on up to 50 runs of a specific wor
 `--stdin` reads run IDs or URLs from standard input, one per line, instead of discovering runs from the GitHub API. It cannot be combined with a workflow-name positional argument. Date, count, and workflow-name filters are ignored in this mode, but content filters such as `--engine`, `--firewall`, and `--safe-output` still apply. Blank lines and `#` comments are ignored. Bare numeric IDs require `--repo owner/repo`; full run URLs do not.
 
 ```bash wrap
-cat run-ids.txt | gh aw logs --stdin
 echo "1234567890" | gh aw logs --stdin --engine claude
 cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare numeric IDs
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
@@ -595,7 +583,6 @@ gh aw audit 12345678 --repo owner/repo                    # Specify repository f
 **`--stdin` flag:** Reads run IDs or URLs from stdin (one per line), bypassing the need to pass positional arguments. Mutually exclusive with positional run-ID arguments. Blank lines and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
 
 ```bash wrap
-echo "1234567890" | gh aw audit --stdin
 echo -e "1234567890\n9876543210" | gh aw audit --stdin   # diff mode: first is base
 cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
@@ -632,9 +619,7 @@ Compare behavior between two or more workflow runs to detect policy regressions,
 ```bash wrap
 gh aw audit 12345 12346                     # Compare two runs
 gh aw audit 12345 12346 12347 12348         # Compare base against 3 runs
-gh aw audit 12345 12346 --format markdown   # Markdown output for PR comments
-gh aw audit 12345 12346 --json              # JSON for CI integration
-gh aw audit 12345 12346 --repo owner/repo   # Specify repository
+gh aw audit 12345 12346 --format markdown   # Markdown for PR comments (or --json for CI)
 ```
 
 The diff output shows: new or removed network domains, status changes (allowed ↔ denied), volume changes (>100% threshold), MCP tool invocation changes, run metric comparisons (token usage, duration, turns), tokens-per-turn changes, and per-tool and per-bash-command call breakdowns.
