@@ -694,6 +694,13 @@ describe("Unified conclusion session", () => {
     expect(published.some(event => event.type === "session.collection_warning")).toBe(false);
   });
 
+  it("retains a structured Codex transport-wedge execution event in the unified session", () => {
+    const execution = { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } };
+    write("agent-stdio.log", [JSON.stringify({ type: "thread.started", thread_id: "thread" }), JSON.stringify(execution)].join("\n"));
+    const events = writeUnifiedSession({ rootDir: root, engine: "codex" });
+    expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: execution.data, provenance: { component: "execution", phase: "agent", path: "agent-stdio.log" } }]);
+  });
+
   it.each(["", "{bad\n", '{"type":"result","usage":{}}\n'])("falls back from an unusable canonical session (%j) to native events", content => {
     const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
     write("agent-session.jsonl", content);

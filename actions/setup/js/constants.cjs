@@ -156,6 +156,18 @@ const DETECTION_LOG_FILENAME = "detection.log";
  */
 const DETECTION_RESULT_FILENAME = "detection_result.json";
 
+/**
+ * Default timeout for a Codex MCP tool call when no server timeout is configured.
+ * @type {number}
+ */
+const DEFAULT_MCP_CALL_WATCHDOG_MS = 120_000;
+
+/**
+ * Grace period added to the configured MCP tool timeout before terminating Codex.
+ * @type {number}
+ */
+const MCP_CALL_TRANSPORT_GRACE_MS = 60_000;
+
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
@@ -175,4 +187,6 @@ module.exports = {
   GITHUB_RATE_LIMITS_JSONL_PATH,
   DETECTION_LOG_FILENAME,
   DETECTION_RESULT_FILENAME,
+  DEFAULT_MCP_CALL_WATCHDOG_MS,
+  MCP_CALL_TRANSPORT_GRACE_MS,
 };
