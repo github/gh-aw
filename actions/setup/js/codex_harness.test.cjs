@@ -42,6 +42,7 @@ const {
   DEFAULT_CONTEXT_REBUILD_TERM_GRACE_MS,
   resolvePostResultWatchdogIdleTimeoutMs,
   createMCPCallWatchdog,
+  resolveMCPServerToolTimeouts,
   DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
   MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
   MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS,
@@ -139,6 +140,37 @@ describe("codex_harness.cjs", () => {
       watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "2" } }));
       watchdog.observe(JSON.stringify({ type: "item.failed", item: { type: "mcp_tool_call", id: "2" } }));
       time = 200;
+      expect(watchdog.expired()).toBe(false);
+    });
+
+    it("uses per-server timeouts after the global timeout override", () => {
+      const timeouts = resolveMCPServerToolTimeouts(
+        {
+          defaults: { mcp_servers: { github: { tool_timeout_sec: 60 }, search: { tool_timeout_sec: 30 } } },
+          overrides: { mcp_servers: { github: { tool_timeout_sec: 180 } } },
+        },
+        90
+      );
+      expect(timeouts).toEqual({ github: 180, search: 90 });
+
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(
+        item => timeouts[item.server] * 1000 + 60_000,
+        () => time
+      );
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "1", server: "github" } }));
+      time = 239_999;
+      expect(watchdog.expired()).toBe(false);
+      time = 240_000;
+      expect(watchdog.expiredTimeoutMs()).toBe(240_000);
+    });
+
+    it("clears an oversized completion from its bounded lifecycle prefix", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(100, () => time);
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "large" } }));
+      time = 100;
+      watchdog.observePrefix('{"type":"item.completed","item":{"id":"large","type":"mcp_tool_call","server":"github","result":"');
       expect(watchdog.expired()).toBe(false);
     });
   });

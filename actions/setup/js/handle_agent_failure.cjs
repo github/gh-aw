@@ -333,7 +333,7 @@ function buildFailureMatchCategories(options) {
 }
 
 function hasMCPTransportWedge(logContent) {
-  return /\[codex-harness\][^\n]*runtime guard requested termination \(transport_wedge: MCP tool call timed out after \d+s\)/.test(logContent);
+  return /^\[codex-harness\](?: \d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?)? attempt \d+: runtime guard requested termination \(transport_wedge: MCP tool call timed out after \d+s\) \(SIGTERM\)\r?$/m.test(logContent);
 }
 
 /**

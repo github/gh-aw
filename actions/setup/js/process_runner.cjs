@@ -79,6 +79,7 @@ function sleep(ms) {
  *   env?: NodeJS.ProcessEnv,
  *   stdin?: string | Buffer,
  *   onStdoutLine?: (line: string) => void,
+ *   onStdoutLinePrefix?: (prefix: string) => void,
  *   onStderrLine?: (line: string) => void,
  *   shutdownGraceMs?: number,
  *   drainTimeoutMs?: number,
@@ -118,6 +119,7 @@ function runProcess({
   env,
   stdin,
   onStdoutLine,
+  onStdoutLinePrefix,
   onStderrLine,
   shutdownGraceMs = 5000,
   drainTimeoutMs = 2000,
@@ -214,7 +216,7 @@ function runProcess({
       // Complete output still goes to the parent's log streams. Keep a bounded classifier tail.
       return Buffer.from(combined).subarray(-outputLimit).toString("utf8");
     };
-    const lineObserver = callback => {
+    const lineObserver = (callback, onOversizedLine) => {
       let pending = "";
       let dropping = false;
       return (text, final = false) => {
@@ -222,6 +224,7 @@ function runProcess({
         for (const part of text.split(/(?<=\n)/)) {
           if (!dropping) pending += part;
           if (pending.length > 1024 * 1024) {
+            onOversizedLine?.(pending.slice(0, 64 * 1024));
             pending = "";
             dropping = true;
           }
@@ -234,7 +237,7 @@ function runProcess({
         if (final) pending = "";
       };
     };
-    const observeStdout = lineObserver(onStdoutLine);
+    const observeStdout = lineObserver(onStdoutLine, onStdoutLinePrefix);
     const observeStderr = lineObserver(onStderrLine);
     /** @param {NodeJS.Signals} signal */
     function signalTree(signal) {

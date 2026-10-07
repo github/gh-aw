@@ -34,6 +34,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
@@ -92,9 +93,37 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
 const DEFAULT_MCP_CALL_WATCHDOG_MS = 120_000;
+const MCP_CALL_TRANSPORT_GRACE_MS = 60_000;
+
+function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
+  const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
+  const defaults = {
+    ...config.defaults,
+    mcp_servers: Object.fromEntries(
+      Object.entries(configuredServers).map(([name, value]) => [
+        name,
+        typeof value === "object" && value !== null && !Array.isArray(value)
+          ? { ...value, ...(Number.isSafeInteger(runtimeToolTimeoutSeconds) && runtimeToolTimeoutSeconds > 0 ? { tool_timeout_sec: runtimeToolTimeoutSeconds } : {}) }
+          : value,
+      ])
+    ),
+  };
+  const effectiveServers = mergeConfig(defaults, config.overrides || {}).mcp_servers || {};
+  return Object.fromEntries(
+    Object.entries(effectiveServers).flatMap(([name, value]) => (typeof value?.tool_timeout_sec === "number" && Number.isSafeInteger(value.tool_timeout_sec) && value.tool_timeout_sec > 0 ? [[name, value.tool_timeout_sec]] : []))
+  );
+}
 
 function createMCPCallWatchdog(timeoutMs, now = Date.now) {
   const pending = new Map();
+  function track(eventType, item) {
+    if (item?.type !== "mcp_tool_call" || typeof item.id !== "string") return;
+    if (eventType === "item.started") {
+      const callTimeoutMs = typeof timeoutMs === "function" ? timeoutMs(item) : timeoutMs;
+      pending.set(item.id, { startedAt: now(), timeoutMs: Number.isSafeInteger(callTimeoutMs) && callTimeoutMs > 0 ? callTimeoutMs : DEFAULT_MCP_CALL_WATCHDOG_MS });
+    }
+    if (eventType === "item.completed" || eventType === "item.failed") pending.delete(item.id);
+  }
   return {
     observe(line) {
       let event;
@@ -103,13 +132,39 @@ function createMCPCallWatchdog(timeoutMs, now = Date.now) {
       } catch {
         return;
       }
-      const item = event?.item;
-      if (item?.type !== "mcp_tool_call" || typeof item.id !== "string") return;
-      if (event.type === "item.started") pending.set(item.id, now());
-      if (event.type === "item.completed" || event.type === "item.failed") pending.delete(item.id);
+      track(event?.type, event?.item);
+    },
+    observePrefix(prefix) {
+      const eventType = /^\s*\{\s*"type"\s*:\s*"(item\.started|item\.completed|item\.failed)"/.exec(prefix)?.[1];
+      if (!eventType) return;
+      const itemStart = /,\s*"item"\s*:\s*\{/.exec(prefix);
+      if (!itemStart) return;
+      const itemPrefix = prefix.slice(itemStart.index + itemStart[0].length);
+      if (!/(?:^|,)\s*"type"\s*:\s*"mcp_tool_call"/.test(itemPrefix)) return;
+      const idMatch = /(?:^|,)\s*"id"\s*:\s*("(?:\\.|[^"\\])*")/.exec(itemPrefix);
+      if (!idMatch) return;
+      const serverMatch = /(?:^|,)\s*"server(?:_name)?"\s*:\s*("(?:\\.|[^"\\])*")/.exec(itemPrefix);
+      let item;
+      try {
+        item = {
+          type: "mcp_tool_call",
+          id: JSON.parse(idMatch[1]),
+          ...(serverMatch ? { server: JSON.parse(serverMatch[1]) } : {}),
+        };
+      } catch {
+        return;
+      }
+      track(eventType, item);
+    },
+    expiredTimeoutMs() {
+      const current = now();
+      for (const call of pending.values()) {
+        if (current - call.startedAt >= call.timeoutMs) return call.timeoutMs;
+      }
+      return null;
     },
     expired() {
-      return [...pending.values()].some(start => now() - start >= timeoutMs);
+      return this.expiredTimeoutMs() !== null;
     },
   };
 }
@@ -831,8 +886,12 @@ async function main() {
     runAttempt: async attempt => {
       const terminalErrors = [];
       const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
-      const mcpWatchdogTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + 60_000 : DEFAULT_MCP_CALL_WATCHDOG_MS;
-      const mcpWatchdog = createMCPCallWatchdog(mcpWatchdogTimeoutMs);
+      const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
+      const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
+      const mcpWatchdog = createMCPCallWatchdog(item => {
+        const server = item.server ?? item.server_name ?? item.serverName;
+        return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;
+      });
       let nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
       // Track the file size before this attempt so the watchdog only arms on output
       // written by this attempt, not by a previous retry.
@@ -858,12 +917,14 @@ async function main() {
             }
           } catch {}
         },
+        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
         runtimeGuard: {
           pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
           termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
           shouldTerminate: async () => {
             if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
-            if (mcpWatchdog.expired()) return { terminate: true, reason: `transport_wedge: MCP tool call timed out after ${Math.round(mcpWatchdogTimeoutMs / 1000)}s` };
+            const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
+            if (expiredMCPCallTimeoutMs !== null) return { terminate: true, reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s` };
             if (!contextRebuildCircuitBreaker.enabled) return false;
             if (Date.now() < nextContextCheckAt) return false;
             nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
@@ -1133,6 +1194,7 @@ if (typeof module !== "undefined" && module.exports) {
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
     createMCPCallWatchdog,
+    resolveMCPServerToolTimeouts,
     POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
