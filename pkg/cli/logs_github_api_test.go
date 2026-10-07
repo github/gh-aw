@@ -43,6 +43,40 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 	assert.Equal(t, 2, runs[0].Attempt, "Attempt should be populated")
 }
 
+func TestLogsCachedWorkflowRunMetadataIsCurrent(t *testing.T) {
+	t.Parallel()
+
+	updatedAt := time.Date(2026, time.September, 1, 10, 2, 0, 0, time.UTC)
+	cached := WorkflowRun{
+		DatabaseID: 42,
+		Repository: "octo/repo",
+		Attempt:    3,
+		Status:     "completed",
+		UpdatedAt:  updatedAt,
+	}
+	tests := []struct {
+		name    string
+		current WorkflowRun
+		owner   string
+		repo    string
+		want    bool
+	}{
+		{name: "matching repository", current: cached, owner: "octo", repo: "repo", want: true},
+		{name: "case insensitive repository", current: cached, owner: "Octo", repo: "Repo", want: true},
+		{name: "implicit repository", current: cached, want: true},
+		{name: "different repository", current: cached, owner: "other", repo: "repo"},
+		{name: "different run", current: WorkflowRun{DatabaseID: 43}, owner: "octo", repo: "repo"},
+		{name: "different attempt", current: WorkflowRun{DatabaseID: 42, Attempt: 4}, owner: "octo", repo: "repo"},
+		{name: "newer update", current: WorkflowRun{DatabaseID: 42, UpdatedAt: updatedAt.Add(time.Minute)}, owner: "octo", repo: "repo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, cachedWorkflowRunMetadataIsCurrent(cached, tt.current, tt.owner, tt.repo))
+		})
+	}
+}
+
 func TestFilterIgnoredWorkflowRuns(t *testing.T) {
 	runs := []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}
 

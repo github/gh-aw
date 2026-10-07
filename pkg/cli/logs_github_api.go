@@ -323,7 +323,7 @@ func cachedWorkflowRunMetadataIsCurrent(cached, current WorkflowRun, owner, repo
 	if cached.DatabaseID != current.DatabaseID {
 		return false
 	}
-	if owner != "" && repo != "" && !strings.EqualFold(cached.Repository, filepath.Join(owner, repo)) {
+	if owner != "" && repo != "" && !strings.EqualFold(cached.Repository, buildRepoFlag(owner, repo, "")) {
 		return false
 	}
 	if current.Attempt > 0 && cached.Attempt != current.Attempt {

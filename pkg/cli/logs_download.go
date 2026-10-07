@@ -478,12 +478,8 @@ func downloadWorkflowRunLogsForDiagnostics(ctx context.Context, opts downloadArt
 // repo/hostname overrides for cross-repo and multi-host support.
 func buildBulkDownloadArgs(opts downloadArtifactsOptions) []string {
 	ghArgs := []string{"run", "download", strconv.FormatInt(opts.runID, 10), "--dir", opts.outputDir}
-	if opts.owner != "" && opts.repo != "" {
-		if opts.hostname != "" && opts.hostname != "github.com" {
-			ghArgs = append(ghArgs, "-R", filepath.Join(opts.hostname, opts.owner, opts.repo))
-		} else {
-			ghArgs = append(ghArgs, "-R", filepath.Join(opts.owner, opts.repo))
-		}
+	if repoFlag := buildRepoFlag(opts.owner, opts.repo, opts.hostname); repoFlag != "" {
+		ghArgs = append(ghArgs, "-R", repoFlag)
 	}
 	return ghArgs
 }
