@@ -12,7 +12,7 @@ GitHub Agentic Workflows upload several artifacts during workflow execution. Thi
 | Artifact Name | Constant | Type | Description |
 |---------------|----------|------|-------------|
 | `agent` | `constants.AgentArtifactName`<br/>Source: `pkg/constants/job_constants.go` | Multi-file | Unified agent job outputs (logs, safe outputs, token usage summary) |
-| `agent-output-fallback` | `constants.AgentOutputFallbackArtifactName` | Multi-file | Small dedicated copy of the processed agent output (`agent_output.json`) and raw safe-output NDJSON (`safeoutputs.jsonl`), used when the larger `agent` upload fails or times out |
+| `agent-output-fallback` | `constants.AgentOutputFallbackArtifactName` | Multi-file | Small dedicated copy of processed agent output, raw safe-output NDJSON, execution evidence, token usage, and model-routing records, used when the larger `agent` upload fails or times out |
 | `activation` | `constants.ActivationArtifactName` | Multi-file | Activation job output (`aw_info.json`, `prompt.txt`, rate limits) |
 | `firewall-audit-logs` | `constants.FirewallAuditArtifactName`<br/>Source: `pkg/constants/constants.go` | Multi-file | AWF firewall audit/observability logs (token usage, network policy, audit trail) |
 | `detection` | `constants.DetectionArtifactName` | Conditional | Legacy inline engine (`features.gh-aw-detection: false`): single-file `detection.log`. The default external `gh-aw-detection` engine: multi-file `detection_result.json` + `step-summary.md`; `detection.log` is intentionally **not** uploaded (see below) |
@@ -69,7 +69,7 @@ gh aw logs <run-id>
 
 The `firewall-audit-logs` artifact is uploaded by **all firewall-enabled workflows**. It contains AWF (Agent Workflow Firewall) structured audit and observability logs.
 
-> **⚠️ Important:** This artifact is **separate** from the `agent` artifact. Token usage data (`token-usage.jsonl`) lives here, not in the `agent` artifact.
+> **⚠️ Important:** Current runs include API proxy logs in the unified `agent` artifact at `sandbox/firewall/logs/api-proxy-logs/`. The separate `firewall-audit-logs` artifact may also contain firewall audit logs, depending on workflow configuration and AWF version.
 
 ### Directory Structure
 
@@ -77,6 +77,7 @@ The `firewall-audit-logs` artifact is uploaded by **all firewall-enabled workflo
 firewall-audit-logs/
 ├── api-proxy-logs/
 │   ├── token-usage.jsonl        ← Token usage data (input/output/cache tokens per API request)
+│   ├── model-routing.jsonl      ← Model-routing decisions and per-request outcomes
 │   └── token-diag.log           ← Token diagnostics JSONL (only when AWF_DEBUG_TOKENS=1)
 ├── squid-logs/
 │   └── access.log               ← Network policy log (domain allow/deny decisions)
@@ -119,14 +120,14 @@ cat firewall-audit-logs/policy-manifest.json
 
 ### Common Mistake
 
-Downstream workflows sometimes download `agent-artifacts` or `agent` expecting to find `token-usage.jsonl`. This will silently return no data — the token usage file is only in the `firewall-audit-logs` artifact.
+Current workflows include `token-usage.jsonl` and `model-routing.jsonl` in the `agent` artifact under `sandbox/firewall/logs/api-proxy-logs/`. Older runs may instead use the separate `firewall-audit-logs` artifact.
 
 ```bash
-# ❌ WRONG — token-usage.jsonl is NOT in the agent artifact
+# ✅ Current runs — API proxy logs in the agent artifact
 gh run download <run-id> -n agent
-cat agent/token-usage.jsonl  # File not found!
+cat agent/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
 
-# ✅ CORRECT — download from firewall-audit-logs
+# Older layouts may use firewall-audit-logs
 gh run download <run-id> -n firewall-audit-logs
 cat firewall-audit-logs/api-proxy-logs/token-usage.jsonl
 ```
@@ -139,6 +140,7 @@ The JSONL files in this artifact are described by versioned JSON Schemas publish
 |------|--------------|------------|
 | `audit.jsonl` | `audit.schema.json` | `https://github.com/github/gh-aw-firewall/releases/download/<tag>/audit.schema.json` |
 | `api-proxy-logs/token-usage.jsonl` | `token-usage.schema.json` | `https://github.com/github/gh-aw-firewall/releases/download/<tag>/token-usage.schema.json` |
+| `api-proxy-logs/model-routing.jsonl` | See [AWF model-routing audit-log documentation](https://github.com/github/gh-aw-firewall/blob/main/docs/api-proxy-sidecar.md#model-routing-audit-log) | AWF documentation (no separate schema asset) |
 
 Use `releases/latest/download/` in place of a specific tag to track the most recent published release. Schemas are versioned by AWF release tag; consumers should match `_schema` by prefix (for example `_schema.startsWith("audit/")`) so additive changes remain non-breaking.
 
@@ -149,8 +151,14 @@ The unified `agent` artifact contains agent job outputs:
 - Agent execution logs
 - Safe output data (`agent_output.json`)
 - GitHub API rate limit logs (`github_rate_limits.jsonl`)
-- Token usage summary (`agent_usage.json`) — aggregated totals only; per-request data is in `firewall-audit-logs`. When AWF records include valid `ai_credits_this_response` and `ai_credits_total` values, the summary preserves those reported values instead of repricing the tokens.
+- Token usage summary (`agent_usage.json`) — aggregated totals only; per-request data is in `sandbox/firewall/logs/api-proxy-logs/`. When AWF records include valid `ai_credits_this_response` and `ai_credits_total` values, the summary preserves those reported values instead of repricing the tokens.
 - `otel.jsonl` — OTLP span mirror written by gh-aw's JavaScript span exporters when `observability.otlp` is configured
+
+The AWF API proxy log directory may also contain `token-usage.jsonl` and `model-routing.jsonl`. Both are available to `gh aw audit` and `gh aw logs` in supported artifact layouts.
+
+## `agent-output-fallback`
+
+When uploaded, the small `agent-output-fallback` artifact includes the processed agent output, safe-output records, execution evidence, agent usage, and the three supported `token-usage.jsonl` and `model-routing.jsonl` path variants beneath `sandbox/firewall/logs`, `sandbox/firewall/audit`, and `sandbox/firewall-audit-logs`. It also carries grader files when graders are configured.
 
 For OTLP configuration, runtime environment variables, and span semantics, see the [OpenTelemetry guide](/gh-aw/reference/open-telemetry/).
 
@@ -482,6 +490,7 @@ The `usage` artifact also carries experiment and evals data when the workflow de
 
 - `experiment/state.jsonl`, `experiment/state.json`, `experiment/assignments.json` — A/B experiment state and the current run's variant assignments
 - `evals.jsonl`, `evals/token_usage.jsonl`, `evals/execution.json` — BinEval results, evals token usage, and evals execution evidence
+- `agent/model-routing.jsonl` — AWF routing records, copied when present so `gh aw audit` and `gh aw logs` can report routing from the usage artifact alone
 - `detection/detection_result.json` — When threat detection is enabled, the detection job result, conclusion, categorized failure reason, and validated threat verdict flags (when available). Raw detector reasons and logs are not copied into this file. `gh aw audit --artifacts usage` reports failed or warned detection and detected threats as security findings.
 
 ### Accessing usage data

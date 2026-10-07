@@ -156,6 +156,7 @@ func renderLogsOutputCrossRun(processedRuns []ProcessedRun, logsData LogsData, o
 	report := buildCrossRunAuditReport(inputs)
 	report.GitHubAPIRateLimit = logsData.GitHubAPIRateLimit
 	report.GitHubAPIRateLimits = logsData.GitHubAPIRateLimits
+	report.ModelRouting = logsData.ModelRouting
 	if opts.jsonOutput {
 		return renderCrossRunReportJSON(report)
 	}

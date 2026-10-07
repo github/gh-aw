@@ -29,6 +29,7 @@
       { "if": { "properties": { "type": { "const": "experiment.state" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentStateData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.http_access" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallAccessData" } } } },
+      { "if": { "properties": { "type": { "const": "firewall.model_routing" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelRoutingData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
       { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
@@ -316,6 +317,20 @@
         "status": { "$ref": "#/definitions/JsonValue" },
         "reason": { "$ref": "#/definitions/JsonValue" },
         "error": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "ModelRoutingData": {
+      "type": "object",
+      "properties": {
+        "stage": { "$ref": "#/definitions/JsonValue" },
+        "routed": { "$ref": "#/definitions/JsonValue" },
+        "outcome": { "$ref": "#/definitions/JsonValue" },
+        "selected_model": { "$ref": "#/definitions/JsonValue" },
+        "selected_effort": { "$ref": "#/definitions/JsonValue" },
+        "router": { "$ref": "#/definitions/JsonValue" },
+        "request_id": { "$ref": "#/definitions/JsonValue" },
+        "deviations": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
     },

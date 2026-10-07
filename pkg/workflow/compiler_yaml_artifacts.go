@@ -93,8 +93,11 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
 		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/model-routing.jsonl"),
 		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
+		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/model-routing.jsonl"),
 	}
 
 	// Include grader manifest/results in the fallback so detection and downstream

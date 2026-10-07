@@ -109,6 +109,7 @@ function normalizeRuntimeEvent(component, record) {
   } else if (component === "firewall") {
     if (kind === "http_access" || record.decision !== undefined) type = "firewall.http_access";
     else if (kind === "token_usage") type = "firewall.token_usage";
+    else if (kind === "model_routing") type = "firewall.model_routing";
     else if (["token_steering", "timeout_steering"].includes(kind)) type = "firewall.steering";
   }
   return {

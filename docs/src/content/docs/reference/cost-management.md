@@ -24,6 +24,8 @@ A typical run includes a short pre-activation job (10–30 seconds) and an agent
 
 ## Monitoring Costs with `gh aw logs`
 
+For routed runs, the Model Routing summary separates classifier AIC from selected-model and deviated-traffic cost in each run. Cross-run `--format pretty|markdown` and `--json` output groups task labels and mode by selected model, effort, and router version, with run counts and total/average AIC. Use the selected route to compare the cost of different classification outcomes; classifier cost is routing overhead, while deviated traffic can include sub-agents or overrides.
+
 The `gh aw logs` command surfaces per-run metrics — elapsed duration, token usage, AIC (AI Credits), and turn count — before you decide what to optimize. Use `gh aw audit <run-id>` to deep-dive into a single run's token usage, tool calls, and inference spend; its **Metrics** and **Performance Metrics** sections cover token counts, AIC, turn counts, and estimated cost in one place. For cost trends across multiple runs, use `gh aw logs --format markdown [workflow]` to generate a cross-run report with anomaly detection.
 
 ### View recent run durations
@@ -200,6 +202,8 @@ max-ai-credits: 500
 gh-aw does not compile a synthetic price for the selector itself. Requests are accounted against the concrete model reported by the response, so each model is charged at its own catalog rate. When a response omits model metadata, the proxy falls back to its conservative rate rather than undercounting.
 
 The same rule applies to `apiProxy.maxModelMultiplierCap`: the cap is evaluated against the multiplier of the *resolved* concrete model, not against the dynamic selector. A selector such as `auto` therefore never bypasses the cap — a request routed to a model whose multiplier exceeds the cap is rejected with HTTP 400 (`model_multiplier_cap_exceeded`). Models without an explicit multiplier use `defaultModelMultiplier` when configured, otherwise the highest configured multiplier.
+
+For task-level model routing, see the [Model Routing guide](/gh-aw/reference/model-routing/) for configuration and for interpreting classifier overhead, selected-route costs, and deviations in `gh aw audit` and `gh aw logs`.
 
 ### Cap Turns per Run
 
