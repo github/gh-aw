@@ -5,6 +5,14 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
 
+/** @param {unknown} value @returns {string} */
+function validateModelIdentifier(value) {
+  if (typeof value !== "string") return "";
+  // Reject rather than repair telemetry that could forge footer marker fields.
+  if (!value || value.length > 128 || /[^A-Za-z0-9._/:@-]/.test(value)) return "";
+  return value;
+}
+
 function readFallbackMetadata(filePath) {
   try {
     return JSON.parse(require("fs").readFileSync(filePath, "utf8"));
@@ -15,7 +23,7 @@ function readFallbackMetadata(filePath) {
 
 function recordFallbackModel(model, env = process.env, infoPath = `${env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`) {
   const fs = require("fs");
-  if (typeof model !== "string" || !model || /[\r\n]/.test(model)) throw new Error("Invalid resolved fallback model");
+  if (!validateModelIdentifier(model)) throw new Error("Invalid resolved fallback model");
   env.GH_AW_INFO_MODEL = model;
   const info = fs.existsSync(infoPath) ? readFallbackMetadata(infoPath) : {};
   const phase = env.GH_AW_PHASE || "agent";
@@ -38,7 +46,7 @@ function getFallbackModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw
   if (!fs.existsSync(infoPath)) return "";
   const info = readFallbackMetadata(infoPath);
   const model = phase === "agent" ? info.fallback_model : info[`${phase}_fallback_model`];
-  return typeof model === "string" ? model : "";
+  return validateModelIdentifier(model);
 }
 
 function recordFallbackModelFromUsage(content, env = process.env, infoPath, logger = console.warn) {
@@ -54,7 +62,8 @@ function recordFallbackModelFromUsage(content, env = process.env, infoPath, logg
     }
     if (typeof entry?._schema !== "string" || !entry._schema.startsWith("token-usage/") || !entry.model_fallback || Number(entry.status) >= 400) continue;
     const selected = entry.model || entry.model_fallback.model;
-    if (typeof selected === "string" && selected && !/[\r\n]/.test(selected)) model = selected;
+    const validated = validateModelIdentifier(selected);
+    if (validated) model = validated;
   }
   if (model) recordFallbackModel(model, env, infoPath);
   return model;
@@ -169,6 +178,7 @@ function normalizeCodexModelArgs(args, provider, options = {}) {
 }
 
 module.exports = {
+  validateModelIdentifier,
   recordFallbackModel,
   getFallbackModel,
   recordFallbackModelFromUsage,

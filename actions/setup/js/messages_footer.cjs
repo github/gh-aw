@@ -16,7 +16,7 @@ const { formatCompactInteger } = require("./compact_numbers.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
 const { getDetectionWarningMessage } = require("./messages_run_status.cjs");
-const { getFallbackModel } = require("./model_fallback.cjs");
+const { getFallbackModel, validateModelIdentifier } = require("./model_fallback.cjs");
 
 /**
  * Get the detection caution alert if the detection job found a potential issue.
@@ -614,7 +614,7 @@ function generateXMLMarker(workflowName, runUrl) {
   // Read engine metadata from environment variables
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineVersion = process.env.GH_AW_ENGINE_VERSION || "";
-  const engineModel = getFallbackModel() || process.env.GH_AW_ENGINE_MODEL || "";
+  const engineModel = getFallbackModel() || validateModelIdentifier(process.env.GH_AW_ENGINE_MODEL);
   const trackerId = process.env.GH_AW_TRACKER_ID || "";
   const runId = process.env.GITHUB_RUN_ID || "";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
