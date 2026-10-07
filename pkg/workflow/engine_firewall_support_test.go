@@ -196,14 +196,12 @@ func TestCheckNetworkSupport_StrictMode(t *testing.T) {
 	})
 }
 
-func TestCheckToolsNetworkSupport(t *testing.T) {
-	restrictedNetwork := &NetworkPermissions{Allowed: []string{"example.com"}}
+func TestValidateCopilotWebToolsSupport(t *testing.T) {
 	type testCase struct {
 		name         string
 		engine       CodingAgentEngine
 		engineConfig *EngineConfig
 		tools        map[string]any
-		network      *NetworkPermissions
 		strictMode   bool
 		wantErr      bool
 		wantWarnings int
@@ -211,79 +209,92 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 	}
 	tests := []testCase{
 		{
-			name:         "non-strict web-fetch emits warning",
-			engine:       NewCopilotEngine(),
-			tools:        map[string]any{"web-fetch": nil},
-			network:      restrictedNetwork,
-			wantWarnings: 1,
+			name:        "non-strict web-fetch is rejected",
+			engine:      NewCopilotEngine(),
+			tools:       map[string]any{"web-fetch": nil},
+			wantErr:     true,
+			errContains: []string{"tools.web-fetch", "offline BYOK mode", "copilot-sdk: true"},
 		},
 		{
-			name:         "non-strict web-search emits warning",
-			engine:       NewCopilotEngine(),
-			tools:        map[string]any{"web-search": map[string]any{}},
-			network:      restrictedNetwork,
-			wantWarnings: 1,
+			name:        "non-strict web-search is rejected",
+			engine:      NewCopilotEngine(),
+			tools:       map[string]any{"web-search": map[string]any{}},
+			wantErr:     true,
+			errContains: []string{"tools.web-search", "offline BYOK mode", "MCP server"},
 		},
 		{
-			name:         "non-strict enabled tools emit separate warnings",
-			engine:       NewCopilotEngine(),
-			tools:        map[string]any{"web-fetch": true, "web-search": true},
-			network:      restrictedNetwork,
-			wantWarnings: 2,
+			name:        "non-strict enabled tools produce errors",
+			engine:      NewCopilotEngine(),
+			tools:       map[string]any{"web-fetch": true, "web-search": true},
+			wantErr:     true,
+			errContains: []string{"tools.web-fetch", "tools.web-search"},
 		},
 		{
-			name:        "defaults with blocked domains rejects enabled tools",
+			name:        "strict enabled fetch produces error",
 			engine:      NewCopilotEngine(),
 			tools:       map[string]any{"web-fetch": true},
-			network:     &NetworkPermissions{Allowed: []string{"defaults"}, Blocked: []string{"tracker.example.com"}},
 			strictMode:  true,
 			wantErr:     true,
-			errContains: []string{"tools.web-fetch", "does not follow the configured network restrictions"},
+			errContains: []string{"tools.web-fetch", "offline BYOK mode"},
 		},
 		{
 			name:       "strict enabled tools produce errors",
 			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"web-fetch": nil, "web-search": true},
-			network:    restrictedNetwork,
 			strictMode: true,
 			wantErr:    true,
 			errContains: []string{
 				"tools.web-fetch",
 				"tools.web-search",
-				"does not follow the configured network restrictions",
-				"To enforce network restrictions, use Codex or Claude",
-				"configure network.hosted-web separately",
+				"offline BYOK mode",
+				"COPILOT_OFFLINE=true",
+				"use a supported engine",
 				"engine: codex",
 			},
 		},
 		{
-			name:         "unavailable web-search is allowed",
+			name:         "old pinned version does not bypass rejection",
 			engine:       NewCopilotEngine(),
 			engineConfig: &EngineConfig{Version: "1.0.86"},
 			tools:        map[string]any{"web-search": true},
-			network:      restrictedNetwork,
 			strictMode:   true,
+			wantErr:      true,
+			errContains:  []string{"tools.web-search", "offline BYOK mode"},
 		},
 		{
 			name:       "disabled tools are allowed",
 			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"web-fetch": false, "web-search": false},
-			network:    restrictedNetwork,
 			strictMode: true,
 		},
 		{
 			name:       "unrelated tools are allowed",
 			engine:     NewCopilotEngine(),
 			tools:      map[string]any{"github": nil, "bash": []any{"git"}},
-			network:    restrictedNetwork,
 			strictMode: true,
 		},
 		{
-			name:       "tools are allowed without network restrictions",
-			engine:     NewCopilotEngine(),
-			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    &NetworkPermissions{Allowed: []string{"defaults"}},
-			strictMode: true,
+			name:        "tools are rejected without network restrictions",
+			engine:      NewCopilotEngine(),
+			tools:       map[string]any{"web-fetch": nil, "web-search": nil},
+			strictMode:  true,
+			wantErr:     true,
+			errContains: []string{"tools.web-fetch", "tools.web-search"},
+		},
+		{
+			name:         "SDK custom fetch is allowed",
+			engine:       NewCopilotEngine(),
+			engineConfig: &EngineConfig{CopilotSDK: true},
+			tools:        map[string]any{"web-fetch": nil},
+			strictMode:   true,
+		},
+		{
+			name:         "SDK native search remains unavailable",
+			engine:       NewCopilotEngine(),
+			engineConfig: &EngineConfig{CopilotSDK: true},
+			tools:        map[string]any{"web-fetch": nil, "web-search": nil},
+			wantErr:      true,
+			errContains:  []string{"tools.web-search", "offline BYOK mode"},
 		},
 	}
 
@@ -292,7 +303,6 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			name:       "web tools with " + engine.GetID() + " are allowed",
 			engine:     engine,
 			tools:      map[string]any{"web-fetch": nil, "web-search": nil},
-			network:    restrictedNetwork,
 			strictMode: true,
 		})
 	}
@@ -302,7 +312,7 @@ func TestCheckToolsNetworkSupport(t *testing.T) {
 			compiler := NewCompiler(WithFailFast(false))
 			compiler.strictMode = tt.strictMode
 
-			err := compiler.checkToolsNetworkSupport(tt.engine, tt.engineConfig, tt.tools, tt.network)
+			err := compiler.validateCopilotWebToolsSupport(tt.engine, tt.engineConfig, tt.tools)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -334,11 +344,12 @@ Test firewall-bound tool validation.
 `, engine, strict)
 	}
 
-	t.Run("non-strict mode warns and compiles", func(t *testing.T) {
-		compiler := NewCompiler()
+	t.Run("non-strict mode rejects unavailable tools", func(t *testing.T) {
+		compiler := NewCompiler(WithFailFast(false))
 		_, err := compiler.ParseWorkflowString(workflow("copilot", false), "non-strict-tools.md")
-		require.NoError(t, err)
-		assert.Equal(t, 2, compiler.GetWarningCount())
+		require.ErrorContains(t, err, "tools.web-fetch")
+		require.ErrorContains(t, err, "tools.web-search")
+		assert.Equal(t, 0, compiler.GetWarningCount())
 	})
 
 	t.Run("strict mode rejects Copilot web tools", func(t *testing.T) {
@@ -347,11 +358,11 @@ Test firewall-bound tool validation.
 		require.Error(t, err)
 		require.ErrorContains(t, err, "tools.web-fetch")
 		require.ErrorContains(t, err, "tools.web-search")
-		require.ErrorContains(t, err, "To enforce network restrictions, use Codex or Claude")
+		require.ErrorContains(t, err, "offline BYOK mode")
 		require.NotContains(t, err.Error(), "engine: claude")
 	})
 
-	t.Run("strict mode allows unavailable Copilot web-search", func(t *testing.T) {
+	t.Run("strict mode rejects unavailable Copilot web-search for old versions", func(t *testing.T) {
 		compiler := NewCompiler()
 		_, err := compiler.ParseWorkflowString(`---
 on: workflow_dispatch
@@ -367,7 +378,8 @@ tools:
 ---
 Test unavailable web-search firewall validation.
 `, "strict-copilot-old-web-search.md")
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "tools.web-search")
+		require.ErrorContains(t, err, "offline BYOK mode")
 	})
 
 	t.Run("strict mode allows web tools for Claude", func(t *testing.T) {

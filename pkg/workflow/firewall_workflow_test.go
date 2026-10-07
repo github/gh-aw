@@ -193,8 +193,6 @@ sandbox:
 network:
   allowed:
     - defaults
-tools:
-  web-fetch:
 ---
 
 # Test
@@ -236,8 +234,6 @@ sandbox:
 network:
   allowed:
     - defaults
-tools:
-  web-fetch:
 ---
 
 # Test

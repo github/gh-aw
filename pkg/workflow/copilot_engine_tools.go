@@ -76,7 +76,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 			for _, cmd := range bashCommands {
 				if cmdStr, ok := cmd.(string); ok {
 					if cmdStr == ":*" || cmdStr == "*" {
-						if copilotNeedsBuiltinMCPs(workflowData) || isCopilotSDKMode(workflowData) ||
+						if isCopilotSDKMode(workflowData) ||
 							(workflowData != nil && hasNetworkRestrictions(workflowData.NetworkPermissions)) {
 							hasUnrestrictedBash = true
 							break
@@ -169,28 +169,17 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 		args = append(args, "--allow-tool", constants.MCPScriptsMCPServerID.String())
 	}
 
-	// Handle web-fetch builtin tool (Copilot CLI uses web_fetch with underscore)
-	if isCopilotToolValueEnabled(tools, "web-fetch") {
+	// SDK mode supplies a custom proxy-aware fetch tool; native web tools are unavailable.
+	if isCopilotSDKMode(workflowData) && isCopilotToolValueEnabled(tools, "web-fetch") {
 		copilotEngineToolsLog.Print("Web-fetch tool enabled, adding web_fetch permission")
 		// web-fetch -> web_fetch
 		args = append(args, "--allow-tool", "web_fetch")
 	}
 
-	// Handle web-search builtin tool (Copilot CLI uses web_search with underscore)
-	var engineConfig *EngineConfig
-	if workflowData != nil {
-		engineConfig = workflowData.EngineConfig
-	}
-	if isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(engineConfig) {
-		copilotEngineToolsLog.Print("Web-search tool enabled, adding web_search permission")
-		// web-search -> web_search
-		args = append(args, "--allow-tool", "web_search")
-	}
-
 	// Built-in tool names that should be skipped when processing MCP servers
 	// Note: GitHub is NOT included here because it needs MCP configuration in CLI mode
 	// Note: web-fetch is NOT included here because it needs explicit --allow-tool argument
-	// Note: web-search is handled above with an explicit --allow-tool argument
+	// Note: native web-search is unavailable in offline BYOK mode
 	builtInTools := map[string]struct {
 	}{
 		"bash":         {},

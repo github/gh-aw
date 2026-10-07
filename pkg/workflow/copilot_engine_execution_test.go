@@ -116,7 +116,7 @@ func TestCopilotEngineExecutionSteps(t *testing.T) {
 	}
 }
 
-func TestCopilotEngineExecutionStepsWithWebFetchKeepsBuiltinToolSchema(t *testing.T) {
+func TestCopilotEngineExecutionStepsWithNativeWebFetchOmitsPermission(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
 		Name: "test-workflow",
@@ -130,15 +130,15 @@ func TestCopilotEngineExecutionStepsWithWebFetchKeepsBuiltinToolSchema(t *testin
 	}
 
 	stepContent := strings.Join([]string(steps[0]), "\n")
-	if strings.Contains(stepContent, "--disable-builtin-mcps") {
-		t.Fatalf("Expected web-fetch workflows to keep Copilot built-in tool schema enabled, got:\n%s", stepContent)
+	if !strings.Contains(stepContent, "--disable-builtin-mcps") {
+		t.Fatalf("Expected Copilot built-in MCP servers to remain disabled, got:\n%s", stepContent)
 	}
-	if !strings.Contains(stepContent, "--allow-tool web_fetch") {
-		t.Fatalf("Expected web-fetch workflows to allow web_fetch, got:\n%s", stepContent)
+	if strings.Contains(stepContent, "--allow-tool web_fetch") {
+		t.Fatalf("Expected native web-fetch permission to be omitted, got:\n%s", stepContent)
 	}
 }
 
-func TestCopilotEngineExecutionStepsWithWebSearchKeepsBuiltinToolSchema(t *testing.T) {
+func TestCopilotEngineExecutionStepsWithNativeWebSearchOmitsPermission(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
 		Name: "test-workflow",
@@ -152,18 +152,19 @@ func TestCopilotEngineExecutionStepsWithWebSearchKeepsBuiltinToolSchema(t *testi
 	}
 
 	stepContent := strings.Join([]string(steps[0]), "\n")
-	if strings.Contains(stepContent, "--disable-builtin-mcps") {
-		t.Fatalf("Expected web-search workflows to keep Copilot built-in tool schema enabled, got:\n%s", stepContent)
+	if !strings.Contains(stepContent, "--disable-builtin-mcps") {
+		t.Fatalf("Expected Copilot built-in MCP servers to remain disabled, got:\n%s", stepContent)
 	}
-	if !strings.Contains(stepContent, "--allow-tool web_search") {
-		t.Fatalf("Expected web-search workflows to allow web_search, got:\n%s", stepContent)
+	if strings.Contains(stepContent, "--allow-tool web_search") {
+		t.Fatalf("Expected native web-search permission to be omitted, got:\n%s", stepContent)
 	}
 }
 
-func TestCopilotEngineExecutionStepsWithWebFetchAndWildcardBashScopesTools(t *testing.T) {
+func TestCopilotEngineExecutionStepsWithSDKWebFetchAndWildcardBashScopesTools(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
-		Name: "test-workflow",
+		Name:         "test-workflow",
+		EngineConfig: &EngineConfig{CopilotSDK: true},
 		Tools: map[string]any{
 			"bash":      []any{"*"},
 			"web-fetch": nil,

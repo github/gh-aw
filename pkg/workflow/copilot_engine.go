@@ -44,12 +44,12 @@ func NewCopilotEngine() *CopilotEngine {
 			capabilities: EngineCapabilities{
 				ToolsAllowlist:       true,
 				MCP:                  true,
-				MaxTurns:             true, // AWF max-turns is supported for Copilot runs
-				MaxContinuations:     true, // Copilot CLI supports --autopilot with --max-autopilot-continues
-				WebSearch:            true, // Copilot CLI exposes the built-in web_search tool
-				BareMode:             true, // Copilot CLI supports --no-custom-instructions
-				BashCommandAllowlist: true, // Copilot enforces tools.bash allowlist via --allow-tool shell(cmd)
-				Plugins:              true, // Copilot CLI supports Agent Plugins
+				MaxTurns:             true,  // AWF max-turns is supported for Copilot runs
+				MaxContinuations:     true,  // Copilot CLI supports --autopilot with --max-autopilot-continues
+				WebSearch:            false, // Offline BYOK mode disables native web tools
+				BareMode:             true,  // Copilot CLI supports --no-custom-instructions
+				BashCommandAllowlist: true,  // Copilot enforces tools.bash allowlist via --allow-tool shell(cmd)
+				Plugins:              true,  // Copilot CLI supports Agent Plugins
 				DynamicWorkflows:     true,
 			},
 			dedicatedLLMGatewayPort: constants.CopilotLLMGatewayPort,

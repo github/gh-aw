@@ -26,8 +26,6 @@ sandbox:
 network:
   allowed:
     - defaults
-tools:
-  web-fetch:
 ---
 
 # Test
