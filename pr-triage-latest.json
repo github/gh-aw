@@ -1,25 +1,15 @@
 {
-  "run_date": "2026-10-06T18:34:19Z",
-  "run_id": 37511578201,
-  "source": "github-mcp-triage",
+  "run_date": "2026-10-07T01:04:12Z",
+  "run_id": 37555065569,
+  "source": "manual-pr-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 4,
-  "category_counts": {
-    "bug": 1
-  },
-  "risk_counts": {
-    "high": 1
-  },
-  "priority_counts": {
-    "medium": 1
-  },
-  "action_counts": {
-    "batch_review": 1
-  },
+  "cooldown_skipped": 8,
+  "category_counts": {"bug": 1},
+  "risk_counts": {"high": 1},
+  "priority_counts": {"medium": 1},
+  "action_counts": {"batch_review": 1},
   "batches": [],
-  "selected_candidates": [
-    56568
-  ],
+  "selected_candidates": [56568],
   "prs": [
     {
       "number": 56568,
@@ -28,16 +18,12 @@
       "risk": "high",
       "priority": "medium",
       "score": 68,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 22,
-        "quality": 11
-      },
+      "score_breakdown": {"impact": 35, "urgency": 22, "quality": 11},
       "action": "batch_review",
       "batch": null,
-      "notes": "High-risk signed-commit fallback fix with explicit review changes requested and no CI signal; keep it in a focused review batch.",
       "ci_status": "unknown",
-      "review_status": "changes_requested"
+      "review_status": "pending",
+      "notes": "Eligible Copilot PR older than the 1-hour cooldown; behavior fix with no current CI signal and should be reviewed in a focused batch."
     }
   ]
 }
