@@ -53,7 +53,13 @@ clean_git_config() {
   done || true
 
   # Checkout stores persisted credentials in a separate config reached via includeIf.
+  local include_iterations=0 max_include_iterations=1000
   while IFS= read -r -d '' entry; do
+    if (( include_iterations >= max_include_iterations )); then
+      echo "ERROR: Checkout credential include cleanup exceeded ${max_include_iterations} iterations" >&2
+      exit 1
+    fi
+    include_iterations=$((include_iterations + 1))
     local key="${entry%%$'\n'*}" include_path="${entry#*$'\n'}"
     if [[ "$include_path" =~ (^|/)git-credentials-[0-9a-f-]+\.config$ ]] &&
       git config --file "${GIT_CONFIG_PATH}" --fixed-value --get-all "$key" "$include_path" >/dev/null; then

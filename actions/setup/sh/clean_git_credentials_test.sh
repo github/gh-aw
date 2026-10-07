@@ -202,6 +202,32 @@ assert "credential file outside runner temp retained" "[ -f '${TEST_WORKSPACE}/g
 assert "unrelated include preserved" "git --git-dir='${REPO}/.git' config --file '${REPO}/.git/config' --includes core.ignorecase | grep -q true"
 echo ""
 
+# ── Test 10: Include cleanup iteration boundary ────────────────────────────
+echo "Test 10: Include cleanup succeeds at the iteration limit"
+REPO="${TEST_WORKSPACE}/repo10"
+make_git_config "${REPO}" '[includeIf "gitdir:/workspace/.git"]'
+for ((i = 0; i < 1000; i++)); do
+  printf '\tpath = /nonexistent/git-credentials-abc123.config\n' >>"${REPO}/.git/config"
+done
+assert "cleanup succeeds at 1000 includes" "GITHUB_WORKSPACE='${REPO}' bash '${CLEAN_SCRIPT}' >/dev/null 2>&1"
+assert "all credential includes removed at limit" "! git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' 2>/dev/null"
+echo ""
+
+# ── Test 11: Include cleanup iteration limit exceeded ──────────────────────
+echo "Test 11: Include cleanup fails when the iteration limit is exceeded"
+make_git_config "${REPO}" '[includeIf "gitdir:/workspace/.git"]'
+for ((i = 0; i < 1001; i++)); do
+  printf '\tpath = /nonexistent/other.config\n' >>"${REPO}/.git/config"
+done
+printf '\tpath = /nonexistent/git-credentials-abc123.config\n' >>"${REPO}/.git/config"
+EXIT_CODE=0
+OUTPUT=$(GITHUB_WORKSPACE="${REPO}" bash "${CLEAN_SCRIPT}" 2>&1) || EXIT_CODE=$?
+assert "cleanup exits 1 when limit exceeded" "[ ${EXIT_CODE} -eq 1 ]"
+assert "reports iteration limit without include values" "echo '${OUTPUT}' | grep -q 'ERROR: Checkout credential include cleanup exceeded 1000 iterations'"
+assert "credential include beyond limit is not processed" "git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' | grep -q 'git-credentials-abc123.config'"
+rm -rf "${REPO}"
+echo ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "Tests passed: ${TESTS_PASSED}"
 echo "Tests failed: ${TESTS_FAILED}"
