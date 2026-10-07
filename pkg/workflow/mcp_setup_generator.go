@@ -110,7 +110,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 	// Collect all Docker images that will be used and generate download step
 	dockerImages := collectDockerImages(tools, workflowData, c.actionMode)
-	generateDownloadDockerImagesStep(yaml, dockerImages, workflowData.RawFrontmatter["docker-image-pull-policy"] == "never")
+	generateDownloadDockerImagesStep(yaml, dockerImages, dockerImagePullPolicy(workflowData))
 
 	// If no MCP tools, skip setup unless the engine still needs MCP gateway/config bootstrap.
 	// Codex with AWF firewall enabled requires MCP config generation to set its OpenAI proxy

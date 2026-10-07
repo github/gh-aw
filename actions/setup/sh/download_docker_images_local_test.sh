@@ -71,6 +71,7 @@ run_fail
 run_fail alpine:latest
 run_fail "registry.example.com/team/app:v1"
 run_fail "registry.example.com/team/app:v1@sha256:${a^^}"
+run_fail "registry.example.com/team/app@sha256:$a"
 run_fail $'registry.example.com/team/app:v1\nbad@sha256:'"$a"
 run_fail "$first" "registry.example.com:5000/team/app:v1@sha256:$b"
 printf 'registry.example.com:5000/team/app@sha256:%s\n' "$b" > "$MOCK_DIGESTS"

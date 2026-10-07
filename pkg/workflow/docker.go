@@ -286,15 +286,29 @@ func mergeDockerImagePins(existing, newPins []GHAWManifestContainer) []GHAWManif
 	return result
 }
 
+// dockerImagePullPolicy returns the configured Docker image pull policy.
+func dockerImagePullPolicy(data *WorkflowData) string {
+	if data == nil || data.RawFrontmatter == nil {
+		return ""
+	}
+	policy, ok := data.RawFrontmatter["docker-image-pull-policy"].(string)
+	if !ok {
+		return ""
+	}
+	return policy
+}
+
 // generateDownloadDockerImagesStep generates the step to download Docker images
-func generateDownloadDockerImagesStep(yaml *strings.Builder, dockerImages []string, localOnly bool) {
+func generateDownloadDockerImagesStep(yaml *strings.Builder, dockerImages []string, pullPolicy string) {
 	if len(dockerImages) == 0 {
 		return
 	}
 
 	yaml.WriteString("      - name: Download container images\n")
-	if localOnly {
-		yaml.WriteString("        env:\n          GH_AW_DOCKER_IMAGE_PULL_POLICY: never\n")
+	if pullPolicy == "always" || pullPolicy == "never" {
+		yaml.WriteString("        env:\n          GH_AW_DOCKER_IMAGE_PULL_POLICY: ")
+		yaml.WriteString(pullPolicy)
+		yaml.WriteString("\n")
 	}
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh\"")
 	for _, image := range dockerImages {

@@ -42,7 +42,11 @@ case "${GH_AW_DOCKER_IMAGE_PULL_POLICY-always}" in
         exit 1
       fi
       repository="${BASH_REMATCH[1]}"
-      tag="${BASH_REMATCH[7]:-latest}"
+      tag="${BASH_REMATCH[7]}"
+      if [[ -z "$tag" ]]; then
+        echo "Local-only mode requires an explicit tag before the digest: $image" >&2
+        exit 1
+      fi
       digest="${BASH_REMATCH[8]}"
       registry="${repository%%/*}"
       if [[ "$registry" != *.* && "$registry" != *:* && "$registry" != localhost ]]; then
