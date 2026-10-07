@@ -312,7 +312,24 @@ function writeProcessedFile(filePath, content, changed) {
 
   // Replacing a file needs a writable parent, not ownership of the old inode.
   // Keep the temporary copy private and on the same filesystem for atomic rename.
-  const temporaryDir = fs.mkdtempSync(path.join(path.dirname(filePath), ".gh-aw-redact-"));
+  let temporaryDir;
+  try {
+    temporaryDir = fs.mkdtempSync(path.join(path.dirname(filePath), ".gh-aw-redact-"));
+  } catch (error) {
+    if (!isErrnoCode(error, "EACCES", "EPERM")) {
+      throw error;
+    }
+    // Go module caches make both files and parents read-only. The file owner
+    // can still prepare the inode without changing directory permissions.
+    fs.chmodSync(filePath, 0o600);
+    if (changed) {
+      fs.writeFileSync(filePath, content, "utf8");
+    } else {
+      fs.accessSync(filePath, fs.constants.W_OK);
+    }
+    core.debug(`Made file writable for secret redaction: ${filePath}`);
+    return;
+  }
   try {
     const replacement = path.join(temporaryDir, "redacted");
     fs.writeFileSync(replacement, content, { encoding: "utf8", mode: 0o600, flag: "wx" });
@@ -368,7 +385,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
       fs.unlinkSync(filePath);
     } catch (cleanupError) {
       if (!isErrnoCode(cleanupError, "ENOENT")) {
-        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed`);
+        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed: ${filePath}`);
       }
     }
     const reason = maskedValues.length || path.extname(filePath).toLowerCase() === ".html" ? "secret redaction failed" : getErrorMessage(error);

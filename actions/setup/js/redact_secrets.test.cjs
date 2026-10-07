@@ -67,6 +67,28 @@ describe("redact_secrets.cjs", () => {
       }
     }),
     describe("file handling", () => {
+      it.each([false, true])("processes runner-owned read-only files in read-only Go module directories (secrets: %s)", hasSecrets => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const moduleDir = path.join(tempDir, "go-mod");
+        fs.mkdirSync(moduleDir);
+        const file = path.join(moduleDir, "README.md");
+        fs.writeFileSync(file, "secret-value", { mode: 0o444 });
+        fs.chmodSync(moduleDir, 0o555);
+        const inode = fs.statSync(file).ino;
+        try {
+          expect(processFile(file, hasSecrets ? ["secret-value"] : [])).toBe(hasSecrets ? 1 : 0);
+          expect(fs.readFileSync(file, "utf8")).toBe(hasSecrets ? "***REDACTED***" : "secret-value");
+          expect(fs.statSync(file).ino).toBe(inode);
+          expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+          expect(fs.statSync(moduleDir).mode & 0o777).toBe(0o555);
+          fs.writeFileSync(file, "[custom redaction]");
+          expect(fs.readFileSync(file, "utf8")).toBe("[custom redaction]");
+          expect(fs.readdirSync(moduleDir)).toEqual(["README.md"]);
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+        } finally {
+          fs.chmodSync(moduleDir, 0o700);
+        }
+      });
       it.each(["EACCES", "EPERM"])("prepares unchanged non-writable logs for custom masking (%s)", code => {
         const { processFile } = require("./redact_secrets.cjs");
         const file = path.join(tempDir, "server.log");
@@ -89,6 +111,27 @@ describe("redact_secrets.cjs", () => {
           expect(mockCore.setFailed).not.toHaveBeenCalled();
         } finally {
           spy.mockRestore();
+        }
+      });
+      it.each(["EACCES", "EPERM"])("fails closed when read-only file permissions cannot be changed (%s)", code => {
+        const { processFile } = require("./redact_secrets.cjs");
+        const moduleDir = path.join(tempDir, "go-mod");
+        fs.mkdirSync(moduleDir);
+        const file = path.join(moduleDir, "README.md");
+        fs.writeFileSync(file, "secret-value", { mode: 0o444 });
+        fs.chmodSync(moduleDir, 0o555);
+        const chmod = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+          throw Object.assign(new Error("permission denied: secret-value"), { code });
+        });
+        try {
+          expect(() => processFile(file, ["secret-value"], ["runtime-mask"])).toThrow(`Failed to remove artifact source after secret redaction failed: ${file}`);
+          expect(fs.readFileSync(file, "utf8")).toBe("secret-value");
+          expect(fs.statSync(file).mode & 0o777).toBe(0o444);
+          expect(mockCore.info.mock.calls.flat().join("\n")).not.toContain("secret-value");
+          expect(mockCore.warning.mock.calls.flat().join("\n")).not.toContain("secret-value");
+        } finally {
+          chmod.mockRestore();
+          fs.chmodSync(moduleDir, 0o700);
         }
       });
       it("atomically replaces container-owned logs when writing redacted content is denied", () => {
