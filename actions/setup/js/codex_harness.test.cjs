@@ -290,6 +290,16 @@ process.exit(0);`,
       expect(calls[0].args.filter(arg => arg === "--model" || arg === "-m" || arg.startsWith("--model="))).toHaveLength(1);
     });
 
+    it.each(["auto", "copilot/auto"])("starts Codex with the %s gateway picker in environment and CLI model inputs", model => {
+      for (const args of [[], ["--model", model], [`--model=${model}`]]) {
+        const { result, calls } = runHarnessFixture("process.exit(0);", { args, env: { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_AGENT_CODEX: model } });
+        expect(result.status, result.stderr).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].args.join(" ")).toMatch(/--model(?:=| )auto/);
+        expect(calls[0].args.join(" ")).not.toContain("copilot/");
+      }
+    });
+
     it("fails startup rather than switching credentials for a conflicting runtime prefix", () => {
       const { result, calls } = runHarnessFixture("process.exit(0);", { env: { GH_AW_LLM_PROVIDER: "openai", GH_AW_MODEL_AGENT_CODEX: "copilot/gpt-5" } });
       expect(result.status).toBe(1);

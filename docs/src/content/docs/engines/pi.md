@@ -5,7 +5,7 @@ description: Select and authenticate Pi as the AI engine for GitHub Agentic Work
 
 [Pi](https://pi.dev/) is a provider-agnostic coding agent for repository analysis and code changes. GitHub Agentic Workflows runs Pi through GitHub Actions from a Markdown workflow and adds GitHub triggers, sandbox controls, and safe outputs for event-driven, reviewable automation.
 
-Pi v1.0.0 supports native MCP through the gh-aw policy gateway. GitHub CLI proxy mode and `tools.cli-proxy: true` remain optional transport choices. The default model is `copilot/gpt-5.4` when no model is configured.
+Pi v1.0.0 supports native MCP through the gh-aw policy gateway. GitHub CLI proxy mode and `tools.cli-proxy: true` remain optional transport choices. The default model is `copilot/auto` when no model is configured for the Copilot backend with the default gateway enabled. Native execution without the gateway retains `copilot/gpt-5.4`.
 
 ## Selecting Pi + GitHub as the AI engine
 
@@ -14,8 +14,10 @@ To select Pi as the AI engine, with inference hosted and billed through a GitHub
 ```yaml
 engine:
   id: pi
-  model: copilot/gpt-5.4
+  model: copilot/auto
 ```
+
+Both `auto` and `copilot/auto` delegate model selection to the Copilot gateway. The `auto` routing sentinel does not need to appear in the gateway's concrete-model inventory. Set a concrete model such as `copilot/gpt-5.4` to pin model selection.
 
 To authenticate:
 

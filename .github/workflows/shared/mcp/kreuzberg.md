@@ -2,7 +2,7 @@
 mcp-servers:
   kreuzberg:
     container: "ghcr.io/xberg-io/xberg"
-    version: "latest"
+    version: "1.3.6@sha256:f8dd1d18b97a883b235b70ca3765b9e526cf5436764a89b6401a5d32ab96ada9"
     entrypointArgs:
       - "mcp"
     mounts:

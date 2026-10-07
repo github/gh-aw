@@ -325,6 +325,12 @@ Use `min-integrity: unapproved` as a middle ground for community triage workflow
 
 ## Workflow Failures and Debugging
 
+### Codex Setup Crashes Before Agent Execution
+
+If `Configure Codex` exits with code 139 and logs a Node.js segmentation fault while converting the bundled model catalog, inspect the setup failure before changing terminal safe-output instructions. `missing_terminal_safe_output` can be a downstream symptom because the agent never started.
+
+Node.js v24.21.0 and v26.8.0 through v26.10.0 have a [short-read buffer overflow in UTF-8 pipe reads](https://github.com/nodejs/node/issues/66341). The gh-aw Codex and MCP gateway setup scripts avoid this path by reading stdin as a Buffer and then decoding it with `.toString("utf8")`. Ensure the action scripts used by the compiled workflow include this workaround.
+
 ### Timeout Errors
 
 GitHub Actions marks the run as `timed_out` when the job exceeds `timeout-minutes` (default: 20 min). Use the table below to map common engine error patterns to the correct fix, then recompile with `gh aw compile`. See [Long Build Times](/gh-aw/reference/sandbox/#long-build-times) for caching strategies and self-hosted runner recommendations.

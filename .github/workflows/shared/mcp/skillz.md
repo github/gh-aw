@@ -48,7 +48,7 @@
 mcp-servers:
   skillz:
     container: "intellectronica/skillz"
-    version: "latest"
+    version: "0.1@sha256:4b3156dd57057abdc68b05401fefe4373a1e3015b43e0db72ebe33273e7e4052"
     args:
       - "-v"
       - "${{ github.workspace }}/.github/skills:/skillz:ro"

@@ -50,7 +50,8 @@ function main() {
   if (process.argv.includes("--direct-tools")) {
     const home = process.env.CODEX_HOME;
     if (!home) throw new Error("CODEX_HOME is required to configure Codex direct tools");
-    const catalog = directToolCatalog(JSON.parse(fs.readFileSync(0, "utf8")));
+    // Avoid Node's UTF-8 pipe short-read overflow (nodejs/node#66341).
+    const catalog = directToolCatalog(JSON.parse(fs.readFileSync(0).toString("utf8")));
     const output = JSON.stringify(catalog);
     writeSecureOutput(path.join(home, "models.json"), output);
     return output;

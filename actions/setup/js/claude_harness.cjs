@@ -377,7 +377,7 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log)
   const provider = normalizeReflectProviderName(env.GH_AW_LLM_PROVIDER, "anthropic");
   const copilotProvider = REFLECT_PROVIDER_ALIASES.github.has(provider);
   if (childEnv.ANTHROPIC_MODEL) {
-    childEnv.ANTHROPIC_MODEL = normalizeClaudeModel(childEnv.ANTHROPIC_MODEL, provider, childEnv);
+    childEnv.ANTHROPIC_MODEL = normalizeClaudeModel(childEnv.ANTHROPIC_MODEL, provider, childEnv, { reflectData, logger });
   }
   const resolved = reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
   if (copilotProvider && (!resolved || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(resolved.endpointProvider)))) {
@@ -414,8 +414,7 @@ async function main() {
   try {
     const resolved = resolveClaudePromptFileArgs(args);
     prompt = resolved.prompt;
-    const modelArgs = normalizeClaudeModelArgs(resolved.args, normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic"), process.env);
-    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(modelArgs), process.env));
+    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(resolved.args), process.env));
     initialArgs = capabilities.args;
     pluginDir = capabilities.pluginDir;
   } catch (err) {
@@ -423,17 +422,23 @@ async function main() {
     log(`fatal: ${e.message}`);
     process.exit(1);
   }
+  // Auto model selection needs the configured provider's live inventory.
+  const reflection = await fetchAWFReflect({ logger: log });
+  let childEnv;
+  try {
+    initialArgs = normalizeClaudeModelArgs(initialArgs, normalizeReflectProviderName(process.env.GH_AW_LLM_PROVIDER, "anthropic"), process.env, { reflectData: reflection.reflectData, logger: log });
+    childEnv = await buildClaudeChildEnv(reflection.reflectData);
+  } catch (error) {
+    removeClaudePlugin(pluginDir);
+    throw error;
+  }
+
   const freshRetryArgs = stripContinueArgs(initialArgs);
   // Args without --prompt-file, used as the base for --continue retries.
   const continueBaseArgs = freshRetryArgs;
 
   const safeInitialArgs = initialArgs;
   const safeFreshRetryArgs = freshRetryArgs;
-
-  // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
-  // This is best-effort: failures are logged but do not affect the agent run.
-  const reflection = await fetchAWFReflect({ logger: log });
-  const childEnv = await buildClaudeChildEnv(reflection.reflectData);
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
   // A noop indicates the work is complete or there is nothing to do — starting the agent

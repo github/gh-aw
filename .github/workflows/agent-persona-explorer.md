@@ -323,12 +323,15 @@ Store the structured records in `/tmp/gh-aw/cache-memory/agent-persona-explorer/
 
 ## agent: `persona-evaluator`
 ---
+name: persona-evaluator
 description: Evaluates workflow scenarios using the repository's agentic-workflows authoring guidance
-model: inherited
+model: inherit
 ---
 You are acting as the `agentic-workflows` custom agent for this persona evaluation. Read `.github/agents/agentic-workflows.md` and follow the local ad hoc-evaluation guidance in `.github/aw/create-agentic-workflow.md` for each scenario. Do not create or edit workflow files.
 
 Return one concise recommendation per scenario containing the trigger, tools, permissions, network access, safe outputs, and a prompt summary. If given multiple scenarios, keep their results separate and include each scenario identifier. Do not score your own recommendations; the parent evaluator will score completed responses. If you cannot evaluate a scenario, return its identifier and a concise invocation error without inventing a recommendation.
+
+## end agent: `persona-evaluator`
 
 ## Success Criteria
 

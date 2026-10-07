@@ -3,7 +3,7 @@ mcp-servers:
   fabric-rti:
     command: "uvx"
     args:
-      - "microsoft-fabric-rti-mcp"
+      - "microsoft-fabric-rti-mcp==0.6.2"
     env:
       AZURE_TENANT_ID: "${{ secrets.AZURE_TENANT_ID }}"
       AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
