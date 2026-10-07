@@ -456,12 +456,6 @@ To build and test repository custom linters:
 [@zarenner (5)](https://github.com/github/gh-aw/issues?q=is%3Aissue+is%3Aclosed+label%3Acommunity+author%3Azarenner)
 [@zkoppert (2)](https://github.com/github/gh-aw/issues?q=is%3Aissue+is%3Aclosed+label%3Acommunity+author%3Azkoppert)
 
-
-### ⚠️ Attribution Candidates Need Review
-
-The following community issues were closed during this period but could not be automatically linked to a specific merged PR.  Please verify whether they should be credited:
-
-- **@appbrew-zod** for [engine.env can't be shared: rejected in engine definitions and imports; behaviors.execution.env silently drops the api-proxy target](https://github.com/github/gh-aw/issues/60858) ([#60858](https://github.com/github/gh-aw/issues/60858)) — closed 2026-09-23, marked as NOT_PLANNED
 ## Workshop
 
 > [!TIP]
