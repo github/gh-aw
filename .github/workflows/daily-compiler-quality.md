@@ -91,8 +91,11 @@ tools:
   - tail
   - uniq
   - yq
+  - cd
+  - test
+  - "["
   cache-memory: true
-  cli-proxy: true
+  cli-proxy: false
   github:
     mode: local
     toolsets:
@@ -134,29 +137,21 @@ Analyze a rotating subset of compiler files daily using Serena's semantic analys
 Focus on Go compiler files in `pkg/workflow/` directory:
 
 ```bash
-TARGET_FILES=(
-  pkg/workflow/compiler.go
-  pkg/workflow/compiler_activation_job.go
-  pkg/workflow/compiler_orchestrator_engine.go
-  pkg/workflow/compiler_orchestrator_frontmatter.go
-  pkg/workflow/compiler_orchestrator_tools.go
-  pkg/workflow/compiler_orchestrator_workflow.go
-  pkg/workflow/compiler_jobs.go
-  pkg/workflow/compiler_safe_outputs.go
-  pkg/workflow/compiler_safe_outputs_job.go
-  pkg/workflow/compiler_safe_output_jobs.go
-  pkg/workflow/compiler_safe_outputs_builder.go
-  pkg/workflow/safe_outputs_config_generation.go
-  pkg/workflow/compiler_yaml.go
+ls \
+  pkg/workflow/compiler.go \
+  pkg/workflow/compiler_activation_job.go \
+  pkg/workflow/compiler_orchestrator_engine.go \
+  pkg/workflow/compiler_orchestrator_frontmatter.go \
+  pkg/workflow/compiler_orchestrator_tools.go \
+  pkg/workflow/compiler_orchestrator_workflow.go \
+  pkg/workflow/compiler_jobs.go \
+  pkg/workflow/compiler_safe_outputs.go \
+  pkg/workflow/compiler_safe_outputs_job.go \
+  pkg/workflow/compiler_safe_output_jobs.go \
+  pkg/workflow/compiler_safe_outputs_builder.go \
+  pkg/workflow/safe_outputs_config_generation.go \
+  pkg/workflow/compiler_yaml.go \
   pkg/workflow/compiler_yaml_main_job.go
-)
-
-for file in "${TARGET_FILES[@]}"; do
-  if [ ! -f "$file" ]; then
-    printf 'Configured compiler quality target is missing: %s\n' "$file" >&2
-    exit 1
-  fi
-done
 ```
 
 **Daily rotation strategy**: Analyze 2-3 files per day to provide thorough analysis while respecting time limits.
@@ -738,6 +733,7 @@ The compiler codebase maintains **good overall quality** with an average score o
 
 ### Tool Guardrails (Required)
 
+- Use separate commands with workspace-relative paths for file inspection; avoid combining `cd`, shell loops, and command substitutions in one tool call.
 - Do **not** use inline Python shell snippets such as `shell(python3 -c "...")` or similar one-liners for reading/parsing files.
 - When you need file discovery or file content, prefer native tools (`glob`, `grep`, `view`) instead of ad-hoc shell scripting.
 - If Serena (the semantic MCP code-analysis server) is unavailable, use allowed shell utilities (`grep`, `sed`, `head`, `tail`) rather than Python wrappers.

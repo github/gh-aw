@@ -253,7 +253,24 @@ LIMIT 1;
 ```
 
 If replay is reported unavailable, use the generic `records` history instead of querying replay tables.
-If absent, submit one `ledger_append` operation `upsert` with the run ID as `key` and a `value` containing `record_type: caveman_run`, the date, number of files processed, number of files optimized, and the planned outcome (`pull_request_requested` or `noop`). Do not include file contents or raw analysis notes. Do not edit ledger branches directly.
+If absent, call `ledger_append` exactly once with the following shape, replacing the date, counts, and planned outcome with this run's values:
+
+```json
+{
+  "ledger": "caveman-run-history",
+  "operation": "upsert",
+  "value": {
+    "record_type": "caveman_run",
+    "run_id": "${{ github.run_id }}",
+    "date": "2026-10-05",
+    "files_processed": 5,
+    "files_optimized": 0,
+    "planned_outcome": "noop"
+  }
+}
+```
+
+Keep `value.run_id` a quoted string; it is the table primary key. Do not add a top-level `key` or fields beyond this schema. Use `pull_request_requested` when requesting a PR, otherwise `noop`. Do not include file contents or raw analysis notes. Do not edit ledger branches directly.
 
 ## Step 6: Output
 

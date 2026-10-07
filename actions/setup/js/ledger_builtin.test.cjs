@@ -132,6 +132,14 @@ test("table requires an existing row for update and rejects duplicate and invali
   assert.deepEqual(reducer.output().tables.state.rows, [{ key: "a", value: '{"id":"a","score":9}' }]);
 });
 
+test("built-in operation diagnostics identify unexpected and missing fields without values", () => {
+  assert.throws(() => validateOperation({ operation: "upsert", key: "private key", value: { id: "a", score: 1 } }, configs.table), {
+    name: "TypeError",
+    message: 'Invalid ledger operation fields: unexpected field "key" for upsert',
+  });
+  assert.throws(() => validateOperation({ operation: "upsert" }, configs.table), { name: "TypeError", message: 'Invalid ledger operation fields: missing field "value" for upsert' });
+});
+
 test("table rejects oversized merged rows during updates", () => {
   const reducer = createReducer({
     type: "table",
