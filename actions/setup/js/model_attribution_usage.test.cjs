@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { recordFallbackModelFromUsage, getFallbackModel } = require("./model_fallback.cjs");
+const { recordFallbackModelFromUsage, getFallbackModel } = require("./model_attribution.cjs");
 
 describe("AWF native fallback attribution", () => {
   it("uses actual-model evidence and isolates detection from the main agent", () => {
@@ -14,7 +14,9 @@ describe("AWF native fallback attribution", () => {
     try {
       fs.writeFileSync(infoPath, '{"model":"primary"}');
       const record = { _schema: "token-usage/v0.28.44", model: "secondary", model_fallback: { requested_model: "primary", model: "secondary", status: 503, attempt: 1 } };
-      expect(recordFallbackModelFromUsage(JSON.stringify(record), {}, infoPath)).toBe("secondary");
+      const env = { GH_AW_INFO_MODEL: "primary", COPILOT_MODEL: "primary" };
+      expect(recordFallbackModelFromUsage(JSON.stringify(record), env, infoPath)).toBe("secondary");
+      expect(env).toEqual({ GH_AW_INFO_MODEL: "primary", COPILOT_MODEL: "primary" });
       expect(getFallbackModel(infoPath)).toBe("secondary");
       expect(JSON.parse(fs.readFileSync(infoPath, "utf8")).model).toBe("secondary");
       record.model = "detector";

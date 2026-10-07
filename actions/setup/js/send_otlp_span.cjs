@@ -15,7 +15,7 @@ const { resolveAICreditsFailureState } = require("./ai_credits_context.cjs");
 const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
-const { getFallbackModel } = require("./model_fallback.cjs");
+const { getFallbackModel } = require("./model_attribution.cjs");
 
 /**
  * send_otlp_span.cjs

@@ -493,6 +493,7 @@ Unqualified models use the primary provider. Provider prefixes such as `copilot/
 AWF v0.28.44 supports concrete same-provider chains only. Cross-provider chains and fallback model aliases fail compilation; cross-provider support is tracked in [github/gh-aw-firewall#9548](https://github.com/github/gh-aw-firewall/issues/9548). Custom drivers and harnesses can use AWF request recovery without implementing model switching. `engine.model-routing` cannot be combined with `fallback-models`.
 
 AWF's `token-usage.jsonl` records the actual serving model and `model_fallback` evidence; gh-aw uses that evidence for `aw_info.json`, telemetry, and generated output attribution.
+This post-run attribution does not change harness model selection or execution retries.
 
 The repository's smoke workflows configure fallback chains across Copilot, Claude, Codex, Gemini, and Pi. Additional coverage includes Copilot SDK (`smoke-copilot-sdk`), ARM64 (`smoke-copilot-arm`), Claude on GitHub inference (`smoke-github-claude`), published service ports with `docker-sudo-iptables` (`smoke-service-ports`), and Cloud Hypervisor (`smoke-work-queue`). These workflows exercise their existing tasks with fallback enabled; they do not force provider failures or prove that a model switch occurred.
 

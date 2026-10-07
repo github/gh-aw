@@ -108,7 +108,7 @@ function buildAICSuffix() {
   const agentAIC = parsePositiveAIC(process.env.GH_AW_AIC);
   const detectionAIC = parsePositiveAIC(process.env.GH_AW_THREAT_DETECTION_AIC);
   const evalsAIC = parsePositiveAIC(process.env.GH_AW_EVALS_AIC);
-  const compressedModelName = reduceModelNameToIdentifier(require("./model_fallback.cjs").getFallbackModel() || process.env.GH_AW_PRIMARY_MODEL || process.env.GH_AW_ENGINE_MODEL);
+  const compressedModelName = reduceModelNameToIdentifier(require("./model_attribution.cjs").getFallbackModel() || process.env.GH_AW_PRIMARY_MODEL || process.env.GH_AW_ENGINE_MODEL);
   const agentSuffix = buildAICEntry("", agentAIC, compressedModelName);
   const detectionSuffix = buildAICEntry("⌖", detectionAIC);
   const evalsSuffix = buildAICEntry("◇", evalsAIC);

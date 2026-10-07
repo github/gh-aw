@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { validateModelIdentifier, recordFallbackModel, recordFallbackModelFromUsage, getFallbackModel } = require("./model_fallback.cjs");
+const { validateModelIdentifier, recordFallbackModelFromUsage, getFallbackModel } = require("./model_attribution.cjs");
 const footers = [require("./generate_footer.cjs"), require("./messages_footer.cjs")];
 
 const invalidModels = [
@@ -52,10 +52,8 @@ describe("model attribution trust boundaries", () => {
   it.each(invalidModels)("rejects unsafe identifiers %j before persistence and when reading metadata", model => {
     expect(validateModelIdentifier(model)).toBe("");
     const env = { GH_AW_INFO_MODEL: "primary" };
-    expect(() => recordFallbackModel(model, env, infoPath)).toThrow("Invalid resolved fallback model");
-    expect(env.GH_AW_INFO_MODEL).toBe("primary");
-    expect(fs.existsSync(infoPath)).toBe(false);
     expect(recordFallbackModelFromUsage(usage(model), env, infoPath)).toBe("");
+    expect(env.GH_AW_INFO_MODEL).toBe("primary");
     expect(fs.existsSync(infoPath)).toBe(false);
     fs.writeFileSync(infoPath, JSON.stringify({ fallback_model: model, detection_fallback_model: model }));
     expect(getFallbackModel(infoPath)).toBe("");

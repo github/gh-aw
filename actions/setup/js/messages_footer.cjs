@@ -16,7 +16,7 @@ const { formatCompactInteger } = require("./compact_numbers.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
 const { getDetectionWarningMessage } = require("./messages_run_status.cjs");
-const { getFallbackModel, validateModelIdentifier } = require("./model_fallback.cjs");
+const { getFallbackModel, validateModelIdentifier } = require("./model_attribution.cjs");
 
 /**
  * Get the detection caution alert if the detection job found a potential issue.

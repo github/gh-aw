@@ -54,7 +54,7 @@ function matchesWorkflowId(body, workflowId) {
  * @returns {string} XML comment marker with workflow metadata
  */
 function generateXMLMarker(workflowName, runUrl) {
-  const { getFallbackModel, validateModelIdentifier } = require("./model_fallback.cjs");
+  const { getFallbackModel, validateModelIdentifier } = require("./model_attribution.cjs");
   // Read engine metadata from environment variables
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineVersion = process.env.GH_AW_ENGINE_VERSION || "";
