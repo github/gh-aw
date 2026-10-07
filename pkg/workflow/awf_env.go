@@ -98,6 +98,9 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	for _, name := range coreSecretVarNames {
 		addUnique(name)
 	}
+	for _, name := range fallbackProviderSecretNames(workflowData) {
+		addUnique(name)
+	}
 
 	// MCP gateway agent ID is always a secret when MCP servers are present.
 	if HasMCPServers(workflowData) {

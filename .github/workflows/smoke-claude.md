@@ -28,6 +28,9 @@ max-turns: 100
 model: claude-sonnet-4-6
 engine:
   id: claude
+  fallback-models:
+    - anthropic/claude-haiku-4-5
+    - anthropic/claude-sonnet-5
   bare: true
 inlined-imports: true
 imports:

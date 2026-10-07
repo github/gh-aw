@@ -471,6 +471,34 @@ You can also set the underlying `GH_AW_HARNESS_*` env vars directly via `engine.
 
 Threat detection runs default `max-retries` to **0** instead of inheriting the harness default of 3, since detection is a bounded scan of already-completed agent output rather than the primary task — a failed attempt should not silently retry the whole detection run and burn extra time and model spend. Set `engine.harness.max-retries` (or `safe-outputs.threat-detection.engine.harness.max-retries`) explicitly to opt back into retries for detection.
 
+### Ordered model fallback (`fallback-models`)
+
+All built-in engines accept an ordered list of alternative models. With AWF v0.28.31 or newer and a compatible API-proxy image, concrete same-provider chains compile to `apiProxy.fallbackModels`. AWF retries the failed inference request with the next model without restarting the agent or replaying its task, and applies the same model-policy and budget guards to each alternative. An explicit chain disables AWF's automatic middle-power model substitution so only configured alternatives are tried.
+
+Fallback is handled entirely by AWF, not by a harness that restarts the agent or replays its task. `engine.harness.max-retries` still controls ordinary engine execution retries; it does not configure AWF's per-request fallback policy. Configurations without a compatible AWF sandbox fail compilation rather than switching to a harness recovery path.
+
+```aw wrap
+engine:
+  id: copilot
+  model: grok-4.7
+  fallback-models:
+    - gpt-5.6-luna
+    - mai-code-1.1-flash
+```
+
+Fallback applies to provider server errors, request timeouts, unsupported models, and HTTP 400 errors explicitly tied to model availability. Authentication failures, HTTP 429, MCP policy failures, proxy guardrails, cancellation, and job timeouts do not switch models. If every configured model fails, the job fails normally. Workflows without `fallback-models` retain their existing retry behavior.
+
+Unqualified models use the primary provider. Provider prefixes such as `copilot/`, `github/`, `github-copilot/`, `openai/`, `anthropic/`, `gemini/`, and `google/` must match that provider. The compiler provisions credentials for referenced providers, honors `engine.env` overrides, and excludes raw provider credentials from the agent container. GitHub inference can use `permissions.copilot-requests: write`; otherwise it requires `COPILOT_GITHUB_TOKEN`. OpenAI uses `CODEX_API_KEY` or `OPENAI_API_KEY`, Anthropic uses `ANTHROPIC_API_KEY` or configured Anthropic WIF, and Gemini uses `GEMINI_API_KEY`.
+
+AWF v0.28.44 supports concrete same-provider chains only. Cross-provider chains and fallback model aliases fail compilation; cross-provider support is tracked in [github/gh-aw-firewall#9548](https://github.com/github/gh-aw-firewall/issues/9548). Custom drivers and harnesses can use AWF request recovery without implementing model switching. `engine.model-routing` cannot be combined with `fallback-models`.
+
+AWF's `token-usage.jsonl` records the actual serving model and `model_fallback` evidence; gh-aw uses that evidence for `aw_info.json`, telemetry, and generated output attribution.
+This post-run attribution does not change harness model selection or execution retries.
+
+The repository's smoke workflows configure fallback chains across Copilot, Claude, Codex, Gemini, and Pi. Additional coverage includes Copilot SDK (`smoke-copilot-sdk`), ARM64 (`smoke-copilot-arm`), Claude on GitHub inference (`smoke-github-claude`), published service ports with `docker-sudo-iptables` (`smoke-service-ports`), and Cloud Hypervisor (`smoke-work-queue`). These workflows exercise their existing tasks with fallback enabled; they do not force provider failures or prove that a model switch occurred.
+
+Codex has no gh-aw-supplied default model. Set `engine.model`, a phase-specific `GH_AW_MODEL_*_CODEX` repository variable, or `GH_AW_DEFAULT_MODEL_CODEX` explicitly; an empty model selection never introduces an implicit `gpt-5.4` recovery model.
+
 ### Copilot SDK Support
 
 Enable `engine.copilot-sdk: true` to run Copilot in SDK mode.

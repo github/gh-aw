@@ -12,6 +12,9 @@ permissions:
 engine:
   id: copilot
   model: copilot/gpt-5.3-codex
+  fallback-models:
+    - copilot/gpt-5.4
+    - copilot/gpt-5.4-mini
 sandbox:
   agent:
     id: awf
