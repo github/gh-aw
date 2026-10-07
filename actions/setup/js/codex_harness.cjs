@@ -34,6 +34,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require("./constants.cjs");
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
@@ -93,8 +94,6 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
-const DEFAULT_MCP_CALL_WATCHDOG_MS = 120_000;
-const MCP_CALL_TRANSPORT_GRACE_MS = 60_000;
 
 function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
   const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
