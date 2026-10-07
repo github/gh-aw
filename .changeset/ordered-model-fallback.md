@@ -2,7 +2,7 @@
 "gh-aw": minor
 ---
 
-Add ordered `engine.fallback-models` with AWF request-level recovery for same-provider models and shared harness recovery for cross-provider models. Provision credentials for every configured provider, preserve guardrails, and attribute outputs to the model actually used.
+Add ordered `engine.fallback-models` with recovery handled entirely by AWF. Provision credentials for referenced providers, preserve guardrails, and attribute outputs to the model actually used. Require compatible AWF and API-proxy versions and concrete same-provider chains; reject unsupported configurations instead of restarting the agent through a harness.
 
 Upgrade gh-aw-firewall from v0.28.37 to v0.28.44.
 

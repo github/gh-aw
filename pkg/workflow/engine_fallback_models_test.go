@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,12 +36,11 @@ func TestEngineFallbackProviderSecrets(t *testing.T) {
 				EngineConfig:       &EngineConfig{ID: id, FallbackModels: fallbacks},
 				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
 			}
-			require.NoError(t, validateEngineFallbackModels(data))
+			require.ErrorContains(t, validateEngineFallbackModels(data), "same provider")
 			env := map[string]string{}
 			applyEngineHarnessRetryEnv(env, data)
-			var got []string
-			require.NoError(t, json.Unmarshal([]byte(env["GH_AW_FALLBACK_MODELS"]), &got))
-			require.Equal(t, fallbacks, got)
+			require.NotContains(t, env, "GH_AW_FALLBACK_MODELS")
+			require.NotContains(t, env, "GH_AW_NATIVE_FALLBACK_MODELS")
 			engine, err := GetGlobalEngineRegistry().GetEngine(id)
 			require.NoError(t, err)
 			for _, secret := range fallbackProviderSecretNames(data) {
@@ -68,25 +66,30 @@ func TestEngineFallbackProviderSecrets(t *testing.T) {
 
 func TestEngineFallbackModelsValidation(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		config EngineConfig
-		model  string
-		want   string
+		name     string
+		config   EngineConfig
+		model    string
+		want     string
+		disabled bool
 	}{
-		{"custom harness", EngineConfig{ID: "copilot", HarnessScript: "custom.cjs", FallbackModels: []string{"secondary"}}, "", "built-in"},
-		{"custom driver", EngineConfig{ID: "copilot", Driver: "custom.cjs", FallbackModels: []string{"secondary"}}, "", "built-in"},
-		{"routing", EngineConfig{ID: "copilot", ModelRouting: &CopilotModelRoutingConfig{}, FallbackModels: []string{"secondary"}}, "", "model-routing"},
-		{"no harness", EngineConfig{ID: "gemini", FallbackModels: []string{"secondary"}}, "", "built-in"},
-		{"expression", EngineConfig{ID: "copilot", FallbackModels: []string{"${{ inputs.model }}"}}, "", "literal"},
-		{"glob", EngineConfig{ID: "copilot", FallbackModels: []string{"gpt-*"}}, "", "literal"},
-		{"cross provider without AWF", EngineConfig{ID: "copilot", FallbackModels: []string{"openai/secondary"}}, "", "AWF"},
-		{"same provider without AWF", EngineConfig{ID: "codex", FallbackModels: []string{"openai/secondary"}}, "", ""},
-		{"native unqualified codex", EngineConfig{ID: "codex", FallbackModels: []string{"secondary"}}, "", ""},
-		{"native unqualified claude", EngineConfig{ID: "claude", FallbackModels: []string{"secondary"}}, "", ""},
-		{"single model", EngineConfig{ID: "gemini"}, "", ""},
+		{"custom harness", EngineConfig{ID: "copilot", HarnessScript: "custom.cjs", FallbackModels: []string{"secondary"}}, "", "", false},
+		{"custom driver", EngineConfig{ID: "copilot", Driver: "custom.cjs", FallbackModels: []string{"secondary"}}, "", "", false},
+		{"routing", EngineConfig{ID: "copilot", ModelRouting: &CopilotModelRoutingConfig{}, FallbackModels: []string{"secondary"}}, "", "model-routing", false},
+		{"no harness", EngineConfig{ID: "gemini", FallbackModels: []string{"secondary"}}, "", "", false},
+		{"expression", EngineConfig{ID: "copilot", FallbackModels: []string{"${{ inputs.model }}"}}, "", "literal", false},
+		{"glob", EngineConfig{ID: "copilot", FallbackModels: []string{"gpt-*"}}, "", "literal", false},
+		{"cross provider without AWF", EngineConfig{ID: "copilot", FallbackModels: []string{"openai/secondary"}}, "", "AWF", true},
+		{"same provider without AWF", EngineConfig{ID: "codex", FallbackModels: []string{"openai/secondary"}}, "", "AWF", true},
+		{"native unqualified codex", EngineConfig{ID: "codex", FallbackModels: []string{"secondary"}}, "", "", false},
+		{"native unqualified claude", EngineConfig{ID: "claude", FallbackModels: []string{"secondary"}}, "", "", false},
+		{"single model", EngineConfig{ID: "gemini"}, "", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateEngineFallbackModels(&WorkflowData{Model: tc.model, EngineConfig: &tc.config, SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Disabled: true}}})
+			err := validateEngineFallbackModels(&WorkflowData{
+				Model: tc.model, EngineConfig: &tc.config,
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+				SandboxConfig:      &SandboxConfig{Agent: &AgentSandboxConfig{Disabled: tc.disabled}},
+			})
 			if tc.want == "" {
 				require.NoError(t, err)
 			} else {
@@ -131,7 +134,7 @@ func TestEngineFallbackAliasEnvOverrides(t *testing.T) {
 		EngineConfig:       &EngineConfig{ID: "copilot", FallbackModels: []string{"gemini/secondary"}},
 		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
 	}
-	require.ErrorContains(t, validateEngineFallbackModels(data), "provider protocol")
+	require.ErrorContains(t, validateEngineFallbackModels(data), "same provider")
 }
 
 func TestCompileEngineFallbackProviders(t *testing.T) {
@@ -151,18 +154,9 @@ engine:
 ---
 Say hello.
 `), 0o600))
-	require.NoError(t, NewCompiler().CompileWorkflow(path))
-	lock, err := os.ReadFile(filepath.Join(dir, "fallback.lock.yml"))
-	require.NoError(t, err)
-	compiled := string(lock)
-	require.Contains(t, compiled, "GH_AW_FALLBACK_MODELS:")
-	require.Contains(t, compiled, "validate-fallback-openai")
-	require.Contains(t, compiled, "validate-fallback-anthropic")
-	require.Contains(t, compiled, "${{ secrets.CUSTOM_ANTHROPIC_KEY }}")
-	require.Contains(t, compiled, "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}")
-	for _, secret := range []string{"COPILOT_GITHUB_TOKEN", "ANTHROPIC_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"} {
-		require.Contains(t, compiled, "--exclude-env "+secret)
-	}
+	require.ErrorContains(t, NewCompiler().CompileWorkflow(path), "same provider")
+	_, err := os.Stat(filepath.Join(dir, "fallback.lock.yml"))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestCompileEngineFallbackNative(t *testing.T) {
@@ -186,6 +180,7 @@ Say hello.
 			require.NoError(t, err)
 			require.Contains(t, string(lock), `\"fallbackModels\":[\"secondary\",\"last\"]`)
 			require.NotContains(t, string(lock), "GH_AW_FALLBACK_MODELS:")
+			require.NotContains(t, string(lock), "GH_AW_NATIVE_FALLBACK_MODELS:")
 		})
 	}
 }

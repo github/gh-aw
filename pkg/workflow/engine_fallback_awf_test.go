@@ -19,7 +19,7 @@ func TestAWFNativeFallbackModels(t *testing.T) {
 			require.Equal(t, []string{"secondary", "last"}, nativeAWFFallbackModels(data))
 			env := map[string]string{}
 			applyEngineHarnessRetryEnv(env, data)
-			require.Equal(t, "1", env["GH_AW_NATIVE_FALLBACK_MODELS"])
+			require.NotContains(t, env, "GH_AW_NATIVE_FALLBACK_MODELS")
 			require.NotContains(t, env, "GH_AW_FALLBACK_MODELS")
 			config, err := BuildAWFConfigJSON(AWFCommandConfig{EngineName: id, WorkflowData: data})
 			require.NoError(t, err)
@@ -59,14 +59,14 @@ func TestAWFNativeFallbackGates(t *testing.T) {
 			if tc.image != "" {
 				data.SandboxConfig = &SandboxConfig{Agent: &AgentSandboxConfig{Images: map[string]string{awfImageRoleAPIProxy: tc.image + "@sha256:" + strings.Repeat("a", 64)}}}
 			}
-			require.Empty(t, nativeAWFFallbackModels(data))
+			require.Error(t, validateEngineFallbackModels(data))
 			env := map[string]string{}
 			applyEngineHarnessRetryEnv(env, data)
-			require.Contains(t, env, "GH_AW_FALLBACK_MODELS")
+			require.NotContains(t, env, "GH_AW_FALLBACK_MODELS")
 			require.NotContains(t, env, "GH_AW_NATIVE_FALLBACK_MODELS")
 			config, err := BuildAWFConfigJSON(AWFCommandConfig{EngineName: "copilot", WorkflowData: data})
-			require.NoError(t, err)
-			require.NotContains(t, config, `"fallbackModels"`)
+			require.Error(t, err)
+			require.Empty(t, config)
 		})
 	}
 }

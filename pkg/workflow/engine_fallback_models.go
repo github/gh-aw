@@ -132,13 +132,6 @@ func validateEngineFallbackModels(data *WorkflowData) error {
 		return nil
 	}
 	cfg := data.EngineConfig
-	engine, err := GetGlobalEngineRegistry().GetEngine(cfg.ID)
-	if err != nil {
-		return err
-	}
-	if len(nativeAWFFallbackModels(data)) == 0 && (!engineRequiresNodeHarness(engine) || cfg.IsInlineDefinition || cfg.HarnessScript != "" || cfg.Driver != "") {
-		return errors.New("engine.fallback-models requires an engine with a built-in retry harness and no custom driver or harness")
-	}
 	if cfg.ModelRouting != nil {
 		return errors.New("engine.fallback-models cannot be combined with engine.model-routing; use fixed models for fallback")
 	}
@@ -150,17 +143,5 @@ func validateEngineFallbackModels(data *WorkflowData) error {
 			return fmt.Errorf("%s", errs[0])
 		}
 	}
-	providers := fallbackModelProviders(data)
-	if len(providers) > 1 && !isFirewallEnabled(data) {
-		return errors.New("cross-provider engine.fallback-models requires the AWF agent sandbox; enable sandbox.agent")
-	}
-	for _, provider := range providers {
-		if cfg.ID == "codex" && provider != LLMProviderOpenAI && provider != LLMProviderGitHub ||
-			cfg.ID == "claude" && provider != LLMProviderAnthropic && provider != LLMProviderGitHub ||
-			cfg.ID == "copilot" && provider != LLMProviderGitHub && provider != LLMProviderOpenAI && provider != LLMProviderAnthropic ||
-			cfg.ID == "gemini" && provider != "gemini" {
-			return fmt.Errorf("engine.fallback-models: %s does not support the %s provider protocol", cfg.ID, provider)
-		}
-	}
-	return nil
+	return validateAWFFallbackModels(data)
 }

@@ -9,7 +9,7 @@ const { emitSoftTimeoutSignal } = require("./harness_retry_guard.cjs");
  * `nextDelayMs` overrides the delay before the immediately next attempt; following retries
  * resume exponential backoff from that delay.
  * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, cancelled?: boolean }} HarnessAttemptResult
- * @typedef {{ action: "retry" | "stop", exitCode?: number, nextDelayMs?: number, allowModelFallback?: boolean }} HarnessFailureDecision
+ * @typedef {{ action: "retry" | "stop", exitCode?: number, nextDelayMs?: number }} HarnessFailureDecision
  */
 
 /**
@@ -120,52 +120,9 @@ async function runHarnessRetryLoop(options) {
   return { exitCode: lastExitCode, attempts, lastResult };
 }
 
-/**
- * Model changes start a new retry budget, but never extend the job's soft deadline.
- * @param {Parameters<typeof runHarnessRetryLoop>[0] & {
- *   fallbackModels: string[],
- *   shouldFallback: (result: HarnessAttemptResult) => boolean,
- *   switchModel: (model: string) => Promise<void>,
- * }} options
- */
-async function runHarnessModelFallbackLoop(options) {
-  let index = 0;
-  for (;;) {
-    let fallbackAllowed = true;
-    const run = await runHarnessRetryLoop({
-      ...options,
-      handleFailure: async context => {
-        const decision = await options.handleFailure(context);
-        fallbackAllowed = decision.allowModelFallback !== false;
-        if (fallbackAllowed && options.fallbackModels.length > 0 && decision.exitCode !== 0 && context.attempt < context.maxRetries && options.shouldFallback(context.result)) {
-          return { ...decision, action: "retry" };
-        }
-        return decision;
-      },
-    });
-    if (
-      run.exitCode === 0 ||
-      !fallbackAllowed ||
-      !run.lastResult ||
-      run.lastResult.cancelled ||
-      run.lastResult.runtimeGuardFired ||
-      run.lastResult.watchdogFired ||
-      index >= options.fallbackModels.length ||
-      !options.shouldFallback(run.lastResult) ||
-      (options.softTimeoutGuard && Date.now() >= options.softTimeoutGuard.softDeadlineMs)
-    ) {
-      return run;
-    }
-    const model = options.fallbackModels[index++];
-    options.log(`switching to fallback model ${JSON.stringify(model)} (${index}/${options.fallbackModels.length})`);
-    await options.switchModel(model);
-  }
-}
-
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     runHarnessRetryLoop,
-    runHarnessModelFallbackLoop,
     shouldSkipForNoopSafeOutputs,
     shouldStopForNoopSafeOutputs,
   };

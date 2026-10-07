@@ -465,26 +465,24 @@ Threat detection runs default `max-retries` to **0** instead of inheriting the h
 
 All built-in engines accept an ordered list of alternative models. With AWF v0.28.31 or newer and a compatible API-proxy image, concrete same-provider chains compile to `apiProxy.fallbackModels`. AWF retries the failed inference request with the next model without restarting the agent or replaying its task, and applies the same model-policy and budget guards to each alternative. An explicit chain disables AWF's automatic middle-power model substitution so only configured alternatives are tried.
 
-Copilot, Claude, and Codex use the shared harness for cross-provider chains, runtime aliases, disabled sandboxes, or older AWF versions. On that path, each model gets its own `engine.harness.max-retries` budget and existing exponential backoff. Switching starts a fresh session in the same agent job, preserves staged safe outputs and artifacts, and does not extend the job's soft deadline. Harness retry settings do not change AWF's native per-request fallback policy.
+Fallback is handled entirely by AWF, not by a harness that restarts the agent or replays its task. `engine.harness.max-retries` still controls ordinary engine execution retries; it does not configure AWF's per-request fallback policy. Configurations without a compatible AWF sandbox fail compilation rather than switching to a harness recovery path.
 
 ```aw wrap
 engine:
   id: copilot
   model: grok-4.7
   fallback-models:
-    - openai/gpt-5.4
-    - anthropic/claude-sonnet-4.6
-  harness:
-    max-retries: 3
+    - gpt-5.6-luna
+    - mai-code-1.1-flash
 ```
 
 Fallback applies to provider server errors, request timeouts, unsupported models, and HTTP 400 errors explicitly tied to model availability. Authentication failures, HTTP 429, MCP policy failures, proxy guardrails, cancellation, and job timeouts do not switch models. If every configured model fails, the job fails normally. Workflows without `fallback-models` retain their existing retry behavior.
 
-Unqualified models use the primary provider; `copilot/`, `github/`, `github-copilot/`, `openai/`, and `anthropic/` explicitly select a provider. The compiler provisions and validates credentials for every referenced provider, honors `engine.env` overrides, and excludes raw provider credentials from the agent container. GitHub inference can use `permissions.copilot-requests: write`; otherwise it requires `COPILOT_GITHUB_TOKEN`. OpenAI uses `CODEX_API_KEY` or `OPENAI_API_KEY`, and Anthropic uses `ANTHROPIC_API_KEY` or configured Anthropic WIF.
+Unqualified models use the primary provider. Provider prefixes such as `copilot/`, `github/`, `github-copilot/`, `openai/`, `anthropic/`, `gemini/`, and `google/` must match that provider. The compiler provisions credentials for referenced providers, honors `engine.env` overrides, and excludes raw provider credentials from the agent container. GitHub inference can use `permissions.copilot-requests: write`; otherwise it requires `COPILOT_GITHUB_TOKEN`. OpenAI uses `CODEX_API_KEY` or `OPENAI_API_KEY`, Anthropic uses `ANTHROPIC_API_KEY` or configured Anthropic WIF, and Gemini uses `GEMINI_API_KEY`.
 
-Cross-provider fallback requires the AWF agent sandbox. Engine protocol restrictions still apply: Claude supports Anthropic and GitHub inference; Codex supports OpenAI and GitHub inference. Custom drivers and harnesses require the AWF-native path; `engine.model-routing` cannot be combined with `fallback-models`. Model aliases resolve against the AWF catalog, and their referenced providers are provisioned too. AWF's `token-usage.jsonl` records the actual serving model and `model_fallback` evidence; gh-aw uses that evidence for `aw_info.json`, telemetry, and generated output attribution.
+AWF v0.28.44 supports concrete same-provider chains only. Cross-provider chains and fallback model aliases fail compilation; cross-provider support is tracked in [github/gh-aw-firewall#9548](https://github.com/github/gh-aw-firewall/issues/9548). Custom drivers and harnesses can use AWF request recovery without implementing model switching. `engine.model-routing` cannot be combined with `fallback-models`.
 
-Harness-level switching starts the original task again, so workflows using that path must tolerate replay and avoid duplicating side effects or staged safe outputs. Claude refuses to switch after partial work unless `engine.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART: "true"` explicitly declares the workflow replay-safe. AWF-native request fallback does not require this opt-in.
+AWF's `token-usage.jsonl` records the actual serving model and `model_fallback` evidence; gh-aw uses that evidence for `aw_info.json`, telemetry, and generated output attribution.
 
 Codex has no gh-aw-supplied default model. Set `engine.model`, a phase-specific `GH_AW_MODEL_*_CODEX` repository variable, or `GH_AW_DEFAULT_MODEL_CODEX` explicitly; an empty model selection never introduces an implicit `gpt-5.4` recovery model.
 
