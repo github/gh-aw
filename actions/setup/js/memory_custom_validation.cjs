@@ -43,6 +43,19 @@ function readDirectory(targetPath) {
   }
 }
 
+function pruneEmptyDirectories(dirPath) {
+  for (const entry of readDirectory(dirPath)) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const childPath = path.join(dirPath, entry.name);
+    pruneEmptyDirectories(childPath);
+    if (readDirectory(childPath).length === 0) {
+      removePath(childPath, { recursive: true, force: true });
+    }
+  }
+}
+
 /**
  * @param {string} targetPath
  * @param {BufferEncoding | undefined} [encoding]
@@ -258,6 +271,7 @@ function runCustomMemoryValidation(options) {
         return !options.isEligibleFile || fs.statSync(sourcePath).isDirectory() || options.isEligibleFile(relativePath.replace(/\\/g, "/"));
       },
     });
+    pruneEmptyDirectories(validationMemoryDir);
   } catch (error) {
     removePath(validationDir, { recursive: true, force: true });
     return {
