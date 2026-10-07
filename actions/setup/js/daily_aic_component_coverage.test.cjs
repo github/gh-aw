@@ -38,7 +38,7 @@ function evaluate(files, jobs, overrides = {}) {
       artifacts: [
         { id: 10, name: "usage", createdAt: new Date(overrides.artifactTime || later) },
         ...["agent", "detection", "evals"].map(name => {
-          const latest = jobs.filter(item => item.name === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
+          const latest = jobs.filter(item => (item.name.toLowerCase() === "evaluations" ? "evals" : item.name.toLowerCase()) === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
           return { id: latest?.id, name, createdAt: new Date(overrides.producerTime || latest?.completed_at || time) };
         }),
       ],
@@ -105,14 +105,14 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
 });
 
-it("counts compiler-generated Agent, Detection and Evals jobs using their lowercase accounting paths", async () => {
+it("counts compiler-generated Agent, Detection and Evaluations jobs using their lowercase accounting paths", async () => {
   const f = evaluate(
     {
       "agent/token_usage.jsonl": '{"aic":18.02604}',
       "detection/token_usage.jsonl": '{"aic":30.08748}',
       "evals/token_usage.jsonl": '{"aic":1}',
     },
-    [job("Agent"), job("Detection"), job("Evals")]
+    [job("Agent"), job("Detection"), job("Evaluations")]
   );
   await expect(f.result).resolves.toBeCloseTo(49.11352);
   expect(f.client.listArtifacts).toHaveBeenCalledOnce();
