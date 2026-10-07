@@ -104,7 +104,7 @@ safe-outputs:
 	assert.Contains(t, err.Error(), "pre-steps:")
 }
 
-func TestSameJobStepTokenMissingInAgentIngestionFails(t *testing.T) {
+func TestSameJobStepTokenMissingInSafeOutputMentionResolutionFails(t *testing.T) {
 	workflowFile := writeStepTokenWorkflow(t, "missing-agent", `---
 on:
   workflow_dispatch:
@@ -119,11 +119,6 @@ safe-outputs:
     allowed-teams: [my-org/my-team]
     github-token: ${{ steps.octosts.outputs.token || secrets.GITHUB_TOKEN }}
 jobs:
-  safe_outputs:
-    pre-steps:
-      - name: Mint token (safe outputs)
-        id: octosts
-        uses: `+stsMintStep+`
   conclusion:
     pre-steps:
       - name: Mint token (conclusion)
@@ -131,12 +126,12 @@ jobs:
         uses: `+stsMintStep+`
 ---
 
-# Missing agent ingestion token
+# Missing safe-output mention-resolution token
 `)
 
 	err := NewCompiler().CompileWorkflow(workflowFile)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `job "agent" has no step with id "octosts"`)
+	assert.Contains(t, err.Error(), `job "safe_outputs" has no step with id "octosts"`)
 	assert.Contains(t, err.Error(), "safe-outputs.mentions.github-token")
 	assert.Contains(t, err.Error(), "pre-steps:")
 }
@@ -150,15 +145,17 @@ permissions:
   id-token: write
 engine: claude
 strict: false
-pre-steps:
-  - name: Mint mention token
-    id: mention_mint
-    uses: `+stsMintStep+`
 safe-outputs:
   add-comment:
   mentions:
     allowed-teams: [my-org/my-team]
     github-token: ${{ steps.mention_mint.outputs.token }}
+jobs:
+  safe_outputs:
+    pre-steps:
+      - name: Mint mention token
+        id: mention_mint
+        uses: `+stsMintStep+`
 ---
 
 # Mention-only same-job token
@@ -169,11 +166,11 @@ safe-outputs:
 	require.NoError(t, err)
 	lockYAML := string(lockContent)
 	agent := extractJobSection(lockYAML, "agent")
-	assert.Contains(t, agent, "github-token: ${{ steps.mention_mint.outputs.token }}")
-	assert.Less(t, jobStepIDDeclarationIndex(agent, "mention_mint"), jobStepOutputConsumptionIndex(agent, "mention_mint"))
-	for _, jobName := range []string{"safe_outputs", "conclusion"} {
-		assert.NotContains(t, extractJobSection(lockYAML, jobName), "steps.mention_mint.outputs.token")
-	}
+	assert.NotContains(t, agent, "steps.mention_mint.outputs.token")
+	safeOutputs := extractJobSection(lockYAML, "safe_outputs")
+	assert.Contains(t, safeOutputs, "GH_AW_MENTIONS_GITHUB_TOKEN: ${{ steps.mention_mint.outputs.token }}")
+	assert.Less(t, jobStepIDDeclarationIndex(safeOutputs, "mention_mint"), jobStepOutputConsumptionIndex(safeOutputs, "mention_mint"))
+	assert.NotContains(t, extractJobSection(lockYAML, "conclusion"), "steps.mention_mint.outputs.token")
 }
 
 // TestSameJobStepTokenMintedAfterConsumerFails verifies that safe-outputs.steps, which run

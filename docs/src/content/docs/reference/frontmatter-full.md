@@ -22160,14 +22160,15 @@ safe-outputs:
   # Format 2: Advanced configuration for @mention filtering with fine-grained
   # control
   mentions:
-    # Dedicated token for resolving mention allowlists during ingestion. Does not
-    # inherit safe-outputs.github-token or affect write operations.
+    # Dedicated token for resolving mention allowlists in the trusted safe_outputs
+    # job. It is not exposed to agent-job ingestion and does not inherit other
+    # safe-output credentials or affect write operations.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Dedicated GitHub App for resolving mention allowlists during ingestion. Minted
-    # after agent execution; takes precedence over mentions.github-token. Does not
-    # inherit safe-outputs.github-app.
+    # Dedicated GitHub App for resolving mention allowlists in the trusted
+    # safe_outputs job. Its token is read-only, takes precedence over
+    # mentions.github-token, and does not inherit safe-outputs.github-app.
     # (optional)
     github-app:
       # Deprecated alias for client-id. GitHub App ID/client ID (e.g., '${{ vars.APP_ID
@@ -22382,10 +22383,11 @@ safe-outputs:
 
     # List of team slugs whose members are always allowed to be mentioned. Accepts
     # 'team-slug' (resolved against the current org) or 'org/team-slug' format. Team
-    # members are fetched from the GitHub API at runtime; bots are excluded.
-    # IMPORTANT: requires read:org scope — not available with the default
-    # GITHUB_TOKEN. Use a classic PAT with read:org, a fine-grained PAT with
-    # Members:Read, or a GitHub App with the Members:Read permission. Without the
+    # members are resolved in the trusted safe_outputs job; bots are excluded.
+    # Requires the mention-resolution token to have read:org scope, which the default
+    # github.token does not provide. Configure safe-outputs.mentions.github-token with
+    # a classic PAT or fine-grained PAT with Members:Read, or
+    # safe-outputs.mentions.github-app with the Members:Read permission. Without the
     # required scope, team lookups fail with a warning and those members are skipped.
     # (optional)
     allowed-teams: []

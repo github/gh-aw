@@ -187,10 +187,10 @@ type MentionsConfig struct {
 
 	// AllowedTeams is a list of team slugs whose members are always allowed to be mentioned.
 	// Accepts "team-slug" (resolved against the current org) or "org/team-slug" format.
-	// Requires the workflow token to have read:org scope (a fine-grained PAT, classic PAT with
-	// read:org, or a GitHub App with the Members:Read permission). The default GITHUB_TOKEN
-	// does not include read:org and will produce a 403/404 warning; team members will be skipped
-	// but the workflow will not fail.
+	// Team membership is resolved in the trusted safe_outputs job and requires the mention
+	// resolution token to have read:org scope (a fine-grained PAT, classic PAT with read:org,
+	// or a GitHub App with the Members:Read permission). The default github.token does not
+	// include read:org; team members will be skipped with a warning if no suitable token is set.
 	AllowedTeams []string `yaml:"allowed-teams,omitempty" json:"allowedTeams,omitempty"`
 
 	// Max is the maximum number of mentions per message (default: 50). Supports integer or GitHub Actions expression.

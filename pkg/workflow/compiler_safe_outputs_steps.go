@@ -233,6 +233,22 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 		}
 	}
 
+	if mentions := data.SafeOutputs.Mentions; mentions != nil && mentions.GitHubApp != nil {
+		fallbackRepo := ""
+		if hasWorkflowCallTrigger(data.On) {
+			fallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+		}
+		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
+			mentions.GitHubApp,
+			buildMentionResolutionPermissions(data.SafeOutputs),
+			fallbackRepo,
+			inferSingleCheckoutRepositoryForGitHubAppOwner(data),
+			"Generate GitHub App token for mention resolution",
+			"safe-outputs-mentions-app-token",
+		)...)
+	}
+
 	return steps
 }
 
@@ -368,6 +384,7 @@ func buildCustomScriptFilesStep(scripts map[string]*SafeScriptConfig) ([]string,
 func (c *Compiler) addSafeOutputCoreEnvVars(steps *[]string, data *WorkflowData) error {
 	*steps = append(*steps, "          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
 	*steps = append(*steps, "          GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}\n")
+	*steps = append(*steps, "          GH_AW_MENTIONS_GITHUB_TOKEN: "+safeOutputMentionsGitHubToken(data)+"\n")
 
 	// Add allowed domains configuration for URL sanitization in safe output handlers.
 	// Without this, sanitizeContent() in safe_output_handler_manager.cjs only allows
@@ -428,6 +445,29 @@ func (c *Compiler) addSafeOutputCoreEnvVars(steps *[]string, data *WorkflowData)
 	c.addAllSafeOutputConfigEnvVars(steps, data)
 
 	return nil
+}
+
+func safeOutputMentionsGitHubToken(data *WorkflowData) string {
+	if data == nil || data.SafeOutputs == nil || data.SafeOutputs.Mentions == nil {
+		return "${{ github.token }}"
+	}
+	mentions := data.SafeOutputs.Mentions
+	if mentions.GitHubApp == nil {
+		if mentions.GitHubToken != "" {
+			return mentions.GitHubToken
+		}
+		return "${{ github.token }}"
+	}
+
+	token := "${{ steps.safe-outputs-mentions-app-token.outputs.token }}"
+	if !mentions.GitHubApp.shouldIgnoreMissingKey() {
+		return token
+	}
+	fallback := mentions.GitHubToken
+	if fallback == "" {
+		fallback = "${{ github.token }}"
+	}
+	return combineTokenExpressions(token, fallback)
 }
 
 // addCITriggerTokenEnvVar appends the GH_AW_CI_TRIGGER_TOKEN env var used to push an

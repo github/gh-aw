@@ -265,63 +265,6 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	yaml.WriteString("            await main(core, context);\n")
 }
 
-func (c *Compiler) generateOutputCollectionGitHubToken(yaml *strings.Builder, data *WorkflowData) string {
-	if data.SafeOutputs == nil || data.SafeOutputs.Mentions == nil {
-		return ""
-	}
-	config := data.SafeOutputs.Mentions
-	app := config.GitHubApp
-	if app == nil {
-		if config.GitHubToken != "" {
-			compilerYamlStepLifecycleLog.Print("Ingest agent output uses safe-outputs.mentions.github-token for mention allowlist resolution")
-		}
-		return config.GitHubToken
-	}
-
-	permissions := NewPermissions()
-	if data.SafeOutputs.AddComments != nil {
-		commentPermissions := buildAddCommentPermissions(data.SafeOutputs.AddComments)
-		for _, scope := range []PermissionScope{PermissionIssues, PermissionPullRequests} {
-			if _, ok := commentPermissions.Get(scope); ok {
-				permissions.Set(scope, PermissionRead)
-			}
-		}
-	}
-	if len(config.AllowedTeams) > 0 {
-		permissions.Set(PermissionMembers, PermissionRead)
-	}
-	const stepID = "safe-outputs-ingestion-app-token"
-	fallbackRepo := ""
-	if hasWorkflowCallTrigger(data.On) {
-		fallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
-	}
-	steps := c.buildGitHubAppTokenMintStepForJob("agent", app, permissions, fallbackRepo,
-		inferSingleCheckoutRepositoryForGitHubAppOwner(data),
-		"Generate GitHub App token for output ingestion", stepID)
-	for _, step := range collapseYAMLLinesIntoSteps(steps) {
-		// Ingestion runs even after agent failure; token minting and owner resolution must too.
-		if prefix, condition, found := strings.Cut(step, "        if: "); found {
-			existing, rest, _ := strings.Cut(condition, "\n")
-			step = prefix + "        if: " + combineGitHubIfExpressions("always()", existing) + "\n" + rest
-		} else {
-			firstLine, rest, _ := strings.Cut(step, "\n")
-			step = firstLine + "\n        if: always()\n" + rest
-		}
-		yaml.WriteString(step)
-	}
-	token := "${{ steps." + stepID + ".outputs.token }}"
-	if app.shouldIgnoreMissingKey() {
-		compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.mentions.github-app token with a mention-specific/default token fallback")
-		fallback := config.GitHubToken
-		if fallback == "" {
-			fallback = "${{ secrets.GITHUB_TOKEN }}"
-		}
-		return combineTokenExpressions(token, fallback)
-	}
-	compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.mentions.github-app token for mention allowlist resolution")
-	return token
-}
-
 func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *WorkflowData) error { //nolint:largefunc // Existing artifact collection keeps related output paths and ordering together.
 	// Copy the raw safe-output NDJSON to a /tmp/gh-aw/ path so it can be included in the
 	// unified agent artifact together with all other /tmp/gh-aw/ outputs.
@@ -346,7 +289,6 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 		yaml.WriteString("          fi\n")
 	}
 
-	githubToken := c.generateOutputCollectionGitHubToken(yaml, data)
 	yaml.WriteString("      - name: Ingest agent output\n")
 	yaml.WriteString("        id: collect_output\n")
 	yaml.WriteString("        if: always()\n")
@@ -410,11 +352,6 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	}
 
 	yaml.WriteString("        with:\n")
-	if githubToken != "" {
-		yaml.WriteString("          github-token: " + githubToken + "\n")
-	} else {
-		compilerYamlStepLifecycleLog.Print("Ingest agent output uses the default GitHub Actions token for mention allowlist resolution")
-	}
 	yaml.WriteString("          script: |\n")
 
 	// Load script from external file using require()

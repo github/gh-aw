@@ -2097,7 +2097,7 @@ Accepts a literal integer or a GitHub Actions expression string (e.g., `${{ inpu
 
 By default, `@mentions` in AI-generated content are escaped with backticks unless the mentioned user is a verified collaborator or inferred from the event context (issue/PR author, assignees, etc.). Use `mentions:` to control this behavior:
 
-Collaborator checks use the repository receiving each safe output. With `target-repo`, the workflow repository's collaborators are not used as a fallback when the token cannot read the target repository. The agent job sanitizes output first, so its token needs read access to the target repository to preserve collaborator mentions; a later handler token cannot restore escaped mentions.
+Collaborator checks use the repository receiving each safe output. With `target-repo`, the workflow repository's collaborators are not used as a fallback when the token cannot read the target repository. The agent job preserves mention candidates without performing lookups; the trusted `safe_outputs` job filters them before publication.
 
 ```yaml wrap
 safe-outputs:
@@ -2123,7 +2123,7 @@ safe-outputs:
 
 **`allowed-teams`** lets organizations allow all members of specific GitHub teams to be mentioned without listing individual usernames. Team members are fetched from the GitHub API at runtime using `GET /orgs/{org}/teams/{team_slug}/members`. Bot accounts within the team are excluded. Use `org/team-slug` for cross-org teams or just `team-slug` to resolve against the current repository's organization.
 
-Configure `safe-outputs.mentions.github-token` or `safe-outputs.mentions.github-app` with read access to team membership. **Ingest agent output** resolves allowed mentions before sanitization using these dedicated credentials. It does not inherit `safe-outputs.github-token`, `safe-outputs.github-app`, or `GH_AW_GITHUB_TOKEN`; without mention-specific credentials it uses the default Actions token.
+Configure `safe-outputs.mentions.github-token` or `safe-outputs.mentions.github-app` with read access to team membership. Mention and team lookups run in the trusted `safe_outputs` job, after the agent artifact is transferred. The token selection is mention app, mention token, then `github.token`; it never inherits `safe-outputs.github-token`, `safe-outputs.github-app`, per-output credentials, or `GH_AW_GITHUB_TOKEN`.
 
 ```yaml wrap
 safe-outputs:
@@ -2132,10 +2132,10 @@ safe-outputs:
     allowed-teams: [my-org/my-team]
 ```
 
-Alternatively, configure `safe-outputs.mentions.github-app` with the standard `client-id`, `private-key`, `owner`, `repositories`, and `permissions` fields. Its token is minted after agent execution and gateway shutdown, takes precedence over `mentions.github-token`, and requests `members: read` when `allowed-teams` is configured. With `ignore-if-missing: true`, missing app credentials fall back to `mentions.github-token`, then `GITHUB_TOKEN`. Omitting the mention-specific app disables ingestion app-token minting without disabling mention filtering. Downstream write credentials remain unchanged.
+Alternatively, configure `safe-outputs.mentions.github-app` with the standard `client-id`, `private-key`, `owner`, `repositories`, and `permissions` fields. Its token is minted in the trusted `safe_outputs` job before **Process Safe Outputs**, takes precedence over `mentions.github-token`, and requests `issues: read` when `add-comment` is enabled and `members: read` when `allowed-teams` is configured. Permission overrides may be `read` or `none`; `write` and other values are rejected. With `ignore-if-missing: true`, missing app credentials fall back to `mentions.github-token`, then `github.token`. Omitting the mention-specific app does not disable mention filtering. Downstream write credentials remain unchanged.
 
 > [!IMPORTANT]
-> `allowed-teams` requires the workflow token to have `read:org` scope. The default `GITHUB_TOKEN` does **not** include this scope. Use one of the following:
+> `allowed-teams` requires the mention-resolution token to have `read:org` scope. The default `github.token` does **not** include this scope. Use one of the following:
 > - A **classic PAT** with the `read:org` scope stored as a repository secret
 > - A **fine-grained PAT** with the "Members" repository permission (read)
 > - A **GitHub App** installation token with the "Members" permission (read)

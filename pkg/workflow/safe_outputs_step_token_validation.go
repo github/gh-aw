@@ -124,7 +124,7 @@ func (c *Compiler) validateSafeOutputStepTokenReferences(data *WorkflowData) err
 				continue
 			}
 			field := "safe-outputs.github-token"
-			if jobName == string(constants.AgentJobName) && data.SafeOutputs.Mentions != nil &&
+			if data.SafeOutputs.Mentions != nil &&
 				strings.Contains(data.SafeOutputs.Mentions.GitHubToken, "steps."+stepID+".outputs.") {
 				field = "safe-outputs.mentions.github-token"
 			}
