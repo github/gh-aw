@@ -169,14 +169,16 @@ describe("getFailedNonBuiltinJobs", () => {
     global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
       data: {
         jobs: [
-          { name: "Agent", conclusion: "failure", html_url: "https://example.com/agent" },
-          { name: "Build project", conclusion: "failure", html_url: "https://example.com/build" },
+          { name: "Agent", conclusion: "failure", html_url: "https://github.com/owner/repo/actions/runs/123/jobs/456" },
+          { name: "Build project", conclusion: "failure", html_url: "https://github.com/owner/repo/actions/runs/123/jobs/789" },
         ],
       },
     });
     await main();
-    expect(global.github.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Failed jobs: Smoke Gemini", body: expect.stringContaining("- [`Build project`](https://example.com/build)") }));
-    expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("https://example.com/agent");
+    expect(global.github.rest.issues.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "[aw] Failed jobs: Smoke Gemini", body: expect.stringContaining("- [`Build project`](https://github.com/owner/repo/actions/runs/123/jobs/789)") })
+    );
+    expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("https://github.com/owner/repo/actions/runs/123/jobs/456");
   });
 
   it.each(["", "invalid JSON", "null", "[]"])("rejects invalid job result metadata %j rather than falling back to name-based filtering", async metadata => {
