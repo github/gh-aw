@@ -33,6 +33,7 @@ func TestGeminiCopilotProvider(t *testing.T) {
 			assert.Contains(t, step, "gemini_copilot.cjs gemini --yolo --skip-trust")
 			assert.Contains(t, step, "GH_AW_GEMINI_COPILOT_MODEL: gemini-3.8-flash")
 			assert.Contains(t, step, "GEMINI_MODEL: gemini-3.8-flash")
+			assert.Contains(t, step, "GEMINI_CLI_HOME: /tmp/gh-aw/gemini-home")
 			assert.Contains(t, step, "--exclude-env COPILOT_GITHUB_TOKEN")
 			assert.NotContains(t, step, "GEMINI_API_KEY:")
 			assert.NotContains(t, step, `\"gemini\":`)

@@ -354,6 +354,7 @@ func TestGeminiEngineFirewallIntegration(t *testing.T) {
 		assert.Contains(t, stepContent, "allowDomains", "Should include allowDomains in config JSON")
 		assert.Contains(t, stepContent, `\"enabled\":true`, "Should include apiProxy enabled in config JSON")
 		assert.Contains(t, stepContent, "GEMINI_API_BASE_URL: http://host.docker.internal:10003", "Should set GEMINI_API_BASE_URL to LLM gateway URL")
+		assert.Contains(t, stepContent, "GEMINI_CLI_HOME: /tmp/gh-aw/gemini-home", "Sandboxed Gemini runtime state must use a writable directory")
 	})
 
 	t.Run("firewall disabled", func(t *testing.T) {
@@ -375,6 +376,7 @@ func TestGeminiEngineFirewallIntegration(t *testing.T) {
 		assert.Contains(t, stepContent, "set -o pipefail", "Should use simple command with pipefail")
 		assert.NotContains(t, stepContent, "awf", "Should not use AWF when firewall is disabled")
 		assert.NotContains(t, stepContent, "GEMINI_API_BASE_URL", "Should not set GEMINI_API_BASE_URL when firewall is disabled")
+		assert.NotContains(t, stepContent, "GEMINI_CLI_HOME", "Unsandboxed Gemini must retain its existing user configuration")
 	})
 }
 

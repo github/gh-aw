@@ -365,6 +365,8 @@ touch %s
 		env["GEMINI_API_BASE_URL"] = fmt.Sprintf("http://host.docker.internal:%d", constants.GeminiLLMGatewayPort)
 	}
 	if firewallEnabled {
+		// AWF protects ~/.gemini; Gemini 0.63 writes its project registry there.
+		env["GEMINI_CLI_HOME"] = constants.TmpGeminiHome
 		// Set git identity environment variables so the first git commit succeeds inside the
 		// container. AWF's --env-all forwards these to the container, ensuring git does not
 		// rely on the host-side ~/.gitconfig which is not visible in the sandbox.

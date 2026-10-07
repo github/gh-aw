@@ -1110,6 +1110,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ github.token }}
           DEBUG: gemini-cli:*
+          GEMINI_CLI_HOME: /tmp/gh-aw/gemini-home
           GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: gemini-3.8-flash
           GH_AW_GEMINI_COPILOT_MODEL: gemini-3.8-flash

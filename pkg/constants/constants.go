@@ -624,6 +624,9 @@ const TmpAwPatchGlob = TmpGhAwDir + "/aw-*.patch"
 // TmpGeminiClientErrorGlob is the glob for Gemini client error JSON diagnostic files.
 const TmpGeminiClientErrorGlob = TmpGhAwDir + "/gemini-client-error-*.json"
 
+// TmpGeminiHome is the writable Gemini CLI home in the agent sandbox.
+const TmpGeminiHome = TmpGhAwDir + "/gemini-home"
+
 // TmpPiAgentDir is the Pi engine agent working directory.
 const TmpPiAgentDir = TmpGhAwDir + "/pi-agent-dir"
 

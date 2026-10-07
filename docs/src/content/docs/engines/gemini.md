@@ -26,6 +26,11 @@ instead. Neither setting stores credentials in the project configuration.
 Configured MCP servers are also included in Gemini's tool allowlist; their
 gateway-side tool restrictions still apply.
 
+In the AWF sandbox, `GEMINI_CLI_HOME` points to `/tmp/gh-aw/gemini-home`
+so Gemini can write its project registry and runtime state without modifying
+the protected `~/.gemini` directory. Project settings and system settings
+remain at their existing paths; the shell's `HOME` is unchanged.
+
 ## Using Copilot-hosted Gemini models
 
 Use a `copilot/gemini*` model with the AWF sandbox enabled:
