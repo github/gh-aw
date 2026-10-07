@@ -37,6 +37,8 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"bare unknown", "Use lookup to inspect the issue.", nil},
 		{"native read", "Use Read(file).", []promptToolRequirement{{server: "native-read", tool: "Read"}}},
 		{"native read path", "Call `Read(pkg/workflow/data.json)`.", []promptToolRequirement{{server: "native-read", tool: "Read"}}},
+		{"bare safe output", "Call create_issue.", []promptToolRequirement{{server: "safeoutputs", tool: "create_issue"}}},
+		{"safe output alias", "Use dismiss_review.", []promptToolRequirement{{server: "safeoutputs", tool: "dismiss_pull_request_review"}}},
 		{"ambiguous natural read", "Read pkg/workflow/data.json.", nil},
 		{"native gemini read", "Use read_file(file).", nil},
 		{"negation", "Do not use shell(curl).\nNever call mcp__github__issue_read.\nDon't run `curl example.com`.\nYou must not use github(issue_read).", nil},
@@ -171,6 +173,8 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 		{"safeoutput wrapper instruction", "engine: copilot\ntools:\n  cli-proxy: true\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Use add_labels to label the issue.", 0},
 		{"safeoutput native retained", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Call mcp__safeoutputs__add_labels.", 0},
 		{"safeoutput tool not enabled", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  noop: {}\n", "Call mcp__safeoutputs__add_labels.", 1},
+		{"bare safeoutput tool not enabled", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Call create_issue.", 1},
+		{"bare safeoutput tool enabled", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Call add_labels.", 0},
 		{"task fence pipeline denied", "engine: copilot\ntools:\n  bash: [find]\n", "Find all schema files and list them:\n```bash\nfind schemas -name '*.json' | schema-sort\n```", 1},
 		{"task fence pipeline allowed", "engine: copilot\ntools:\n  bash: [find, schema-sort]\n", "Find all schema files and list them:\n```bash\nfind schemas -name '*.json' | schema-sort\n```", 0},
 		{"script configured", "engine: codex\nmcp-scripts:\n  read-outcomes:\n    description: Read outcomes\n    run: echo outcomes\n", "Call mcp__mcpscripts__read-outcomes.", 0},
@@ -299,6 +303,7 @@ func TestPromptToolRuntimeImportsConfinedAndCommentAware(t *testing.T) {
 	mainPath := filepath.Join(dir, ".github", "workflows", "main.md")
 	files := map[string]string{
 		"direct.md":    "Run `curl example.com`.\n{{#runtime-import .github/prompts/nested.md}}\n<!-- {{#runtime-import .github/prompts/commented.md}} -->",
+		"inline.md":    "Run `wget example.com`.\n<!-- {{#runtime-import .github/prompts/commented.md}} -->",
 		"nested.md":    "Run `curl example.com`.\n{{#runtime-import .github/prompts/direct.md}}",
 		"commented.md": "Call github(issue_read).",
 	}
@@ -311,11 +316,14 @@ func TestPromptToolRuntimeImportsConfinedAndCommentAware(t *testing.T) {
 	data := &WorkflowData{
 		MarkdownContent: "{{#runtime-import .github/prompts/direct.md}}\n{{#runtime-import .github/prompts/link.md}}\n{{#runtime-import ../outside.md}}",
 		Tools:           map[string]any{"bash": false, "github": false},
+		PromptImports:   []parser.PromptImportEntry{{Markdown: "{{#runtime-import .github/prompts/inline.md}}"}},
 	}
 	compiler := NewCompiler()
+	compiler.markdownPath = mainPath
 	output := testutil.CaptureStderr(t, func() { compiler.validatePromptTools(data, mainPath) })
-	require.Equal(t, 1, compiler.GetWarningCount())
+	require.Equal(t, 2, compiler.GetWarningCount())
 	require.Contains(t, output, "shell(curl example.com)")
+	require.Contains(t, output, "shell(wget example.com)")
 	require.NotContains(t, output, "github(issue_read)")
 }
 

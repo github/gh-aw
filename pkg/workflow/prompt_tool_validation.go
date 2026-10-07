@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 var promptToolImperative = regexp.MustCompile(`(?i)^(?:please\s+|you must\s+|must\s+)?(use|call|run)\s+(?:the\s+)?(?:tool\s+)?(.+)$`)
@@ -38,8 +39,7 @@ func (c *Compiler) validatePromptTools(data *WorkflowData, markdownPath string) 
 	for _, entry := range data.PromptImports {
 		contents = append(contents, entry.Markdown)
 	}
-	seed := runtimeImportValidationMarkdown(data) + "\n" + strings.Join(contents, "\n")
-	contents = append(contents, promptRuntimeImportContent(seed, resolveWorkspaceRoot(markdownPath), map[string]struct{}{}))
+	contents = append(contents, c.collectRuntimeImportMarkdownForCompilerAnalysis(data))
 	var capabilities EngineCapabilities
 	if engine, err := c.getAgenticEngine(ResolveEngineID(data)); err == nil {
 		capabilities = engine.GetCapabilities()
@@ -86,35 +86,34 @@ func promptToolWarning(data *WorkflowData, requirement promptToolRequirement) st
 	return fmt.Sprintf("Prompt explicitly requires %s, but the effective tool configuration does not allow it. Align the prompt with the permitted tools, or, if intended, %s. Permissions have not been expanded.", name, advice)
 }
 
-// Reuse the existing confined, symlink-checked reader; strip comments before following
-// references, including nested imports, so commented-out instructions stay inert.
-func promptRuntimeImportContent(content, workspaceRoot string, seen map[string]struct{}) string {
-	var imported strings.Builder
-	for _, ref := range extractRuntimeImportReferences(removeXMLComments(content)) {
-		body, ok, stop := readRuntimeImportMarkdownForAnalysis(ref, workspaceRoot, seen)
-		if stop {
-			break
-		}
-		if !ok {
-			continue
-		}
-		imported.WriteByte('\n')
-		imported.WriteString(body)
-		imported.WriteByte('\n')
-		imported.WriteString(promptRuntimeImportContent(body, workspaceRoot, seen))
-	}
-	return imported.String()
-}
-
 func promptToolRequirements(content string) []promptToolRequirement {
 	content = removeXMLComments(content)
-	knownGitHubTools, _ := getGitHubToolToToolsetMap()
+	knownTools := promptKnownTools()
 	var requirements []promptToolRequirement
 	var state promptToolScanState
 	for rawLine := range strings.SplitSeq(content, "\n") {
-		requirements = append(requirements, state.consumeLine(rawLine, knownGitHubTools)...)
+		requirements = append(requirements, state.consumeLine(rawLine, knownTools)...)
 	}
 	return requirements
+}
+
+func promptKnownTools() map[string]promptToolRequirement {
+	knownTools := make(map[string]promptToolRequirement)
+	gitHubTools, _ := getGitHubToolToToolsetMap()
+	for name := range gitHubTools {
+		knownTools[name] = promptToolRequirement{server: "github", tool: name}
+	}
+	for _, handler := range safeOutputHandlers {
+		if handler.ToolName == "" {
+			continue
+		}
+		requirement := promptToolRequirement{server: "safeoutputs", tool: handler.ToolName}
+		knownTools[handler.ToolName] = requirement
+		for _, alias := range handler.Aliases {
+			knownTools[stringutil.NormalizeSafeOutputIdentifier(alias)] = requirement
+		}
+	}
+	return knownTools
 }
 
 type promptToolScanState struct {
@@ -124,7 +123,7 @@ type promptToolScanState struct {
 	pendingRun bool
 }
 
-func (state *promptToolScanState) consumeLine(rawLine string, knownGitHubTools map[string]string) []promptToolRequirement {
+func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[string]promptToolRequirement) []promptToolRequirement {
 	line := strings.TrimSpace(rawLine)
 	marker := ""
 	for _, candidate := range []string{"```", "~~~"} {
@@ -162,12 +161,12 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownGitHubTools m
 		return nil
 	}
 	line = promptListPrefix.ReplaceAllString(line, "")
-	requirements, pending := promptInstructionRequirements(line, knownGitHubTools)
+	requirements, pending := promptInstructionRequirements(line, knownTools)
 	state.pendingRun = pending
 	return requirements
 }
 
-func promptInstructionRequirements(line string, knownGitHubTools map[string]string) ([]promptToolRequirement, bool) {
+func promptInstructionRequirements(line string, knownTools map[string]promptToolRequirement) ([]promptToolRequirement, bool) {
 	match := promptToolImperative.FindStringSubmatch(line)
 	if len(match) < 3 {
 		return nil, promptShellTaskIntro.MatchString(line) && !promptShellNonInstruction.MatchString(line)
@@ -182,10 +181,10 @@ func promptInstructionRequirements(line string, knownGitHubTools map[string]stri
 		}
 	}
 	pending := strings.EqualFold(verb, "run") && slices.ContainsFunc([]string{":", "the following:", "following:", "the following commands:", "following commands:", "commands:"}, func(intro string) bool { return strings.EqualFold(intro, target) })
-	return promptInvocationRequirements(verb, target, knownGitHubTools), pending
+	return promptInvocationRequirements(verb, target, knownTools), pending
 }
 
-func promptInvocationRequirements(verb, target string, knownGitHubTools map[string]string) []promptToolRequirement {
+func promptInvocationRequirements(verb, target string, knownTools map[string]promptToolRequirement) []promptToolRequirement {
 	inline := strings.HasPrefix(target, "`")
 	target = strings.TrimPrefix(target, "`")
 	if (strings.EqualFold(verb, "use") || strings.EqualFold(verb, "call")) && promptNativeRead.MatchString(target) {
@@ -218,8 +217,8 @@ func promptInvocationRequirements(verb, target string, knownGitHubTools map[stri
 	if strings.EqualFold(verb, "use") || strings.EqualFold(verb, "call") {
 		if bare := promptBareTool.FindStringSubmatch(target); len(bare) >= 2 {
 			for _, name := range bare[1:] {
-				if _, known := knownGitHubTools[name]; known {
-					return []promptToolRequirement{{server: "github", tool: name}}
+				if requirement, known := knownTools[name]; known {
+					return []promptToolRequirement{requirement}
 				}
 			}
 		}
