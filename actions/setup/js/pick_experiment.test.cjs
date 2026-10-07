@@ -802,13 +802,18 @@ describe("pick_experiment", () => {
     it("distributes variants proportionally across many runs", () => {
       const counts = { A: 0, B: 0 };
       const N = 1000;
-      for (let i = 0; i < N; i++) {
-        const v = pickVariantWeighted(["A", "B"], [70, 30]);
-        counts[v]++;
+      let sample = 0;
+      const random = vi.spyOn(Math, "random").mockImplementation(() => (sample++ + 0.5) / N);
+      try {
+        for (let i = 0; i < N; i++) {
+          const v = pickVariantWeighted(["A", "B"], [70, 30]);
+          counts[v]++;
+        }
+        expect(counts["A"]).toBe(700);
+        expect(counts["B"]).toBe(300);
+      } finally {
+        random.mockRestore();
       }
-      // With weights 70:30 we expect ~70% A and ~30% B.  Allow 10% absolute tolerance.
-      expect(counts["A"] / N).toBeCloseTo(0.7, 1);
-      expect(counts["B"] / N).toBeCloseTo(0.3, 1);
     });
   });
 

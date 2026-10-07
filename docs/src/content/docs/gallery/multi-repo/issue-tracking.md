@@ -190,6 +190,7 @@ on:
 permissions:
   contents: read
 
+engine: codex
 tools:
   github:
     toolsets: [issues]

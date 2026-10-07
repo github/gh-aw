@@ -200,7 +200,6 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// These are returned to the caller so they can be used for safe update enforcement
 	// without requiring a second scan of the full YAML content.
 	secrets := CollectSecretReferences(bodyContent)
-	actions := CollectActionReferences(bodyContent)
 
 	// If this workflow has a workflow_call trigger, inject on.workflow_call.secrets:
 	// declarations so callers can map secrets explicitly instead of using secrets: inherit.
@@ -221,6 +220,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 			compilerYamlLog.Printf("Regenerated workflow body with on.workflow_call.secrets declarations")
 		}
 	}
+
+	var pinResolver SHAResolver
+	if data.ActionResolver != nil {
+		pinResolver = data.ActionResolver
+	}
+	bodyContent, err = mapPinnedUsesInYAML(bodyContent, data.ActionPinMappings, data.ActionPinPrefixes, data.ActionPinWarnings, pinResolver)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	actions := CollectActionReferences(bodyContent)
 
 	// Generate workflow header comments (including metadata as first line, plus secrets/actions lists)
 	if err := c.generateWorkflowHeader(&yaml, data, frontmatterHash, bodyHash, secrets, actions); err != nil {

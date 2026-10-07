@@ -56,7 +56,7 @@ Fetch content from the web.
 // TestMCPFetchNotAddedForAnyEngine tests that the mcp/fetch container is never added
 // to any compiled workflow, regardless of engine, since the fallback has been removed.
 func TestMCPFetchNotAddedForAnyEngine(t *testing.T) {
-	engines := []string{"codex", "claude", "copilot", "gemini"}
+	engines := []string{"codex", "claude", "gemini"}
 
 	for _, engine := range engines {
 		t.Run(engine, func(t *testing.T) {

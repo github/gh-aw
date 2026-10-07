@@ -136,6 +136,9 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	if pullPolicy := dockerImagePullPolicy(data); pullPolicy != "" {
+		detectionData.RawFrontmatter = map[string]any{"docker-image-pull-policy": pullPolicy}
+	}
 
 	if firewallConfig := getFirewallConfig(data); firewallConfig != nil {
 		firewallCopy := *firewallConfig
@@ -206,7 +209,7 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 	threatLog.Printf("Pre-pulling %d AWF container image(s) for detection job", len(images))
 
 	var b strings.Builder
-	generateDownloadDockerImagesStep(&b, images)
+	generateDownloadDockerImagesStep(&b, images, dockerImagePullPolicy(data))
 	if b.Len() == 0 {
 		return nil
 	}
