@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,78 @@ import (
 
 	"github.com/github/gh-aw/pkg/fileutil"
 )
+
+// TestSpec_PublicAPI_EnsureParentDir validates recursive parent creation and
+// the documented empty-path error.
+func TestSpec_PublicAPI_EnsureParentDir(t *testing.T) {
+	t.Parallel()
+
+	t.Run("creates missing parent directories", func(t *testing.T) {
+		t.Parallel()
+		parent := filepath.Join(t.TempDir(), "nested", "parent")
+		err := fileutil.EnsureParentDir(filepath.Join(parent, "output.txt"), 0o750)
+		require.NoError(t, err, "EnsureParentDir should create nested parents")
+		assert.True(t, fileutil.DirExists(parent), "the requested parent directory should exist")
+	})
+
+	t.Run("rejects an empty path", func(t *testing.T) {
+		t.Parallel()
+		assert.Error(t, fileutil.EnsureParentDir("", 0o750),
+			"EnsureParentDir should reject an empty path")
+	})
+}
+
+// TestSpec_PublicAPI_ValidateExecutablePath validates the documented absolute
+// path, symlink resolution, regular-file, and executable-bit contracts.
+func TestSpec_PublicAPI_ValidateExecutablePath(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	executable := filepath.Join(dir, "tool")
+	require.NoError(t, os.WriteFile(executable, []byte("tool"), 0o700),
+		"test executable should be created")
+
+	resolved, err := fileutil.ValidateExecutablePath(executable)
+	require.NoError(t, err, "an absolute executable file should be accepted")
+	assert.Equal(t, executable, resolved, "the resolved executable path should be returned")
+
+	require.Error(t, func() error {
+		_, err := fileutil.ValidateExecutablePath("relative-tool")
+		return err
+	}(), "a relative executable path should be rejected")
+
+	require.Error(t, func() error {
+		_, err := fileutil.ValidateExecutablePath(dir)
+		return err
+	}(), "a directory should be rejected as a non-regular executable")
+
+	if runtime.GOOS != "windows" {
+		nonExecutable := filepath.Join(dir, "non-executable")
+		require.NoError(t, os.WriteFile(nonExecutable, []byte("tool"), 0o600),
+			"test non-executable should be created")
+		_, err := fileutil.ValidateExecutablePath(nonExecutable)
+		assert.Error(t, err, "a file without executable bits should be rejected on non-Windows systems")
+	}
+}
+
+// TestSpec_PublicAPI_ResolveExecutablePath validates PATH lookup, validation,
+// and the documented empty-name and missing-command errors.
+func TestSpec_PublicAPI_ResolveExecutablePath(t *testing.T) {
+	dir := t.TempDir()
+	executable := filepath.Join(dir, "spec-tool")
+	require.NoError(t, os.WriteFile(executable, []byte("tool"), 0o700),
+		"test executable should be created")
+	t.Setenv("PATH", dir)
+
+	resolved, err := fileutil.ResolveExecutablePath("spec-tool")
+	require.NoError(t, err, "a command present on PATH should resolve")
+	assert.Equal(t, executable, resolved, "ResolveExecutablePath should return the validated absolute path")
+
+	_, err = fileutil.ResolveExecutablePath("")
+	require.Error(t, err, "an empty executable name should be rejected")
+
+	_, err = fileutil.ResolveExecutablePath("missing-spec-tool")
+	assert.Error(t, err, "a command absent from PATH should return an error")
+}
 
 // TestSpec_PublicAPI_ValidateAbsolutePath validates the documented behavior:
 // rejects empty paths, cleans with filepath.Clean, verifies cleaned path is absolute.
