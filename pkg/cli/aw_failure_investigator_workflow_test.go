@@ -25,6 +25,9 @@ func TestAWFailureInvestigatorPrefetchUsesRunLevelFailures(t *testing.T) {
 		`.filter((name) => name.endsWith('.lock.yml'))`,
 		`falling back to workflow path suffix matching`,
 		`repos/${REPO}/actions/runs`,
+		"runApiJson(`repos/${REPO}/actions/runs/${runId}/jobs`, { per_page: '100' })",
+		`String(jobName || '').trim().toLowerCase() === 'agent'`,
+		`const jobId = job.id;`,
 		`failed_job_names: [...new Set(failedJobNames)].sort(),`,
 		`agent_job_conclusion: agentJobConclusion,`,
 	} {
@@ -34,5 +37,8 @@ func TestAWFailureInvestigatorPrefetchUsesRunLevelFailures(t *testing.T) {
 	}
 	if strings.Contains(text, `'--log-failed'`) {
 		t.Fatal("expected workflow prefetch to use full job logs for error-marker capture")
+	}
+	if strings.Contains(text, `job.databaseId`) {
+		t.Fatal("expected workflow prefetch to use the Actions API job.id")
 	}
 }
