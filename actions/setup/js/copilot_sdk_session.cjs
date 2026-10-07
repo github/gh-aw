@@ -130,6 +130,7 @@ function extractPromptFromArgs(args) {
  *     defineTool?: typeof import("@github/copilot-sdk").defineTool,
  *   },
  *   sessionStateBaseDir?: string,
+ *   structuredOutput?: {schema: import("ajv").AnySchemaObject, outputPath: string},
  * }} options
  * @returns {Promise<{exitCode: number, output: string, hasOutput: boolean, durationMs: number}>}
  */
@@ -150,6 +151,7 @@ async function runWithCopilotSDK({
   coreLogger,
   sdkModule,
   sessionStateBaseDir,
+  structuredOutput,
 }) {
   // Lazy-require to avoid loading the SDK when it is not needed.
   // The SDK is large and has side-effects on import (worker threads, etc.).
@@ -209,6 +211,7 @@ async function runWithCopilotSDK({
   /** @type {any} */
   let catastrophicToolDenialsError = null;
   let catastrophicToolDenialsTriggered = false;
+  let structuredOutputInvalid = false;
   /**
    * Rejects `denialGuardPromise` once the tool-denial threshold is exceeded and the
    * bounded force-exit interval elapses. Declared here so `recordToolDenial` (defined
@@ -312,6 +315,14 @@ async function runWithCopilotSDK({
   }
 
   try {
+    const schemaPath = process.env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE;
+    if (!structuredOutput && schemaPath) {
+      const { loadStructuredOutputSchema } = require("./structured_output.cjs");
+      const outputPath = process.env.GH_AW_STRUCTURED_OUTPUT_FILE;
+      if (!outputPath) throw new Error("Structured output requires GH_AW_STRUCTURED_OUTPUT_FILE");
+      structuredOutput = { schema: loadStructuredOutputSchema(schemaPath), outputPath };
+    }
+    if (structuredOutput) fs.rmSync(structuredOutput.outputPath, { force: true });
     await client.start();
     clientStarted = true;
     log("client started");
@@ -500,10 +511,62 @@ async function runWithCopilotSDK({
     // session.disconnect()/sendAndWait then stall, the driver still settles with a
     // nonzero exit within a bounded interval instead of hanging until the job's own
     // timeout intervenes. denialGuardPromise never settles unless the guard fires.
-    const result = await Promise.race([session.sendAndWait({ prompt }, sendTimeoutMs), denialGuardPromise]);
+    let result = await Promise.race([session.sendAndWait({ prompt, ...(structuredOutput ? { responseSchema: structuredOutput.schema } : {}) }, sendTimeoutMs), denialGuardPromise]);
 
     if (catastrophicToolDenialsError) {
       throw catastrophicToolDenialsError;
+    }
+
+    if (structuredOutput) {
+      const outputConfig = structuredOutput;
+      const { validateStructuredOutput } = require("./structured_output.cjs");
+      /** @param {import("@github/copilot-sdk").AssistantMessageEvent | undefined} response */
+      const parseResponse = response => {
+        if (!response || response.agentId || response.data?.toolRequests?.length || typeof response.data?.content !== "string") {
+          throw new Error("Structured output requires a final root assistant response");
+        }
+        let value;
+        try {
+          value = JSON.parse(response.data.content);
+        } catch {
+          throw new Error("Structured output is not a raw JSON value");
+        }
+        validateStructuredOutput(value, outputConfig.schema);
+        return value;
+      };
+      let value;
+      try {
+        value = parseResponse(result);
+      } catch {
+        structuredOutputInvalid = true;
+        // Fresh SDK sessions after transport retries share this correction budget.
+        const correctionMarker = `${outputConfig.outputPath}.correction-used`;
+        if (fs.existsSync(correctionMarker)) {
+          throw new Error("Structured output is invalid and its one correction attempt has already been used");
+        }
+        fs.writeFileSync(correctionMarker, "", { flag: "wx" });
+        log("structured output was invalid; requesting one schema-constrained correction");
+        if (postCompletionWatchdog) {
+          clearTimeout(postCompletionWatchdog);
+          postCompletionWatchdog = null;
+        }
+        structuredOutputInvalid = false;
+        result = await Promise.race([
+          session.sendAndWait(
+            {
+              prompt: "Your final response did not satisfy the required JSON schema. Return only a corrected JSON value matching the schema. Do not repeat completed work or tool calls.",
+              responseSchema: outputConfig.schema,
+            },
+            sendTimeoutMs
+          ),
+          denialGuardPromise,
+        ]);
+        if (catastrophicToolDenialsError) throw catastrophicToolDenialsError;
+        structuredOutputInvalid = true;
+        value = parseResponse(result);
+        structuredOutputInvalid = false;
+      }
+      fs.writeFileSync(outputConfig.outputPath, `${JSON.stringify(value)}\n`);
     }
 
     // sendAndWait returns the last assistant.message event; capture its content
@@ -529,7 +592,7 @@ async function runWithCopilotSDK({
     // When the post-completion idle watchdog force-disconnected the session, the
     // agent's work is done — the SDK simply failed to resolve sendAndWait after
     // the final tool result was returned.  Treat it as a successful completion.
-    if (postCompletionWatchdogTriggered && !catastrophicToolDenialsError && hasOutput && pendingToolCalls.size === 0) {
+    if (!structuredOutput && postCompletionWatchdogTriggered && !catastrophicToolDenialsError && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: post-completion watchdog triggered disconnect — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
       return { exitCode: 0, output, hasOutput, durationMs };
@@ -540,7 +603,7 @@ async function runWithCopilotSDK({
     // done — the SDK simply failed to emit the idle signal.  Treat it as a successful
     // run so the harness does not classify it as a failure or waste retry attempts.
     const isIdleTimeout = !catastrophicToolDenialsError && SDK_IDLE_TIMEOUT_PATTERN.test(failure.message);
-    if (isIdleTimeout && hasOutput && pendingToolCalls.size === 0) {
+    if (!structuredOutput && isIdleTimeout && hasOutput && pendingToolCalls.size === 0) {
       log(`warning: SDK idle-timeout with collected output and no pending tool calls — treating as completed`);
       log(`session completed: hasOutput=${hasOutput} assistantTurns=${assistantTurnCount} durationMs=${durationMs}`);
       return { exitCode: 0, output, hasOutput, durationMs };
@@ -549,7 +612,7 @@ async function runWithCopilotSDK({
     // Preserve any output collected before the error so the harness can use it
     // for retry decisions and diagnostics.
     return {
-      exitCode: 1,
+      exitCode: structuredOutputInvalid ? 65 : 1,
       output: hasOutput ? output : failure.message,
       hasOutput,
       durationMs,

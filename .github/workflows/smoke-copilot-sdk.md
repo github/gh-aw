@@ -24,6 +24,34 @@ engine:
     - copilot/gpt-5.4-mini
   copilot-sdk: true
   bare: true
+structured-output:
+  schema:
+    type: object
+    properties:
+      status:
+        type: string
+        enum: [PASS, FAIL]
+      calculation:
+        type: integer
+      fileVerified:
+        type: boolean
+    required: [status, calculation, fileVerified]
+    additionalProperties: false
+jobs:
+  verify_structured_output:
+    needs: agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify native Copilot SDK JSON output
+        env:
+          STRUCTURED_JSON: ${{ needs.agent.outputs.structured }}
+        run: |
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const result = JSON.parse(process.env.STRUCTURED_JSON);
+          assert.deepEqual(result, { status: 'PASS', calculation: 42, fileVerified: true });
+          NODE
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
@@ -67,3 +95,7 @@ Create an issue titled **"Smoke Test: Copilot SDK - ${{ github.run_id }}"** with
 - ✅ or ❌ for each task above
 - Overall status: PASS or FAIL
 - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+After creating the issue, return a final JSON response with `status` set to `PASS`
+or `FAIL`, `calculation` set to the computed integer, and `fileVerified` indicating
+whether the file contents were verified. Do not wrap the JSON in Markdown.

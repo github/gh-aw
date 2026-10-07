@@ -439,6 +439,15 @@ function buildCodexResumeArgs(args, threadId) {
   return [...args.slice(0, -1), "resume", threadId, "-"];
 }
 
+function resolveCodexStructuredOutput(env = process.env) {
+  const schemaPath = env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE;
+  const outputPath = env.GH_AW_STRUCTURED_OUTPUT_FILE;
+  if (!schemaPath && !outputPath) return null;
+  if (!schemaPath || !outputPath) throw new Error("Codex structured-output requires both schema and output file paths");
+  const { loadStructuredOutputSchema, validateStructuredOutput } = require("./structured_output.cjs");
+  return { outputPath, schema: loadStructuredOutputSchema(schemaPath), validate: validateStructuredOutput };
+}
+
 /**
  * Inject `--json` after `exec` in the args list so that Codex streams structured
  * JSON Lines (JSONL) to stdout.  This enables machine-readable output for CI
@@ -774,7 +783,9 @@ async function main() {
   // would be wasteful and potentially harmful.  This check runs before API key validation so
   // that a noop can be honoured even when credentials are absent.
   const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
-  if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
+  const structuredOutput = resolveCodexStructuredOutput();
+  if (structuredOutput) fs.rmSync(structuredOutput.outputPath, { force: true });
+  if (!structuredOutput && shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
     process.exit(0);
   }
 
@@ -862,8 +873,12 @@ async function main() {
   /** @type {string[] | null} */
   let resumeArgs = null;
   let lastThreadId = "";
+  let structuredCorrectionUsed = false;
+  let structuredResultValid = false;
   const tokenUsagePaths = process.env.GH_AW_CODEX_TOKEN_USAGE_PATH ? [process.env.GH_AW_CODEX_TOKEN_USAGE_PATH] : TOKEN_USAGE_PATHS;
   const resumePrompt = "Continue the interrupted task using the existing session. Preserve previously staged safe outputs; do not emit them again. Complete only unfinished work.";
+  const correctionPrompt =
+    "The final response did not match the supplied JSON schema. Correct only the final JSON response using that same schema: include every required field, use the required types, and omit additional properties. Do not call tools, repeat completed work, or emit previously staged safe outputs.";
   log(
     `context-rebuild circuit breaker: enabled=${contextRebuildCircuitBreaker.enabled}` +
       ` maxRebuildFactor=${contextRebuildCircuitBreaker.maxRebuildFactor}` +
@@ -891,69 +906,112 @@ async function main() {
       // written by this attempt, not by a previous retry.
       const safeOutputsByteOffset = safeOutputsPath ? getSafeOutputsByteOffset(safeOutputsPath) : 0;
 
-      const result = await runProcess({
-        command,
-        args: resumeArgs || resolvedArgs,
-        attempt,
-        log,
-        logArgs: resumeArgs ? [...resumeArgs.slice(0, -1), "<resume prompt via stdin>"] : safeArgs,
-        env: codexEnv,
-        stdin: resumeArgs ? resumePrompt : promptInput.stdin,
-        maxCollectedOutputBytes: 4 * 1024 * 1024,
-        onStdoutLine: line => {
-          mcpWatchdog.observe(line);
+      let completedTurn = false;
+      const execute = async (executionArgs, stdin, correction = false) => {
+        completedTurn = false;
+        if (structuredOutput) {
+          structuredResultValid = false;
+          fs.rmSync(structuredOutput.outputPath, { force: true });
+        }
+        return runProcess({
+          command,
+          args: executionArgs,
+          attempt,
+          log,
+          logArgs: correction || resumeArgs ? [...executionArgs.slice(0, -1), "<resume prompt via stdin>"] : safeArgs,
+          env: codexEnv,
+          stdin,
+          maxCollectedOutputBytes: 4 * 1024 * 1024,
+          onStdoutLine: line => {
+            mcpWatchdog.observe(line);
+            try {
+              const event = JSON.parse(line);
+              if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
+              if (event.type === "turn.completed") completedTurn = true;
+              if (event.type === "turn.failed" || event.type === "error") {
+                terminalErrors.push(line);
+                if (terminalErrors.length > 8) terminalErrors.shift();
+              }
+            } catch {}
+          },
+          onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
+          runtimeGuard: {
+            pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
+            termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+            onTriggered: decision => {
+              if (decision.event) process.stdout.write(`${JSON.stringify(decision.event)}\n`);
+            },
+            shouldTerminate: async () => {
+              if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
+              const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
+              if (expiredMCPCallTimeoutMs !== null) {
+                return {
+                  terminate: true,
+                  reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s`,
+                  event: { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } },
+                };
+              }
+              if (!contextRebuildCircuitBreaker.enabled) return false;
+              if (Date.now() < nextContextCheckAt) return false;
+              nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
+              return evaluateContextRebuildCircuitBreakerForAttempt(
+                await readWorkingSetFromTokenUsage(tokenUsagePaths),
+                {
+                  maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
+                  minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
+                },
+                { safeOutputsPath, safeOutputsByteOffset, logger: log }
+              );
+            },
+          },
+          postResultWatchdog:
+            safeOutputsPath && !structuredOutput
+              ? {
+                  shouldArm: () =>
+                    hasTerminalSafeOutput(safeOutputsPath, {
+                      byteOffset: safeOutputsByteOffset,
+                      includeMissingData: true,
+                      includeReportIncomplete: true,
+                      logger: log,
+                    }),
+                  inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
+                }
+              : undefined,
+        });
+      };
+      let result = await execute(resumeArgs || resolvedArgs, structuredCorrectionUsed ? correctionPrompt : resumeArgs ? resumePrompt : promptInput.stdin);
+      if (structuredOutput && result.exitCode === 0 && !result.runtimeGuardFired && !result.cancelled) {
+        for (;;) {
+          const finalText = fs.existsSync(structuredOutput.outputPath) ? fs.readFileSync(structuredOutput.outputPath, "utf8") : "";
+          if (!completedTurn || !finalText.trim()) {
+            log("fatal: Codex produced no structured final result (the model may have refused or exhausted its budget)");
+            fs.rmSync(structuredOutput.outputPath, { force: true });
+            return { ...result, exitCode: 1, structuredOutputFailed: true, safeOutputsByteOffset };
+          }
           try {
-            const event = JSON.parse(line);
-            if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
-            if (event.type === "turn.failed" || event.type === "error") {
-              terminalErrors.push(line);
-              if (terminalErrors.length > 8) terminalErrors.shift();
+            const value = JSON.parse(finalText);
+            structuredOutput.validate(value, structuredOutput.schema);
+            fs.writeFileSync(structuredOutput.outputPath, JSON.stringify(value), { mode: 0o600 });
+            structuredResultValid = true;
+            break;
+          } catch {
+            const correctionArgs = lastThreadId ? buildCodexResumeArgs(resolvedArgs, lastThreadId) : null;
+            if (structuredCorrectionUsed || !correctionArgs || (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs)) {
+              log("fatal: Codex structured final response does not match the schema; correction is exhausted or exact-session resume is unavailable");
+              fs.rmSync(structuredOutput.outputPath, { force: true });
+              return { ...result, exitCode: 1, structuredOutputFailed: true, safeOutputsByteOffset };
             }
-          } catch {}
-        },
-        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
-        runtimeGuard: {
-          pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
-          termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
-          onTriggered: decision => {
-            if (decision.event) process.stdout.write(`${JSON.stringify(decision.event)}\n`);
-          },
-          shouldTerminate: async () => {
-            if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
-            const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
-            if (expiredMCPCallTimeoutMs !== null) {
-              return {
-                terminate: true,
-                reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s`,
-                event: { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } },
-              };
+            structuredCorrectionUsed = true;
+            log("structured final response is schema-invalid; attempting one native schema-constrained correction in the same session");
+            result = await execute(correctionArgs, correctionPrompt, true);
+            if (result.exitCode !== 0 || result.runtimeGuardFired || result.cancelled) {
+              fs.rmSync(structuredOutput.outputPath, { force: true });
+              log("Codex structured-output correction was interrupted; preserving the independent transport retry policy");
+              break;
             }
-            if (!contextRebuildCircuitBreaker.enabled) return false;
-            if (Date.now() < nextContextCheckAt) return false;
-            nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
-            return evaluateContextRebuildCircuitBreakerForAttempt(
-              await readWorkingSetFromTokenUsage(tokenUsagePaths),
-              {
-                maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
-                minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
-              },
-              { safeOutputsPath, safeOutputsByteOffset, logger: log }
-            );
-          },
-        },
-        postResultWatchdog: safeOutputsPath
-          ? {
-              shouldArm: () =>
-                hasTerminalSafeOutput(safeOutputsPath, {
-                  byteOffset: safeOutputsByteOffset,
-                  includeMissingData: true,
-                  includeReportIncomplete: true,
-                  logger: log,
-                }),
-              inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
-            }
-          : undefined,
-      });
+          }
+        }
+      }
       const missingErrors = terminalErrors.filter(line => !result.output.includes(line));
       if (missingErrors.length) result.output = `${missingErrors.join("\n")}\n${result.output}`;
       // A guard-terminated run must never be reported as a success: Codex may handle SIGTERM
@@ -966,6 +1024,7 @@ async function main() {
       return { ...result, safeOutputsByteOffset };
     },
     handleFailure: ({ attempt, result }) => {
+      if ("structuredOutputFailed" in result && result.structuredOutputFailed === true) return { action: "stop" };
       if (result.runtimeGuardFired) {
         const details = result.runtimeGuardReason || "Codex runtime guard terminated the run after context rebuild thresholds were exceeded.";
         emitInfrastructureIncomplete(details, { logger: log });
@@ -1146,6 +1205,11 @@ async function main() {
     },
   });
   lastExitCode = retryRun.exitCode;
+  if (structuredOutput && (!structuredResultValid || lastExitCode !== 0)) {
+    fs.rmSync(structuredOutput.outputPath, { force: true });
+    if (lastExitCode === 0) log("fatal: Codex stopped without a validated structured final response");
+    lastExitCode = lastExitCode || 1;
+  }
 
   // Fetch AWF API proxy reflection data and persist to disk for post-run step summary.
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. no api-proxy running in sandbox or test mode).
@@ -1163,6 +1227,7 @@ if (typeof module !== "undefined" && module.exports) {
     resolveCodexPromptFileArgs,
     resolveCodexPromptInput,
     buildCodexResumeArgs,
+    resolveCodexStructuredOutput,
     injectJsonFlag,
     isRateLimitError,
     isTokenPerMinuteRateLimitError,

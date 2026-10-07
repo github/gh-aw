@@ -7,6 +7,23 @@
   "type": "object",
   "required": ["on"],
   "properties": {
+    "structured-output": {
+      "type": "object",
+      "description": "Constrain the agent's primary response with a native JSON Schema output mechanism. Unsupported engines are rejected.",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "Self-contained JSON Schema draft-07 or 2020-12 with an object root."
+        },
+        "schema-file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path to a JSON Schema file, embedded at compile time."
+        }
+      },
+      "oneOf": [{ "required": ["schema"] }, { "required": ["schema-file"] }]
+    },
     "name": {
       "type": "string",
       "minLength": 1,
@@ -15237,6 +15254,10 @@
                     },
                     "bash-command-allowlist": {
                       "type": "boolean"
+                    },
+                    "structured-output": {
+                      "type": "boolean",
+                      "description": "Native JSON Schema constraints on the primary response. The engine harness must consume the compiled schema and emit raw validated JSON."
                     }
                   },
                   "additionalProperties": false

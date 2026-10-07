@@ -625,6 +625,10 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	generateModelRoutingConversationStep(yaml, data)
 
+	if err := c.generateStructuredOutputSetup(yaml, data); err != nil {
+		return nil, "", err
+	}
+
 	// Start CLI proxy on the host before AWF execution. When tools.github.mode is gh-proxy,
 	// the compiler starts a difc-proxy container on the host that AWF's cli-proxy sidecar
 	// connects to via host.docker.internal:18443.
@@ -684,7 +688,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
-	if hasSafeJobArtifactPaths(data) {
+	if hasSafeJobArtifactPaths(data) || data.StructuredOutput != nil {
 		c.generateTrackedSecretRedactionStep(yaml, yaml.String(), data)
 	} else {
 		c.generateSecretRedactionStep(yaml, yaml.String(), data)
@@ -695,6 +699,10 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// /tmp/gh-aw/ that is reachable in both AWF sandbox and non-sandbox modes).
 	// secret redaction already scanned this file, so it is safe to append.
 	c.generateAgentStepSummaryAppend(yaml, data)
+
+	if err := c.generateStructuredOutputCollection(yaml, data); err != nil {
+		return nil, "", err
+	}
 
 	// Add output collection step only if safe-outputs feature is used (GH_AW_SAFE_OUTPUTS functionality)
 	if data.SafeOutputs != nil {

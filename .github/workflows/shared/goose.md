@@ -13,6 +13,7 @@ engine:
     capabilities:
       max-turns: true
       tools-allowlist: true
+      structured-output: true
     manifest:
       files:
         - .goosehints
@@ -160,8 +161,50 @@ engine:
           if (!/^[1-9][0-9]*$/.test(env.GH_AW_MAX_TURNS) || Number(env.GH_AW_MAX_TURNS) > 4294967295) throw new Error("GH_AW_MAX_TURNS must be a positive 32-bit integer");
           args.push("--max-turns", env.GH_AW_MAX_TURNS);
         }
-        args.push("--instructions", promptPath);
-        fail(spawnSync(binary, args, { stdio: "inherit", env }), "Goose execution");
+        const schemaPath = env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE;
+        const outputPath = env.GH_AW_STRUCTURED_OUTPUT_FILE;
+        if (schemaPath || outputPath) {
+          if (!schemaPath || !outputPath) throw new Error("Goose structured output requires both schema and output paths");
+          rmSync(outputPath, { force: true });
+          const { loadStructuredOutputSchema, validateStructuredOutput } = require("./structured_output.cjs");
+          const { createGooseStructuredOutputRecipe, createGooseStructuredOutputCollector, startGooseStructuredOutputProxy } = require("./goose_structured_output.cjs");
+          const { runProcess } = require("./process_runner.cjs");
+          const schema = loadStructuredOutputSchema(schemaPath);
+          const recipePath = join(installDir, "structured-output-recipe.json");
+          writeFileSync(recipePath, createGooseStructuredOutputRecipe(schema, readFileSync(promptPath, "utf8")), { mode: 0o600 });
+          args.push("--recipe", recipePath);
+          const collector = createGooseStructuredOutputCollector();
+          const proxy = await startGooseStructuredOutputProxy(env.OPENAI_HOST || "https://api.openai.com");
+          env.OPENAI_HOST = proxy.host;
+          try {
+            const result = await runProcess({
+              command: binary, args, env, attempt: 0, log,
+              onStdoutLine: collector.onStdoutLine,
+              maxCollectedOutputBytes: 1024 * 1024,
+              runtimeGuard: {
+                shouldTerminate: () => ({
+                  terminate: collector.hasExhaustedCorrection(),
+                  reason: "Goose native structured output failed after one correction attempt",
+                }),
+                pollIntervalMs: 100,
+              },
+            });
+            if (proxy.hasExhaustedCorrection() || collector.hasExhaustedCorrection()) throw new Error("Goose native structured output failed after one correction attempt");
+            if (result.exitCode !== 0) {
+              const error = new Error(`Goose execution failed with exit code ${result.exitCode}`);
+              error.exitCode = result.exitCode;
+              throw error;
+            }
+            const value = collector.result();
+            validateStructuredOutput(value, schema);
+            writeFileSync(outputPath, JSON.stringify(value), { mode: 0o600 });
+          } finally {
+            await proxy.close();
+          }
+        } else {
+          args.push("--instructions", promptPath);
+          fail(spawnSync(binary, args, { stdio: "inherit", env }), "Goose execution");
+        }
         } finally {
           if (existsSync(installDir)) rmSync(installDir, { recursive: true, force: true });
         }
@@ -199,6 +242,28 @@ Execution uses `goose run --no-session --with-builtin developer --output-format
 stream-json --instructions <prompt-file>` and forwards `GH_AW_MAX_TURNS` to
 `--max-turns`. Native streamable HTTP extensions retain gateway authorization
 headers; stdio extensions retain names, argument arrays, and environment values.
+
+When `structured-output` is configured, the harness supplies the workflow schema
+through Goose's native recipe `response.json_schema` instead of asking the model
+to write a JSON file. Goose validates its built-in `recipe__final_output` call,
+corrects invalid final output, and emits the final JSON response. The harness
+allows one schema-correction attempt and stops on a second native validation
+failure; ordinary transport behavior remains unchanged.
+An in-sandbox loopback forwarding adapter stops additional inference requests
+after the correction budget is exhausted. It preserves requests and responses;
+schema enforcement remains Goose's native recipe validator.
+The harness requires the successful native call, matching final response, and
+completed run before publishing it. Ordinary runs retain `--instructions`.
+Optional properties and open objects are supported; Goose does not require every
+property in `required` or force `additionalProperties: false`. Absent `$schema`
+selects draft-07 explicitly to match gh-aw. Draft-2020-12 is supported without
+`format` constraints; its native validator treats those as annotations, so the
+harness rejects that combination before inference. Use draft-07 for formats.
+The sample supports the configured OpenAI-compatible provider, not Goose
+providers that omit its built-in final-output tool. Structured workflows require
+the verified 1.53.0 binary and unmodified native harness: custom `engine.command`,
+`engine.args`, harness/driver overrides, execution behavior overrides, and other
+versions are rejected. Ordinary workflows retain existing override behavior.
 Configuration and session state are isolated in a temporary `GOOSE_PATH_ROOT`,
 and keyring access is disabled for unattended execution. Goose's CLI HTTP
 extension flag cannot carry headers, so the harness writes an owner-only native

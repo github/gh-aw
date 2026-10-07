@@ -18,6 +18,19 @@ JSON Schema for validating agentic workflow frontmatter configuration
 
 ```yaml wrap
 ---
+# Constrain the agent's primary response with a native JSON Schema output
+# mechanism. Unsupported engines are rejected.
+# (optional)
+structured-output:
+  # Self-contained JSON Schema draft-07 or 2020-12 with an object root.
+  # (optional)
+  schema:
+    {}
+
+  # Repository-relative path to a JSON Schema file, embedded at compile time.
+  # (optional)
+  schema-file: "example-value"
+
 # Workflow name that appears in the GitHub Actions interface. If not specified,
 # defaults to the filename without extension.
 # (optional)
@@ -2614,6 +2627,13 @@ engine:
   # (optional)
   model: "example-value"
 
+  # Ordered alternative models after model-specific failures, supported by engines
+  # with a built-in retry harness. Each model receives its own harness retry budget.
+  # Cannot be combined with model-routing or a custom driver or harness.
+  # (optional)
+  fallback-models: []
+    # Array of strings
+
   # Experimental per-run Copilot model and reasoning-effort selection from the task
   # text; requires the AWF firewall and ignores fixed model and effort settings. See
   # https://github.github.com/gh-aw/reference/model-routing/.
@@ -3200,6 +3220,11 @@ engine:
 
       # (optional)
       bash-command-allowlist: true
+
+      # Native JSON Schema constraints on the primary response. The engine harness must
+      # consume the compiled schema and emit raw validated JSON.
+      # (optional)
+      structured-output: true
 
     # (optional)
     manifest:
@@ -21096,6 +21121,13 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
+      # Ordered alternative models after model-specific failures, supported by engines
+      # with a built-in retry harness. Each model receives its own harness retry budget.
+      # Cannot be combined with model-routing or a custom driver or harness.
+      # (optional)
+      fallback-models: []
+        # Array of strings
+
       # Experimental per-run Copilot model and reasoning-effort selection from the task
       # text; requires the AWF firewall and ignores fixed model and effort settings. See
       # https://github.github.com/gh-aw/reference/model-routing/.
@@ -21682,6 +21714,11 @@ safe-outputs:
 
           # (optional)
           bash-command-allowlist: true
+
+          # Native JSON Schema constraints on the primary response. The engine harness must
+          # consume the compiled schema and emit raw validated JSON.
+          # (optional)
+          structured-output: true
 
         # (optional)
         manifest:

@@ -38,6 +38,7 @@ func writeGooseSmokeFixtures(t *testing.T, dir string) {
 		"smoke-test-goose-123.json": `{"pullRequests":[{"number":1,"title":"PR 1"},{"number":2,"title":"PR 2"}],"bash":true,"build":true,"fileWrite":true,"runtime":true,"webFetch":true}`,
 		"smoke-test-goose-123.txt":  "Smoke test passed for Goose at test timestamp\n",
 		"web-fetch.json":            `{"containsGitHub":true}`,
+		"structured-output.json":    `{"summary":"All six checks passed","passed":true}`,
 		"gh-aw":                     "test build output",
 		"agent-stdio.log": `[goose-harness] verified Goose 1.53.0
 {"type":"message","message":{"role":"assistant","content":[{"type":"toolRequest","id":"tool-1","toolCall":{"status":"success","value":{"name":"github__pull_request_read"}}}]}}
@@ -69,6 +70,8 @@ func TestGooseSmokeCheckerRequiresOperationalEvidence(t *testing.T) {
 		{name: "passing evidence"},
 		{name: "failed execution", execution: "failure", wantError: "Goose execution failed"},
 		{name: "missing evidence", file: "smoke-test-goose-123.json", wantError: "ENOENT"},
+		{name: "missing native structured output", file: "structured-output.json", wantError: "ENOENT"},
+		{name: "failed native structured output", file: "structured-output.json", content: `{"summary":"Failure","passed":false}`, wantError: "Native structured output must report a passed smoke test"},
 		{name: "failed build", file: "smoke-test-goose-123.json", content: `{"pullRequests":[{"number":1,"title":"PR 1"},{"number":2,"title":"PR 2"}],"bash":true,"build":false,"fileWrite":true,"runtime":true,"webFetch":true}`, wantError: "build did not pass"},
 		{name: "invented PR", file: "smoke-test-goose-123.json", content: `{"pullRequests":[{"number":1,"title":"invented"},{"number":2,"title":"PR 2"}],"bash":true,"build":true,"fileWrite":true,"runtime":true,"webFetch":true}`, wantError: "invented"},
 		{name: "missing web receipt", file: "web-fetch.json", wantError: "ENOENT"},
@@ -116,7 +119,8 @@ func runGooseSmokeChecker(t *testing.T, dir, checker, execution string) (string,
 const path = require("node:path");
 const wrapper = name => name === "node:fs" ? {
 	...fs,
-	readFileSync: (file, ...args) => fs.readFileSync(["/tmp/gh-aw/agent-stdio.log", "/tmp/gh-aw/agent-session.jsonl"].includes(file) ? path.join(process.env.SMOKE_ROOT, path.basename(file)) : file, ...args)
+	readFileSync: (file, ...args) => fs.readFileSync(["/tmp/gh-aw/agent-stdio.log", "/tmp/gh-aw/agent-session.jsonl", "/tmp/gh-aw/structured-output.json"].includes(file) ? path.join(process.env.SMOKE_ROOT, path.basename(file)) : file, ...args),
+	lstatSync: file => fs.lstatSync(file === "/tmp/gh-aw/structured-output.json" ? path.join(process.env.SMOKE_ROOT, path.basename(file)) : file)
 } : require(name);
 const github = { rest: { pulls: { get: async ({pull_number}) => ({data: {merged_at: "2026-10-01", title: "PR " + pull_number}}) } } };
 const summary = {addHeading() {return this;}, addRaw() {return this;}, async write() {}};

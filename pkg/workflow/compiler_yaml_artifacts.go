@@ -28,7 +28,7 @@ func (c *Compiler) generateUploadAccessLogs(yaml *strings.Builder, tools map[str
 // and reliability. The step always runs (even on cancellation) and ignores missing files.
 // Workflows with custom safe-job artifacts additionally require successful secret redaction.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, requireSuccessfulRedaction bool) {
+func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []string, prefix string, requireSuccessfulRedaction, requireStructuredOutput bool) {
 	if len(paths) == 0 {
 		compilerYamlArtifactsLog.Print("No paths to upload, skipping unified artifact upload")
 		return
@@ -43,7 +43,9 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 	c.stepOrderTracker.RecordArtifactUpload("Upload agent artifacts", paths)
 
 	yaml.WriteString("      - name: Upload agent artifacts\n")
-	if requireSuccessfulRedaction {
+	if requireStructuredOutput {
+		yaml.WriteString("        if: always() && steps.redact_secrets.outcome == 'success' && steps.structured_output.outcome == 'success'\n")
+	} else if requireSuccessfulRedaction {
 		yaml.WriteString("        if: always() && steps.redact_secrets.outcome == 'success'\n")
 	} else {
 		yaml.WriteString("        if: always()\n")

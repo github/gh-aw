@@ -20,6 +20,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Merge engine-declared output files into the unified artifact instead of creating a
 	// separate agent_outputs artifact.
 	paths = append(paths, getEngineArtifactPaths(engine)...)
+	if data.StructuredOutput != nil {
+		paths = append(paths, StructuredOutputFilePath, StructuredOutputSchemaPath)
+	}
 
 	// Collect MCP logs.
 	paths = append(paths, constants.TmpMcpLogsDir)
@@ -283,7 +286,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
 	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix)
-	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, hasSafeJobArtifactPaths(data))
+	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, hasSafeJobArtifactPaths(data) || data.StructuredOutput != nil, data.StructuredOutput != nil)
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its files
 	// live in the workspace. When a checkout: entry targets an external repository without a path

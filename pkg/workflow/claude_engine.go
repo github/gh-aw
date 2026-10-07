@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
+	"golang.org/x/mod/semver"
 )
 
 var claudeLog = logger.New("workflow:claude_engine")
@@ -43,10 +45,39 @@ func NewClaudeEngine() *ClaudeEngine {
 				BashDisable:          true,  // Explicit Bash deny rules remove shell execution.
 				Plugins:              true,  // Claude Code loads Agent Plugins via --plugin-dir
 				DynamicWorkflows:     true,
+				StructuredOutput:     true,
 			},
 			dedicatedLLMGatewayPort: constants.ClaudeLLMGatewayPort,
 		},
 	}
+}
+
+// ValidateStructuredOutputConfig requires the built-in harness and a CLI version
+// that rejects invalid schemas rather than silently returning unstructured text.
+func (e *ClaudeEngine) ValidateStructuredOutputConfig(config *EngineConfig) error {
+	if config == nil {
+		return nil
+	}
+	if config.Command != "" || config.Driver != "" || config.InlineDriver != nil || config.HarnessScript != "" && config.HarnessScript != e.GetHarnessScriptName() {
+		return errors.New("structured-output with Claude requires the built-in CLI command and harness; remove engine.command, engine.driver, or the custom engine.harness")
+	}
+	if config.Version != "" {
+		version := "v" + strings.TrimPrefix(config.Version, "v")
+		if !semver.IsValid(version) || semver.Compare(version, "v2.1.205") < 0 {
+			return fmt.Errorf("structured-output with Claude requires engine.version 2.1.205 or later; got %q", config.Version)
+		}
+	}
+	for _, arg := range config.Args {
+		flag, _, _ := strings.Cut(arg, "=")
+		switch flag {
+		case "--json-schema", "--structured-output-schema-file", "--structured-output-file", "--output-format", "--input-format", "--no-session-persistence", "--continue", "-c", "--resume", "-r", "--max-structured-output-retries":
+			return fmt.Errorf("structured-output with Claude manages %s; remove it from engine.args", flag)
+		}
+	}
+	if config.Env["CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS"] != "" && config.Env["CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS"] != "false" && config.Env["CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS"] != "0" {
+		return errors.New("structured-output with Claude cannot be disabled by engine.env.CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS")
+	}
+	return nil
 }
 
 // GetModelEnvVarName returns the native environment variable name that the Claude Code CLI uses
@@ -271,6 +302,12 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 
 	// stream-json outputs JSONL, compatible with the log parser.
 	claudeArgs = append(claudeArgs, "--output-format", "stream-json")
+	if workflowData.StructuredOutput != nil {
+		claudeArgs = append(claudeArgs,
+			"--structured-output-schema-file", StructuredOutputSchemaPath,
+			"--structured-output-file", StructuredOutputFilePath,
+		)
+	}
 
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Bare {
 		claudeLog.Print("Bare mode enabled: adding --bare")

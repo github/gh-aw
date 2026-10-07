@@ -123,6 +123,10 @@ Add deterministic steps before or after agentic execution, or define full custom
 
 The `jobs:` map can also target compiler-generated built-in jobs such as `agent`, `activation`, and `safe_outputs` for additive customization. In particular, `jobs.agent.needs` and `jobs.agent.if` let you gate the generated agent job on a custom setup job while preserving compiler-managed dependencies.
 
+### Structured Output (`structured-output:`)
+
+Declares a JSON Schema for the agent's primary response using either an inline `schema` or a repository-relative `schema-file`. Only engines with native schema-constrained output support accept this field. Validated JSON is exposed as the string `needs.agent.outputs.structured`; use `fromJSON(...)` to access its fields. See [Structured Output](/gh-aw/reference/structured-output/) for the schema, engine, failure, and downstream transport contracts.
+
 ### Pre-start Docker Image Pull Policy (`docker-image-pull-policy:`)
 
 By default, the generated agent and detection jobs pre-pull their Docker images (`docker-image-pull-policy: always`). Set `docker-image-pull-policy: never` to require those images to be present locally instead:

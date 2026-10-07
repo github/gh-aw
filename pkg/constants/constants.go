@@ -487,17 +487,18 @@ var IgnoredFrontmatterFields = []string{}
 // All other fields defined in main_workflow_schema.json can be used in shared workflows
 // and will be properly imported and merged when the shared workflow is imported.
 var SharedWorkflowForbiddenFields = []string{
-	"on",              // Trigger field - only for main workflows
-	"container",       // Container configuration
-	"environment",     // Deployment environment
-	"github-token",    // GitHub token configuration
-	"if",              // Conditional execution
-	"name",            // Workflow name
-	"run-name",        // Run display name
-	"runs-on",         // Runner specification
-	"strict",          // Strict mode
-	"timeout-minutes", // Timeout in minutes
-	"tracker-id",      // Tracker ID
+	"on",                // Trigger field - only for main workflows
+	"container",         // Container configuration
+	"environment",       // Deployment environment
+	"github-token",      // GitHub token configuration
+	"if",                // Conditional execution
+	"name",              // Workflow name
+	"run-name",          // Run display name
+	"runs-on",           // Runner specification
+	"strict",            // Strict mode
+	"structured-output", // Primary response contract, not import-safe
+	"timeout-minutes",   // Timeout in minutes
+	"tracker-id",        // Tracker ID
 }
 
 // Repository directory path constants

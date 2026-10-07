@@ -108,6 +108,14 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	ctx.toolsResult = toolsResult
 	ctx.workflowData = c.buildInitialWorkflowData(ctx.frontmatter, toolsResult, engineSetup, engineSetup.importsResult)
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
+	structuredOutput, err := parseStructuredOutput(ctx.frontmatter.Frontmatter, ctx.cleanPath, engineSetup.agenticEngine, engineSetup.engineConfig)
+	if err != nil {
+		return formatStructuredOutputError(ctx, err)
+	}
+	if structuredOutput != nil && ctx.workflowData.UseSamples {
+		return formatStructuredOutputError(ctx, errors.New("structured-output cannot be used with samples replay: select native agent execution"))
+	}
+	ctx.workflowData.StructuredOutput = structuredOutput
 	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }

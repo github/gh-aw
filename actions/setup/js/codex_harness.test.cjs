@@ -78,11 +78,27 @@ function spawnSync(command, args, options) {
   return spawnProcessSync(command, args, { ...options, env });
 }
 
-function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {} } = {}) {
+function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}, structured = false, initialStructuredOutput } = {}) {
   const dir = makeHarnessTempDir("runtime-");
   const executable = path.join(dir, "codex-stub.cjs");
   const promptPath = path.join(dir, "prompt.txt");
   const callsPath = path.join(dir, "calls.jsonl");
+  const schemaPath = path.join(dir, "schema.json");
+  const structuredOutputPath = path.join(dir, "structured.json");
+  if (structured) {
+    fs.writeFileSync(
+      schemaPath,
+      JSON.stringify({
+        type: "object",
+        properties: { answer: { type: "string" }, count: { type: "integer" } },
+        required: ["answer", "count"],
+        additionalProperties: false,
+      })
+    );
+    if (initialStructuredOutput !== undefined) fs.writeFileSync(structuredOutputPath, initialStructuredOutput);
+    args = [...args, "--output-schema", schemaPath, "--output-last-message", structuredOutputPath];
+    env = { ...env, GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE: schemaPath, GH_AW_STRUCTURED_OUTPUT_FILE: structuredOutputPath };
+  }
   fs.writeFileSync(
     executable,
     `#!${process.execPath}\nconst fs=require("fs");let input="";process.stdin.setEncoding("utf8");process.stdin.on("data",s=>input+=s);process.stdin.on("end",()=>{fs.appendFileSync(process.env.CODEX_HARNESS_STUB_CALLS,JSON.stringify({args:process.argv.slice(2),stdin:input})+"\\n");${script}\n});`
@@ -116,10 +132,146 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
         .split("\n")
         .map(line => JSON.parse(line))
     : [];
-  return { result, calls };
+  return { result, calls, structuredOutput: fs.existsSync(structuredOutputPath) ? fs.readFileSync(structuredOutputPath, "utf8") : undefined };
 }
 
 describe("codex_harness.cjs", () => {
+  describe("native structured output", () => {
+    const threadId = "0199a213-81c0-7800-8aa1-bbab2a035a53";
+    const completedTurn = `process.stdout.write(JSON.stringify({type:"turn.completed",usage:{input_tokens:1,output_tokens:1}})+"\\n");`;
+    const threadStarted = `process.stdout.write(JSON.stringify({type:"thread.started",thread_id:"${threadId}"})+"\\n");`;
+
+    it("uses native schema and final-message flags and preserves only raw primary JSON", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,JSON.stringify({answer:"done",count:2}));${completedTurn}`, { structured: true });
+      expect(result.status).toBe(0);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args).toContain("--output-schema");
+      expect(calls[0].args).toContain("--output-last-message");
+      expect(calls[0].args).toContain("--json");
+      expect(JSON.parse(structuredOutput)).toEqual({ answer: "done", count: 2 });
+    });
+
+    it("corrects an invalid response exactly once with the same native schema even when infrastructure retries are disabled", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(
+        `${threadStarted}
+const n=fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS,"utf8").trim().split("\\n").length;
+fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,JSON.stringify(n===1?{answer:"done",count:"wrong",extra:true}:{answer:"done",count:2}));
+${completedTurn}`,
+        { structured: true, env: { GH_AW_HARNESS_MAX_RETRIES: "0" } }
+      );
+      expect(result.status).toBe(0);
+      expect(calls).toHaveLength(2);
+      expect(calls[1].args).toEqual([...calls[0].args.slice(0, -1), "resume", threadId, "-"]);
+      expect(calls[1].stdin).toContain("Correct only the final JSON response");
+      expect(calls[1].stdin).toContain("Do not call tools");
+      expect(JSON.parse(structuredOutput)).toEqual({ answer: "done", count: 2 });
+    });
+
+    it.each(["{", '{"answer":"missing count"}', '{"answer":"wrong type","count":"2"}', '{"answer":"extra field","count":2,"extra":true}', '{"result":{"answer":"envelope","count":2}}'])(
+      "fails and removes invalid output after one correction: %s",
+      invalid => {
+        const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,${JSON.stringify(invalid)});${completedTurn}`, {
+          structured: true,
+          env: { GH_AW_HARNESS_MAX_RETRIES: "3" },
+        });
+        expect(result.status).toBe(1);
+        expect(calls).toHaveLength(2);
+        expect(structuredOutput).toBeUndefined();
+        expect(result.stderr).toContain("correction is exhausted");
+      }
+    );
+
+    it.each(["", "process.stdout.write('refused\\n');"])("fails without a structured result and never publishes a stale file", script => {
+      const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}${script}${completedTurn}`, {
+        structured: true,
+        initialStructuredOutput: '{"answer":"stale","count":2}',
+      });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(structuredOutput).toBeUndefined();
+      expect(result.stderr).toContain("no structured final result");
+    });
+
+    it("does not accept a file written before the native turn has completed", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{"answer":"unfinished","count":2}');`, { structured: true });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(structuredOutput).toBeUndefined();
+    });
+
+    it("does not replay invalid output without an exact resumable thread", () => {
+      const { result, calls } = runHarnessFixture(`fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{}');${completedTurn}`, { structured: true });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(result.stderr).toContain("exact-session resume is unavailable");
+    });
+
+    it("preserves transport retries during the sole schema correction", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(
+        `${threadStarted}
+const n=fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS,"utf8").trim().split("\\n").length;
+if(n===2){process.stderr.write("503 Service Unavailable\\n");process.exit(1);}
+fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,n===1?'{}':'{"answer":"corrected","count":2}');${completedTurn}`,
+        { structured: true, env: { GH_AW_HARNESS_MAX_RETRIES: "3" } }
+      );
+      expect(result.status).toBe(0);
+      expect(calls).toHaveLength(3);
+      expect(calls[2].args).toEqual(calls[1].args);
+      expect(calls[2].stdin).toBe(calls[1].stdin);
+      expect(JSON.parse(structuredOutput)).toEqual({ answer: "corrected", count: 2 });
+    });
+
+    it("does not grant another schema correction after a transport retry", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(
+        `${threadStarted}
+const n=fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS,"utf8").trim().split("\\n").length;
+if(n===2){process.stderr.write("503 Service Unavailable\\n");process.exit(1);}
+fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{}');${completedTurn}`,
+        { structured: true, env: { GH_AW_HARNESS_MAX_RETRIES: "3" } }
+      );
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(3);
+      expect(structuredOutput).toBeUndefined();
+      expect(result.stderr).toContain("correction is exhausted");
+    });
+
+    it("requires structured output even when a noop was previously staged", () => {
+      const dir = makeHarnessTempDir("structured-noop-");
+      const safeOutputsPath = path.join(dir, "safe-outputs.jsonl");
+      fs.writeFileSync(safeOutputsPath, '{"type":"noop","message":"Previously completed"}\n');
+      const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{"answer":"done","count":2}');${completedTurn}`, {
+        structured: true,
+        env: { GH_AW_SAFE_OUTPUTS: safeOutputsPath },
+      });
+      expect(result.status).toBe(0);
+      expect(calls).toHaveLength(1);
+      expect(JSON.parse(structuredOutput)).toEqual({ answer: "done", count: 2 });
+    });
+
+    it("does not treat exhausted execution budgets as successful without a structured result", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(`${threadStarted}process.stderr.write("AWF API proxy is blocking requests\\n");process.exit(1);`, {
+        structured: true,
+        env: { GH_AW_HARNESS_MAX_RETRIES: "0" },
+      });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(structuredOutput).toBeUndefined();
+    });
+
+    it("retains the native schema and final-message flags through an interrupted-session retry", () => {
+      const { result, calls, structuredOutput } = runHarnessFixture(
+        `${threadStarted}
+const n=fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS,"utf8").trim().split("\\n").length;
+if(n===1){fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{"answer":"stale","count":2}');process.stdout.write(JSON.stringify({type:"turn.failed",error:{message:"connection reset"}})+"\\n");process.exit(1);}
+fs.writeFileSync(process.env.GH_AW_STRUCTURED_OUTPUT_FILE,'{"answer":"resumed","count":3}');${completedTurn}`,
+        { structured: true }
+      );
+      expect(result.status).toBe(0);
+      expect(calls).toHaveLength(2);
+      expect(calls[1].args).toEqual([...calls[0].args.slice(0, -1), "resume", threadId, "-"]);
+      expect(JSON.parse(structuredOutput)).toEqual({ answer: "resumed", count: 3 });
+    });
+  });
   describe("MCP call watchdog", () => {
     it("times out only an outstanding MCP call, not other output or completed calls", () => {
       let time = 0;

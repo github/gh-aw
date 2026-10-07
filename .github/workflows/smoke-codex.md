@@ -26,6 +26,45 @@ engine:
   fallback-models:
     - openai/gpt-5.4
     - openai/gpt-5.4-mini
+structured-output:
+  schema:
+    type: object
+    properties:
+      engine:
+        type: string
+        enum: [codex]
+      status:
+        type: string
+        enum: [PASS, FAIL]
+      tests_passed:
+        type: integer
+        minimum: 0
+      tests_failed:
+        type: integer
+        minimum: 0
+    required: [engine, status, tests_passed, tests_failed]
+    additionalProperties: false
+jobs:
+  check-structured-output:
+    needs: agent
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Assert native Codex structured output
+        env:
+          STRUCTURED_OUTPUT: ${{ needs.agent.outputs.structured }}
+        run: |
+          node <<'NODE'
+          const assert = require("node:assert/strict");
+          const result = JSON.parse(process.env.STRUCTURED_OUTPUT);
+          assert.deepEqual(Object.keys(result).sort(), ["engine", "status", "tests_failed", "tests_passed"]);
+          assert.equal(result.engine, "codex");
+          assert.ok(["PASS", "FAIL"].includes(result.status));
+          assert.ok(Number.isInteger(result.tests_passed) && result.tests_passed >= 0);
+          assert.ok(Number.isInteger(result.tests_failed) && result.tests_failed >= 0);
+          assert.equal(result.status, result.tests_failed === 0 ? "PASS" : "FAIL");
+          NODE
 imports:
   - shared/gh.md
   - shared/reporting-otlp.md
@@ -132,6 +171,13 @@ sandbox:
     - If no editable issue fields are available, report this test as skipped with reason
 
 ## Output
+
+After completing the tests and emitting the required safe outputs below, return
+only the native schema-constrained JSON final response with exactly these fields:
+`engine: "codex"`, `status: "PASS" or "FAIL"`, `tests_passed` (nonnegative integer),
+and `tests_failed` (nonnegative integer). Set `status` to `PASS` exactly when
+`tests_failed` is zero. Do not wrap the JSON in markdown or a result envelope.
+The downstream job parses `needs.agent.outputs.structured` and checks this exact shape.
 
 **ALWAYS create an issue** with a summary of the smoke test run:
 - Title: "Smoke Test: Codex - ${{ github.run_id }}"

@@ -32,6 +32,60 @@ engine:
     - anthropic/claude-haiku-4-5
     - anthropic/claude-sonnet-5
   bare: true
+structured-output:
+  schema:
+    type: object
+    additionalProperties: false
+    required: [engine, schema_version, overall_status, tests]
+    properties:
+      engine:
+        const: claude
+      schema_version:
+        const: 1
+      overall_status:
+        enum: [PASS, PARTIAL, FAIL]
+      tests:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [number, status]
+          properties:
+            number:
+              type: integer
+              enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+            status:
+              enum: [pass, fail, skipped]
+jobs:
+  verify_structured_output:
+    needs: [agent]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert native Claude structured output
+        env:
+          STRUCTURED_JSON: ${{ needs.agent.outputs.structured }}
+        run: |
+          node <<'NODE'
+          const assert = require("node:assert/strict");
+          const result = JSON.parse(process.env.STRUCTURED_JSON);
+          assert.deepEqual(Object.keys(result).sort(), ["engine", "overall_status", "schema_version", "tests"]);
+          assert.equal(result.engine, "claude");
+          assert.equal(result.schema_version, 1);
+          assert.ok(["PASS", "PARTIAL", "FAIL"].includes(result.overall_status));
+          assert.ok(Array.isArray(result.tests));
+          assert.equal(result.tests.length, 19);
+          for (const test of result.tests) {
+            assert.deepEqual(Object.keys(test).sort(), ["number", "status"]);
+            assert.ok(Number.isInteger(test.number) && test.number >= 1 && test.number <= 19);
+            assert.ok(["pass", "fail", "skipped"].includes(test.status));
+          }
+          assert.equal(new Set(result.tests.map(test => test.number)).size, 19);
+          const expected = result.tests.some(test => test.status === "fail") ? "FAIL"
+            : result.tests.some(test => test.status === "skipped") ? "PARTIAL" : "PASS";
+          assert.equal(result.overall_status, expected);
+          console.log("Native Claude structured output has the exact smoke-test shape.");
+          NODE
 inlined-imports: true
 imports:
   - shared/gh.md
@@ -257,3 +311,11 @@ For tests below, mark a test as passed only if the required tool call succeeds.
    - If step 8 failed to extract a discussion number, skip this step
 
 If all non-skipped tests pass, use the `add_labels` tool to add the label `smoke-claude` to the pull request (omit the `item_number` parameter to auto-target the triggering PR if this workflow was triggered by a pull_request event).
+
+After completing the required safe outputs, return native structured output with
+`engine: "claude"`, `schema_version: 1`, `overall_status: "PASS"`, `"PARTIAL"`, or
+`"FAIL"`, and `tests` containing exactly one `{number, status}` record for every
+test from 1 through 19. Use `status: "pass"`, `"fail"`, or `"skipped"` according to
+the observed tool result. Overall status is FAIL if any test failed, otherwise
+PARTIAL if any test was skipped, otherwise PASS. Do not write a JSON file yourself;
+the native Claude schema result supplies the downstream job output.

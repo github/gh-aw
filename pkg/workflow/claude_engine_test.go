@@ -3,11 +3,15 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -178,6 +182,119 @@ func TestClaudeEngineWithOutput(t *testing.T) {
 	// Should include GH_AW_SAFE_OUTPUTS when hasOutput=true in environment section (via step output)
 	if !strings.Contains(stepContent, "GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}") {
 		t.Errorf("Expected GH_AW_SAFE_OUTPUTS in env section when hasOutput=true in step content:\n%s", stepContent)
+	}
+}
+
+func TestClaudeEngineStructuredOutput(t *testing.T) {
+	engine := NewClaudeEngine()
+	assert.True(t, engine.GetCapabilities().StructuredOutput)
+	for _, configured := range []bool{false, true} {
+		t.Run(fmt.Sprintf("configured=%t", configured), func(t *testing.T) {
+			data := &WorkflowData{Name: "claude-structured-output", Model: "claude-sonnet-4-6"}
+			if configured {
+				data.StructuredOutput = &StructuredOutputConfig{Schema: map[string]any{
+					"type": "object", "properties": map[string]any{"ok": map[string]any{"type": "boolean"}},
+					"required": []string{"ok"}, "additionalProperties": false,
+				}}
+			}
+			steps := engine.GetExecutionSteps(data, "test-log")
+			require.Len(t, steps, 1)
+			step := strings.Join([]string(steps[0]), "\n")
+			assert.Contains(t, step, "claude_harness.cjs")
+			assert.Contains(t, step, "--output-format stream-json")
+			if configured {
+				assert.Contains(t, step, "--structured-output-schema-file "+StructuredOutputSchemaPath)
+				assert.Contains(t, step, "--structured-output-file "+StructuredOutputFilePath)
+				assert.NotContains(t, step, `"properties"`)
+			} else {
+				assert.NotContains(t, step, "--structured-output-schema-file")
+				assert.NotContains(t, step, "--structured-output-file")
+			}
+		})
+	}
+}
+
+func TestClaudeValidateStructuredOutputConfig(t *testing.T) {
+	engine := NewClaudeEngine()
+	for _, config := range []*EngineConfig{
+		nil, {}, {Bare: true}, {Version: "2.1.205"}, {Version: string(constants.DefaultClaudeCodeVersion)},
+		{HarnessScript: engine.GetHarnessScriptName()}, {Args: []string{"--max-turns", "10"}},
+	} {
+		require.NoError(t, engine.ValidateStructuredOutputConfig(config))
+	}
+	for name, config := range map[string]*EngineConfig{
+		"old version":        {Version: "2.1.204"},
+		"unverified version": {Version: "latest"},
+		"custom command":     {Command: "my-claude"},
+		"custom harness":     {HarnessScript: "custom.cjs"},
+		"custom driver":      {Driver: "custom.cjs"},
+		"inline driver":      {InlineDriver: &InlineEngineDriver{}},
+		"format override":    {Args: []string{"--output-format=json"}},
+		"schema override":    {Args: []string{"--json-schema", "{}"}},
+		"no persistence":     {Args: []string{"--no-session-persistence"}},
+		"resume override":    {Args: []string{"--resume=other-session"}},
+		"disabled native":    {Env: map[string]string{"CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS": "true"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, engine.ValidateStructuredOutputConfig(config))
+		})
+	}
+}
+
+func TestClaudeSmokeStructuredOutputContract(t *testing.T) {
+	compiler := NewCompiler(WithNoEmit(true))
+	require.NoError(t, compiler.CompileWorkflow("../../.github/workflows/smoke-claude.md"))
+	content, err := os.ReadFile("../../.github/workflows/smoke-claude.md")
+	require.NoError(t, err)
+	parsed, err := parser.ExtractFrontmatterFromContent(string(content))
+	require.NoError(t, err)
+	config, err := parseStructuredOutput(parsed.Frontmatter, "../../.github/workflows/smoke-claude.md", NewClaudeEngine(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	assert.Equal(t, "object", config.Schema["type"])
+	assert.Equal(t, false, config.Schema["additionalProperties"])
+
+	jobs := parsed.Frontmatter["jobs"].(map[string]any)
+	job := jobs["verify_structured_output"].(map[string]any)
+	steps := job["steps"].([]any)
+	run := steps[0].(map[string]any)["run"].(string)
+	script, found := strings.CutPrefix(run, "node <<'NODE'\n")
+	require.True(t, found)
+	script = strings.TrimSuffix(strings.TrimSpace(script), "\nNODE")
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required to validate the downstream smoke assertion")
+	}
+	tests := make([]map[string]any, 19)
+	for i := range tests {
+		tests[i] = map[string]any{"number": i + 1, "status": "pass"}
+	}
+	for _, mutation := range []string{"valid", "wrong engine", "extra root field", "duplicate test", "incorrect overall status"} {
+		t.Run(mutation, func(t *testing.T) {
+			payload := map[string]any{"engine": "claude", "schema_version": 1, "overall_status": "PASS", "tests": tests}
+			switch mutation {
+			case "wrong engine":
+				payload["engine"] = "not-claude"
+			case "extra root field":
+				payload["extra"] = true
+			case "duplicate test":
+				duplicate := append([]map[string]any(nil), tests...)
+				duplicate[18] = tests[0]
+				payload["tests"] = duplicate
+			case "incorrect overall status":
+				payload["overall_status"] = "FAIL"
+			}
+			encoded, err := json.Marshal(payload)
+			require.NoError(t, err)
+			command := exec.Command(node, "-e", script)
+			command.Env = append(os.Environ(), "STRUCTURED_JSON="+string(encoded))
+			output, err := command.CombinedOutput()
+			if mutation == "valid" {
+				require.NoError(t, err, string(output))
+			} else {
+				require.Error(t, err, string(output))
+			}
+		})
 	}
 }
 

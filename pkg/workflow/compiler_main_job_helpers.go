@@ -146,7 +146,7 @@ func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
 	if isFirewallEnabled(data) || data.AI == string(constants.CopilotEngine) {
 		usageStepID = constants.ParseTokenUsageStepID
 	}
-	return map[string]string{
+	outputs := map[string]string{
 		"model": fmt.Sprintf("${{ needs.%s.outputs.model }}", constants.ActivationJobName),
 		// aic is the total AI Credits cost for the run (1 AIC == 0.01 USD), captured by the
 		// MCP gateway log parser step and passed to downstream jobs for footer rendering.
@@ -167,6 +167,10 @@ func buildMainJobCoreOutputs(data *WorkflowData) map[string]string {
 		// setup-parent-span-id propagates the global setup parent span ID across jobs.
 		"setup-parent-span-id": "${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}",
 	}
+	if data.StructuredOutput != nil {
+		outputs["structured"] = "${{ steps.structured_output.outputs.structured }}"
+	}
+	return outputs
 }
 
 // addMainJobEngineErrorOutputs adds engine error detection output declarations to outputs when the

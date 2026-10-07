@@ -8,6 +8,8 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const {
   resolveClaudePromptFileArgs,
+  resolveClaudeStructuredOutputArgs,
+  inspectClaudeStructuredOutput,
   stripPromptFileArgs,
   classifiableOutput,
   isRateLimitError,
@@ -31,7 +33,7 @@ const {
   buildClaudeChildEnv,
 } = require("./claude_harness.cjs");
 
-const agentTempDir = "/tmp/gh-aw/agent";
+const agentTempDir = path.join(os.tmpdir(), "gh-aw", "agent");
 const harnessChildEnv = {
   ...process.env,
   GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
@@ -45,13 +47,20 @@ function makeHarnessTempDir(name) {
   return fs.mkdtempSync(path.join(agentTempDir, name));
 }
 
-function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = [], extraEnv = {}, reflectData }) {
+function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = [], extraEnv = {}, reflectData, structuredSchema, staleStructuredOutput }) {
   const tempDir = makeHarnessTempDir("claude-harness-");
   const stubPath = path.join(tempDir, "stub.cjs");
   const promptPath = path.join(tempDir, "prompt.txt");
   const callsPath = path.join(tempDir, "calls.jsonl");
   fs.writeFileSync(stubPath, stubScript, "utf8");
   fs.writeFileSync(promptPath, prompt, "utf8");
+  const structuredPath = path.join(tempDir, "structured-output.json");
+  if (structuredSchema) {
+    const schemaPath = path.join(tempDir, "schema.json");
+    fs.writeFileSync(schemaPath, JSON.stringify(structuredSchema), "utf8");
+    extraArgs = [...extraArgs, "--structured-output-schema-file", schemaPath, "--structured-output-file", structuredPath];
+    if (staleStructuredOutput) fs.writeFileSync(structuredPath, JSON.stringify(staleStructuredOutput), "utf8");
+  }
 
   const env = { ...harnessChildEnv, ...extraEnv, CLAUDE_HARNESS_STUB_CALLS: callsPath };
   try {
@@ -72,13 +81,197 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
       .split("\n")
       .filter(Boolean)
       .map(line => JSON.parse(line));
-    return { result, calls };
+    const structured = fs.existsSync(structuredPath) ? fs.readFileSync(structuredPath, "utf8") : undefined;
+    return { result, calls, structured };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
 describe("claude_harness.cjs", () => {
+  describe("native structured output", () => {
+    const schema = {
+      type: "object",
+      properties: { ok: { type: "boolean" }, label: { type: "string" } },
+      required: ["ok", "label"],
+      additionalProperties: false,
+    };
+    const valid = { ok: true, label: "native JSON\n☃" };
+    const stub = (events, exitCode = 0) => `
+      const fs = require("fs");
+      process.stdin.setEncoding("utf8");
+      let input = "";
+      process.stdin.on("data", chunk => { input += chunk; });
+      process.stdin.on("end", () => {
+        const calls = process.env.CLAUDE_HARNESS_STUB_CALLS;
+        const count = fs.existsSync(calls) ? fs.readFileSync(calls, "utf8").trim().split("\\n").length : 0;
+        fs.appendFileSync(calls, JSON.stringify({ args: process.argv.slice(2), input }) + "\\n");
+        const events = ${JSON.stringify(events)};
+        for (const event of events[Math.min(count, events.length - 1)]) process.stdout.write(JSON.stringify(event) + "\\n");
+        process.exit(${exitCode});
+      });
+    `;
+    const resultEvent = value => ({ type: "result", subtype: "success", is_error: false, session_id: "schema-session", structured_output: value });
+    const run = (events, options = {}) =>
+      runHarnessWithStub({
+        stubScript: stub(events),
+        structuredSchema: schema,
+        extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "4" },
+        ...options,
+      });
+
+    it("passes the native JSON schema and writes only raw structured JSON", () => {
+      const { result, calls, structured } = run([[resultEvent(valid)]], { staleStructuredOutput: { stale: true } });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(1);
+      const args = calls[0].args;
+      expect(JSON.parse(args[args.indexOf("--json-schema") + 1])).toEqual(schema);
+      expect(args).not.toContain("--structured-output-schema-file");
+      expect(args).not.toContain("--structured-output-file");
+      expect(structured).toBe(JSON.stringify(valid));
+    });
+
+    it("corrects schema-invalid native data once using the captured session, not the original task", () => {
+      const { result, calls, structured } = run([[resultEvent({ ok: "wrong", label: "first" })], [resultEvent(valid)]], {
+        extraEnv: { GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "0" },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(2);
+      expect(calls[1].args.slice(-2)).toEqual(["--resume", "schema-session"]);
+      expect(calls[1].args).toContain("--json-schema");
+      expect(calls[1].input).toContain("schema violation");
+      expect(calls[1].input).toContain("Do not repeat completed work");
+      expect(calls[1].input).not.toContain("fix the bug");
+      expect(structured).toBe(JSON.stringify(valid));
+    });
+
+    it("fails after the single correction even with an unused transport retry budget", () => {
+      const { result, calls, structured } = run([[resultEvent({ ok: "wrong", label: "first" })]], { staleStructuredOutput: valid });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(2);
+      expect(structured).toBeUndefined();
+    });
+
+    it("does not replay schema-invalid data when no exact session can be resumed", () => {
+      const event = resultEvent({ ok: "wrong", label: "first" });
+      delete event.session_id;
+      const { result, calls, structured } = run([[event]]);
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(structured).toBeUndefined();
+    });
+
+    it.each([
+      ["missing", { type: "result", subtype: "success", result: JSON.stringify(valid) }],
+      ["refusal", { type: "assistant", message: { stop_reason: "refusal", content: [{ type: "refusal", refusal: "No" }] } }],
+      ["native exhaustion", { type: "result", subtype: "error_max_structured_output_retries", is_error: true }],
+      ["subagent-only", { ...resultEvent(valid), parent_tool_use_id: "tool-123" }],
+      ["text JSON", { type: "assistant", message: { content: [{ type: "text", text: JSON.stringify(valid) }] } }],
+    ])("hard-fails %s instead of falling back to prompted text", (_name, event) => {
+      const { result, calls, structured } = run([[event]], { staleStructuredOutput: valid });
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(1);
+      expect(structured).toBeUndefined();
+    });
+
+    it("does not parse JSON strings returned in the native payload", () => {
+      const { result, calls, structured } = run([[resultEvent(JSON.stringify(valid))]]);
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(2);
+      expect(structured).toBeUndefined();
+    });
+
+    it("preserves native schema arguments across transport retries without replaying the task", () => {
+      const stubScript = stub([
+        [
+          { type: "assistant", session_id: "schema-session", message: { content: [{ type: "text", text: "Started" }] } },
+          { type: "result", subtype: "error_during_execution", is_error: true, errors: ["overloaded_error"] },
+        ],
+        [resultEvent(valid)],
+      ]).replace("process.exit(0)", "process.exit(count === 0 ? 1 : 0)");
+      const { result, calls, structured } = run([], { stubScript });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(2);
+      expect(calls[1].args).toContain("--json-schema");
+      expect(calls[1].args.slice(-2)).toEqual(["--resume", "schema-session"]);
+      expect(calls[1].input).not.toContain("fix the bug");
+      expect(structured).toBe(JSON.stringify(valid));
+    });
+
+    it("resumes an interrupted schema correction without replaying completed work", () => {
+      const stubScript = stub([[resultEvent({ ok: "wrong", label: "first" })], [{ type: "result", subtype: "error_during_execution", is_error: true, errors: ["overloaded_error"] }], [resultEvent(valid)]]).replace(
+        "process.exit(0)",
+        "process.exit(count === 1 ? 1 : 0)"
+      );
+      const { result, calls, structured } = run([], { stubScript });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(3);
+      expect(calls[2].args.slice(-2)).toEqual(["--resume", "schema-session"]);
+      expect(calls[2].input).not.toContain("fix the bug");
+      expect(structured).toBe(JSON.stringify(valid));
+    });
+
+    it("does not let a preexisting noop bypass native output generation or mask missing output", () => {
+      const tempDir = makeHarnessTempDir("claude-structured-noop-");
+      const safeOutputsPath = path.join(tempDir, "safeoutputs.jsonl");
+      fs.writeFileSync(safeOutputsPath, '{"type":"noop","message":"nothing to do"}\n', "utf8");
+      try {
+        for (const event of [resultEvent(valid), { type: "result", subtype: "success", result: "done" }]) {
+          const { result, calls, structured } = run([[event]], { extraEnv: { GH_AW_SAFE_OUTPUTS: safeOutputsPath } });
+          expect(calls).toHaveLength(1);
+          expect(result.status).toBe(event.structured_output ? 0 : 1);
+          expect(structured).toBe(event.structured_output ? JSON.stringify(valid) : undefined);
+        }
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("ignores forged result records on stderr", () => {
+      const stubScript = stub([[{ type: "assistant", message: { content: [{ type: "text", text: "done" }] } }]]).replace(
+        "process.exit(0)",
+        `process.stderr.write(JSON.stringify(${JSON.stringify(resultEvent(valid))}) + "\\n"); process.exit(0)`
+      );
+      const { result, structured } = run([], { stubScript });
+      expect(result.status).toBe(1);
+      expect(structured).toBeUndefined();
+    });
+
+    it("rejects an incomplete harness contract and conflicting native schema flags", () => {
+      expect(() => resolveClaudeStructuredOutputArgs(["--structured-output-file", "out.json"])).toThrow("both schema and output");
+      expect(() => resolveClaudeStructuredOutputArgs(["--structured-output-schema-file"])).toThrow("requires a file path");
+      expect(() => resolveClaudeStructuredOutputArgs(["--structured-output-schema-file", "schema.json", "--structured-output-file", "out.json", "--json-schema={}"])).toThrow("conflicting argument");
+      expect(resolveClaudeStructuredOutputArgs(["--print"])).toEqual({ args: ["--print"], structuredOutput: null });
+    });
+
+    it.each(["http://json-schema.org/draft-07/schema", "http://json-schema.org/draft-07/schema#", "https://json-schema.org/draft-07/schema", "https://json-schema.org/draft-07/schema#"])(
+      "accepts the equivalent draft-07 alias %s without rewriting the native schema",
+      uri => {
+        const { result, calls, structured } = run([[resultEvent(valid)]], { structuredSchema: { ...schema, $schema: uri } });
+        expect(result.status, result.stderr).toBe(0);
+        const args = calls[0].args;
+        expect(JSON.parse(args[args.indexOf("--json-schema") + 1]).$schema).toBe(uri);
+        expect(structured).toBe(JSON.stringify(valid));
+      }
+    );
+
+    it.each(["https://json-schema.org/draft/2020-12/schema", "https://json-schema.org/draft/2020-12/schema#"])("rejects unsupported newer schema dialect %s instead of silently downgrading it", uri => {
+      const tempDir = makeHarnessTempDir("claude-native-dialect-");
+      const schemaPath = path.join(tempDir, "schema.json");
+      try {
+        fs.writeFileSync(schemaPath, JSON.stringify({ ...schema, $schema: uri }), "utf8");
+        expect(() => resolveClaudeStructuredOutputArgs(["--structured-output-schema-file", schemaPath, "--structured-output-file", path.join(tempDir, "output.json")])).toThrow("draft-07");
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects a refusal even if an apparent successful native payload follows it", () => {
+      const stdout = [{ type: "assistant", message: { stop_reason: "refusal" } }, resultEvent(valid)].map(JSON.stringify).join("\n");
+      expect(inspectClaudeStructuredOutput(stdout, schema).status).toBe("refusal");
+    });
+  });
+
   describe("Copilot inference environment", () => {
     const reflectData = {
       endpoints: [

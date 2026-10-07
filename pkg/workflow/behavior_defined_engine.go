@@ -621,6 +621,10 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	applyEngineAndAgentEnv(env, workflowData, behaviorDefinedEngineLog)
 	applyMCPScriptsSecretEnv(env, workflowData)
 	e.applyBehaviorDefinedModelEnv(exec, workflowData, env)
+	if workflowData != nil && workflowData.StructuredOutput != nil {
+		env["GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE"] = StructuredOutputSchemaPath
+		env["GH_AW_STRUCTURED_OUTPUT_FILE"] = StructuredOutputFilePath
+	}
 	return env
 }
 

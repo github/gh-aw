@@ -162,6 +162,16 @@ type EngineCapabilities struct {
 
 	// DynamicWorkflows reports whether the engine supports loading saved dynamic workflows.
 	DynamicWorkflows bool
+
+	// StructuredOutput reports native JSON Schema constraints on the primary response.
+	// JSON log envelopes and prompt-only JSON instructions do not qualify.
+	StructuredOutput bool
+}
+
+// StructuredOutputConfigValidator rejects execution modes that cannot honor the
+// native structured-output contract even when the engine supports it generally.
+type StructuredOutputConfigValidator interface {
+	ValidateStructuredOutputConfig(*EngineConfig) error
 }
 
 // PluginInstallationProvider generates installation steps for Agent Plugins.

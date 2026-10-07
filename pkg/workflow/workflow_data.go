@@ -99,9 +99,10 @@ type WorkflowData struct {
 	AI                             string                 // "claude" or "codex" (for backwards compatibility)
 	Model                          string                 // Top-level LLM model override (from frontmatter model: field or imports)
 	EngineConfig                   *EngineConfig          // Extended engine configuration
-	AgentFile                      string                 // Path to custom agent file (from imports)
-	AgentImportSpec                string                 // Original import specification for agent file (e.g., "owner/repo/path@ref")
-	RepositoryImports              []string               // Repository-only imports (format: "owner/repo@ref") for .github folder merging
+	StructuredOutput               *StructuredOutputConfig
+	AgentFile                      string   // Path to custom agent file (from imports)
+	AgentImportSpec                string   // Original import specification for agent file (e.g., "owner/repo/path@ref")
+	RepositoryImports              []string // Repository-only imports (format: "owner/repo@ref") for .github folder merging
 	StopTime                       string
 	Cooldown                       time.Duration                   // minimum time between completed runs that executed the agent job
 	SkipIfMatch                    *SkipIfMatchConfig              // skip-if-match configuration with query and max threshold

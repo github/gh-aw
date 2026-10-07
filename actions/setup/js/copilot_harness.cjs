@@ -787,6 +787,7 @@ function classifyCopilotFailure(detection) {
  */
 function shouldRetryFailedExecution(params) {
   if (params.exitCode === 0) return false;
+  if (params.exitCode === 65 && process.env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE) return false;
   if (params.isModelRoutingFailure) return false;
   if (hasNumerousPermissionDeniedIssues(params.output)) return false;
   if (isCAPIQuotaExceededError(params.output)) return false;
@@ -1280,7 +1281,11 @@ async function main() {
   // legitimate noop exit is never turned into an infrastructure-incomplete failure by an
   // unrelated listener being unavailable.
   const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
-  if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
+  const structuredOutputRequested = Boolean(process.env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE);
+  if (structuredOutputRequested && process.env.GH_AW_STRUCTURED_OUTPUT_FILE) {
+    fs.rmSync(`${process.env.GH_AW_STRUCTURED_OUTPUT_FILE}.correction-used`, { force: true });
+  }
+  if (!structuredOutputRequested && shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
     process.exit(0);
   }
 
@@ -1475,12 +1480,13 @@ async function main() {
             logArgs: safeArgs,
             env: childEnv,
             stdin: promptStdin,
-            postResultWatchdog: safeOutputsPath
-              ? {
-                  shouldArm: () => hasTerminalSafeOutput(safeOutputsPath),
-                  inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
-                }
-              : undefined,
+            postResultWatchdog:
+              safeOutputsPath && !structuredOutputRequested
+                ? {
+                    shouldArm: () => hasTerminalSafeOutput(safeOutputsPath),
+                    inactivityTimeoutMs: POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
+                  }
+                : undefined,
           });
           lastHasOutput = result.hasOutput;
           const attemptDetections = detectCopilotErrors(result.output);
@@ -1492,6 +1498,10 @@ async function main() {
           return result;
         },
         handleFailure: async ({ attempt, result }) => {
+          if (result.exitCode === 65 && process.env.GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE) {
+            log("structured output failed — not restarting the SDK session");
+            return { action: "stop" };
+          }
           // Determine whether to retry.
           // Retry whenever the session was partially executed (hasOutput).
           //   - CLI mode: retry with --continue so the Copilot CLI can continue from on-disk state.
@@ -1606,7 +1616,7 @@ async function main() {
             );
           }
 
-          if (shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) {
+          if (!structuredOutputRequested && shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeOutputs, log })) {
             return { action: "stop", exitCode: 0 };
           }
 
@@ -1622,7 +1632,7 @@ async function main() {
           // run means the agent completed its task (wrote safe-output) but produced no console
           // output before the watchdog terminated the idle process.
           const isExpectedLateExit = failureClass === "partial_execution" || failureClass === "long_run_exit" || (failureClass === "no_output" && result.watchdogFired) || (failureClass === "authentication_failed" && result.watchdogFired);
-          if (isExpectedLateExit && safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath)) {
+          if (!structuredOutputRequested && isExpectedLateExit && safeOutputsPath && hasTerminalSafeOutput(safeOutputsPath)) {
             const reason = result.watchdogFired ? "post-result watchdog fired after terminal safe-output was emitted" : "partial execution after terminal safe-output was already produced";
             log(`attempt ${attempt + 1}: ${reason} — treating as success (late-activity exit suppressed)`);
             return { action: "stop", exitCode: 0 };

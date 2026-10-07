@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"path"
@@ -35,6 +36,7 @@ const detectionResultFilePath = "/tmp/gh-aw/threat-detection/detection_result.js
 var (
 	codexToolCallOldFormat = regexp.MustCompile(`\] tool ([^(]+)\(`)
 	codexToolCallNewFormat = regexp.MustCompile(`^tool ([^(]+)\(`)
+	codexStableVersion     = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 // CodexEngine represents the Codex agentic engine
@@ -61,6 +63,7 @@ func NewCodexEngine() *CodexEngine {
 				NativeAgentFile:  false, // Codex does not support agent file natively; the compiler prepends the agent file content to prompt.txt
 				BashDisable:      true,  // Codex can fully refuse shell execution via `-c features.shell_tool=false`, though it cannot enforce a per-command allowlist
 				Plugins:          true,  // Codex CLI loads Agent Plugins through a generated local marketplace and "codex plugin add"
+				StructuredOutput: true,  // Codex exec constrains its final response with --output-schema.
 			},
 			dedicatedLLMGatewayPort: constants.CodexLLMGatewayPort,
 		},
@@ -293,12 +296,45 @@ func (e *CodexEngine) codexModelEnvVar(workflowData *WorkflowData) string {
 }
 
 func (e *CodexEngine) codexStructuredOutputConfig(workflowData *WorkflowData) (string, string) {
+	if !workflowData.IsDetectionRun && workflowData.StructuredOutput != nil {
+		return fmt.Sprintf(" --output-schema %s --output-last-message %s ", StructuredOutputSchemaPath, StructuredOutputFilePath), ""
+	}
 	if !workflowData.IsDetectionRun {
 		return "", ""
 	}
 	codexEngineLog.Printf("Enabling structured outputs for Codex detection run")
 	return fmt.Sprintf(` --output-schema %s -o %s`, detectionSchemaFilePath, detectionResultFilePath),
 		fmt.Sprintf("mkdir -p /tmp/gh-aw/threat-detection && printf '%%s' '%s' > %s", detectionResponseSchema, detectionSchemaFilePath)
+}
+
+// ValidateStructuredOutputConfig ensures schema-constrained correction can resume
+// a persisted native Codex session without replacing the compiler-owned output.
+func (e *CodexEngine) ValidateStructuredOutputConfig(config *EngineConfig) error {
+	if config == nil {
+		return nil
+	}
+	if config.Command != "" || (config.HarnessScript != "" && config.HarnessScript != e.GetHarnessScriptName()) {
+		return errors.New("structured-output with Codex requires the native Codex command and bundled harness; remove engine.command and engine.harness overrides")
+	}
+	if config.Version != "" && config.Version != "latest" {
+		var major, minor, patch int
+		version := strings.TrimPrefix(config.Version, "v")
+		if !codexStableVersion.MatchString(version) {
+			return errors.New("structured-output with Codex requires a stable engine.version of 0.132.0 or later; omit engine.version to use the supported default")
+		}
+		if _, err := fmt.Sscanf(version, "%d.%d.%d", &major, &minor, &patch); err != nil || (major == 0 && minor < 132) {
+			return errors.New("structured-output with Codex requires engine.version 0.132.0 or later for schema-constrained resume; omit engine.version to use the supported default")
+		}
+	}
+	for _, arg := range config.Args {
+		for token := range strings.FieldsSeq(arg) {
+			if token == "--" || token == "resume" || token == "fork" || token == "review" || strings.HasPrefix(token, "--ephemeral") ||
+				strings.HasPrefix(token, "--output-schema") || strings.HasPrefix(token, "--output-last-message") || strings.HasPrefix(token, "-o") {
+				return fmt.Errorf("structured-output with Codex is incompatible with engine.args option %q; the compiler owns schema, result file, and resumable execution", token)
+			}
+		}
+	}
+	return nil
 }
 
 func (e *CodexEngine) codexCommandName(workflowData *WorkflowData) string {
@@ -461,15 +497,7 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 		"RUNNER_TEMP":                  "${{ runner.temp }}",
 		"RUST_LOG":                     "${{ runner.debug == 1 && 'trace,hyper_util=info,mio=info,reqwest=info,os_info=info,codex_otel=warn,codex_core=debug,codex_exec=debug' || 'warn' }}",
 	}
-	if provider == LLMProviderGitHub {
-		copilotToken := llmProviderSecretExpression(provider, workflowData)
-		env["COPILOT_GITHUB_TOKEN"] = copilotToken
-		env[constants.CopilotBYOKDummyAPIKeyEnvVar] = constants.CopilotBYOKDummyAPIKey
-	} else {
-		openAIKey := llmProviderSecretExpression(provider, workflowData)
-		env["CODEX_API_KEY"] = openAIKey
-		env["OPENAI_API_KEY"] = openAIKey
-	}
+	applyCodexProviderEnv(env, workflowData, provider)
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	env["GH_AW_PHASE"] = workflowRunPhase(workflowData)
 	if IsRelease() {
@@ -502,11 +530,26 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	}
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, codexEngineLog)
+	if !workflowData.IsDetectionRun && workflowData.StructuredOutput != nil {
+		env["GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE"] = StructuredOutputSchemaPath
+		env["GH_AW_STRUCTURED_OUTPUT_FILE"] = StructuredOutputFilePath
+	}
 	if !firewallEnabled && provider == LLMProviderOpenAI && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
 		env["OPENAI_BASE_URL"] = "https://" + path.Join(workflowData.EngineConfig.APITarget, "v1")
 	}
 	applyMCPScriptsSecretEnv(env, workflowData)
 	return env
+}
+
+func applyCodexProviderEnv(env map[string]string, workflowData *WorkflowData, provider LLMProvider) {
+	if provider == LLMProviderGitHub {
+		env["COPILOT_GITHUB_TOKEN"] = llmProviderSecretExpression(provider, workflowData)
+		env[constants.CopilotBYOKDummyAPIKeyEnvVar] = constants.CopilotBYOKDummyAPIKey
+	} else {
+		openAIKey := llmProviderSecretExpression(provider, workflowData)
+		env["CODEX_API_KEY"] = openAIKey
+		env["OPENAI_API_KEY"] = openAIKey
+	}
 }
 
 func (e *CodexEngine) buildCodexExecutionStep(workflowData *WorkflowData, command string, env map[string]string) GitHubActionStep {

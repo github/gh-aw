@@ -15,6 +15,10 @@
 package workflow
 
 import (
+	"errors"
+	"fmt"
+	"strings"
+
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -51,10 +55,33 @@ func NewCopilotEngine() *CopilotEngine {
 				BashCommandAllowlist: true,  // Copilot enforces tools.bash allowlist via --allow-tool shell(cmd)
 				Plugins:              true,  // Copilot CLI supports Agent Plugins
 				DynamicWorkflows:     true,
+				StructuredOutput:     true, // Native responseSchema is available through the built-in SDK driver only.
 			},
 			dedicatedLLMGatewayPort: constants.CopilotLLMGatewayPort,
 		},
 	}
+}
+
+func (e *CopilotEngine) ValidateStructuredOutputConfig(config *EngineConfig) error {
+	if config == nil || !config.CopilotSDK {
+		return errors.New("structured-output with Copilot requires engine.copilot-sdk: true; CLI --output-format json only serializes session events")
+	}
+	if config.Command != "" || config.Driver != "" || config.InlineDriver != nil || config.HarnessScript != "" && config.HarnessScript != e.GetHarnessScriptName() {
+		return errors.New("structured-output with Copilot requires the built-in SDK driver and harness; remove engine.command, engine.driver, or the custom engine.harness")
+	}
+	if !versionAtLeast(config.Version, string(constants.DefaultCopilotVersion), "1.0.90") {
+		return fmt.Errorf("structured-output with Copilot requires engine.version 1.0.90 or later; got %q", config.Version)
+	}
+	if config.MaxContinuations > 1 {
+		return errors.New("structured-output with Copilot requires a non-autopilot SDK session; remove max-continuations")
+	}
+	for _, arg := range config.Args {
+		flag, _, _ := strings.Cut(arg, "=")
+		if flag == "--autopilot" || flag == "--max-autopilot-continues" {
+			return fmt.Errorf("structured-output with Copilot requires a non-autopilot SDK session; remove %s from engine.args", flag)
+		}
+	}
+	return nil
 }
 
 // GetAPMTarget returns "copilot" so that apm-action packs Copilot-specific primitives.

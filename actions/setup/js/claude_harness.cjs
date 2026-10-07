@@ -332,6 +332,104 @@ function resolveClaudePromptFileArgs(args) {
 }
 
 /**
+ * Replace harness-only schema paths with Claude's native --json-schema argument.
+ * @param {string[]} args
+ * @returns {{args: string[], structuredOutput: {schema: Record<string, unknown>, outputPath: string} | null}}
+ */
+function resolveClaudeStructuredOutputArgs(args) {
+  const childArgs = [];
+  let schemaPath;
+  let outputPath;
+  for (let i = 0; i < args.length; i++) {
+    const flag = args[i];
+    if (flag !== "--structured-output-schema-file" && flag !== "--structured-output-file") {
+      childArgs.push(flag);
+      continue;
+    }
+    const value = args[++i];
+    if (!value || value.startsWith("--")) throw new Error(`${flag} requires a file path`);
+    if (flag === "--structured-output-schema-file") {
+      if (schemaPath) throw new Error(`duplicate ${flag}`);
+      schemaPath = value;
+    } else {
+      if (outputPath) throw new Error(`duplicate ${flag}`);
+      outputPath = value;
+    }
+  }
+  if (!schemaPath && !outputPath) return { args: childArgs, structuredOutput: null };
+  if (!schemaPath || !outputPath) throw new Error("Claude structured output requires both schema and output file paths");
+  if (schemaPath === outputPath) throw new Error("Claude structured output schema and output paths must differ");
+  if (childArgs.some(arg => arg === "--json-schema" || arg.startsWith("--json-schema="))) {
+    throw new Error("Claude structured output manages --json-schema; remove the conflicting argument");
+  }
+  const { loadStructuredOutputSchema } = require("./structured_output.cjs");
+  fs.rmSync(outputPath, { force: true });
+  const schema = loadStructuredOutputSchema(schemaPath);
+  if (
+    schema.$schema &&
+    String(schema.$schema)
+      .replace(/#$/, "")
+      .replace(/^https:/, "http:") !== "http://json-schema.org/draft-07/schema"
+  ) {
+    throw new Error("Claude native structured output supports JSON Schema draft-07; use draft-07 or omit $schema");
+  }
+  return { args: [...childArgs, "--json-schema", JSON.stringify(schema)], structuredOutput: { schema, outputPath } };
+}
+
+/**
+ * Only the top-level native result may supply data: never parse assistant text,
+ * tool results, stderr, or JSON wrapped in prose as a structured-output fallback.
+ * @param {string} stdout
+ * @param {Record<string, unknown>} schema
+ * @returns {{status: "valid" | "invalid" | "missing" | "error" | "refusal" | "exhausted", value?: unknown, error?: string, terminal?: boolean}}
+ */
+function inspectClaudeStructuredOutput(stdout, schema) {
+  let result;
+  let refused = false;
+  for (const line of stdout.split("\n")) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!event || typeof event !== "object" || event.parent_tool_use_id != null) continue;
+    if (event.type === "result") result = event;
+    if (event.type === "assistant" || event.type === "result") {
+      const message = event.message || event;
+      if (
+        event.error === "refusal" ||
+        event.stop_reason === "refusal" ||
+        message.stop_reason === "refusal" ||
+        message.error === "refusal" ||
+        message.refusal ||
+        (Array.isArray(message.content) && message.content.some(block => block?.type === "refusal"))
+      ) {
+        refused = true;
+      }
+    }
+  }
+  if (refused) return { status: "refusal", error: "Claude refused the structured-output request" };
+  if (!result) return { status: "missing", error: "Claude did not emit a native structured-output result" };
+  if (result.subtype === "error_max_structured_output_retries") {
+    return { status: "exhausted", error: "Claude exhausted its native structured-output retries" };
+  }
+  if (result.subtype !== "success" || result.is_error) {
+    return { status: "error", error: `Claude structured output failed (${result.subtype || "unknown result"})` };
+  }
+  if (!Object.hasOwn(result, "structured_output")) {
+    return { status: "missing", terminal: true, error: "Claude result is missing structured_output" };
+  }
+  try {
+    const { validateStructuredOutput } = require("./structured_output.cjs");
+    validateStructuredOutput(result.structured_output, schema);
+    return { status: "valid", value: result.structured_output };
+  } catch (error) {
+    return { status: "invalid", error: `Claude structured output failed schema validation: ${getErrorMessage(error)}` };
+  }
+}
+
+/**
  * Strip --prompt-file and its path argument from args.
  * Used for --continue retries where Claude resumes from on-disk session state
  * and should not be given the original prompt again.
@@ -411,10 +509,13 @@ async function main() {
   let initialArgs;
   let prompt;
   let pluginDir;
+  let structuredOutput;
   try {
     const resolved = resolveClaudePromptFileArgs(args);
     prompt = resolved.prompt;
-    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(resolved.args), process.env));
+    const structured = resolveClaudeStructuredOutputArgs(resolved.args);
+    structuredOutput = structured.structuredOutput;
+    const capabilities = claudeBareCapabilities(claudeRepositoryEditPolicy(stripContinueArgs(structured.args), process.env));
     initialArgs = capabilities.args;
     pluginDir = capabilities.pluginDir;
   } catch (err) {
@@ -444,7 +545,7 @@ async function main() {
   // A noop indicates the work is complete or there is nothing to do — starting the agent
   // would be wasteful and potentially harmful.
   const safeOutputsPath = process.env.GH_AW_SAFE_OUTPUTS || "";
-  if (shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
+  if (!structuredOutput && shouldSkipForNoopSafeOutputs({ safeOutputsPath, hasNoopInSafeOutputs, log })) {
     removeClaudePlugin(pluginDir);
     process.exit(0);
   }
@@ -460,6 +561,8 @@ async function main() {
   // Reset only when a genuinely fresh run begins (see below), never on a --continue attempt.
   let sessionHasProgress = false;
   let sessionId;
+  let structuredCorrectionUsed = false;
+  let structuredOutputWritten = false;
   const driverStartTime = Date.now();
   // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
@@ -493,30 +596,62 @@ async function main() {
       // Use redacted args for logging when the run carries the prompt text.
       const logArgs = attempt === 0 ? safeInitialArgs : useContinueOnRetry ? currentArgs : safeFreshRetryArgs;
       const safeOutputsByteOffset = claudeSafeOutputsOffset(safeOutputsPath);
-      const result = await runProcess({
-        command,
-        args: currentArgs,
-        attempt,
-        log,
-        logArgs,
-        env: childEnv,
-        stdin: attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined),
-        postResultWatchdog: safeOutputsPath
-          ? {
-              shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),
-              inactivityTimeoutMs: resolvePostResultWatchdogIdleTimeoutMs(),
-            }
-          : undefined,
-        runtimeGuard: softTimeoutGuard
-          ? {
-              shouldTerminate: () => (Date.now() >= softTimeoutGuard.softDeadlineMs ? { terminate: true, reason: "Claude execution reached its soft deadline" } : false),
-            }
-          : undefined,
-      });
-      sessionId = claudeSessionId(result.output) || sessionId;
+      /** @param {string[]} executionArgs @param {string | undefined} stdin */
+      const execute = (executionArgs, stdin) =>
+        runProcess({
+          command,
+          args: executionArgs,
+          attempt,
+          log,
+          logArgs,
+          env: childEnv,
+          stdin,
+          // Safe outputs can finish before the native schema result; retain the
+          // shared execution deadline instead of terminating on that earlier signal.
+          postResultWatchdog:
+            safeOutputsPath && !structuredOutput
+              ? {
+                  shouldArm: () => hasTerminalSafeOutput(safeOutputsPath, { byteOffset: safeOutputsByteOffset, logger: log }),
+                  inactivityTimeoutMs: resolvePostResultWatchdogIdleTimeoutMs(),
+                }
+              : undefined,
+          runtimeGuard: softTimeoutGuard
+            ? {
+                shouldTerminate: () => (Date.now() >= softTimeoutGuard.softDeadlineMs ? { terminate: true, reason: "Claude execution reached its soft deadline" } : false),
+              }
+            : undefined,
+        });
+      let result = await execute(currentArgs, attempt > 0 && useContinueOnRetry ? CLAUDE_RESUME_PROMPT : (prompt ?? undefined));
+      sessionId = claudeSessionId(structuredOutput ? result.stdout : result.output) || sessionId;
+      if (structuredOutput && !result.cancelled && !result.runtimeGuardFired) {
+        let native = inspectClaudeStructuredOutput(result.stdout, structuredOutput.schema);
+        if (result.exitCode === 0 && native.status === "invalid" && sessionId && !structuredCorrectionUsed && (!softTimeoutGuard || Date.now() < softTimeoutGuard.softDeadlineMs)) {
+          structuredCorrectionUsed = true;
+          sessionHasProgress = true;
+          useContinueOnRetry = true;
+          log("native structured output failed schema validation — attempting one exact-session correction");
+          const correction = `Your native structured output did not match the configured JSON Schema: ${native.error?.slice(0, 2000)}. Return corrected structured output using StructuredOutput and the configured schema. Do not repeat completed work or tool side effects.`;
+          result = await execute([...continueBaseArgs, "--resume", sessionId], correction);
+          native = inspectClaudeStructuredOutput(result.stdout, structuredOutput.schema);
+        }
+        if (native.status === "exhausted" || native.status === "refusal" || native.terminal || native.status === "invalid" || (result.exitCode === 0 && native.status !== "valid")) {
+          log(`fatal: ${native.error}`);
+          return { ...result, exitCode: 1, safeOutputsByteOffset, structuredOutputFailure: true };
+        }
+        if (result.exitCode === 0 && !result.runtimeGuardFired && !result.cancelled && native.status === "valid") {
+          // Exclusive creation prevents an agent-written file or symlink from
+          // replacing the validated native result.
+          fs.rmSync(structuredOutput.outputPath, { force: true });
+          fs.writeFileSync(structuredOutput.outputPath, JSON.stringify(native.value), { encoding: "utf8", mode: 0o600, flag: "wx" });
+          structuredOutputWritten = true;
+        }
+      }
       return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset };
     },
     handleFailure: ({ attempt, result }) => {
+      if ("structuredOutputFailure" in result && result.structuredOutputFailure) {
+        return { action: "stop", exitCode: 1 };
+      }
       if (result.runtimeGuardFired && softTimeoutGuard) {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
         return { action: "stop" };
@@ -731,6 +866,11 @@ async function main() {
     },
   });
   lastExitCode = retryRun.exitCode;
+  if (structuredOutput && !structuredOutputWritten) {
+    log("fatal: Claude did not produce validated native structured output");
+    fs.rmSync(structuredOutput.outputPath, { force: true });
+    lastExitCode = 1;
+  }
 
   // Fetch AWF API proxy reflection data and persist to disk for post-run step summary.
   await fetchAWFReflect({ logger: log });
@@ -743,6 +883,8 @@ async function main() {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     resolveClaudePromptFileArgs,
+    resolveClaudeStructuredOutputArgs,
+    inspectClaudeStructuredOutput,
     stripPromptFileArgs,
     classifiableOutput,
     isRateLimitError,

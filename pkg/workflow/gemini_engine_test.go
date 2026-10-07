@@ -26,6 +26,7 @@ func TestGeminiEngine(t *testing.T) {
 		assert.True(t, capabilities.ToolsAllowlist, "Should support tools allowlist")
 		assert.True(t, capabilities.MaxTurns, "Should support max turns")
 		assert.False(t, capabilities.WebSearch, "Should not support built-in web search")
+		assert.True(t, capabilities.StructuredOutput, "Should constrain primary responses through native generation config")
 	})
 
 	t.Run("required secrets", func(t *testing.T) {
@@ -70,6 +71,60 @@ func TestGeminiEngine(t *testing.T) {
 		assert.Contains(t, stepContent, "mv /tmp/gemini-client-error-*.json /tmp/gh-aw/", "Step should move files to /tmp/gh-aw/")
 		assert.Contains(t, stepContent, "if: always()", "Step should run always so files are captured on failure")
 	})
+}
+
+func TestGeminiStructuredOutputConfig(t *testing.T) {
+	engine := NewGeminiEngine()
+	for _, tt := range []struct {
+		name   string
+		config *EngineConfig
+		valid  bool
+	}{
+		{name: "default", valid: true},
+		{name: "implicit version", config: &EngineConfig{}, valid: true},
+		{name: "pinned version", config: &EngineConfig{Version: "0.62.0"}, valid: true},
+		{name: "newer version", config: &EngineConfig{Version: "0.63.0"}, valid: true},
+		{name: "older version", config: &EngineConfig{Version: "0.61.0"}},
+		{name: "floating version", config: &EngineConfig{Version: "latest"}},
+		{name: "prerelease", config: &EngineConfig{Version: "0.63.0-preview.1"}},
+		{name: "custom command", config: &EngineConfig{Command: "custom-gemini"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := engine.ValidateStructuredOutputConfig(tt.config)
+			if tt.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "structured-output")
+			}
+		})
+	}
+}
+
+func TestGeminiStructuredOutputExecution(t *testing.T) {
+	engine := NewGeminiEngine()
+	for _, firewall := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct", true: "firewall"}[firewall], func(t *testing.T) {
+			data := &WorkflowData{
+				Name:             "native-structured-gemini",
+				StructuredOutput: &StructuredOutputConfig{Schema: map[string]any{"type": "object"}},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: firewall},
+				},
+			}
+			steps := engine.GetExecutionSteps(data, "/tmp/gh-aw/agent-stdio.log")
+			require.Len(t, steps, 2)
+			content := strings.Join(steps[1], "\n")
+			assert.Contains(t, content, "gemini_structured_output.cjs")
+			assert.Contains(t, content, "${RUNNER_TEMP}/gh-aw/actions/gemini_structured_output.cjs")
+			assert.NotContains(t, content, "${{ runner.temp }}/gh-aw/actions")
+			assert.Contains(t, content, StructuredOutputSchemaPath+" "+StructuredOutputFilePath+" -- gemini")
+			assert.Contains(t, content, "--output-format stream-json")
+			assert.Contains(t, content, "--prompt")
+			assert.Contains(t, content, "cat /tmp/gh-aw/aw-prompts/prompt.txt")
+			assert.NotContains(t, content, "--json-schema")
+			assert.Contains(t, content, "shell_harness.cjs")
+		})
+	}
 }
 
 func TestGeminiEngineInstallation(t *testing.T) {

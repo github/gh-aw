@@ -14,6 +14,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCodexEngineStructuredOutput(t *testing.T) {
+	engine := NewCodexEngine()
+	require.True(t, engine.GetCapabilities().StructuredOutput)
+	for _, firewall := range []bool{false, true} {
+		t.Run(fmt.Sprintf("firewall=%v", firewall), func(t *testing.T) {
+			data := &WorkflowData{
+				Name:             "structured-codex",
+				EngineConfig:     &EngineConfig{ID: "codex", Args: []string{"--model gpt-5.4"}},
+				StructuredOutput: &StructuredOutputConfig{Schema: map[string]any{"type": "object"}},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: firewall},
+				},
+			}
+			step := strings.Join(engine.GetExecutionSteps(data, "test-log")[0], "\n")
+			assert.Contains(t, step, "--output-schema "+StructuredOutputSchemaPath)
+			assert.Contains(t, step, "--output-last-message "+StructuredOutputFilePath)
+			assert.Contains(t, step, "GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE: "+StructuredOutputSchemaPath)
+			assert.Contains(t, step, "GH_AW_STRUCTURED_OUTPUT_FILE: "+StructuredOutputFilePath)
+			assert.Contains(t, step, StructuredOutputFilePath+" --model gpt-5.4")
+			assert.NotContains(t, step, detectionSchemaFilePath)
+		})
+	}
+}
+
+func TestCodexEngineStructuredOutputPreservesOtherRuns(t *testing.T) {
+	engine := NewCodexEngine()
+	for _, detection := range []bool{false, true} {
+		t.Run(fmt.Sprintf("detection=%v", detection), func(t *testing.T) {
+			data := &WorkflowData{Name: "codex", IsDetectionRun: detection, EngineConfig: &EngineConfig{ID: "codex"}}
+			if detection {
+				data.StructuredOutput = &StructuredOutputConfig{Schema: map[string]any{"type": "object"}}
+			}
+			step := strings.Join(engine.GetExecutionSteps(data, "test-log")[0], "\n")
+			assert.NotContains(t, step, StructuredOutputSchemaPath)
+			assert.NotContains(t, step, StructuredOutputFilePath)
+			assert.NotContains(t, step, "GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE")
+			if detection {
+				assert.Contains(t, step, "--output-schema "+detectionSchemaFilePath)
+				assert.Contains(t, step, "-o "+detectionResultFilePath)
+			} else {
+				assert.NotContains(t, step, "--output-schema")
+				assert.NotContains(t, step, "--output-last-message")
+			}
+		})
+	}
+}
+
+func TestCodexEngineValidateStructuredOutputConfig(t *testing.T) {
+	engine := NewCodexEngine()
+	for _, config := range []*EngineConfig{
+		nil,
+		{ID: "codex"},
+		{ID: "codex", Version: string(constants.DefaultCodexVersion)},
+		{ID: "codex", Version: "0.132.0"},
+		{ID: "codex", Version: "v0.132.0"},
+		{ID: "codex", Version: "1.0.0"},
+		{ID: "codex", Version: "latest"},
+		{ID: "codex", HarnessScript: "codex_harness.cjs", Args: []string{"--model", "gpt-5.4"}},
+	} {
+		require.NoError(t, engine.ValidateStructuredOutputConfig(config))
+	}
+	for _, config := range []*EngineConfig{
+		{ID: "codex", Command: "other-codex"},
+		{ID: "codex", HarnessScript: "custom.cjs"},
+		{ID: "codex", Version: "0.131.0"},
+		{ID: "codex", Version: "0.132.0-alpha.1"},
+		{ID: "codex", Version: "${{ inputs.version }}"},
+		{ID: "codex", Args: []string{"--output-schema other.json"}},
+		{ID: "codex", Args: []string{"--output-last-message=other.json"}},
+		{ID: "codex", Args: []string{"-oother.json"}},
+		{ID: "codex", Args: []string{"--ephemeral"}},
+		{ID: "codex", Args: []string{"--"}},
+		{ID: "codex", Args: []string{"resume"}},
+		{ID: "codex", Args: []string{"fork"}},
+		{ID: "codex", Args: []string{"review"}},
+	} {
+		require.Error(t, engine.ValidateStructuredOutputConfig(config), "%+v", config)
+	}
+}
+
 func TestCodexEngine_ResolveLLMProvider_DefaultOpenAI(t *testing.T) {
 	engine := NewCodexEngine()
 

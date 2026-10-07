@@ -570,6 +570,10 @@ func (e *CopilotEngine) buildCopilotStepEnv(
 	e.addCopilotFinalStepEnv(env, workflowData)
 	e.addCopilotSandboxEnv(env, flags.sandboxEnabled)
 	e.addCopilotSDKStepEnv(env, workflowData, copilotSDKServerArgsJSON, copilotSDKToolConfigJSON)
+	if workflowData.StructuredOutput != nil {
+		env["GH_AW_STRUCTURED_OUTPUT_SCHEMA_FILE"] = StructuredOutputSchemaPath
+		env["GH_AW_STRUCTURED_OUTPUT_FILE"] = StructuredOutputFilePath
+	}
 	return env
 }
 
