@@ -79,7 +79,7 @@ async function main() {
   } catch (error) {
     const retryAt = retryNotBefore(error?.response?.headers);
     if (retryAt) core.info(`[daily-aic-cache] No further API requests before ${retryAt}`);
-    throw error;
+    core.warning("[daily-aic-cache] Scan observation restore unavailable; proceeding without restored observations.");
   }
 }
 

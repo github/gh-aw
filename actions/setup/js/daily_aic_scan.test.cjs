@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { scanDailyAIC } = require("./daily_aic_scan.cjs");
 const { createAPIBudget, apiError, retryNotBefore, safeResponseHeaders } = require("./daily_aic_api_budget.cjs");
 const { readScanCache, scanCacheEntry, AIC_SCAN_CACHE_FILE_PATH } = require("./daily_aic_cache_helpers.cjs");
-const { mainWithPaths: restore, isTrustedProducer } = require("./restore_aic_scan_cache.cjs");
+const { main: restoreMain, mainWithPaths: restore, isTrustedProducer } = require("./restore_aic_scan_cache.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const guardrail = require("./check_daily_aic_workflow_guardrail.cjs");
 
@@ -397,6 +397,44 @@ describe("business response circuit breaker", () => {
 });
 
 describe("trusted artifact fallback without writable Actions cache", () => {
+  it.each(["getWorkflowRun", "listWorkflowRuns", "listWorkflowRunArtifacts"])("continues without restored observations when %s exhausts the API quota", async method => {
+    const headers = { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 3600) };
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    const producer = { ...current, id: 50, event: "pull_request_target", repository: { full_name: repository } };
+    const fail = vi.fn(async () => {
+      throw apiError(403, headers, "sensitive API error");
+    });
+    const actions = {
+      getWorkflowRun: vi.fn(async () => response(current)),
+      listWorkflowRuns: vi.fn(async () => response({ workflow_runs: [producer] })),
+      listWorkflowRunArtifacts: vi.fn(async () => response({ artifacts: [] })),
+    };
+    actions[method] = fail;
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = { auth: async () => ({ token: "synthetic" }), rest: { actions } };
+
+    await expect(restoreMain()).resolves.toBeUndefined();
+    expect(fail).toHaveBeenCalledOnce();
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("No further API requests before"));
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("proceeding without restored observations"));
+    expect(global.core.warning).not.toHaveBeenCalledWith(expect.stringContaining("sensitive API error"));
+    if (method !== "listWorkflowRunArtifacts") expect(actions.listWorkflowRunArtifacts).not.toHaveBeenCalled();
+  });
+
+  it.each([429, 500, "network"])("continues without restored observations after %s restore failure", async failure => {
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99 };
+    const error = failure === "network" ? new Error("sensitive network error") : apiError(failure, {}, "sensitive API error");
+    const getWorkflowRun = vi.fn(async () => {
+      throw error;
+    });
+    global.github = { rest: { actions: { getWorkflowRun } } };
+
+    await expect(restoreMain()).resolves.toBeUndefined();
+    expect(getWorkflowRun).toHaveBeenCalledOnce();
+    expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("proceeding without restored observations"));
+    expect(global.core.warning).not.toHaveBeenCalledWith(expect.stringContaining("sensitive"));
+  });
+
   it.each([401, 403, 429])("stops fallback fan-out on HTTP %i", async status => {
     const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
     const producer = id => ({ ...current, id, event: "pull_request_target", repository: { full_name: repository } });
