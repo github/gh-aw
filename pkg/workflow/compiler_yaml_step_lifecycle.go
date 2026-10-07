@@ -355,7 +355,10 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	// Resolve mention allowlists with the configured token before sanitization.
 	// Safe-output app tokens are minted in a different job and are unavailable here.
 	if data.SafeOutputs != nil && data.SafeOutputs.GitHubToken != "" {
+		compilerYamlStepLifecycleLog.Print("Ingest agent output uses safe-outputs.github-token for mention allowlist resolution")
 		yaml.WriteString("          github-token: " + resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken) + "\n")
+	} else {
+		compilerYamlStepLifecycleLog.Print("Ingest agent output uses the default GitHub Actions token for mention allowlist resolution")
 	}
 	yaml.WriteString("          script: |\n")
 

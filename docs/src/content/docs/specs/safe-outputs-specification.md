@@ -2134,6 +2134,14 @@ Requirements:
 - Neutralize unauthorized: `@user` becomes `@ user` (add space)
 - Preserve mentions in code blocks
 
+**Ingestion credential requirements**:
+
+- When `safe-outputs.github-token` is configured, **Ingest agent output** MUST use that global token to resolve mention allowlists, including `mentions.allowed-teams`, before sanitization.
+- Allowed team members' raw `@login` mentions MUST be preserved during ingestion so downstream handlers can notify those users.
+- Without a global `safe-outputs.github-token`, ingestion MUST retain the default GitHub Actions token. Per-output token overrides and GitHub App tokens minted in the `safe_outputs` job MUST NOT be used by ingestion in the `agent` job.
+- A global token referencing `steps.<id>.outputs.*` MUST be produced by an earlier step in the `agent` job as well as in every other consuming job.
+- Compiler debug logging SHOULD identify the ingestion token source without logging credential values or token expressions.
+
 **Transformation T6: Markdown Safety**
 
 Requirements:
