@@ -2,7 +2,10 @@ package workflow
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	"github.com/goccy/go-yaml"
 )
 
 func (cm *CheckoutManager) defaultCheckoutIndex(entry *resolvedCheckout) int {
@@ -29,7 +32,7 @@ func (cm *CheckoutManager) writeDefaultCheckoutInputs(sb *strings.Builder, overr
 		fmt.Fprintf(sb, "          repository: %s\n", override.key.repository)
 	}
 	if override.ref != "" && cm.defaultRefOverride == "" {
-		fmt.Fprintf(sb, "          ref: %s\n", override.ref)
+		writeCheckoutRef(sb, override.ref)
 	}
 	if len(override.sparsePatterns) > 0 {
 		// Fetch blobs up front rather than requiring authenticated lazy fetches.
@@ -42,6 +45,16 @@ func (cm *CheckoutManager) writeDefaultCheckoutInputs(sb *strings.Builder, overr
 	writeCheckoutDepthAndSparse(sb, override)
 	writeCheckoutSubmodulesAndLFS(sb, override)
 	return token != ""
+}
+
+func writeCheckoutRef(sb *strings.Builder, ref string) {
+	// Preserve literal refs that YAML would otherwise interpret as numbers or indicators.
+	value := ref
+	var scalar any
+	if err := yaml.Unmarshal([]byte(ref), &scalar); err != nil || scalar != ref {
+		value = strconv.Quote(ref)
+	}
+	fmt.Fprintf(sb, "          ref: %s\n", value) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 }
 
 func writeCheckoutDepthAndSparse(sb *strings.Builder, entry *resolvedCheckout) {
