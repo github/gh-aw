@@ -2029,6 +2029,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
+          GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,api.npms.io,bun.sh,cdn.jsdelivr.net,deb.nodesource.com,deno.land,esm.sh,get.pnpm.io,go.dev,golang.org,googleapis.deno.dev,googlechromelabs.github.io,goproxy.io,jsr.io,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,pkg.go.dev,proxy.golang.org,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.yarnpkg.com,skimdb.npmjs.com,storage.googleapis.com,sum.golang.org,telemetry.vercel.com,www.npmjs.com,www.npmjs.org,yarnpkg.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}

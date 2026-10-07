@@ -24,11 +24,19 @@ network:
     - defaults
     - github
 tools:
-  bash: true
+  bash: false
+  cli-proxy: false
   cache-memory: true
   github:
-    mode: gh-proxy
+    mode: local
     toolsets: [default]
+mcp-scripts:
+  read-outcome-summary:
+    description: Read the precomputed outcome summary JSON.
+    run: cat /tmp/gh-aw/outcome-summary.json
+  read-outcome-evaluations:
+    description: Read the precomputed per-item outcome evaluations.
+    run: cat /tmp/gh-aw/outcome-evaluations.jsonl
 safe-outputs:
   create-issue:
     title-prefix: "[Outcome Report]"
@@ -74,10 +82,10 @@ The pre-agent step has already evaluated outcomes for recent workflow runs. Resu
 
 ## Task
 
-1. Read `/tmp/gh-aw/outcome-summary.json`
-2. Read `/tmp/gh-aw/outcome-evaluations.jsonl` to build per-workflow status bars from per-item `outcome_status`
-3. If `total_outcomes` is 0, call `noop` with "No new safe output outcomes to report"
-4. Otherwise, create a report issue with the summary
+1. Call `mcp__mcpscripts__read-outcome-summary` to read `/tmp/gh-aw/outcome-summary.json`.
+2. If `total_outcomes` is 0, call `noop` with "No new safe output outcomes to report" and stop; the evaluations file may not exist.
+3. Call `mcp__mcpscripts__read-outcome-evaluations` to read `/tmp/gh-aw/outcome-evaluations.jsonl` and build per-workflow status bars from per-item `outcome_status`. GitHub-backed Codex has no shell tool; use these file-specific MCP tools instead.
+4. Create a report issue with the summary
 
 ### Summary JSON field reference
 
