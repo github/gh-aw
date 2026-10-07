@@ -49,9 +49,11 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 		yaml.WriteString("        if: always()\n")
 	}
 	yaml.WriteString("        continue-on-error: true\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/upload-artifact"))
+	uploadAction := c.getActionPin("actions/upload-artifact")
+	fmt.Fprintf(yaml, "        uses: %s\n", uploadAction)
 	yaml.WriteString("        with:\n")
 	fmt.Fprintf(yaml, "          name: %s\n", artifactName)
+	yaml.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 
 	// Write paths as multi-line YAML string
 	yaml.WriteString("          path: |\n")
@@ -117,9 +119,11 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 	yaml.WriteString("      - name: Upload agent output fallback artifact\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        continue-on-error: true\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/upload-artifact"))
+	uploadAction := c.getActionPin("actions/upload-artifact")
+	fmt.Fprintf(yaml, "        uses: %s\n", uploadAction)
 	yaml.WriteString("        with:\n")
 	fmt.Fprintf(yaml, "          name: %s%s\n", prefix, constants.AgentOutputFallbackArtifactName)
+	yaml.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 	yaml.WriteString("          path: |\n")
 	for _, path := range paths {
 		fmt.Fprintf(yaml, "            %s\n", path)

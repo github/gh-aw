@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -345,6 +346,40 @@ func TestWorkflowCallDownstreamSetupComputesLocalPrefix(t *testing.T) {
 	steps := strings.Join(compiler.generateSetupStepForJob("agent", nonCall, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
 	assert.NotContains(t, steps, "id: artifact-prefix\n")
 	assert.NotContains(t, steps, "id: resolve-host-repo\n")
+}
+
+func TestWorkflowCallArtifactPrefixStableAcrossRunAttempts(t *testing.T) {
+	scriptPath := filepath.Join("..", "..", "actions", "setup", "sh", "compute_artifact_prefix.sh")
+	inputs := `{"owner":"octo","repo":"hello-world"}`
+	var artifactNames []string
+
+	for _, attempt := range []string{"1", "2"} {
+		outputPath := filepath.Join(t.TempDir(), "github-output")
+		cmd := exec.Command("bash", scriptPath)
+		env := make([]string, 0, len(os.Environ())+3)
+		for _, entry := range os.Environ() {
+			if !strings.HasPrefix(entry, "INPUTS_JSON=") &&
+				!strings.HasPrefix(entry, "GITHUB_RUN_ATTEMPT=") &&
+				!strings.HasPrefix(entry, "GITHUB_OUTPUT=") {
+				env = append(env, entry)
+			}
+		}
+		cmd.Env = append(env,
+			"INPUTS_JSON="+inputs,
+			"GITHUB_RUN_ATTEMPT="+attempt,
+			"GITHUB_OUTPUT="+outputPath,
+		)
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "prefix script failed: %s", output)
+
+		prefixOutput, err := os.ReadFile(outputPath)
+		require.NoError(t, err)
+		prefix := strings.TrimSpace(strings.TrimPrefix(string(prefixOutput), "prefix="))
+		require.NotEmpty(t, prefix)
+		artifactNames = append(artifactNames, prefix+"agent")
+	}
+
+	assert.Equal(t, artifactNames[0], artifactNames[1], "attempt 2 consumer should request attempt 1 producer's artifact")
 }
 
 func TestHasWorkflowCallTrigger(t *testing.T) {

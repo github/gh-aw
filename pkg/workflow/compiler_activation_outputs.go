@@ -167,9 +167,11 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	)
 	ctx.steps = append(ctx.steps, "      - name: "+constants.ActivationUploadArtifactStepName+"\n")
 	ctx.steps = append(ctx.steps, "        if: success() || failure()\n")
-	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")))
+	uploadAction := c.getActionPin("actions/upload-artifact")
+	ctx.steps = append(ctx.steps, fmt.Sprintf("        uses: %s\n", uploadAction))
 	ctx.steps = append(ctx.steps, "        with:\n")
 	ctx.steps = append(ctx.steps, fmt.Sprintf("          name: %s\n", activationArtifactName))
+	ctx.steps = append(ctx.steps, artifactUploadOverwriteOption(artifactPrefixExprForActivationJob(ctx.data), uploadAction))
 	ctx.steps = append(ctx.steps, "          include-hidden-files: true\n")
 	ctx.steps = append(ctx.steps, "          path: |\n")
 	// Keep aw_info.json in activation for fallback downloads from workflows created
@@ -272,12 +274,14 @@ func workQueueRequiresAssignment(data *WorkflowData) bool {
 func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildContext) {
 	compilerActivationJobLog.Print("Adding info artifact upload step")
 	infoArtifactName := artifactPrefixExprForActivationJob(ctx.data) + constants.InfoArtifactName.String()
+	uploadAction := c.getActionPin("actions/upload-artifact")
 	ctx.steps = append(ctx.steps,
 		"      - name: Upload info artifact\n",
 		"        if: success() || failure()\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		fmt.Sprintf("        uses: %s\n", uploadAction),
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", infoArtifactName),
+		artifactUploadOverwriteOption(artifactPrefixExprForActivationJob(ctx.data), uploadAction),
 		"          path: /tmp/gh-aw/aw_info.json\n",
 		"          if-no-files-found: ignore\n",
 	)

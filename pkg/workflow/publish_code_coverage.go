@@ -104,9 +104,11 @@ func generateSafeOutputsCodeCoverageStagingUpload(builder *strings.Builder, data
 	builder.WriteString("      # Upload safe-outputs upload-code-coverage staging for the upload_code_coverage job\n")
 	builder.WriteString("      - name: Upload upload-code-coverage staging\n")
 	builder.WriteString("        if: always()\n")
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+	uploadAction := pinAction("actions/upload-artifact")
+	fmt.Fprintf(builder, "        uses: %s\n", uploadAction)
 	builder.WriteString("        with:\n")
 	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName)
+	builder.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 	fmt.Fprintf(builder, "          path: %s\n", codeCoverageStagingDirExpr)
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")
@@ -127,7 +129,7 @@ func generateSafeOutputsCodeCoverageStagingUpload(builder *strings.Builder, data
 //     (the job condition checks that upload_code_coverage_file is non-empty)
 //   - does not perform a checkout: actions/upload-code-coverage resolves the commit/ref/PR
 //     number itself from the triggering event context
-func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName string) (*Job, error) {
+func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName string) (*Job, error) { //nolint:largefunc // The job's download, permissions, condition, and upload steps are assembled together.
 	publishCodeCoverageLog.Print("Building upload_code_coverage job")
 
 	if data.SafeOutputs == nil || data.SafeOutputs.UploadCodeCoverage == nil {

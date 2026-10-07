@@ -51,6 +51,15 @@ func TestArtifactDownloadSingleArtifactUsesExactName(t *testing.T) {
 	assert.NotContains(t, steps, "merge-multiple: true", "single-artifact downloads should not merge multiple matches")
 }
 
+func TestArtifactUploadOverwriteOption(t *testing.T) {
+	assert.Equal(t,
+		"          overwrite: true\n",
+		artifactUploadOverwriteOption("${{ steps.artifact-prefix.outputs.prefix }}", "actions/upload-artifact@sha # v7.0.1"),
+	)
+	assert.Empty(t, artifactUploadOverwriteOption("${{ steps.artifact-prefix.outputs.prefix }}", "actions/upload-artifact@sha # v3.2.2"))
+	assert.Empty(t, artifactUploadOverwriteOption("", "actions/upload-artifact@sha # v7.0.1"))
+}
+
 func TestArtifactDownloadFallbackUsesPatternWhenSupported(t *testing.T) {
 	steps := strings.Join(buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName:     "agent",

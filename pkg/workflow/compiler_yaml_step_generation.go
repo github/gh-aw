@@ -18,7 +18,7 @@ var compilerYamlStepGenerationLog = logger.New("workflow:compiler_yaml_step_gene
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - Not in dev or script mode
 // - action-tag feature is specified (uses remote actions instead)
-func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
+func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string { //nolint:largefunc // Script and dev modes intentionally share ref and checkout policy.
 	compilerYamlStepGenerationLog.Printf("Generating checkout actions folder step: actionMode=%s, version=%s", c.actionMode, c.version)
 	// Check if action-tag is specified - if so, we're using remote actions
 	if data != nil && data.Features != nil {
@@ -98,7 +98,7 @@ func (c *Compiler) generateRestoreActionsSetupStep() string {
 	var step strings.Builder
 	step.WriteString("      - name: Restore actions folder\n")
 	step.WriteString("        if: always()\n")
-	fmt.Fprintf(&step, "        uses: %s\n", getActionPin("actions/checkout"))
+	step.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")))
 	step.WriteString("        with:\n")
 	step.WriteString("          repository: github/gh-aw\n")
 	step.WriteString("          sparse-checkout: |\n")
@@ -388,7 +388,7 @@ func (c *Compiler) generateScriptModeCleanupStep() string {
 	step.WriteString("        run: |\n")
 	step.WriteString("          bash /tmp/gh-aw/actions-source/actions/setup/clean.sh\n")
 	step.WriteString("        env:\n")
-	fmt.Fprintf(&step, "          INPUT_DESTINATION: %s\n", SetupActionDestination)
+	step.WriteString(fmt.Sprintf("          INPUT_DESTINATION: %s\n", SetupActionDestination))
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
 	return step.String()
 }

@@ -98,12 +98,12 @@ func deriveLiteralGitHubAppOwner(repository string) (string, bool) {
 		return "", false
 	}
 
-	parts := strings.SplitN(repository, "/", 2)
-	if len(parts) != 2 {
+	owner, _, hasRepo := strings.Cut(repository, "/")
+	if !hasRepo {
 		return "", false
 	}
 
-	owner := strings.TrimSpace(parts[0])
+	owner = strings.TrimSpace(owner)
 	if owner == "" || strings.Contains(owner, "${{") {
 		return "", false
 	}

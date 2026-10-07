@@ -272,7 +272,8 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 		} else {
 			fmt.Fprintf(builder, "      - name: Upload cache-memory data as artifact (%s)\n", cache.ID)
 		}
-		fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+		uploadAction := pinAction("actions/upload-artifact")
+		fmt.Fprintf(builder, "        uses: %s\n", uploadAction)
 		if cacheHasValidationStep(cache) {
 			fmt.Fprintf(builder, "        if: always() && steps.%s.outcome == 'success'\n", cacheMemoryValidationStepID(cache.ID))
 		} else {
@@ -285,6 +286,7 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 		} else {
 			fmt.Fprintf(builder, "          name: %scache-memory-%s\n", prefix, cache.ID)
 		}
+		builder.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 		builder.WriteString("          include-hidden-files: true\n")
 		fmt.Fprintf(builder, "          path: %s\n", cacheDir)
 		// Add retention-days if configured

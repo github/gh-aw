@@ -527,14 +527,17 @@ func (c *Compiler) buildCustomThreatDetectionSteps(steps []any) []string {
 // same reusable workflow is called multiple times within a single workflow run.
 // The prefix comes from the agent job output since the detection job depends on the agent job.
 func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
-	detectionArtifactName := artifactPrefixExprForAgentDownstreamJob(data) + constants.DetectionArtifactName.String()
+	artifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
+	detectionArtifactName := artifactPrefix + constants.DetectionArtifactName.String()
+	uploadAction := c.getActionPin("actions/upload-artifact")
 	threatLog.Printf("Building detection log upload step with artifact name %s", detectionArtifactName)
 	steps := []string{
 		"      - name: Upload threat detection log\n",
 		"        if: always()\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		fmt.Sprintf("        uses: %s\n", uploadAction),
 		"        with:\n",
 		"          name: " + detectionArtifactName + "\n",
+		artifactUploadOverwriteOption(artifactPrefix, uploadAction),
 		"          path: |\n",
 		"            /tmp/gh-aw/threat-detection/detection.log\n",
 		"            " + detectionExecutionEvidencePath + "\n",

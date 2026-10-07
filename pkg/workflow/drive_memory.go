@@ -72,9 +72,12 @@ func generateDriveMemoryBaselineSteps(builder *strings.Builder, data *WorkflowDa
 	builder.WriteString("            const { memoryTreeDigest } = require('${{ runner.temp }}/gh-aw/actions/memory_custom_validation.cjs');\n")
 	builder.WriteString("            fs.writeFileSync(process.env.BASELINE_PATH, memoryTreeDigest(process.env.MEMORY_DIR) + '\\n', 'utf8');\n")
 	fmt.Fprintf(builder, "      - name: Upload drive-memory baseline (%s)\n", drive.ID)
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+	uploadAction := pinAction("actions/upload-artifact")
+	fmt.Fprintf(builder, "        uses: %s\n", uploadAction)
 	builder.WriteString("        with:\n")
-	fmt.Fprintf(builder, "          name: %sdrive-memory-baseline-%s\n", artifactPrefixExprForDownstreamJob(data), drive.ID)
+	prefix := artifactPrefixExprForDownstreamJob(data)
+	fmt.Fprintf(builder, "          name: %sdrive-memory-baseline-%s\n", prefix, drive.ID)
+	builder.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 	fmt.Fprintf(builder, "          path: %s\n", driveMemoryBaselinePathFor(drive.ID))
 	builder.WriteString("          retention-days: 1\n")
 }
@@ -162,9 +165,11 @@ func generateDriveMemoryPersistence(builder *strings.Builder, data *WorkflowData
 			} else {
 				builder.WriteString("        if: always()\n")
 			}
-			fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+			uploadAction := pinAction("actions/upload-artifact")
+			fmt.Fprintf(builder, "        uses: %s\n", uploadAction)
 			builder.WriteString("        with:\n")
 			fmt.Fprintf(builder, "          name: %sdrive-memory-%s\n", prefix, drive.ID)
+			builder.WriteString(artifactUploadOverwriteOption(prefix, uploadAction))
 			builder.WriteString("          include-hidden-files: true\n")
 			fmt.Fprintf(builder, "          path: ${{ github.workspace }}/%s\n", driveMemoryMountPathFor(drive.ID))
 			builder.WriteString("          retention-days: 1\n")

@@ -49,7 +49,7 @@ type SafeOutputJobConfig struct {
 // 2. Build custom environment variables
 // 3. Invoke buildGitHubScriptStep
 // 4. Create Job with standard metadata
-func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobConfig) (*Job, error) {
+func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobConfig) (*Job, error) { //nolint:largefunc // Shared job assembly keeps related steps, outputs, and permissions together.
 	safeOutputsJobsLog.Printf("Building safe output job: %s (actionMode=%s)", config.JobName, c.actionMode)
 	var steps []string
 

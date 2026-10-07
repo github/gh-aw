@@ -555,9 +555,11 @@ func generateRepoMemoryUploadArtifactStep(builder *strings.Builder, p repoMemory
 	} else {
 		builder.WriteString("        if: always()\n")
 	}
-	fmt.Fprintf(builder, "        uses: %s\n", p.pinAction("actions/upload-artifact"))
+	uploadAction := p.pinAction("actions/upload-artifact")
+	fmt.Fprintf(builder, "        uses: %s\n", uploadAction)
 	builder.WriteString("        with:\n")
 	fmt.Fprintf(builder, "          name: %srepo-memory-%s\n", p.prefix, p.sanitizedID)
+	builder.WriteString(artifactUploadOverwriteOption(p.prefix, uploadAction))
 	fmt.Fprintf(builder, "          path: %s\n", p.memoryDir)
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")

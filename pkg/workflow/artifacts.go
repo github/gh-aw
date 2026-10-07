@@ -107,6 +107,13 @@ func downloadArtifactSupportsPattern(actionRef string) bool {
 	return !strings.HasPrefix(version, "v3") && !strings.Contains(version, "# v3.")
 }
 
+func artifactUploadOverwriteOption(prefix, actionRef string) string {
+	if prefix == "" || !downloadArtifactSupportsPattern(actionRef) {
+		return ""
+	}
+	return "          overwrite: true\n"
+}
+
 func downloadArtifactInputLines(artifactName, actionRef string) []string {
 	if downloadArtifactSupportsPattern(actionRef) {
 		return []string{

@@ -432,7 +432,9 @@ await main();`
 // buildUploadEvalsArtifactStep creates the step that uploads evals.jsonl as the
 // evals artifact for downstream consumption.
 func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
-	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
+	artifactPrefix := artifactPrefixExprForDownstreamJob(data)
+	evalsArtifactName := artifactPrefix + constants.EvalsArtifactName.String()
+	uploadAction := c.getActionPin("actions/upload-artifact")
 	proxyLogsDir := constants.AWFProxyLogsDir.String()
 	auditDir := constants.AWFAuditDir.String()
 	if isArcDindTopology(data) {
@@ -449,9 +451,10 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		"          done\n",
 		"      - name: Upload evals results\n",
 		"        if: always() && steps.redact_evals_results.outcome == 'success'\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		fmt.Sprintf("        uses: %s\n", uploadAction),
 		"        with:\n",
 		"          name: " + evalsArtifactName + "\n",
+		artifactUploadOverwriteOption(artifactPrefix, uploadAction),
 		"          path: |\n",
 		"            " + evalsResultsPath + "\n",
 		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
@@ -459,9 +462,10 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		"          if-no-files-found: ignore\n",
 		"      - name: Upload evals accounting after failure\n",
 		"        if: always() && steps.redact_evals_results.outcome != 'success'\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		fmt.Sprintf("        uses: %s\n", uploadAction),
 		"        with:\n",
 		"          name: " + evalsArtifactName + "\n",
+		artifactUploadOverwriteOption(artifactPrefix, uploadAction),
 		"          path: |\n",
 		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
 		"            " + evalsExecutionEvidencePath + "\n",

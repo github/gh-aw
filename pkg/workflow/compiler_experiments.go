@@ -703,12 +703,15 @@ func (c *Compiler) generateExperimentArtifactUploadStep(data *WorkflowData, sani
 	// For regular workflows the sanitized workflow ID is used as a prefix so the
 	// artifact name uniquely identifies which workflow produced it.
 	experimentArtifactName := experimentArtifactUploadName(data, sanitizedID)
+	artifactPrefix := artifactPrefixExprForActivationJob(data)
+	uploadAction := c.getActionPin("actions/upload-artifact")
 	return []string{
 		"      - name: Upload experiment artifact\n",
 		"        if: always()\n",
-		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
+		fmt.Sprintf("        uses: %s\n", uploadAction),
 		"        with:\n",
 		fmt.Sprintf("          name: %s\n", experimentArtifactName),
+		artifactUploadOverwriteOption(artifactPrefix, uploadAction),
 		fmt.Sprintf("          path: %s\n", experimentsCacheDir),
 		"          if-no-files-found: ignore\n",
 		"          retention-days: 30\n",

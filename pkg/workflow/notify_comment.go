@@ -319,6 +319,9 @@ func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction 
 		fmt.Sprintf("        uses: %s\n", usageArtifactUploadAction),
 	)
 	steps = append(steps, usageArtifactUploadWithLines...)
+	if overwriteOption := artifactUploadOverwriteOption(prefix, usageArtifactUploadAction); overwriteOption != "" {
+		steps = append(steps, overwriteOption)
+	}
 	// The initial upload can fail transiently (e.g. a runner-side DNS blip while
 	// talking to blob storage). A missing usage artifact permanently blocks the
 	// daily AI Credits guardrail for this run, so wait briefly and retry once
