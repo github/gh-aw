@@ -248,5 +248,40 @@
    "Jira to PR pipeline concept"
   ],
   "blogged": false
+ },
+ "bootc-dev/gh-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-07",
+  "score": 7,
+  "summary": "Installable issue-to-PR pipeline (drafter/review/fix/merge) with GitHub App auth and label-based dispatch; strong gotchas documentation.",
+  "highlights": [
+   "README.md: gh aw add bootc-dev/gh-agentic-workflows@v0.1.0 via aw.yml manifest",
+   "github-app at safe-outputs root keeps token out of agent job",
+   "Pins gh-aw version in .github/aw/gh-aw-version"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-threat-detection": {
+  "kind": "tool",
+  "reviewed": "2026-10-07",
+  "score": 7,
+  "summary": "Standalone Go detector gating safe outputs on prompt injection, secret leaks and malicious patches.",
+  "highlights": [
+   "README.md: artifact-based structural eligibility rules",
+   "Engine timeout kills process group; reasons withheld from uploadable output",
+   "Explicitly advisory, defense-in-depth framing"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-router": {
+  "kind": "tool",
+  "reviewed": "2026-10-07",
+  "score": 6,
+  "summary": "Offline-table model router service (classify/route) that never calls providers; early (v0.1.0).",
+  "highlights": [
+   "openapi.yaml contract",
+   "Stores no request history; 1 MiB/64 in-flight bounds"
+  ],
+  "blogged": false
  }
 }

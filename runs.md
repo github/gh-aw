@@ -6,3 +6,4 @@
 2026-10-04: discovery run; reviewed gh-aw-firewall (7), gh-aw-mcpg (7), gh-aw-actions (5); no blog; backlog 0.
 2026-10-05: discovery run; reviewed awesome-agentic-workflows (5), gh-aw-demo-lab (5); no blog; backlog 3.
 2026-10-06: reviewed book (5), focoit-ai-digest (4), care_fe_aw_v2 (4); no blog; backlog 0.
+2026-10-07: discovery run; reviewed bootc-dev/gh-agentic-workflows (7), gh-aw-threat-detection (7), gh-aw-router (6); no blog; backlog 2.

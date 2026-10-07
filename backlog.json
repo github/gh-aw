@@ -1,1 +1,14 @@
-[]
+[
+ {
+  "id": "githubnext/gh-aw-wizard",
+  "kind": "tool",
+  "source": "repo search",
+  "discovered": "2026-10-07"
+ },
+ {
+  "id": "githubnext/gh-aw-canvas",
+  "kind": "tool",
+  "source": "repo search",
+  "discovered": "2026-10-07"
+ }
+]
