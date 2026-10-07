@@ -12,6 +12,7 @@ const { TLC_SHA256, classify, checkpointBundle, runVerification } = require("./w
 const SUCCESS = "Model checking completed. No error has been found.\n42 states generated, 21 distinct states found, 0 states left on queue.\nThe depth of the complete state graph search is 7.\n";
 const INVARIANT_FALSE = "Error: The invariant of DAGValidity is equal to FALSE\n";
 const CONFIGS = [
+  { config: "WorkQueue", moduleName: "WorkQueue" },
   { config: "FairDAGGitHub", moduleName: "FairWorkQueue" },
   { config: "QueueOrdering", moduleName: "WorkQueue" },
 ];
@@ -33,6 +34,15 @@ if (process.argv.includes("-version")) {
 }
 const mode = process.env.FORMAL_TEST_MODE;
 if (mode === "passed") {
+  const config = process.argv[process.argv.indexOf("-config") + 1];
+  const model = process.argv.at(-1);
+  const crypto = require("node:crypto");
+  fs.writeFileSync(process.env.FORMAL_TEST_INPUT_OBSERVATION, JSON.stringify({
+    config,
+    model,
+    config_sha256: crypto.createHash("sha256").update(fs.readFileSync(config)).digest("hex"),
+    model_sha256: crypto.createHash("sha256").update(fs.readFileSync(model)).digest("hex")
+  }));
   process.stdout.write(${JSON.stringify(SUCCESS)});
 } else if (mode === "violation") {
   console.error("Error: Invariant Safety is violated.");
@@ -61,7 +71,7 @@ if (mode === "passed") {
     jar,
     expectedJarSha256: crypto.createHash("sha256").update(fs.readFileSync(jar)).digest("hex"),
     timeoutSeconds: 10,
-    env: { FORMAL_TEST_MODE: "passed", GITHUB_STEP_SUMMARY: path.join(dir, "step-summary.md") },
+    env: { FORMAL_TEST_MODE: "passed", FORMAL_TEST_INPUT_OBSERVATION: path.join(dir, "inputs.json"), GITHUB_STEP_SUMMARY: path.join(dir, "step-summary.md") },
   };
 }
 
@@ -120,9 +130,15 @@ for (const { config, moduleName } of CONFIGS) {
     }
     assert.equal(result.command[0], options.javaBin);
     assert.equal(result.command[result.command.indexOf("-cp") + 1], options.jar);
-    assert.equal(result.command[result.command.indexOf("-config") + 1], path.resolve(__dirname, "../../specs/work-queue", `${config}.cfg`));
+    assert.equal(result.command[result.command.indexOf("-config") + 1], path.join(bundle, `${config}.cfg`));
     assert.equal(result.command[result.command.indexOf("-metadir") + 1], path.join(options.outputDir, "state"));
-    assert.equal(result.command.at(-1), path.resolve(__dirname, "../../specs/work-queue", `${moduleName}.tla`));
+    assert.equal(result.command.at(-1), path.join(bundle, `${moduleName}.tla`));
+    assert.deepEqual(JSON.parse(fs.readFileSync(options.env.FORMAL_TEST_INPUT_OBSERVATION, "utf8")), {
+      config: path.join(bundle, `${config}.cfg`),
+      model: path.join(bundle, `${moduleName}.tla`),
+      config_sha256: result.source_sha256[`${config}.cfg`],
+      model_sha256: result.source_sha256[`${moduleName}.tla`],
+    });
     assert.match(fs.readFileSync(path.join(bundle, "summary.md"), "utf8"), /passed/);
     assert.equal(fs.readFileSync(options.env.GITHUB_STEP_SUMMARY, "utf8"), fs.readFileSync(path.join(bundle, "summary.md"), "utf8"));
     assert.equal(result.checkpoints.reason, "no_checkpoint");

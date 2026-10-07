@@ -383,6 +383,63 @@ Earlier counts below are retained evidence, not substitutes for those verdicts.
 The models/configurations remained hash-identical after merging main; no claim
 is made that model checking verifies current Go/JavaScript runtime refinement.
 
+### Evaluation refinements without state-space reduction
+
+`WorkQueue` now dispatches each actor's actions by its existing phase guard.
+Every action retains its original guard and update; the `CASE` branches merely
+avoid evaluating actions whose first guard is false. Run termination and
+duplicate-record publication remain separate alternatives. No variable,
+transition, bound, safety invariant or action property is removed.
+
+In `FairWorkQueue` default mode, `Class(w)` and `Key(w)` are always 1.
+Consequently active classes/keys are either empty or `{1}`, and selecting among
+them cannot depend on their pass values. `NextWork` directly chooses the same
+oldest eligible Work. `Normalize` retains the exact class-1/key-1 wake-up clocks,
+inactive clocks and active-set updates using the simplified formulas.
+Weighted/strict selection is unchanged. The recursive DAG closure also
+evaluates its preceding finite set before reusing it; `TLCEval(x) = x`.
+There is no cached authoritative projection, new state variable, `VIEW`,
+symmetry reduction or extra exploration constraint.
+
+[`compare-evaluation.mjs`](compare-evaluation.mjs) independently instantiates
+the original and revised modules over the same variables/constants. It explores
+the **union** of their transitions and checks `NextEquivalence` on each edge,
+so a missing revised transition cannot disappear from the comparison. Both
+initial-state predicates and safety predicates must agree/hold; fair-model
+replay projections must be exactly equal, including accounting clocks.
+The five comparison configurations cover historical recovery, default batches,
+weighted/strict selection and typed external gates. Missing-transition and
+changed-clock mutations must produce the exact action-property/invariant
+diagnostics. These finite comparisons supplement the algebraic equivalence
+argument; they do not exhaust the three larger requested configurations or
+prove runtime refinement.
+
+To reproduce the comparison against the last unrefined source:
+
+```bash
+baseline="$(mktemp -d)"
+git archive 4ae415cc7046e215b6056fed90c26e4b915ef06b specs/work-queue |
+  tar -x -C "$baseline"
+export JAVA_BIN=/path/to/java
+export TLA2TOOLS_JAR=/absolute/path/to/tla2tools.jar
+node specs/work-queue/compare-evaluation.mjs \
+  "$baseline/specs/work-queue" \
+  "$PWD/.queue-validation-cache/evaluation-comparison"
+```
+
+The comparison rejects changed configurations, an unexpected TLC checksum,
+timeouts, tooling failures and unexpected mutation diagnostics. Its manifest
+is a pass only when every case finished. Use a fresh results directory rather
+than overwriting an earlier capture.
+
+The long-run collector `.github/scripts/work-queue-formal-check.cjs` accepts
+`FORMAL_CONFIG=WorkQueue`, `QueueOrdering` or `FairDAGGitHub`. It executes the
+model/configuration **copies in its evidence bundle**, not live checkout files,
+so concurrent source edits cannot change the inputs after their hashes are
+recorded. `RESULTS_DIR` and `TLA2TOOLS_JAR` must be absolute paths. A natural
+successful exit with an empty remaining queue is required for a pass; a timeout
+or unvalidated checkpoint never establishes exhaustion or resumability.
+
 ### Successor: mandatory fair scheduling and batched workers
 
 The [priority/fairness specification](priority-and-fairness.md) defines the

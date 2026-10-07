@@ -36,9 +36,10 @@ Edges == {e \in Works \X Works : e[1] \in Dependencies[e[2]]}
 RECURSIVE Reach(_)
 Reach(n) ==
     IF n = 0 THEN Edges
-    ELSE Reach(n - 1) \cup
+    ELSE LET previous == TLCEval(Reach(n - 1))
+         IN previous \cup
          {e \in Works \X Works : \E v \in Works :
-             <<e[1], v>> \in Reach(n - 1) /\ <<v, e[2]>> \in Edges}
+             <<e[1], v>> \in previous /\ <<v, e[2]>> \in Edges}
 DAGValidity ==
     /\ Dependencies \in [Works -> SUBSET Works]
     /\ ExternalDependencies \in [Works -> SUBSET (1..2)]
@@ -68,7 +69,13 @@ Eligible(s) ==
 Classes(s) == {Class(w) : w \in Eligible(s)}
 Keys(s, p) == {Key(w) : w \in {v \in Eligible(s) : Class(v) = p}}
 Normalize(s) ==
-    [s EXCEPT
+    IF Mode = "default" THEN
+      LET active == IF Eligible(s) = {} THEN {} ELSE {1}
+      IN [s EXCEPT
+           !.cp[1] = IF 1 \in active \ s.ca THEN Max(@, s.cv + 1) ELSE @,
+           !.kp[1][1] = IF 1 \in active \ s.ka[1] THEN Max(@, s.kv[1] + 1) ELSE @,
+           !.ca = active, !.ka = [p \in 1..2 |-> IF p = 1 THEN active ELSE {}]]
+    ELSE [s EXCEPT
       !.cp = [p \in 1..2 |-> IF p \in Classes(s) \ s.ca
                    THEN Max(s.cp[p], s.cv + Stride(p)) ELSE s.cp[p]],
       !.kp = [p \in 1..2 |-> [k \in 1..2 |->
@@ -77,6 +84,8 @@ Normalize(s) ==
       !.ca = Classes(s), !.ka = [p \in 1..2 |-> Keys(s, p)]]
 NextWork(s) ==
     IF Eligible(s) = {} THEN 0
+    ELSE IF Mode = "default" THEN
+         CHOOSE w \in Eligible(s) : \A v \in Eligible(s) : s.pos[w] <= s.pos[v]
     ELSE LET n == Normalize(s)
              p == IF Mode = "strict" THEN Min(Classes(s))
                   ELSE CHOOSE p \in Classes(s) :
