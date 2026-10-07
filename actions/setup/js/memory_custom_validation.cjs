@@ -43,6 +43,19 @@ function readDirectory(targetPath) {
   }
 }
 
+function pruneEmptyDirectories(dirPath) {
+  for (const entry of readDirectory(dirPath)) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const childPath = path.join(dirPath, entry.name);
+    pruneEmptyDirectories(childPath);
+    if (readDirectory(childPath).length === 0) {
+      removePath(childPath, { recursive: true, force: true });
+    }
+  }
+}
+
 /**
  * @param {string} targetPath
  * @param {BufferEncoding | undefined} [encoding]
@@ -222,6 +235,7 @@ function memoryTreeDigest(dirPath) {
  *   memoryId?: string,
  *   kind: "repo" | "cache" | "drive",
  *   timeoutSeconds?: number,
+ *   isEligibleFile?: (relativePath: string) => boolean,
  * }} options
  */
 function runCustomMemoryValidation(options) {
@@ -252,9 +266,12 @@ function runCustomMemoryValidation(options) {
       dereference: true,
       filter: sourcePath => {
         const relativePath = path.relative(options.memoryDir, sourcePath);
-        return relativePath === "" || relativePath.split(path.sep)[0] !== ".git";
+        if (relativePath === "") return true;
+        if (relativePath.split(path.sep)[0] === ".git") return false;
+        return !options.isEligibleFile || fs.statSync(sourcePath).isDirectory() || options.isEligibleFile(relativePath.replace(/\\/g, "/"));
       },
     });
+    pruneEmptyDirectories(validationMemoryDir);
   } catch (error) {
     removePath(validationDir, { recursive: true, force: true });
     return {
