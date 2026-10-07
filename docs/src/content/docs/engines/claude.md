@@ -7,7 +7,7 @@ description: Select and authenticate Claude Code as the AI engine for GitHub Age
 
 ## Selecting Claude Code as the AI engine
 
-To select Claude Code as the AI engine, with inference hosted and and billed through an Anthropic subscription, add this to the workflow frontmatter:
+To select Claude Code as the AI engine, with inference hosted and billed through an Anthropic subscription, add this to the workflow frontmatter:
 
 ```yaml
 engine: claude
@@ -20,6 +20,25 @@ To authenticate, either
 2. Use keyless [Anthropic Workload Identity Federation](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif).
 
 Claude subscription OAuth tokens such as `CLAUDE_CODE_OAUTH_TOKEN` are not supported.
+
+### GitHub Copilot inference
+
+Select a Copilot-hosted Anthropic model to run Claude Code with inference billed through GitHub Copilot:
+
+```aw wrap
+engine: claude
+model: copilot/claude-haiku-4.5
+permissions:
+  copilot-requests: write
+```
+
+`copilot-requests: write` authenticates inference with `${{ github.token }}`; no PAT, `COPILOT_GITHUB_TOKEN` secret, or `ANTHROPIC_API_KEY` is required. Without that permission, configure `COPILOT_GITHUB_TOKEN` instead. The default agent sandbox is required: AWF holds the GitHub credential, and Claude receives only a placeholder key and the reflected Copilot proxy endpoint.
+
+The `copilot/` prefix selects the provider and is removed from the model ID passed to Claude. An explicit `engine.model-provider` overrides provider selection. For a fully dynamic model expression whose provider cannot be inferred at compile time, set `engine.model-provider: github`.
+
+Claude uses its native Messages API, not the OpenAI Responses or Chat Completions API. Select an Anthropic model available to the account; `copilot/auto` and non-Anthropic models are not compatibility guarantees. Model access, beta headers, and request features are subject to GitHub Copilot API (CAPI) support.
+
+The [`smoke-claude-copilot` canary](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-copilot.md) exercises native streaming inference, an MCP tool call, and inference after the tool result. Its host-side assertions require a real tool receipt containing an unpredictable nonce and a subsequent safe output echoing it, so precomputed tool calls cannot pass. Model fallback is disabled so an unsupported CAPI request cannot pass by silently selecting another model. Failures retain the Claude transcript and AWF proxy diagnostics; local compilation alone does not establish live CAPI compatibility.
 
 ## Example: scheduled repository report
 
@@ -58,9 +77,13 @@ The default permission mode is `dontAsk`: actions requiring approval run only wh
 
 Bare mode skips ambient discovery and restricts native tools to Bash, Edit, and Read in Claude Code 2.1.288. Workflow-declared skills load through the `gh-aw-workflow` plugin and can be explicitly invoked as `/gh-aw-workflow:<skill-name>`. Top-level pinned plugins continue to load explicitly. Do not rely on automatic Skill-tool invocation or subagent delegation in bare mode; use `bare: false` when the workflow needs those capabilities.
 
-Claude Code [dynamic workflows](https://code.claude.com/docs/en/workflows) can run in the default headless (`claude -p`) mode when the prompt explicitly requests a saved workflow. The interactive keyword trigger does not work in headless mode. gh-aw pre-approves the `Workflow` tool by default, while the agents it launches remain subject to the configured tool permissions. Set `engine.dynamic-workflows: false` to disable `Workflow` tool approval and restore engine configuration only when PR checkout requires it. Save project scripts and any files their agents read under `.claude/workflows/`: the existing engine-config restoration snapshots the engine-declared `.claude/` directory recursively from the activation checkout and restores it from the activation artifact after the agent checkout, including when the PR checkout is disabled. For supporting files elsewhere in the repository, use `ambient-folders` to include them in the activation artifact. Dynamic workflows require ambient discovery; do not enable `engine.bare: true` for them.
+Claude Code [dynamic workflows](https://code.claude.com/docs/en/workflows) are disabled by default in gh-aw. Set `engine.dynamic-workflows: true` to pre-approve the `Workflow` tool. They can run in the default headless (`claude -p`) mode when the prompt explicitly requests a saved workflow; the interactive keyword trigger does not work in headless mode. Their agents remain subject to the configured tool permissions. When dynamic workflows are disabled, engine configuration is restored only when PR checkout requires it. Save project scripts and any files their agents read under `.claude/workflows/`: the existing engine-config restoration snapshots the engine-declared `.claude/` directory recursively from the activation checkout and restores it from the activation artifact after the agent checkout, including when the PR checkout is disabled. For supporting files elsewhere in the repository, use `ambient-folders` to include them in the activation artifact. Dynamic workflows require ambient discovery; do not enable `engine.bare: true` for them.
 
 The built-in harness passes a short continuation prompt when resuming an interrupted session, preserving its session ID and prior work. It uses `CLAUDE_CODE_MAX_RETRIES: 0` to leave transient-error retries to the harness; `ANTHROPIC_MAX_RETRIES` does not control the Claude CLI retry loop.
+
+The repository's [`smoke-claude-dynamic` workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/smoke-claude-dynamic.md) is a minimal end-to-end example. It explicitly enables dynamic workflows with `bare: false`, invokes a saved script with structured arguments, and verifies that the script and a nested hidden fixture match the trusted activation artifact. Its post-step checks native `Workflow` tool evidence and the returned result instead of accepting an agent's success claim.
+
+Unified session traces distinguish a successful background launch from workflow completion. The Claude adapter maps task lifecycle observations to engine-independent events (`dynamicWorkflows.task_started`, `dynamicWorkflows.task_progress`, `dynamicWorkflows.task_updated`, `dynamicWorkflows.task_notification`, and `dynamicWorkflows.background_tasks_changed`). These retain task/tool correlation and expose observed progress and completion status without publishing embedded workflow scripts or agent prompts. Task usage snapshots are shown separately, not added to the parent session's token totals.
 
 For an offline native-CLI compatibility check against an installed version, run the opt-in contract suite from `actions/setup/js`:
 

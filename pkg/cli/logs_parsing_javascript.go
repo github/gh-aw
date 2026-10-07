@@ -28,11 +28,17 @@ var logsParsingJsLog = logger.New("cli:logs_parsing_js")
 // parseAgentLog parses agent logs and generates a markdown summary
 func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose bool) error {
 	logsParsingJsLog.Printf("Parsing agent logs in: %s", runDir)
+	if rendered, err := parsePersistedAgentLog(runDir); rendered || err != nil {
+		return err
+	}
 	// Determine which parser script to use based on the engine
 	if engine == nil {
 		logsParsingJsLog.Print("No engine detected, skipping log parsing")
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("No engine detected in %s, skipping log parsing", filepath.Base(runDir))))
 		return nil
+	}
+	if rendered, err := parseUnifiedAgentLog(runDir, engine.GetID()); rendered || err != nil {
+		return err
 	}
 
 	// Find the agent log file - use engine.GetLogFileForParsing() to determine location

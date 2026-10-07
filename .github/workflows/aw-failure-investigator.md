@@ -71,7 +71,7 @@ imports:
   - shared/graders.md
 steps:
   - name: Deterministic pre-fetch for failure analysis
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

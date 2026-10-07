@@ -116,7 +116,7 @@ jobs:
           persist-credentials: false
       - name: Compute Release Config
         id: compute_config
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         with:
           script: |
             const releaseType = context.payload.inputs.release_type;
@@ -791,7 +791,7 @@ jobs:
       issues: write
     steps:
       - name: Comment on pull requests included in release
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         env:
           RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
           RELEASE_ID: ${{ needs.release.outputs.release_id }}

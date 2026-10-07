@@ -38,6 +38,8 @@ To authenticate:
 
 GitHub inference requires the AWF sandbox. Do not set `sandbox.agent: false` for this provider. For a model supplied through an expression or repository variable, set `engine.model-provider: github` explicitly; runtime model prefixes do not change the selected credentials.
 
+GitHub inference disables Codex's native shell and JavaScript code-mode tools because the Copilot compatibility adapter does not support the custom `exec` tool. gh-aw generates a direct-tool model catalog from the installed Codex binary's bundled metadata, preserving the other model settings. This also disables code mode for models that select it independently of feature flags. MCP tools and the supported `apply_patch` tool remain available. The installed Codex command must support `debug models --bundled`; `engine.config` cannot re-enable these features or replace the managed catalog. OpenAI inference is unchanged.
+
 Recompile the workflow with `gh aw compile` and commit the changes to your repository. The workflow will now run with Codex as the AI engine.
 
 ## Example: scheduled repository report

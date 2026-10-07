@@ -408,7 +408,7 @@ func TestRuntimeIfConditionIntegration(t *testing.T) {
 						"if":      "hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != ''",
 					},
 					"node": map[string]any{
-						"version": "20",
+						"version": "24",
 						"if":      "hashFiles('package.json') != ''",
 					},
 				},

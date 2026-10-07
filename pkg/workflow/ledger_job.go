@@ -16,7 +16,7 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 		needs = append(needs, string(constants.DetectionJobName))
 	}
 	steps := append([]string{}, c.generateCheckoutActionsFolder(data)...)
-	steps = append(steps, c.generateSetupStep(data, c.resolveActionReference("./actions/setup", data), SetupActionDestination, false, "", "")...)
+	steps = append(steps, c.generateSetupStepForJob("push_ledger_changes", data, c.resolveActionReference("./actions/setup", data), SetupActionDestination, false, "", "", "")...)
 	steps = append(steps,
 		"      - name: Download validated ledger transactions\n",
 		"        if: always()\n",

@@ -96,7 +96,16 @@ function buildCorpus(repo, issues, discussions, cutoff) {
 }
 
 async function collectIssues(github, owner, repo, cutoff) {
-  const list = async params => github.paginate(github.rest.issues.listForRepo, { owner, repo, per_page: 100, ...params });
+  const list = async params => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await github.paginate(github.rest.issues.listForRepo, { owner, repo, per_page: 100, ...params });
+      } catch (error) {
+        if (attempt >= 2 || !(error.status >= 500 && error.status <= 599)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+  };
   const [open, closed, recent] = await Promise.all([list({ state: "open" }), list({ state: "closed", labels: label }), cutoff ? list({ state: "closed", since: cutoff }) : []]);
   return [...new Map([...open, ...closed, ...recent].filter(item => !item.pull_request).map(item => [item.number, item])).values()];
 }

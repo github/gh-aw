@@ -74,7 +74,7 @@ func (c *Compiler) buildRestoreMemorySteps(cfg *restoreMemoryConfig, jobName str
 		}
 		setupLines = append(setupLines, c.generateCheckoutActionsFolder(data)...)
 		// Pass empty trace IDs — custom jobs do not inherit the activation span.
-		setupLines = append(setupLines, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, "", "")...)
+		setupLines = append(setupLines, c.generateSetupStepForJob(jobName, data, setupActionRef, SetupActionDestination, false, "", "", "")...)
 	}
 
 	if cfg.CacheMemory {

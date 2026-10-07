@@ -51,7 +51,7 @@ func TestActivationArtifactUploadRunsAfterSuccessOrFailure(t *testing.T) {
 }
 
 func TestDynamicWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
-	disabled := false
+	enabled, disabled := true, false
 	engine := NewClaudeEngine()
 	engine.id = "dynamic-test"
 	compiler := NewCompiler()
@@ -60,7 +60,8 @@ func TestDynamicWorkflowsSavedWhenPRCheckoutDisabled(t *testing.T) {
 		Name: "Dynamic workflows",
 		AI:   "dynamic-test",
 		EngineConfig: &EngineConfig{
-			ID: "dynamic-test",
+			ID:               "dynamic-test",
+			DynamicWorkflows: &enabled,
 		},
 		CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
 	}
@@ -91,22 +92,30 @@ func TestClaudeWorkflowsNotSavedWhenDynamicWorkflowsDisabled(t *testing.T) {
 }
 
 func TestCopilotDynamicWorkflowsSnapshotWithPRCheckoutDisabled(t *testing.T) {
-	disabled := false
-	for _, enabled := range []bool{true, false} {
-		t.Run(map[bool]string{true: "enabled", false: "disabled"}[enabled], func(t *testing.T) {
+	enabled, disabled := true, false
+	for _, tt := range []struct {
+		name    string
+		setting *bool
+		want    bool
+	}{
+		{name: "default"},
+		{name: "enabled", setting: &enabled, want: true},
+		{name: "disabled", setting: &disabled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
 			data := &WorkflowData{
 				Name: "Copilot workflows",
 				AI:   "copilot",
 				EngineConfig: &EngineConfig{
 					ID:               "copilot",
-					DynamicWorkflows: &enabled,
+					DynamicWorkflows: tt.setting,
 				},
 				CheckoutConfigs: []*CheckoutConfig{{PullRequest: &disabled}},
 			}
 			job, err := NewCompiler().buildActivationJob(data, false, "", "copilot.lock.yml")
 			require.NoError(t, err)
 			steps := strings.Join(job.Steps, "")
-			if enabled {
+			if tt.want {
 				save := extractWorkflowStepByName(t, steps, "Save agent config folders for base branch restoration")
 				assert.Contains(t, save, `GH_AW_AGENT_FOLDERS: ".agents .github"`)
 				assert.Contains(t, extractWorkflowStepByName(t, steps, "Upload activation artifact"), "/tmp/gh-aw/base")

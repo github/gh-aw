@@ -4,9 +4,93 @@ import { mergeSessionSources } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeCodexSession } from "./codex_session.cjs";
+import { normalizeClaudeSession } from "./claude_session.cjs";
+import { normalizeCopilotSession } from "./copilot_session.cjs";
+import { normalizeGeminiSession } from "./gemini_session.cjs";
+import { collapseStreamedMessages } from "./agent_session_render.cjs";
 import { reconcileSessionUsage, selectSessionResult, sessionTokenTotal } from "./agent_session.cjs";
+import { createSessionValidator } from "./scripts/validate_session.cjs";
+import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
+import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
 
 describe("essential unified session payloads", () => {
+  it("preserves completion-only dynamic workflow launch metadata without a tool start", () => {
+    const record = dynamicWorkflow.find(record => record.tool_use_result);
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "partial.jsonl", events: normalizeClaudeSession([record]) }]);
+    const launch = events.find(event => event.type === "tool.execution_complete");
+    expect(launch.data).toMatchObject({
+      taskId: "dynamic-task",
+      taskType: "local_workflow",
+      workflowName: "smoke-claude-dynamic",
+      workflowRunId: "dynamic-run",
+      status: "async_launched",
+      toolCallId: "workflow-tool",
+      success: true,
+    });
+    expect(launch.data).not.toHaveProperty("toolName");
+    expect(generatePlainTextSummary(events)).toContain("[launch succeeded; workflow outcome pending]");
+    expect(createSessionValidator("unified").event(launch)).toBe(true);
+  });
+
+  it("enforces the dynamic workflow privacy projection in the published schema", () => {
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent.jsonl", events: normalizeClaudeSession(dynamicWorkflow) }]);
+    const validate = createSessionValidator("unified").event;
+    const launch = events.find(event => event.type === "tool.execution_complete");
+    expect(validate(launch), JSON.stringify(validate.errors)).toBe(true);
+    for (const type of Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES)) {
+      const event = events.find(event => event.type === type);
+      expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+      for (const field of ["prompt", "description", "summary", "workflow_progress"]) {
+        expect(validate({ ...event, data: { ...event.data, [field]: "PRIVATE_NATIVE_FIELD" } })).toBe(false);
+      }
+      expect(validate({ ...event, data: { ...event.data, tasks: [{ taskId: "task", prompt: "PRIVATE_TASK_SCRIPT" }] } })).toBe(false);
+      expect(validate({ ...event, data: { ...event.data, workflowProgress: [{ agentId: "agent", promptPreview: "PRIVATE_AGENT_PROMPT" }] } })).toBe(false);
+      expect(validate({ ...event, data: { ...event.data, usage: { totalTokens: 0, summary: "PRIVATE_USAGE" } } })).toBe(false);
+    }
+  });
+
+  it("projects engine-independent dynamic workflow events without native Claude envelopes", () => {
+    const source = [
+      {
+        type: "tool.execution_complete",
+        data: { toolName: "run_dynamic_workflow", toolCallId: "launch", success: true, status: "async_launched", taskId: "task", taskType: "dynamic_workflow", workflowName: "example", workflowRunId: "run" },
+      },
+      { type: "dynamicWorkflows.task_started", data: { taskId: "task", toolCallId: "launch", taskType: "dynamic_workflow", workflowName: "example", sessionId: "session", prompt: "PRIVATE_SCRIPT" } },
+      {
+        type: "dynamicWorkflows.task_progress",
+        data: {
+          taskId: "task",
+          toolCallId: "launch",
+          usage: { totalTokens: 0, toolUses: 0, durationMs: 0 },
+          workflowProgress: [{ type: "workflow_agent", index: 0, phaseIndex: 0, agentId: "agent", state: "done", promptPreview: "PRIVATE_AGENT_PROMPT" }],
+        },
+      },
+      { type: "dynamicWorkflows.task_updated", data: { taskId: "task", status: "completed" } },
+      { type: "dynamicWorkflows.task_notification", data: { taskId: "task", toolCallId: "launch", status: "completed", summary: "PRIVATE_SUMMARY" } },
+      { type: "dynamicWorkflows.background_tasks_changed", data: { tasks: [{ taskId: "task", taskType: "dynamic_workflow", status: "completed", description: "PRIVATE_DESCRIPTION" }] } },
+    ];
+    const original = structuredClone(source);
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "other-engine.jsonl", events: source }]);
+    expect(events.map(event => event.type)).toEqual(source.map(event => event.type));
+    expect(events[0].data).toEqual(source[0].data);
+    expect(events[2].data).toEqual({
+      taskId: "task",
+      toolCallId: "launch",
+      usage: { totalTokens: 0, toolUses: 0, durationMs: 0 },
+      workflowProgress: [{ type: "workflow_agent", index: 0, phaseIndex: 0, agentId: "agent", state: "done" }],
+    });
+    const validate = createSessionValidator("unified").event;
+    for (const event of events) expect(validate(event), JSON.stringify(validate.errors)).toBe(true);
+    for (const event of events) expect(normalizeUnifiedSessionEvent(event).data).toEqual(event.data);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("workflowName=example workflowRunId=run [launch succeeded; workflow outcome pending]");
+      expect(output).toContain("dynamicWorkflows.task_notification taskId=task toolCallId=launch status=completed");
+      expect(output).not.toContain("PRIVATE_");
+      expect(output).not.toContain("claude.");
+    }
+    expect(source).toEqual(original);
+  });
+
   it("removes duplicated engine envelopes without trimming significant message text", () => {
     const content = "  first\nsecond\t\n" + "x".repeat(10000);
     const message = {
@@ -24,6 +108,42 @@ describe("essential unified session payloads", () => {
     expect(Buffer.byteLength(JSON.stringify(compact))).toBeLessThan(Buffer.byteLength(JSON.stringify(message)) / 2);
     expect(message).toEqual(original);
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+  });
+
+  it.each(["assistant.message", "assistant.reasoning"])("retains supplied %s stream boundaries without copying opaque payloads", type => {
+    const source = {
+      type,
+      session_id: "session",
+      parent_tool_use_id: "parent-tool",
+      agentId: "child",
+      message: { id: "message", content: "PRIVATE_NATIVE_SNAPSHOT" },
+      data: { content: "exact text", delta: true, partial: false, contentIndex: 0, channel: "channel", opaque: "PRIVATE_EXTENSION" },
+    };
+    const compact = normalizeUnifiedSessionEvent(source);
+    expect(compact.data).toEqual({ content: "exact text", delta: true, partial: false, contentIndex: 0, channel: "channel", sessionId: "session", parentToolUseId: "parent-tool", agentId: "child", messageId: "message" });
+    expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
+    expect(JSON.stringify(compact)).not.toContain("PRIVATE_");
+  });
+
+  it("keeps Copilot, Claude and Gemini streaming evidence through collection and compaction", () => {
+    const claude = event => ({ type: "stream_event", session_id: "session", event });
+    const traces = [
+      normalizeCopilotSession(["Hello", " ", "world."].map((deltaContent, index) => ({ type: "assistant.message_delta", id: `event-${index}`, data: { messageId: "answer", deltaContent } }))),
+      normalizeClaudeSession([
+        claude({ type: "message_start", message: { id: "answer" } }),
+        claude({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }),
+        ...["Hello", " ", "world."].map(text => claude({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })),
+        claude({ type: "message_stop" }),
+      ]),
+      normalizeGeminiSession(["Hello", " ", "world."].map((content, timestamp) => ({ type: "message", role: "assistant", timestamp, delta: true, content }))),
+    ];
+    for (const events of traces) {
+      const compact = mergeSessionSources([{ component: "agent", phase: "agent", path: "stream.jsonl", events }]);
+      const projected = collapseStreamedMessages(compact);
+      expect(projected.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello world."]);
+      const output = generatePlainTextSummary(compact);
+      expect(output.match(/agent\/agent assistant\.message Hello world\./g)).toHaveLength(1);
+    }
   });
 
   it.each([

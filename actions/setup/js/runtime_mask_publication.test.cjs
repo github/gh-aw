@@ -119,6 +119,25 @@ describe("runtime mask publication boundary", () => {
     expect(JSON.parse(fs.readFileSync(source, "utf8"))).toEqual({ body: "***" });
   });
 
+  it("sanitizes regex-shaped multiline gateway text without removing artifacts", async () => {
+    const gatewayAgentId = "runtime-gateway-agent-id";
+    const actualGatewayLines = [
+      "MCP_GATEWAY_AGENT_ID=$(openssl rand -base64 45 | tr -d '/+=')",
+      `echo "::add-mask::${gatewayAgentId}"`,
+      "export MCP_GATEWAY_AGENT_ID",
+      'export MCP_GATEWAY_PAYLOAD_DIR="/tmp/gh-aw/mcp-payloads"',
+      'mkdir -p "/tmp/gh-aw/mcp-payloads"',
+    ];
+    const mask = actualGatewayLines.join("\n");
+    const stdio = write("agent-stdio.log", `::add-mask::${mask.replace(/\n/g, "%0A")}\n${mask}\n`);
+    const source = write("safeoutputs.jsonl", { body: mask });
+    await redactSources();
+    expect(core.setFailed).not.toHaveBeenCalled();
+    expect(core.warning).not.toHaveBeenCalled();
+    expect(fs.readFileSync(stdio, "utf8")).toBe("***\n***\n***\n***\n");
+    expect(JSON.parse(fs.readFileSync(source, "utf8"))).toEqual({ body: "***\n***\n***\n***" });
+  });
+
   it("removes a source on failed runtime-mask writes without logging masks and continues sanitizing the other files", async () => {
     write("agent-stdio.log", `::add-mask::${opaque.replace(/%/g, "%25")}\n`);
     const failing = write("mcp-logs/first.jsonl", { credential: opaque });
@@ -131,7 +150,7 @@ describe("runtime mask publication boundary", () => {
     await redactSources();
     expect(fs.existsSync(failing)).toBe(false);
     expectSafe(JSON.parse(fs.readFileSync(remaining, "utf8")));
-    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after runtime mask redaction failed"));
+    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Removed artifact source after secret redaction failed"));
     expectSafe(core.warning.mock.calls.flat());
     expectSafe(core.setFailed.mock.calls.flat());
   });

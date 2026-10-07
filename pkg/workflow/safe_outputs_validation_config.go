@@ -51,6 +51,7 @@ type TypeValidationConfig struct {
 	CustomValidation string                     `json:"customValidation,omitempty"`
 	DataEnabled      bool                       `json:"dataEnabled,omitempty"`
 	DataSchema       map[string]any             `json:"dataSchema,omitempty"`
+	CollapseData     bool                       `json:"collapseData,omitempty"`
 }
 
 // Constants for validation
@@ -142,7 +143,8 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		},
 	},
 	"create_issue": {
-		DefaultMax: 1,
+		DefaultMax:   1,
+		CollapseData: true,
 		Fields: map[string]FieldValidation{
 			"title":  {Required: true, Type: "string", Sanitize: true, MaxLength: 128},
 			"body":   {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength, MinLength: MinIssueBodyLength},

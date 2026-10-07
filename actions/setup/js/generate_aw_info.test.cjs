@@ -72,6 +72,7 @@ describe("generate_aw_info.cjs", () => {
     process.env.GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST = "true";
     delete process.env.GH_AW_INFO_CACHE_MEMORY;
     process.env.GH_AW_INFO_STAGED = "false";
+    delete process.env.GH_AW_INFO_DRY_RUN;
     process.env.GH_AW_INFO_ALLOWED_DOMAINS = "[]";
     process.env.GH_AW_INFO_FIREWALL_ENABLED = "false";
     process.env.GH_AW_INFO_AWF_VERSION = "";
@@ -121,9 +122,18 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.actor).toBe("octocat");
     expect(awInfo.event_name).toBe("push");
     expect(awInfo.staged).toBe(false);
+    expect(awInfo.dry_run).toBe(false);
     expect(awInfo.firewall_enabled).toBe(false);
     expect(awInfo.features).toBeUndefined();
     expect(awInfo.created_at).toBeTruthy();
+  });
+
+  it("should record dry-run and explicitly report unverified extension effects", async () => {
+    process.env.GH_AW_INFO_DRY_RUN = "true";
+    await main(mockCore, mockContext);
+    const awInfo = JSON.parse(fs.readFileSync(awInfoPath, "utf8"));
+    expect(awInfo.dry_run).toBe(true);
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("not verified read-only"));
   });
 
   it("should expose the authoritative run creation time when requested", async () => {

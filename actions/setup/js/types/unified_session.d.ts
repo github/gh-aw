@@ -10,6 +10,7 @@ import type {
   SessionEventDataMap,
   SessionFileFormatData,
   SessionInitData,
+  SessionMetric,
   SessionProvenance,
   SessionResultData,
   ToolExecutionCompleteData,
@@ -30,6 +31,39 @@ export interface UnifiedSessionUsage {
 
 export interface UnifiedSessionResultData extends Pick<SessionResultData, "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials"> {
   usage?: UnifiedSessionUsage | null;
+}
+
+export interface DynamicWorkflowTaskData {
+  taskId?: string;
+  toolCallId?: string;
+  taskType?: string;
+  workflowName?: string;
+  status?: string;
+  sessionId?: string;
+  parentToolUseId?: string | null;
+}
+
+export interface DynamicWorkflowProgressData {
+  type?: string;
+  index?: SessionCount;
+  phaseIndex?: SessionCount;
+  agentId?: string;
+  model?: string;
+  state?: string;
+  attempt?: SessionCount;
+  startedAt?: SessionMetric;
+  queuedAt?: SessionMetric;
+  lastProgressAt?: SessionMetric;
+}
+
+export interface DynamicWorkflowObservationData extends DynamicWorkflowTaskData {
+  usage?: {
+    totalTokens?: SessionCount;
+    toolUses?: SessionCount;
+    durationMs?: SessionMetric;
+  };
+  tasks?: DynamicWorkflowTaskData[];
+  workflowProgress?: DynamicWorkflowProgressData[];
 }
 
 /** Runtime observations retain supplied JSON values, including null and false. */
@@ -143,6 +177,14 @@ export interface ExecutionResultData {
   finishedAt?: JsonValue;
 }
 
+export interface DailyAICDecisionData {
+  status: "disabled" | "skipped" | "under_budget" | "exceeded" | "structural_error" | "transient_error";
+  exceeded?: boolean;
+  total?: number;
+  estimated?: number;
+  threshold?: number;
+}
+
 export interface WorkflowInfoData {
   engineId?: JsonValue;
   agentVersion?: JsonValue;
@@ -151,9 +193,24 @@ export interface WorkflowInfoData {
   mcpgVersion?: JsonValue;
   requestedModel?: JsonValue;
   triggerType?: JsonValue;
+  dryRun?: JsonValue;
   workflow?: JsonValue;
   repository?: JsonValue;
   runId?: JsonValue;
+}
+
+export interface GitHubApiRateLimitData {
+  source?: JsonValue;
+  credentialSource?: JsonValue;
+  operation?: JsonValue;
+  resource?: JsonValue;
+  limit?: JsonValue;
+  remaining?: JsonValue;
+  used?: JsonValue;
+  reset?: JsonValue;
+  attempt?: JsonValue;
+  delayMs?: JsonValue;
+  status?: JsonValue;
 }
 
 export interface CollectionWarningData {
@@ -184,11 +241,21 @@ export interface UnifiedSessionEventDataMap {
   "session.init": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
   "session.start": Pick<SessionInitData, "sourceEngine" | "model" | "sessionId" | "cwd">;
   "user.message": Pick<MessageData, "content">;
+  "prompt.system": Pick<MessageData, "content">;
+  "prompt.user": Pick<MessageData, "content">;
   "assistant.message": Pick<MessageData, "content">;
   "assistant.refusal": Pick<AssistantRefusalData, "reason" | "content" | "policyCategory" | "explanation" | "partial">;
   "assistant.reasoning": Pick<MessageData, "content">;
   "tool.execution_start": Pick<ToolExecutionStartData, "toolCallId" | "toolName" | "input" | "command" | "mcpServerName">;
-  "tool.execution_complete": Pick<ToolExecutionCompleteData, "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError">;
+  "tool.execution_complete": Pick<
+    ToolExecutionCompleteData,
+    "toolCallId" | "toolName" | "success" | "output" | "error" | "durationMs" | "exitCode" | "status" | "mcpServerName" | "isError" | "taskId" | "taskType" | "workflowName" | "workflowRunId"
+  >;
+  "dynamicWorkflows.task_started": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_progress": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_updated": DynamicWorkflowObservationData;
+  "dynamicWorkflows.task_notification": DynamicWorkflowObservationData;
+  "dynamicWorkflows.background_tasks_changed": DynamicWorkflowObservationData;
   "session.result": UnifiedSessionResultData;
   "mcp.rpc.request": McpObservationData;
   "mcp.rpc.response": McpObservationData;
@@ -211,7 +278,9 @@ export interface UnifiedSessionEventDataMap {
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;
   "detection.result": DetectionResultData;
+  "guardrail.daily_aic": DailyAICDecisionData;
   "workflow.info": WorkflowInfoData;
+  "github_api.rate_limit": GitHubApiRateLimitData;
   "session.collection_warning": CollectionWarningData;
   "session.collection": CollectionData;
 }

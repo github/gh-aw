@@ -338,6 +338,7 @@ func TestGenerateActionYml(t *testing.T) {
 				contentStr := string(content)
 				assert.Contains(t, contentStr, "name:", "Should contain name field")
 				assert.Contains(t, contentStr, "description:", "Should contain description field")
+				assert.Contains(t, contentStr, "using: 'node24'", "Should use the Node.js 24 runtime")
 			}
 		})
 	}

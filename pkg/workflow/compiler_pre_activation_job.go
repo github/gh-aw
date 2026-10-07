@@ -90,7 +90,7 @@ func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupAction
 
 	// Pre-activation job doesn't need project support (no safe outputs processed here).
 	// Pre-activation generates the root trace ID; activation will reuse it via setup-trace-id output.
-	steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, "", "")...)
+	steps = append(steps, c.generateSetupStepForJob("pre_activation", data, setupActionRef, SetupActionDestination, false, "", "", "")...)
 
 	var perms *Permissions
 	if needsContentsRead {
@@ -778,7 +778,8 @@ func (c *Compiler) buildPreActivationAppTokenMintStep(app *GitHubAppConfig) []st
 		PermissionIssues:       PermissionRead,
 		PermissionPullRequests: PermissionRead,
 	})
-	return c.buildGitHubAppTokenMintStepWithMeta(
+	return c.buildGitHubAppTokenMintStepForJob(
+		"pre_activation",
 		app,
 		permissions,
 		"",

@@ -428,6 +428,9 @@ function projectSessionInitialization(events) {
 function sessionOutputText(value) {
   if (typeof value === "string") return value;
   if (value === undefined) return "";
+  if (Array.isArray(value) && value.length > 0 && value.every(block => block?.type === "text" && typeof block.text === "string")) {
+    return value.map(block => block.text).join("\n");
+  }
   if (value && typeof value === "object") {
     if (typeof value.text === "string") return value.text;
     if (Object.hasOwn(value, "content")) {

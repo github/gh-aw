@@ -48,6 +48,8 @@ type LogsData struct {
 
 // ContinuationData provides parameters to continue an incomplete logs query.
 type ContinuationData struct {
+	DryRun                bool    `json:"dry_run,omitempty"`
+	NoDryRun              bool    `json:"no_dry_run,omitempty"`
 	Message               string  `json:"message"`
 	WorkflowName          string  `json:"workflow_name,omitempty"`
 	Count                 int     `json:"count,omitempty"`

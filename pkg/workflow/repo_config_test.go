@@ -336,6 +336,25 @@ func TestLoadRepoConfig_DisabledJobs(t *testing.T) {
 	assert.False(t, cfg.Maintenance.IsJobDisabled("create_labels"), "unlisted jobs should remain enabled")
 }
 
+func TestLoadRepoConfig_DisabledManualMaintenanceJobs(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"maintenance": {"disabled_jobs": [
+		"run_operation", "update_pull_request_branches", "validate_workflows",
+		"activity_report", "forecast_report", "close_agentic_workflows_issues",
+		"create_labels", "cleanup-cache-memory"
+	]}}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err)
+	for _, job := range []string{
+		"run_operation", "update_pull_request_branches", "validate_workflows",
+		"activity_report", "forecast_report", "close_agentic_workflows_issues",
+		"create_labels", "cleanup_cache_memory",
+	} {
+		assert.True(t, cfg.Maintenance.IsJobDisabled(job), "expected %s to be disabled", job)
+	}
+}
+
 func TestLoadRepoConfig_DisabledJobsRejectsInvalidOrDuplicateValues(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -356,6 +375,11 @@ func TestLoadRepoConfig_DisabledJobsRejectsInvalidOrDuplicateValues(t *testing.T
 			name:     "unknown job rejected",
 			awJSON:   `{"maintenance": {"disabled_jobs": ["apply_safe_outputz"]}}`,
 			contains: "unrecognized maintenance.disabled_jobs entry",
+		},
+		{
+			name:     "operation name is not a job ID",
+			awJSON:   `{"maintenance": {"disabled_jobs": ["validate"]}}`,
+			contains: `unrecognized maintenance.disabled_jobs entry "validate"`,
 		},
 	}
 
@@ -644,6 +668,18 @@ func TestLoadRepoConfig_ActionPins(t *testing.T) {
 		_, err := LoadRepoConfig(dir)
 		assert.Error(t, err, "value without @version should fail schema validation")
 	})
+}
+
+func TestLoadRepoConfig_ActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-"}}`)
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "mirror/actions-", cfg.ActionPinPrefixes["actions/"])
+
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-@v4"}}`)
+	_, err = LoadRepoConfig(dir)
+	require.Error(t, err, "prefix values must not contain action versions")
 }
 
 func TestValidateCronExpression(t *testing.T) {

@@ -83,7 +83,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 ---
 
@@ -93,7 +93,7 @@ jobs:
 				"build:",
 				"- uses: actions/setup-node@",
 				"with:",
-				"node-version:", // Both "20" and '20' are valid YAML
+				"node-version:", // Both "24" and '24' are valid YAML
 				"cache:",        // Both "npm" and 'npm' are valid YAML
 			},
 			shouldError: false,

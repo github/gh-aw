@@ -52,7 +52,7 @@ describe("Pi CI stream regressions", () => {
     expect(byType(logEntries, "tool.execution_complete")).toEqual([]);
   });
 
-  it("keeps deltas before interleaved tools and emits only a missing snapshot suffix", () => {
+  it("coalesces adjacent deltas without moving later text before interleaved tools", () => {
     const message = { role: "assistant", timestamp: 10, content: [{ type: "text", text: " before after!\n" }], usage: { input: 4, output: 2 } };
     const events = transformPiV3Entries([
       { type: "turn_start" },
@@ -64,11 +64,170 @@ describe("Pi CI stream regressions", () => {
       { type: "turn_end", message },
       { type: "agent_end", messages: [message] },
     ]);
-    expect(events.filter(e => !e.type.startsWith("pi.")).map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message", "assistant.message"]);
-    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual([" before", " after", "!\n"]);
+    expect(events.filter(e => !e.type.startsWith("pi.")).map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message"]);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual([" before", " after!\n"]);
+    expect(
+      byType(events, "assistant.message")
+        .map(e => e.data.content)
+        .join("")
+    ).toBe(message.content[0].text);
     expect(events[0].id).toBe("delta-1");
     expect(events[1].data.input).toBe(false);
     expect(events[2].data).toMatchObject({ output: false, durationMs: 0, success: true });
+  });
+
+  it("places a recovered snapshot suffix after the interruption without repeating the complete answer", () => {
+    const message = { role: "assistant", id: "answer", content: [{ type: "text", text: " before\n\nafter\n" }] };
+    const events = transformPiV3Entries([
+      { type: "message_update", id: "before", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: " before\n" } },
+      { type: "tool_execution_start", toolCallId: "tool", toolName: "bash", args: {} },
+      { type: "tool_execution_end", toolCallId: "tool", result: {}, isError: false },
+      { type: "message_end", id: "after", message },
+      { type: "turn_end", message },
+      { type: "agent_end", messages: [message] },
+    ]);
+    const ordered = events.filter(e => !e.type.startsWith("pi."));
+    expect(ordered.map(e => e.type)).toEqual(["assistant.message", "tool.execution_start", "tool.execution_complete", "assistant.message"]);
+    expect(ordered[0]).toMatchObject({ id: "before", data: { content: " before\n" } });
+    expect(ordered[3]).toMatchObject({ id: "after", data: { content: "\nafter\n" } });
+    expect(
+      byType(events, "assistant.message")
+        .map(e => e.data.content)
+        .join("")
+    ).toBe(message.content[0].text);
+  });
+
+  it("reconciles corrected complete content across interrupted segments without relocating events", () => {
+    const message = { role: "assistant", id: "corrected", content: [{ type: "text", text: "right\n", signature: "complete" }] };
+    const events = transformPiV3Entries([
+      { type: "message_update", id: "first", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "wrong" } },
+      { type: "vendor.progress", data: { count: 1 } },
+      { type: "message_update", id: "second", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: " text\n" } },
+      { type: "message_end", message },
+      { type: "agent_end", messages: [message] },
+    ]);
+    expect(events.filter(e => !e.type.startsWith("pi.")).map(e => e.type)).toEqual(["assistant.message", "vendor.progress", "assistant.message"]);
+    const text = byType(events, "assistant.message");
+    expect(text.map(e => e.id)).toEqual(["first", "second"]);
+    expect(text.map(e => e.data.content).join("")).toBe("right\n");
+    expect(text.every(e => e.data.signature === "complete")).toBe(true);
+  });
+
+  it("renders the real Pi final-answer lifecycle once with continuous Markdown and exact whitespace", () => {
+    const text = " The smoke tests have been executed successfully.\n\n### Results\n- **Overall Status**: PASS\n\n[Run](https://github.com/github/gh-aw/actions/runs/37248388015)\n ";
+    const message = { role: "assistant", responseId: "answer", timestamp: 10, content: [{ type: "text", text, signature: "final-metadata" }], usage: { input: 7, output: 3 } };
+    const records = [
+      { type: "turn_start" },
+      { type: "message_start", message: { ...message, responseId: undefined, content: [] } },
+      ...Array.from(text, (delta, index) => ({ type: "message_update", id: `delta-${index}`, timestamp: index + 10, assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta } })),
+      { type: "message_update", assistantMessageEvent: { type: "text_end", contentIndex: 0, content: text } },
+      { type: "message_end", message },
+      { type: "turn_end", message },
+      { type: "agent_end", messages: [message] },
+    ];
+    const original = structuredClone(records);
+    const { logEntries, markdown } = parse(records);
+    expect(byType(logEntries, "assistant.message")).toHaveLength(1);
+    expect(byType(logEntries, "assistant.message")[0]).toMatchObject({ id: "delta-0", timestamp: 10, data: { content: text, signature: "final-metadata" } });
+    expect(markdown).toContain(text.trim());
+    expect(markdown.split("The smoke tests have been executed successfully.")).toHaveLength(2);
+    expect(selectSessionResult(logEntries)).toMatchObject({ numTurns: 1, usage: { input_tokens: 7, output_tokens: 3 } });
+    expect(records).toEqual(original);
+  });
+
+  it("coalesces interrupted text and reasoning separately without moving their first observations", () => {
+    const records = [
+      { type: "message_update", id: "reasoning", timestamp: 1, assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: " why\n" } },
+      { type: "vendor.progress", id: "progress", data: { count: 1 } },
+      { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: " now " } },
+      { type: "message_update", id: "answer", timestamp: 2, assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: " first\n" } },
+      { type: "tool_execution_start", toolCallId: "tool", toolName: "bash", args: { command: "echo ok" } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "\nsecond " } },
+      { type: "error", error: "interrupted" },
+    ];
+    const events = transformPiV3Entries(records);
+    expect(events.map(e => e.type)).toEqual(["assistant.reasoning", "vendor.progress", "assistant.reasoning", "assistant.message", "tool.execution_start", "assistant.message", "pi.error"]);
+    expect(events[0]).toMatchObject({ id: "reasoning", timestamp: 1, data: { content: " why\n" } });
+    expect(events[3]).toMatchObject({ id: "answer", timestamp: 2, data: { content: " first\n" } });
+    expect(
+      byType(events, "assistant.reasoning")
+        .map(e => e.data.content)
+        .join("")
+    ).toBe(" why\n now ");
+    expect(
+      byType(events, "assistant.message")
+        .map(e => e.data.content)
+        .join("")
+    ).toBe(" first\n\nsecond ");
+  });
+
+  it("keeps equal content in distinct messages and interrupted turns separate", () => {
+    const message = id => ({ role: "assistant", id, content: [{ type: "text", text: "same\n" }] });
+    const events = transformPiV3Entries([
+      { type: "message_end", message: message("first") },
+      { type: "message_end", message: message("second") },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "partial\n" } },
+      { type: "turn_start" },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "new\n" } },
+      { type: "message_start", message: { role: "assistant", id: "last", content: [] } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "last\n" } },
+    ]);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["same\n", "same\n", "partial\n", "new\n", "last\n"]);
+  });
+
+  it("respects anonymous message boundaries while suppressing repeated transcript snapshots", () => {
+    const message = { role: "assistant", content: [{ type: "text", text: "same\n" }] };
+    const lifecycle = [
+      { type: "message_start", message: { ...message, content: [] } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "same\n" } },
+      { type: "message_end", message },
+    ];
+    const events = transformPiV3Entries([...lifecycle, ...lifecycle, { type: "agent_end", messages: [message, message] }]);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["same\n", "same\n"]);
+    expect(
+      byType(
+        transformPiV3Entries([
+          { type: "message_end", message: { ...message, content: [{ type: "text", text: "first\n" }] } },
+          { type: "message_end", message: { ...message, content: [{ type: "text", text: "second\n" }] } },
+        ]),
+        "assistant.message"
+      ).map(e => e.data.content)
+    ).toEqual(["first\n", "second\n"]);
+  });
+
+  it("recovers authoritative snapshots rather than keeping incorrect partial text and reasoning", () => {
+    const message = {
+      role: "assistant",
+      id: "corrected",
+      content: [
+        { type: "thinking", thinking: "complete reasoning\n", signature: "reasoning-metadata" },
+        { type: "text", text: "complete answer\n", signature: "answer-metadata" },
+      ],
+    };
+    const events = transformPiV3Entries([
+      { type: "message_update", id: "reasoning", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "incorrect reasoning" } },
+      { type: "message_update", id: "answer", assistantMessageEvent: { type: "text_delta", contentIndex: 1, delta: "incorrect answer" } },
+      { type: "message_end", message },
+      { type: "turn_end", message: { ...message, usage: { input: 2 } } },
+      { type: "agent_end", messages: [message] },
+    ]);
+    expect(byType(events, "assistant.reasoning")).toHaveLength(1);
+    expect(byType(events, "assistant.reasoning")[0]).toMatchObject({ id: "reasoning", data: { content: "complete reasoning\n", signature: "reasoning-metadata" } });
+    expect(byType(events, "assistant.message")).toHaveLength(1);
+    expect(byType(events, "assistant.message")[0]).toMatchObject({ id: "answer", data: { content: "complete answer\n", signature: "answer-metadata" } });
+  });
+
+  it("does not merge content block indices or text and reasoning at the same index", () => {
+    const events = transformPiV3Entries([
+      { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "reason" } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "first" } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 2, delta: "second" } },
+      { type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "ing\n" } },
+      { type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 2, delta: "\n" } },
+    ]);
+    expect(byType(events, "assistant.reasoning").map(e => e.data.content)).toEqual(["reason", "ing\n"]);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["first", "second", "\n"]);
+    expect(events.map(e => e.type)).toEqual(["assistant.reasoning", "assistant.message", "assistant.message", "assistant.reasoning", "assistant.message"]);
   });
 
   it("retains interrupted text/thinking, partial arguments, dangling starts and orphan completions", () => {
@@ -174,7 +333,7 @@ describe("Pi CI stream regressions", () => {
       { type: "agent_end", messages: [{ role: "assistant", content: [{ type: "text", text: "partial complete" }], usage: { input: 2 } }] },
     ];
     const events = transformPiV3Entries(records);
-    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["partial ", "complete"]);
+    expect(byType(events, "assistant.message").map(e => e.data.content)).toEqual(["partial complete"]);
     expect(computePiV3Stats(records)).toMatchObject({ turns: 1, usage: { input_tokens: 2 } });
   });
 

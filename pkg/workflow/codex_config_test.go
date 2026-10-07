@@ -102,16 +102,22 @@ func TestCodexGitHubInferenceDisablesUnsupportedExecTool(t *testing.T) {
 	for _, test := range []struct {
 		name         string
 		model        string
+		provider     LLMProvider
 		disableShell bool
 	}{
 		{name: "Copilot provider", model: "copilot/gpt-5.3-codex", disableShell: true},
+		{name: "Copilot code-mode model", model: "copilot/gpt-5.6-sol", disableShell: true},
+		{name: "Copilot model prefix normalization", model: " COPILOT/GPT-5.6-TERRA ", disableShell: true},
+		{name: "Explicit GitHub provider", model: "${{ vars.MODEL }}", provider: LLMProviderGitHub, disableShell: true},
 		{name: "OpenAI provider", model: "gpt-5.3-codex"},
+		{name: "OpenAI code-mode model", model: "openai/gpt-5.6-sol"},
+		{name: "Explicit OpenAI provider", model: "copilot/gpt-5.6-sol", provider: LLMProviderOpenAI},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			data := &WorkflowData{
 				Name:         "provider-tool-config",
 				Model:        test.model,
-				EngineConfig: &EngineConfig{ID: "codex"},
+				EngineConfig: &EngineConfig{ID: "codex", LLMProvider: test.provider},
 			}
 			var output strings.Builder
 			require.NoError(t, renderCodexMCPConfigForTest(t, NewCodexEngine(), &output, map[string]any{}, nil, data))
@@ -120,22 +126,84 @@ func TestCodexGitHubInferenceDisablesUnsupportedExecTool(t *testing.T) {
 			features := config["features"].(map[string]any)
 			if test.disableShell {
 				assert.Equal(t, false, features["shell_tool"])
+				assert.Equal(t, false, features["code_mode"])
+				assert.Equal(t, false, features["code_mode_only"])
+				assert.Equal(t, codexHome(data)+"/models.json", config["model_catalog_json"])
+				assert.Contains(t, output.String(), "codex debug models --bundled |")
+				assert.Contains(t, output.String(), "--direct-tools")
 			} else {
 				assert.NotContains(t, features, "shell_tool")
+				assert.NotContains(t, features, "code_mode")
+				assert.NotContains(t, features, "code_mode_only")
+				assert.NotContains(t, config, "model_catalog_json")
+				assert.NotContains(t, output.String(), "--direct-tools")
 			}
 		})
 	}
 }
 
 func TestCodexGitHubInferenceRejectsExecToolOverride(t *testing.T) {
-	_, err := NewCodexEngine().buildNativeConfig(&WorkflowData{
-		Model: "copilot/gpt-5.3-codex",
-		EngineConfig: &EngineConfig{
-			ID:     "codex",
-			Config: "[features]\nshell_tool = true",
-		},
-	}, nil)
-	require.ErrorContains(t, err, "does not support the Codex exec custom tool")
+	for _, config := range []string{
+		"[features]\nshell_tool = true",
+		"[features]\ncode_mode = true",
+		"[features]\ncode_mode_only = true",
+		"[features.code_mode]\nenabled = true",
+		`model_catalog_json = "/custom/models.json"`,
+	} {
+		t.Run(config, func(t *testing.T) {
+			_, err := NewCodexEngine().buildNativeConfig(&WorkflowData{
+				Model: "copilot/gpt-5.6-sol",
+				EngineConfig: &EngineConfig{
+					ID:     "codex",
+					Config: config,
+				},
+			}, nil)
+			require.ErrorContains(t, err, "exec custom tool")
+		})
+	}
+}
+
+func TestCodexGitHubDirectToolCatalogConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, "custom-codex-home")
+	cmd := exec.Command("node", "actions/setup/js/convert_gateway_config_codex.cjs", "--direct-tools")
+	cmd.Dir = filepath.Join("..", "..")
+	cmd.Env = append(os.Environ(), "CODEX_HOME="+home)
+	cmd.Stdin = strings.NewReader(`{"models":[{"slug":"gpt-5.6-sol","tool_mode":"code_mode_only","context_window":400000}]}`)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	catalogPath := filepath.Join(home, "models.json")
+	content, err := os.ReadFile(catalogPath)
+	require.NoError(t, err)
+	var catalog struct {
+		Models []struct {
+			Slug          string `json:"slug"`
+			ToolMode      string `json:"tool_mode"`
+			ContextWindow int    `json:"context_window"`
+		} `json:"models"`
+	}
+	require.NoError(t, json.Unmarshal(content, &catalog))
+	require.Len(t, catalog.Models, 1)
+	assert.Equal(t, "direct", catalog.Models[0].ToolMode)
+	assert.Equal(t, 400000, catalog.Models[0].ContextWindow)
+	info, err := os.Stat(catalogPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+	for _, configOnly := range []bool{false, true} {
+		step, err := NewCodexEngine().renderConfigurationStep(&WorkflowData{
+			IsDetectionRun: configOnly,
+			Model:          "copilot/gpt-5.6-sol",
+			EngineConfig:   &EngineConfig{ID: "codex", Env: map[string]string{"CODEX_HOME": home}},
+		}, nil, configOnly)
+		require.NoError(t, err)
+		rendered := strings.Join(step, "\n")
+		assert.Less(t, strings.Index(rendered, "--direct-tools"), strings.Index(rendered, "--bootstrap"))
+		assert.Contains(t, decodeCodexBootstrap(t, rendered)["model_catalog_json"], home)
+		if configOnly {
+			assert.Contains(t, rendered, "--config-only")
+		}
+	}
 }
 
 func TestCodexNativeConfigShellEnvironment(t *testing.T) {

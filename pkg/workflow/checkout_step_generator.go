@@ -49,7 +49,8 @@ func (cm *CheckoutManager) GenerateCheckoutAppTokenSteps(c *Compiler, permission
 		checkoutManagerLog.Printf("Generating app token minting step for checkout index=%d repo=%q", checkoutIndex, entry.key.repository)
 		// Pass empty fallback so the app token defaults to github.event.repository.name.
 		// Checkout-specific cross-repo scoping is handled via the explicit repository field.
-		steps = append(steps, collapseYAMLLinesIntoSteps(c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, collapseYAMLLinesIntoSteps(c.buildGitHubAppTokenMintStepForJob(
+			"agent",
 			entry.githubApp,
 			permissions,
 			"",
@@ -76,7 +77,8 @@ func (cm *CheckoutManager) GenerateSafeOutputCheckoutAppTokenSteps(c *Compiler, 
 			continue
 		}
 		checkoutManagerLog.Printf("Generating safe_outputs app token minting step for checkout index=%d repo=%q", checkoutIndex, entry.key.repository)
-		steps = append(steps, collapseYAMLLinesIntoSteps(c.buildGitHubAppTokenMintStepWithMeta(
+		steps = append(steps, collapseYAMLLinesIntoSteps(c.buildGitHubAppTokenMintStepForJob(
+			"safe_outputs",
 			entry.safeOutputApp,
 			permissions,
 			"",

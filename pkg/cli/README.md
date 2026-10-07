@@ -876,7 +876,27 @@ Method-form symbols on exported types (e.g. `(*FileTracker).TrackCreated`, `(*Do
 | `mcp_schema.go` | `MarshalOutputSchema` | `func MarshalOutputSchema(schema *jsonschema.Schema) ([]byte, error)` | Serializes a generated output schema using the CLI's standard indented JSON format. |
 | `models_command.go` | `NewModelsCommand` | `func NewModelsCommand() *cobra.Command` | Creates the `models` command that lists model catalog pricing, aliases, and observed automation models. |
 
+### Additional exported symbols (verified 2026-10-06)
+
+| File | Symbol | Kind | Description |
+|------|--------|------|-------------|
+| `sessions_command.go` | `NewSessionsCommand` | `func NewSessionsCommand() *cobra.Command` | Creates the `sessions` command. |
+| `work_command.go` | `NewWorkCommand` | `func NewWorkCommand() *cobra.Command` | Creates the `work` command. |
+| `mcp_schema.go` | `GenerateOutputSchema` | `func GenerateOutputSchema[T any]() (*jsonschema.Schema, error)` | Generates a JSON schema for the CLI output type `T`. |
+| `validation_issue.go` | `(ValidationIssue).ToFinding` | `func (v ValidationIssue) ToFinding(severity scanfindings.SeverityLevel) scanfindings.Finding` | Converts a validation issue into a scan finding of the given severity. |
+| `gateway_logs_types.go` | `(RPCMessageEntry).EffectiveType` | `func (e RPCMessageEntry) EffectiveType() string` | Returns the message type; the legacy `type` field takes precedence over `event` (schema `rpc-message/v2`). |
+| `logs_models.go` | `NumericID` | `type NumericID int64` | Integer identifier accepting either a JSON number or its string form. |
+| `experiments_analyze_statistics.go` | `ExperimentReadiness` | `type ExperimentReadiness string` | Whether normal analysis requirements have enough usable data. |
+| `experiments_analyze_statistics.go` | `GuardrailStatusCode` | `type GuardrailStatusCode string` | Stable machine-readable outcome of a guardrail evaluation. |
+| `friction_cost.go` | `FrictionCostSummary`, `FrictionCost`, `FrictionTokens`, `FrictionUncertain`, `FrictionDriverSummary`, `FrictionGroup`, `FrictionEvent`, `FrictionUnmeasuredDriver` | structs | Precomputed estimated avoidable marginal cost of execution-friction events in a run (AIC is the canonical unit). |
+| `logs_work_queue.go` | `WorkQueueReport`, `WorkQueueSnapshot`, `WorkQueueWorker`, `WorkQueueTransaction`, `WorkQueueOperation` | structs | Activation-time queue facts, agent intent, and operations observed in a run's job logs (runtime queue protocol). |
+| `logs_usage_activity.go` | `LedgerActivity`, `LedgerCompactionActivity` | structs | Ledger mutations and repo-memory compaction statistics. |
+
+Methods on unexported types (e.g. `cachedLogsJSONLWriter.Append*`, `githubGraderRunArtifactSource.Load`) are not part of the public API.
+
 ## Source Synchronization
+
+Re-verified on 2026-10-06: the exported symbols listed above were previously undocumented and are now covered.
 
 Reviewed against recent source updates on 2026-08-08; the "Additional exported top-level functions" table above was added after diffing the full exported-symbol list against this README. Re-verified on 2026-09-26: diffed the full exported top-level function list against all documented tables and added the "Additional exported top-level functions (verified 2026-09-26)" table above for 10 previously undocumented functions. No other public-contract deltas were identified beyond the sections above.
 

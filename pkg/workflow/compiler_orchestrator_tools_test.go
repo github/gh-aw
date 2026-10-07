@@ -177,7 +177,7 @@ on: push
 engine: copilot
 runtimes:
   node:
-    version: "20"
+    version: "24"
   python:
     version: "3.11"
 ---

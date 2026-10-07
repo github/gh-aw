@@ -91,7 +91,7 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
   try {
     for (const run of candidates.values()) {
       const cached = entries.get(run.id);
-      const hit = matchesCompletedRun(cached, run);
+      const hit = matchesCompletedRun(cached, run) && cached.source === "recorded";
       core.info(
         `[daily-workflow-aic] Resolving run AIC: ${JSON.stringify({
           runId: run.id,
@@ -102,13 +102,16 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
       );
       let aic;
       let reason;
+      let source;
       if (hit) {
         aic = cached.aic;
         reason = "scan_cache";
+        source = "recorded";
       } else {
         try {
           aic = await getRunAIC(artifactClient, run.id, token, owner, repo, run, { github, budget });
           reason = "artifact_accounting";
+          source = "recorded";
         } catch (error) {
           const status = getErrorStatus(error);
           const canUseFallback = Number.isFinite(fallbackAIC) && fallbackAIC > 0 && !status;
@@ -124,6 +127,7 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
           if (!canUseFallback) throw error;
           aic = fallbackAIC;
           reason = "max_ai_credits_fallback";
+          source = "estimated";
           core.warning(
             `[daily-workflow-aic] Assuming max AI Credits after all accounting sources failed: ${JSON.stringify({
               runId: run.id,
@@ -133,12 +137,12 @@ async function scanDailyAIC({ github, context, budget, artifactClient, getRunAIC
           );
         }
       }
-      entries.set(run.id, scanCacheEntry(run, aic, repository, current.workflow_id, now));
+      entries.set(run.id, scanCacheEntry(run, aic, repository, current.workflow_id, now, source));
       if (hit) {
         cacheHits++;
       }
       core.info(`[daily-workflow-aic] Computed run AIC: ${JSON.stringify({ runId: run.id, aic, reason })}`);
-      countedRuns.push({ ...run, aic });
+      countedRuns.push({ ...run, aic, source });
     }
   } finally {
     // This runs even after an API error. Partial snapshots accelerate recovery but

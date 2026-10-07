@@ -161,6 +161,7 @@ func sideRepoAppTokenMintStepYAML(app *GitHubAppConfig, targetRepo string) strin
 
 // generateAllSideRepoMaintenanceWorkflowsOptions configures side-repo maintenance workflow generation.
 type generateAllSideRepoMaintenanceWorkflowsOptions struct {
+	pinWarnings      map[string]bool
 	workflowDataList []*WorkflowData
 	workflowDir      string
 	version          string
@@ -170,6 +171,7 @@ type generateAllSideRepoMaintenanceWorkflowsOptions struct {
 	resolver         SHAResolver
 	hasExpires       bool
 	minExpiresDays   int
+	repoConfig       *RepoConfig
 }
 
 // generateAllSideRepoMaintenanceWorkflows detects SideRepoOps targets and
@@ -205,6 +207,8 @@ func generateSideRepoMaintenanceFiles(ctx context.Context, targets []SideRepoTar
 			resolver:       opts.resolver,
 			hasExpires:     opts.hasExpires,
 			minExpiresDays: opts.minExpiresDays,
+			repoConfig:     opts.repoConfig,
+			pinWarnings:    opts.pinWarnings,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate side-repo maintenance workflow for %s: %w", target.Repository, err)
@@ -240,6 +244,7 @@ func isSideRepoMaintenanceWorkflowFile(name string) bool {
 // generateSideRepoMaintenanceWorkflowOptions configures generation of a single side-repo
 // maintenance workflow.
 type generateSideRepoMaintenanceWorkflowOptions struct {
+	pinWarnings    map[string]bool
 	target         SideRepoTarget
 	outPath        string
 	version        string
@@ -249,6 +254,7 @@ type generateSideRepoMaintenanceWorkflowOptions struct {
 	resolver       SHAResolver
 	hasExpires     bool
 	minExpiresDays int
+	repoConfig     *RepoConfig
 }
 
 // generateSideRepoMaintenanceWorkflow generates a workflow_call-based maintenance
@@ -264,6 +270,12 @@ func generateSideRepoMaintenanceWorkflow(
 	content, err := buildSideRepoMaintenanceWorkflowYAML(renderCtx)
 	if err != nil {
 		return fmt.Errorf("failed to finalize side-repo maintenance workflow YAML: %w", err)
+	}
+	if opts.repoConfig != nil {
+		content, err = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, opts.pinWarnings, opts.resolver)
+		if err != nil {
+			return err
+		}
 	}
 	maintenanceLog.Printf("Writing side-repo maintenance workflow to %s", renderCtx.outPath)
 	if err := os.WriteFile(renderCtx.outPath, []byte(content), constants.FilePermPublic); err != nil {

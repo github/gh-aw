@@ -24,7 +24,7 @@ model: copilot/mai-code-1.1-flash
 strict: true
 runtimes:
   node:
-    version: "20"
+    version: "24"
   python:
     version: "3.11"
   go:

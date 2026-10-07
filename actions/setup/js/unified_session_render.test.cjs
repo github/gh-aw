@@ -4,7 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary, generateConversationMarkdown, formatToolUse, formatInitializationSummary, MAX_STEP_SUMMARY_SIZE } from "./log_parser_shared.cjs";
 import { publishUnifiedSessionSummary, validateSessionFileHeader } from "./unified_session_render.cjs";
-import { main } from "./unified_session.cjs";
+import { main, mergeSessionSources } from "./unified_session.cjs";
+import { normalizeClaudeSession } from "./claude_session.cjs";
+import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 
 function event(type, data, component, index, timestampMs, sourcePath = `${component}.jsonl`) {
   return { type, data, provenance: { component, phase: component === "agent" ? "agent" : "conclusion", path: sourcePath, index, ...(timestampMs !== undefined ? { timestampMs } : {}) } };
@@ -19,6 +21,8 @@ const trace = [
   event("tool.execution_complete", { toolCallId: "shared", success: false, output: "failed" }, "agent", 1, 5, "session-a.jsonl"),
   event("tool.execution_complete", { toolCallId: "shared", success: true, output: "done" }, "agent", 1, 6, "session-b.jsonl"),
   event("user.message", { content: "PRIVATE_USER_PROMPT" }, "agent", 2, 7, "session-a.jsonl"),
+  event("prompt.system", { content: "PRIVATE_SYSTEM_INSTRUCTIONS" }, "prompt", 0, undefined, "aw-prompts/system.txt"),
+  event("prompt.user", { content: "PRIVATE_SPLIT_USER_PROMPT" }, "prompt", 0, undefined, "aw-prompts/user.txt"),
   event("assistant.message", { content: "Done <details>.\n" }, "agent", 3, 8, "session-a.jsonl"),
   event("session.result", { numTurns: 1, usage: { input_tokens: 0, output_tokens: 2 } }, "agent", 4, 9, "session-a.jsonl"),
   event("session.result", { numTurns: 2, usage: { input_tokens: 10, output_tokens: 3 } }, "agent", 2, 10, "session-b.jsonl"),
@@ -70,7 +74,7 @@ describe("unified session publication views", () => {
     for (const output of [generatePlainTextSummary(trace), generateCopilotCliStyleSummary(trace)]) {
       expect(output).toContain("File format version: 1");
       for (const type of new Set(trace.map(record => record.type))) {
-        if (type !== "user.message") expect(output).toContain(type);
+        if (!["user.message", "prompt.system", "prompt.user"].includes(type)) expect(output).toContain(type);
       }
       expect(output).toContain("list_issues");
       expect(output).toContain("rpcId=0");
@@ -97,6 +101,29 @@ describe("unified session publication views", () => {
     expect(markdown).toContain("<details><summary>Unified trace details</summary>");
   });
 
+  it.each(["completed", "failed", "stopped"])("distinguishes a Workflow launch from task status %s and renders progress without embedded prompts", status => {
+    const records = dynamicWorkflow.map(record => (record.subtype === "task_notification" ? { ...record, status } : record));
+    const events = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: normalizeClaudeSession(records) }]);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("[launch succeeded; workflow outcome pending]");
+      expect(output).toContain("workflowName=smoke-claude-dynamic workflowRunId=dynamic-run");
+      expect(output).toContain("dynamicWorkflows.task_started taskId=dynamic-task toolCallId=workflow-tool taskType=local_workflow");
+      expect(output).toContain("dynamicWorkflows.task_progress taskId=dynamic-task toolCallId=workflow-tool totalTokens=0 toolUses=0 durationMs=0");
+      expect(output).toContain("agentId=dynamic-agent model=claude-sonnet-4-6 state=done");
+      expect(output).toContain(`dynamicWorkflows.task_notification taskId=dynamic-task toolCallId=workflow-tool status=${status}`);
+      expect(output).toContain("dynamicWorkflows.background_tasks_changed tasks=[]");
+      expect(output).toContain("Tokens: 18 total (7 in / 11 out)");
+      expect(output).not.toContain("PRIVATE_");
+    }
+  });
+
+  it("renders top-level parent correlation for Copilot subagent events in both views", () => {
+    const events = [header, { ...event("subagent.started", { agentName: "child" }, "agent", 1, 1), agentId: "child-id", parentId: "parent-id" }];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("subagent.started agentId=child-id agentName=child parentId=parent-id");
+    }
+  });
+
   it("scopes agent pairing, snapshots and accounting without adding firewall usage", () => {
     const output = generatePlainTextSummary(trace);
     const first = output.slice(output.indexOf("Agent source: agent/session-a.jsonl"), output.indexOf("Agent source: agent/session-b.jsonl"));
@@ -107,6 +134,47 @@ describe("unified session publication views", () => {
     expect(second).toContain("Tools: 1/1 succeeded");
     expect(second).toContain("Tokens: 13 total (10 in / 3 out)");
     expect(first + second).not.toContain("999");
+  });
+
+  it("collapses streamed text into one conversation and timeline message, preserving the native record count", () => {
+    const events = [header, ...["Hello", " ", "world."].map((content, index) => event("assistant.message", { content, delta: true, messageId: "answer" }, "agent", index, index + 1))];
+    const original = structuredClone(events);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      const conversation = output.slice(output.indexOf("Agent conversation:"), output.indexOf("Chronological trace"));
+      expect(conversation).toContain("Hello world.");
+      expect(output.match(/assistant\.message Hello world\./g)).toHaveLength(1);
+      expect(output).toContain("Records: 4");
+      expect(output).toContain("1970-01-01T00:00:00.001Z agent/agent assistant.message");
+    }
+    expect(events).toEqual(original);
+  });
+
+  it("does not merge message identities that publication redaction collapses", () => {
+    process.env.GH_AW_SECRET_NAMES = "FIRST_ID,SECOND_ID";
+    process.env.SECRET_FIRST_ID = "secret-first-message";
+    process.env.SECRET_SECOND_ID = "secret-second-message";
+    const events = [
+      header,
+      event("assistant.message", { content: "First message", delta: true, messageId: "secret-first-message" }, "agent", 0, 1),
+      event("assistant.message", { content: "Second message", delta: true, messageId: "secret-second-message" }, "agent", 1, 2),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).not.toContain("First messageSecond message");
+      expect(output.match(/agent\/agent assistant\.message /g)).toHaveLength(2);
+      expect(output).not.toContain("secret-first-message");
+      expect(output).not.toContain("secret-second-message");
+    }
+  });
+
+  it("redacts secrets formed by joining individually innocuous stream fragments", () => {
+    process.env.GH_AW_SECRET_NAMES = "STREAM";
+    process.env.SECRET_STREAM = "cross-stream-secret-value";
+    const events = [header, ...["Result: cross-stream-", "secret-value", "."].map((content, index) => event("assistant.message", { content, delta: true }, "agent", index, index + 1))];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("Result: ");
+      expect(output).not.toContain("cross-stream-secret-value");
+    }
+    expect(events[1].data.content).toBe("Result: cross-stream-");
   });
 
   it("retains private pairing keys until projection so redaction cannot merge distinct tool calls", () => {
@@ -139,6 +207,81 @@ describe("unified session publication views", () => {
     expect(result.markdown).not.toContain("PRIVATE_");
   });
 
+  it("renders multiline agent conversations with tool arguments, output and errors before runtime observations", () => {
+    const events = [
+      header,
+      event("user.message", { content: "PRIVATE_USER_PROMPT" }, "agent", 0, 0),
+      event("assistant.reasoning", { content: "First thought\nSecond thought" }, "agent", 1, 1),
+      event("assistant.message", { content: "First answer\nSecond answer" }, "agent", 2, 2),
+      event("tool.execution_start", { toolName: "Bash", toolCallId: "shell", input: { command: "printf fixture-command", description: "Run fixture" } }, "agent", 3, 3),
+      event("tool.execution_complete", { toolCallId: "shell", success: false, output: "fixture-output", error: { code: "DENIED", message: "fixture-error" }, durationMs: 0 }, "agent", 4, 4),
+      event("tool.execution_start", { toolName: "lookup", toolCallId: "pending", input: { query: "fixture-query" } }, "agent", 5, 5),
+      event("tool.execution_complete", { toolName: "lookup", toolCallId: "orphan", success: true, output: "" }, "agent", 6, 6),
+      event("mcp.rpc.request", { method: "tools/call", arguments: { query: "PRIVATE_RPC_ARGUMENT" } }, "mcp", 0, 7),
+    ];
+    const original = structuredClone(events);
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {
+      expect(output).toContain("Agent conversation: agent/agent.jsonl");
+      expect(output).toContain("◐ First thought\n  Second thought");
+      expect(output).toContain("◆ First answer\n  Second answer");
+      expect(output).toContain("✗ $ printf fixture-command");
+      expect(output).toContain("fixture-output");
+      expect(output).toContain("Error:");
+      expect(output).toContain("fixture-error");
+      expect(output).toContain("DENIED");
+      expect(output).toContain("fixture-query");
+      expect(output).toContain("[pending]");
+      expect(output).toContain("[start unavailable]");
+      expect(output).toContain("[empty output]");
+      expect(output.indexOf("Agent conversation:")).toBeLessThan(output.indexOf("Chronological trace"));
+      expect(output).not.toContain("PRIVATE_");
+    }
+    expect(events).toEqual(original);
+  });
+
+  it("keeps conversation tool pairing and source order independent of merged timestamps", () => {
+    const events = [
+      header,
+      event("tool.execution_complete", { toolCallId: "shared", success: true, output: "second source result" }, "agent", 1, 0, "second.jsonl"),
+      event("tool.execution_complete", { toolCallId: "shared", success: false, output: "first source result" }, "agent", 1, 1, "first.jsonl"),
+      event("tool.execution_start", { toolCallId: "shared", toolName: "first", input: false }, "agent", 0, 2, "first.jsonl"),
+      event("tool.execution_start", { toolCallId: "shared", toolName: "second", input: null }, "agent", 0, 3, "second.jsonl"),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      const second = output.slice(output.indexOf("Agent conversation: agent/second.jsonl"), output.indexOf("Agent conversation: agent/first.jsonl"));
+      const first = output.slice(output.indexOf("Agent conversation: agent/first.jsonl"), output.indexOf("Chronological trace"));
+      expect(second).toContain("✓ second(null)");
+      expect(second).toContain("second source result");
+      expect(second).not.toContain("first source result");
+      expect(first).toContain("✗ first(false)");
+      expect(first).toContain("first source result");
+      expect(first).not.toContain("second source result");
+    }
+  });
+
+  it("keeps distinct source scopes when redaction makes their publication labels identical", () => {
+    const firstPath = "private-first-source.jsonl";
+    const secondPath = "private-second-source.jsonl";
+    process.env.GH_AW_SECRET_NAMES = "FIRST_PATH,SECOND_PATH";
+    process.env.SECRET_FIRST_PATH = firstPath;
+    process.env.SECRET_SECOND_PATH = secondPath;
+    const events = [
+      header,
+      event("tool.execution_start", { toolCallId: "shared", toolName: "first" }, "agent", 0, 0, firstPath),
+      event("tool.execution_start", { toolCallId: "shared", toolName: "second" }, "agent", 0, 1, secondPath),
+      event("tool.execution_complete", { toolCallId: "shared", success: false, output: "first failed" }, "agent", 1, 2, firstPath),
+      event("tool.execution_complete", { toolCallId: "shared", success: true, output: "second succeeded" }, "agent", 1, 3, secondPath),
+    ];
+    for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events)]) {
+      expect(output).toContain("✗ first");
+      expect(output).toContain("✓ second");
+      expect(output).toContain("Tools: 0/1 succeeded");
+      expect(output).toContain("Tools: 1/1 succeeded");
+      expect(output).not.toContain(firstPath);
+      expect(output).not.toContain(secondPath);
+    }
+  });
+
   it("rejects unsupported, missing or misplaced version headers without assuming compatibility", () => {
     expect(() => validateSessionFileHeader([])).toThrow("ERR_VALIDATION: Unified session file is missing");
     for (const version of [0, "1", 2, undefined]) {
@@ -153,7 +296,12 @@ describe("unified session publication views", () => {
     const token = "ghp_" + "a".repeat(36);
     process.env.GH_AW_SECRET_NAMES = "RENDER_KEY";
     process.env.SECRET_RENDER_KEY = secret;
-    const events = [header, event("assistant.message", { content: `${secret} ${token}\n\`\`\`\`\`\`\`\`\`\n</details>\n::warning::untrusted` }, "agent", 0, 0)];
+    const events = [
+      header,
+      event("assistant.message", { content: `${secret} ${token}\n\`\`\`\`\`\`\`\`\`\n</details>\n::warning::untrusted` }, "agent", 0, 0),
+      event("tool.execution_start", { toolCallId: "shell", toolName: "bash", input: { command: `echo ${token}` } }, "agent", 1, 1),
+      event("tool.execution_complete", { toolCallId: "shell", success: false, output: token, error: { code: "DENIED", message: token } }, "agent", 2, 2),
+    ];
     const original = structuredClone(events);
     const plain = generatePlainTextSummary(events);
     const markdown = generateCopilotCliStyleSummary(events);
@@ -161,6 +309,8 @@ describe("unified session publication views", () => {
       expect(output).not.toContain(token);
       expect(output).not.toContain(secret.slice(0, 40));
       expect(output).toContain("***REDACTED***");
+      expect(output).toContain("$ echo ***REDACTED***");
+      expect(output).toContain("DENIED: ***REDACTED***");
       expect(output).not.toMatch(/^::warning::/m);
     }
     expect(markdown).toContain("&lt;/details&gt;");

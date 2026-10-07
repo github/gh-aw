@@ -1005,6 +1005,34 @@ func TestSpec_PublicAPI_ResolveActionPin_MappingTargetUnknown(t *testing.T) {
 	})
 }
 
+func TestResolveActionPinPrefixMapping(t *testing.T) {
+	pin := actionpins.GetActionPinsByRepo("actions/checkout")[0]
+	baseline, err := actionpins.ResolveActionPin(pin.Repo, pin.Version, nil)
+	require.NoError(t, err)
+	ctx := &actionpins.PinContext{
+		Warnings: make(map[string]bool),
+		PrefixMappings: map[string]string{
+			"actions/":         "mirror/actions-",
+			"actions/checkout": "mirror/checkout",
+		},
+	}
+	resolved, err := actionpins.ResolveActionPin(pin.Repo, pin.Version, ctx)
+	require.NoError(t, err)
+	assert.Equal(t, strings.Replace(baseline, "actions/checkout@", "mirror/checkout@", 1), resolved)
+	assert.True(t, ctx.Warnings["prefix:actions/checkout"])
+
+	ctx.Mappings = map[string]string{pin.Repo + "@" + pin.Version: "internal/exact@" + pin.SHA}
+	resolved, err = actionpins.ResolveActionPin(pin.Repo, pin.Version, ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "internal/exact@"+pin.SHA, resolved, "exact mapping takes precedence over prefix")
+
+	ctx.Mappings = nil
+	other := actionpins.GetActionPinsByRepo("actions/setup-node")[0]
+	resolved, err = actionpins.ResolveActionPin(other.Repo, other.Version, ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "mirror/actions-setup-node@"+other.SHA+" # "+other.Version, resolved)
+}
+
 // TestSpec_PublicAPI_ApplyContainerPinMapping validates the exported ApplyContainerPinMapping function.
 // Spec: ApplyContainerPinMapping redirects container image references via ctx.ContainerMappings,
 // requiring a valid @sha256:<64-hex-char> digest in the mapped value.

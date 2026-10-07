@@ -28,7 +28,7 @@ jobs:
       issues: write
     steps:
       - name: Post ACE editor session link
-        uses: actions/github-script@v9.0.0
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.payload.issue.number;

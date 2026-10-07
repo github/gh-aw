@@ -290,7 +290,8 @@ func (c *Compiler) resolveFrontmatterSkillToken(ctx *activationJobBuildContext, 
 		return tokenExpr
 	}
 	stepID := fmt.Sprintf("frontmatter-skill-app-token-%d", stepNumber)
-	ctx.steps = append(ctx.steps, c.buildGitHubAppTokenMintStepWithMeta(
+	ctx.steps = append(ctx.steps, c.buildGitHubAppTokenMintStepForJob(
+		"activation",
 		skillRef.GitHubApp,
 		nil,
 		"",

@@ -28,7 +28,7 @@ safe-outputs:
     title-prefix: "[refactoring] "
 steps:
 - name: Build workflow index
-  uses: actions/github-script@v9.0.0
+  uses: actions/github-script@v9
   with:
     script: |
       const fs = require('fs');

@@ -38,7 +38,7 @@ func generateDriveMemorySteps(builder *strings.Builder, data *WorkflowData, pinA
 		if drive.Prefetch {
 			builder.WriteString("          prefetch: true\n")
 		}
-		if drive.RestoreOnly || threatDetectionEnabled {
+		if data.DryRun || drive.RestoreOnly || threatDetectionEnabled {
 			builder.WriteString("          write: false\n")
 		} else {
 			builder.WriteString("          write: true\n")
@@ -94,6 +94,9 @@ func generateDriveMemoryGitSetupStep(builder *strings.Builder, drive DriveMemory
 }
 
 func generateDriveMemoryGitCommitSteps(builder *strings.Builder, data *WorkflowData) {
+	if data.DryRun {
+		return
+	}
 	if data.DriveMemoryConfig == nil {
 		return
 	}
@@ -140,6 +143,9 @@ func generateDriveMemoryValidation(builder *strings.Builder, data *WorkflowData)
 }
 
 func generateDriveMemoryPersistence(builder *strings.Builder, data *WorkflowData, pinAction func(string) string) {
+	if data.DryRun {
+		return
+	}
 	if data.DriveMemoryConfig == nil {
 		return
 	}
@@ -215,7 +221,7 @@ func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetection
 	if setupActionRef != "" || c.actionMode.IsScript() {
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 		traceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, traceID, setupParentSpanNeedsExpr(constants.ActivationJobName))...)
+		steps = append(steps, c.generateSetupStepForJob("update_drive_memory", data, setupActionRef, SetupActionDestination, false, traceID, setupParentSpanNeedsExpr(constants.ActivationJobName), "")...)
 	}
 
 	hasWritableDrive := false

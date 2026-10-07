@@ -290,14 +290,15 @@ func (c *Compiler) generateStopMCPGateway(yaml *strings.Builder, data *WorkflowD
 // This prevents downstream safe_outputs and conclusion jobs from receiving an ENOENT error
 // when loading the agent output file, making it easier to surface the real engine failure
 // reason (e.g. quota exceeded) instead of an unhelpful file-not-found message.
-func (c *Compiler) generateAgentOutputPlaceholderStep(yaml *strings.Builder) {
+func (c *Compiler) generateAgentOutputPlaceholderStep(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Print("Generating agent output placeholder step")
 
+	outputPath := constants.TmpGhAwDir + "/agent_output.json"
 	yaml.WriteString("      - name: Write agent output placeholder if missing\n")
 	yaml.WriteString("        if: always()\n")
 	yaml.WriteString("        run: |\n")
-	yaml.WriteString("          if [ ! -f /tmp/gh-aw/agent_output.json ]; then\n")
-	yaml.WriteString("            echo '{\"items\":[]}' > /tmp/gh-aw/agent_output.json\n")
+	yaml.WriteString("          if [ ! -f " + outputPath + " ]; then\n")
+	yaml.WriteString("            echo '{\"items\":[]}' > " + outputPath + "\n")
 	yaml.WriteString("          fi\n")
 }
 
@@ -305,17 +306,21 @@ func (c *Compiler) generateAgentOutputPlaceholderStep(yaml *strings.Builder) {
 // file to the real $GITHUB_STEP_SUMMARY. This runs after secret redaction so the content
 // is already sanitised before being published to the workflow step summary.
 // The step is a no-op when the file is empty (agent wrote nothing).
-func (c *Compiler) generateAgentStepSummaryAppend(yaml *strings.Builder) {
+func (c *Compiler) generateAgentStepSummaryAppend(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Print("Generating agent step summary append step")
 
 	yaml.WriteString("      - name: Append agent step summary\n")
 	yaml.WriteString("        if: always()\n")
+	if isArcDindTopology(data) {
+		yaml.WriteString("        env:\n")
+		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
+	}
 	yaml.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh\"\n")
 }
 
 // generateTokenUsageSummary generates a step that parses the firewall proxy's
 // token-usage.jsonl and appends a markdown table to $GITHUB_STEP_SUMMARY.
-// The step also writes aggregated token totals to /tmp/gh-aw/agent_usage.json
+// The step also writes aggregated token totals to gh-aw/agent_usage.json
 // so they are bundled in the agent artifact for third-party tools.
 func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Print("Generating token usage summary step")
@@ -324,6 +329,10 @@ func (c *Compiler) generateTokenUsageSummary(yaml *strings.Builder, data *Workfl
 	yaml.WriteString("        if: always()\n")
 	fmt.Fprintf(yaml, "        id: %s\n", constants.ParseTokenUsageStepID)
 	yaml.WriteString("        continue-on-error: true\n")
+	if isArcDindTopology(data) {
+		yaml.WriteString("        env:\n")
+		yaml.WriteString("          GH_AW_TMP_DIR: ${{ runner.temp }}/gh-aw\n")
+	}
 	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
@@ -459,6 +468,18 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 		}
 
 		pluginInstallSteps := pluginInstaller.GetPluginInstallationSteps(data)
+		for i, ref := range data.PluginReferences {
+			if ref.GitHubApp == nil {
+				continue
+			}
+			stepID := pluginAppTokenStepID(i)
+			for _, step := range pluginInstallSteps {
+				if strings.Contains(strings.Join(step, "\n"), "id: "+stepID+"\n") {
+					c.recordGeneratedWildcardAppTokenStep("agent", ref.GitHubApp, stepID)
+					break
+				}
+			}
+		}
 		compilerYamlLog.Printf("Adding %d plugin installation steps for %s", len(pluginInstallSteps), engine.GetID())
 		for _, step := range pluginInstallSteps {
 			for _, line := range step {
@@ -683,7 +704,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	// The agent writes its GITHUB_STEP_SUMMARY content to AgentStepSummaryPath (a file inside
 	// /tmp/gh-aw/ that is reachable in both AWF sandbox and non-sandbox modes).
 	// secret redaction already scanned this file, so it is safe to append.
-	c.generateAgentStepSummaryAppend(yaml)
+	c.generateAgentStepSummaryAppend(yaml, data)
 
 	// Add output collection step only if safe-outputs feature is used (GH_AW_SAFE_OUTPUTS functionality)
 	if data.SafeOutputs != nil {

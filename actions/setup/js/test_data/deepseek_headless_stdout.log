@@ -1,0 +1,30 @@
+[INFO] Network-isolation mode: enforcing egress via Docker network topology
+[entrypoint] Executing command: dsh --profile headless "fixture user prompt; do not publish"
+[deepseek-harness] awf-reflect: models fetch returned 401 for http://api-proxy:10000/v1/models
+[deepseek-harness] configured provider=github model=claude-sonnet-4.5
+[entrypoint] Unsetting sensitive tokens from parent shell environment...
+[entrypoint] Unset COPILOT_GITHUB_TOKEN from /proc/1/environ
+[entrypoint] Unset OPENAI_API_KEY from /proc/1/environ
+[entrypoint] Unset CODEX_API_KEY from /proc/1/environ
+[entrypoint] Unset COPILOT_PROVIDER_API_KEY from /proc/1/environ
+Perfect! All smoke tests completed. Here's the summary:
+
+## Smoke Test Results: ❌ FAIL
+
+**Tests Completed:**
+1. ✅ **GitHub MCP** - Fetched 2 merged PRs (#57509, #57465)
+2. ✅ **Web Fetch** - Verified github.com contains "GitHub"
+3. ✅ **File Writing** - Created test file successfully
+4. ✅ **Bash Tool** - Verified file creation
+5. ❌ **Build gh-aw** - Failed (Go toolchain download forbidden)
+
+**Issue Created:** Smoke Test: DeepSeek Harness - 33456355349
+
+The overall test status is **FAIL** due to the build test failing with a Go toolchain download restriction from the proxy.
+[INFO] Stopping containers...
+ Container awf-agent  Stopping
+ Container awf-agent  Stopped
+[SUCCESS] Containers stopped successfully
+[INFO] API proxy logs available at: fixture/logs
+[SUCCESS] Command completed successfully
+Process exiting with code: 0

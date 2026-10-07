@@ -139,6 +139,7 @@ func isNoOpReportAsIssueEnabled(reportAsIssue *string) bool {
 // trigger; pass an empty string to fall back to "main".
 func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWorkflowOptions) error { //nolint:largefunc // Existing workflow orchestration remains centralized.
 	workflowDataList := opts.WorkflowDataList
+	pinWarnings := actionPinWarningsForWorkflows(workflowDataList) //nolint:seenmapbool // PinContext.Warnings requires map[string]bool for shared deduplication.
 	workflowDir := opts.WorkflowDir
 	version := opts.Version
 	actionMode := opts.ActionMode
@@ -165,6 +166,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 			return err
 		}
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
+			PinWarnings:     pinWarnings,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig.IsAutoUpgradeEnabled(),
@@ -226,6 +229,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		// for safe_outputs, create_labels, and validate operations.
 		if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 			workflowDataList: workflowDataList,
+			pinWarnings:      pinWarnings,
+			repoConfig:       repoConfig,
 			workflowDir:      workflowDir,
 			version:          version,
 			actionMode:       actionMode,
@@ -239,6 +244,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		}
 
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
+			PinWarnings:     pinWarnings,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),
@@ -288,6 +295,13 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		strings.TrimSpace(compileGitHubTokenSecret) != "",
 	)
 	copilotOrgBilling := allCopilotWorkflowsUseOrgBilling(workflowDataList)
+	hasCacheMemory := false
+	for _, data := range workflowDataList {
+		if data != nil && data.CacheMemoryConfig != nil && len(data.CacheMemoryConfig.Caches) > 0 {
+			hasCacheMemory = true
+			break
+		}
+	}
 	content, err := buildMaintenanceWorkflowYAML(ctx, buildMaintenanceWorkflowYAMLOptions{
 		cronSchedule:        cronSchedule,
 		scheduleDesc:        scheduleDesc,
@@ -305,6 +319,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		createCompilePR:     enableCompileCreatePullRequest,
 		copilotOrgBilling:   copilotOrgBilling,
 		compactionLedgers:   compactionLedgers,
+		hasCacheMemory:      hasCacheMemory,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to finalize maintenance workflow YAML: %w", err)
@@ -312,6 +327,12 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	content, err = applyArtifactRetention(content, repoConfig)
 	if err != nil {
 		return fmt.Errorf("failed to configure maintenance artifact retention: %w", err)
+	}
+	if repoConfig != nil {
+		content, err = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, pinWarnings, resolver)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Write the maintenance workflow file
@@ -330,6 +351,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	// Generate side-repo maintenance workflows for any SideRepoOps targets detected.
 	if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 		workflowDataList: workflowDataList,
+		pinWarnings:      pinWarnings,
+		repoConfig:       repoConfig,
 		workflowDir:      workflowDir,
 		version:          version,
 		actionMode:       actionMode,
@@ -343,6 +366,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+		RepoConfig:      repoConfig,
+		PinWarnings:     pinWarnings,
 		Context:         ctx,
 		WorkflowDir:     workflowDir,
 		Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),

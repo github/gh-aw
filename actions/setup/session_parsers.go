@@ -11,6 +11,7 @@ import "embed"
 //go:embed js/agent_session.cjs js/agent_session_render.cjs js/claude_session.cjs
 //go:embed js/provider_refusal.cjs
 //go:embed js/codex_session.cjs js/codex_log_framing.cjs js/copilot_session.cjs
+//go:embed js/copilot_workflow_events.cjs js/dynamic_workflow_session.cjs
 //go:embed js/gemini_session.cjs
 //go:embed js/pi_session.cjs js/pi_session_redaction.cjs js/session_artifact.cjs
 //go:embed js/log_parser_bootstrap.cjs js/log_parser_format.cjs js/log_parser_shared.cjs
@@ -18,4 +19,8 @@ import "embed"
 //go:embed js/add_mask_redaction.cjs js/redact_secrets.cjs js/safe_output_manifest.cjs
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
 //go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs
+//go:embed js/engine_log_parser.cjs
+//go:embed js/parse_kiro_log.cjs
+//go:embed js/parse_deepseek_log.cjs
+//go:embed js/parse_pydantic_log.cjs
 var SessionParserSources embed.FS

@@ -155,8 +155,10 @@ func writeLedgerCompactionPlanJob(b *strings.Builder, opts buildMaintenanceWorkf
 	}
 	b.WriteString(`
   ledger_compaction_plan:
+    name: Plan ledger compaction
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnlyOrOperation(maintenanceCompactLedgerOperation)) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Planning treats ledger content as untrusted and must remain read-only.
     permissions:
       contents: read
     outputs:
@@ -212,9 +214,11 @@ func writeLedgerCompactionApplyJob(b *strings.Builder, opts buildMaintenanceWork
 	}
 	b.WriteString(`
   ledger_compaction_apply:
+    name: Apply ledger compaction
     needs: ledger_compaction_plan
     if: ${{ !cancelled() && needs.ledger_compaction_plan.outputs.plans_uploaded == 'true' && needs.ledger_compaction_plan.outputs.plan_created == 'true' }}
     runs-on: ` + opts.runsOnValue + `
+    # Applying a validated plan commits updated ledger content.
     permissions:
       contents: write
     steps:

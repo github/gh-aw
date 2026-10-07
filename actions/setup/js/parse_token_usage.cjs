@@ -8,24 +8,34 @@ const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
+const DEFAULT_GH_AW_DIR = "/tmp/gh-aw";
 /**
  * Parses the firewall proxy token-usage.jsonl and appends a collapsible markdown
  * table to $GITHUB_STEP_SUMMARY via core.summary.addDetails.
  *
- * Also writes aggregated token totals to /tmp/gh-aw/agent_usage.json so the data
- * is bundled in the agent artifact and accessible to third-party tools.
+ * Also writes aggregated token totals to the gh-aw directory so the data is
+ * bundled in the agent artifact and accessible to third-party tools.
  */
 
-const TOKEN_USAGE_AUDIT_PATH = "/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl";
-const TOKEN_USAGE_PATH = "/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
+const TOKEN_USAGE_AUDIT_PATH = path.join(DEFAULT_GH_AW_DIR, "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl");
+const TOKEN_USAGE_PATH = path.join(DEFAULT_GH_AW_DIR, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
 // AWF v0.27.7+ may write token-usage.jsonl under --audit-dir as well as --proxy-logs-dir.
 // Include this path so the agent job captures token data regardless of which dir AWF chose.
-const TOKEN_USAGE_AWF_AUDIT_PATH = "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl";
+const TOKEN_USAGE_AWF_AUDIT_PATH = path.join(DEFAULT_GH_AW_DIR, "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl");
 const TOKEN_USAGE_PATHS = [TOKEN_USAGE_AUDIT_PATH, TOKEN_USAGE_AWF_AUDIT_PATH, TOKEN_USAGE_PATH];
-const AGENT_USAGE_PATH = "/tmp/gh-aw/agent_usage.json";
-const AGENT_USAGE_JSONL_PATH = "/tmp/gh-aw/agent_usage.jsonl";
-const COPILOT_SESSION_STATE_DIR = "/tmp/gh-aw/sandbox/agent/logs/copilot-session-state";
+const AGENT_USAGE_PATH = path.join(DEFAULT_GH_AW_DIR, "agent_usage.json");
+const AGENT_USAGE_JSONL_PATH = path.join(DEFAULT_GH_AW_DIR, "agent_usage.jsonl");
+const COPILOT_SESSION_STATE_DIR = path.join(DEFAULT_GH_AW_DIR, "sandbox/agent/logs/copilot-session-state");
 const DEFAULT_SUMMARY_TITLE = "Token Usage";
+
+function getGhAwPath(relativePath) {
+  const root = process.env.GH_AW_TMP_DIR;
+  return path.join(root && root.trim() ? root.trim() : DEFAULT_GH_AW_DIR, relativePath);
+}
+
+function getTokenUsagePaths() {
+  return [getGhAwPath("sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"), getGhAwPath("sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"), getGhAwPath("sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl")];
+}
 
 function getUsageOutputPath(envName, defaultPath) {
   const configured = process.env[envName];
@@ -34,8 +44,8 @@ function getUsageOutputPath(envName, defaultPath) {
 
 function writeEmptyUsageEvidence() {
   if (process.env.GH_AW_WRITE_EMPTY_USAGE !== "true") return;
-  const usagePath = getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH);
-  const usageJSONLPath = getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", AGENT_USAGE_JSONL_PATH);
+  const usagePath = getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", getGhAwPath("agent_usage.json"));
+  const usageJSONLPath = getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", getGhAwPath("agent_usage.jsonl"));
   fs.mkdirSync(path.dirname(usagePath), { recursive: true });
   fs.mkdirSync(path.dirname(usageJSONLPath), { recursive: true });
   fs.writeFileSync(usagePath, '{"input_tokens":0,"output_tokens":0,"ai_credits":0}\n');
@@ -131,7 +141,7 @@ function getSummaryTitle() {
  * @param {string} sessionStateDir
  * @returns {{aiCredits: number, premiumRequests: number} | null}
  */
-function findCopilotUsageCheckpoint(sessionStateDir = COPILOT_SESSION_STATE_DIR) {
+function findCopilotUsageCheckpoint(sessionStateDir = getGhAwPath("sandbox/agent/logs/copilot-session-state")) {
   if (!fs.existsSync(sessionStateDir)) return null;
 
   /** @type {string[]} */
@@ -196,8 +206,8 @@ async function reportCopilotUsageCheckpoint(checkpoint) {
     premium_requests: checkpoint.premiumRequests,
   };
   try {
-    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH), JSON.stringify(agentUsage) + "\n");
-    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", AGENT_USAGE_JSONL_PATH), JSON.stringify({ provider: "copilot", ai_credits: checkpoint.aiCredits, premium_requests: checkpoint.premiumRequests }) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", getGhAwPath("agent_usage.json")), JSON.stringify(agentUsage) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_JSONL_PATH", getGhAwPath("agent_usage.jsonl")), JSON.stringify({ provider: "copilot", ai_credits: checkpoint.aiCredits, premium_requests: checkpoint.premiumRequests }) + "\n");
   } catch (error) {
     throw new Error(`${ERR_PARSE}: Failed to write Copilot usage files: ${getErrorMessage(error)}`, { cause: error });
   }
@@ -303,9 +313,9 @@ async function appendStepSummarySection(title, markdown, workingSet = null) {
 /**
  * Main function to parse token usage and write the step summary.
  */
-async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
+async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/copilot-session-state")) {
   try {
-    const tokenUsagePaths = getReadableTokenUsagePaths(TOKEN_USAGE_PATHS);
+    const tokenUsagePaths = getReadableTokenUsagePaths(getTokenUsagePaths());
     if (tokenUsagePaths.length === 0) {
       const checkpoint = findCopilotUsageCheckpoint(copilotSessionStateDir);
       if (checkpoint) {
@@ -366,7 +376,7 @@ async function main(copilotSessionStateDir = COPILOT_SESSION_STATE_DIR) {
       ai_credits: summary.aiCreditsSource === "awf_reported" ? Number(summary.totalAIC.toFixed(6)) : Number((summary.totalAIC || 0).toFixed(3)),
       ...(primaryModel ? { primary_model: primaryModel } : {}),
     };
-    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", AGENT_USAGE_PATH), JSON.stringify(agentUsage) + "\n");
+    fs.writeFileSync(getUsageOutputPath("GH_AW_AGENT_USAGE_PATH", getGhAwPath("agent_usage.json")), JSON.stringify(agentUsage) + "\n");
 
     if (primaryModel) {
       core.exportVariable("GH_AW_PRIMARY_MODEL", primaryModel);
@@ -414,6 +424,7 @@ if (typeof module !== "undefined" && module.exports) {
     findCopilotUsageCheckpoint,
     reportCopilotUsageCheckpoint,
     getUsageOutputPath,
+    getTokenUsagePaths,
     writeEmptyUsageEvidence,
   };
 }

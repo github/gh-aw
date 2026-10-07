@@ -146,7 +146,7 @@ After generation, you need to:
        description: 'Output description'
    
    runs:
-     using: 'node20'
+     using: 'node24'
      main: 'index.js'
    ```
 
@@ -185,7 +185,7 @@ After generation, you need to:
 
 ### Action Requirements
 
-- **Runtime**: Actions must use Node.js 20 (`using: 'node20'`)
+- **Runtime**: Actions must use Node.js 24 (`using: 'node24'`)
 - **Dependencies**: Use `@actions/core` and `@actions/github` for GitHub Actions integration
 - **Error Handling**: Always wrap main logic in try-catch and use `core.setFailed()` for errors
 - **Logging**: Use `core.info()`, `core.warning()`, and `core.error()` for output
@@ -230,7 +230,7 @@ Actions that use multiple source files in the `src/` directory. The build system
 The build system validates:
 
 - ✅ `action.yml` exists and contains required fields
-- ✅ `action.yml` uses `node20` runtime
+- ✅ `action.yml` uses `node24` runtime
 - ✅ Source files exist in `src/` directory
 - ✅ Required dependencies are available
 
@@ -282,7 +282,7 @@ Check that:
 Ensure `action.yml` includes all required fields:
 - `name`
 - `description`
-- `runs` with `using: 'node20'` and `main: 'index.js'`
+- `runs` with `using: 'node24'` and `main: 'index.js'`
 
 ## References
 

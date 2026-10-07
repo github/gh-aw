@@ -117,7 +117,7 @@ steps:
   - name: Setup Node.js
     uses: actions/setup-node@v4 # SHA will be pinned
     with:
-      node-version: '20'
+      node-version: '24'
   - name: Install
     run: npm install
 ---
@@ -125,7 +125,7 @@ steps:
 # Test workflow`,
 			expectSetup: []string{
 				"node-version:", // Should keep user's version (check for key)
-				"20",            // Check for the value (regardless of quote type)
+				"24",            // Check for the value (regardless of quote type)
 			},
 			notExpectSetup: []string{
 				// Should not add a second Node.js setup with different version

@@ -68,7 +68,7 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 			config.Staged = &value
 		}
 	}
-	if c.forceStaged {
+	if c.forceStaged || c.dryRun {
 		value := TemplatableBool("true")
 		config.Staged = &value
 	}

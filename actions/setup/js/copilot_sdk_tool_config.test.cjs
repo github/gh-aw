@@ -188,13 +188,13 @@ describe("buildCopilotSDKSessionToolConfig", () => {
     expect(config.availableTools.toArray()).toEqual(expect.arrayContaining(["builtin:bash", "builtin:read_bash", "builtin:stop_bash", "builtin:list_bash"]));
   });
 
-  it("admits web_search only when the webSearch capability is enabled", () => {
+  it("rejects unavailable native web_search even with matching permissions", () => {
     const toolConfig = validToolConfig({
       capabilities: { ...validToolConfig().capabilities, webSearch: true },
       permissions: { allowedTools: ["read", "safeoutputs", "web_fetch", "web_search"] },
     });
-    const config = buildCopilotSDKSessionToolConfig(toolConfig, fakeSDKTools);
-    expect(config.availableTools.toArray()).toContain("builtin:web_search");
+    expect(() => parseCopilotSDKToolConfig(JSON.stringify(toolConfig))).toThrow("unavailable in offline BYOK mode");
+    expect(() => buildCopilotSDKSessionToolConfig(toolConfig, fakeSDKTools)).toThrow("unavailable in offline BYOK mode");
   });
 
   it("omits web_search when the webSearch capability is disabled", () => {

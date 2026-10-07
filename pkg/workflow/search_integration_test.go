@@ -15,9 +15,7 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-// TestWebSearchValidationForCopilot tests that when a Copilot workflow uses web-search,
-// compilation succeeds without a warning because Copilot CLI exposes the built-in
-// web_search tool.
+// TestWebSearchValidationForCopilot verifies compilation rejects unavailable native search.
 func TestWebSearchValidationForCopilot(t *testing.T) {
 	// Create a temporary directory for the test
 	tmpDir := testutil.TempDir(t, "test-*")
@@ -52,7 +50,7 @@ Search the web for information.
 	// Create a compiler
 	compiler := NewCompiler()
 
-	// Compile the workflow - should succeed
+	// Compile the workflow - unavailable native search is rejected.
 	err := compiler.CompileWorkflow(workflowPath)
 
 	// Restore stderr
@@ -64,37 +62,19 @@ Search the web for information.
 	io.Copy(&buf, r)
 	stderrOutput := buf.String()
 
-	if err != nil {
-		t.Fatalf("Expected compilation to succeed for Copilot engine with web-search tool, but got error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "offline BYOK mode") {
+		t.Fatalf("Expected unavailable native search error, got: %v (stderr: %s)", err, stderrOutput)
 	}
 
-	if strings.Contains(stderrOutput, "does not support the web-search tool") {
-		t.Errorf("Expected no web-search warning for Copilot engine, but got: %s", stderrOutput)
-	}
-
-	// Verify the lock file was created
+	// Failed compilation must not create a misleading lock file.
 	lockFile := stringutil.MarkdownToLockFile(workflowPath)
-	if _, err := os.Stat(lockFile); os.IsNotExist(err) {
-		t.Fatal("Expected lock file to be created")
-	}
-
-	// Read and verify the lock file allows the built-in web_search tool
-	lockContent, err := os.ReadFile(lockFile)
-	if err != nil {
-		t.Fatalf("Failed to read lock file: %v", err)
-	}
-
-	lockStr := string(lockContent)
-	if !strings.Contains(lockStr, "--allow-tool web_search") {
-		t.Errorf("Expected Copilot workflow to allow web_search, but it didn't")
-	}
-	if strings.Contains(lockStr, "--disable-builtin-mcps") {
-		t.Errorf("Expected Copilot workflow with web-search to keep built-in tools enabled, but it didn't")
+	if _, err := os.Stat(lockFile); !os.IsNotExist(err) {
+		t.Fatalf("Expected no lock file, got: %v", err)
 	}
 }
 
 // TestWebSearchValidationForCopilotPinnedOldVersion tests that Copilot workflows
-// pinned to older CLI versions do not receive the web_search permission.
+// pinned to older CLI versions also reject unavailable native search.
 func TestWebSearchValidationForCopilotPinnedOldVersion(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 
@@ -133,25 +113,12 @@ Search the web for information.
 	io.Copy(&buf, r)
 	stderrOutput := buf.String()
 
-	if err != nil {
-		t.Fatalf("Expected compilation to succeed for Copilot engine with older pinned version, but got error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "offline BYOK mode") {
+		t.Fatalf("Expected unavailable native search error, got: %v (stderr: %s)", err, stderrOutput)
 	}
 
-	if !strings.Contains(stderrOutput, "Copilot CLI versions before 1.0.87 do not support the web-search tool") {
-		t.Errorf("Expected version-gate warning for older pinned Copilot CLI, but got: %s", stderrOutput)
-	}
-
-	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
-	if err != nil {
-		t.Fatalf("Failed to read lock file: %v", err)
-	}
-
-	lockStr := string(lockContent)
-	if strings.Contains(lockStr, "--allow-tool web_search") {
-		t.Errorf("Expected older pinned Copilot CLI workflow to omit web_search permission, but it was present")
-	}
-	if !strings.Contains(lockStr, "--disable-builtin-mcps") {
-		t.Errorf("Expected older pinned Copilot CLI workflow to keep built-in MCPs disabled, but it didn't")
+	if _, err := os.Stat(stringutil.MarkdownToLockFile(workflowPath)); !os.IsNotExist(err) {
+		t.Fatalf("Expected no lock file, got: %v", err)
 	}
 }
 

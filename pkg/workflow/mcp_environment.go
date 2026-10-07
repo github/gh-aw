@@ -115,6 +115,11 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		// though the step may still be generated to supply GH_AW_SINK_VISIBILITY.
 		// Security: Pass step outputs through environment variables to prevent template injection.
 		guardPoliciesExplicit := len(getGitHubGuardPolicies(toolConfig)) > 0
+		if githubToolEnabledInTools && guardPoliciesExplicit && !githubBackendIsEnclaveOnly(workflowData) {
+			envVars["GH_AW_GUARD_BLOCKED_USERS"] = "${{ steps.parse-guard-vars.outputs.blocked_users }}"
+			envVars["GH_AW_GUARD_TRUSTED_USERS"] = "${{ steps.parse-guard-vars.outputs.trusted_users }}"
+			envVars["GH_AW_GUARD_APPROVAL_LABELS"] = "${{ steps.parse-guard-vars.outputs.approval_labels }}"
+		}
 		if githubToolEnabledInTools && !guardPoliciesExplicit && !githubBackendIsEnclaveOnly(workflowData) && githubLockdownDetectionStepEnabled(workflowData) {
 			envVars["GITHUB_MCP_GUARD_MIN_INTEGRITY"] = "${{ steps.determine-automatic-lockdown.outputs.min_integrity }}"
 			envVars["GITHUB_MCP_GUARD_REPOS"] = "${{ steps.determine-automatic-lockdown.outputs.repos }}"

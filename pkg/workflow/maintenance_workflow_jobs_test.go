@@ -137,6 +137,7 @@ func TestGenerateMaintenanceWorkflow_OperationJobConditions(t *testing.T) {
 					Expires: 48,
 				},
 			},
+			CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
 		},
 	}
 
@@ -173,7 +174,7 @@ func TestGenerateMaintenanceWorkflow_OperationJobConditions(t *testing.T) {
 	closeAgenticWorkflowIssuesCondition := `(github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.operation == 'close_agentic_workflows_issues'`
 	cleanCacheMemoriesCondition := `github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' || inputs.operation == '' || inputs.operation == 'none' || inputs.operation == 'clean_cache_memories'`
 
-	const jobSectionSearchRange = 350
+	const jobSectionSearchRange = 500
 	const runOpSectionSearchRange = 550
 
 	// Jobs that should be disabled when any non-dedicated operation is set (cleanup-cache-memory has its own dedicated operation)

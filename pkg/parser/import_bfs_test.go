@@ -3,10 +3,84 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestHandleAgentImportItemSubstitutesModelFromVirtualFile(t *testing.T) {
+	const importedAgentPath = "/virtual/repository/.github/agents/imported.md"
+	content := `---
+import-schema:
+  model:
+    type: string
+    default: claude-haiku-4.5
+model: ${{ github.aw.import-inputs.model }}
+---
+Agent instructions.
+`
+	originalReadFile := readFileFunc
+	readFileFunc = func(path string) ([]byte, error) {
+		if path != importedAgentPath {
+			return nil, fmt.Errorf("unexpected path %q", path)
+		}
+		return []byte(content), nil
+	}
+	t.Cleanup(func() {
+		readFileFunc = originalReadFile
+	})
+
+	for _, test := range []struct {
+		name      string
+		inputs    map[string]any
+		wantModel string
+	}{
+		{name: "input substitution", inputs: map[string]any{"model": "claude-sonnet-4.6"}, wantModel: "claude-sonnet-4.6"},
+		{name: "schema default", wantModel: "claude-haiku-4.5"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			state := newImportBFSState()
+			handled, err := handleAgentImportItem(importQueueItem{
+				fullPath:   importedAgentPath,
+				importPath: ".github/agents/imported.md",
+				inputs:     test.inputs,
+			}, state)
+			require.NoError(t, err)
+			require.True(t, handled)
+			require.Equal(t, []SubAgentModel{{Name: "imported.md", Model: test.wantModel}}, state.acc.subAgentModels)
+		})
+	}
+}
+
+func TestCollectInlineSubAgentModelsHonorsImportedSection(t *testing.T) {
+	content := `---
+on: issues
+---
+# Chosen
+## agent: ` + "`selected`" + `
+---
+model: claude-haiku-4.5
+---
+Selected instructions.
+
+# Other
+## agent: ` + "`excluded`" + `
+---
+model: claude-opus-4.6
+---
+Excluded instructions.
+`
+	parsed, err := ExtractFrontmatterFromContent(content)
+	require.NoError(t, err)
+
+	acc := newImportAccumulator()
+	err = acc.collectInlineSubAgentWarnings(
+		"shared.md#Chosen", "Chosen", content, false, parsed, nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, []SubAgentModel{{Name: "selected", Model: "claude-haiku-4.5"}}, acc.subAgentModels)
+}
 
 func TestParseImportSpecsFromArray_RejectsIfField(t *testing.T) {
 	_, err := parseImportSpecsFromArray([]any{

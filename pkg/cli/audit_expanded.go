@@ -30,6 +30,7 @@ type AuditEngineConfig struct {
 	MCPServers      []string `json:"mcp_servers,omitempty"`
 	TriggerEvent    string   `json:"trigger_event,omitempty" console:"header:Trigger Event,omitempty"`
 	Repository      string   `json:"repository,omitempty" console:"header:Repository,omitempty"`
+	DryRun          bool     `json:"dry_run" console:"header:Dry Run"`
 }
 
 // PromptAnalysis represents analysis of the input prompt
@@ -206,6 +207,7 @@ func extractEngineConfigWithInferredEngine(logsPath, inferredEngineID string) *A
 		FirewallVersion: awInfo.GetFirewallVersion(),
 		TriggerEvent:    awInfo.EventName,
 		Repository:      awInfo.Repository,
+		DryRun:          awInfo.DryRun,
 	}
 
 	// Extract MCP server names from aw_info.json steps metadata

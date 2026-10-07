@@ -10,6 +10,50 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+func TestDockerImagePullPolicySteps(t *testing.T) {
+	var step strings.Builder
+	generateDownloadDockerImagesStep(&step, []string{"registry.example.com/app:v1"}, "never")
+	if !strings.Contains(step.String(), "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("agent download step missing local-only policy: %s", step.String())
+	}
+	step.Reset()
+	generateDownloadDockerImagesStep(&step, []string{"registry.example.com/app:v1"}, "always")
+	if !strings.Contains(step.String(), "GH_AW_DOCKER_IMAGE_PULL_POLICY: always") {
+		t.Fatalf("agent download step missing explicit pull policy: %s", step.String())
+	}
+	step.Reset()
+	generateDownloadDockerImagesStep(&step, []string{"registry.example.com/app:v1"}, "")
+	if strings.Contains(step.String(), "GH_AW_DOCKER_IMAGE_PULL_POLICY") {
+		t.Fatalf("default download step must not override policy: %s", step.String())
+	}
+
+	data := &WorkflowData{
+		AI:             "codex",
+		RawFrontmatter: map[string]any{"docker-image-pull-policy": "never"},
+		SafeOutputs:    &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+		Features:       map[string]any{string(constants.GHAWDetectionFeatureFlag): true},
+		SandboxConfig:  &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}},
+	}
+	steps := strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
+	if !strings.Contains(steps, "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("detection download step missing local-only policy: %s", steps)
+	}
+	data.Features[string(constants.GHAWDetectionFeatureFlag)] = false
+	steps = strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
+	if !strings.Contains(steps, "GH_AW_DOCKER_IMAGE_PULL_POLICY: never") {
+		t.Fatalf("inline detection download step missing local-only policy: %s", steps)
+	}
+
+	data.RawFrontmatter["docker-image-pull-policy"] = "always"
+	for _, featureEnabled := range []bool{true, false} {
+		data.Features[string(constants.GHAWDetectionFeatureFlag)] = featureEnabled
+		steps = strings.Join(NewCompiler().buildDetectionJobSteps(data), "")
+		if !strings.Contains(steps, "GH_AW_DOCKER_IMAGE_PULL_POLICY: always") {
+			t.Fatalf("detection download step missing explicit pull policy with feature enabled=%v: %s", featureEnabled, steps)
+		}
+	}
+}
+
 func TestBuildDetectionJobStepsCodexAvoidsDuplicateContainerPullStep(t *testing.T) {
 	compiler := NewCompiler()
 
@@ -101,6 +145,7 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 		wantArcDindSetup     bool
 		wantCopilotInstalled bool
 		wantNodeActionRef    string
+		wantNodeVersion      string
 	}{
 		{
 			name: "copilot on standard topology",
@@ -190,6 +235,16 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 			wantInstallStep:   "Install Codex CLI",
 			wantNodeActionRef: "myorg/myrepo/.github/actions/setup-node@main",
 		},
+		{
+			name: "external detector honors pinned node version",
+			data: &WorkflowData{
+				AI:          "claude",
+				Runtimes:    map[string]any{"node": map[string]any{"version": "24.21.0"}},
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep: "Install Claude Code CLI",
+			wantNodeVersion: "24.21.0",
+		},
 	}
 
 	for _, tt := range tests {
@@ -206,6 +261,9 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 
 			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
 				t.Fatalf("expected exactly one Setup Node.js step, got %d:\n%s", count, steps)
+			}
+			if tt.wantNodeVersion != "" && !strings.Contains(steps, "node-version: '"+tt.wantNodeVersion+"'") {
+				t.Errorf("expected Node version %q:\n%s", tt.wantNodeVersion, steps)
 			}
 			if tt.wantInstallStep != "" {
 				nodeIndex := strings.Index(steps, "- name: Setup Node.js")

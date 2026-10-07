@@ -165,7 +165,7 @@ on: workflow_dispatch
 run-install-scripts: true
 runtimes:
   node:
-    version: "20"
+    version: "24"
 ---
 
 # Test`
@@ -175,7 +175,7 @@ runtimes:
 		"run-install-scripts": true,
 		"runtimes": map[string]any{
 			"node": map[string]any{
-				"version": "20",
+				"version": "24",
 			},
 		},
 	}
@@ -187,7 +187,7 @@ runtimes:
 	assert.NotContains(t, result, "\nrun-install-scripts: true\n")
 	assert.Contains(t, result, "  node:")
 	assert.Contains(t, result, "    run-install-scripts: true")
-	assert.Contains(t, result, "    version: \"20\"")
+	assert.Contains(t, result, "    version: \"24\"")
 }
 
 func TestRunInstallScriptsToRuntimesNode_IdempotentBothPresent(t *testing.T) {

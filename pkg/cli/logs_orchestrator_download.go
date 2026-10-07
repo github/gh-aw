@@ -239,6 +239,8 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 			engine:            opts.Engine,
 			runtime:           opts.Runtime,
 			noStaged:          opts.NoStaged,
+			dryRun:            opts.DryRun,
+			noDryRun:          opts.NoDryRun,
 			firewallOnly:      opts.FirewallOnly,
 			noFirewall:        opts.NoFirewall,
 			safeOutputType:    opts.SafeOutputType,

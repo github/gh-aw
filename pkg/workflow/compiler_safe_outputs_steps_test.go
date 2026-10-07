@@ -393,6 +393,7 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 				"id: process_safe_outputs",
 				"uses: actions/github-script@",
 				"GH_AW_AGENT_OUTPUT",
+				"GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}",
 				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
 				"setupGlobals",
 				"process_safe_outputs.cjs",
@@ -416,6 +417,29 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 			checkContains: []string{
 				"name: Process Safe Outputs",
 				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+			},
+		},
+		{
+			name: "handler manager with configured token source",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubToken:  "${{ secrets.CUSTOM_TOKEN }}",
+				CreateIssues: &CreateIssuesConfig{},
+			},
+			checkContains: []string{
+				`GH_AW_GITHUB_TOKEN_SOURCE: "unknown"`,
+			},
+		},
+		{
+			name: "handler manager with GitHub App token source",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubApp: &GitHubAppConfig{
+					AppID:      "${{ vars.APP_ID }}",
+					PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}",
+				},
+				CreateIssues: &CreateIssuesConfig{},
+			},
+			checkContains: []string{
+				`GH_AW_GITHUB_TOKEN_SOURCE: "app"`,
 			},
 		},
 		{

@@ -21,12 +21,19 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	c.jobManager = NewJobManager()
 
 	// Build all jobs
+	data = c.dryRunWorkflowData(data)
 	if err := c.buildJobs(data, markdownPath); err != nil {
 		compilerYamlLog.Printf("Failed to build jobs: %v", err)
 		return fmt.Errorf("job generation could not complete; check that each configured job has valid step fields such as run, uses, and with: %w", err)
 	}
 
 	compilerYamlLog.Printf("Built %d jobs successfully", len(c.jobManager.GetAllJobs()))
+
+	c.disableDryRunPushJobs()
+
+	if err := c.applyEnvironmentOverride(); err != nil {
+		return err
+	}
 
 	// Validate job dependencies
 	if err := c.jobManager.ValidateDependencies(); err != nil {
@@ -45,7 +52,7 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 // permissions, concurrency, run-name, environment variables, cache comments, and jobs.
 func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowData) {
 	// Write basic workflow structure
-	fmt.Fprintf(yaml, "name: \"%s\"\n", data.Name)
+	fmt.Fprintf(yaml, "name: \"%s\"\n", data.Name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 
 	// Inject on.workflow_call.outputs when workflow_call is configured and safe-outputs are present
 	onSection := data.On
@@ -69,6 +76,7 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 
 	// Always write empty permissions at the top level
 	// Agent permissions are applied only to the agent job
+	yaml.WriteString("# Jobs receive only their explicitly declared permissions.\n")
 	yaml.WriteString("permissions: {}\n\n")
 
 	yaml.WriteString(data.Concurrency)
@@ -92,7 +100,7 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 	c.jobManager.WriteJobsYAML(yaml)
 }
 
-func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) {
+func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) { //nolint:largefunc // Existing workflow YAML assembly keeps generation steps in order.
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
 
 	repoConfig, err := c.loadRepoConfig()
@@ -192,7 +200,6 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// These are returned to the caller so they can be used for safe update enforcement
 	// without requiring a second scan of the full YAML content.
 	secrets := CollectSecretReferences(bodyContent)
-	actions := CollectActionReferences(bodyContent)
 
 	// If this workflow has a workflow_call trigger, inject on.workflow_call.secrets:
 	// declarations so callers can map secrets explicitly instead of using secrets: inherit.
@@ -213,6 +220,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 			compilerYamlLog.Printf("Regenerated workflow body with on.workflow_call.secrets declarations")
 		}
 	}
+
+	var pinResolver SHAResolver
+	if data.ActionResolver != nil {
+		pinResolver = data.ActionResolver
+	}
+	bodyContent, err = mapPinnedUsesInYAML(bodyContent, data.ActionPinMappings, data.ActionPinPrefixes, data.ActionPinWarnings, pinResolver)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	actions := CollectActionReferences(bodyContent)
 
 	// Generate workflow header comments (including metadata as first line, plus secrets/actions lists)
 	if err := c.generateWorkflowHeader(&yaml, data, frontmatterHash, bodyHash, secrets, actions); err != nil {

@@ -136,6 +136,9 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	if pullPolicy := dockerImagePullPolicy(data); pullPolicy != "" {
+		detectionData.RawFrontmatter = map[string]any{"docker-image-pull-policy": pullPolicy}
+	}
 
 	if firewallConfig := getFirewallConfig(data); firewallConfig != nil {
 		firewallCopy := *firewallConfig
@@ -206,7 +209,7 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 	threatLog.Printf("Pre-pulling %d AWF container image(s) for detection job", len(images))
 
 	var b strings.Builder
-	generateDownloadDockerImagesStep(&b, images)
+	generateDownloadDockerImagesStep(&b, images, dockerImagePullPolicy(data))
 	if b.Len() == 0 {
 		return nil
 	}
@@ -326,6 +329,10 @@ func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID s
 		setup.commandPrefix += codexBYOKAPIKeyExport() + " && "
 		return setup
 	}
+	if engineID == "claude" && NewClaudeEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
+		setup.commandPrefix += claudeCopilotAPIKeyExport() + " && "
+		return setup
+	}
 	if engineID != "copilot" {
 		return setup
 	}
@@ -391,7 +398,7 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 		filteredInstallSteps = append([]GitHubActionStep{GenerateNodeJsSetupStep()}, filteredInstallSteps...)
 	}
 
-	filteredInstallSteps = applyNodeSetupActionOverride(filteredInstallSteps, data)
+	filteredInstallSteps = applyNodeSetupOverrides(filteredInstallSteps, data)
 
 	var yaml strings.Builder
 	arcDind := isArcDindTopology(threatDetectionData)
@@ -499,7 +506,11 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 
 	// Compute which env vars to exclude from the AWF container. The API proxy
 	// handles authentication, so the raw credentials must not reach the container.
-	excludeEnvVarNames := ComputeAWFExcludeEnvVarNames(threatDetectionData, engineCoreSecretVarNames(engineID))
+	coreSecretVarNames := engineCoreSecretVarNames(engineID)
+	if engineID == "claude" {
+		coreSecretVarNames = claudeSecretEnvVarNames(threatDetectionData)
+	}
+	excludeEnvVarNames := ComputeAWFExcludeEnvVarNames(threatDetectionData, coreSecretVarNames)
 
 	// Compute allowed domains for the detection engine. The AWF firewall for the
 	// detection job must permit the engine's required API endpoints. Without this,

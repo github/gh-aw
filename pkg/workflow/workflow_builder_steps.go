@@ -8,7 +8,7 @@ import (
 )
 
 // processAndMergeSteps handles the merging of imported steps with main workflow steps.
-func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData *WorkflowData, importsResult *parser.ImportsResult) error {
+func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData *WorkflowData, importsResult *parser.ImportsResult) error { //nolint:largefunc // Existing step merge handles main and imported steps together.
 	workflowBuilderLog.Print("Processing and merging custom steps")
 
 	workflowData.CustomSteps = c.extractTopLevelYAMLSection(frontmatter, "steps")
@@ -278,6 +278,9 @@ func (c *Compiler) processAndMergePostSteps(frontmatter map[string]any, workflow
 	if len(mainPostSteps) > 0 || len(importedPostSteps) > 0 {
 		allPostSteps = append(allPostSteps, mainPostSteps...)
 		allPostSteps = append(allPostSteps, importedPostSteps...)
+		if err := validatePostStepsSafeOutputs(allPostSteps); err != nil {
+			return err
+		}
 
 		stepsWrapper := map[string]any{"post-steps": allPostSteps}
 		stepsYAML, err := yaml.Marshal(stepsWrapper)

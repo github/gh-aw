@@ -93,12 +93,12 @@ steps:
       sudo apt-get update
       sudo apt-get install -y make
   - name: Setup Go
-    uses: actions/setup-go@v7.0.0
+    uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
       cache: true
   - name: Setup Node.js
-    uses: actions/setup-node@v7.0.0
+    uses: actions/setup-node@v7
     with:
       node-version: "24"
       cache: npm

@@ -41,14 +41,14 @@ safe-outputs:
 timeout-minutes: 45
 steps:
   - name: Setup Python
-    uses: actions/setup-python@v7.0.0
+    uses: actions/setup-python@v7
     with:
       python-version: "3.12"
   - name: Prepare analysis workspace
     run: |
       mkdir -p /tmp/gh-aw/ambient-context
   - name: Closed PR deduplication guard
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       script: |
@@ -109,7 +109,7 @@ steps:
         core.info(`Deduplication guard: ${closedOptimizerPrs.length} closed optimizer PRs, ${blockedFiles.length} blocked files`);
         for (const bf of blockedFiles) core.info(`  BLOCKED: ${bf}`);
   - name: PR close-rate metric
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       script: |

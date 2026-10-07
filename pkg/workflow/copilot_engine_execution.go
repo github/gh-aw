@@ -51,7 +51,7 @@ const copilotSettingsPath = "$HOME/.copilot/settings.json"
 
 // copilotSettingsDefaultContent is the default JSON content written to the Copilot CLI
 // settings file when no additional settings are configured.
-const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":true}}`
+const copilotSettingsDefaultContent = `{"builtInAgents":{"rubberDuck":false},"enabledFeatureFlags":{"EXTENSIONS":false}}`
 
 type copilotSettings struct {
 	BuiltInAgents       map[string]bool            `json:"builtInAgents"`
@@ -63,7 +63,7 @@ func buildCopilotSettingsContent(workflowData *WorkflowData) string {
 	settings := copilotSettings{
 		BuiltInAgents: map[string]bool{"rubberDuck": false},
 		EnabledFeatureFlags: map[string]bool{
-			"EXTENSIONS": workflowData == nil || workflowData.EngineConfig.DynamicWorkflowsEnabled(),
+			"EXTENSIONS": workflowData != nil && workflowData.EngineConfig.DynamicWorkflowsEnabled(),
 		},
 	}
 	if workflowData != nil {
@@ -236,13 +236,7 @@ func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) ([]string, 
 	isDetectionJob := isDetectionRun(workflowData)
 	copilotArgs := e.buildCopilotBaseArgs(sandboxEnabled)
 
-	// Disable Copilot CLI built-in MCP servers unless a workflow opts into
-	// web-fetch or web-search. The CLI exposes web_fetch and web_search through its
-	// built-in tool schema, so disabling built-ins would leave --allow-tool with no
-	// callable tool.
-	if !copilotNeedsBuiltinMCPs(workflowData) {
-		copilotArgs = append(copilotArgs, "--disable-builtin-mcps")
-	}
+	copilotArgs = append(copilotArgs, "--disable-builtin-mcps")
 	// Add --no-ask-user to enable fully autonomous runs (suppresses interactive prompts).
 	// Emitted for both agent and detection jobs when the Copilot CLI version supports it
 	// (v1.0.19+). Latest and unspecified versions always include the flag.
@@ -268,14 +262,6 @@ func (e *CopilotEngine) buildCopilotArgs(workflowData *WorkflowData) ([]string, 
 	}
 	toolArgs := e.computeCopilotToolArguments(workflowData.Tools, workflowData.SafeOutputs, workflowData.MCPScripts, workflowData)
 	return e.buildCopilotFeatureArgs(workflowData, copilotArgs, toolArgs), toolArgs
-}
-
-func copilotNeedsBuiltinMCPs(workflowData *WorkflowData) bool {
-	if workflowData == nil || workflowData.Tools == nil || isCopilotSDKMode(workflowData) {
-		return false
-	}
-	return isCopilotToolValueEnabled(workflowData.Tools, "web-fetch") ||
-		(isCopilotToolValueEnabled(workflowData.Tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig))
 }
 
 func (e *CopilotEngine) buildCopilotBaseArgs(sandboxEnabled bool) []string {
@@ -793,22 +779,6 @@ func copilotSupportsNoAskUser(engineConfig *EngineConfig) bool {
 		versionStr,
 		string(constants.DefaultCopilotVersion),
 		string(constants.CopilotNoAskUserMinVersion),
-	)
-}
-
-func copilotSupportsWebSearch(engineConfig *EngineConfig) bool {
-	var versionStr string
-	if engineConfig != nil && engineConfig.Version != "" {
-		versionStr = engineConfig.Version
-	}
-	if containsExpression(versionStr) {
-		copilotExecLog.Printf("copilotSupportsWebSearch: expression version %q treated as supported", versionStr)
-		return true
-	}
-	return versionAtLeast(
-		versionStr,
-		string(constants.DefaultCopilotVersion),
-		string(constants.CopilotWebSearchMinVersion),
 	)
 }
 

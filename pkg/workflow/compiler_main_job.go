@@ -28,7 +28,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 		agentTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		agentParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, agentTraceID, agentParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("agent", data, setupActionRef, SetupActionDestination, false, agentTraceID, agentParentSpanID, "")...)
 	}
 	// Set runtime paths that depend on RUNNER_TEMP via $GITHUB_ENV.
 	// These cannot be set in job-level env: because the runner context is not

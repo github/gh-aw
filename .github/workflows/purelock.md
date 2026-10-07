@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -136,7 +136,7 @@ jobs:
           retention-days: 3
 steps:
   - name: Setup Go
-    uses: actions/setup-go@v7.0.0
+    uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
       # The sandbox mounts the runner's Go module cache, so restoring it again

@@ -675,7 +675,7 @@ func (c *Compiler) buildPushRepoMemorySetupAndCheckoutSteps(data *WorkflowData, 
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 		repoMemoryTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		repoMemoryParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		steps = append(steps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, repoMemoryTraceID, repoMemoryParentSpanID)...)
+		steps = append(steps, c.generateSetupStepForJob("push_repo_memory", data, setupActionRef, SetupActionDestination, false, repoMemoryTraceID, repoMemoryParentSpanID, "")...)
 	}
 	var checkoutStep strings.Builder
 	checkoutStep.WriteString("      - name: Checkout repository\n")

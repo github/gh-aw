@@ -225,9 +225,9 @@ func TestGetGitHubGuardPoliciesToolCallLimits(t *testing.T) {
 					"tool-call-limits": map[string]int{
 						"issue_read": 1,
 					},
-					"blocked-users":   guardExprSentinel + "${{ steps.parse-guard-vars.outputs.blocked_users }}",
-					"trusted-users":   guardExprSentinel + "${{ steps.parse-guard-vars.outputs.trusted_users }}",
-					"approval-labels": guardExprSentinel + "${{ steps.parse-guard-vars.outputs.approval_labels }}",
+					"blocked-users":   guardExprSentinel + "${GH_AW_GUARD_BLOCKED_USERS}",
+					"trusted-users":   guardExprSentinel + "${GH_AW_GUARD_TRUSTED_USERS}",
+					"approval-labels": guardExprSentinel + "${GH_AW_GUARD_APPROVAL_LABELS}",
 				},
 			},
 		},
@@ -248,9 +248,9 @@ func TestGetGitHubGuardPoliciesToolCallLimits(t *testing.T) {
 					"tool-call-limits": map[string]int{
 						"issue_read": 2,
 					},
-					"blocked-users":   guardExprSentinel + "${{ steps.parse-guard-vars.outputs.blocked_users }}",
-					"trusted-users":   guardExprSentinel + "${{ steps.parse-guard-vars.outputs.trusted_users }}",
-					"approval-labels": guardExprSentinel + "${{ steps.parse-guard-vars.outputs.approval_labels }}",
+					"blocked-users":   guardExprSentinel + "${GH_AW_GUARD_BLOCKED_USERS}",
+					"trusted-users":   guardExprSentinel + "${GH_AW_GUARD_TRUSTED_USERS}",
+					"approval-labels": guardExprSentinel + "${GH_AW_GUARD_APPROVAL_LABELS}",
 				},
 			},
 		},
@@ -273,7 +273,7 @@ func TestRenderGitHubGuardPoliciesDefersRuntimeExpressions(t *testing.T) {
 
 	result := output.String()
 	for _, field := range []string{"blocked-users", "trusted-users", "approval-labels"} {
-		assert.Contains(t, result, `"`+field+`": ${{ steps.parse-guard-vars.outputs.`+strings.ReplaceAll(field, "-", "_")+` }}`)
+		assert.Contains(t, result, `"`+field+`": ${GH_AW_GUARD_`+strings.ToUpper(strings.ReplaceAll(field, "-", "_"))+`}`)
 	}
 	assert.NotContains(t, result, guardExprSentinel)
 }

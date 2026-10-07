@@ -18,12 +18,20 @@ var compilerGitHubActionsStepsLog = logger.New("workflow:compiler_github_actions
 //
 // Returns a string containing the complete script content to be used in a github-script action's "script:" field.
 func generateGitHubScriptWithRequire(scriptPath string) string {
+	return generateGitHubScriptWithCredentialSource(scriptPath, false)
+}
+
+func generateGitHubScriptWithCredentialSource(scriptPath string, withCredentialSource bool) string {
 	compilerGitHubActionsStepsLog.Printf("Generating GitHub script step with require: %s", scriptPath)
 	var script strings.Builder
 
 	// Use the setup_globals helper to store GitHub Actions objects in global scope
 	script.WriteString("            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
-	script.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
+	setupCall := "            setupGlobals(core, github, context, exec, io, getOctokit"
+	if withCredentialSource {
+		setupCall += ", process.env.GH_AW_GITHUB_TOKEN_SOURCE"
+	}
+	script.WriteString(setupCall + ");\n")
 	script.WriteString("            const { main } = require('" + SetupActionDestination + "/" + scriptPath + "');\n")
 	script.WriteString("            await main();\n")
 

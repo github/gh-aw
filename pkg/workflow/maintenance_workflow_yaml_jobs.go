@@ -70,8 +70,10 @@ func writeMaintenanceAdminPermissionsStep(b *strings.Builder, opts buildMaintena
 
 func writeMaintenanceCloseExpiredJobYAML(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef, jobName, permissionLine, stepName, scriptName string) {
 	b.WriteString(`  ` + jobName + `:
+    name: ` + stepName + `
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnly()) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Closing expired resources requires write access to this resource type only.
     permissions:
       ` + permissionLine + `
     steps:
@@ -101,11 +103,16 @@ func buildMaintenanceCloseExpiredJobs(opts buildMaintenanceWorkflowYAMLOptions, 
 }
 
 func buildMaintenanceCleanupCacheJob(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("cleanup-cache-memory") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   cleanup-cache-memory:
+    name: Cleanup cache memory
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnlyOrOperation("clean_cache_memories")) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Removing obsolete Actions caches requires actions: write.
     permissions:
       actions: write
     steps:
@@ -125,11 +132,16 @@ func buildMaintenanceCleanupCacheJob(opts buildMaintenanceWorkflowYAMLOptions, s
 }
 
 func buildMaintenanceRunOperationJob(ctx context.Context, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("run_operation") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   run_operation:
+    name: Run maintenance operation
     if: ${{ ` + RenderCondition(buildRunOperationCondition(maintenanceRunOperationExclusions(opts)...)) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Updates, upgrades, and workflow enable/disable operations need repository write access.
     permissions:
       actions: write
       contents: write
@@ -175,11 +187,16 @@ func maintenanceRunOperationExclusions(opts buildMaintenanceWorkflowYAMLOptions)
 }
 
 func buildMaintenanceUpdatePRBranchesJob(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("update_pull_request_branches") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   update_pull_request_branches:
+    name: Update pull request branches
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition("update_pull_request_branches")) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Branch updates may write commits and update pull requests.
     permissions:
       contents: write
       pull-requests: write
@@ -210,8 +227,10 @@ func buildMaintenanceApplySafeOutputsJob(opts buildMaintenanceWorkflowYAMLOption
 	var b strings.Builder
 	b.WriteString(`
   apply_safe_outputs:
+    name: Apply safe outputs
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition("safe_outputs")) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Replay can create or update any supported safe-output resource.
     permissions:
       actions: read
       contents: write
@@ -248,11 +267,16 @@ func buildMaintenanceApplySafeOutputsJob(opts buildMaintenanceWorkflowYAMLOption
 }
 
 func buildMaintenanceCreateLabelsJob(ctx context.Context, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("create_labels") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   create_labels:
+    name: Create labels
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition("create_labels")) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Creating repository labels uses the issues API.
     permissions:
       contents: read
       issues: write
@@ -280,9 +304,11 @@ func buildMaintenanceCreateLabelsJob(ctx context.Context, opts buildMaintenanceW
 func writeMaintenanceIssueReportJobPrefix(b *strings.Builder, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef, jobName, operation string, timeoutMinutes int) {
 	b.WriteString(`
   ` + jobName + `:
+    name: ` + strings.ReplaceAll(jobName, "_", " ") + `
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition(operation)) + ` }}
     runs-on: ` + opts.runsOnValue + `
     timeout-minutes: ` + strconv.Itoa(timeoutMinutes) + `
+    # Read workflow logs and create the resulting report issue.
     permissions:
       actions: read
       contents: read
@@ -295,6 +321,9 @@ func writeMaintenanceIssueReportJobPrefix(b *strings.Builder, opts buildMaintena
 }
 
 func buildMaintenanceActivityReportJob(ctx context.Context, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("activity_report") {
+		return ""
+	}
 	var b strings.Builder
 	writeMaintenanceIssueReportJobPrefix(&b, opts, setupActionRef, "activity_report", "activity_report", 120)
 	b.WriteString(generateInstallCLISteps(ctx, opts.actionMode, opts.version, opts.actionTag, opts.resolver))
@@ -384,6 +413,9 @@ func buildMaintenanceActivityReportIssueStep(resolver SHAResolver) string {
 }
 
 func buildMaintenanceForecastReportJob(ctx context.Context, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("forecast_report") {
+		return ""
+	}
 	var b strings.Builder
 	writeMaintenanceIssueReportJobPrefix(&b, opts, setupActionRef, "forecast_report", "forecast", 60)
 	b.WriteString(generateInstallCLISteps(ctx, opts.actionMode, opts.version, opts.actionTag, opts.resolver))
@@ -468,11 +500,16 @@ func buildMaintenanceForecastIssueStep(resolver SHAResolver) string {
 }
 
 func buildMaintenanceCloseIssuesJob(opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("close_agentic_workflows_issues") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   close_agentic_workflows_issues:
+    name: Close agentic workflows issues
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition("close_agentic_workflows_issues")) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Closing no-repro issues requires issues: write.
     permissions:
       issues: write
     steps:
@@ -494,11 +531,16 @@ func buildMaintenanceCloseIssuesJob(opts buildMaintenanceWorkflowYAMLOptions, se
 }
 
 func buildMaintenanceValidateWorkflowsJob(ctx context.Context, opts buildMaintenanceWorkflowYAMLOptions, setupActionRef string) string {
+	if opts.maintenanceConfig.IsJobDisabled("validate_workflows") {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(`
   validate_workflows:
+    name: Validate workflows
     if: ${{ ` + RenderCondition(buildDispatchOperationCondition("validate")) + ` }}
     runs-on: ` + FormatRunsOn(opts.configuredRunsOn, "ubuntu-latest") + `
+    # Read workflow sources and file issues for validation findings.
     permissions:
       contents: read
       issues: write
@@ -527,8 +569,10 @@ func buildMaintenanceLabelDisableJob(opts buildMaintenanceWorkflowYAMLOptions, s
 	var b strings.Builder
 	b.WriteString(`
   label_disable_agentic_workflow:
+    name: Disable agentic workflow by label
     if: ${{ ` + RenderCondition(buildLabeledDisableCondition()) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Label requests disable workflow runs and update the requesting issue.
     permissions:
       actions: write
       contents: read
@@ -556,8 +600,10 @@ func buildMaintenanceLabelApplySafeOutputsJob(opts buildMaintenanceWorkflowYAMLO
 	var b strings.Builder
 	b.WriteString(`
   label_apply_safe_outputs:
+    name: Apply safe outputs by label
     if: ${{ ` + RenderCondition(buildLabeledApplySafeOutputsCondition()) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Applying safe outputs can update each supported repository resource.
     permissions:
       actions: read
       contents: write
@@ -628,11 +674,13 @@ func buildMaintenanceCompileWorkflowsJob(ctx context.Context, opts buildMaintena
 	var b strings.Builder
 	b.WriteString(`
   compile-workflows:
+    name: Compile workflows
     if: ${{ ` + RenderCondition(buildNotForkAndScheduled()) + ` }}
     runs-on: ` + opts.runsOnValue + `
     concurrency:
       group: ${{ github.workflow }}-compile-workflows-${{ github.repository }}
       cancel-in-progress: true
+    # Detect drift by reading sources and open a tracking issue when necessary.
     permissions:
       contents: read
       issues: write
@@ -670,8 +718,10 @@ func buildMaintenanceSecretValidationJob(opts buildMaintenanceWorkflowYAMLOption
 	var b strings.Builder
 	b.WriteString(`
   secret-validation:
+    name: Validate secrets
     if: ${{ ` + RenderCondition(buildNotForkAndScheduleOnly()) + ` }}
     runs-on: ` + opts.runsOnValue + `
+    # Read repository scripts to check configured integration secrets without write access.
     permissions:
       contents: read
     steps:

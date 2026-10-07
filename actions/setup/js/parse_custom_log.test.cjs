@@ -1,9 +1,54 @@
 // @ts-check
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseCustomLog } from "./parse_custom_log.cjs";
+import { parseEngineSession } from "./unified_session.cjs";
 
 describe("parseCustomLog", () => {
+  it("delegates recognized Pydantic stdout before generic result guessing and by engine name", () => {
+    const decoder = require("./parse_pydantic_log.cjs");
+    const log = 'signed engine fixture\n{"type":"result","num_turns":1}';
+    const parser = vi.spyOn(decoder, "parsePydanticLog").mockReturnValue({
+      markdown: "decoded",
+      logEntries: [{ type: "assistant.message", data: { content: "Observed answer" } }],
+      mcpFailures: [],
+      maxTurnsHit: false,
+      partial: false,
+    });
+    try {
+      const result = parseCustomLog(log);
+      expect(parser).toHaveBeenCalledWith(log);
+      expect(result.logEntries).toMatchObject([{ type: "assistant.message", data: { content: "Observed answer" } }]);
+      expect(result.markdown).toContain("Pydantic AI format");
+      expect(parseEngineSession(log, "pydantic-ai")).toMatchObject([{ type: "assistant.message", data: { content: "Observed answer" } }]);
+      expect(parser).toHaveBeenCalledTimes(2);
+    } finally {
+      parser.mockRestore();
+    }
+  });
+
+  it("uses the DeepSeek signature decoder before a generic synthetic result", () => {
+    const decoder = require("./parse_deepseek_log.cjs");
+    const log = 'signed engine fixture\n{"type":"result","num_turns":1}';
+    const signature = vi.spyOn(decoder, "isDeepSeekLog").mockReturnValue(true);
+    const parser = vi.spyOn(decoder, "parseDeepSeekLog").mockReturnValue({
+      markdown: "decoded",
+      logEntries: [{ type: "assistant.message", data: { content: "Observed answer" } }],
+      mcpFailures: [],
+      maxTurnsHit: false,
+    });
+    try {
+      const result = parseCustomLog(log);
+      expect(signature).toHaveBeenCalledWith(log);
+      expect(parser).toHaveBeenCalledWith(log);
+      expect(result.logEntries).toMatchObject([{ type: "assistant.message", data: { content: "Observed answer" } }]);
+      expect(result.markdown).toContain("DeepSeek format");
+    } finally {
+      signature.mockRestore();
+      parser.mockRestore();
+    }
+  });
+
   it("should detect and parse Claude format logs", () => {
     const claudeLog = JSON.stringify([
       {

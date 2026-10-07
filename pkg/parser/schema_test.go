@@ -50,6 +50,26 @@ func TestValidateMainWorkflowFrontmatter_MaxToolCalls(t *testing.T) {
 	}
 }
 
+func TestValidateMainWorkflowFrontmatter_DockerImagePullPolicy(t *testing.T) {
+	for _, tt := range []struct {
+		policy  any
+		wantErr bool
+	}{
+		{policy: "always"},
+		{policy: "never"},
+		{policy: "", wantErr: true},
+		{policy: "sometimes", wantErr: true},
+		{policy: true, wantErr: true},
+	} {
+		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+			"on": "workflow_dispatch", "docker-image-pull-policy": tt.policy,
+		}, "workflow.md")
+		if (err != nil) != tt.wantErr {
+			t.Errorf("policy %v: error = %v, want error %v", tt.policy, err, tt.wantErr)
+		}
+	}
+}
+
 func TestValidateMainWorkflowFrontmatter_RejectsUnsupportedTopLevelFields(t *testing.T) {
 	t.Parallel()
 
@@ -1851,6 +1871,25 @@ func TestMainWorkflowSchema_CreateDiscussionRequiredCategoryAllowed(t *testing.T
 
 	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
 		t.Fatalf("expected create-discussion.required-category to pass schema validation, got: %v", err)
+	}
+}
+
+func TestMainWorkflowSchema_SandboxAgentRouterImageAllowed(t *testing.T) {
+	t.Parallel()
+
+	frontmatter := map[string]any{
+		"on": "daily",
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"images": map[string]any{
+					"router": "registry.example.com/approved/router:v0.1.3@sha256:" + strings.Repeat("a", 64),
+				},
+			},
+		},
+	}
+
+	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
+		t.Fatalf("expected sandbox.agent.images.router to pass schema validation, got: %v", err)
 	}
 }
 

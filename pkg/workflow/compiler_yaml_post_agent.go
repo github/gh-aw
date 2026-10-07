@@ -14,7 +14,8 @@ import (
 func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEngine, logFileFull string, initialPaths []string) []string { //nolint:largefunc // Existing artifact policy remains explicit and ordered.
 	paths := initialPaths
 	paths = append(paths, agentExecutionEvidencePath, agentExecutionExitCodePath,
-		constants.TmpGhAwDirSlash+"agent-session.jsonl", constants.TmpGhAwDirSlash+"agent-errors.jsonl")
+		constants.TmpGhAwDirSlash+"agent-session.jsonl", constants.TmpGhAwDirSlash+"agent-errors.jsonl",
+		constants.TmpGhAwDirSlash+"aw-prompts/user.txt", constants.TmpGhAwDirSlash+"aw-prompts/system.txt")
 
 	// Merge engine-declared output files into the unified artifact instead of creating a
 	// separate agent_outputs artifact.
@@ -225,7 +226,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// receive a valid (empty) JSON file instead of an ENOENT error.
 	// The placeholder is only written if the engine did not already write the file.
 	if data.SafeOutputs != nil {
-		c.generateAgentOutputPlaceholderStep(yaml)
+		c.generateAgentOutputPlaceholderStep(yaml, data)
 	}
 
 	// Add post-execution cleanup step for Copilot engine

@@ -422,7 +422,7 @@ func TestConvertJSONWorkflowToMarkdown_CompilerRoundTrip(t *testing.T) {
 		"disabled":    true,
 		"disabled_state": {"disabled_at": "2026-05-20T15:14:55.440451459Z", "reason": "disabled_by_user"},
 		"permissions": {"security-events": "read"},
-		"tools":       ["github/list_code_scanning_alerts"],
+		"tools":       ["github/list_code_scanning_alerts", "web_search"],
 		"triggers":    {"workflow_run": {"conclusions": ["failure"], "types": ["completed"], "workflows": ["bar"]}},
 		"created_at":  "2026-05-20T15:14:50.047316109Z",
 		"updated_at":  "2026-05-20T15:14:55.440451459Z",
@@ -447,6 +447,8 @@ func TestConvertJSONWorkflowToMarkdown_CompilerRoundTrip(t *testing.T) {
 	assert.Contains(t, gen.Markdown, "toolsets:")
 	assert.Contains(t, gen.Markdown, "- code_security")
 	assert.Contains(t, gen.Markdown, "security-events: read")
+	assert.NotContains(t, gen.Markdown, "web-search:")
+	assert.Contains(t, gen.Warnings, `tool "web_search" was skipped because Copilot native web search is unavailable; use a web-search MCP server or select a supported engine`)
 
 	// ── Compiler round-trip ───────────────────────────────────────────────────
 	// The converted markdown must compile to valid GitHub Actions YAML without
@@ -464,4 +466,16 @@ func TestConvertJSONWorkflowToMarkdown_CompilerRoundTrip(t *testing.T) {
 	// Spot-check the compiled YAML output.
 	assert.Contains(t, yamlOutput, "workflow_run:", "compiled YAML must contain workflow_run trigger")
 	assert.Contains(t, yamlOutput, "do something", "compiled YAML must contain the prompt body")
+}
+
+func TestConvertJSONWorkflowToMarkdown_WebSearchForSupportedEngine(t *testing.T) {
+	t.Parallel()
+	gen, err := ConvertJSONWorkflowToMarkdown(&JSONWorkflow{
+		Name:   "supported-search",
+		Engine: "codex",
+		Tools:  []string{"web_search"},
+	}, ConvertOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, gen.Markdown, "web-search:")
+	assert.Empty(t, gen.Warnings)
 }

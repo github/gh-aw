@@ -97,6 +97,11 @@ func extractEngineFromAwInfo(infoFilePath string, verbose bool) workflow.CodingA
 	registry := workflow.GetGlobalEngineRegistry()
 	engine, err := registry.GetEngine(info.EngineID)
 	if err != nil {
+		if localEngine, localErr := loadLocalLogParserEngine(info.EngineID); localErr == nil && localEngine != nil {
+			return localEngine
+		} else if localErr != nil {
+			logsParsingCoreLog.Printf("Failed to load local engine definition: %v", localErr)
+		}
 		logsParsingCoreLog.Printf("Unknown engine: %s", info.EngineID)
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Unknown engine in aw_info.json: "+info.EngineID))

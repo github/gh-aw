@@ -13,9 +13,23 @@ const main = createEngineLogParser({
 /**
  * Parses custom engine log content by attempting multiple parser strategies
  * @param {string} logContent - The raw log content as a string
+ * @param {string} [engine=""] - Explicitly selected behavior-defined engine
  * @returns {{markdown: string, mcpFailures: string[], maxTurnsHit: boolean, logEntries: Array}} Result with formatted markdown content, MCP failure list, max-turns status, and parsed log entries
  */
-function parseCustomLog(logContent) {
+function parseCustomLog(logContent, engine = "") {
+  if (engine) {
+    const parsed = require("./engine_log_parser.cjs").parseBehaviorLog(logContent, engine);
+    if (parsed) return parsed;
+  }
+  const { isDeepSeekLog, parseDeepSeekLog } = require("./parse_deepseek_log.cjs");
+  if (isDeepSeekLog(logContent)) {
+    const result = parseDeepSeekLog(logContent);
+    return { ...result, markdown: `### Custom Engine Log (DeepSeek format)\n\n${result.markdown}` };
+  }
+  const pydanticResult = require("./parse_pydantic_log.cjs").parsePydanticLog(logContent);
+  if (pydanticResult.logEntries.length) {
+    return { ...pydanticResult, markdown: `### Custom Engine Log (Pydantic AI format)\n\n${pydanticResult.markdown}` };
+  }
   const entries = parseLogEntries(logContent) ?? [];
   const { isGooseEvent, parseGooseLog } = require("./parse_goose_log.cjs");
   if (entries.some(entry => isGooseEvent(entry) && entry.type !== "error")) {

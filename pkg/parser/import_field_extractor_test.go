@@ -734,7 +734,7 @@ func TestExtractConfigFields_FirstWinsAndAccumulates(t *testing.T) {
 		"mcp-servers":           map[string]any{"server-a": map[string]any{"url": "https://a.example.com"}},
 		"safe-outputs":          map[string]any{"enabled": true},
 		"mcp-scripts":           map[string]any{"setup": "echo first"},
-		"runtimes":              map[string]any{"node": map[string]any{"version": "20"}},
+		"runtimes":              map[string]any{"node": map[string]any{"version": "24"}},
 		"network":               map[string]any{"allow": []any{"github.com"}},
 		"permissions":           map[string]any{"contents": "read"},
 		"secret-masking":        map[string]any{"enabled": true},

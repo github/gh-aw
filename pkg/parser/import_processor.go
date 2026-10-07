@@ -85,6 +85,7 @@ type ImportsResult struct {
 	MergedExcludedEnv             []string              // Union of excluded-env lists from all imports (deduplicated, used to extend the main workflow's excluded-env)
 	ImportedFiles                 []string              // List of imported file paths (for manifest)
 	AgentFile                     string                // Path to custom agent file (if imported)
+	SubAgentModels                []SubAgentModel       // models declared by imported inline agents and agent files
 	AgentImportSpec               string                // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	RepositoryImports             []string              // List of repository imports (format: "owner/repo@ref") for .github folder merging
 	// ImportInputs uses map[string]any because input values can be different types (string, number, boolean).

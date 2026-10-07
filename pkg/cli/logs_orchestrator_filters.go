@@ -20,6 +20,8 @@ type runFilterOpts struct {
 	engine            string
 	runtime           string
 	noStaged          bool
+	dryRun            bool
+	noDryRun          bool
 	firewallOnly      bool
 	noFirewall        bool
 	safeOutputType    string
@@ -57,7 +59,7 @@ func matchRuntimeFilter(awInfo *AwInfo, awInfoErr error, filterRuntime string) (
 func applyRunFilters(ctx context.Context, result DownloadResult, opts runFilterOpts, verbose bool) bool {
 	var awInfo *AwInfo
 	var awInfoErr error
-	if opts.engine != "" || opts.runtime != "" || opts.noStaged || opts.firewallOnly || opts.noFirewall {
+	if opts.engine != "" || opts.runtime != "" || opts.noStaged || opts.dryRun || opts.noDryRun || opts.firewallOnly || opts.noFirewall {
 		awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 		awInfo, awInfoErr = parseAwInfo(awInfoPath, verbose)
 	}
@@ -65,6 +67,7 @@ func applyRunFilters(ctx context.Context, result DownloadResult, opts runFilterO
 	return skipByEngineFilter(result, opts, awInfo, awInfoErr, verbose) ||
 		skipByRuntimeFilter(result, opts, awInfo, awInfoErr, verbose) ||
 		skipByStagedFilter(result, opts, awInfo, awInfoErr, verbose) ||
+		skipByDryRunFilter(result, opts, awInfo, awInfoErr, verbose) ||
 		skipByFirewallFilter(result, opts, awInfo, awInfoErr, verbose) ||
 		skipBySafeOutputFilter(result, opts, verbose) ||
 		skipByFilteredIntegrityFilter(result, opts, verbose) ||
@@ -121,6 +124,21 @@ func skipByStagedFilter(result DownloadResult, opts runFilterOpts, awInfo *AwInf
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: workflow is staged (filtered out by --exclude-staged)", result.Run.DatabaseID)))
 	}
 	return true
+}
+
+func skipByDryRunFilter(result DownloadResult, opts runFilterOpts, awInfo *AwInfo, awInfoErr error, verbose bool) bool {
+	if !opts.dryRun && !opts.noDryRun {
+		return false
+	}
+	if awInfoErr != nil || awInfo == nil {
+		logAndMaybeExplainSkip(result.Run.DatabaseID, "dry-run metadata unavailable", "dry-run filter requires valid aw_info.json", verbose)
+		return true
+	}
+	if (opts.dryRun && !awInfo.DryRun) || (opts.noDryRun && awInfo.DryRun) {
+		logAndMaybeExplainSkip(result.Run.DatabaseID, "dry-run filter mismatch", fmt.Sprintf("dry_run=%t does not match requested filter", awInfo.DryRun), verbose)
+		return true
+	}
+	return false
 }
 
 func skipByFirewallFilter(result DownloadResult, opts runFilterOpts, awInfo *AwInfo, awInfoErr error, verbose bool) bool {

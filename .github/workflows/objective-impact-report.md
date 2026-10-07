@@ -41,7 +41,7 @@ pre-agent-steps:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       EXPR_GITHUB_REPOSITORY: ${{ github.repository }}
-    uses: actions/github-script@v9.0.0
+    uses: actions/github-script@v9
     with:
       script: |
         const fs = require("fs");

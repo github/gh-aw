@@ -23,7 +23,7 @@ safe-outputs:
         - name: Checkout repository
           uses: actions/checkout@v7.0.1
         - name: Post diagnostic report to pull request
-          uses: actions/github-script@v9.0.0
+          uses: actions/github-script@v9
           with:
             script: |
               const fs = require('fs');
@@ -131,7 +131,7 @@ safe-outputs:
               }
 steps:
   - name: Setup Go
-    uses: actions/setup-go@v7.0.0
+    uses: actions/setup-go@v7
     with:
       go-version-file: go.mod
       cache: true

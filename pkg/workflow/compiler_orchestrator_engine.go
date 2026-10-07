@@ -315,6 +315,7 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 	if err != nil {
 		return "", nil, "", nil, err
 	}
+	engineConfig = c.mergeImportedModelRoutingConfigs(engineConfig, allEngines)
 	if engineSetting == "" {
 		defaultEngine := c.engineRegistry.GetDefaultEngine()
 		engineSetting = defaultEngine.GetID()
@@ -327,6 +328,40 @@ func (c *Compiler) resolveEngineFromIncludesAndImports(
 		orchestratorEngineLog.Printf("Normalized engineConfig.ID from engineSetting: %s", engineSetting)
 	}
 	return engineSetting, engineConfig, model, allEngines, nil
+}
+
+func (c *Compiler) mergeImportedModelRoutingConfigs(engineConfig *EngineConfig, importedEngines []string) *EngineConfig {
+	if engineConfig == nil {
+		return nil
+	}
+	for _, engineJSON := range importedEngines {
+		importedConfig, _, err := c.extractEngineConfigFromJSON(engineJSON)
+		if err != nil {
+			continue
+		}
+		if importedConfig.ModelRouting == nil ||
+			(importedConfig.ID != "" && engineConfig.ID != "" && !strings.EqualFold(importedConfig.ID, engineConfig.ID)) {
+			continue
+		}
+		if engineConfig.ModelRouting == nil {
+			routing := *importedConfig.ModelRouting
+			routing.AllowedModels = append([]string(nil), routing.AllowedModels...)
+			engineConfig.ModelRouting = &routing
+			continue
+		}
+		seen := make(map[string]struct{}, len(engineConfig.ModelRouting.AllowedModels))
+		for _, model := range engineConfig.ModelRouting.AllowedModels {
+			seen[model] = struct{}{}
+		}
+		for _, model := range importedConfig.ModelRouting.AllowedModels {
+			if _, exists := seen[model]; exists {
+				continue
+			}
+			engineConfig.ModelRouting.AllowedModels = append(engineConfig.ModelRouting.AllowedModels, model)
+			seen[model] = struct{}{}
+		}
+	}
+	return engineConfig
 }
 
 // mergeImportedEngineConfig resolves the engine config contributed by imports and

@@ -18,6 +18,11 @@
         "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CAssistantRefusalData%2C(%22reason%22%7C%22content%22%7C%22policyCategory%22%7C%22explanation%22%7C%22partial%22)%3E" } } }
       },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.background_tasks_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_notification" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_started" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
       { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
@@ -26,14 +31,18 @@
       { "if": { "properties": { "type": { "const": "firewall.http_access" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/FirewallAccessData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.steering" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "firewall.token_usage" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/UsageReportData" } } } },
+      { "if": { "properties": { "type": { "const": "github_api.rate_limit" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GitHubApiRateLimitData" } } } },
       { "if": { "properties": { "type": { "const": "grader.manifest" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderManifestData" } } } },
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
+      { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.event" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/RuntimeObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.guard.blocked" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
+      { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
@@ -54,7 +63,7 @@
         "then": {
           "properties": {
             "data": {
-              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22)%3E"
+              "$ref": "#/definitions/Pick%3CToolExecutionCompleteData%2C(%22toolCallId%22%7C%22toolName%22%7C%22success%22%7C%22output%22%7C%22error%22%7C%22durationMs%22%7C%22exitCode%22%7C%22status%22%7C%22mcpServerName%22%7C%22isError%22%7C%22taskId%22%7C%22taskType%22%7C%22workflowName%22%7C%22workflowRunId%22)%3E"
             }
           }
         }
@@ -121,6 +130,18 @@
       "additionalProperties": false
     },
     "CollectionWarningData": { "type": "object", "properties": { "code": { "type": "string" }, "path": { "type": "string" }, "line": { "type": "number", "minimum": 1, "multipleOf": 1 } }, "required": ["code"], "additionalProperties": {} },
+    "DailyAICDecisionData": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["disabled", "skipped", "under_budget", "exceeded", "structural_error", "transient_error"] },
+        "exceeded": { "type": "boolean" },
+        "total": { "type": "number" },
+        "estimated": { "type": "number" },
+        "threshold": { "type": "number" }
+      },
+      "required": ["status"],
+      "additionalProperties": false
+    },
     "DetectionResultData": {
       "type": "object",
       "properties": {
@@ -132,6 +153,55 @@
         "maliciousPatch": { "type": "boolean" }
       },
       "additionalProperties": {}
+    },
+    "DynamicWorkflowObservationData": {
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "toolCallId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "status": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "parentToolUseId": { "type": ["string", "null"] },
+        "usage": {
+          "type": "object",
+          "properties": { "totalTokens": { "$ref": "#/definitions/SessionCount" }, "toolUses": { "$ref": "#/definitions/SessionCount" }, "durationMs": { "$ref": "#/definitions/SessionMetric" } },
+          "additionalProperties": false
+        },
+        "tasks": { "type": "array", "items": { "$ref": "#/definitions/DynamicWorkflowTaskData" } },
+        "workflowProgress": { "type": "array", "items": { "$ref": "#/definitions/DynamicWorkflowProgressData" } }
+      },
+      "additionalProperties": false
+    },
+    "DynamicWorkflowProgressData": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "index": { "$ref": "#/definitions/SessionCount" },
+        "phaseIndex": { "$ref": "#/definitions/SessionCount" },
+        "agentId": { "type": "string" },
+        "model": { "type": "string" },
+        "state": { "type": "string" },
+        "attempt": { "$ref": "#/definitions/SessionCount" },
+        "startedAt": { "$ref": "#/definitions/SessionMetric" },
+        "queuedAt": { "$ref": "#/definitions/SessionMetric" },
+        "lastProgressAt": { "$ref": "#/definitions/SessionMetric" }
+      },
+      "additionalProperties": false
+    },
+    "DynamicWorkflowTaskData": {
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "toolCallId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "status": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "parentToolUseId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
     },
     "EvalResultData": {
       "type": "object",
@@ -166,6 +236,23 @@
         "decision": { "$ref": "#/definitions/JsonValue" },
         "bytes": { "$ref": "#/definitions/JsonValue" },
         "durationMs": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
+    "GitHubApiRateLimitData": {
+      "type": "object",
+      "properties": {
+        "source": { "$ref": "#/definitions/JsonValue" },
+        "credentialSource": { "$ref": "#/definitions/JsonValue" },
+        "operation": { "$ref": "#/definitions/JsonValue" },
+        "resource": { "$ref": "#/definitions/JsonValue" },
+        "limit": { "$ref": "#/definitions/JsonValue" },
+        "remaining": { "$ref": "#/definitions/JsonValue" },
+        "used": { "$ref": "#/definitions/JsonValue" },
+        "reset": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "$ref": "#/definitions/JsonValue" },
+        "delayMs": { "$ref": "#/definitions/JsonValue" },
+        "status": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
     },
@@ -250,7 +337,7 @@
       "properties": { "sourceEngine": { "type": "string" }, "model": { "type": "string" }, "sessionId": { "type": ["string", "null"] }, "cwd": { "type": "string" } },
       "additionalProperties": false
     },
-    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\")>": {
+    "Pick<ToolExecutionCompleteData,(\"toolCallId\"|\"toolName\"|\"success\"|\"output\"|\"error\"|\"durationMs\"|\"exitCode\"|\"status\"|\"mcpServerName\"|\"isError\"|\"taskId\"|\"taskType\"|\"workflowName\"|\"workflowRunId\")>": {
       "type": "object",
       "properties": {
         "toolCallId": { "type": "string" },
@@ -262,7 +349,11 @@
         "exitCode": { "type": "number" },
         "status": { "type": "string" },
         "mcpServerName": { "type": "string" },
-        "isError": { "type": "boolean" }
+        "isError": { "type": "boolean" },
+        "taskId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "workflowRunId": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -394,6 +485,7 @@
         "mcpgVersion": { "$ref": "#/definitions/JsonValue" },
         "requestedModel": { "$ref": "#/definitions/JsonValue" },
         "triggerType": { "$ref": "#/definitions/JsonValue" },
+        "dryRun": { "$ref": "#/definitions/JsonValue" },
         "workflow": { "$ref": "#/definitions/JsonValue" },
         "repository": { "$ref": "#/definitions/JsonValue" },
         "runId": { "$ref": "#/definitions/JsonValue" }

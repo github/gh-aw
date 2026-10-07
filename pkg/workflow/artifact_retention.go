@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/actionpins"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"gopkg.in/yaml.v3"
 )
@@ -51,7 +52,7 @@ func resolvedArtifactRetentionConfig(config *RepoConfig, data *WorkflowData) (*R
 		if !strings.EqualFold(extractActionRepo(source), "actions/upload-artifact") {
 			continue
 		}
-		pin, err := getActionPinWithData(extractActionRepo(source), extractActionVersion(source), data)
+		pin, err := actionpins.ResolveActionPin(extractActionRepo(source), extractActionVersion(source), data.PinContext())
 		if err != nil {
 			return nil, fmt.Errorf("cannot resolve artifact retention action mapping for %s: %w", source, err)
 		}

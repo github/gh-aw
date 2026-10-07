@@ -394,7 +394,7 @@ func TestAddCustomStepsWithRuntimeInsertion(t *testing.T) {
   - name: Build
     run: make build`,
 			runtimeSetupSteps: []GitHubActionStep{
-				{"      - name: Setup Node.js", "        uses: actions/setup-node@v4", "        with:", "          node-version: '20'"},
+				{"      - name: Setup Node.js", "        uses: actions/setup-node@v4", "        with:", "          node-version: '24'"},
 			},
 			tools: &ToolsConfig{},
 			expectInOutput: []string{
@@ -402,7 +402,7 @@ func TestAddCustomStepsWithRuntimeInsertion(t *testing.T) {
 				"uses: actions/checkout@v4",
 				"- name: Setup Node.js",
 				"uses: actions/setup-node@v4",
-				"node-version: '20'",
+				"node-version: '24'",
 				"- name: Build",
 				"run: make build",
 			},
@@ -875,7 +875,7 @@ func TestGenerateMainJobStepsArcDindSkipsNodePathStepWithoutGeneratedNodeSetup(t
   - name: Setup Node
     uses: actions/setup-node@v6
     with:
-      node-version: "20"
+      node-version: "22"
   - name: Prepare context
     run: echo ready
 `

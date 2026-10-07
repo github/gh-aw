@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { generateConversationMarkdown, generatePlainTextSummary, generateCopilotCliStyleSummary, formatToolUse, formatInitializationSummary, convertCopilotEventsToLegacyLogEntries, MAX_STEP_SUMMARY_SIZE } from "./log_parser_shared.cjs";
-import { redactSessionForPublication } from "./agent_session_render.cjs";
+import { collapseStreamedMessages, redactSessionForPublication } from "./agent_session_render.cjs";
+import { normalizeClaudeSession } from "./claude_session.cjs";
+import { normalizeCopilotSession } from "./copilot_session.cjs";
+import { normalizeGeminiSession } from "./gemini_session.cjs";
 
 const options = { formatToolCallback: formatToolUse, formatInitCallback: init => formatInitializationSummary(init, { includeSlashCommands: true }) };
 
@@ -49,6 +52,136 @@ const trace = freeze([
   },
   { type: "vendor.extension", data: { content: "PRIVATE_PROMPT" } },
 ]);
+
+describe("streamed conversation display projection", () => {
+  const render = events => [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, options).markdown];
+  const message = (content, fields = {}) => ({ type: "assistant.message", data: { content, delta: true, ...fields } });
+
+  it("joins timestamped chunks, whitespace and split Unicode into one entry without rewriting native records", () => {
+    const chunks = ["Hello", " ", "world.\n", "Second ", "line ", "\uD83D", "\uDCA1"];
+    const events = freeze(chunks.map((content, index) => ({ ...message(content, { messageId: "answer" }), id: `event-${index}`, timestamp: index })));
+    const original = JSON.stringify(events);
+    const projected = collapseStreamedMessages(events);
+    expect(projected).toHaveLength(1);
+    expect(projected[0].data.content).toBe(chunks.join(""));
+    for (const output of render(events)) {
+      expect(output).toContain("Hello world.");
+      expect(output).toContain("Second line \uD83D\uDCA1");
+    }
+    expect(JSON.stringify(events)).toBe(original);
+  });
+
+  it("renders Copilot projected deltas once while retaining the native transport", () => {
+    const events = freeze(normalizeCopilotSession(["Hello", " ", "world."].map((deltaContent, index) => ({ type: "assistant.message_delta", id: `event-${index}`, timestamp: index, data: { messageId: "answer", deltaContent } }))));
+    const projected = collapseStreamedMessages(events);
+    expect(projected.filter(event => event.type === "assistant.message_delta")).toHaveLength(3);
+    expect(projected.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello world."]);
+    for (const output of render(events)) expect(output).toContain("Hello world.");
+  });
+
+  it("joins Gemini deltas with differing envelopes and reconciles a complete snapshot", () => {
+    const events = freeze(
+      normalizeGeminiSession([
+        { type: "message", role: "assistant", messageId: "answer", delta: true, timestamp: 1, content: "Hello" },
+        { type: "message", role: "assistant", messageId: "answer", delta: true, timestamp: 2, content: " " },
+        { type: "message", role: "assistant", messageId: "answer", delta: true, timestamp: 3, content: "world" },
+        { type: "message", role: "assistant", messageId: "answer", timestamp: 4, content: "Hello world." },
+      ])
+    );
+    expect(
+      collapseStreamedMessages(events)
+        .filter(event => event.type === "assistant.message")
+        .map(event => event.data.content)
+    ).toEqual(["Hello world."]);
+    for (const output of render(events)) expect(output).toContain("Hello world.");
+  });
+
+  it("joins Claude transport fragments and snapshot suffixes without adding separators", () => {
+    const native = event => ({ type: "stream_event", session_id: "session", event });
+    const events = freeze(
+      normalizeClaudeSession([
+        native({ type: "message_start", message: { id: "answer" } }),
+        native({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }),
+        native({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello" } }),
+        native({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: " " } }),
+        native({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "world" } }),
+        native({ type: "message_stop" }),
+        { type: "assistant", session_id: "session", message: { id: "answer", content: [{ type: "text", text: "Hello world." }] } },
+      ])
+    );
+    const projected = collapseStreamedMessages(events);
+    expect(projected.filter(event => event.type === "claude.stream_event")).toHaveLength(6);
+    expect(projected.filter(event => event.type === "assistant.message").map(event => event.data.content)).toEqual(["Hello world."]);
+    for (const output of render(events)) expect(output).toContain("Hello world.");
+  });
+
+  it("replaces identified cumulative partial snapshots instead of concatenating them", () => {
+    const events = freeze([
+      { type: "assistant.message", data: { messageId: "answer", partial: true, content: "Hel" } },
+      { type: "assistant.message", data: { messageId: "answer", partial: true, content: "Hello" } },
+      { type: "assistant.message", data: { messageId: "answer", content: "Hello world." } },
+    ]);
+    expect(collapseStreamedMessages(events).map(event => event.data.content)).toEqual(["Hello world."]);
+    for (const output of render(events)) {
+      expect(output).toContain("Hello world.");
+      expect(output).not.toContain("HelHello");
+    }
+  });
+
+  it("also joins explicit legacy streaming entries", () => {
+    const events = freeze(["Hello", " ", "world."].map(text => ({ type: "assistant", delta: true, message: { id: "answer", content: [{ type: "text", text }] } })));
+    expect(collapseStreamedMessages(events)[0].message.content[0].text).toBe("Hello world.");
+    for (const output of render(events)) expect(output).toContain("Hello world.");
+  });
+
+  it.each([
+    message("second", { messageId: "different" }),
+    { ...message("second"), session_id: "different" },
+    { ...message("second"), agentId: "different" },
+    { ...message("second"), parent_tool_use_id: "different" },
+    { ...message("second"), provenance: { phase: "retry", path: "different.jsonl" } },
+    message("second", { channel: "different" }),
+    { type: "assistant.reasoning", data: { content: "second", delta: true } },
+  ])("keeps different message scopes and channels separate: %j", second => {
+    const events = freeze([message("first"), second]);
+    expect(collapseStreamedMessages(events)).toHaveLength(2);
+  });
+
+  it.each([
+    { type: "tool.execution_start", data: { toolCallId: "tool", toolName: "lookup" } },
+    { type: "tool.execution_complete", data: { toolCallId: "tool", success: true } },
+    { type: "user.message", data: { content: "PRIVATE_PROMPT" } },
+    { type: "assistant.turn_end", data: {} },
+    { type: "vendor.extension", data: { content: "PRIVATE_PROMPT" } },
+  ])("never moves text across a conversation boundary: %j", boundary => {
+    const events = freeze([message("before"), boundary, message("after")]);
+    expect(collapseStreamedMessages(events)).toEqual(events);
+    for (const output of render(events)) expect(output).not.toContain("beforeafter");
+  });
+
+  it("does not combine ordinary adjacent messages or unidentified partial snapshots", () => {
+    const events = freeze([
+      { type: "assistant.message", data: { content: "First turn" } },
+      { type: "assistant.message", data: { content: "Second turn" } },
+      { type: "assistant.message", data: { partial: true, content: "Unidentified partial" } },
+      { type: "assistant.message", data: { partial: true, content: "Another partial" } },
+    ]);
+    expect(collapseStreamedMessages(events)).toEqual(events);
+  });
+
+  it("never replaces canonical message content with an opaque native addition", () => {
+    const events = freeze([message("Partial", { messageId: "answer" }), { type: "assistant.message", content: "PRIVATE_OPAQUE_ADDITION", data: { messageId: "answer", content: "Final answer" } }]);
+    expect(collapseStreamedMessages(events)[0].data.content).toBe("Final answer");
+    for (const output of render(events)) expect(output).not.toContain("PRIVATE_OPAQUE_ADDITION");
+  });
+
+  it("keeps private message identities distinct when publication redaction makes them equal", () => {
+    const events = freeze([message("first", { messageId: "secret-one" }), message("second", { messageId: "secret-two" })]);
+    const published = redactSessionForPublication(events, value => value.replace(/secret-(one|two)/g, "masked"));
+    expect(published.map(event => event.data.messageId)).toEqual(["masked", "masked"]);
+    expect(collapseStreamedMessages(published).map(event => event.data.content)).toEqual(["first", "second"]);
+  });
+});
 
 describe("standard agent trace rendering", () => {
   it("T-UAS-009/042: both publication views merge partial initialization without inventing inventories", () => {
@@ -154,6 +287,23 @@ describe("standard agent trace rendering", () => {
     expect(generateCopilotCliStyleSummary(events)).toContain(expected);
     expect(generateConversationMarkdown(events, { ...options, formatToolCallback: (call, result) => formatToolUse(call, result, { includeDetailedParameters: true }) }).markdown).toContain(expected);
     expect(events[0].data.input).toEqual(value);
+  });
+
+  it("renders MCP text-block output as readable text without changing the structured trace", () => {
+    const output = [
+      { type: "text", text: "First tool result" },
+      { type: "text", text: "Second tool result" },
+    ];
+    const events = freeze([
+      { type: "tool.execution_start", data: { toolCallId: "lookup", toolName: "lookup", input: {} } },
+      { type: "tool.execution_complete", data: { toolCallId: "lookup", success: true, output } },
+    ]);
+    for (const summary of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, options).markdown]) {
+      expect(summary).toContain("First tool result");
+      expect(summary).toContain("Second tool result");
+      expect(summary).not.toContain('"type": "text"');
+    }
+    expect(events[1].data.output).toEqual(output);
   });
 
   it("T-UAS-022: renderer-only generated IDs cannot collide with a supplied native ID", () => {

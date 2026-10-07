@@ -35,6 +35,12 @@ description: "Description of the workflow"
 # (optional)
 intent: "example-value"
 
+# Policy for pre-start Docker images in agent and detection jobs. 'always'
+# (default) pulls images; 'never' validates exact local RepoDigests and does not
+# contact a registry.
+# (optional)
+docker-image-pull-policy: "always"
+
 # Optional emoji to represent the workflow visually in listings and UI surfaces.
 # (optional)
 emoji: "example-value"
@@ -2281,6 +2287,10 @@ sandbox:
       # (optional)
       api-proxy: "example-value"
 
+      # Model router sidecar image used by engine.model-routing.
+      # (optional)
+      router: "example-value"
+
       # CLI proxy sidecar image used by tools.github.mode: gh-proxy,
       # integrity-reactions, or raw --difc-proxy-host AWF arguments.
       # (optional)
@@ -2604,16 +2614,26 @@ engine:
   # (optional)
   model: "example-value"
 
-  # Ask AWF to select a Copilot model for this task using its rendered prompt.
+  # Experimental per-run Copilot model and reasoning-effort selection from the task
+  # text; requires the AWF firewall and ignores fixed model and effort settings. See
+  # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   model-routing:
-    # Routing objective.
+    # Routing objective: cost prefers the cheapest model-and-effort choice meeting the
+    # quality bar; cost-speed also weighs execution time.
     goal: "cost"
 
-    # Routing quality/cost profile.
+    # Routing quality profile: economy, balanced, and robust set increasing quality
+    # bars, generally with increasing cost; auto lets the classifier recommend one of
+    # these profiles per task.
     mode: "economy"
 
-    # Copilot model candidates; provider qualification is added by the compiler.
+    # Required Copilot models the router may select and the routed task may call;
+    # declared sub-agent models are admitted separately. Provider qualification is
+    # added by the compiler. Must satisfy models.allowed and models.blocked; GitHub
+    # Actions expressions are rejected when either policy is set. Candidate lists from
+    # imported workflows using the same engine are merged. Unavailable models and
+    # models not covered by routing tables are not selected.
     allowed-models: []
       # Array of strings
 
@@ -2859,7 +2879,7 @@ engine:
   bare: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
-  # true.
+  # false. Copilot dynamic workflows are experimental.
   # (optional)
   dynamic-workflows: true
 
@@ -3020,7 +3040,7 @@ engine:
   bare: true
 
   # Whether dynamic workflows are enabled for engines that support them. Defaults to
-  # true.
+  # false. Copilot dynamic workflows are experimental.
   # (optional)
   dynamic-workflows: true
 
@@ -4326,6 +4346,16 @@ tools:
     # Queue storage backend; defaults to git. Choose issues to store queue records on
     # GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret.
     storage: "git"
+
+    # Fail closed and block safe outputs when no trusted inbound worker assignment is
+    # present.
+    # (optional)
+    require-assignment: true
+
+    # Declare this workflow as a work-queue worker eligible to receive trusted queue
+    # claims.
+    # (optional)
+    worker: true
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
@@ -8502,9 +8532,12 @@ safe-outputs:
 
     # Protected files prevent workflow run approval when modified by the associated
     # pull request. Use exclude to remove filenames or path prefixes from the default
-    # protected set.
+    # protected set, or a leading / for an exact repository path.
     # (optional)
     protected-files:
+      # Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection
+      # everywhere they match. A leading / excludes only the exact repository path (e.g.
+      # /pyproject.toml), leaving same-named nested files protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -9898,8 +9931,8 @@ safe-outputs:
 
       # List of filenames or path prefixes to remove from the default protected-file
       # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). Use this to allow the agent to modify specific files that are
-      # otherwise blocked by default.
+      # ".agents/"). A leading / matches only the exact repository path (e.g.
+      # "/pyproject.toml"), keeping nested files with the same name protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -16993,8 +17026,8 @@ safe-outputs:
 
       # List of filenames or path prefixes to remove from the default protected-file
       # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). Use this to allow the agent to modify specific files that are
-      # otherwise blocked by default.
+      # ".agents/"). A leading / matches only the exact repository path (e.g.
+      # "/pyproject.toml"), keeping nested files with the same name protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -21063,16 +21096,26 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
-      # Ask AWF to select a Copilot model for this task using its rendered prompt.
+      # Experimental per-run Copilot model and reasoning-effort selection from the task
+      # text; requires the AWF firewall and ignores fixed model and effort settings. See
+      # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       model-routing:
-        # Routing objective.
+        # Routing objective: cost prefers the cheapest model-and-effort choice meeting the
+        # quality bar; cost-speed also weighs execution time.
         goal: "cost"
 
-        # Routing quality/cost profile.
+        # Routing quality profile: economy, balanced, and robust set increasing quality
+        # bars, generally with increasing cost; auto lets the classifier recommend one of
+        # these profiles per task.
         mode: "economy"
 
-        # Copilot model candidates; provider qualification is added by the compiler.
+        # Required Copilot models the router may select and the routed task may call;
+        # declared sub-agent models are admitted separately. Provider qualification is
+        # added by the compiler. Must satisfy models.allowed and models.blocked; GitHub
+        # Actions expressions are rejected when either policy is set. Candidate lists from
+        # imported workflows using the same engine are merged. Unavailable models and
+        # models not covered by routing tables are not selected.
         allowed-models: []
           # Array of strings
 
@@ -21318,7 +21361,7 @@ safe-outputs:
       bare: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
-      # true.
+      # false. Copilot dynamic workflows are experimental.
       # (optional)
       dynamic-workflows: true
 
@@ -21479,7 +21522,7 @@ safe-outputs:
       bare: true
 
       # Whether dynamic workflows are enabled for engines that support them. Defaults to
-      # true.
+      # false. Copilot dynamic workflows are experimental.
       # (optional)
       dynamic-workflows: true
 
@@ -22196,9 +22239,10 @@ safe-outputs:
   # those categories trigger issues. If only prefixed (excluded) categories are
   # specified, all categories except those trigger issues. If both are specified,
   # categories must match included AND not match excluded. Common categories:
-  # agent_failure, timed_out, missing_safe_outputs, report_incomplete, missing_tool,
-  # missing_data, inference_access_error, mcp_policy_error,
-  # ai_credits_rate_limit_error, max_ai_credits_exceeded, daily_ai_credits_unknown.
+  # agent_failure, timed_out, transport_wedge, missing_safe_outputs,
+  # report_incomplete, missing_tool, missing_data, inference_access_error,
+  # mcp_policy_error, ai_credits_rate_limit_error, max_ai_credits_exceeded,
+  # daily_ai_credits_unknown.
   report-failure-as-issue: []
     # Array items: string
 

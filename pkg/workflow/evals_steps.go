@@ -242,7 +242,7 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 	var steps []string
 
 	// Install the engine binary (fresh runner has no engine installed).
-	installSteps := applyNodeSetupActionOverride(engine.GetInstallationSteps(evalsData), data)
+	installSteps := applyNodeSetupOverrides(engine.GetInstallationSteps(evalsData), data)
 
 	// Ensure Node.js is on PATH when the engine harness requires it.
 	// Guard against engines whose install steps already bundle Setup Node.js.

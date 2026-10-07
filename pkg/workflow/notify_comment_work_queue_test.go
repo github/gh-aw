@@ -33,7 +33,8 @@ func TestConclusionWorkQueueSummary(t *testing.T) {
 			require.Contains(t, steps, "Summarize work queue activity\n        if: always()")
 			require.Contains(t, steps, "Summarize work queue activity\n        if: always()\n        continue-on-error: true")
 			require.Contains(t, steps, "work_queue_summary.cjs")
-			require.Contains(t, steps, "await main({ core, githubClient: github, context });")
+			require.Contains(t, steps, "path: ${{ runner.temp }}/gh-aw-activation\n")
+			require.Contains(t, steps, "snapshotPath: '${{ runner.temp }}/gh-aw-activation/work-queue.snapshot.json'")
 			require.Less(t, strings.Index(steps, "Download activation artifact for work queue summary"), strings.Index(steps, "Summarize work queue activity"))
 		})
 	}

@@ -36,6 +36,7 @@ type SkipIfCheckFailingConfig struct {
 }
 type WorkflowData struct {
 	WorkQueuePolicy                *WorkQueuePolicyConfig
+	DryRun                         bool // Disable compiler-managed GitHub mutations while retaining local diagnostics
 	Name                           string
 	WorkflowID                     string           // workflow identifier derived from markdown filename (basename without extension)
 	CompiledVersion                string           // gh-aw compiler version emitted to generated install steps as GH_AW_COMPILED_VERSION (release tag for releases, "dev" for non-release builds) so the install script can resolve a compat.json window at runtime without churn
@@ -95,12 +96,13 @@ type WorkflowData struct {
 	ExplicitlyDisabledTools        map[string]struct{}        // tool names explicitly set to false before default resolution mutates/removes their map entries
 	BashDisabled                   bool                       // true when tools.bash was fully and explicitly refused (bash: false, or bash: []) after default-tool resolution; used by engines that can fully disable shell execution (e.g. Codex's features.shell_tool=false), see EngineCapabilities.BashDisable
 	MarkdownContent                string
-	AI                             string        // "claude" or "codex" (for backwards compatibility)
-	Model                          string        // Top-level LLM model override (from frontmatter model: field or imports)
-	EngineConfig                   *EngineConfig // Extended engine configuration
-	AgentFile                      string        // Path to custom agent file (from imports)
-	AgentImportSpec                string        // Original import specification for agent file (e.g., "owner/repo/path@ref")
-	RepositoryImports              []string      // Repository-only imports (format: "owner/repo@ref") for .github folder merging
+	SubAgentModels                 []parser.SubAgentModel // models declared by inline and imported sub-agents
+	AI                             string                 // "claude" or "codex" (for backwards compatibility)
+	Model                          string                 // Top-level LLM model override (from frontmatter model: field or imports)
+	EngineConfig                   *EngineConfig          // Extended engine configuration
+	AgentFile                      string                 // Path to custom agent file (from imports)
+	AgentImportSpec                string                 // Original import specification for agent file (e.g., "owner/repo/path@ref")
+	RepositoryImports              []string               // Repository-only imports (format: "owner/repo@ref") for .github folder merging
 	StopTime                       string
 	Cooldown                       time.Duration                   // minimum time between completed runs that executed the agent job
 	SkipIfMatch                    *SkipIfMatchConfig              // skip-if-match configuration with query and max threshold
@@ -219,6 +221,7 @@ type WorkflowData struct {
 	ModelPolicyBlocked             []string                        // merged models.blocked policy list (union across imports + main frontmatter)
 	DefaultAiCreditsPricing        *AiCreditsPricingConfig         // fallback per-token pricing from frontmatter models.default-ai-credits-pricing; used by AWF API proxy for unrecognized models
 	ActionPinMappings              map[string]string               // action-pin redirect table from aw.json action_pins: maps "owner/repo@version" → "owner/repo@version"
+	ActionPinPrefixes              map[string]string               // repository-prefix redirects from aw.json action_pin_prefixes
 	ActionPinSourceVersions        map[string]string               // inline labels for frontmatter steps already pinned by SHA
 	ContainerPinMappings           map[string]string               // container-pin redirect table from aw.json container_pins: maps source image → replacement image
 	GHES                           bool                            // select action versions compatible with GitHub Enterprise Server
@@ -261,6 +264,7 @@ func (d *WorkflowData) PinContext() *actionpins.PinContext {
 			})
 		},
 	}
+	pinCtx.PrefixMappings = d.ActionPinPrefixes
 	// Only set Resolver if non-nil to avoid passing a typed nil interface value
 	// (which would be non-nil in actionpins but crash on method call).
 	if d.ActionResolver != nil {

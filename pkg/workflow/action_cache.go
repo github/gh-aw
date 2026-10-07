@@ -179,8 +179,9 @@ func (c *ActionCache) PruneStaleContainerPins(knownImages map[string]struct {
 		if setutil.Contains(knownImages, image) {
 			continue
 		}
-		if strings.HasPrefix(image, constants.DefaultFirewallRegistry+"/") {
-			actionCacheLog.Printf("Skipping prune of gh-aw-firewall container pin for image=%s (historical pins are retained)", image)
+		if strings.HasPrefix(image, constants.DefaultFirewallRegistry+"/") ||
+			strings.HasPrefix(image, constants.DefaultRouterRegistry+":") {
+			actionCacheLog.Printf("Skipping prune of canonical container pin for image=%s (historical pins are retained)", image)
 			continue
 		}
 		delete(c.ContainerPins, image)

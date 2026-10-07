@@ -1,10 +1,12 @@
 # ADR-62957: Enable native web search for Copilot engine
 
 **Date**: 2026-09-23
-**Status**: Draft
+**Status**: Superseded by [ADR-66310](66310-reject-unavailable-copilot-native-web-tools.md)
 **Deciders**: gh-aw maintainers
 
 ---
+
+> This decision is retained for historical context. ADR-66310 reflects the current behavior: Copilot's native web tools are unavailable in offline BYOK mode.
 
 ### Context
 

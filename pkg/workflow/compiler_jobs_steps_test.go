@@ -215,7 +215,7 @@ jobs:
       - name: Pre-activation uses pre-step
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
   activation:
     pre-steps:
       - name: Activation run pre-step

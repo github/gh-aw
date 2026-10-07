@@ -21,6 +21,8 @@ type LogsDownloadOptions struct {
 	Verbose            bool
 	ToolGraph          bool
 	NoStaged           bool
+	DryRun             bool
+	NoDryRun           bool
 	FirewallOnly       bool
 	NoFirewall         bool
 	Parse              bool
@@ -99,6 +101,8 @@ type StdinLogsOptions struct {
 	Verbose           bool
 	ToolGraph         bool
 	NoStaged          bool
+	DryRun            bool
+	NoDryRun          bool
 	FirewallOnly      bool
 	NoFirewall        bool
 	Parse             bool
@@ -129,6 +133,8 @@ type continuationOptions struct {
 	startDate             string
 	endDate               string
 	engine                string
+	dryRun                bool
+	noDryRun              bool
 	branch                string
 	afterRunID            int64
 	ignoreWorkflowRuns    []int64

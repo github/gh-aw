@@ -220,7 +220,8 @@ func (c *Compiler) generateGitHubMCPAppTokenMintingSteps(data *WorkflowData) []s
 	}
 
 	// Generate the token minting step using the existing helper from safe_outputs_app.go
-	rawSteps := c.buildGitHubAppTokenMintStepWithMeta(
+	rawSteps := c.buildGitHubAppTokenMintStepForJob(
+		"agent",
 		app,
 		permissions,
 		"",

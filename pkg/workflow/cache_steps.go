@@ -25,7 +25,11 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 		return
 	}
 	for i, cache := range caches {
-		writeCacheStep(builder, cache, i, len(caches))
+		if data.DryRun {
+			writeCacheStepWithAction(builder, cache, i, len(caches), "actions/cache/restore")
+		} else {
+			writeCacheStep(builder, cache, i, len(caches))
+		}
 	}
 }
 
@@ -60,9 +64,13 @@ func normalizeCacheStepArray(cacheArray []any) []map[string]any {
 }
 
 func writeCacheStep(builder *strings.Builder, cache map[string]any, idx int, total int) {
+	writeCacheStepWithAction(builder, cache, idx, total, "actions/cache")
+}
+
+func writeCacheStepWithAction(builder *strings.Builder, cache map[string]any, idx int, total int, action string) {
 	stepName := resolveCacheStepName(cache, idx, total)
 	fmt.Fprintf(builder, "      - name: %s\n", stepName)
-	fmt.Fprintf(builder, "        uses: %s\n", getActionPin("actions/cache"))
+	fmt.Fprintf(builder, "        uses: %s\n", getActionPin(action))
 	builder.WriteString("        with:\n")
 	writeCacheStepValue(builder, "key", cache["key"])
 	writeCachePath(builder, cache["path"])

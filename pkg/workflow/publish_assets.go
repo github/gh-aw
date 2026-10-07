@@ -139,7 +139,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 		// Publish assets job depends on the agent job; reuse its trace ID so all jobs share one OTLP trace
 		publishTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		publishParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		preSteps = append(preSteps, c.generateSetupStep(data, setupActionRef, SetupActionDestination, false, publishTraceID, publishParentSpanID)...)
+		preSteps = append(preSteps, c.generateSetupStepForJob("upload_assets", data, setupActionRef, SetupActionDestination, false, publishTraceID, publishParentSpanID, "")...)
 	}
 
 	// Step 1: Checkout repository

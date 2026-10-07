@@ -3,6 +3,8 @@
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
 /** @typedef {Record<string, string[]>} Fields */
 const { computeInferenceAIC, findModelPricing } = require("./model_costs.cjs");
+const { COPILOT_WORKFLOW_EVENT_FIELDS } = require("./copilot_workflow_events.cjs");
+const { DYNAMIC_WORKFLOW_EVENT_TYPES } = require("./dynamic_workflow_session.cjs");
 
 /** @type {Fields} */
 const USAGE_FIELDS = {
@@ -75,15 +77,42 @@ const SAFE_OUTPUT_FIELDS = {
   errorCode: ["errorCode", "error_code"],
 };
 
+/** @type {Fields} */
+const MESSAGE_FIELDS = {
+  content: ["content"],
+  delta: ["delta"],
+  partial: ["partial"],
+  messageId: ["messageId", "message_id"],
+  contentIndex: ["contentIndex"],
+  channel: ["channel"],
+  sessionId: ["sessionId", "session_id"],
+  agentId: ["agentId"],
+  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+};
+
+/** @type {Fields} */
+const TASK_FIELDS = {
+  taskId: ["taskId", "task_id"],
+  toolCallId: ["toolCallId", "tool_use_id"],
+  taskType: ["taskType", "task_type"],
+  workflowName: ["workflowName", "workflow_name"],
+  status: ["status"],
+  sessionId: ["sessionId", "session_id"],
+  parentToolUseId: ["parentToolUseId", "parent_tool_use_id"],
+};
+
 /** @type {Record<string, Fields>} */
 const EVENT_FIELDS = {
+  ...COPILOT_WORKFLOW_EVENT_FIELDS,
   "session.format": { version: ["version"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "session.init": { sourceEngine: ["sourceEngine"], model: ["model"], sessionId: ["sessionId", "session_id"], cwd: ["cwd"] },
   "user.message": { content: ["content"] },
-  "assistant.message": { content: ["content"] },
+  "prompt.system": { content: ["content"] },
+  "prompt.user": { content: ["content"] },
+  "assistant.message": MESSAGE_FIELDS,
   "assistant.refusal": { reason: ["reason"], content: ["content"], policyCategory: ["policyCategory"], explanation: ["explanation"], partial: ["partial"] },
-  "assistant.reasoning": { content: ["content"] },
+  "assistant.reasoning": MESSAGE_FIELDS,
   "tool.execution_start": { ...TOOL_FIELDS, input: ["input", "parameters", "arguments"], command: ["command"] },
   "tool.execution_complete": {
     ...TOOL_FIELDS,
@@ -94,6 +123,10 @@ const EVENT_FIELDS = {
     exitCode: ["exitCode", "exit_code"],
     status: ["status"],
     isError: ["isError", "is_error"],
+    taskId: ["taskId"],
+    taskType: ["taskType"],
+    workflowName: ["workflowName"],
+    workflowRunId: ["workflowRunId"],
   },
   "session.result": {
     numTurns: ["numTurns", "num_turns"],
@@ -137,6 +170,19 @@ const EVENT_FIELDS = {
   "grader.manifest": {},
   "grader.result": GRADER_FIELDS,
   "eval.result": { id: ["id"], answer: ["answer"], model: ["model"], error: ["error"] },
+  "github_api.rate_limit": {
+    source: ["source"],
+    credentialSource: ["credentialSource", "credential_source"],
+    operation: ["operation"],
+    resource: ["resource"],
+    limit: ["limit"],
+    remaining: ["remaining"],
+    used: ["used"],
+    reset: ["reset"],
+    attempt: ["attempt"],
+    delayMs: ["delayMs", "delay_ms"],
+    status: ["status"],
+  },
   "execution.result": { outcome: ["outcome"], conclusion: ["conclusion"], exitCode: ["exitCode", "exit_code"], durationMs: ["durationMs", "duration_ms"], startedAt: ["startedAt", "started_at"], finishedAt: ["finishedAt", "finished_at"] },
   "detection.result": {
     jobResult: ["jobResult", "job_result"],
@@ -146,7 +192,15 @@ const EVENT_FIELDS = {
     secretLeak: ["secretLeak", "secret_leak"],
     maliciousPatch: ["maliciousPatch", "malicious_patch"],
   },
+  "guardrail.daily_aic": {
+    status: ["status"],
+    exceeded: ["exceeded"],
+    total: ["total"],
+    estimated: ["estimated"],
+    threshold: ["threshold"],
+  },
   "workflow.info": {
+    dryRun: ["dryRun", "dry_run"],
     engineId: ["engineId", "engine_id", "engine"],
     agentVersion: ["agentVersion", "agent_version"],
     cliVersion: ["cliVersion", "cli_version"],
@@ -161,6 +215,9 @@ const EVENT_FIELDS = {
 };
 EVENT_FIELDS["session.start"] = EVENT_FIELDS["session.init"];
 EVENT_FIELDS["usage.report"] = EVENT_FIELDS["firewall.token_usage"];
+for (const type of Object.values(DYNAMIC_WORKFLOW_EVENT_TYPES)) {
+  EVENT_FIELDS[type] = TASK_FIELDS;
+}
 
 /**
  * Prefer an explicitly supplied canonical field, including false, zero, and null.
@@ -210,6 +267,37 @@ function normalizeUnifiedSessionEvent(event, phase) {
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
   const data = known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (known && event.type.startsWith("dynamicWorkflows.")) {
+    if (!Object.hasOwn(data, "status") && source.patch?.status !== undefined) data.status = structuredClone(source.patch.status);
+    const usage = selectFields(source.usage, { totalTokens: ["totalTokens", "total_tokens"], toolUses: ["toolUses", "tool_uses"], durationMs: ["durationMs", "duration_ms"] });
+    if (Object.keys(usage).length) data.usage = usage;
+    if (Array.isArray(source.tasks)) data.tasks = source.tasks.map(task => selectFields(task, TASK_FIELDS));
+    const progress = source.workflowProgress ?? source.workflow_progress;
+    if (Array.isArray(progress)) {
+      data.workflowProgress = progress.map(item =>
+        selectFields(item, {
+          type: ["type"],
+          index: ["index"],
+          phaseIndex: ["phaseIndex"],
+          agentId: ["agentId"],
+          model: ["model"],
+          state: ["state"],
+          attempt: ["attempt"],
+          startedAt: ["startedAt"],
+          queuedAt: ["queuedAt"],
+          lastProgressAt: ["lastProgressAt"],
+        })
+      );
+    }
+  }
+  if (event.type === "assistant.message" || event.type === "assistant.reasoning") {
+    const metadata = selectFields(event, MESSAGE_FIELDS);
+    delete metadata.content;
+    for (const [key, value] of Object.entries(metadata)) if (!Object.hasOwn(data, key)) data[key] = value;
+    const message = event.message;
+    if (!Object.hasOwn(data, "messageId") && message && typeof message === "object" && !Array.isArray(message) && "id" in message && message.id !== undefined) data.messageId = structuredClone(message.id);
+    if (event.copilotProjection === "assistant.message_delta") data.delta = true;
+  }
   if (known && event.type.startsWith("mcp.") && event.type !== "mcp.event") {
     const rpc = source.payload;
     for (const [key, value] of Object.entries({ rpcId: rpc?.id, method: rpc?.method, toolName: rpc?.params?.name, error: rpc?.error })) {
@@ -244,7 +332,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
     const errors = source.errors ?? source.failures;
     if (Array.isArray(errors)) data.errors = errors.map(error => (error && typeof error === "object" && !Array.isArray(error) ? selectFields(error, SAFE_OUTPUT_FIELDS) : structuredClone(error)));
   }
-  const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"] });
+  const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
   /** @type {any} */
   const nativeMessage = event.message;
   if (!Object.hasOwn(metadata, "timestamp") && nativeMessage?.timestamp !== undefined) metadata.timestamp = structuredClone(nativeMessage.timestamp);

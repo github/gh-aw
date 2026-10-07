@@ -129,6 +129,10 @@
       "properties": {
         "toolCallId": { "type": "string" },
         "toolName": { "type": "string" },
+        "taskId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "workflowName": { "type": "string" },
+        "workflowRunId": { "type": "string" },
         "success": { "type": "boolean" },
         "output": { "$ref": "#/definitions/JsonValue" },
         "result": { "$ref": "#/definitions/JsonValue" },

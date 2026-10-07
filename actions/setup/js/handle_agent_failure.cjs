@@ -3,6 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
 const { getDetectionCautionAlert, getFooterAgentFailureIssueMessage, getFooterAgentFailureCommentMessage, generateXMLMarker } = require("./messages.cjs");
 const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
@@ -25,11 +26,12 @@ const { formatAICCredits } = require("./daily_aic_workflow_helpers.cjs");
 const { formatAIC } = require("./model_costs.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp_gateway_log.cjs");
-const { readDedupedTokenUsage, TOKEN_USAGE_PATHS } = require("./parse_token_usage.cjs");
+const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usage.cjs");
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES } = require("./empty_output_outcome.cjs");
+const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -284,6 +286,7 @@ function parseHTMLCommentMetadata(body, markerKey) {
 function buildFailureMatchCategories(options) {
   const categories = [];
 
+  if (options.transportWedge) categories.push("transport_wedge");
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
   if (options.hasAssignCopilotFailures) categories.push("assign_copilot_failures");
@@ -330,11 +333,32 @@ function buildFailureMatchCategories(options) {
   return categories.sort();
 }
 
+function hasMCPTransportWedge(sessionContent) {
+  if (!sessionContent.includes('"transport_wedge"')) return false;
+  return sessionContent.split(/\r?\n/).some(line => {
+    try {
+      const event = JSON.parse(line);
+      return isAgentExecutionEvent(event) && event.data.categories.includes("transport_wedge");
+    } catch {
+      return false;
+    }
+  });
+}
+
+function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+}
+
+function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
+}
+
 /**
  * Build a precise failure issue title for known failure classes.
  * Falls back to the generic failure title when no specific class matches.
  * @param {Object} options
  * @param {string} options.workflowName
+ * @param {boolean} [options.transportWedge]
  * @param {boolean} options.isTimedOut
  * @param {boolean} options.hasMissingSafeOutputs
  * @param {boolean} options.hasReportIncomplete
@@ -391,6 +415,7 @@ function buildFailureIssueTitle(options) {
     const agentName = sanitizeContent(options.copilotAgentNotFound, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH).replace(/\s+/g, " ").trim();
     return `[aw] ${workflowName} could not find configured Copilot agent "${agentName}"`;
   }
+  if (options.transportWedge) return `[aw] ${workflowName} stalled on an MCP tool call`;
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -1701,13 +1726,8 @@ function buildReportIncompleteContext(items) {
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The agent reported that the task could not be performed due to an infrastructure or tool failure.") + "\n**Reasons:**\n";
-  for (const msg of messages) {
-    context += `- ${msg.reason}\n`;
-    if (msg.details) {
-      context += `  \n  ${msg.details}\n`;
-    }
-  }
+  let context = buildWarningAlertLine("Task Could Not Be Completed", "The agent reported that the task could not be performed due to an infrastructure or tool failure.");
+  context += renderErrorDetails(messages.map(msg => [msg.reason, msg.details].filter(Boolean).join("\n")).join("\n\n"));
   context +=
     "\nThis is a structured incompletion signal (`report_incomplete`), not a real task outcome. Any other safe outputs emitted alongside this signal (e.g., comments) describe the failure state, not a completed review or action.\n\n";
 
@@ -1921,6 +1941,18 @@ function renderPluginDiagnosticsDetails(diagnosticsLog) {
   const sanitizedDiagnostics = sanitizeContent(diagnosticsLog, { maxLength: PLUGIN_DIAGNOSTICS_MAX_LENGTH });
   const fence = safeMarkdownCodeFence([sanitizedDiagnostics]);
   return `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n${fence}\n${sanitizedDiagnostics}\n${fence}\n\n</details>\n`;
+}
+
+/**
+ * Render error diagnostics as literal text with progressive disclosure.
+ * @param {string} diagnostics
+ * @param {string[]} [maskedValues]
+ * @returns {string}
+ */
+function renderErrorDetails(diagnostics, maskedValues = []) {
+  const sanitized = redactAndBoundDiagnostics(diagnostics, { maskedValues });
+  const fence = safeMarkdownCodeFence([sanitized]);
+  return `\n\n<details>\n<summary>Error details:</summary>\n\n${fence}text\n${sanitized}\n${fence}\n\n</details>\n\n`;
 }
 
 /**
@@ -2296,7 +2328,7 @@ function buildEngineMaxCacheMissesExceededContext(engineLabel) {
  */
 function readTokenUsageMarkdown() {
   try {
-    const readablePaths = TOKEN_USAGE_PATHS.filter(p => {
+    const readablePaths = getTokenUsagePaths().filter(p => {
       try {
         return fs.existsSync(p) && fs.statSync(p).size > 0;
       } catch {
@@ -2467,7 +2499,7 @@ function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
  * @param {string} threshold - Configured daily workflow threshold
  * @returns {string} Formatted context string, or empty string if no failure
  */
-function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) {
+function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold, estimatedAIC = "") {
   if (!hasDailyAICExceeded) {
     return "";
   }
@@ -2475,11 +2507,22 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold) 
   const templatePath = getPromptPath("daily_workflow_aic_exceeded.md");
   const formattedTotalAIC = formatAICCredits(totalAIC);
   const formattedThreshold = formatAICCredits(threshold);
+  const total = Number(totalAIC);
+  const estimated = Number(estimatedAIC);
+  const hasBreakdown = estimatedAIC !== "" && Number.isFinite(total) && Number.isFinite(estimated) && estimated >= 0 && estimated <= total;
+  const estimateGuidance = !hasBreakdown
+    ? "The accounting breakdown is unavailable for this run. The agent will resume when the guardrail total falls below the threshold."
+    : estimated > 0
+      ? "Estimated credits represent conservative per-run maximums where accounting is unavailable, not confirmed consumption. Subsequent scans retry unresolved accounting and replace estimates if recorded usage becomes available. Otherwise, these estimates stop counting when the affected runs leave the rolling 24-hour window."
+      : "The agent will resume automatically once the rolling 24-hour total falls below the threshold. No action is required if the current limit is appropriate for your usage.";
   return (
     "\n" +
     renderTemplateFromFile(templatePath, {
       total_aic: formattedTotalAIC || "unknown",
+      recorded_aic: hasBreakdown ? formatAICCredits(total - estimated) || "0" : "unknown",
+      estimated_aic: hasBreakdown ? formatAICCredits(estimated) || "0" : "unknown",
       threshold: formattedThreshold || "unknown",
+      estimate_guidance: estimateGuidance,
     })
   );
 }
@@ -3040,8 +3083,7 @@ function detectEngineRateLimit429Failure() {
 /**
  * Extract terminal error messages from agent-stdio.log to surface engine failures.
  * First tries to match known error patterns (ERROR:, Error:, Fatal:, panic:, Reconnecting...).
- * Falls back to the last non-empty lines of the log when no patterns match, so that
- * even timeout or unexpected-termination failures include the final agent output.
+ * Never copies arbitrary log tails into reports, since they can contain secrets.
  * The log file is available in the conclusion job after the agent artifact is downloaded.
  * @returns {string} Formatted context string, or empty string if no engine failure found
  */
@@ -3061,7 +3103,7 @@ function buildEngineFailureContext(options = {}) {
 
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
-    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? `**Driver exit code:** ${exitCodeText}\n\n` : "";
+    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
         core.info("agent-stdio.log not found, but shell expansion guard rejection was detected — using dedicated context message");
@@ -3254,25 +3296,17 @@ function buildEngineFailureContext(options = {}) {
             : "**Diagnosis:** The DIFC proxy (`awmg-cli-proxy`) failed to respond (`diagnosis=unknown`). The probe exhausted its retry budget before the service became reachable.\n\n";
           context += dnsDiagnosis;
         }
-        context += "\n<details>\n<summary>Error details</summary>\n\n";
-        for (const message of errorMessages) {
-          context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
-        }
-        context += `\n</details>\n\nSee [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
+        context += renderErrorDetails([...errorMessages].join("\n"), maskedValues);
+        context += `See [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
         return context;
       }
 
-      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails + "**Error details:**\n";
-      for (const message of errorMessages) {
-        context += `- ${applyAddMaskRedaction(message, maskedValues)}\n`;
-      }
-      context += "\n";
-      return context;
+      const diagnostics = [...(exitDetails ? [`Driver exit code: ${exitCodeText}`] : []), ...errorMessages].join("\n");
+      return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + renderErrorDetails(diagnostics, maskedValues);
     }
 
     // AWF infrastructure lines written by the firewall/container wrapper — not produced by
-    // the engine itself. They must be filtered out of the fallback tail so the failure
-    // context surfaces actual agent output rather than container lifecycle noise
+    // the engine itself. Filter them out when checking whether the engine produced output
     // (e.g. "Container awf-squid  Removed", "[WARN] Command completed with exit code: 1",
     // "Process exiting with code: 1"). Shared constant from log_parser_shared.cjs keeps the
     // pattern in sync with parse_copilot_log.cjs.
@@ -3282,7 +3316,7 @@ function buildEngineFailureContext(options = {}) {
     //   [WARN] --pids-limit/container.pidsLimit is not supported by this microVM runtime …
     //      The Docker agent cgroup cannot be passed through, so pids.max/pids.current are unavailable.
     // Those continuations belong to the infrastructure line above them, so they must be
-    // filtered out as well — otherwise they can be reported as the "last agent output".
+    // filtered out as well to avoid misclassifying a startup failure.
     const infraContinuationLines = new Set();
     {
       let previousWasInfra = false;
@@ -3303,17 +3337,15 @@ function buildEngineFailureContext(options = {}) {
       }
     }
 
-    // Fallback: no known error patterns found — include the last non-empty lines so that
-    // failures caused by timeouts or unexpected terminations still surface useful context.
-    const TAIL_LINES = 10;
+    // Classify startup failures without publishing arbitrary engine output.
     const nonEmptyLines = lines.map((line, index) => ({ line, index })).filter(entry => entry.line.trim());
     if (nonEmptyLines.length === 0) {
       return "";
     }
 
-    // Exclude AWF infrastructure lines so the fallback displays only actual engine output.
+    // Exclude AWF infrastructure lines when checking for actual engine output.
     // `::add-mask::` command lines are runner directives, not agent output: drop them so the
-    // rendered tail neither leaks the masked value nor wastes a tail slot.
+    // directives do not count as engine output.
     const agentLines = nonEmptyLines
       .filter(entry => !INFRA_LINE_RE.test(entry.line) && !infraContinuationLines.has(entry.index) && !isAddMaskCommandLine(entry.line) && !isRecoveredNoDeferredMarkerLine(entry.index))
       .map(entry => entry.line);
@@ -3347,13 +3379,8 @@ function buildEngineFailureContext(options = {}) {
       return context;
     }
 
-    const tailLines = agentLines.slice(-TAIL_LINES);
-    core.info(`No specific error patterns found; including last ${tailLines.length} line(s) of agent-stdio.log as fallback`);
-
-    let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "**Last agent output:**\n\`\`\`\n";
-    context += applyAddMaskRedaction(tailLines.join("\n"), maskedValues);
-    context += "\n```\n\n";
-    return context;
+    core.info("No specific error patterns found; omitting raw agent output from the failure report");
+    return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "Review the workflow run logs for diagnostics. Raw agent output is omitted because it may contain secrets.\n\n";
   } catch (error) {
     core.info(`Failed to read agent-stdio.log for engine failure context: ${getErrorMessage(error)}`);
     return "";
@@ -3927,6 +3954,7 @@ async function main() {
     const dailyAICContinueOnError = process.env.GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR === "true";
     const dailyAICGuardrailErrorIsFailure = hasDailyAICGuardrailError && !dailyAICContinueOnError;
     const dailyAICTotal = process.env.GH_AW_DAILY_AI_CREDITS_TOTAL || "";
+    const dailyAICEstimated = process.env.GH_AW_DAILY_AI_CREDITS_ESTIMATED || "";
     const dailyAICThreshold = process.env.GH_AW_DAILY_AI_CREDITS_THRESHOLD || "";
     // Cache-memory availability flag — set when cache-memory is configured for the workflow.
     // Used to detect cache-miss misconfigurations reported by the agent.
@@ -4272,10 +4300,19 @@ async function main() {
 
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
+    let transportWedge = false;
+    if (agentConclusion === "failure") {
+      try {
+        transportWedge = hasMCPTransportWedge(fs.readFileSync(getAgentSessionPath(), "utf8"));
+      } catch {
+        core.debug("Unified agent session unavailable for MCP watchdog classification");
+      }
+    }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasMissingSafeOutputs,
@@ -4304,6 +4341,7 @@ async function main() {
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasAssignmentErrors,
@@ -4549,7 +4587,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
-        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues
@@ -4791,7 +4829,7 @@ async function main() {
 
         // Build stale lock file failure context
         const staleLockFileFailedContext = buildStaleLockFileFailedContext(hasStaleLockFileFailed);
-        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold);
+        const dailyAICExceededContext = buildDailyAICExceededContext(hasDailyAICExceeded, dailyAICTotal, dailyAICThreshold, dailyAICEstimated);
         const dailyAICGuardrailErrorContext = buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, dailyAICGuardrailStatus, dailyAICGuardrailError, dailyAICContinueOnError);
 
         // Build copilot assignment failure context for created issues
@@ -5015,6 +5053,9 @@ module.exports = {
   CASCADE_ROLLUP_TITLE,
   FAILURE_TITLE_PATTERN,
   buildFailureMatchCategories,
+  hasMCPTransportWedge,
+  getAgentStdioLogPath,
+  getAgentSessionPath,
   buildFailureIssueTitle,
   FAILURE_CATEGORIES_PATH,
 };

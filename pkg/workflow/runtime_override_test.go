@@ -26,9 +26,9 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 				"node": {
 					Runtime: &Runtime{
 						ID:             "node",
-						DefaultVersion: "20",
+						DefaultVersion: "24",
 					},
-					Version: "20",
+					Version: "24",
 				},
 			},
 			expected: map[string]string{
@@ -46,9 +46,9 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 				"node": {
 					Runtime: &Runtime{
 						ID:             "node",
-						DefaultVersion: "20",
+						DefaultVersion: "24",
 					},
-					Version: "20",
+					Version: "24",
 				},
 			},
 			expected: map[string]string{
@@ -73,6 +73,26 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 			},
 			expected: map[string]string{
 				"python": "3.12",
+			},
+		},
+		{
+			name: "override existing runtime version with whole-number float",
+			runtimes: map[string]any{
+				"node": map[string]any{
+					"version": float64(24),
+				},
+			},
+			requirements: map[string]*RuntimeRequirement{
+				"node": {
+					Runtime: &Runtime{
+						ID:             "node",
+						DefaultVersion: "24",
+					},
+					Version: "24",
+				},
+			},
+			expected: map[string]string{
+				"node": "24",
 			},
 		},
 		{
@@ -101,9 +121,9 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 				"node": {
 					Runtime: &Runtime{
 						ID:             "node",
-						DefaultVersion: "20",
+						DefaultVersion: "24",
 					},
-					Version: "20",
+					Version: "24",
 				},
 			},
 			expected: map[string]string{
@@ -132,13 +152,13 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 				"node": {
 					Runtime: &Runtime{
 						ID:             "node",
-						DefaultVersion: "20",
+						DefaultVersion: "24",
 					},
-					Version: "20",
+					Version: "24",
 				},
 			},
 			expected: map[string]string{
-				"node": "20",
+				"node": "24",
 			},
 		},
 		{
@@ -157,7 +177,7 @@ func TestApplyRuntimeOverrides(t *testing.T) {
 						ActionRepo:    "actions/setup-node",
 						ActionVersion: "v4",
 					},
-					Version: "20",
+					Version: "24",
 				},
 			},
 			expected: map[string]string{
@@ -344,7 +364,7 @@ func TestApplyRuntimeOverrides_ExistingRequirementActionRepoOnlyClonesRuntime(t 
 	requirements := map[string]*RuntimeRequirement{
 		"node": {
 			Runtime: existingRuntime,
-			Version: "20",
+			Version: "24",
 		},
 	}
 	applyRuntimeOverrides(map[string]any{
@@ -460,7 +480,7 @@ func TestApplyRuntimeOverrides_Cooldown(t *testing.T) {
 			Runtime: &Runtime{
 				ID: "node",
 			},
-			Version:  "20",
+			Version:  "24",
 			Cooldown: true,
 		},
 	}

@@ -396,7 +396,9 @@ tools:
 	workflowPath := filepath.Join(tempDir, "main-workflow.md")
 	workflowContent := `---
 on: issues
-engine: copilot
+engine:
+  id: copilot
+  copilot-sdk: true
 imports:
   - shared-web-fetch.md
 permissions:
@@ -424,10 +426,9 @@ Uses imported web-fetch tool.
 		t.Fatalf("Failed to read lock file: %v", err)
 	}
 
-	// Verify compilation succeeded
-	// Note: Copilot has built-in web-fetch support, so no explicit MCP configuration is needed
-	// The test verifies that the workflow compiles successfully when web-fetch is imported
-	_ = lockFileContent // Compilation success is sufficient verification
+	if !strings.Contains(string(lockFileContent), `"webFetch":true`) {
+		t.Error("Expected imported web-fetch to enable the SDK custom tool")
+	}
 }
 
 // TestImportWebSearchTool tests that web-search tool can be imported from a shared workflow
@@ -640,7 +641,9 @@ tools:
 	workflowPath := filepath.Join(tempDir, "main-workflow.md")
 	workflowContent := `---
 on: issues
-engine: copilot
+engine:
+  id: copilot
+  copilot-sdk: true
 imports:
   - shared-neutral-tools.md
 permissions:
@@ -675,8 +678,9 @@ Uses all imported neutral tools.
 		t.Error("Expected compiled workflow to contain --allow-all-paths flag for edit tool")
 	}
 
-	// Note: web-fetch has built-in Copilot support, so no explicit MCP configuration is needed
-	// The test verifies that web-fetch compiles successfully when imported
+	if !strings.Contains(workflowData, `"webFetch":true`) {
+		t.Error("Expected imported web-fetch to enable the SDK custom tool")
+	}
 
 	// Verify timeout is configured (120 seconds)
 	hasTimeout := strings.Contains(workflowData, "120000") ||

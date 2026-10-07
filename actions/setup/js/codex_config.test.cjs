@@ -6,7 +6,26 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 const req = createRequire(import.meta.url);
-const { buildConfig, mergeConfig, serializeConfig } = req("./codex_config.cjs");
+const { buildConfig, mergeConfig, serializeConfig, directToolCatalog } = req("./codex_config.cjs");
+
+describe("Codex GitHub direct-tool catalog", () => {
+  it("overrides model-selected code mode without changing other metadata", () => {
+    const catalog = {
+      models: [
+        { slug: "gpt-5.6-sol", tool_mode: "code_mode_only", context_window: 400000, model_messages: { instructions: "preserved" } },
+        { slug: "gpt-5.6-terra", tool_mode: "code_mode" },
+        { slug: "gpt-5.3-codex", tool_mode: null },
+      ],
+    };
+    const original = structuredClone(catalog);
+    expect(directToolCatalog(catalog)).toEqual({ models: catalog.models.map(model => ({ ...model, tool_mode: "direct" })) });
+    expect(catalog).toEqual(original);
+  });
+
+  it.each([null, {}, { models: [] }, { models: [null] }, { models: [{}] }, { models: [{ slug: "" }] }])("rejects malformed catalogs: %j", catalog => {
+    expect(() => directToolCatalog(catalog)).toThrow("Invalid bundled Codex model catalog");
+  });
+});
 
 describe("Codex effective configuration", () => {
   let dir;

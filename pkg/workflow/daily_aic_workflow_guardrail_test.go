@@ -149,6 +149,10 @@ Guardrail test workflow`
 	if !strings.Contains(lockStr, "daily_ai_credits_total: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_total || '' }}") {
 		t.Fatal("expected activation job to expose the aggregated AI Credits total output")
 	}
+	if !strings.Contains(lockStr, "daily_ai_credits_estimated: ${{ steps.daily-ai-credits-workflow-guardrail.outputs.daily_ai_credits_estimated || '' }}") ||
+		!strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}") {
+		t.Fatal("expected estimated credits to reach the conclusion report")
+	}
 	if strings.Contains(lockStr, "daily_ai_credits_issue_url") {
 		t.Fatal("expected activation job to avoid surfacing a separate daily AI Credits issue URL")
 	}
@@ -160,6 +164,16 @@ Guardrail test workflow`
 	}
 	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}") {
 		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail status")
+	}
+	generationStart := strings.Index(lockStr, "name: Generate usage activity summary and unified session")
+	if generationStart == -1 {
+		t.Fatal("expected conclusion to generate the unified session")
+	}
+	generationStep := strings.SplitN(lockStr[generationStart:], "        with:\n", 2)[0]
+	for _, field := range []string{"GUARDRAIL_STATUS", "EXCEEDED", "TOTAL", "ESTIMATED", "THRESHOLD"} {
+		if !strings.Contains(generationStep, "GH_AW_DAILY_AI_CREDITS_"+field+": ${{ needs.activation.outputs.") {
+			t.Fatalf("expected unified session generation to receive daily AIC %s", field)
+		}
 	}
 	if !strings.Contains(lockStr, "GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}") {
 		t.Fatal("expected the conclusion job to receive the daily AI Credits guardrail error")

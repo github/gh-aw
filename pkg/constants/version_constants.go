@@ -41,10 +41,6 @@ const DefaultClaudeCodeVersion Version = "2.1.288"
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
 const DefaultCopilotVersion Version = "1.0.90"
 
-// CopilotWebSearchMinVersion is the first known Copilot CLI version that
-// exposes the built-in web_search tool.
-const CopilotWebSearchMinVersion Version = "1.0.87"
-
 // DefaultCopilotSDKVersion is the default version of the @github/copilot-sdk package.
 const DefaultCopilotSDKVersion Version = "1.0.16"
 
@@ -68,11 +64,17 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.31"
+const DefaultFirewallVersion Version = "v0.28.37"
+
+// DefaultRouterVersion is the default version of the gh-aw model router image.
+const DefaultRouterVersion Version = "0.1.3"
 
 // AWFModelRoutingMinVersion is the first AWF version that exposes task routing
 // selections through /reflect and accepts apiProxy.routing.
 const AWFModelRoutingMinVersion Version = "v0.28.29"
+
+// AWFRoutingCandidateModelsMinVersion separates router candidates from request policy.
+const AWFRoutingCandidateModelsMinVersion Version = "v0.28.33"
 
 // AWFExcludeEnvMinVersion is the minimum AWF version that supports the --exclude-env flag.
 // Workflows pinning an older AWF version must not emit --exclude-env flags or the run will fail.
@@ -219,7 +221,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.28"
+const DefaultMCPGatewayVersion Version = "v0.4.29"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

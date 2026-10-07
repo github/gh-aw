@@ -40,6 +40,7 @@ const { buildCopilotSDKSessionToolConfig } = require("./copilot_sdk_tool_config.
 const { buildCopilotSDKToolCallBudget } = require("./copilot_sdk_tool_budget.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 const { extractShellCommandFromToolData, extractStructuredToolInput } = require("./tool_call_details.cjs");
+const { COPILOT_WORKFLOW_EVENT_TYPES } = require("./copilot_workflow_events.cjs");
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // This is intentionally generous — the headless Copilot CLI has its own internal
@@ -362,9 +363,11 @@ async function runWithCopilotSDK({
      * @param {string} type
      * @param {any} data
      * @param {string | undefined} [timestamp]
+     * @param {Record<string, any>} [native]
      */
-    function writeEvent(type, data, timestamp) {
-      const entry = { type, timestamp: timestamp ?? new Date().toISOString(), data };
+    function writeEvent(type, data, timestamp, native = {}) {
+      const metadata = Object.fromEntries(["id", "parentId", "agentId", "ephemeral"].filter(key => Object.hasOwn(native, key)).map(key => [key, native[key]]));
+      const entry = { type, timestamp: timestamp ?? new Date().toISOString(), ...metadata, data };
       const jsonl = JSON.stringify(entry) + "\n";
       stream.write(jsonl);
       process.stderr.write(jsonl);
@@ -372,6 +375,10 @@ async function runWithCopilotSDK({
 
     // Subscribe to all session events and serialise the ones we care about.
     session.on(event => {
+      // Workflow lifecycle signals are ephemeral; without this copy they never reach the artifact.
+      if (COPILOT_WORKFLOW_EVENT_TYPES.has(event.type)) {
+        writeEvent(event.type, event.data, event.timestamp, event);
+      }
       // Skip transient events that are not persisted by the server.
       if (event.ephemeral) return;
 
@@ -400,7 +407,7 @@ async function runWithCopilotSDK({
             ...(input === undefined ? {} : { input }),
             ...(command ? { command } : {}),
           };
-          writeEvent("tool.execution_start", eventData, event.timestamp);
+          writeEvent("tool.execution_start", eventData, event.timestamp, event);
           break;
         }
 
@@ -417,7 +424,7 @@ async function runWithCopilotSDK({
           const result = event.data?.result ?? undefined;
           // max-tool-denials intentionally tracks permission denials only.
           // Tool execution failures are still logged, but do not increment the guardrail counter.
-          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp);
+          writeEvent("tool.execution_complete", { toolName, mcpServerName, ...(toolCallId ? { toolCallId } : {}), success, result }, event.timestamp, event);
           break;
         }
 
@@ -428,7 +435,7 @@ async function runWithCopilotSDK({
             output += content;
             assistantTurnCount++;
           }
-          writeEvent("assistant.message", { content }, event.timestamp);
+          writeEvent("assistant.message", { content }, event.timestamp, event);
           break;
         }
 
@@ -451,34 +458,6 @@ async function runWithCopilotSDK({
 
         case "session.task_complete":
           writeEvent("session.task_complete", { success: event.data?.success, summary: event.data?.summary }, event.timestamp);
-          break;
-
-        case "subagent.started":
-          writeEvent(
-            "subagent.started",
-            {
-              agentName: event.data?.agentName,
-              agentDisplayName: event.data?.agentDisplayName,
-              toolCallId: event.data?.toolCallId,
-            },
-            event.timestamp
-          );
-          break;
-
-        case "subagent.completed":
-          writeEvent("subagent.completed", { agentName: event.data?.agentName, toolCallId: event.data?.toolCallId }, event.timestamp);
-          break;
-
-        case "subagent.failed":
-          writeEvent(
-            "subagent.failed",
-            {
-              agentName: event.data?.agentName,
-              toolCallId: event.data?.toolCallId,
-              error: event.data?.error,
-            },
-            event.timestamp
-          );
           break;
 
         default:

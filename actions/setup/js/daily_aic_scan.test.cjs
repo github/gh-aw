@@ -110,6 +110,7 @@ describe("complete daily AIC scan observations", () => {
     };
     const first = await scanDailyAIC(f);
     expect(first.countedRuns.map(item => item.aic)).toEqual([2, 0, 6]);
+    expect(first.countedRuns.map(item => item.source)).toEqual(["recorded", "recorded", "recorded"]);
     expect(f.artifactClient.listArtifacts).toHaveBeenCalledTimes(3);
     expect(f.artifactClient.downloadArtifact).toHaveBeenCalledTimes(3);
     f.artifactClient.listArtifacts.mockClear();
@@ -120,6 +121,41 @@ describe("complete daily AIC scan observations", () => {
     expect(f.artifactClient.downloadArtifact).not.toHaveBeenCalled();
     expect(f.github.rest.actions.listJobsForWorkflowRun).not.toHaveBeenCalled();
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"scan_cache"'));
+  });
+
+  it("recounts version 1 zero-credit observations from completed Agent and Detection jobs", async () => {
+    const prior = scanCacheEntry(run(1), 0, repository, 7, now);
+    prior.coverage_version = 1;
+    writeEntries([prior]);
+    const f = fixture([run(1)]);
+    f.getRunAIC = guardrail.getRunAIC;
+    f.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue(
+      response({
+        jobs: [
+          { id: 1, name: "Agent", run_attempt: 1, status: "completed", conclusion: "success", started_at: time, completed_at: time },
+          { id: 2, name: "Detection", run_attempt: 1, status: "completed", conclusion: "success", started_at: time, completed_at: time },
+        ],
+      })
+    );
+    f.artifactClient = {
+      listArtifacts: vi.fn(async () => ({ artifacts: [{ id: 10, name: "usage", createdAt: new Date(time) }] })),
+      downloadArtifact: vi.fn(async (_id, options) => {
+        for (const [name, aic] of [
+          ["agent", 18.02604],
+          ["detection", 30.08748],
+        ]) {
+          const file = path.join(options.path, name, "token_usage.jsonl");
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, JSON.stringify({ aic }));
+        }
+        return { downloadPath: options.path };
+      }),
+    };
+    const result = await scanDailyAIC(f);
+    expect(result.cacheHits).toBe(0);
+    expect(result.countedRuns[0].aic).toBeCloseTo(48.11352);
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)).toMatchObject({ coverage_version: 2, source: "recorded" });
+    expect((await scanDailyAIC(f)).cacheHits).toBe(1);
   });
 
   it.each(["missing", "metadata-only", "malformed", "unknown-model", "old-attempt", "detection", "evals", "invalid-numeric"])("conservatively assumes max AI Credits when %s usage cannot be resolved", async kind => {
@@ -151,9 +187,61 @@ describe("complete daily AIC scan observations", () => {
     };
     const result = await scanDailyAIC(f);
     expect(result.countedRuns[0].aic).toBe(1000);
+    expect(result.countedRuns[0].source).toBe("estimated");
     expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)?.aic).toBe(1000);
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)?.source).toBe("estimated");
     expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Assuming max AI Credits after all accounting sources failed"));
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"reason":"max_ai_credits_fallback"'));
+  });
+
+  it("retries estimated and provenance-less cached values, replacing them with recorded usage", async () => {
+    const first = fixture([run(1), run(2)]);
+    first.getRunAIC.mockRejectedValue(new Error("accounting unavailable"));
+    expect((await scanDailyAIC(first)).countedRuns.map(item => item.source)).toEqual(["estimated", "estimated"]);
+
+    const legacy = readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(2);
+    delete legacy.source;
+    writeEntries([readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1), legacy]);
+    const second = fixture([run(1), run(2)]);
+    second.getRunAIC.mockImplementation(async (_client, id) => (id === 1 ? 4 : 5));
+    expect((await scanDailyAIC(second)).countedRuns.map(item => [item.aic, item.source])).toEqual([
+      [4, "recorded"],
+      [5, "recorded"],
+    ]);
+    expect(second.getRunAIC).toHaveBeenCalledTimes(2);
+    expect((await scanDailyAIC(fixture([run(1), run(2)]))).cacheHits).toBe(2);
+  });
+
+  it("keeps unresolved legacy cache values out of recorded usage", async () => {
+    const entry = scanCacheEntry(run(1), 1000, repository, 7, now);
+    delete entry.source;
+    writeEntries([entry]);
+    const f = fixture([run(1)]);
+    f.getRunAIC.mockRejectedValue(new Error("accounting unavailable"));
+    const result = await scanDailyAIC(f);
+    expect(result.countedRuns[0]).toMatchObject({ aic: 1000, source: "estimated" });
+    expect(f.getRunAIC).toHaveBeenCalledOnce();
+  });
+
+  it("reinspects recorded zero usage cached with the old component coverage", async () => {
+    const entry = scanCacheEntry(run(1), 0, repository, 7, now);
+    entry.coverage_version = 1;
+    writeEntries([entry]);
+    const f = fixture([run(1)]);
+    f.getRunAIC.mockResolvedValue(48.11352);
+    const result = await scanDailyAIC(f);
+    expect(result.cacheHits).toBe(0);
+    expect(result.countedRuns[0]).toMatchObject({ aic: 48.11352, source: "recorded" });
+    expect(f.getRunAIC).toHaveBeenCalledOnce();
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)?.aic).toBe(48.11352);
+  });
+
+  it("accepts corrected estimates without replacing recorded accounting for the same attempt", () => {
+    const recorded = scanCacheEntry(run(1), 4, repository, 7, now - 2000, "recorded");
+    const estimated = scanCacheEntry(run(1), 1000, repository, 7, now - 1000, "estimated");
+    const nextAttempt = scanCacheEntry(run(1, { run_attempt: 2 }), 1000, repository, 7, now, "estimated");
+    expect(readScanCache([JSON.stringify(recorded), JSON.stringify(estimated)].join("\n"), repository, 7, now).get(1).aic).toBe(4);
+    expect(readScanCache([JSON.stringify(recorded), JSON.stringify(nextAttempt)].join("\n"), repository, 7, now).get(1)).toMatchObject({ run_attempt: 2, source: "estimated" });
   });
 
   it("still rejects unresolved usage when no positive max-AI-credits fallback is available", async () => {

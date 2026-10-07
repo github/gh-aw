@@ -1,7 +1,7 @@
 // @ts-check
 
 const { createEngineLogParser, parseLogEntries, generateCopilotCliStyleSummary, buildStepSummaryDetailsSection } = require("./log_parser_shared.cjs");
-const { createSessionEvent, isSessionEvent, accumulateSessionUsage, isMetric, isTokenCount } = require("./agent_session.cjs");
+const { createSessionEvent, isSessionEvent, accumulateSessionUsage, isMetric, isTokenCount, sessionToolSuccess } = require("./agent_session.cjs");
 
 const main = createEngineLogParser({ parserName: "OpenCode", parseFunction: parseOpenCodeLog, supportsDirectories: false });
 /** @param {any} entry @returns {boolean} */
@@ -101,15 +101,18 @@ function parseOpenCodeLog(content) {
       if (state.status === "completed" || state.status === "error") {
         const start = state.time?.start;
         const end = state.time?.end;
-        emit("tool.execution_complete", {
+        const completion = {
           toolCallId: part.callID,
           toolName: part.tool,
           status: state.status,
-          success: state.status === "completed",
           output: state.output,
+          ...(state.metadata !== undefined ? { metadata: state.metadata } : {}),
+          ...(Number.isSafeInteger(state.metadata?.exit) ? { exitCode: state.metadata.exit } : {}),
           ...(state.error !== undefined ? { error: state.error } : {}),
           ...(isMetric(start) && isMetric(end) && end >= start ? { durationMs: end - start } : {}),
-        });
+        };
+        const success = sessionToolSuccess({ ...raw.data, ...state, ...completion }) ?? state.status === "completed";
+        emit("tool.execution_complete", { ...completion, status: success ? "completed" : "error", success });
       }
     } else if (raw.type === "step_start") {
       emit("opencode.step_start", { sessionId: raw.sessionID, partId: part.id });

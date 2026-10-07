@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { sessionCLI } from "./session_cli.cjs";
+import { spawnSync } from "node:child_process";
+import { sessionCLI, UnrecognizedSessionError } from "./session_cli.cjs";
 
 describe("Session CLI adapter", () => {
   let root;
@@ -41,7 +42,7 @@ describe("Session CLI adapter", () => {
     write("agent-session.jsonl", [
       { type: "user.message", data: { content: "private user prompt" } },
       { type: "assistant.message", data: { content: "Visible assistant response" } },
-      { type: "tool.execution_start", data: { toolName: "bash", arguments: { command: "private shell command" } } },
+      { type: "tool.execution_start", data: { toolName: "bash", arguments: { command: "visible shell command" } } },
     ]);
     const file = write("usage/aw_session.jsonl", sessionCLI(["reconstruct", root]));
     const markdown = sessionCLI(["markdown", file]);
@@ -49,7 +50,7 @@ describe("Session CLI adapter", () => {
     expect(markdown).toContain("Visible assistant response");
     expect(markdown).toContain("tool.execution_start");
     expect(markdown).not.toContain("private user prompt");
-    expect(markdown).not.toContain("private shell command");
+    expect(markdown).toContain("$ visible shell command [pending]");
   });
 
   it("uses the engine parser for audit Markdown", () => {
@@ -61,6 +62,21 @@ describe("Session CLI adapter", () => {
     write("agent-stdio.log", "unrecognized log text\n");
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => sessionCLI(["reconstruct", root, "claude"])).toThrow("No recognizable agent session");
+    expect(() => sessionCLI(["reconstruct", root, "claude"])).toThrow(UnrecognizedSessionError);
+  });
+
+  it("uses a distinct exit status for unsupported sessions without disguising genuine parser failures", () => {
+    write("agent-stdio.log", "unrecognized log text\n");
+    const executable = path.join(import.meta.dirname, "session_cli.cjs");
+    const unsupported = spawnSync(process.execPath, [executable, "reconstruct", root, "claude"], { encoding: "utf8" });
+    expect(unsupported.error).toBeUndefined();
+    expect(unsupported.status).toBe(2);
+    expect(unsupported.stdout).toBe("");
+    expect(unsupported.stderr).toContain("No recognizable agent session");
+    const invalid = spawnSync(process.execPath, [executable, "markdown", write("invalid.jsonl", "not JSON")], { encoding: "utf8" });
+    expect(invalid.error).toBeUndefined();
+    expect(invalid.status).toBe(1);
+    expect(invalid.stderr).toContain("Invalid session JSONL");
   });
 
   it("rejects invalid session files and unsupported versions", () => {

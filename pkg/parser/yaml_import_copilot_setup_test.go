@@ -77,7 +77,7 @@ func TestExtractStepsFromCopilotSetup(t *testing.T) {
 						"name": "Set up Node.js",
 						"uses": "actions/setup-node@v4",
 						"with": map[string]any{
-							"node-version": "20",
+							"node-version": "24",
 						},
 					},
 				},
@@ -164,7 +164,7 @@ func TestExtractStepsFromCopilotSetup_StripsCheckoutStep(t *testing.T) {
 						"name": "Set up Node.js",
 						"uses": "actions/setup-node@v4",
 						"with": map[string]any{
-							"node-version": "20",
+							"node-version": "24",
 						},
 					},
 				},
@@ -324,7 +324,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -415,7 +415,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 `
 	copilotSetupFile := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
 	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0600)

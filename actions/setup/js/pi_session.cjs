@@ -4,7 +4,8 @@ const { isDeepStrictEqual } = require("node:util");
 const { createSessionEvent, isSessionEvent, normalizeAgentSession, transformFlatSessionEntries, isMetric, isTokenCount } = require("./agent_session.cjs");
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
-/** @typedef {{text: Map<number, string>, thinking: Map<number, string>, calls: Map<number, SessionEvent>}} MessageState */
+/** @typedef {{content: string, segments: SessionEvent[]}} TextState */
+/** @typedef {{text: Map<number, TextState>, thinking: Map<number, TextState>, calls: Map<number, SessionEvent>, finalized: boolean, identity?: string}} MessageState */
 
 /** @param {any} message @returns {string|undefined} */
 function messageIdentity(message) {
@@ -16,7 +17,7 @@ function messageIdentity(message) {
 
 /** @returns {MessageState} */
 function newMessageState() {
-  return { text: new Map(), thinking: new Map(), calls: new Map() };
+  return { text: new Map(), thinking: new Map(), calls: new Map(), finalized: false };
 }
 
 /** @param {any} result @returns {boolean} */
@@ -66,16 +67,26 @@ function transformPiV3Entries(records) {
 
   const emitText = (raw, state, kind, index, text, delta, role = "assistant", metadata = {}) => {
     if (typeof text !== "string") return;
-    const previous = state[kind].get(index);
-    const content = delta ? text : previous === undefined ? text : text.startsWith(previous) ? text.slice(previous.length) : undefined;
-    if (content === undefined) {
-      emit(raw, "pi.message_snapshot", { ...metadata, content: text, contentIndex: index, channel: kind });
-      return;
+    const previous = state[kind].get(index) ?? { content: "", segments: [] };
+    const content = delta ? previous.content + text : text;
+    const suffix = delta ? text : content.startsWith(previous.content) ? content.slice(previous.content.length) : undefined;
+    let offset = 0;
+    for (const [position, segment] of previous.segments.entries()) {
+      const value = suffix === undefined ? content.slice(offset, position === previous.segments.length - 1 ? undefined : offset + segment.data.content.length) : segment.data.content;
+      offset += segment.data.content.length;
+      Object.assign(segment.data, structuredClone(metadata), { content: value });
     }
-    if (delta || previous === undefined || content !== "") {
-      emit(raw, role === "user" ? "user.message" : kind === "thinking" ? "assistant.reasoning" : "assistant.message", { ...metadata, content });
+    if (suffix !== undefined && (suffix !== "" || previous.segments.length === 0)) {
+      const segment = previous.segments.at(-1);
+      // Coalesce only adjacent observations, never across another channel or event.
+      if (segment && events.at(-1) === segment) {
+        segment.data.content += suffix;
+      } else {
+        previous.segments.push(emit(raw, role === "user" ? "user.message" : kind === "thinking" ? "assistant.reasoning" : "assistant.message", { ...metadata, content: suffix }));
+      }
     }
-    state[kind].set(index, delta ? (previous ?? "") + text : text);
+    previous.content = content;
+    state[kind].set(index, previous);
   };
 
   const emitCall = (raw, part, state = assistantState, index = raw.assistantMessageEvent?.contentIndex ?? 0) => {
@@ -122,9 +133,13 @@ function transformPiV3Entries(records) {
       return;
     }
     const before = events.length;
-    const identity = messageIdentity(message) ?? (raw.id !== undefined && raw.type !== "agent_end" ? JSON.stringify(["record", raw.id]) : undefined);
-    const state = (identity !== undefined && messageStates.get(identity)) || fallback;
+    const messageID = messageIdentity(message);
+    const identity = messageID ?? (raw.id !== undefined && raw.type !== "agent_end" ? JSON.stringify(["record", raw.id]) : undefined);
+    const duplicate = snapshots.some(snapshot => snapshot.state === fallback && snapshot.message.role === message.role && isDeepStrictEqual(snapshot.message.content, message.content));
+    const distinct = fallback.finalized && ((messageID !== undefined && fallback.identity !== undefined && messageID !== fallback.identity) || (raw.type === "message_end" && !duplicate));
+    const state = (identity !== undefined && messageStates.get(identity)) || (distinct ? newMessageState() : fallback);
     if (identity !== undefined) messageStates.set(identity, state);
+    if (messageID !== undefined) state.identity = messageID;
     if (message.role === "assistant") assistantState = state;
     const content = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
     for (const [index, part] of (Array.isArray(content) ? content : []).entries()) {
@@ -133,6 +148,7 @@ function transformPiV3Entries(records) {
       } else if (part?.type === "toolCall") emitCall(raw, part, state, index);
     }
     if (!snapshots.some(snapshot => snapshot.state === state && isDeepStrictEqual(snapshot.message, message))) snapshots.push({ message: structuredClone(message), state });
+    if (raw.type === "message_end" || raw.type === "turn_end") state.finalized = true;
     if (message.role === "assistant" && events.length === before && raw.type !== "agent_end") emit(raw, "pi.message_snapshot", { role: message.role, model: message.model, usage: message.usage });
   };
 
@@ -153,6 +169,7 @@ function transformPiV3Entries(records) {
       }
       emitMessage(raw, raw.message, activeState);
     } else if (raw.type === "message_update") {
+      if (assistantState.finalized) assistantState = activeState = newMessageState();
       const update = raw.assistantMessageEvent;
       const kind = update?.type?.startsWith("thinking_") ? "thinking" : "text";
       if (update?.type === "text_delta" || update?.type === "thinking_delta") {
