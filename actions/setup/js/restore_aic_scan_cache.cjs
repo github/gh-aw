@@ -4,13 +4,10 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { MAX_RESTORE_RUNS, MAX_RESTORE_PAGES, SCAN_WINDOW_MS } = require("./constants.cjs");
 const { DefaultArtifactClient } = require("./artifact_client.cjs");
 const { AIC_SCAN_CACHE_FILE_PATH, AIC_SCAN_CACHE_ARTIFACT_NAME, readScanCache } = require("./daily_aic_cache_helpers.cjs");
 const { createAPIBudget, retryNotBefore } = require("./daily_aic_api_budget.cjs");
-
-const MAX_RESTORE_RUNS = 10;
-const MAX_RESTORE_PAGES = 25;
-const SCAN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function isTrustedProducer(run, current, repository, defaultBranch) {
   if (run.workflow_id !== current.workflow_id || run.path !== current.path || run.repository?.full_name !== repository) return false;
