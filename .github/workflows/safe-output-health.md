@@ -33,7 +33,7 @@ imports:
   - shared/otlp.md
 steps:
   - name: Check successful audit cadence
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     with:
       github-token: ${{ secrets.GITHUB_TOKEN }}
       script: |

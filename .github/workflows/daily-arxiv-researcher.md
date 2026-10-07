@@ -53,7 +53,7 @@ safe-outputs:
 
 steps:
   - name: Fetch and parse arXiv papers
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     with:
       script: |
         const fs = require('fs');

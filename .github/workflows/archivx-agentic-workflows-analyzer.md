@@ -39,7 +39,7 @@ safe-outputs:
     max-patch-files: 1
     max-patch-size: 1024
 skills:
-- SylphAI-Inc/skills/skills/glowmotion@490fda5de2427c496d34e914f68896c4c2818fac
+- SylphAI-Inc/skills/skills/glowmotion@51a5abd0856c4edf1ebe9ee9e3b2c51011bfadb6
 - cathrynlavery/diagram-design/skills/diagram-design@648c2a597839301e06df1e7434a08bde9f42eed3
 steps:
 - env:

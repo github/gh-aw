@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "24"
 
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload spellcheck artifact
         if: success()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: spellcheck-results
           path: |
@@ -247,7 +247,7 @@ safe-outputs:
 
 steps:
   - name: Download spellcheck artifact
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: spellcheck-results
       path: /tmp/gh-aw/agent/spellcheck

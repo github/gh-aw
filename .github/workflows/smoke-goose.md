@@ -65,7 +65,7 @@ mcp-scripts:
 post-steps:
   - name: Assert Goose smoke evidence
     if: always()
-    uses: actions/github-script@v9
+    uses: actions/github-script@v9.0.0
     env:
       SMOKE_STATE: ${{ runner.temp }}/smoke-goose
       SMOKE_ROOT: /tmp/gh-aw/agent

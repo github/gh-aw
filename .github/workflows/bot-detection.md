@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: Precompute deterministic findings
         id: precompute
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

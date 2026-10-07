@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -125,7 +125,7 @@ jobs:
           fi
           cat "$BUNDLE/candidates.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload PureLock bundle
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: purelock-bundle-${{ github.run_id }}
           path: |
@@ -136,14 +136,14 @@ jobs:
           retention-days: 3
 steps:
   - name: Setup Go
-    uses: actions/setup-go@v7
+    uses: actions/setup-go@v7.0.0
     with:
       go-version-file: go.mod
       # The sandbox mounts the runner's Go module cache, so restoring it again
       # causes setup-go's tar extraction to fail on existing files.
       cache: false
   - name: Download PureLock bundle
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: purelock-bundle-${{ github.run_id }}
       path: /tmp/gh-aw/purelock

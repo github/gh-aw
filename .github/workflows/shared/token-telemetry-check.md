@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Download agent artifact
         id: download-agent
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@v8.0.2
         with:
           name: agent
           path: /tmp/gh-aw/

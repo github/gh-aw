@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: "3.11"
 
@@ -187,7 +187,7 @@ jobs:
           EOF
 
       - name: Upload geo-optimizer results
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: geo-optimizer-results
           path: /tmp/gh-aw/agent/geo-optimizer
@@ -196,7 +196,7 @@ jobs:
 
 steps:
   - name: Download geo-optimizer results
-    uses: actions/download-artifact@v8.0.1
+    uses: actions/download-artifact@v8.0.2
     with:
       name: geo-optimizer-results
       path: /tmp/gh-aw/agent/geo-optimizer
