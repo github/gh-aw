@@ -2281,6 +2281,10 @@ sandbox:
       # (optional)
       api-proxy: "example-value"
 
+      # Model router sidecar image used by engine.model-routing.
+      # (optional)
+      router: "example-value"
+
       # CLI proxy sidecar image used by tools.github.mode: gh-proxy,
       # integrity-reactions, or raw --difc-proxy-host AWF arguments.
       # (optional)
@@ -2604,16 +2608,26 @@ engine:
   # (optional)
   model: "example-value"
 
-  # Ask AWF to select a Copilot model for this task using its rendered prompt.
+  # Experimental per-run Copilot model and reasoning-effort selection from the task
+  # text; requires the AWF firewall and ignores fixed model and effort settings. See
+  # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   model-routing:
-    # Routing objective.
+    # Routing objective: cost prefers the cheapest model-and-effort choice meeting the
+    # quality bar; cost-speed also weighs execution time.
     goal: "cost"
 
-    # Routing quality/cost profile.
+    # Routing quality profile: economy, balanced, and robust set increasing quality
+    # bars, generally with increasing cost; auto lets the classifier recommend one of
+    # these profiles per task.
     mode: "economy"
 
-    # Copilot model candidates; provider qualification is added by the compiler.
+    # Required Copilot models the router may select and the routed task may call;
+    # declared sub-agent models are admitted separately. Provider qualification is
+    # added by the compiler. Must satisfy models.allowed and models.blocked; GitHub
+    # Actions expressions are rejected when either policy is set. Candidate lists from
+    # imported workflows using the same engine are merged. Unavailable models and
+    # models not covered by routing tables are not selected.
     allowed-models: []
       # Array of strings
 
@@ -21063,16 +21077,26 @@ safe-outputs:
       # (optional)
       model: "example-value"
 
-      # Ask AWF to select a Copilot model for this task using its rendered prompt.
+      # Experimental per-run Copilot model and reasoning-effort selection from the task
+      # text; requires the AWF firewall and ignores fixed model and effort settings. See
+      # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       model-routing:
-        # Routing objective.
+        # Routing objective: cost prefers the cheapest model-and-effort choice meeting the
+        # quality bar; cost-speed also weighs execution time.
         goal: "cost"
 
-        # Routing quality/cost profile.
+        # Routing quality profile: economy, balanced, and robust set increasing quality
+        # bars, generally with increasing cost; auto lets the classifier recommend one of
+        # these profiles per task.
         mode: "economy"
 
-        # Copilot model candidates; provider qualification is added by the compiler.
+        # Required Copilot models the router may select and the routed task may call;
+        # declared sub-agent models are admitted separately. Provider qualification is
+        # added by the compiler. Must satisfy models.allowed and models.blocked; GitHub
+        # Actions expressions are rejected when either policy is set. Candidate lists from
+        # imported workflows using the same engine are merged. Unavailable models and
+        # models not covered by routing tables are not selected.
         allowed-models: []
           # Array of strings
 

@@ -209,6 +209,10 @@ engine:
 
 See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy) for defaults, units, and the equivalent `GH_AW_HARNESS_*` environment variables.
 
+### Model Routing (`engine.model-routing:`)
+
+Enables experimental per-run model and reasoning-effort selection for Copilot with the AWF firewall. Requires `goal` (`cost` or `cost-speed`), `mode` (`economy`, `balanced`, `robust`, or `auto`), and a non-empty `allowed-models` list. Overrides the fixed `engine.model` and effort settings. See [Model Routing](../model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
+
 ### Engine Driver (`engine.driver:`)
 
 Overrides the built-in engine runtime driver for engines that support driver mode. For Copilot, setting `engine.driver` also enables SDK mode. `engine.driver` accepts either a string path/command or an inline source object with exactly one of `node:`, `python:`, `go:`, or `java:`. See [AI Engines](/gh-aw/reference/engines/#copilot-sdk-support) for driver requirements and supported formats.
