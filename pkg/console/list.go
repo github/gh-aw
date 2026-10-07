@@ -25,7 +25,13 @@ func ShowInteractiveList(title string, items []ListItem) (string, error) {
 		return "", errors.New("no items to display")
 	}
 
-	// Check if we're in a TTY environment
+	if !tty.IsStdinTerminal() {
+		listLog.Print("Non-TTY stdin detected, cannot read list selection")
+		return "", errors.New("interactive input not available (stdin is not a TTY)")
+	}
+
+	// The text fallback reads from stdin, while the Huh form also requires a
+	// terminal on stderr for rendering.
 	if !tty.IsStderrTerminal() {
 		listLog.Print("Non-TTY detected, falling back to text list")
 		return showTextList(title, items)

@@ -11,44 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestConfirmAction_NonTTY verifies that ConfirmAction falls back to the
-// text-based confirmation prompt when stderr is not a terminal (as is the
-// case in `go test` runs), reading the response from os.Stdin.
+// TestConfirmAction_NonTTY verifies that ConfirmAction does not read from
+// stdin when it is not connected to a terminal.
 func TestConfirmAction_NonTTY(t *testing.T) {
-	tests := []struct {
-		name       string
-		input      string
-		wantResult bool
-		wantErr    bool
-	}{
-		{name: "yes", input: "y\n", wantResult: true},
-		{name: "no", input: "n\n", wantResult: false},
-		{name: "invalid", input: "maybe\n", wantErr: true},
-	}
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Stdin = oldStdin })
+	t.Cleanup(func() { r.Close() })
+	t.Cleanup(func() { w.Close() })
+	os.Stdin = r
+	_, err = w.WriteString("y\n")
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			oldStdin := os.Stdin
-			r, w, err := os.Pipe()
-			require.NoError(t, err)
-			t.Cleanup(func() { os.Stdin = oldStdin })
-			t.Cleanup(func() { r.Close() })
-			os.Stdin = r
-
-			go func() {
-				_, _ = w.WriteString(tt.input)
-				w.Close()
-			}()
-
-			result, err := ConfirmAction("Delete all workflows?", "Yes, delete", "Cancel")
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.wantResult, result)
-			}
-		})
-	}
+	result, err := ConfirmAction("Delete all workflows?", "Yes, delete", "Cancel")
+	require.Error(t, err)
+	assert.False(t, result)
+	require.ErrorContains(t, err, "stdin is not a TTY")
 }
 
 func TestShowTextConfirm(t *testing.T) {

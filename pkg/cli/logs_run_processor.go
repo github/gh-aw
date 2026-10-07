@@ -671,7 +671,7 @@ type cachedRunMetadataRefresh struct {
 }
 
 func refreshCachedRunMetadata(ctx context.Context, cachedRun *WorkflowRun, runOutputDir string, run WorkflowRun, params concurrentRunDownloadParams) cachedRunMetadataRefresh {
-	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo)
+	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(runOutputDir, run, params.dlOwner, params.dlRepo, params.dlHost)
 	if err == nil && needsRefresh {
 		err = waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, 1, params.rateLimitState)
 	}
