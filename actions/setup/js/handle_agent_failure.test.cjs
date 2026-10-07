@@ -431,6 +431,14 @@ describe("handle_agent_failure", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, hasReportIncomplete: true, emptyOutputCause })).toBe(title);
     });
 
+    it.each([
+      ["engine_outage", "[aw] Test Workflow had engine outage"],
+      ["request_rejection", "[aw] Test Workflow had request rejection"],
+      ["prompt_exhaustion", "[aw] Test Workflow had prompt exhaustion"],
+    ])("uses the classified terminal-output cause %s in the issue title", (terminalOutputFailureCause, title) => {
+      expect(buildFailureIssueTitle({ ...baseOptions, terminalOutputFailureCause })).toBe(title);
+    });
+
     it("prefers unknownModelAICredits over isTimedOut when both are true", () => {
       expect(buildFailureIssueTitle({ ...baseOptions, unknownModelAICredits: true, isTimedOut: true })).toBe("[aw] Test Workflow has unknown model pricing");
     });
@@ -755,13 +763,14 @@ describe("handle_agent_failure", () => {
     /** @type {string} */
     let promptsDir;
 
-    function buildExistingIssueBody({ branch, categories, expires = "2099-01-01T00:00:00.000Z", pullRequestNumber, workflowName = "Test Workflow", workflowId = "test-workflow" } = {}) {
+    function buildExistingIssueBody({ branch, categories, expires = "2099-01-01T00:00:00.000Z", pullRequestNumber, failureCause, workflowName = "Test Workflow", workflowId = "test-workflow" } = {}) {
       const prPart = pullRequestNumber ? `, pull_request: ${pullRequestNumber}` : "";
+      const failureCausePart = failureCause ? `, failure_cause: ${failureCause}` : "";
       return (
         `> Generated from [${workflowName}](https://github.com/owner/repo/actions/runs/123456)\n` +
         `> - [x] expires <!-- gh-aw-expires: ${expires} --> on Jan 1, 2099, 12:00 AM UTC\n\n` +
         `<!-- gh-aw-agentic-workflow: ${workflowName}, workflow_id: ${workflowId}, run: https://github.com/owner/repo/actions/runs/123456 -->\n` +
-        `<!-- gh-aw-failure-issue: true, workflow_id: ${workflowId}, branch: ${branch || ""}, failure_categories: ${categories.join("|")}${prPart} -->`
+        `<!-- gh-aw-failure-issue: true, workflow_id: ${workflowId}, branch: ${branch || ""}, failure_categories: ${categories.join("|")}${failureCausePart}${prPart} -->`
       );
     }
 
@@ -772,6 +781,30 @@ describe("handle_agent_failure", () => {
         `<!-- gh-aw-agentic-workflow: ${workflowName}, workflow_id: ${workflowId}, run: https://github.com/owner/repo/actions/runs/123456 -->`
       );
     }
+
+    it("reuses terminal-output issues by workflow and classified cause instead of volatile categories", () => {
+      const { isReusableFailureIssue } = require("./handle_agent_failure.cjs");
+      const body = buildExistingIssueBody({
+        branch: "feature/old",
+        categories: ["engine_driver_failure", "report_incomplete"],
+        failureCause: "engine_outage",
+      });
+
+      expect(
+        isReusableFailureIssue(body, {
+          workflowId: "test-workflow",
+          failureCategories: ["engine_driver_failure", "report_incomplete", "http_500_response_error"],
+          failureCause: "engine_outage",
+        })
+      ).toBe(true);
+      expect(
+        isReusableFailureIssue(body, {
+          workflowId: "test-workflow",
+          failureCategories: ["engine_driver_failure", "report_incomplete"],
+          failureCause: "request_rejection",
+        })
+      ).toBe(false);
+    });
 
     beforeEach(() => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-handle-agent-failure-match-"));
@@ -2880,6 +2913,10 @@ describe("handle_agent_failure", () => {
 
     it("returns false when missing model pricing error is present", () => {
       expect(shouldBuildEngineFailureContext("failure", false, false, true)).toBe(false);
+    });
+
+    it("returns false for classified terminal-output failures to keep raw engine logs out of issues", () => {
+      expect(shouldBuildEngineFailureContext("failure", false, false, false, false, true)).toBe(false);
     });
 
     it("returns false for non-failure conclusions", () => {

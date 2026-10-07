@@ -6,9 +6,19 @@ import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = _require("./constants.cjs");
 const incompleteOutput = JSON.stringify({
-  items: [{ type: "report_incomplete", reason: "missing_terminal_safe_output", details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed." }],
+  items: [
+    {
+      type: "report_incomplete",
+      reason: "missing_terminal_safe_output",
+      failureCause: "prompt_exhaustion",
+      retryCount: 0,
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
+    },
+  ],
   errors: [],
   collectorEmptyOutputCause: "missing_terminal_safe_output",
+  collectorFailureCause: "prompt_exhaustion",
+  collectorRetryCount: 0,
 });
 describe("collect_ndjson_output.cjs", () => {
   let mockCore, collectScript;

@@ -17,6 +17,25 @@ const EMPTY_OUTPUT_CAUSES = Object.freeze({
   invalid_safe_outputs: "produced no valid safe outputs",
   missing_terminal_safe_output: "finished without a terminal safe output",
 });
+const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
+  engine_outage: "engine outage",
+  request_rejection: "request rejection",
+  prompt_exhaustion: "prompt exhaustion",
+});
+
+const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded", "max_cache_misses_exceeded"]);
+const REQUEST_REJECTION_ERROR_CATEGORIES = new Set([
+  "ai_credits_rate_limit_error",
+  "authentication_failed",
+  "awf_api_proxy_blocking_requests",
+  "capi_quota_exceeded_error",
+  "http_400_response_error",
+  "inference_access_error",
+  "max_ai_credits_exceeded",
+  "mcp_policy_error",
+  "model_not_supported_error",
+  "shell_expansion_guard_rejected",
+]);
 
 /**
  * Silence is not evidence of an intentional noop. Preserve runtime diagnostics
@@ -67,11 +86,19 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   } catch {
     // Ignore missing CLI audit evidence for workflows using MCP directly.
   }
+  let driverExitCode;
+  let executionCategories = [];
+  let executionErrorCodes = [];
   for (const event of events) {
     if (event.type === "agent.execution" && event.provenance.component === "execution" && event.provenance.phase === "agent" && event.data.exitCode > 0) {
       // A CLI parse error itself makes the bridge exit non-zero; preserve that more specific cause.
       if (!safeoutputsCliError) reason = "engine_driver_failure";
       diagnostics.add(`Driver exit code: ${event.data.exitCode}. The engine driver exited before a terminal safe output was recorded.`);
+    }
+    if (event.type === "agent.execution" && event.provenance.component === "execution" && event.provenance.phase === "agent") {
+      if (Number.isSafeInteger(event.data.exitCode)) driverExitCode = event.data.exitCode;
+      executionCategories = Array.isArray(event.data.categories) ? event.data.categories : executionCategories;
+      executionErrorCodes = Array.isArray(event.data.errorCodes) ? event.data.errorCodes : executionErrorCodes;
     }
     if (event.provenance.component !== "agent") continue;
     /** @type {any} */
@@ -122,13 +149,44 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   for (const command of extractDeniedCommands(attributedDiagnostics)) diagnostics.add(`Permission denied: ${command}`);
   const engineSummary = agentErrorSummaryText(safeStdio);
   if (engineSummary) diagnostics.add(engineSummary);
+  const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
+  if (driverExitCode !== undefined && ![...diagnostics].some(diagnostic => diagnostic.startsWith("Driver exit code:"))) {
+    diagnostics.add(`Driver exit code: ${driverExitCode}`);
+  }
+  const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
+  const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
+  const isRequestRejection = ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
+  const isEngineOutage = reason === "engine_driver_failure" || executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error", "sandbox_runtime_crash"].includes(category)) || errorCodes.some(code => code >= 500);
+  const failureCause = isPromptExhaustion ? "prompt_exhaustion" : isRequestRejection ? "request_rejection" : isEngineOutage ? "engine_outage" : "prompt_exhaustion";
+  const retryEvents = events.filter(event => event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
+  const harnessRetryLines = stdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
+  const harnessRetryCount = harnessRetryLines.length;
+  const retryCount = Math.max(retryEvents.length, harnessRetryCount);
+  const retryStatusCodes = [
+    ...new Set(
+      [...retryEvents.map(event => event.data.status ?? event.data.error_status ?? event.data.code), ...harnessRetryLines.flatMap(line => [...line.matchAll(/\b(?:HTTP\s+|status=)([1-5]\d{2})\b/gi)].map(match => Number(match[1])))].filter(
+        code => Number.isSafeInteger(code) && code >= 100 && code <= 599
+      )
+    ),
+  ];
+  diagnostics.add(`Failure classification: ${failureCause}`);
+  if (engineErrorType) {
+    diagnostics.add(`Last engine error type: ${engineErrorType}`);
+  } else if (reason === "engine_driver_failure") {
+    diagnostics.add("Last engine error type: unknown");
+  }
+  diagnostics.add(`Retry attempts observed: ${retryCount}${retryStatusCodes.length ? ` (HTTP ${retryStatusCodes.join(", HTTP ")})` : ""}`);
   const details = [...diagnostics].slice(0, 20).join("\n");
   const sanitized = redactAndBoundDiagnostics(details, { secrets, maskedValues });
   return {
     type: "report_incomplete",
     reason,
+    failureCause,
+    ...(driverExitCode !== undefined ? { driverExitCode } : {}),
+    retryCount,
+    ...(engineErrorType ? { engineErrorType } : {}),
     ...(sanitized ? { details: sanitized } : {}),
   };
 }
 
-module.exports = { buildEmptyOutputOutcome, EMPTY_OUTPUT_CAUSES };
+module.exports = { buildEmptyOutputOutcome, EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES };

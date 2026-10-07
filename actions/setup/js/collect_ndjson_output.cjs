@@ -383,15 +383,27 @@ async function main() {
     }
     core.info(`Successfully parsed ${parsedItems.length} valid output items`);
     let collectorEmptyOutputCause;
+    let collectorFailureCause;
+    let collectorDriverExitCode;
+    let collectorRetryCount;
+    let collectorEngineErrorType;
     if (!parsedItems.some(item => !["missing_tool", "missing_data"].includes(item.type))) {
       const incompleteOutcome = buildEmptyOutputOutcome(errors);
       parsedItems.push(incompleteOutcome);
       collectorEmptyOutputCause = incompleteOutcome.reason;
+      collectorFailureCause = incompleteOutcome.failureCause;
+      collectorDriverExitCode = incompleteOutcome.driverExitCode;
+      collectorRetryCount = incompleteOutcome.retryCount;
+      collectorEngineErrorType = incompleteOutcome.engineErrorType;
     }
     const validatedOutput = {
       items: parsedItems,
       errors: errors,
       ...(collectorEmptyOutputCause ? { collectorEmptyOutputCause } : {}),
+      ...(collectorFailureCause ? { collectorFailureCause } : {}),
+      ...(collectorDriverExitCode !== undefined ? { collectorDriverExitCode } : {}),
+      ...(collectorRetryCount !== undefined ? { collectorRetryCount } : {}),
+      ...(collectorEngineErrorType ? { collectorEngineErrorType } : {}),
     };
     const path = require("path");
     const agentOutputFile = path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME);
