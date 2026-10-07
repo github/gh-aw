@@ -76,6 +76,10 @@ export interface RuntimeObservationData {
   requestId?: JsonValue;
 }
 
+export interface ModelRoutingData {
+  [key: string]: JsonValue;
+}
+
 export interface McpObservationData {
   serverName?: JsonValue;
   direction?: JsonValue;
@@ -265,6 +269,7 @@ export interface UnifiedSessionEventDataMap {
   "mcp.event": RuntimeObservationData;
   "firewall.http_access": FirewallAccessData;
   "firewall.token_usage": UsageReportData;
+  "firewall.model_routing": ModelRoutingData;
   "firewall.steering": RuntimeObservationData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;

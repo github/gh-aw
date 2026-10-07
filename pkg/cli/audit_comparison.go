@@ -21,18 +21,27 @@ var auditComparisonLog = logger.New("cli:audit_comparison")
 type AuditComparisonData struct {
 	BaselineFound  bool                           `json:"baseline_found"`
 	Baseline       *AuditComparisonBaseline       `json:"baseline,omitempty"`
+	ModelRouting   *AuditComparisonRoute          `json:"model_routing,omitempty"`
 	Delta          *AuditComparisonDelta          `json:"delta,omitempty"`
 	Classification *AuditComparisonClassification `json:"classification,omitempty"`
 	Recommendation *AuditComparisonRecommendation `json:"recommendation,omitempty"`
 }
 
 type AuditComparisonBaseline struct {
-	RunID        int64    `json:"run_id"`
-	WorkflowName string   `json:"workflow_name,omitempty"`
-	Conclusion   string   `json:"conclusion,omitempty"`
-	CreatedAt    string   `json:"created_at,omitempty"`
-	Selection    string   `json:"selection,omitempty"`
-	MatchedOn    []string `json:"matched_on,omitempty"`
+	RunID        int64                 `json:"run_id"`
+	WorkflowName string                `json:"workflow_name,omitempty"`
+	Conclusion   string                `json:"conclusion,omitempty"`
+	CreatedAt    string                `json:"created_at,omitempty"`
+	Selection    string                `json:"selection,omitempty"`
+	MatchedOn    []string              `json:"matched_on,omitempty"`
+	ModelRouting *AuditComparisonRoute `json:"model_routing,omitempty"`
+}
+
+type AuditComparisonRoute struct {
+	Model         string `json:"model,omitempty"`
+	Effort        string `json:"effort,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	RouterVersion string `json:"router_version,omitempty"`
 }
 
 type AuditComparisonDelta struct {
@@ -40,6 +49,13 @@ type AuditComparisonDelta struct {
 	Posture         AuditComparisonStringDelta      `json:"posture"`
 	BlockedRequests AuditComparisonIntDelta         `json:"blocked_requests"`
 	MCPFailure      *AuditComparisonMCPFailureDelta `json:"mcp_failure,omitempty"`
+	ModelRouting    *AuditComparisonRouteDelta      `json:"model_routing,omitempty"`
+}
+
+type AuditComparisonRouteDelta struct {
+	Before  *AuditComparisonRoute `json:"before,omitempty"`
+	After   *AuditComparisonRoute `json:"after,omitempty"`
+	Changed bool                  `json:"changed"`
 }
 
 type AuditComparisonIntDelta struct {
@@ -74,6 +90,7 @@ type auditComparisonSnapshot struct {
 	Posture         string
 	BlockedRequests int
 	MCPFailures     []string
+	ModelRouting    *AuditComparisonRoute
 }
 
 type auditComparisonCandidate struct {
@@ -99,7 +116,26 @@ func buildAuditComparisonSnapshot(processedRun ProcessedRun, createdItems []Crea
 		Posture:         deriveAuditPosture(createdItems),
 		BlockedRequests: blockedRequests,
 		MCPFailures:     collectMCPFailureServers(processedRun.MCPFailures),
+		ModelRouting:    modelRoutingComparisonRoute(processedRun.ModelRouting),
 	}
+}
+
+func modelRoutingComparisonRoute(routing *ModelRoutingSummary) *AuditComparisonRoute {
+	if routing == nil || routing.SelectedModel == "" {
+		return nil
+	}
+	return &AuditComparisonRoute{
+		Model: routing.SelectedModel, Effort: routing.SelectedEffort,
+		Mode: routing.Mode, RouterVersion: routing.RouterVersion,
+	}
+}
+
+func sameModelRoutingRoute(left, right *AuditComparisonRoute) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.Model == right.Model && left.Effort == right.Effort &&
+		left.Mode == right.Mode && left.RouterVersion == right.RouterVersion
 }
 
 func loadAuditComparisonSnapshotFromArtifacts(run WorkflowRun, logsPath string, verbose bool) (auditComparisonSnapshot, error) {
@@ -133,12 +169,17 @@ func loadAuditComparisonSnapshotFromArtifacts(run WorkflowRun, logsPath string, 
 		Posture:         deriveAuditPosture(extractCreatedItemsFromManifest(logsPath)),
 		BlockedRequests: blockedRequests,
 		MCPFailures:     collectMCPFailureServers(mcpFailures),
+		ModelRouting:    modelRoutingComparisonRoute(analyzeModelRouting(logsPath)),
 	}, nil
 }
 
 func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath string) auditComparisonCandidate {
 	createdItems := resolveCreatedItems(logsPath, summary.SafeOutputs)
 	posture := deriveAuditPosture(createdItems)
+	routing := summary.ModelRouting
+	if routing == nil {
+		routing = analyzeModelRouting(logsPath)
+	}
 
 	blockedRequests := 0
 	if summary.FirewallAnalysis != nil {
@@ -152,6 +193,7 @@ func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath stri
 			Posture:         posture,
 			BlockedRequests: blockedRequests,
 			MCPFailures:     collectMCPFailureServers(summary.MCPFailures),
+			ModelRouting:    modelRoutingComparisonRoute(routing),
 		},
 		TaskDomain:          summary.TaskDomain,
 		BehaviorFingerprint: summary.BehaviorFingerprint,
@@ -361,6 +403,16 @@ func buildAuditComparison(currentConclusion string, current auditComparisonSnaps
 			Changed: baseline.BlockedRequests != current.BlockedRequests,
 		},
 	}
+	if current.ModelRouting != nil || baseline.ModelRouting != nil {
+		delta.ModelRouting = &AuditComparisonRouteDelta{
+			Before:  baseline.ModelRouting,
+			After:   current.ModelRouting,
+			Changed: !sameModelRoutingRoute(current.ModelRouting, baseline.ModelRouting),
+		}
+		if delta.ModelRouting.Changed {
+			reasonCodes = append(reasonCodes, "model_routing_changed")
+		}
+	}
 
 	if current.Turns > baseline.Turns {
 		reasonCodes = append(reasonCodes, "turns_increase")
@@ -422,8 +474,10 @@ func buildAuditComparison(currentConclusion string, current auditComparisonSnaps
 			Conclusion:   baselineRun.Conclusion,
 			CreatedAt:    baselineRun.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Selection:    "latest_success",
+			ModelRouting: baseline.ModelRouting,
 		},
-		Delta: delta,
+		ModelRouting: current.ModelRouting,
+		Delta:        delta,
 		Classification: &AuditComparisonClassification{
 			Label:       label,
 			ReasonCodes: reasonCodes,
@@ -443,6 +497,9 @@ func recommendAuditComparisonAction(label, currentConclusion string, delta *Audi
 	}
 	if delta == nil || label == "stable" {
 		return "No action needed; this run matches the selected successful baseline closely."
+	}
+	if delta.ModelRouting != nil && delta.ModelRouting.Changed {
+		return "Review the model-routing change against the selected successful baseline, including the selected model, effort, mode, and router version."
 	}
 
 	if delta.Posture.Before == "read_only" && delta.Posture.After == "write_capable" {

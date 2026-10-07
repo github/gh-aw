@@ -838,6 +838,7 @@ func applyRunUsageMetrics(result *DownloadResult, metrics *LogMetrics, runOutput
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze token usage for run %d: %v", result.Run.DatabaseID, tokenErr)))
 	}
 	result.TokenUsage = tokenUsage
+	result.ModelRouting = analyzeModelRouting(runOutputDir)
 	backfillRunTokenUsageFromFirewall(metrics, result, tokenUsage)
 	steeringEvents, steeringErr := extractGatewaySteeringEvents(runOutputDir)
 	if steeringErr != nil && verbose {
@@ -890,6 +891,7 @@ func finalizeAndSaveRunSummary(ctx context.Context, result *DownloadResult, runO
 		SkillActivations:        result.SkillActivations,
 		MCPToolUsage:            result.MCPToolUsage,
 		TokenUsage:              result.TokenUsage,
+		ModelRouting:            result.ModelRouting,
 		GatewaySteeringEvents:   result.GatewaySteeringEvents,
 		WorkingSet:              result.WorkingSet,
 		Ledger:                  result.Ledger,
@@ -933,6 +935,7 @@ func newRunSummary(result *DownloadResult, metrics LogMetrics, jobDetails []JobI
 			SkillActivations:        result.SkillActivations,
 			MCPToolUsage:            result.MCPToolUsage,
 			TokenUsage:              result.TokenUsage,
+			ModelRouting:            result.ModelRouting,
 			GatewaySteeringEvents:   result.GatewaySteeringEvents,
 			WorkingSet:              result.WorkingSet,
 			Ledger:                  result.Ledger,
