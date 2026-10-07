@@ -348,6 +348,10 @@ func (c *Compiler) collectRuntimeImportMarkdownForCompilerAnalysis(data *Workflo
 	workspaceRoot := resolveWorkspaceRoot(c.markdownPath)
 	var seed strings.Builder
 	seed.WriteString(data.MarkdownContent)
+	if data.ImportedMarkdown != "" {
+		seed.WriteByte('\n')
+		seed.WriteString(data.ImportedMarkdown)
+	}
 	if data.MainWorkflowMarkdown != "" {
 		seed.WriteByte('\n')
 		seed.WriteString(data.MainWorkflowMarkdown)
@@ -358,13 +362,17 @@ func (c *Compiler) collectRuntimeImportMarkdownForCompilerAnalysis(data *Workflo
 		seed.WriteString("}}")
 	}
 	for _, entry := range data.PromptImports {
+		if entry.Markdown != "" {
+			seed.WriteByte('\n')
+			seed.WriteString(entry.Markdown)
+		}
 		if entry.ImportPath != "" {
 			seed.WriteString("\n{{#runtime-import ")
 			seed.WriteString(filepath.ToSlash(entry.ImportPath))
 			seed.WriteString("}}")
 		}
 	}
-	seedContent := seed.String()
+	seedContent := removeXMLComments(seed.String())
 	if !strings.Contains(seedContent, "{{#runtime-import") && !strings.Contains(seedContent, "{{#import") {
 		return ""
 	}
@@ -372,7 +380,7 @@ func (c *Compiler) collectRuntimeImportMarkdownForCompilerAnalysis(data *Workflo
 }
 
 func collectRuntimeImportMarkdownContent(markdownContent, workspaceRoot string, seen map[string]struct{}) string {
-	refs := extractRuntimeImportReferences(markdownContent)
+	refs := extractRuntimeImportReferences(removeXMLComments(markdownContent))
 	if len(refs) == 0 {
 		return ""
 	}

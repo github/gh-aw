@@ -127,6 +127,8 @@ Use **`gh` CLI search** (not manual scraping):
 5. Sort by stars descending.
 6. Select the top 20 repositories.
 
+Do not search or list existing issues to deduplicate reports; the configured `create_issue` safe output closes older issues. If GitHub search is rate-limited or unavailable, do not sleep or repeatedly retry. Make at most one materially different retry, then stop and report the blocked run using the terminal safe-output fallback below. Never describe a partial audit as a clean result.
+
 Save selection artifacts:
 
 - `$RUN_DIR/candidates.json`
@@ -248,16 +250,18 @@ Formatting rules:
 
 ## Output Requirements
 
-At the end, do one of the following:
+At the end, choose exactly one terminal outcome:
 
 - If any issue category above is non-empty, call `create_issue` safe-output(s).
-- If no action is needed, call:
+- If the full 20-repository audit completed and no action is needed, call:
 
 ```json
 {"noop":{"message":"No compatibility issues detected; validated 20 repositories and found no actionable cross-repository failures."}}
 ```
 
-Never finish without a safe-output call.
+- If an infrastructure or tooling failure prevents completing the audit, call `create_issue` once with a title explaining that the cross-repo audit was blocked. Include the phase reached, the specific blocker, verified partial progress, and what remains unverified; do not claim compatibility findings or a clean result without completing the audit. If this terminal issue cannot be created, emit `report_incomplete` with the blocker instead.
+
+Never wait on a long rate-limit delay or finish without a safe-output call. `noop` is only valid after the full audit completes successfully with no actionable findings.
 
 ## Quality Bar
 

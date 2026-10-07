@@ -33,6 +33,8 @@ tools:
     - find
     - jq
     - wc
+    - sort
+    - echo
 safe-outputs:
   create-issue:
     expires: 1d
