@@ -43,7 +43,7 @@ type UploadAssetsConfig struct {
 }
 
 // parseUploadAssetConfig handles upload-asset configuration
-func (c *Compiler) parseUploadAssetConfig(outputMap map[string]any) *UploadAssetsConfig {
+func (c *Compiler) parseUploadAssetConfig(outputMap map[string]any) *UploadAssetsConfig { //nolint:largefunc // Parses the complete upload-asset configuration and defaults in one pass.
 	if configData, exists := outputMap["upload-asset"]; exists {
 		// Explicit false disables upload-asset (e.g. when passed via import-inputs)
 		if b, ok := configData.(bool); ok && !b {
@@ -117,7 +117,7 @@ func (c *Compiler) parseUploadAssetConfig(outputMap map[string]any) *UploadAsset
 }
 
 // buildUploadAssetsJob creates the publish_assets job
-func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, threatDetectionEnabled bool) (*Job, error) {
+func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, threatDetectionEnabled bool) (*Job, error) { //nolint:largefunc // Keeps the generated job's ordered checkout, setup, and publish steps together.
 	publishAssetsLog.Printf("Building upload_assets job: workflow=%s, main_job=%s, threat_detection=%v", data.Name, mainJobName, threatDetectionEnabled)
 
 	if data.SafeOutputs == nil || data.SafeOutputs.UploadAssets == nil {

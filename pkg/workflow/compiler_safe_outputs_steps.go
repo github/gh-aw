@@ -295,20 +295,20 @@ func scriptNameToHandlerName(scriptName string) string {
 	parts := strings.FieldsFunc(scriptName, func(r rune) bool {
 		return r == '-' || r == '_'
 	})
-	handlerName := "handle"
+	var handlerName strings.Builder
+	handlerName.WriteString("handle")
 	for _, part := range parts {
 		if part != "" {
-			handlerName += strings.ToUpper(part[:1]) + part[1:]
+			handlerName.WriteString(strings.ToUpper(part[:1]) + part[1:])
 		}
 	}
-	if handlerName == "handle" {
+	if handlerName.String() == "handle" {
 		if scriptName == "" {
-			handlerName += "Unknown"
-		} else {
-			handlerName += strings.ToUpper(scriptName[:1]) + scriptName[1:]
+			return "handleUnknown"
 		}
+		return "handle" + strings.ToUpper(scriptName[:1]) + scriptName[1:]
 	}
-	return handlerName
+	return handlerName.String()
 }
 
 // generateSafeOutputScriptContent generates a complete JavaScript module for a custom safe-output

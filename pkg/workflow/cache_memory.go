@@ -12,7 +12,7 @@ import (
 // generateCacheMemorySteps generates cache setup steps (directory creation, restore, and git init) for the cache-memory configuration.
 // Cache-memory provides a simple file share that LLMs can read/write freely.
 // Artifact upload is handled separately by generateCacheMemoryArtifactUpload after agent execution.
-func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
+func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) { //nolint:largefunc // Preserves ordered setup steps for each configured cache.
 	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
 		return
 	}
@@ -23,7 +23,7 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 
 	// Use backward-compatible paths only when there's a single cache with ID "default"
 	// This maintains compatibility with existing workflows
-	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default"
+	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default" //nolint:uncheckedsliceindex // The length check guarantees the single cache.
 
 	// Extract GitHub guard policy for integrity-aware cache key generation.
 	var githubConfig *GitHubToolConfig
@@ -142,7 +142,7 @@ func generateCacheMemoryGitCommitSteps(builder *strings.Builder, data *WorkflowD
 
 	cacheLog.Printf("Generating cache-memory git commit steps for %d caches", len(data.CacheMemoryConfig.Caches))
 
-	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default"
+	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default" //nolint:uncheckedsliceindex // The length check guarantees the single cache.
 
 	for _, cache := range data.CacheMemoryConfig.Caches {
 		// Skip restore-only caches (nothing to commit)
@@ -175,7 +175,7 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 	cacheLog.Printf("Generating cache-memory validation steps for %d caches", len(data.CacheMemoryConfig.Caches))
 
 	// Use backward-compatible paths only when there's a single cache with ID "default"
-	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default"
+	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default" //nolint:uncheckedsliceindex // The length check guarantees the single cache.
 
 	for _, cache := range data.CacheMemoryConfig.Caches {
 		// Skip restore-only caches
@@ -224,7 +224,7 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 // generateCacheMemoryArtifactUpload generates artifact upload steps for cache-memory.
 // This should be called after agent execution steps to ensure cache is uploaded after the agent has finished.
 // pinAction resolves the upload-artifact action reference; pass c.getActionPin from Compiler methods.
-func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowData, pinAction func(string) string) {
+func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowData, pinAction func(string) string) { //nolint:largefunc // Preserves per-cache validation and upload ordering.
 	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
 		return
 	}
@@ -240,7 +240,7 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 	cacheLog.Printf("Generating cache-memory artifact upload steps for %d caches", len(data.CacheMemoryConfig.Caches))
 
 	// Use backward-compatible paths only when there's a single cache with ID "default"
-	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default"
+	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default" //nolint:uncheckedsliceindex // The length check guarantees the single cache.
 
 	// In workflow_call context, apply the per-invocation prefix to avoid artifact name clashes.
 	prefix := artifactPrefixExprForDownstreamJob(data)
@@ -298,14 +298,14 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 
 // buildCacheMemoryPromptSection builds a PromptSection for cache memory instructions
 // Returns a PromptSection that references a template file with substitutions, or nil if no cache is configured
-func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
+func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection { //nolint:largefunc // Keeps the prompt template variants and shared configuration logic together.
 	if config == nil || len(config.Caches) == 0 {
 		return nil
 	}
 
 	// Check if there's only one cache with ID "default" to use singular template
-	if len(config.Caches) == 1 && config.Caches[0].ID == "default" {
-		cache := config.Caches[0]
+	if len(config.Caches) == 1 && config.Caches[0].ID == "default" { //nolint:uncheckedsliceindex // The length check guarantees the single cache.
+		cache := config.Caches[0] //nolint:uncheckedsliceindex // The preceding condition guarantees the single cache.
 		// Trailing slash makes the path look like a directory in prompt context.
 		cacheDir := cacheMemoryDirFor(cache.ID) + "/"
 
@@ -358,12 +358,12 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	// When empty (all extensions allowed for all caches), the placeholder is replaced with nothing.
 	allSame := true
 	for i := 1; i < len(config.Caches); i++ {
-		if len(config.Caches[i].AllowedExtensions) != len(config.Caches[0].AllowedExtensions) {
+		if len(config.Caches[i].AllowedExtensions) != len(config.Caches[0].AllowedExtensions) { //nolint:uncheckedsliceindex // The loop starts at 1 and is bounded by len(config.Caches).
 			allSame = false
 			break
 		}
-		for j, ext := range config.Caches[i].AllowedExtensions {
-			if ext != config.Caches[0].AllowedExtensions[j] {
+		for j, ext := range config.Caches[i].AllowedExtensions { //nolint:uncheckedsliceindex // The outer loop bounds i within config.Caches.
+			if ext != config.Caches[0].AllowedExtensions[j] { //nolint:uncheckedsliceindex // The loop bounds the cache indices and j ranges over the current cache's extensions.
 				allSame = false
 				break
 			}
@@ -375,7 +375,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 
 	var extsUnion []string
 	if allSame {
-		extsUnion = config.Caches[0].AllowedExtensions
+		extsUnion = config.Caches[0].AllowedExtensions //nolint:uncheckedsliceindex // The earlier empty-cache check guarantees at least one cache.
 	} else {
 		extensionSet := make(map[string]struct {
 		})
@@ -421,7 +421,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 
 // buildUpdateCacheMemoryJob builds a job that updates cache-memory after detection passes
 // This job downloads cache-memory artifacts and saves them to GitHub Actions cache
-func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) {
+func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetectionEnabled bool) (*Job, error) { //nolint:largefunc // Keeps ordered cache validation, download, update, and upload steps together.
 	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
 		return nil, nil
 	}
