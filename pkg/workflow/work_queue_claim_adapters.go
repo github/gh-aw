@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -13,6 +15,11 @@ import (
 
 var workQueueAdapterFieldPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z_0-9]*$`)
 var workQueueAdapterVerifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
+var workQueueAdapterNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*$`)
+var workQueueAdapterProjectionPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*(\.[A-Za-z][A-Za-z_0-9]*){0,7}$`)
+var workQueueAdapterBranchPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$`)
+var workQueueAdapterRestRoutePattern = regexp.MustCompile(`^/repos/\{owner\}/\{repo\}/[A-Za-z0-9_{}./-]+$`)
+var workQueueAdapterRestFieldPattern = regexp.MustCompile(`\{([A-Za-z_][A-Za-z_0-9]*)\}`)
 
 // WorkQueueClaimAdapter binds custom output semantics to a trusted, independently
 // verified effect. Delegated code prepares data; only the guarded handler applies it.
@@ -62,78 +69,41 @@ type WorkQueueRestVerifier struct {
 	NumberField  string            `json:"number-field,omitempty" yaml:"number-field,omitempty"`
 }
 
-func parseWorkQueueClaimAdapters(raw map[string]any) map[string]*WorkQueueClaimAdapter {
+func parseWorkQueueClaimAdapters(value any) (map[string]*WorkQueueClaimAdapter, error) {
+	raw, ok := value.(map[string]any)
+	if !ok || raw == nil {
+		return nil, errors.New("safe-outputs.claim-adapters requires an object")
+	}
 	adapters := make(map[string]*WorkQueueClaimAdapter, len(raw))
 	for name, value := range raw {
 		fields, ok := value.(map[string]any)
-		if !ok {
-			continue
+		if !ok || fields == nil {
+			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s requires an object", name)
 		}
+		encoded, err := json.Marshal(fields)
+		if err != nil {
+			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s: %w", name, err)
+		}
+		decoder := json.NewDecoder(bytes.NewReader(encoded))
+		decoder.UseNumber()
+		decoder.DisallowUnknownFields()
 		adapter := &WorkQueueClaimAdapter{}
-		adapter.Mode, _ = fields["mode"].(string)
-		adapter.EffectType, _ = fields["effect-type"].(string)
-		adapter.TargetRepo, _ = fields["target-repo"].(string)
-		adapter.VerifierID, _ = fields["verifier-id"].(string)
-		adapter.Expected, _ = fields["expected"].(map[string]any)
-		if raw, ok := fields["graphql"].(map[string]any); ok {
-			adapter.GraphQL = &WorkQueueGraphQL{}
-			adapter.GraphQL.Mutation, _ = raw["mutation"].(string)
-			adapter.GraphQL.InputType, _ = raw["input-type"].(string)
-			adapter.GraphQL.ResponseField, _ = raw["response-field"].(string)
-			adapter.GraphQL.ResourceType, _ = raw["resource-type"].(string)
-			adapter.GraphQL.ResourceKind, _ = raw["resource-kind"].(string)
-			adapter.GraphQL.RepositoryField, _ = raw["repository-field"].(string)
-			adapter.GraphQL.RepositoryInput, _ = raw["repository-input"].(string)
-			adapter.GraphQL.Permission, _ = raw["permission"].(string)
-			adapter.GraphQL.NumberField, _ = raw["number-field"].(string)
-			if fields, ok := raw["fields"].(map[string]any); ok {
-				adapter.GraphQL.Fields = map[string]string{}
-				for desired, observed := range fields {
-					adapter.GraphQL.Fields[desired], _ = observed.(string)
-				}
-			}
+		if err := decoder.Decode(adapter); err != nil {
+			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s: %w", name, err)
 		}
-		if raw, ok := fields["git-tree"].(map[string]any); ok {
-			adapter.GitTree = &WorkQueueGitTree{}
-			adapter.GitTree.BaseRevision, _ = raw["base-revision"].(string)
-			adapter.GitTree.BranchPrefix, _ = raw["branch-prefix"].(string)
-			adapter.GitTree.PullRequest, _ = raw["pull-request"].(bool)
-			adapter.GitTree.BaseBranch, _ = raw["base-branch"].(string)
+		normalized := stringutil.NormalizeSafeOutputIdentifier(name)
+		if _, exists := adapters[normalized]; exists {
+			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s conflicts with another normalized adapter name", name)
 		}
-		if raw, ok := fields["request"].(map[string]any); ok {
-			adapter.Request = &WorkQueueRestRequest{}
-			adapter.Request.Method, _ = raw["method"].(string)
-			adapter.Request.Route, _ = raw["route"].(string)
-			adapter.Request.Permission, _ = raw["permission"].(string)
-		}
-		if raw, ok := fields["verifier"].(map[string]any); ok {
-			adapter.Verifier = &WorkQueueRestVerifier{}
-			adapter.Verifier.Route, _ = raw["route"].(string)
-			adapter.Verifier.ResourceKind, _ = raw["resource-kind"].(string)
-			adapter.Verifier.NumberField, _ = raw["number-field"].(string)
-			if fields, ok := raw["fields"].(map[string]any); ok {
-				adapter.Verifier.Fields = map[string]string{}
-				for desired, observed := range fields {
-					adapter.Verifier.Fields[desired], _ = observed.(string)
-				}
-			}
-		}
-		if mapping, ok := fields["field-map"].(map[string]any); ok {
-			adapter.FieldMap = make(map[string]string, len(mapping))
-			for destination, source := range mapping {
-				adapter.FieldMap[destination], _ = source.(string)
-			}
-		}
-		adapters[stringutil.NormalizeSafeOutputIdentifier(name)] = adapter
+		adapters[normalized] = adapter
 	}
-	return adapters
+	return adapters, nil
 }
 
 func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 	if data.SafeOutputs == nil {
 		return nil
 	}
-	effects := []string{"create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"}
 	builtinFields := map[string][]string{
 		"create_issue":  {"title", "body", "labels", "assignees", "milestone"},
 		"update_issue":  {"title", "body", "labels", "assignees", "milestone", "state", "status", "state_reason"},
@@ -154,69 +124,104 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 	}
 	verifierIDs := make(map[string]string)
 	for name, adapter := range data.SafeOutputs.ClaimAdapters {
-		if adapter == nil || !slices.Contains([]string{"prepared", "script"}, adapter.Mode) || !slices.Contains(effects, adapter.EffectType) {
-			return fmt.Errorf("work-queue: claim-adapters.%s requires a supported mode and independently verifiable effect-type", name)
+		if err := validateWorkQueueClaimAdapterIdentity(name, adapter, data.SafeOutputs, nativeVerifiers, verifierIDs); err != nil {
+			return err
 		}
-		fields := builtinFields[adapter.EffectType]
-		if fields != nil && adapter.EffectType != "create_issue" {
-			fields = append(slices.Clone(fields), "item_number", "issue_number", "pull_request_number")
+		if err := validateWorkQueueClaimAdapterEffects(name, adapter, builtinFields[adapter.EffectType]); err != nil {
+			return err
 		}
-		if !repoSlugPattern.MatchString(adapter.TargetRepo) || strings.Contains(adapter.TargetRepo, "${{") {
-			return fmt.Errorf("work-queue: claim-adapters.%s.target-repo requires a fixed approved repository", name)
+	}
+	return validateWorkQueuePreparedAdapters(data.SafeOutputs)
+}
+
+func validateWorkQueueClaimAdapterIdentity(name string, adapter *WorkQueueClaimAdapter, outputs *SafeOutputsConfig, nativeVerifiers map[string]bool, verifierIDs map[string]string) error {
+	effects := []string{"create_issue", "update_issue", "close_issue", "add_comment", "add_labels", "remove_labels", "replace_label", "github_rest", "git_tree", "github_graphql"}
+	if adapter == nil || !slices.Contains([]string{"prepared", "script"}, adapter.Mode) || !slices.Contains(effects, adapter.EffectType) {
+		return fmt.Errorf("work-queue: claim-adapters.%s requires a supported mode and independently verifiable effect-type", name)
+	}
+	if !repoSlugPattern.MatchString(adapter.TargetRepo) || strings.Contains(adapter.TargetRepo, "${{") {
+		return fmt.Errorf("work-queue: claim-adapters.%s.target-repo requires a fixed approved repository", name)
+	}
+	if adapter.VerifierID != "" && !workQueueAdapterVerifierPattern.MatchString(adapter.VerifierID) {
+		return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id requires a bounded independently verified native effect identifier", name)
+	}
+	id := adapter.VerifierID
+	if id == "" {
+		id = stringutil.NormalizeSafeOutputIdentifier(name)
+	}
+	if nativeVerifiers[id] && name != id && outputs.ClaimAdapters[id] == nil {
+		return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with the enabled native %s verifier", name, id)
+	}
+	if prior, exists := verifierIDs[id]; exists {
+		return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with claim-adapters.%s; verifier identifiers must be unique", name, prior)
+	}
+	verifierIDs[id] = name
+	return nil
+}
+
+func validateWorkQueueClaimAdapterEffects(name string, adapter *WorkQueueClaimAdapter, fields []string) error {
+	if fields != nil && adapter.EffectType != "create_issue" {
+		fields = append(slices.Clone(fields), "item_number", "issue_number", "pull_request_number")
+	}
+	if adapter.EffectType == "github_rest" {
+		if err := validateWorkQueueRestAdapter(name, adapter); err != nil {
+			return err
 		}
-		if adapter.VerifierID != "" && !workQueueAdapterVerifierPattern.MatchString(adapter.VerifierID) {
-			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id requires a bounded independently verified native effect identifier", name)
+	} else if adapter.Request != nil || adapter.Verifier != nil {
+		return fmt.Errorf("work-queue: claim-adapters.%s REST verifier configuration requires github_rest effect-type", name)
+	}
+	if adapter.EffectType == "git_tree" {
+		if err := validateWorkQueueGitTreeAdapter(name, adapter); err != nil {
+			return err
 		}
-		id := adapter.VerifierID
-		if id == "" {
-			id = stringutil.NormalizeSafeOutputIdentifier(name)
+	} else if adapter.GitTree != nil {
+		return fmt.Errorf("work-queue: claim-adapters.%s code verifier configuration requires git_tree effect-type", name)
+	}
+	if adapter.EffectType == "github_graphql" {
+		if err := validateWorkQueueGraphQLAdapter(name, adapter); err != nil {
+			return err
 		}
-		if nativeVerifiers[id] && name != id && data.SafeOutputs.ClaimAdapters[id] == nil {
-			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with the enabled native %s verifier", name, id)
+	} else if adapter.GraphQL != nil {
+		return fmt.Errorf("work-queue: claim-adapters.%s GraphQL verifier configuration requires github_graphql effect-type", name)
+	}
+	return validateWorkQueueClaimAdapterFieldMap(name, adapter, fields)
+}
+
+func validateWorkQueueClaimAdapterFieldMap(name string, adapter *WorkQueueClaimAdapter, fields []string) error {
+	for destination, source := range adapter.FieldMap {
+		if (!slices.Contains([]string{"github_rest", "git_tree", "github_graphql"}, adapter.EffectType) && !slices.Contains(fields, destination)) || !workQueueAdapterFieldPattern.MatchString(source) {
+			return fmt.Errorf("work-queue: claim-adapters.%s.field-map contains an undeclared effect field", name)
 		}
-		if prior, exists := verifierIDs[id]; exists {
-			return fmt.Errorf("work-queue: claim-adapters.%s.verifier-id conflicts with claim-adapters.%s; verifier identifiers must be unique", name, prior)
-		}
-		verifierIDs[id] = name
-		if adapter.EffectType == "github_rest" {
-			if err := validateWorkQueueRestAdapter(name, adapter); err != nil {
-				return err
-			}
-		} else if adapter.Request != nil || adapter.Verifier != nil {
-			return fmt.Errorf("work-queue: claim-adapters.%s REST verifier configuration requires github_rest effect-type", name)
-		}
-		if adapter.EffectType == "git_tree" {
-			if err := validateWorkQueueGitTreeAdapter(name, adapter); err != nil {
-				return err
-			}
-		} else if adapter.GitTree != nil {
-			return fmt.Errorf("work-queue: claim-adapters.%s code verifier configuration requires git_tree effect-type", name)
-		}
-		if adapter.EffectType == "github_graphql" {
-			if err := validateWorkQueueGraphQLAdapter(name, adapter); err != nil {
-				return err
-			}
-		} else if adapter.GraphQL != nil {
-			return fmt.Errorf("work-queue: claim-adapters.%s GraphQL verifier configuration requires github_graphql effect-type", name)
-		}
-		for destination, source := range adapter.FieldMap {
-			if (!slices.Contains([]string{"github_rest", "git_tree", "github_graphql"}, adapter.EffectType) && !slices.Contains(fields, destination)) || !workQueueAdapterFieldPattern.MatchString(source) {
-				return fmt.Errorf("work-queue: claim-adapters.%s.field-map contains an undeclared effect field", name)
-			}
-			for field := range adapter.FieldMap {
-				if _, overlaps := adapter.Expected[field]; overlaps {
-					return fmt.Errorf("work-queue: claim-adapters.%s cannot both map and fix the same effect field", name)
-				}
-			}
-		}
-		for field := range adapter.Expected {
-			if !slices.Contains([]string{"github_rest", "git_tree", "github_graphql"}, adapter.EffectType) && !slices.Contains(fields, field) {
-				return fmt.Errorf("work-queue: claim-adapters.%s.expected contains an undeclared effect field", name)
+		for field := range adapter.FieldMap {
+			if _, overlaps := adapter.Expected[field]; overlaps {
+				return fmt.Errorf("work-queue: claim-adapters.%s cannot both map and fix the same effect field", name)
 			}
 		}
 	}
-	for name, script := range data.SafeOutputs.Scripts {
-		adapter := data.SafeOutputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
+	for field := range adapter.Expected {
+		if !slices.Contains([]string{"github_rest", "git_tree", "github_graphql"}, adapter.EffectType) && !slices.Contains(fields, field) {
+			return fmt.Errorf("work-queue: claim-adapters.%s.expected contains an undeclared effect field", name)
+		}
+	}
+	return nil
+}
+
+func validateWorkQueuePreparedAdapters(outputs *SafeOutputsConfig) error {
+	for _, validate := range []func(*SafeOutputsConfig) error{
+		validateWorkQueueAdapterScripts, validateWorkQueueAdapterJobs,
+		validateWorkQueueAdapterActions, validateWorkQueueAdapterRawSteps,
+		validateWorkQueueAdapterExecutables,
+	} {
+		if err := validate(outputs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateWorkQueueAdapterScripts(outputs *SafeOutputsConfig) error {
+	for name, script := range outputs.Scripts {
+		adapter := outputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
 		if adapter == nil || adapter.Mode != "script" {
 			return fmt.Errorf("work-queue: script %q requires a trusted per-Claim delivery adapter with mode script", name)
 		}
@@ -224,8 +229,12 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 			return fmt.Errorf("work-queue: prepared script %q cannot expose secret credentials", name)
 		}
 	}
-	for name, job := range data.SafeOutputs.Jobs {
-		adapter := data.SafeOutputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
+	return nil
+}
+
+func validateWorkQueueAdapterJobs(outputs *SafeOutputsConfig) error {
+	for name, job := range outputs.Jobs {
+		adapter := outputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
 		if adapter == nil || adapter.Mode != "prepared" {
 			return fmt.Errorf("work-queue: custom job %q requires a trusted per-Claim delivery adapter with mode prepared", name)
 		}
@@ -244,8 +253,12 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 			return err
 		}
 	}
-	for name, action := range data.SafeOutputs.Actions {
-		adapter := data.SafeOutputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
+	return nil
+}
+
+func validateWorkQueueAdapterActions(outputs *SafeOutputsConfig) error {
+	for name, action := range outputs.Actions {
+		adapter := outputs.ClaimAdapters[stringutil.NormalizeSafeOutputIdentifier(name)]
 		if adapter == nil || adapter.Mode != "prepared" {
 			return fmt.Errorf("work-queue: custom action %q requires a trusted per-Claim delivery adapter with mode prepared", name)
 		}
@@ -261,35 +274,43 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 			}
 		}
 	}
-	if len(data.SafeOutputs.Steps) > 0 {
-		if adapter := data.SafeOutputs.ClaimAdapters["raw_steps"]; adapter == nil || adapter.Mode != "prepared" {
+	return nil
+}
+
+func validateWorkQueueAdapterRawSteps(outputs *SafeOutputsConfig) error {
+	if len(outputs.Steps) > 0 {
+		if adapter := outputs.ClaimAdapters["raw_steps"]; adapter == nil || adapter.Mode != "prepared" {
 			return errors.New("work-queue: raw safe-outputs.steps require a trusted per-Claim delivery adapter named raw_steps")
 		}
-		if strings.Contains(fmt.Sprint(data.SafeOutputs.Steps), "secrets.") {
+		if strings.Contains(fmt.Sprint(outputs.Steps), "secrets.") {
 			return errors.New("work-queue: prepared raw safe-output steps cannot expose write credentials or secrets")
 		}
-		if err := validateWorkQueueAdapterSteps("raw_steps", data.SafeOutputs.Steps); err != nil {
+		if err := validateWorkQueueAdapterSteps("raw_steps", outputs.Steps); err != nil {
 			return err
 		}
 	}
-	for name, adapter := range data.SafeOutputs.ClaimAdapters {
+	return nil
+}
+
+func validateWorkQueueAdapterExecutables(outputs *SafeOutputsConfig) error {
+	for name, adapter := range outputs.ClaimAdapters {
 		matches := 0
-		for rawName := range data.SafeOutputs.Jobs {
+		for rawName := range outputs.Jobs {
 			if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
 				matches++
 			}
 		}
-		for rawName := range data.SafeOutputs.Actions {
+		for rawName := range outputs.Actions {
 			if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
 				matches++
 			}
 		}
-		for rawName := range data.SafeOutputs.Scripts {
+		for rawName := range outputs.Scripts {
 			if stringutil.NormalizeSafeOutputIdentifier(rawName) == name {
 				matches++
 			}
 		}
-		if name == "raw_steps" && len(data.SafeOutputs.Steps) > 0 {
+		if name == "raw_steps" && len(outputs.Steps) > 0 {
 			matches++
 		}
 		if matches != 1 {
@@ -297,7 +318,7 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 		}
 		if adapter.Mode == "script" {
 			found := false
-			for rawName := range data.SafeOutputs.Scripts {
+			for rawName := range outputs.Scripts {
 				found = found || stringutil.NormalizeSafeOutputIdentifier(rawName) == name
 			}
 			if !found {
@@ -314,11 +335,9 @@ func validateWorkQueueGraphQLAdapter(name string, adapter *WorkQueueClaimAdapter
 	if config == nil {
 		return fail("github_graphql requires a declared native operation and independent verifier")
 	}
-	namePattern := regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*$`)
-	pathPattern := regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*(\.[A-Za-z][A-Za-z_0-9]*){0,7}$`)
 	reserved := []string{"owner", "repo", "repositoryId", "repositoryNameWithOwner", "query", "variables", "method", "url", "baseUrl", "headers", "request", "token", "auth", "data", "mediaType", "constructor", "prototype", "claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id"}
 	for _, value := range []string{config.Mutation, config.InputType, config.ResponseField, config.ResourceType} {
-		if len(value) > 128 || !namePattern.MatchString(value) || slices.Contains(reserved, value) {
+		if len(value) > 128 || !workQueueAdapterNamePattern.MatchString(value) || slices.Contains(reserved, value) {
 			return fail("GraphQL requires fixed native operation names")
 		}
 	}
@@ -327,18 +346,12 @@ func validateWorkQueueGraphQLAdapter(name string, adapter *WorkQueueClaimAdapter
 		!slices.Contains([]string{"unknown", "issue", "pull_request", "comment", "discussion", "repository"}, config.ResourceKind) {
 		return fail("GraphQL requires explicit repository binding, native permission and resource kind")
 	}
-	fields := map[string]bool{}
-	for field := range adapter.FieldMap {
-		fields[field] = true
-	}
-	for field := range adapter.Expected {
-		fields[field] = true
-	}
+	fields := workQueueClaimAdapterFields(adapter)
 	if len(fields) == 0 || len(fields) > 64 || len(config.Fields) != len(fields) {
 		return fail("every GraphQL effect field requires independent readback")
 	}
 	for field := range fields {
-		if !namePattern.MatchString(field) || slices.Contains(reserved, field) || config.Fields[field] == "" {
+		if !workQueueAdapterNamePattern.MatchString(field) || slices.Contains(reserved, field) || config.Fields[field] == "" {
 			return fail("GraphQL contains an invalid, reserved or unverified effect field")
 		}
 	}
@@ -347,13 +360,13 @@ func validateWorkQueueGraphQLAdapter(name string, adapter *WorkQueueClaimAdapter
 		paths = append(paths, config.NumberField)
 	}
 	for field, observed := range config.Fields {
-		if !fields[field] {
+		if _, exists := fields[field]; !exists {
 			return fail("GraphQL verifier contains an undeclared effect field")
 		}
 		paths = append(paths, observed)
 	}
 	for _, path := range paths {
-		if len(path) > 256 || !pathPattern.MatchString(path) {
+		if len(path) > 256 || !workQueueAdapterProjectionPattern.MatchString(path) {
 			return fail("GraphQL verifier requires bounded native field paths")
 		}
 		for component := range strings.SplitSeq(path, ".") {
@@ -373,22 +386,16 @@ func validateWorkQueueGraphQLAdapter(name string, adapter *WorkQueueClaimAdapter
 func validateWorkQueueGitTreeAdapter(name string, adapter *WorkQueueClaimAdapter) error {
 	fail := func(reason string) error { return fmt.Errorf("work-queue: claim-adapters.%s: %s", name, reason) }
 	config := adapter.GitTree
-	branch := regexp.MustCompile(`^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$`)
-	revision := regexp.MustCompile(`^([a-f0-9]{40}|[a-f0-9]{64})$`)
-	if config == nil || !revision.MatchString(config.BaseRevision) || len(config.BranchPrefix) > 128 || !branch.MatchString(config.BranchPrefix) {
+	if config == nil || !workQueueImmutableRevision.MatchString(config.BaseRevision) || len(config.BranchPrefix) > 128 || !workQueueAdapterBranchPattern.MatchString(config.BranchPrefix) {
 		return fail("git_tree requires an immutable base revision and fixed branch namespace")
 	}
-	if config.PullRequest && (len(config.BaseBranch) > 128 || !branch.MatchString(config.BaseBranch)) {
+	if config.PullRequest && (len(config.BaseBranch) > 128 || !workQueueAdapterBranchPattern.MatchString(config.BaseBranch)) {
 		return fail("git_tree pull request requires a fixed base branch")
 	}
-	fields := map[string]bool{}
-	for field := range adapter.FieldMap {
-		fields[field] = true
-	}
-	for field := range adapter.Expected {
-		fields[field] = true
-	}
-	if !fields["files"] || (config.PullRequest && !fields["title"]) {
+	fields := workQueueClaimAdapterFields(adapter)
+	_, files := fields["files"]
+	_, title := fields["title"]
+	if !files || (config.PullRequest && !title) {
 		return fail("git_tree requires complete declared file and pull request fields")
 	}
 	for field := range fields {
@@ -407,30 +414,11 @@ func validateWorkQueueRestAdapter(name string, adapter *WorkQueueClaimAdapter) e
 	if !slices.Contains([]string{"checks", "contents", "issues", "pull-requests", "deployments", "discussions"}, adapter.Request.Permission) {
 		return fail("REST adapter requires an explicit native write permission")
 	}
-	routePattern := regexp.MustCompile(`^/repos/\{owner\}/\{repo\}/[A-Za-z0-9_{}./-]+$`)
-	placeholderPattern := regexp.MustCompile(`\{([A-Za-z_][A-Za-z_0-9]*)\}`)
-	routeFields := func(route string) ([]string, error) {
-		if !routePattern.MatchString(route) || strings.Contains(route, "..") || strings.Contains(route, "//") || strings.ContainsAny(placeholderPattern.ReplaceAllString(route, ""), "{}") {
-			return nil, fail("REST routes must be fixed repository-relative paths without origin overrides")
-		}
-		var fields []string
-		for _, match := range placeholderPattern.FindAllStringSubmatch(route, -1) {
-			if len(match) != 2 {
-				return nil, fail("REST route placeholder requires exactly one field")
-			}
-			for index, field := range match {
-				if index == 1 {
-					fields = append(fields, field)
-				}
-			}
-		}
-		return fields, nil
-	}
-	requestFields, err := routeFields(adapter.Request.Route)
+	requestFields, err := workQueueRestRouteFields(name, adapter.Request.Route)
 	if err != nil {
 		return err
 	}
-	readFields, err := routeFields(adapter.Verifier.Route)
+	readFields, err := workQueueRestRouteFields(name, adapter.Verifier.Route)
 	if err != nil {
 		return err
 	}
@@ -441,13 +429,7 @@ func validateWorkQueueRestAdapter(name string, adapter *WorkQueueClaimAdapter) e
 		return fail("unsupported REST verifier resource-kind")
 	}
 	reserved := []string{"owner", "repo", "method", "url", "baseUrl", "headers", "request", "token", "auth", "data", "mediaType", "__proto__", "constructor", "prototype", "claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id"}
-	fields := map[string]bool{}
-	for field := range adapter.FieldMap {
-		fields[field] = true
-	}
-	for field := range adapter.Expected {
-		fields[field] = true
-	}
+	fields := workQueueClaimAdapterFields(adapter)
 	if len(fields) == 0 || len(fields) > 64 || len(adapter.Verifier.Fields) == 0 || len(adapter.Verifier.Fields) > 64 {
 		return fail("REST adapter requires bounded declared fields and independent readback")
 	}
@@ -460,12 +442,12 @@ func validateWorkQueueRestAdapter(name string, adapter *WorkQueueClaimAdapter) e
 		}
 	}
 	for field, observed := range adapter.Verifier.Fields {
-		if !fields[field] || !workQueueAdapterFieldPattern.MatchString(observed) || slices.Contains(reserved, observed) {
+		if _, exists := fields[field]; !exists || !workQueueAdapterFieldPattern.MatchString(observed) || slices.Contains(reserved, observed) {
 			return fail("invalid or undeclared REST field readback")
 		}
 	}
 	for _, field := range append(requestFields, readFields...) {
-		if !slices.Contains([]string{"owner", "repo", "receipt_id"}, field) && !fields[field] {
+		if _, exists := fields[field]; !slices.Contains([]string{"owner", "repo", "receipt_id"}, field) && !exists {
 			return fail("REST route has an unbound selector")
 		}
 	}
@@ -473,6 +455,36 @@ func validateWorkQueueRestAdapter(name string, adapter *WorkQueueClaimAdapter) e
 		return fail("invalid REST resource number field")
 	}
 	return nil
+}
+
+func workQueueRestRouteFields(name, route string) ([]string, error) {
+	fail := func(reason string) error { return fmt.Errorf("work-queue: claim-adapters.%s: %s", name, reason) }
+	if !workQueueAdapterRestRoutePattern.MatchString(route) || strings.Contains(route, "..") || strings.Contains(route, "//") || strings.ContainsAny(workQueueAdapterRestFieldPattern.ReplaceAllString(route, ""), "{}") {
+		return nil, fail("REST routes must be fixed repository-relative paths without origin overrides")
+	}
+	var fields []string
+	for _, match := range workQueueAdapterRestFieldPattern.FindAllStringSubmatch(route, -1) {
+		if len(match) != 2 {
+			return nil, fail("REST route placeholder requires exactly one field")
+		}
+		for index, field := range match {
+			if index == 1 {
+				fields = append(fields, field)
+			}
+		}
+	}
+	return fields, nil
+}
+
+func workQueueClaimAdapterFields(adapter *WorkQueueClaimAdapter) map[string]struct{} {
+	fields := make(map[string]struct{}, len(adapter.FieldMap)+len(adapter.Expected))
+	for field := range adapter.FieldMap {
+		fields[field] = struct{}{}
+	}
+	for field := range adapter.Expected {
+		fields[field] = struct{}{}
+	}
+	return fields
 }
 
 func validateWorkQueueAdapterEnv(name string, env map[string]string) error {
@@ -502,7 +514,7 @@ func validateWorkQueueAdapterSteps(name string, steps []any) error {
 		if err := validateWorkQueueAdapterEnv(name, env); err != nil {
 			return err
 		}
-		if id, _ := step["id"].(string); slices.Contains([]string{"claim_adapter_context", "claim_adapter_artifact", "redact_secrets", "setup"}, id) {
+		if id, ok := step["id"].(string); ok && slices.Contains([]string{"claim_adapter_context", "claim_adapter_artifact", "redact_secrets", "setup"}, id) {
 			return fmt.Errorf("work-queue: prepared executable %q cannot replace a trusted adapter step ID", name)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -44,20 +45,12 @@ func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 		if len(previous) > 0 && !extending(previous, commits) {
 			return Compaction{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during compaction")
 		}
-		ordered, err := Compact(commits)
+		candidate, err := prepareCompaction(commits, snapshot.data)
 		if err != nil {
 			return Compaction{}, err
 		}
-		data, err := Serialize(ordered)
-		if err != nil {
-			return Compaction{}, err
-		}
-		result := Compaction{
-			Tip: ordered[len(ordered)-1].ID, At: time.Now().UnixMilli(),
-			Commits: len(ordered), DuplicatesRemoved: len(commits) - len(ordered),
-			BytesBefore: len(snapshot.data), BytesAfter: len(data),
-		}
-		if bytes.Equal(data, snapshot.data) {
+		result := candidate.result
+		if bytes.Equal(candidate.data, snapshot.data) {
 			result.AcknowledgmentRecovered = pendingErr != nil &&
 				!hasStatus(pendingErr, http.StatusConflict) && !hasStatus(pendingErr, http.StatusUnprocessableEntity)
 			return result, nil
@@ -66,7 +59,7 @@ func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 			hasStatus(pendingErr, http.StatusForbidden)) {
 			return Compaction{}, pendingErr
 		}
-		_, err = b.publish(ctx, snapshot, ordered)
+		_, err = b.publish(ctx, snapshot, candidate.commits)
 		if err == nil {
 			result.Changed = true
 			return result, nil
@@ -81,6 +74,39 @@ func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 			}
 		}
 	}
+	return b.recoverCompactionAcknowledgment(ctx, previous, pendingErr)
+}
+
+type compactionCandidate struct {
+	commits []QueueCommit
+	data    []byte
+	result  Compaction
+}
+
+func prepareCompaction(commits []QueueCommit, before []byte) (compactionCandidate, error) {
+	ordered, err := Compact(commits)
+	if err != nil {
+		return compactionCandidate{}, err
+	}
+	data, err := Serialize(ordered)
+	if err != nil {
+		return compactionCandidate{}, err
+	}
+	tip, err := compactionTip(ordered)
+	if err != nil {
+		return compactionCandidate{}, err
+	}
+	return compactionCandidate{
+		commits: ordered, data: data,
+		result: Compaction{
+			Tip: tip, At: time.Now().UnixMilli(),
+			Commits: len(ordered), DuplicatesRemoved: len(commits) - len(ordered),
+			BytesBefore: len(before), BytesAfter: len(data),
+		},
+	}, nil
+}
+
+func (b Branch) recoverCompactionAcknowledgment(ctx context.Context, previous []QueueCommit, pendingErr error) (Compaction, error) {
 	// A final uncertain response must still be checked before reporting failure.
 	commits, snapshot, err := b.read(ctx)
 	if err != nil {
@@ -98,12 +124,23 @@ func (b Branch) Compact(ctx context.Context) (Compaction, error) {
 		if err != nil {
 			return Compaction{}, err
 		}
+		tip, err := compactionTip(ordered)
+		if err != nil {
+			return Compaction{}, err
+		}
 		return Compaction{
-			Tip: ordered[len(ordered)-1].ID, At: time.Now().UnixMilli(),
+			Tip: tip, At: time.Now().UnixMilli(),
 			AcknowledgmentRecovered: !hasStatus(pendingErr, http.StatusConflict) &&
 				!hasStatus(pendingErr, http.StatusUnprocessableEntity), Commits: len(ordered),
 			BytesBefore: len(snapshot.data), BytesAfter: len(data),
 		}, nil
 	}
 	return Compaction{}, fmt.Errorf("queue compaction unresolved after %d attempts: %w", maxRetries, pendingErr)
+}
+
+func compactionTip(commits []QueueCommit) (string, error) {
+	for _, commit := range slices.Backward(commits) {
+		return commit.ID, nil
+	}
+	return "", queueError("unsupported_protocol", "compaction requires a current policy genesis")
 }

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -316,12 +317,9 @@ func extending(previous, current []QueueCommit) bool {
 	if err != nil || len(newOrder) < len(oldOrder) {
 		return false
 	}
-	for i, old := range oldOrder {
-		if !sameJSON(old, newOrder[i]) {
-			return false
-		}
-	}
-	return true
+	return slices.EqualFunc(oldOrder, newOrder[:len(oldOrder)], func(old, current QueueCommit) bool {
+		return sameJSON(old, current)
+	})
 }
 
 // Publish retains only authenticated logical intent across CAS retries. It
@@ -365,7 +363,7 @@ func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publ
 			}
 			transactions = []QueueCommit{genesis}
 			if genuine {
-				initial = &transactions[0]
+				initial = &genesis
 			}
 		}
 		state, err := Replay(transactions)

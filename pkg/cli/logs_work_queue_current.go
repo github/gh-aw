@@ -254,7 +254,9 @@ func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSn
 			return nil, fmt.Errorf("finish intent line %d: %w", index+1, err)
 		}
 		var fields map[string]json.RawMessage
-		_ = json.Unmarshal(line, &fields)
+		if err := json.Unmarshal(line, &fields); err != nil {
+			return nil, fmt.Errorf("finish intent fields line %d: %w", index+1, err)
+		}
 		if _, supplied := fields["claim_handle"]; !supplied {
 			if snapshot == nil || snapshot.Assignment == nil || len(snapshot.Assignment.Claims) != 1 {
 				return nil, errors.New("finish intent requires a selector for the original multi-Claim assignment")
@@ -274,7 +276,10 @@ func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSn
 			!slices.ContainsFunc(snapshot.Assignment.Claims, func(c WorkQueueClaimReceipt) bool { return c.Handle == intent.Handle }) {
 			return nil, errors.New("finish intent is foreign to original immutable assignment")
 		}
-		canonical, _ := workqueue.Canonical(line)
+		canonical, err := workqueue.Canonical(line)
+		if err != nil {
+			return nil, fmt.Errorf("finish intent line %d: %w", index+1, err)
+		}
 		if previous, ok := ids[intent.IntentID]; ok {
 			if previous != string(canonical) {
 				return nil, errors.New("conflicting work queue intent identity")
@@ -293,7 +298,7 @@ func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSn
 }
 
 func validWorkQueueNativeID(value string) bool {
-	return len(value) > 0 && len(value) <= 256 && !strings.HasPrefix(value, "0") &&
+	return value != "" && len(value) <= 256 && !strings.HasPrefix(value, "0") &&
 		!strings.ContainsFunc(value, func(r rune) bool { return r < '0' || r > '9' })
 }
 

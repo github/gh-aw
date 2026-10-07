@@ -178,7 +178,8 @@ walk through the failure cases in detail.
 
 **Repository examined:** `github/gh-aw`, commit `81891f23dfb58b88bd90c9736887880234bffbe5`
 
-**Status:** research and proposed specification; not an implemented feature
+**Status:** specification with implementation in progress; the coverage table
+in section 9.1 identifies verified, unfinished, and deferred requirements.
 
 **Protocol review revision:** 2026-10-05. Separates fair selection from batch
 packing, specifies delivery/launch recovery and operational controls, defines
@@ -2595,12 +2596,12 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | In progress |
 | Immutable arrays, actual run binding and conservative native recovery | In progress |
 | Universal Claim-scoped outputs, independent outcomes and custom/deferred paths | Built-in gates and trusted custom/raw/native-asset adapter framework implemented with scoped tests; prepared code/tree, broader GraphQL/external/persistent/control verification and final pipeline integration remain unfinished or unverified |
-| Compiler/MCP/operator/explain/trace and workflow examples | In progress |
+| Compiler/MCP/operator/explain/trace and workflow examples | Implemented surfaces have focused regression coverage. Malformed Claim-adapter declarations, unknown fields and normalized-name collisions are rejected; expected JSON numbers retain their exact type. Full recompilation, remaining lint cleanup and final pipeline integration are outstanding |
 | Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
 | Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
 | Retained-history, contention and recovery-headroom operating envelope | Captured local operating-envelope artifacts include JS 16/64/80 MiB histories and bounded assignment/headroom checks; later source edits invalidate their use as final-source evidence. Mock CAS contention is not live Git/network contention. Final-source, supported-host/API measurements and deployment SLOs remain outstanding |
 | Existing `FairDAGGitHub` and `QueueOrdering` exhaustive searches | Incomplete; no observed violation is not a pass |
-| Full JS typecheck/existing dependency-based tests | Genuine declared tools and type dependencies restored. Current normal TypeScript reports only the unchanged baseline `create_project.cjs:253` diagnostic; new queue diagnostics are cleared. Source-stable combined runtime tests and final formatting/lint gates remain required |
+| Full JS typecheck/existing dependency-based tests | TypeScript 7.0.2 and Vitest 5.0.3 are restored. The approved feed does not supply pinned `@types/node` 26.6.4; the existing 26.6.3 installation remains, without changing dependency pins. The current normal typecheck fails only on unchanged `create_project.cjs:253`; new queue diagnostics are cleared. Source-stable combined runtime tests and final formatting/lint gates remain required |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 41 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Required functional trust boundaries; remaining integration failures are tracked independently of branch-writer deployment automation |
 | Workflow administrator bootstrap and live native-dispatch host compatibility | Automatic workflow bootstrap is unsupported: initialize Policy through an explicitly authenticated operator/trusted host. Hosted immutable-SHA dispatch and the pinned run-details response remain unverified live compatibility gates; injected SDK checks are not hosted evidence |

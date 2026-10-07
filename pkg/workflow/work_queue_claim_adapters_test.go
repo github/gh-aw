@@ -10,6 +10,73 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWorkQueueClaimAdapterParsingRejectsMalformedDeclarations(t *testing.T) {
+	for name, raw := range map[string]any{
+		"missing-object": nil,
+		"scalar":         false,
+		"null-adapter":   map[string]any{"custom": nil},
+		"scalar-adapter": map[string]any{"custom": true},
+		"wrong-mode":     map[string]any{"custom": map[string]any{"mode": 1}},
+		"wrong-map":      map[string]any{"custom": map[string]any{"field-map": map[string]any{"body": false}}},
+		"wrong-request":  map[string]any{"custom": map[string]any{"request": true}},
+		"unknown-field":  map[string]any{"custom": map[string]any{"undeclared": "field"}},
+		"unencodable":    map[string]any{"custom": map[string]any{"expected": make(chan int)}},
+		"normalized-duplicate": map[string]any{
+			"custom-job": map[string]any{"mode": "prepared"},
+			"custom_job": map[string]any{"mode": "prepared"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			adapters, err := parseWorkQueueClaimAdapters(raw)
+			require.ErrorContains(t, err, "safe-outputs.claim-adapters")
+			require.Nil(t, adapters)
+			config := NewCompiler().extractSafeOutputsConfig(map[string]any{
+				"safe-outputs": map[string]any{"claim-adapters": raw},
+			})
+			require.ErrorContains(t, validateWorkQueueConfiguration(&WorkflowData{SafeOutputs: config}), "safe-outputs.claim-adapters")
+		})
+	}
+}
+
+func TestWorkQueueClaimAdapterParsingPreservesTypedFields(t *testing.T) {
+	adapters, err := parseWorkQueueClaimAdapters(map[string]any{
+		"custom-job": map[string]any{
+			"mode": "prepared", "effect-type": "git_tree", "target-repo": "owner/repo",
+			"field-map": map[string]any{"files": "files"},
+			"expected":  map[string]any{"title": "Prepared change"},
+			"git-tree": map[string]any{
+				"base-revision": strings.Repeat("a", 40), "branch-prefix": "claims",
+				"pull-request": true, "base-branch": "main",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, map[string]*WorkQueueClaimAdapter{
+		"custom_job": {
+			Mode: "prepared", EffectType: "git_tree", TargetRepo: "owner/repo",
+			FieldMap: map[string]string{"files": "files"}, Expected: map[string]any{"title": "Prepared change"},
+			GitTree: &WorkQueueGitTree{
+				BaseRevision: strings.Repeat("a", 40), BranchPrefix: "claims", PullRequest: true, BaseBranch: "main",
+			},
+		},
+	}, adapters)
+}
+
+func TestWorkQueueClaimAdapterParsingPreservesExactExpectedNumbers(t *testing.T) {
+	adapters, err := parseWorkQueueClaimAdapters(map[string]any{
+		"custom": map[string]any{
+			"mode": "script", "effect-type": "update_issue", "target-repo": "owner/repo",
+			"field-map": map[string]any{"body": "content"},
+			"expected":  map[string]any{"item_number": 42},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, json.Number("42"), adapters["custom"].Expected["item_number"])
+	encoded, err := json.Marshal(adapters["custom"].Expected)
+	require.NoError(t, err)
+	require.Equal(t, `{"item_number":42}`, string(encoded))
+}
+
 func TestWorkQueueCustomAdapterDeclarationAndPreparationIsolation(t *testing.T) {
 	adapter := &WorkQueueClaimAdapter{
 		Mode: "prepared", EffectType: "update_issue", TargetRepo: "owner/repo",
