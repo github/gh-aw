@@ -745,6 +745,10 @@ permissions:
   copilot-requests: write
 safe-outputs:
   create-issue:
+  threat-detection:
+    engine:
+      id: codex
+      model-provider: github
 features:
   gh-aw-detection: true
 tools:

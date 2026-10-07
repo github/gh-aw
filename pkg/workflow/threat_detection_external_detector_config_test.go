@@ -18,12 +18,17 @@ func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
 				continue
 			}
 			t.Run(mainEngine+" to "+detectionEngine, func(t *testing.T) {
+				mainProvider := LLMProvider("")
+				if mainEngine == "pi" {
+					mainProvider = "google"
+				}
 				data := &WorkflowData{
 					AI:    mainEngine,
 					Model: "main-alias",
 					EngineConfig: &EngineConfig{
-						ID:        mainEngine,
-						APITarget: "main-provider.example.com",
+						ID:          mainEngine,
+						LLMProvider: mainProvider,
+						APITarget:   "main-provider.example.com",
 						Env: map[string]string{
 							"ANTHROPIC_BASE_URL":       "https://main-provider.example.com/api",
 							"OPENAI_BASE_URL":          "https://main-provider.example.com/v1",
@@ -96,6 +101,121 @@ func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestDefaultThreatDetectionEngineMatchesMainProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     *WorkflowData
+		expected string
+	}{
+		{
+			name:     "pi openai provider",
+			data:     &WorkflowData{AI: "pi", Model: "openai/gpt-5", EngineConfig: &EngineConfig{ID: "pi"}},
+			expected: "codex",
+		},
+		{
+			name:     "pi anthropic provider",
+			data:     &WorkflowData{AI: "pi", EngineConfig: &EngineConfig{ID: "pi", LLMProvider: LLMProviderAnthropic}},
+			expected: "claude",
+		},
+		{
+			name:     "pi github provider",
+			data:     &WorkflowData{AI: "pi", EngineConfig: &EngineConfig{ID: "pi", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "claude using github provider",
+			data:     &WorkflowData{AI: "claude", EngineConfig: &EngineConfig{ID: "claude", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "codex using github provider",
+			data:     &WorkflowData{AI: "codex", EngineConfig: &EngineConfig{ID: "codex", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "copilot using openai provider",
+			data:     &WorkflowData{AI: "copilot", EngineConfig: &EngineConfig{ID: "copilot", LLMProvider: LLMProviderOpenAI}},
+			expected: "codex",
+		},
+	}
+
+	compiler := NewCompiler()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := compiler.getThreatDetectionEngineID(test.data); got != test.expected {
+				t.Fatalf("getThreatDetectionEngineID() = %q, want %q", got, test.expected)
+			}
+		})
+	}
+}
+
+func TestThreatDetectionInheritsMatchingProviderAcrossEngines(t *testing.T) {
+	data := &WorkflowData{
+		AI:    "pi",
+		Model: "openai/gpt-5",
+		EngineConfig: &EngineConfig{
+			ID:          "pi",
+			LLMProvider: LLMProviderOpenAI,
+			APITarget:   "provider.example.com",
+			Env: map[string]string{
+				"OPENAI_BASE_URL": "https://provider.example.com/v1",
+				"OPENAI_API_KEY":  "${{ secrets.OPENAI_API_KEY }}",
+				"PI_CUSTOM_FLAG":  "main-only",
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{
+			Allowed: []string{"provider.example.com"},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	compiler := NewCompiler()
+	engineID := compiler.getThreatDetectionEngineID(data)
+	if engineID != "codex" {
+		t.Fatalf("expected Pi/OpenAI to use Codex detection, got %q", engineID)
+	}
+	detectionData := buildExternalDetectorWorkflowData(data, engineID)
+	if detectionData.EngineConfig.Env["OPENAI_BASE_URL"] != data.EngineConfig.Env["OPENAI_BASE_URL"] ||
+		detectionData.EngineConfig.Env["OPENAI_API_KEY"] != data.EngineConfig.Env["OPENAI_API_KEY"] {
+		t.Fatal("matching provider environment was not inherited")
+	}
+	if _, exists := detectionData.EngineConfig.Env["PI_CUSTOM_FLAG"]; exists {
+		t.Fatal("engine-specific environment leaked across engine identities")
+	}
+	if detectionData.EngineConfig.APITarget != data.EngineConfig.APITarget {
+		t.Fatal("matching provider API target was not inherited")
+	}
+	if got := getThreatDetectionAdditionalAllowedDomains(data, engineID); len(got) != 1 || got[0] != "provider.example.com" {
+		t.Fatalf("expected matching provider domain to be allowed, got %v", got)
+	}
+
+	for name, build := range map[string]func(*WorkflowData) []string{
+		"external": compiler.buildExternalDetectorExecutionStep,
+		"inline":   compiler.buildDetectionEngineExecutionStep,
+	} {
+		t.Run(name, func(t *testing.T) {
+			steps := strings.Join(build(data), "")
+			expectedValues := []string{"OPENAI_BASE_URL", "provider.example.com"}
+			if name == "external" {
+				expectedValues = append(expectedValues, "--engine codex")
+			}
+			for _, expected := range expectedValues {
+				if !strings.Contains(steps, expected) {
+					t.Errorf("detection steps missing %q", expected)
+				}
+			}
+			if strings.Contains(steps, "PI_CUSTOM_FLAG") {
+				t.Error("engine-specific environment leaked into detection steps")
+			}
+			if !strings.Contains(steps, "GH_AW_MODEL_DETECTION_CODEX: gpt-5") {
+				t.Error("Pi provider/model syntax was not normalized for Codex detection")
+			}
+		})
 	}
 }
 

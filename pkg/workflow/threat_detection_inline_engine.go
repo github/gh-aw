@@ -95,17 +95,17 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		resolvedDetectionModel = "detection"
 	}
 
-	// Inherit APITarget for GHE/custom endpoints only when the engines match.
-	// This ensures the threat detection AWF invocation receives the same --copilot-api-target
-	// and GHE-specific domains in --allow-domains as the main agent AWF invocation.
-	if detectionEngineConfig.APITarget == "" && data.EngineConfig != nil && ResolveEngineID(data) == engineSetting {
+	// Inherit APITarget for GHE/custom endpoints when the engines or providers match.
+	// This ensures detection uses the same endpoint and corresponding allowed domains.
+	if detectionEngineConfig.APITarget == "" && data.EngineConfig != nil &&
+		(ResolveEngineID(data) == engineSetting || sameThreatDetectionProvider(data, engineSetting)) {
 		detectionEngineConfig.APITarget = data.EngineConfig.APITarget
 	}
-	if engineSetting == "copilot" && originalEngineID == "pi" {
+	if originalEngineID == "pi" {
 		// Pi requires provider/model syntax (for example "copilot/gpt-5.4"), but the
-		// Copilot CLI expects only the model ID. extractPiModelID preserves bare model
-		// names unchanged, so empty or already-normalized values keep their current
-		// fallback behavior while provider-scoped Pi models become Copilot-compatible.
+		// detection engine expects only the model ID. extractPiModelID preserves bare
+		// model names unchanged, so provider-scoped Pi models become compatible with
+		// the matching built-in detection engine.
 		resolvedDetectionModel = extractPiModelID(resolvedDetectionModel)
 	}
 
