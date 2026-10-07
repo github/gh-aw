@@ -50,6 +50,29 @@ func TestParseMentionsConfig_Boolean(t *testing.T) {
 	}
 }
 
+func TestParseMentionsCredentials(t *testing.T) {
+	config := parseMentionsConfig(map[string]any{
+		"github-token": "${{ secrets.MENTIONS_PAT }}",
+		"github-app": map[string]any{
+			"client-id": "${{ vars.MENTIONS_APP_ID }}", "private-key": "${{ secrets.MENTIONS_APP_KEY }}",
+			"ignore-if-missing": true, "permissions": map[string]any{"members": "read"},
+		},
+	})
+	require.Equal(t, "${{ secrets.MENTIONS_PAT }}", config.GitHubToken)
+	require.NotNil(t, config.GitHubApp)
+	require.Equal(t, "${{ vars.MENTIONS_APP_ID }}", config.GitHubApp.AppID)
+	require.Equal(t, "${{ secrets.MENTIONS_APP_KEY }}", config.GitHubApp.PrivateKey)
+	require.True(t, config.GitHubApp.IgnoreIfMissing)
+	require.Equal(t, map[string]string{"members": "read"}, config.GitHubApp.Permissions)
+	runtimeConfig := buildMentionsHandlerConfig(config)
+	require.NotContains(t, runtimeConfig, "github-token")
+	require.NotContains(t, runtimeConfig, "github-app")
+	content, err := json.Marshal(config)
+	require.NoError(t, err)
+	require.NotContains(t, string(content), "MENTIONS_PAT")
+	require.NotContains(t, string(content), "MENTIONS_APP_KEY")
+}
+
 func TestParseMentionsConfig_Object(t *testing.T) {
 	tests := []struct {
 		name     string

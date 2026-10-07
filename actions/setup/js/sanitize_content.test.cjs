@@ -314,6 +314,11 @@ describe("sanitize_content.cjs", () => {
       expect(result).toBe("Hello `@user`");
     });
 
+    it("should defer mention neutralization when requested", () => {
+      const result = sanitizeContent("Hello @user", { deferMentions: true });
+      expect(result).toBe("Hello @user");
+    });
+
     it("should not neutralize org/team mentions in allowedAliases", () => {
       const result = sanitizeContent("Hello @myorg/myteam", { allowedAliases: ["myorg/myteam"] });
       expect(result).toBe("Hello @myorg/myteam");

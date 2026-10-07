@@ -244,6 +244,12 @@ The custom prompt is appended to the default threat detection instructions, prov
 
 Override the main workflow engine for threat detection:
 
+When the resolved detection engine matches the main engine, detection inherits `engine.env`, `api-target`, and model aliases. Detection-specific environment values take precedence, including empty values.
+
+When the engines differ, detection does not inherit the main engine's environment, API target, or custom model aliases. This prevents provider URLs, API keys, and custom headers from reaching an unrelated engine. Configure any required provider settings under `safe-outputs.threat-detection.engine.env`; built-in model aliases remain available.
+
+The conclusion job emits a warning when detection runs but produces no security verdict, including engine failures and unparseable results. Intentionally skipped detection does not emit this warning. The warning does not change `continue-on-error` behavior.
+
 **String Format:**
 
 ```yaml wrap
