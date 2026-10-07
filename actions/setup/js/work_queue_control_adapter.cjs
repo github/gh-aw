@@ -14,7 +14,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator } = requi
  *   env?: NodeJS.ProcessEnv,
  *   state?: {credential_generation: string, policy: {pools: Record<string, {allowed_repositories: string[]}>}},
  *   context?: {repo: {owner: string, repo: string}},
- *   core?: {setOutput: (name: string, value: unknown) => unknown, info: (message: string) => unknown},
+ *   core?: {setOutput: (name: string, value: unknown) => unknown, info: (message: string) => unknown, setFailed?: (message: string) => unknown},
  *   github?: object,
  *   githubClient?: object,
  *   dispatchClient?: object,

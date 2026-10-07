@@ -39,6 +39,8 @@ const {
   withClaimExecution,
   currentClaimHandle,
   currentClaimAssignment,
+  claimIdentity,
+  assertClaimIdentity,
   claimArtifactPath,
   closeClaimEffectChannel,
 } = require("./work_queue_claim_scope.cjs");
@@ -398,6 +400,29 @@ async function finalizeLedgerAppend(config, messageHandlers) {
   }
 }
 
+function bindHandlerToFactoryScope(handler) {
+  const handle = currentClaimHandle();
+  const identity = handle ? claimIdentity(handle) : null;
+  const assertScope = () => {
+    if (currentClaimHandle() !== handle) throw new Error("Handler state cannot escape its trusted Claim factory context");
+    if (identity) assertClaimIdentity(identity);
+  };
+  const bound = (...args) => {
+    assertScope();
+    return handler(...args);
+  };
+  for (const [name, value] of Object.entries(handler)) {
+    bound[name] =
+      typeof value === "function"
+        ? (...args) => {
+            assertScope();
+            return Reflect.apply(value, handler, args);
+          }
+        : value;
+  }
+  return bound;
+}
+
 /**
  * Load and initialize handlers for enabled safe output types
  * Calls each handler's factory function (main) to get message processors
@@ -420,6 +445,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
     // The presence of the config key indicates the handler should be loaded
     if (config[type]) {
       if (type === "upload_asset" && !currentClaimHandle()) continue;
+      if (currentClaimHandle() && ["prepared", "script"].includes(config.claim_adapters?.[type]?.mode)) continue;
       try {
         const effectivePath = currentClaimHandle() && type === "create_code_scanning_alert" ? "./work_queue_code_scanning.cjs" : currentClaimHandle() && type === "upload_code_coverage" ? "./work_queue_code_coverage.cjs" : handlerPath;
         const handlerModule = require(effectivePath);
@@ -467,9 +493,11 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
 
           const executable = wrapWithClientRebinding(type, messageHandler, handlerGithubClient);
           const factoryClaim = currentClaimHandle();
+          const factoryIdentity = factoryClaim ? claimIdentity(factoryClaim) : null;
           const declaredExecutable = factoryClaim ? wrapDeclaredBuiltinHandler(type, executable) : executable;
           const assertFactoryScope = () => {
             if (currentClaimHandle() !== factoryClaim) throw new Error("Handler state cannot escape its trusted Claim factory context");
+            if (factoryIdentity) assertClaimIdentity(factoryIdentity);
           };
           const authorizedHandler = async (message, ...args) => {
             assertFactoryScope();
@@ -487,7 +515,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
                   : value;
             }
           }
-          messageHandlers.set(type, factoryClaim ? authorizedHandler : executable);
+          messageHandlers.set(type, factoryClaim ? authorizedHandler : bindHandlerToFactoryScope(executable));
           core.info(`✓ Loaded and initialized handler for: ${type}`);
         } else {
           handlerLoadErrors.set(type, "handler module does not export a main function");
@@ -541,7 +569,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
             // other safe-output operations.
             core.warning(`✗ Custom script handler ${scriptType} main() did not return a function (got ${typeof messageHandler}) — this handler will be skipped`);
           } else {
-            messageHandlers.set(scriptType, messageHandler);
+            messageHandlers.set(scriptType, bindHandlerToFactoryScope(messageHandler));
             core.info(`✓ Loaded and initialized custom script handler for: ${scriptType}`);
           }
         } else {
@@ -574,7 +602,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
           if (typeof messageHandler !== "function") {
             core.warning(`✗ Custom action handler ${actionType} main() did not return a function (got ${typeof messageHandler}) — this handler will be skipped`);
           } else {
-            messageHandlers.set(actionType, messageHandler);
+            messageHandlers.set(actionType, bindHandlerToFactoryScope(messageHandler));
             core.info(`✓ Loaded and initialized custom action handler for: ${actionType}`);
           }
         } else {
@@ -989,7 +1017,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
 
   // Collect missing_tool, missing_data, noop, and report_incomplete messages first
-  const missings = collectMissingMessages(messages.filter(message => !message._claimScopeError));
+  const missings = collectMissingMessages(messages.filter(message => !currentClaimHandle() || !message._claimScopeError));
   if (currentClaimHandle()) setCollectedMissings(missings);
 
   // Initialize shared temporary ID map
@@ -1040,7 +1068,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
     let message = messages[i];
     const messageType = message.type;
     try {
-      if (message._claimScopeError) throw new Error(message._claimScopeError);
+      if (currentClaimHandle() && message._claimScopeError) throw new Error(message._claimScopeError);
       message = await assertClaimAuthorized(message);
     } catch (error) {
       results.push({

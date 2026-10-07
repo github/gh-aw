@@ -16,7 +16,7 @@ const {
   createClaimResourceVerification,
   withClaimResourceVerification,
 } = require("./work_queue_claim_scope.cjs");
-const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
+const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
@@ -52,9 +52,10 @@ async function main(config = {}, suppliedClient) {
     if (
       typeof message.file !== "string" ||
       !message.file ||
+      Buffer.byteLength(message.file) > 256 ||
       message.file.startsWith("/") ||
-      message.file.includes("\\") ||
-      message.file.split("/").includes("..") ||
+      /[\\\x00-\x1f\x7f]/.test(message.file) ||
+      message.file.split("/").some(part => !part || part === "." || part === "..") ||
       !Number.isSafeInteger(message.line) ||
       message.line < 1 ||
       !["error", "warning", "info", "note"].includes(message.severity) ||
@@ -64,6 +65,7 @@ async function main(config = {}, suppliedClient) {
       (message.column !== undefined && (!Number.isSafeInteger(message.column) || message.column < 1))
     )
       throw new Error("Queue code scanning finding is malformed");
+    const target = canonicalResourceTarget({ repository, ref, path: message.file });
     const getCommit = github.rest?.repos?.getCommit;
     const uploadSarif = github.rest?.codeScanning?.uploadSarif;
     if (typeof getCommit !== "function" || typeof uploadSarif !== "function") throw new Error("Queue code scanning requires its native read and write endpoints");
@@ -81,7 +83,7 @@ async function main(config = {}, suppliedClient) {
       $schema: "https://json.schemastore.org/sarif-2.1.0.json",
       runs: [{ tool: { driver: { name: driver, version: "1.0.0" } }, automationDetails: { id: category }, results: [finding] }],
     };
-    const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
+    const authorityResource = await resolveRepositoryTarget(github, target);
     const upload = await withClaimResourceEffects([authorityResource], ["rest.codeScanning.uploadSarif"], () =>
       uploadSarif({ owner, repo, commit_sha: revision, ref, sarif: zlib.gzipSync(Buffer.from(JSON.stringify(report))).toString("base64"), tool_name: driver, validate: true })
     );

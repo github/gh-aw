@@ -5,7 +5,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 
 const fs = require("fs");
-const { normalizeRuntimeMessage, normalizeClaimScope, readClaimScopeContext, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+const { normalizeRuntimeMessage, readClaimScopeContext, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 
 /**
  * Maximum content length to log for debugging purposes
@@ -50,8 +50,10 @@ function truncateForLogging(content) {
  * }} Result object with success flag and items array (if successful) or error message
  */
 function loadAgentOutput(options = {}) {
-  const scope = readClaimScopeContext();
-  if (!options.partitioning && scope && !currentClaimHandle()) {
+  const claimHandle = currentClaimHandle();
+  const scope = claimHandle ? null : readClaimScopeContext();
+  const queueEnabled = Boolean(scope || claimHandle);
+  if (!options.partitioning && scope && !claimHandle) {
     return { success: false, error: "Queue standalone handlers require a trusted per-Claim execution context" };
   }
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
@@ -85,7 +87,7 @@ function loadAgentOutput(options = {}) {
   // Parse the validated output JSON
   let validatedOutput;
   try {
-    validatedOutput = scope ? require("./work_queue_codec.cjs").parseStrictJSON(outputContent) : JSON.parse(outputContent);
+    validatedOutput = queueEnabled ? require("./work_queue_codec.cjs").parseStrictJSON(outputContent) : JSON.parse(outputContent);
   } catch (error) {
     const errorMessage = `Error parsing agent output JSON: ${getErrorMessage(error)}`;
     core.error(errorMessage);
@@ -102,23 +104,22 @@ function loadAgentOutput(options = {}) {
 
   return {
     success: true,
-    items: validatedOutput.items
-      .map(item => {
-        try {
-          if (currentClaimHandle()) {
-            if (scope?.assignment) return normalizeClaimScope(item, scope.assignment);
-          }
-          return normalizeRuntimeMessage(item);
-        } catch (error) {
-          return {
-            type: item?.type,
-            ...(item && Object.hasOwn(item, "claim_handle") ? { claim_handle: item.claim_handle } : {}),
-            _claimScopeError: getErrorMessage(error),
-            _claimScopeErrorCode: error.code,
-          };
-        }
-      })
-      .filter(item => !currentClaimHandle() || (!item._claimScopeError && item.claim_handle === currentClaimHandle())),
+    items: queueEnabled
+      ? validatedOutput.items
+          .map(item => {
+            try {
+              return normalizeRuntimeMessage(item);
+            } catch (error) {
+              return {
+                type: item?.type,
+                ...(item && Object.hasOwn(item, "claim_handle") ? { claim_handle: item.claim_handle } : {}),
+                _claimScopeError: getErrorMessage(error),
+                _claimScopeErrorCode: error.code,
+              };
+            }
+          })
+          .filter(item => !claimHandle || (!item._claimScopeError && item.claim_handle === claimHandle))
+      : validatedOutput.items,
     ...(typeof validatedOutput.collectorEmptyOutputCause === "string" ? { collectorEmptyOutputCause: validatedOutput.collectorEmptyOutputCause } : {}),
     ...(Object.hasOwn(EMPTY_OUTPUT_FAILURE_CAUSES, validatedOutput.collectorFailureCause) ? { collectorFailureCause: validatedOutput.collectorFailureCause } : {}),
     ...(Number.isSafeInteger(validatedOutput.collectorDriverExitCode) && validatedOutput.collectorDriverExitCode >= 0 && validatedOutput.collectorDriverExitCode <= 255

@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { spawnSync } from "child_process";
 import { join } from "path";
-import { writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync, mkdtempSync, realpathSync } from "node:fs";
 
-const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
+const temporaryDirectory = prefix => mkdtempSync(join(realpathSync(process.cwd()), `.gh-aw-${prefix}-`));
 
 describe("core shim", () => {
+  it.each([0, 1, 2])("preserves injected SDK objects across reloads with %i Claims and stray disabled roles", count => {
+    const shimPath = join(import.meta.dirname, "shim.cjs");
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+      const assert = require("node:assert/strict");
+      const assignment = {claims: Array.from({length: ${count}}, (_, i) => ({handle: "h" + i}))};
+      const core = global.core = {setSecret() {}, info() {}};
+      const context = global.context = {payload: {inputs: {work_queue_assignment: assignment}}};
+      const github = global.github = {injected: true};
+      require(${JSON.stringify(shimPath)});
+      delete require.cache[require.resolve(${JSON.stringify(shimPath)})];
+      require(${JSON.stringify(shimPath)});
+      assert.equal(global.core, core);
+      assert.equal(global.context, context);
+      assert.equal(global.github, github);
+      assert.equal(global.context.payload.inputs.work_queue_assignment, assignment);
+    `,
+      ],
+      { encoding: "utf8", env: { ...process.env, GH_AW_WORK_QUEUE_ENABLED: count ? "true" : "false", GH_AW_WORK_QUEUE_ROLE: "stray-role", GITHUB_EVENT_PATH: "" } }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
   it("rejects setSecret outside the github-script runtime", () => {
     const shimPath = join(import.meta.dirname, "shim.cjs");
     const result = spawnSync(process.execPath, ["-e", `require(${JSON.stringify(shimPath)}); core.setSecret("derived-value");`], {

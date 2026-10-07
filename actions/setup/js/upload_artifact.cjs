@@ -43,20 +43,33 @@ const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
-const { assertClaimAuthorized, currentClaimHandle, claimArtifactPath, scopedArtifactFilename, recordClaimEffect, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const {
+  assertClaimAuthorized,
+  currentClaimHandle,
+  readClaimScopeContext,
+  claimArtifactPath,
+  assertClaimArtifactDirectory,
+  assertClaimArtifactFile,
+  scopedArtifactFilename,
+  recordClaimEffect,
+  claimIdentity,
+  assertClaimIdentity,
+  receiptMatchesClaim,
+} = require("./work_queue_claim_scope.cjs");
 const privateDeliveryReceipts = new WeakMap();
 
 /**
  * Staging directory where the model places files to be uploaded.
  * Uses RUNNER_TEMP to match the path used by the compiled workflow when
  * downloading the staging artifact in the safe_outputs job.
- * Note: Computed once at module load time. RUNNER_TEMP must be set before
- * this module is required/evaluated.
+ * Queue Claim namespaces are resolved in their immutable execution context.
  */
+const STAGING_BASE = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
 function stagingDirectory() {
-  const base = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
   const handle = currentClaimHandle();
-  return (handle ? claimArtifactPath(base, handle) : base) + path.sep;
+  const directory = handle ? claimArtifactPath(STAGING_BASE, handle) : STAGING_BASE;
+  if (handle && fs.existsSync(directory)) assertClaimArtifactDirectory(directory);
+  return directory + path.sep;
 }
 
 /** Path where the resolver mapping (tmpId → artifact name) is written. */
@@ -252,6 +265,7 @@ function copySingleFileToStaging(sourcePath, destRelPath) {
   }
   try {
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    if (currentClaimHandle()) assertClaimArtifactDirectory(stagingDirectory());
   } catch (err) {
     throw new Error(`${ERR_SYSTEM}: Failed to create directory ${path.dirname(destPath)}: ${getErrorMessage(err)}`, { cause: err });
   }
@@ -509,6 +523,7 @@ function resolveFiles(request, allowedPaths, defaultInclude, defaultExclude) {
 
   // Deduplicate and sort deterministically.
   const unique = Array.from(new Set(candidateRelPaths)).sort();
+  if (currentClaimHandle()) for (const filename of unique) assertClaimArtifactFile(path.join(stagingDirectory(), filename), stagingDirectory());
   return { files: unique, error: null };
 }
 
@@ -584,6 +599,7 @@ async function getArtifactClient() {
  */
 async function main(config = {}) {
   const factoryClaim = currentClaimHandle();
+  if (!factoryClaim && readClaimScopeContext()?.assignment) throw new Error(`${ERR_VALIDATION}: upload_artifact requires its original per-Claim execution context; use the scoped safe-output handler`);
   const factoryIdentity = factoryClaim ? claimIdentity(factoryClaim) : null;
   const maxUploads = typeof config["max-uploads"] === "number" ? config["max-uploads"] : 1;
   // retention-days and skip-archive are fixed workflow configuration; the agent cannot override them.
@@ -622,7 +638,7 @@ async function main(config = {}) {
    * @returns {Promise<{success: boolean, error?: string, skipped?: boolean, tmpId?: string, temporaryId?: string, artifactName?: string, artifactId?: number, artifactUrl?: string, slotIndex?: number}>}
    */
   return async function handleUploadArtifact(message, resolvedTemporaryIds, temporaryIdMap) {
-    if (factoryClaim && currentClaimHandle() !== factoryClaim) throw new Error("upload_artifact factory cannot escape its original Claim");
+    if (currentClaimHandle() !== factoryClaim) throw new Error(`${ERR_VALIDATION}: upload_artifact factory cannot escape its original Claim; create a handler for the current Claim`);
     if (factoryIdentity) assertClaimIdentity(factoryIdentity);
     message = await assertClaimAuthorized(message);
     if (slotIndex >= maxUploads) {
@@ -672,7 +688,7 @@ async function main(config = {}) {
     const tmpId = resolveTemporaryArtifactId(message);
     if (Object.prototype.hasOwnProperty.call(resolver, tmpId)) {
       core.warning(`upload_artifact: duplicate temporary_id "${tmpId}" detected for artifact "${artifactName}". Using the first occurrence. Ensure each artifact has a unique temporary_id.`);
-    } else {
+    } else if (!factoryClaim) {
       resolver[tmpId] = artifactName;
     }
 
@@ -695,7 +711,14 @@ async function main(config = {}) {
           uploadOpts.skipArchive = true;
         }
         const repository = process.env.GITHUB_REPOSITORY || "";
-        await assertClaimAuthorized({ ...message, repo: repository }, { effect: true, resource: { repository, target_run_id: process.env.GITHUB_RUN_ID } });
+        if (factoryClaim) {
+          if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error(`${ERR_VALIDATION}: Artifact upload requires the original native repository in owner/repo format`);
+          const [owner, repo] = repository.split("/");
+          const { data: nativeRepository } = await github.rest.repos.get({ owner, repo });
+          if (nativeRepository.full_name !== repository || !/^[1-9][0-9]*$/.test(String(nativeRepository.id)))
+            throw new Error(`${ERR_VALIDATION}: Artifact upload repository identity differs from its native target; scoped effects remain blocked`);
+          await assertClaimAuthorized({ ...message, repo: repository }, { effect: true, resource: { repository, host: "github.com", repository_id: String(nativeRepository.id), run_id: process.env.GITHUB_RUN_ID } });
+        }
         const effect = recordClaimEffect({ kind: "artifact", repository, outcome: "unknown" });
         const uploadResult = await client.uploadArtifact(artifactName, absoluteFiles, stagingDirectory(), uploadOpts);
         if (effect) {
@@ -740,6 +763,8 @@ async function main(config = {}) {
       core.info("📝 Upload artifact preview written to step summary");
     }
 
+    if (factoryClaim && !Object.hasOwn(resolver, tmpId)) resolver[tmpId] = artifactName;
+
     // Set step outputs so downstream jobs can reference the tmp ID.
     const outputPrefix = factoryClaim ? `claim_${path.basename(claimArtifactPath("", factoryClaim))}_` : "";
     core.setOutput(`${outputPrefix}slot_${i}_tmp_id`, tmpId);
@@ -761,6 +786,7 @@ async function main(config = {}) {
     try {
       const resolverFile = scopedArtifactFilename(RESOLVER_FILE);
       fs.mkdirSync(path.dirname(resolverFile), { recursive: true });
+      if (factoryClaim) assertClaimArtifactDirectory(path.dirname(resolverFile));
       fs.writeFileSync(resolverFile, JSON.stringify(resolver, null, 2));
       core.info(`Wrote artifact resolver mapping to ${resolverFile}`);
     } catch (err) {
@@ -785,6 +811,7 @@ async function main(config = {}) {
         id: artifactId,
         digest: trustedDigest.replace(/^sha256:/, ""),
         size: trustedSize,
+        url: artifactUrl,
       });
     }
     return result;
@@ -808,7 +835,7 @@ async function verifyArtifactDelivery({ claim, result, github }) {
   return {
     verified: true,
     claim_handle: claim.handle,
-    resource: { kind: "artifact", repository: receipt.repository, id: String(receipt.id), target_run_id: receipt.run_id, name: receipt.name, digest: data.digest, url: result.artifactUrl },
+    resource: { kind: "artifact", repository: receipt.repository, id: String(receipt.id), target_run_id: receipt.run_id, name: receipt.name, digest: data.digest, url: receipt.url },
     evidence: { source: "github_artifact_api", digest: data.digest, run_id: receipt.run_id, size: data.size_in_bytes },
   };
 }

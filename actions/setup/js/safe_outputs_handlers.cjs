@@ -655,6 +655,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const target = args?.ledger === undefined && candidates.length === 1 ? candidates[0] : candidates.find(ledger => ledger.name === args?.ledger);
     if (!target) return buildIntentErrorResponse("Specify a configured ledger of the correct built-in type.");
     const { ledger: _ledger, temp_id, ...fields } = args || {};
+    const claimHandle = currentClaimHandle();
+    if (claimHandle) {
+      for (const field of ["claim_handle", "claim_id", "work_id"]) delete fields[field];
+    }
     if (Object.hasOwn(fields, "operation")) return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
     const record = { operation, ...fields };
     try {
@@ -662,7 +666,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     } catch {
       return buildIntentErrorResponse("Invalid built-in ledger operation arguments.");
     }
-    return defaultHandler("ledger_append")({ ledger: target.name, ...(temp_id !== undefined && { temp_id }), ...record });
+    return defaultHandler("ledger_append")({ ledger: target.name, ...(temp_id !== undefined && { temp_id }), ...(claimHandle ? { claim_handle: claimHandle } : {}), ...record });
   };
   const ledgerAgentAppendHandler = args => {
     const ledgers = config.ledger_append?.ledgers || [];
@@ -3408,17 +3412,22 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     closeDiscussionHandler,
   };
   const scopedHandler =
-    handler =>
+    (handler, type) =>
     (...args) => {
-      const scope = readClaimScopeContext();
-      if (!scope) return handler(...args);
-      const message = normalizeRuntimeMessage(args[0] || {});
+      const executionHandle = currentClaimHandle();
+      const scope = executionHandle ? null : readClaimScopeContext();
+      if (!scope && !executionHandle) return handler(...args);
+      const message = normalizeRuntimeMessage(type ? { ...(args[0] || {}), type } : args[0] || {});
+      if (type && !Object.hasOwn(args[0] || {}, "type")) delete message.type;
+      if (executionHandle) return handler(message, ...args.slice(1));
       return withClaimExecution({ ...scope, claim_handle: message.claim_handle }, () => handler(message, ...args.slice(1)));
     };
   return Object.fromEntries(
     Object.entries(handlers).map(([name, handler]) => [
       name,
-      ["defaultHandler", "ledgerBuiltinHandler", "ledgerAgentAppendHandler"].includes(name) ? (...args) => scopedHandler(Reflect.apply(handler, undefined, args)) : scopedHandler(handler),
+      ["defaultHandler", "ledgerBuiltinHandler"].includes(name)
+        ? (...args) => scopedHandler(Reflect.apply(handler, undefined, args), name === "defaultHandler" ? args[0] : "ledger_append")
+        : scopedHandler(handler, name === "ledgerAgentAppendHandler" ? "ledger_append" : undefined),
     ])
   );
 }

@@ -3,7 +3,7 @@
 
 const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
-const { canonical, closed } = require("./work_queue_codec.cjs");
+const { canonical, canonicalBytes, closed } = require("./work_queue_codec.cjs");
 const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -91,11 +91,16 @@ function createRestEffectHandler(adapter, github) {
   const stagedMode = isStagedMode();
   return async message => {
     assertClaimIdentity(identity);
-    await assertClaimAuthorized(message, { requireCompletion: !stagedMode });
+    if (Object.hasOwn(message, "repo") && message.repo !== adapter["target-repo"]) throw new Error("Explicit Claim repository conflicts with its trusted REST adapter");
+    await assertClaimAuthorized({ ...message, repo: adapter["target-repo"] }, { requireCompletion: !stagedMode });
     if (stagedMode) return { success: true, staged: true, claim_handle: identity.claim_handle };
     const [owner, repo] = adapter["target-repo"].split("/");
     const fields = { ...(adapter.expected || {}) };
-    for (const field of Object.keys(adapter["field-map"] || {})) fields[field] = message[field];
+    for (const field of Object.keys(adapter["field-map"] || {})) {
+      if (!Object.hasOwn(message, field)) throw new Error("Trusted REST adapter is missing a declared input field");
+      fields[field] = message[field];
+    }
+    if (canonicalBytes(fields) > 1024 * 1024) throw new Error("Trusted REST effect input exceeds its byte ceiling");
     const values = { ...fields, owner, repo };
     const route = concreteRoute(adapter.request.route, values);
     const selectors = new Set(routeFields(adapter.request.route));

@@ -12,6 +12,7 @@ const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentit
 function scopedArtifactFile(filename) {
   const handle = currentClaimHandle();
   if (!handle) return filename;
+  if (nodePath.basename(nodePath.dirname(filename)) === nodePath.basename(claimArtifactPath("", handle)) && nodePath.basename(nodePath.dirname(nodePath.dirname(filename))) === "claims") return filename;
   const directory = claimArtifactPath(nodePath.dirname(filename), handle);
   fs.mkdirSync(directory, { recursive: true });
   return nodePath.join(directory, nodePath.basename(filename));
@@ -212,7 +213,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
  * @param {string} [manifestFile] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
  */
 function ensureManifestExists(manifestFile = MANIFEST_FILE_PATH) {
-  if (!manifestFile.includes(`${nodePath.sep}claims${nodePath.sep}`)) manifestFile = scopedArtifactFile(manifestFile);
+  manifestFile = scopedArtifactFile(manifestFile);
   if (!fs.existsSync(manifestFile)) {
     try {
       fs.writeFileSync(manifestFile, "");

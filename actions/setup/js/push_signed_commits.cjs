@@ -281,6 +281,7 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
     return pushOnce();
   }
 
+  await require("./work_queue_git_effects.cjs").assertGitPushAuthorized({ remote: pushRemoteUrl, branch, cwd, gitAuthEnv });
   const githubServerUrl = (process.env.GITHUB_SERVER_URL || "https://github.com").replace(/\/+$/, "");
   let previousExtraheaders = [];
   let overrideApplied = false;

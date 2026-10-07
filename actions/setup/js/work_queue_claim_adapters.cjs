@@ -184,17 +184,6 @@ async function createClaimAdapterHandler(options) {
   const factoryIdentity = claimIdentity(factoryClaim);
   const stagedMode = isStagedMode();
   let execute;
-  if (!stagedMode) {
-    execute =
-      adapter["effect-type"] === "github_rest"
-        ? createRestEffectHandler(adapter, options.github)
-        : adapter["effect-type"] === "git_tree"
-          ? createGitTreeEffectHandler(adapter, options.github)
-          : adapter["effect-type"] === "github_graphql"
-            ? createGraphqlEffectHandler(adapter, options.github)
-            : await options.loadEffectHandler(adapter["effect-type"]);
-    if (typeof execute !== "function") throw new Error("Trusted Claim adapter executable is unavailable");
-  }
   return async (message, resolvedIds, temporaryIds) => {
     if (currentClaimHandle() !== factoryClaim) throw new Error("Trusted Claim adapter cannot escape its factory Claim");
     assertClaimIdentity(factoryIdentity);
@@ -212,6 +201,16 @@ async function createClaimAdapterHandler(options) {
       if (!matchesDeclaredAdapterExpected(adapter, adapterEffectFields(adapter, projected), verification)) throw new Error("Prepared Claim effect differs from its immutable declared verification expectation");
     }
     await assertClaimAuthorized(projected);
+    if (!execute) {
+      execute =
+        adapter["effect-type"] === "github_rest"
+          ? createRestEffectHandler(adapter, options.github)
+          : adapter["effect-type"] === "git_tree"
+            ? createGitTreeEffectHandler(adapter, options.github)
+            : adapter["effect-type"] === "github_graphql"
+              ? createGraphqlEffectHandler(adapter, options.github)
+              : await options.loadEffectHandler(adapter["effect-type"]);
+    }
     if (typeof execute !== "function") throw new Error("Trusted Claim adapter executable is unavailable");
     const result = await execute(projected, resolvedIds, temporaryIds);
     if (!result || typeof result !== "object") throw new Error("Trusted Claim adapter did not return an exact effect receipt");

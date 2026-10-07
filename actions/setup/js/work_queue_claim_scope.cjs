@@ -101,7 +101,7 @@ function snapshotPath() {
 
 function readClaimScopeContext() {
   const configuredRole = process.env.GH_AW_WORK_QUEUE_ROLE;
-  const enabled = process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || configuredRole !== undefined;
+  const enabled = process.env.GH_AW_WORK_QUEUE_ENABLED === "true";
   if (!enabled) return null;
   if (configuredRole !== undefined && !["observer", "dispatcher", "worker"].includes(configuredRole)) throw scopeError("invalid protected compiler role");
   if (configuredRole === "observer") require("./aw_context.cjs").resolveWorkQueueRuntime(global.context?.payload, { role: configuredRole });
@@ -158,7 +158,8 @@ function normalizeRuntimeMessage(message) {
   const execution = claimExecution.getStore();
   const scope = execution || readClaimScopeContext();
   if (!scope) {
-    if (process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && ["work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"].includes(message?.type)) throw scopeError("protected observers cannot emit queue-control operations");
+    if (process.env.GH_AW_WORK_QUEUE_ENABLED === "true" && process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && ["work_queue_submit", "work_queue_dispatch_next", "work_queue_claim_finish"].includes(message?.type))
+      throw scopeError("protected observers cannot emit queue-control operations");
     return message;
   }
   if (!scope.assignment) throw scopeError("unassigned dispatcher cannot emit worker safe outputs");

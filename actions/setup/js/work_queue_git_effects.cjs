@@ -35,16 +35,25 @@ async function assertGitPushAuthorized(options) {
   const direct = /^(?:https?|ssh):\/\//.test(remote) || remote.includes(":");
   if (!direct && !/^[A-Za-z0-9_.-]{1,256}$/.test(remote)) throw new Error("Claim git remote alias is invalid");
   const alias = `gh-aw-scope-${randomUUID()}`;
-  const args = direct ? ["-c", `remote.${alias}.url=${remote}`, "remote", "get-url", "--push", "--all", "--", alias] : ["remote", "get-url", "--push", "--all", "--", remote];
+  // get-url does not recognize command-scoped remotes on all Git versions.
+  // remote -v still expands both insteadOf and pushInsteadOf without persisting config.
+  const args = direct ? ["-c", `remote.${alias}.url=${remote}`, "remote", "-v"] : ["remote", "get-url", "--push", "--all", "--", remote];
   const execute = options.execGitSync || execGitSync;
   const resolved = execute(args, { cwd: options.cwd, suppressLogs: true, env: { ...process.env, ...(options.gitAuthEnv || {}) } });
   if (Buffer.byteLength(resolved) > 8192) throw new Error("Claim git remote targets exceed the byte bound");
-  const urls = resolved.trim().split("\n").filter(Boolean);
+  const urls = direct
+    ? resolved
+        .split("\n")
+        .filter(line => line.startsWith(`${alias}\t`) && line.endsWith(" (push)"))
+        .map(line => line.slice(alias.length + 1, -" (push)".length))
+    : resolved.trim().split("\n").filter(Boolean);
   if (!urls.length || urls.length > 128) throw new Error("Claim git remote targets exceed the count bound");
   for (const url of urls) {
     const repository = gitPushRepository(url);
+    const message = { type: "work_queue_git_effect", claim_handle: currentClaimHandle(), repo: repository, branch_name: options.branch };
+    await assertClaimAuthorized(message, { authorize: options.authorize });
     const resource = await resolveRepositoryTarget(options.github || global.github, { repository, ref: options.branch });
-    await assertClaimAuthorized({ type: "work_queue_git_effect", claim_handle: currentClaimHandle(), repo: repository, branch_name: options.branch }, { authorize: options.authorize, effect: true, resource });
+    await assertClaimAuthorized(message, { authorize: options.authorize, effect: true, resource });
   }
 }
 

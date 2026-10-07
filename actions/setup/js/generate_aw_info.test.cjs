@@ -53,12 +53,22 @@ describe("generate_aw_info.cjs", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    // Create /tmp/gh-aw directory if it doesn't exist
-    if (!fs.existsSync("/tmp/gh-aw")) {
-      fs.mkdirSync("/tmp/gh-aw", { recursive: true });
-    }
+    // Keep compiler-fixed runner paths in memory; never write to the host's /tmp.
+    const files = new Map();
+    const realRead = fs.readFileSync.bind(fs);
+    const realExists = fs.existsSync.bind(fs);
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    vi.spyOn(fs, "writeFileSync").mockImplementation((filename, content) => files.set(String(filename), String(content)));
+    vi.spyOn(fs, "existsSync").mockImplementation(filename => (String(filename).startsWith("/tmp/gh-aw") ? files.has(String(filename)) : realExists(filename)));
+    vi.spyOn(fs, "readFileSync").mockImplementation((filename, ...args) => {
+      if (files.has(String(filename))) return files.get(String(filename));
+      if (String(filename).startsWith("/tmp/gh-aw")) throw Object.assign(new Error("missing fixture"), { code: "ENOENT" });
+      return realRead(filename, ...args);
+    });
+    vi.spyOn(fs, "unlinkSync").mockImplementation(filename => files.delete(String(filename)));
     awInfoPath = "/tmp/gh-aw/aw_info.json";
+    delete process.env.GH_AW_WORK_QUEUE_ENABLED;
+    delete process.env.GH_AW_WORK_QUEUE_ROLE;
 
     // Set default env vars for compile-time values
     process.env.GH_AW_INFO_ENGINE_ID = "copilot";
@@ -100,6 +110,8 @@ describe("generate_aw_info.cjs", () => {
     for (const key of keysToDelete) {
       delete process.env[key];
     }
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("should write aw_info.json with values from env vars and context", async () => {
@@ -427,6 +439,7 @@ describe("generate_aw_info.cjs", () => {
   });
 
   it("preserves the canonical Claim-array assignment and its nested immutable payload in normalized context", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     const expected = { ...caller, work_queue_assignment: queueAssignment };
     for (const payload of [{ inputs: { aw_context: JSON.stringify(expected) } }, { client_payload: { aw_context: expected } }]) {
@@ -438,6 +451,7 @@ describe("generate_aw_info.cjs", () => {
   });
 
   it("normalizes the compiler-managed work_queue_assignment input into context", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     const expected = { ...caller, work_queue_assignment: queueAssignment };
     await main(mockCore, {
@@ -456,32 +470,35 @@ describe("generate_aw_info.cjs", () => {
   });
 
   it.each(["work_queue", "work_claim", "work_queue_claim"])("rejects the retired %s assignment without publishing context", async field => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
     const legacy = { work_id: "w", claim_id: "c", work: { task: "test" } };
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     for (const payload of [{ inputs: { aw_context: JSON.stringify({ ...caller, [field]: legacy }) } }, { inputs: { aw_context: JSON.stringify(caller), [field]: JSON.stringify(legacy) } }]) {
       mockCore.warning.mockClear();
       mockCore.setOutput.mockClear();
-      await main(mockCore, { ...mockContext, payload });
-      expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
-      expect(mockCore.setOutput.mock.calls.filter(([name]) => name === "aw_context").at(-1)).toEqual(["aw_context", "{}"]);
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("legacy"));
+      await expect(main(mockCore, { ...mockContext, payload })).rejects.toThrow(/legacy/);
+      expect(fs.existsSync(awInfoPath)).toBe(false);
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("aw_context", expect.anything());
     }
   });
 
   it.each([null, [], "claim", { work_id: "", claim_id: "c", work: {} }, { ...queueAssignment, claims: [] }, { ...queueAssignment, claims: [{ ...queueAssignment.claims[0], work: [] }] }, { ...queueAssignment, unexpected: true }])(
     "rejects a malformed current assignment without publishing context",
     async work_queue_assignment => {
-      await main(mockCore, {
-        ...mockContext,
-        payload: { inputs: { aw_context: JSON.stringify({ repo: "org/repo", run_id: "123", workflow_id: "caller", work_queue_assignment }) } },
-      });
-      expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
-      expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/claim|assignment|work.queue|codec_invalid/i));
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+      await expect(
+        main(mockCore, {
+          ...mockContext,
+          payload: { inputs: { aw_context: JSON.stringify({ repo: "org/repo", run_id: "123", workflow_id: "caller", work_queue_assignment }) } },
+        })
+      ).rejects.toThrow();
+      expect(fs.existsSync(awInfoPath)).toBe(false);
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("aw_context", expect.anything());
     }
   );
 
   it("rejects duplicate assignment sources and decoded JSON keys without falling back to ordinary context", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     for (const payload of [
       { inputs: { aw_context: JSON.stringify({ ...caller, work_queue_assignment: queueAssignment }), work_queue_assignment: JSON.stringify(queueAssignment) } },
@@ -490,10 +507,9 @@ describe("generate_aw_info.cjs", () => {
     ]) {
       mockCore.warning.mockClear();
       mockCore.setOutput.mockClear();
-      await main(mockCore, { ...mockContext, payload });
-      expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
-      expect(mockCore.setOutput.mock.calls.filter(([name]) => name === "aw_context").at(-1)).toEqual(["aw_context", "{}"]);
-      expect(mockCore.warning).toHaveBeenCalled();
+      await expect(main(mockCore, { ...mockContext, payload })).rejects.toThrow();
+      expect(fs.existsSync(awInfoPath)).toBe(false);
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("aw_context", expect.anything());
     }
   });
 
@@ -508,6 +524,7 @@ describe("generate_aw_info.cjs", () => {
   ])("fails closed for missing, malformed, legacy or shadowed declared-worker input before publishing metadata", async payload => {
     const previousRole = process.env.GH_AW_WORK_QUEUE_ROLE;
     try {
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
       process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
       await expect(main(mockCore, { ...mockContext, payload })).rejects.toThrow();
       expect(fs.existsSync(awInfoPath)).toBe(false);
@@ -521,6 +538,7 @@ describe("generate_aw_info.cjs", () => {
   it("rejects an observer assignment rather than exporting worker metadata", async () => {
     const previousRole = process.env.GH_AW_WORK_QUEUE_ROLE;
     try {
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
       process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
       await expect(main(mockCore, { ...mockContext, payload: { inputs: { work_queue_assignment: JSON.stringify(queueAssignment) } } })).rejects.toThrow(/observer_assignment_forbidden/);
       expect(fs.existsSync(awInfoPath)).toBe(false);
@@ -535,6 +553,7 @@ describe("generate_aw_info.cjs", () => {
     const assignment = { ...queueAssignment, claims: [...queueAssignment.claims, { handle: "h2", claim_id: "claim2", work_id: "work2", work: {}, result_refs: [] }] };
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     try {
+      vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
       process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
       await main(mockCore, {
         ...mockContext,
@@ -546,6 +565,47 @@ describe("generate_aw_info.cjs", () => {
       if (previousRole === undefined) delete process.env.GH_AW_WORK_QUEUE_ROLE;
       else process.env.GH_AW_WORK_QUEUE_ROLE = previousRole;
     }
+  });
+
+  it.each(["worker", "observer", "invalid-role"])("keeps disabled ordinary context unchanged despite stray %s role and assignment inputs", async role => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "false");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", role);
+    const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller", note: "ordinary metadata" };
+    await main(mockCore, {
+      ...mockContext,
+      payload: { inputs: { aw_context: JSON.stringify(caller), work_queue_assignment: '{"broken":' }, client_payload: { work_queue_assignment: null } },
+    });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toEqual(caller);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(caller));
+    expect(mockCore.warning).not.toHaveBeenCalled();
+  });
+
+  it.each(["work_queue", "work_claim"])("preserves main's disabled %s metadata normalization without current Claim authority", async field => {
+    const legacy = { work_id: "w", claim_id: "c", work: { plan: "legacy metadata" } };
+    const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify({ ...caller, [field]: legacy }) } } });
+    const metadata = JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context;
+    expect(metadata).toEqual({ ...caller, work_queue: legacy });
+    expect(metadata).not.toHaveProperty("work_queue_assignment");
+    expect(mockCore.warning).not.toHaveBeenCalled();
+  });
+
+  it("treats new nested queue data as ordinary unsupported metadata when disabled", async () => {
+    const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller", work_queue_assignment: queueAssignment };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(caller) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("context");
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
+    expect(mockCore.warning).toHaveBeenCalledWith("aw_context contains nested objects for keys: work_queue_assignment. Ignoring aw_context.");
+  });
+
+  it.each([1, 2])("validates a standalone %i-Claim activation without fabricating caller provenance", async count => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+    const assignment = { ...queueAssignment, claims: Array.from({ length: count }, (_, i) => ({ ...queueAssignment.claims[0], handle: `h${i + 1}`, claim_id: `c${i + 1}`, work_id: `w${i + 1}` })) };
+    await main(mockCore, { ...mockContext, payload: { inputs: { work_queue_assignment: JSON.stringify(assignment) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("context");
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
+    expect(mockCore.warning).not.toHaveBeenCalled();
   });
 
   it("should reject aw_context missing required fields", async () => {

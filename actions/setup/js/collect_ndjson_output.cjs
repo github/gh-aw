@@ -3,7 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { repairJson, sanitizePrototypePollution } = require("./json_repair_helpers.cjs");
-const { normalizeRuntimeMessage, readClaimScopeContext } = require("./work_queue_claim_scope.cjs");
+const { normalizeRuntimeMessage, readClaimScopeContext, currentClaimHandle, currentClaimAssignment } = require("./work_queue_claim_scope.cjs");
 const { parseStrictJSON } = require("./work_queue_codec.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
@@ -16,7 +16,10 @@ const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "
 async function main() {
   try {
     const fs = require("fs");
-    const queueScope = readClaimScopeContext();
+    const claimHandle = currentClaimHandle();
+    const runtimeScope = claimHandle ? null : readClaimScopeContext();
+    const queueScope = Boolean(claimHandle || runtimeScope);
+    const assignment = currentClaimAssignment() || runtimeScope?.assignment;
     const { sanitizeContent } = require("./sanitize_content.cjs");
     const { validateItem, getMaxAllowedForType, getMinRequiredForType, hasValidationConfig, MAX_BODY_LENGTH: maxBodyLength, resetValidationConfigCache } = require("./safe_output_type_validator.cjs");
     // Load validation config from file and set it in environment for the validator to read
@@ -250,8 +253,8 @@ async function main() {
           rejectItem(`Line ${i + 1}: Invalid JSON - JSON parsing failed`);
           continue;
         }
-        if (!item?.type || typeof item.type !== "string") {
-          rejectItem(`Line ${i + 1}: Missing or invalid required 'type' field`);
+        if (queueScope ? !item?.type || typeof item.type !== "string" : !item.type) {
+          rejectItem(`Line ${i + 1}: ${queueScope ? "Missing or invalid" : "Missing"} required 'type' field`);
           continue;
         }
         // Normalize type to use underscores (convert any dashes to underscores for resilience)
@@ -260,12 +263,14 @@ async function main() {
         core.info(`[INGESTION] Line ${i + 1}: Original type='${originalType}', Normalized type='${itemType}'`);
         // Update item.type to normalized value
         item.type = itemType;
-        try {
-          item = normalizeRuntimeMessage(item);
-        } catch (error) {
-          const message = `Line ${i + 1}: ${getErrorMessage(error)}`;
-          rejectItem(message, error.code);
-          continue;
+        if (queueScope) {
+          try {
+            item = normalizeRuntimeMessage(item);
+          } catch (error) {
+            const message = `Line ${i + 1}: ${getErrorMessage(error)}`;
+            rejectItem(message, error.code);
+            continue;
+          }
         }
         deferMentionFiltering = MENTION_AWARE_OUTPUT_TYPES.has(itemType);
         if (!expectedOutputTypes[itemType]) {
@@ -277,7 +282,7 @@ async function main() {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
-        const typeCount = parsedItems.filter(existing => existing.type === itemType && existing.claim_handle === item.claim_handle && !existing._claimScopeError).length;
+        const typeCount = parsedItems.filter(existing => existing.type === itemType && (!queueScope || (existing.claim_handle === item.claim_handle && !existing._claimScopeError))).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
           rejectItem(`Line ${i + 1}: Too many items of type '${itemType}'. Maximum allowed: ${maxAllowed}.`);
@@ -316,7 +321,7 @@ async function main() {
           // Use the normalized item (with sanitized/validated fields) rather
           // than the raw input, so downstream consumers see the canonical form.
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push({ ...validationResult.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) });
+          parsedItems.push(queueScope ? { ...validationResult.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) } : validationResult.normalizedItem);
         } else {
           // Fall back to validateItemWithSafeJobConfig for unknown types
           const jobOutputType = expectedOutputTypes[itemType];
@@ -331,7 +336,7 @@ async function main() {
             continue;
           }
           core.info(`Line ${i + 1}: Valid ${itemType} item`);
-          parsedItems.push({ ...validation.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) });
+          parsedItems.push(queueScope ? { ...validation.normalizedItem, ...(item.claim_handle ? { claim_handle: item.claim_handle } : {}) } : validation.normalizedItem);
         }
       } catch (error) {
         const errorMsg = getErrorMessage(error);
@@ -345,9 +350,21 @@ async function main() {
     for (const itemType of Object.keys(expectedOutputTypes)) {
       const minRequired = getMinRequiredForType(itemType, expectedOutputTypes);
       if (minRequired > 0) {
-        const actualCount = parsedItems.filter(item => item.type === itemType).length;
-        if (actualCount < minRequired) {
-          errors.push(`Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`);
+        const handles = claimHandle ? [claimHandle] : assignment ? assignment.claims.map(member => member.handle) : [undefined];
+        for (const handle of handles) {
+          const actualCount = parsedItems.filter(item => item.type === itemType && (!queueScope || (!item._claimScopeError && item.claim_handle === handle))).length;
+          if (actualCount < minRequired) {
+            const message = `Too few items of type '${itemType}'. Minimum required: ${minRequired}, found: ${actualCount}.`;
+            errors.push(handle ? `Claim '${handle}': ${message}` : message);
+            if (handle) {
+              parsedItems.push({
+                type: itemType,
+                claim_handle: handle,
+                _claimScopeError: message,
+                _claimScopeErrorCode: "claim_scope_invalid",
+              });
+            }
+          }
         }
       }
     }
@@ -400,7 +417,7 @@ async function main() {
     let hasPatch = false;
     const patchFiles = [];
     try {
-      if (outputContent.trim() && fs.existsSync(patchDir)) {
+      if ((!queueScope || outputContent.trim()) && fs.existsSync(patchDir)) {
         const dirEntries = fs.readdirSync(patchDir);
         for (const entry of dirEntries) {
           if (/^aw-.+\.(patch|bundle)$/.test(entry)) {

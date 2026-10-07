@@ -196,7 +196,8 @@ async function main(config = {}) {
       const observer = process.env.GH_AW_WORK_QUEUE_ROLE === "observer" && !currentClaimHandle() && resolveWorkQueueRuntime(context.payload).role === "observer";
       if (!observer) return { success: false, error: "Queue-scoped code cannot delegate an ordinary workflow dispatch; stage publisher-selected work_queue_dispatch_next" };
     }
-    if (message.inputs && ["work_queue", "work_claim", "work_queue_claim", "work_queue_assignment"].some(key => Object.hasOwn(message.inputs, key))) {
+    const protectedQueue = config.work_queue_enabled || process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || currentClaimHandle() || (typeof message.workflow_name === "string" && workQueueWorkflows.has(message.workflow_name.trim()));
+    if (protectedQueue && message.inputs && ["work_queue", "work_claim", "work_queue_claim", "work_queue_assignment"].some(key => Object.hasOwn(message.inputs, key))) {
       return { success: false, error: "Agent-supplied queue assignments and Work selectors are unsupported; stage work_queue_dispatch_next" };
     }
     // Check if we've hit the max limit
@@ -276,6 +277,10 @@ async function main(config = {}) {
         };
       }
 
+      if (!protectedQueue && message.inputs?.work_queue !== undefined) {
+        throw new Error("Work queue dispatch requires tools.work-queue, a same-repository worker with aw_context, and tools.work-queue enabled on the worker");
+      }
+
       // Prepare inputs - convert all values to strings as required by workflow_dispatch
       // and resolve any #temporary_id references before dispatching
       /** @type {Record<string, string>} */
@@ -285,7 +290,7 @@ async function main(config = {}) {
         const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
         for (const [key, value] of Object.entries(message.inputs)) {
-          if (key === "aw_context" || key === "work_queue_assignment" || key === "work_queue_claim") continue;
+          if (key === "aw_context" || key === "work_queue" || key === "work_queue_claim" || (protectedQueue && key === "work_queue_assignment")) continue;
           // Convert value to string
           let strValue;
           if (value === null || value === undefined) {

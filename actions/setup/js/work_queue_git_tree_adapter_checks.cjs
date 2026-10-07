@@ -8,13 +8,14 @@ const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, validateAdapter, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 const { canonical } = require("./work_queue_codec.cjs");
+const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
 
 const BASE = "a".repeat(40);
 const BASE_TREE = "b".repeat(40);
 const hash = value => crypto.createHash("sha1").update(value).digest("hex");
 const blobHash = value => hash(Buffer.concat([Buffer.from(`blob ${Buffer.byteLength(value)}\0`), Buffer.from(value)]));
 
-function assigned(dispatch = "dispatch") {
+function assigned(dispatch = "dispatch", count = 2) {
   return {
     version: 3,
     dispatch_id: dispatch,
@@ -23,7 +24,7 @@ function assigned(dispatch = "dispatch") {
     policy_epoch: "epoch",
     pool: "default",
     worker_profile: "default",
-    claims: ["h1", "h2"].map(handle => ({
+    claims: ["h1", "h2"].slice(0, count).map(handle => ({
       handle,
       claim_id: `${dispatch}:claim:${handle}`,
       work_id: `${dispatch}:work:${handle}`,
@@ -142,6 +143,53 @@ async function prepare(root, assignment, handle, adapter, message, github) {
 
 function registerTests({ describe, it }) {
   describe("immutable per-Claim prepared code delivery", () => {
+    for (const count of [1, 2]) {
+      it(`prepares and independently settles every member of an original ${count}-Claim assignment`, async () => {
+        const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code-matrix");
+        const assignment = assigned("dispatch", count);
+        const adapter = configured(false);
+        const host = native();
+        const inputs = assignment.claims.map(member => ({ type: "code", ...(count === 1 ? {} : { claim_handle: member.handle }), files: [{ path: `${member.handle}.txt`, content: member.work_id }] }));
+        const authorize = async request => {
+          assert.equal(request.assignment.claims.length, count);
+          assert.equal(request.assignment.worker_profile, assignment.worker_profile);
+          return { claim_handle: request.claim_handle, authorized: true };
+        };
+        const results = [];
+        try {
+          for (const [index, member] of assignment.claims.entries()) {
+            const prepared = await prepareAdapterContext({ assignment, adapter, index, type: "code", messages: inputs, authorize, artifactRoot: root });
+            assert.deepEqual(prepared.messages, [{ ...inputs[index], claim_handle: member.handle }]);
+            fs.writeFileSync(prepared.outputFile, JSON.stringify({ version: 3, claim_handle: member.handle, type: "code", messages: [{ input: prepared.messages[0], payload: { files: inputs[index].files } }] }));
+            const effects = [];
+            await withClaimExecution({ assignment, claim_handle: member.handle, authorize, effects }, async () => {
+              const handler = await createClaimAdapterHandler({ adapter, filename: prepared.outputFile, github: host.github });
+              if (count > 1) await assert.rejects(handler({ type: "code", files: inputs[index].files }), /claim_handle is required/);
+              const result = await handler(inputs[index]);
+              results.push(result);
+              const delivery = await verifyClaimDelivery({
+                assignment,
+                claim_handle: member.handle,
+                messages: [inputs[index]],
+                results: [{ messageIndex: 0, success: true, result }],
+                effects,
+                github: host.github,
+                authorize,
+                verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter }),
+              });
+              assert.equal(delivery.verification, "verified");
+              if (index > 0) assert.equal((await verifyClaimAdapterOutput({ claim: member, result: results[0], github: host.github, adapter })).verified, false);
+            });
+          }
+          assert.equal(host.refs.size, count);
+          assert.equal(new Set(results.map(result => result.branch)).size, count);
+          assert.equal(host.pulls.size, 0);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      });
+    }
+
     it("verifies exact complete tree, bytes, parent, branch and PR fields without a shared writer checkout", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-code");
       const assignment = assigned();

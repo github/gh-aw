@@ -102,6 +102,35 @@ describe("add_workflow_run_comment", () => {
     return import("./add_workflow_run_comment.cjs?test=" + importCounter);
   }
 
+  it.each([0, 1, 2])("keeps trusted activation reporting on the native triggering issue with %i queue Claims", async count => {
+    const assignment = {
+      version: 3,
+      dispatch_id: "d1",
+      request_id: "r1",
+      commit_id: "commit1",
+      policy_epoch: "e1",
+      pool: "default",
+      worker_profile: "worker",
+      claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: { issue_number: 999 }, result_refs: [] })),
+    };
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", count ? "true" : "false");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+    global.context.payload.inputs = { work_queue_assignment: count ? JSON.stringify(assignment) : "stray malformed assignment" };
+    try {
+      const { main } = await importAddWorkflowRunComment();
+      await main();
+      expect(mockGithub.request).toHaveBeenCalledOnce();
+      expect(mockGithub.request).toHaveBeenCalledWith(
+        "POST /repos/{owner}/{repo}/issues/{issue_number}/comments",
+        expect.objectContaining({ owner: "testowner", repo: "testrepo", issue_number: 123, body: expect.stringContaining("/actions/runs/12345") })
+      );
+      expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "67890");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   describe("discussion endpoint validation", () => {
     it("rejects malformed and non-positive discussion endpoint numbers", async () => {
       const { parseDiscussionEndpoint } = await importAddWorkflowRunComment();

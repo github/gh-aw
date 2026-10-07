@@ -218,6 +218,32 @@ function normalizeWorkQueueContext(awContext, rawWorkQueueAssignment) {
   return assignment ? { ...awContext, work_queue_assignment: assignment } : { ...awContext };
 }
 
+// Preserve pre-queue metadata normalization only for workflows without the
+// compiler-managed queue. This data never supplies current Claim authority.
+function normalizeLegacyWorkQueueContext(awContext, rawClaim) {
+  const readAssignment = value => {
+    const hasCurrent = Object.hasOwn(value, "work_queue");
+    const hasLegacy = Object.hasOwn(value, "work_claim");
+    if (hasCurrent && hasLegacy) throw new TypeError("aw_context cannot contain both work_queue and the legacy work_claim assignment");
+    if (!hasCurrent && !hasLegacy) return null;
+    const assignment = hasCurrent ? value.work_queue : value.work_claim;
+    if (!isRecord(assignment) || Object.keys(assignment).length !== 3 || typeof assignment.work_id !== "string" || !assignment.work_id || typeof assignment.claim_id !== "string" || !assignment.claim_id || !isRecord(assignment.work))
+      throw new TypeError("work queue assignment has an invalid shape");
+    return { work_id: assignment.work_id, claim_id: assignment.claim_id, work: assignment.work };
+  };
+  let assignment = readAssignment(awContext);
+  if (rawClaim != null && rawClaim !== "") {
+    const claim = parseInboundAwContext(rawClaim);
+    if (!claim) throw new TypeError("work_queue_claim must be a JSON object");
+    if (assignment) throw new TypeError("work_queue_claim cannot be combined with an assignment in aw_context");
+    assignment = readAssignment({ work_queue: claim });
+  }
+  const normalized = { ...awContext };
+  delete normalized.work_claim;
+  if (assignment) normalized.work_queue = assignment;
+  return normalized;
+}
+
 /**
  * Builds the aw_context object that identifies the calling workflow run.
  * This metadata is injected into compiler-managed dispatched workflows,
@@ -408,4 +434,15 @@ function buildAwContext() {
   };
 }
 
-module.exports = { buildAwContext, buildWorkflowCallId, resolveItemContext, parseInboundAwContext, readInboundAwContext, readInboundWorkQueueAssignment, readWorkQueueAssignment, normalizeWorkQueueContext, resolveWorkQueueRuntime };
+module.exports = {
+  buildAwContext,
+  buildWorkflowCallId,
+  resolveItemContext,
+  parseInboundAwContext,
+  readInboundAwContext,
+  readInboundWorkQueueAssignment,
+  readWorkQueueAssignment,
+  normalizeWorkQueueContext,
+  normalizeLegacyWorkQueueContext,
+  resolveWorkQueueRuntime,
+};

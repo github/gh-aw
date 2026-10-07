@@ -17,7 +17,7 @@ const {
   createClaimResourceVerification,
   withClaimResourceVerification,
 } = require("./work_queue_claim_scope.cjs");
-const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
+const { resolveRepositoryTarget, canonicalResourceTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
@@ -54,6 +54,8 @@ async function main(config = {}, suppliedClient) {
       !message.file ||
       message.file === "." ||
       message.file === ".." ||
+      Buffer.byteLength(message.file) > 256 ||
+      /[\\\x00-\x1f\x7f]/.test(message.file) ||
       typeof message.language !== "string" ||
       !message.language ||
       message.language.length > 128 ||
@@ -62,11 +64,10 @@ async function main(config = {}, suppliedClient) {
       message.label.length > 128
     )
       throw new Error("Queue coverage requires declared isolated report metadata");
+    const target = canonicalResourceTarget({ repository, ref, path: message.file });
     const getCommit = github.rest?.repos?.getCommit;
     const request = github.request;
     if (typeof getCommit !== "function" || typeof request !== "function") throw new Error("Queue coverage requires its native read and write endpoints");
-    const resolved = await getCommit({ owner, repo, ref });
-    if (resolved.data.sha !== revision) throw new Error("Trusted coverage target differs from the immutable worker revision");
     const filename = path.join(root, message.file);
     assertClaimArtifactFile(filename, root);
     const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
@@ -78,9 +79,11 @@ async function main(config = {}, suppliedClient) {
     } finally {
       fs.closeSync(fd);
     }
+    const resolved = await getCommit({ owner, repo, ref });
+    if (resolved.data.sha !== revision) throw new Error("Trusted coverage target differs from the immutable worker revision");
     const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
     const label = `${message.label}/claim/${path.basename(claimArtifactPath("", handle))}`;
-    const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
+    const authorityResource = await resolveRepositoryTarget(github, target);
     const { data } = await withClaimResourceEffects([authorityResource], ["request:PUT /repos/{owner}/{repo}/code-coverage/report"], () =>
       request("PUT /repos/{owner}/{repo}/code-coverage/report", {
         owner,

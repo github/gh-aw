@@ -7,7 +7,7 @@ const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
 
 function registerTests({ describe, it }) {
   describe("ordinary missing-output preservation", () => {
-    it("does not discover stale patches when ordinary safe output is missing or empty", async () => {
+    it("preserves legacy patch discovery when ordinary safe output is missing or empty", async () => {
       const root = temporaryDirectory("queue-collector");
       const keys = ["RUNNER_TEMP", "GH_AW_SAFE_OUTPUTS", "GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_VALIDATION_CONFIG_PATH", "GH_AW_WORK_QUEUE_ENABLED"];
       const previous = keys.map(key => process.env[key]);
@@ -20,6 +20,7 @@ function registerTests({ describe, it }) {
       const previousCore = global.core;
       const previousContext = global.context;
       const exists = fs.existsSync;
+      const readdir = fs.readdirSync;
       try {
         fs.mkdirSync(root, { recursive: true });
         constantsModule.exports = { ...constants, TMP_GH_AW_PATH: root };
@@ -38,9 +39,12 @@ function registerTests({ describe, it }) {
           },
         };
         fs.existsSync = filename => {
-          if (filename === "/tmp/gh-aw") throw new Error("Missing ordinary outputs must not examine the legacy patch directory");
+          if (filename === "/tmp/gh-aw") return true;
           return exists(filename);
         };
+        fs.readdirSync = new Proxy(readdir, {
+          apply: (target, receiver, args) => (args[0] === "/tmp/gh-aw" ? ["aw-existing.patch"] : Reflect.apply(target, receiver, args)),
+        });
         const { main } = require(collectorPath);
         for (const present of [false, true]) {
           const outputs = new Map();
@@ -49,12 +53,13 @@ function registerTests({ describe, it }) {
           process.env.GH_AW_SAFE_OUTPUTS = filename;
           if (present) fs.writeFileSync(filename, "");
           await main();
-          assert.equal(outputs.get("has_patch"), "false");
+          assert.equal(outputs.get("has_patch"), "true");
           assert.equal(outputs.get("raw_output"), "");
           assert.equal(JSON.parse(outputs.get("output")).items[0].type, "report_incomplete");
         }
       } finally {
         fs.existsSync = exists;
+        fs.readdirSync = readdir;
         constantsModule.exports = constants;
         if (cachedCollector) require.cache[collectorPath] = cachedCollector;
         else delete require.cache[collectorPath];

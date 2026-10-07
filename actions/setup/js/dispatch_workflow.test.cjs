@@ -6,9 +6,10 @@ import { queueFixture } from "./work_queue_lifecycle.test_helpers.cjs";
 import { fakeGitHub } from "./work_queue_store_checks.cjs";
 import { replayTransactions } from "./work_queue_replay.cjs";
 import { main as writeSnapshot } from "./write_work_queue_snapshot.cjs";
-import { temporaryDirectory } from "./work_queue_effect_test_helpers.cjs";
 import fs from "node:fs";
 import path from "node:path";
+
+const temporaryDirectory = prefix => fs.mkdtempSync(path.join(fs.realpathSync(process.cwd()), `.gh-aw-${prefix}-`));
 
 // Mock dependencies
 global.core = {
@@ -185,14 +186,41 @@ describe("dispatch_workflow handler factory", () => {
     expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
   });
 
-  it("rejects every retired assignment alias on ordinary dispatches before any POST", async () => {
+  it("rejects every assignment alias on protected observer dispatches before any POST", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "observer");
     const handler = await main({ workflows: ["ordinary"], workflow_files: { ordinary: ".lock.yml" } });
-    for (const key of ["work_queue", "work_claim", "work_queue_claim", "work_queue_assignment"]) {
-      const result = await handler({ workflow_name: "ordinary", inputs: { [key]: {} } }, {});
-      expect(result.success).toBe(false);
-      expect(result.error).toMatch(/Agent-supplied queue assignments/);
+    try {
+      for (const key of ["work_queue", "work_claim", "work_queue_claim", "work_queue_assignment"]) {
+        const result = await handler({ workflow_name: "ordinary", inputs: { [key]: {} } }, {});
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/Agent-supplied queue assignments/);
+      }
+      expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
     }
-    expect(global.github.rest.actions.createWorkflowDispatch).not.toHaveBeenCalled();
+  });
+
+  it("retains main's disabled input conversion and reserved keys despite stray queue context", async () => {
+    vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "false");
+    vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
+    global.context.payload.inputs = { work_queue_assignment: null };
+    try {
+      const handler = await main({ workflows: ["ordinary"], workflow_files: { ordinary: ".lock.yml" } });
+      const result = await handler({ workflow_name: "ordinary", inputs: { work_claim: { note: "ordinary input" }, work_queue_assignment: "ordinary input", work_queue_claim: "ignored reserved input", count: 2, flag: false } }, {});
+      expect(result.success).toBe(true);
+      expect(global.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputs: { work_claim: '{"note":"ordinary input"}', work_queue_assignment: "ordinary input", count: "2", flag: "false" },
+        })
+      );
+      const denied = await main({ workflows: ["ordinary"] });
+      expect((await denied({ workflow_name: "ordinary", inputs: { work_queue: {} } }, {})).error).toMatch(/Work queue dispatch requires/);
+      expect(global.github.rest.actions.createWorkflowDispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("requires an immutable scheduler assignment even for ordinary/staged calls to a queue worker", async () => {

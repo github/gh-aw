@@ -139,19 +139,19 @@ function registerTests({ describe, it }) {
         }
         process.env.GH_AW_WORK_QUEUE_ENABLED = "false";
         process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
-        await assert.rejects(processMessages(handlers, messages), /snapshot is missing/);
-        assert.equal(writes, 1);
+        assert.equal((await processMessages(handlers, messages)).success, true);
+        assert.equal(writes, 2);
         process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
         process.env.GH_AW_WORK_QUEUE_ROLE = "observer";
         for (const snapshot of ["{", Buffer.from([0xff]), JSON.stringify({ version: 3, sha: "head", transactionLog: "", captured_at: 1, origin: {}, worker: assignment(), role: "worker" })]) {
           fs.writeFileSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT, snapshot);
           await assert.rejects(processMessages(handlers, messages));
-          assert.equal(writes, 1);
+          assert.equal(writes, 2);
         }
         fs.unlinkSync(process.env.GH_AW_WORK_QUEUE_SNAPSHOT);
         fs.symlinkSync(path.join(root, "missing-target"), process.env.GH_AW_WORK_QUEUE_SNAPSHOT);
         await assert.rejects(processMessages(handlers, messages), /bounded regular-file/);
-        assert.equal(writes, 1);
+        assert.equal(writes, 2);
       } finally {
         for (const key of keys) {
           if (previous[key] === undefined) delete process.env[key];

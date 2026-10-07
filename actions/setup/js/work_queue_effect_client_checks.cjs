@@ -294,13 +294,16 @@ function registerTests({ describe, it }) {
             branch: "work",
             execGitSync: args => {
               assert.equal(args[0], "-c");
-              return "https://github.com/foreign/repo.git\n";
+              assert.deepEqual(args.slice(2), ["remote", "-v"]);
+              const alias = args[1].match(/^remote\.(.+)\.url=/)?.[1];
+              assert.ok(alias);
+              return `${alias}\thttps://github.com/foreign/repo.git (push)\n`;
             },
           }),
           /same-Claim/
         );
       });
-      assert.deepEqual(proofs, ["owner/repo", "owner/repo", "foreign/repo", "foreign/repo"]);
+      assert.deepEqual(proofs, ["owner/repo", "owner/repo", "owner/repo", "owner/repo", "foreign/repo", "foreign/repo"]);
     });
 
     it("partitions actual artifact uploads, resolver files and outputs and gates their real repository", async () => {
@@ -308,6 +311,7 @@ function registerTests({ describe, it }) {
       const keys = ["RUNNER_TEMP", "GH_AW_ARTIFACT_RESOLVER_FILE", "GITHUB_REPOSITORY", "GITHUB_RUN_ID"];
       const oldEnvironment = keys.map(key => process.env[key]);
       const oldCore = global.core;
+      const oldGithub = global.github;
       const oldFactory = global.__createArtifactClient;
       const uploads = [];
       const outputs = [];
@@ -317,6 +321,16 @@ function registerTests({ describe, it }) {
       process.env.GITHUB_REPOSITORY = "owner/repo";
       process.env.GITHUB_RUN_ID = "123";
       global.core = { ...oldCore, info() {}, warning() {}, setOutput: (key, value) => outputs.push([key, value]) };
+      Reflect.set(global, "github", {
+        rest: {
+          repos: {
+            get: async args => {
+              assert.deepEqual(args, { owner: "owner", repo: "repo" });
+              return { data: { full_name: "owner/repo", id: 7 } };
+            },
+          },
+        },
+      });
       global.__createArtifactClient = () => ({
         uploadArtifact: async (name, files, root) => {
           uploads.push({ name, files, root, content: fs.readFileSync(files[0], "utf8") });
@@ -328,7 +342,11 @@ function registerTests({ describe, it }) {
       try {
         const { main, verifyArtifactDelivery } = require(modulePath);
         const effects = [];
-        const authorize = async request => ({ authorized: true, claim_handle: request.claim_handle });
+        const authorize = async request => {
+          assert.equal(request.requireCompletion, true);
+          if (request.resource !== undefined) assert.deepEqual(request.resource, { repository: "owner/repo", host: "github.com", repository_id: "7", run_id: "123" });
+          return { authorized: true, claim_handle: request.claim_handle };
+        };
         let firstHandler;
         for (const handle of ["h1", "h2"]) {
           const root = claimArtifactPath(path.join(directory, "gh-aw", "safeoutputs", "upload-artifacts"), handle, assignment);
@@ -338,7 +356,7 @@ function registerTests({ describe, it }) {
             const handler = await main();
             if (handle === "h1") firstHandler = handler;
             const result = await handler({ type: "upload_artifact", claim_handle: handle, path: "same.txt", temporary_id: "aw_same" });
-            assert.equal(result.success, true);
+            assert.equal(result.success, true, result.error);
             const client = {
               rest: {
                 actions: {
@@ -400,6 +418,7 @@ function registerTests({ describe, it }) {
       } finally {
         delete require.cache[modulePath];
         global.core = oldCore;
+        global.github = oldGithub;
         global.__createArtifactClient = oldFactory;
         keys.forEach((key, index) => (oldEnvironment[index] === undefined ? delete process.env[key] : (process.env[key] = oldEnvironment[index])));
         fs.rmSync(directory, { recursive: true, force: true });

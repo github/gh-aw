@@ -3,7 +3,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { closed, parseStrictJSON } = require("./work_queue_codec.cjs");
+const { closed, parseStrictJSON, identity } = require("./work_queue_codec.cjs");
 
 // This runs only in the compiler's read-only preparation job. It cannot publish
 // effects or delivery receipts; the trusted job independently ingests its data.
@@ -14,6 +14,17 @@ async function main() {
   if (!inputFile || !outputFile || !runtimeRoot) throw new Error("Claim script requires the compiler-produced isolated paths");
   const input = parseStrictJSON(fs.readFileSync(inputFile, "utf8"));
   closed(input, ["version", "claim_handle", "type", "messages"], [], "Claim script input");
+  identity(input.claim_handle, "prepared Claim handle");
+  if (
+    input.version !== 3 ||
+    typeof input.type !== "string" ||
+    !input.type ||
+    input.type.length > 128 ||
+    !Array.isArray(input.messages) ||
+    input.messages.length > 128 ||
+    input.messages.some(message => !message || typeof message !== "object" || Array.isArray(message) || message.claim_handle !== input.claim_handle || message.type !== input.type)
+  )
+    throw new Error("Claim script requires bounded version-3 inputs with exact immutable attribution");
   const filename = process.env.GH_AW_CLAIM_SCRIPT_FILENAME;
   if (!filename || path.basename(filename) !== filename || !/^safe_output_script_[A-Za-z_0-9]+\.cjs$/.test(filename)) throw new Error("Invalid compiler-produced Claim script filename");
   const module = require(path.join(runtimeRoot, "gh-aw", "actions", filename));

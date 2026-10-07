@@ -15,16 +15,6 @@ async function prepareAdapterContext(options) {
   const member = assignment.claims[index];
   if (!member) return { active: false };
   return withClaimExecution({ assignment, claim_handle: member.handle, authorize: options.authorize }, async () => {
-    await assertClaimAuthorized(
-      { type: "work_queue_adapter_prepare", claim_handle: member.handle, repo: adapter["target-repo"] },
-      {
-        authorize: options.authorize,
-        github: options.github,
-        context: options.context,
-        requireCompletion: false,
-        resource: { repository: adapter["target-repo"] },
-      }
-    );
     const messages = [];
     for (const input of options.messages || []) {
       try {
@@ -36,6 +26,16 @@ async function prepareAdapterContext(options) {
       }
     }
     if (!messages.length) return { active: false, claim_handle: member.handle };
+    await assertClaimAuthorized(
+      { type: "work_queue_adapter_prepare", claim_handle: member.handle, repo: adapter["target-repo"] },
+      {
+        authorize: options.authorize,
+        github: options.github,
+        context: options.context,
+        requireCompletion: false,
+        resource: { repository: adapter["target-repo"] },
+      }
+    );
     const directory = claimArtifactPath(options.artifactRoot || "/tmp/gh-aw", member.handle);
     fs.mkdirSync(path.join(directory, "adapters"), { recursive: true, mode: 0o700 });
     assertClaimArtifactDirectory(directory);

@@ -4073,7 +4073,16 @@ async function main() {
     // was done (e.g., post-processing step or AI model server returning a spurious error).
     let hasCompletedDespiteJobFailure = false;
     const { loadAgentOutput } = require("./load_agent_output.cjs");
-    const agentOutputResult = loadAgentOutput();
+    let agentOutputResult;
+    try {
+      agentOutputResult = loadAgentOutput();
+    } catch (error) {
+      if (process.env.GH_AW_WORK_QUEUE_ENABLED !== "true") throw error;
+      // Invalid queue output is not authority. Infrastructure failure reporting
+      // still needs to inspect the native triggering event and failed job.
+      core.warning(`Unable to read queue-scoped agent output for failure diagnostics: ${getErrorMessage(error)}`);
+      agentOutputResult = { success: false, items: [] };
+    }
     const taskCompleteRegistrationIssueOnlyReportIncomplete =
       agentOutputResult.success &&
       agentOutputResult.items &&

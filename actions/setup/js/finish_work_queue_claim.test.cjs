@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
-import os from "node:os";
 import { createRequire } from "node:module";
 import { authorizeWorkerClaim, finalizeWorkerResults, main, readFinishIntent, reconcileWorkerClaim, verifyWithinBudget } from "./finish_work_queue_claim.cjs";
 import { nodeId } from "./work_queue_graph.cjs";
@@ -11,7 +10,7 @@ import { queueFixture, noWriteClaimVerifier, REF, REPOSITORY, WORKFLOW, DISPATCH
 const directories = [];
 function setup(count = 3, fixtureOptions = {}) {
   const fixture = queueFixture({ bound: true, count, ...fixtureOptions });
-  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-finish-"));
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(process.cwd()), ".gh-aw-queue-finish-"));
   directories.push(directory);
   const options = {
     assignment: fixture.assignment,
@@ -34,6 +33,74 @@ afterEach(() => {
 });
 
 describe("independent trusted Claim finalization", () => {
+  it("exports an unassigned no-effect wrapup without reading or publishing a queue", async () => {
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() } };
+    const readWorkQueueLog = vi.fn(() => {
+      throw new Error("No assignment must not load a queue");
+    });
+    const publishWorkQueueRequest = vi.fn();
+    expect(await main({ worker: null, core, readWorkQueueLog, publishWorkQueueRequest })).toEqual({ version: 3, status: "unassigned", claims: {}, errors: [] });
+    expect(readWorkQueueLog).not.toHaveBeenCalled();
+    expect(publishWorkQueueRequest).not.toHaveBeenCalled();
+    expect(core.setOutput).toHaveBeenCalledWith("claim_authorizations", JSON.stringify({ version: 3, status: "unassigned", claims: {}, errors: [] }));
+  });
+
+  it.each([1, 2])("reports independent cancellation for %i Claims with empty finish output without creating Completion or Result", async count => {
+    const { fixture, options } = setup(count);
+    fs.writeFileSync(options.finishIntentPath, "\n\n");
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() } };
+    const result = await main({ ...options, core });
+    expect(result.status).toBe("cancelled");
+    expect(Object.values(result.claims)).toHaveLength(count);
+    expect(Object.values(result.claims).every(claim => claim.state === "cancelled" && claim.authorized === false)).toBe(true);
+    expect(fixture.transactions.flatMap(commit => commit.operations).some(operation => ["Completion", "Result", "Release"].includes(operation.kind))).toBe(false);
+    expect(core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("0 Claims may process scoped effects"));
+  });
+
+  it("reports a failed Claim finish as pending while permitting a completed sibling and cancelling only its missing sibling", async () => {
+    const { fixture, options } = setup(3);
+    finish(options, "h1", "completed");
+    finish(options, "h2", "completed");
+    const publish = options.publishWorkQueueRequest;
+    options.publishWorkQueueRequest = async request => {
+      if (request.request.parameters.claim_handle === "h1") throw new Error("independent native CAS failure");
+      return publish(request);
+    };
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() } };
+    const result = await main({ ...options, core });
+    expect(result.status).toBe("pending");
+    expect(result.claims.h1).toMatchObject({ state: "blocked", authorized: false });
+    expect(result.claims.h2).toMatchObject({ state: "completed", authorized: true });
+    expect(result.claims.h3).toMatchObject({ state: "cancelled", authorized: false });
+    expect(fixture.state.claims.get(fixture.assignment.claims[0].claim_id).state).toBe("open");
+    expect(core.setOutput).toHaveBeenCalledWith("claim_authorizations", JSON.stringify(result));
+    expect(core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("1 Claims may process scoped effects; 2 Claims"));
+  });
+
+  it("keeps closed-schema, malformed and foreign finish lines from granting Completion or blocking a valid sibling", async () => {
+    const { fixture, options } = setup(2);
+    fs.writeFileSync(
+      options.finishIntentPath,
+      [
+        '{"version":3,"kind":"finish","intent_id":"extra","claim_handle":"h1","authorized":true,"parameters":{"outcome":"completed"}}',
+        '{"version":3,"kind":"finish","intent_id":"bad-outcome","claim_handle":"h1","parameters":{"outcome":"result"}}',
+        '{"version":3,"kind":"finish","intent_id":"foreign","claim_handle":"foreign","parameters":{"outcome":"completed"}}',
+        '{"version":3,"version":3,"kind":"finish","intent_id":"duplicate","claim_handle":"h1","parameters":{"outcome":"completed"}}',
+      ].join("\n") + "\n"
+    );
+    finish(options, "h2", "completed");
+    const result = await reconcileWorkerClaim(options);
+    expect(result.errors).toHaveLength(4);
+    expect(result.claims.h1).toMatchObject({ state: "cancelled", authorized: false });
+    expect(result.claims.h2).toMatchObject({ state: "completed", authorized: true });
+    expect(
+      fixture.transactions
+        .flatMap(commit => commit.operations)
+        .filter(operation => operation.kind === "Completion")
+        .map(operation => operation.claim_id)
+    ).toEqual([fixture.assignment.claims[1].claim_id]);
+  });
+
   it.each([
     undefined,
     null,

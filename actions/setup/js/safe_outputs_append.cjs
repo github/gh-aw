@@ -23,9 +23,9 @@ function createAppendFunction(outputFile) {
    */
   return function appendSafeOutput(entry) {
     if (!outputFile) throw new Error(`${ERR_VALIDATION}: No output file configured`);
-    entry = normalizeRuntimeMessage(entry);
     // Normalize type to use underscores (convert any dashes to underscores)
     entry.type = entry.type.replace(/-/g, "_");
+    entry = normalizeRuntimeMessage(entry);
     // CRITICAL: Use JSON.stringify WITHOUT formatting parameters for JSONL format
     // Each entry must be on a single line, followed by a newline character
     const jsonLine = JSON.stringify(entry) + "\n";

@@ -10,7 +10,7 @@ const validateLockdownRequirements = require("./validate_lockdown_requirements.c
 const { writeMergedModelsJSON } = require("./merge_frontmatter_models.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
-const { normalizeWorkQueueContext, readInboundWorkQueueAssignment, resolveWorkQueueRuntime } = require("./aw_context.cjs");
+const { normalizeLegacyWorkQueueContext, normalizeWorkQueueContext, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 
 /**
  * Generate aw_info.json with workflow run metadata.
@@ -171,7 +171,7 @@ async function main(core, ctx, githubClient) {
   // Include aw_context when the workflow was triggered by a caller that relayed
   // orchestration context via workflow inputs or repository_dispatch client payload.
   // Validates JSON format and structure before populating the context key in aw_info.json.
-  const queueRuntime = process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || process.env.GH_AW_WORK_QUEUE_ROLE !== undefined ? resolveWorkQueueRuntime(ctx.payload) : null;
+  const queueRuntime = process.env.GH_AW_WORK_QUEUE_ENABLED === "true" ? resolveWorkQueueRuntime(ctx.payload) : null;
   const awContextRaw = ctx.payload?.inputs?.aw_context ?? ctx.payload?.client_payload?.aw_context;
   let expressionAwContext = "{}";
   if (awContextRaw != null) {
@@ -183,9 +183,12 @@ async function main(core, ctx, githubClient) {
         core.warning(`aw_context must be a JSON object, got: ${typeof parsed}`);
       } else {
         try {
-          const assignment = queueRuntime ? queueRuntime.assignment : readInboundWorkQueueAssignment(ctx.payload);
-          parsed = normalizeWorkQueueContext(parsed);
-          if (assignment && !Object.hasOwn(parsed, "work_queue_assignment")) parsed = { ...parsed, work_queue_assignment: assignment };
+          if (queueRuntime) {
+            parsed = normalizeWorkQueueContext(parsed);
+            if (queueRuntime.assignment && !Object.hasOwn(parsed, "work_queue_assignment")) parsed = { ...parsed, work_queue_assignment: queueRuntime.assignment };
+          } else {
+            parsed = normalizeLegacyWorkQueueContext(parsed, ctx.payload?.inputs?.work_queue_claim ?? ctx.payload?.client_payload?.work_queue_claim);
+          }
         } catch (error) {
           core.warning(`${getErrorMessage(error)}. Ignoring aw_context.`);
           parsed = null;
@@ -193,7 +196,7 @@ async function main(core, ctx, githubClient) {
         if (parsed !== null) {
           // Only the schema-checked queue assignment may contain nested data.
           const nestedKeys = Object.entries(parsed)
-            .filter(([k, v]) => k !== "work_queue_assignment" && v !== null && typeof v === "object")
+            .filter(([k, v]) => k !== (queueRuntime ? "work_queue_assignment" : "work_queue") && v !== null && typeof v === "object")
             .map(([k]) => k);
           if (nestedKeys.length > 0) {
             core.warning(`aw_context contains nested objects for keys: ${nestedKeys.join(", ")}. Ignoring aw_context.`);
