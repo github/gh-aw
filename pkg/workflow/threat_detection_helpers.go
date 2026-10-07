@@ -111,8 +111,8 @@ func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID str
 }
 
 // mergeThreatDetectionEngineEnv composes detection engine env vars from the main
-// engine env and detection-specific overrides, inheriting provider settings when
-// the engines use the same provider.
+// engine env and detection-specific overrides, inheriting main engine settings
+// only when both configurations resolve to the same engine ID.
 //
 // Detection values take precedence when keys overlap. For the same engine, when detectionEnv is empty,
 // it still returns a copy of the main env map to avoid aliasing/mutation of the
@@ -123,14 +123,7 @@ func mergeThreatDetectionEngineEnv(data *WorkflowData, engineID string, detectio
 	}
 	mainEnv := data.EngineConfig.Env
 	if ResolveEngineID(data) != engineID {
-		provider, ok := matchingThreatDetectionProvider(data, engineID)
-		if !ok {
-			return detectionEnv
-		}
-		mainEnv = providerEnvironment(data.EngineConfig.Env, provider)
-		if len(mainEnv) == 0 {
-			return detectionEnv
-		}
+		return detectionEnv
 	}
 	if len(detectionEnv) == 0 {
 		return maps.Clone(mainEnv)
@@ -140,29 +133,6 @@ func mergeThreatDetectionEngineEnv(data *WorkflowData, engineID string, detectio
 	maps.Copy(merged, mainEnv)
 	maps.Copy(merged, detectionEnv)
 	return merged
-}
-
-func matchingThreatDetectionProvider(data *WorkflowData, engineID string) (LLMProvider, bool) {
-	mainProvider, ok := resolveWorkflowEngineProvider(data, ResolveEngineID(data))
-	if !ok {
-		return "", false
-	}
-
-	detectionConfig := resolveExternalDetectorEngineConfig(data, engineID)
-	detectionModel := inheritedDetectionModel(data, engineID)
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil &&
-		data.SafeOutputs.ThreatDetection.Model != "" {
-		detectionModel = data.SafeOutputs.ThreatDetection.Model
-	}
-	detectionData := *data
-	detectionData.AI = engineID
-	detectionData.Model = detectionModel
-	detectionData.EngineConfig = detectionConfig
-	detectionProvider, ok := resolveWorkflowEngineProvider(&detectionData, engineID)
-	if !ok || detectionProvider != mainProvider {
-		return "", false
-	}
-	return mainProvider, true
 }
 
 func resolveWorkflowEngineProvider(data *WorkflowData, engineID string) (LLMProvider, bool) {
@@ -181,27 +151,6 @@ func resolveWorkflowEngineProvider(data *WorkflowData, engineID string) (LLMProv
 	default:
 		return "", false
 	}
-}
-
-func providerEnvironment(env map[string]string, provider LLMProvider) map[string]string {
-	prefixes := map[LLMProvider][]string{
-		LLMProviderGitHub:    {"COPILOT_"},
-		LLMProviderAnthropic: {"ANTHROPIC_"},
-		LLMProviderOpenAI:    {"OPENAI_", "CODEX_"},
-	}[provider]
-	if len(prefixes) == 0 {
-		return nil
-	}
-	filtered := make(map[string]string)
-	for name, value := range env {
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(name, prefix) {
-				filtered[name] = value
-				break
-			}
-		}
-	}
-	return filtered
 }
 
 // buildExternalDetectorWorkflowData creates the base WorkflowData for an external
@@ -228,7 +177,7 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 	}
 	d.EngineConfig.Env = mergeThreatDetectionEngineEnv(data, engineID, d.EngineConfig.Env)
 	if d.EngineConfig.APITarget == "" && data.EngineConfig != nil &&
-		(ResolveEngineID(data) == engineID || sameThreatDetectionProvider(data, engineID)) {
+		ResolveEngineID(data) == engineID {
 		d.EngineConfig.APITarget = data.EngineConfig.APITarget
 	}
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
@@ -239,11 +188,6 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		d.EngineConfig.HarnessMaxRetries = "0"
 	}
 	return d
-}
-
-func sameThreatDetectionProvider(data *WorkflowData, engineID string) bool {
-	_, ok := matchingThreatDetectionProvider(data, engineID)
-	return ok
 }
 
 // resolveExternalDetectorEngineConfig determines the EngineConfig used to install and

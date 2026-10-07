@@ -95,10 +95,9 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		resolvedDetectionModel = "detection"
 	}
 
-	// Inherit APITarget for GHE/custom endpoints when the engines or providers match.
-	// This ensures detection uses the same endpoint and corresponding allowed domains.
+	// Inherit APITarget for GHE/custom endpoints only when the engine IDs match.
 	if detectionEngineConfig.APITarget == "" && data.EngineConfig != nil &&
-		(ResolveEngineID(data) == engineSetting || sameThreatDetectionProvider(data, engineSetting)) {
+		ResolveEngineID(data) == engineSetting {
 		detectionEngineConfig.APITarget = data.EngineConfig.APITarget
 	}
 	if originalEngineID == "pi" {

@@ -743,7 +743,7 @@ func TestEmitGeneralToolWarnings_PiThreatDetectionAuthWarning(t *testing.T) {
 			},
 		},
 		{
-			name: "does not warn when provider-matched token is configured on the main Pi engine",
+			name: "warns when token is configured only on the main Pi engine",
 			data: &WorkflowData{
 				AI: "pi",
 				EngineConfig: &EngineConfig{
@@ -757,6 +757,7 @@ func TestEmitGeneralToolWarnings_PiThreatDetectionAuthWarning(t *testing.T) {
 					ThreatDetection: &ThreatDetectionConfig{},
 				},
 			},
+			wantWarning: true,
 		},
 		{
 			name: "does not warn with explicit detection Copilot token",
