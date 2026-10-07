@@ -156,7 +156,7 @@ func TestGenerateDefaultCheckoutStep(t *testing.T) {
 		})
 		lines := cm.GenerateDefaultCheckoutStep(false, "", getPin)
 		combined := strings.Join(lines, "")
-		assert.Contains(t, combined, "ref: develop", "should include ref override")
+		assert.Contains(t, combined, "ref: \"develop\"", "should include ref override")
 	})
 
 	t.Run("trial mode overrides user config", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestGenerateAdditionalCheckoutSteps(t *testing.T) {
 		combined := strings.Join(lines, "")
 		assert.Contains(t, combined, "repository: owner/libs", "should include repo")
 		assert.Contains(t, combined, "path: ./libs/owner-libs", "should include path")
-		assert.Contains(t, combined, "ref: main", "should include ref")
+		assert.Contains(t, combined, "ref: \"main\"", "should include ref")
 		assert.Contains(t, combined, "persist-credentials: false", "must always have persist-credentials: false")
 	})
 

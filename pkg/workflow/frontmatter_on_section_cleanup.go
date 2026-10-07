@@ -7,7 +7,7 @@ import (
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
-// commentOutProcessedFieldsInOnSection comments out draft, max-stack, fork, forks, names, labels, manual-approval, cooldown, stop-after, skip-if-match, skip-if-no-match, skip-roles, reaction, lock-for-agent, steps, permissions, needs, restore-memory, stale-check, and report-blocked-version fields in the on section
+// commentOutProcessedFieldsInOnSection comments out draft, max-stack, fork, forks, names, labels, manual-approval, cooldown, stop-after, skip-if-match, skip-if-no-match, skip-roles, reaction, lock-for-agent, steps, permissions, needs, restore-memory, stale-check, report-blocked-version, and pull_request_target policy fields in the on section
 // These fields are processed separately and should be commented for documentation
 // Exception: names fields in sections with __gh_aw_native_label_filter__ marker in frontmatter are NOT commented out
 func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmatter map[string]any) string {
@@ -54,6 +54,7 @@ func newOnSectionLine(raw string) onSectionLine {
 
 type onSectionCleanupState struct {
 	inPullRequest                bool
+	inPullRequestTarget          bool
 	inPullRequestReview          bool
 	inIssues                     bool
 	inDiscussion                 bool
@@ -72,6 +73,8 @@ type onSectionCleanupState struct {
 	inBotsArray                  bool
 	inLabelsArray                bool
 	inNeedsArray                 bool
+	inAllowedCheckouts           bool
+	allowedCheckoutsIndent       int
 	inGitHubApp                  bool
 	inOnSteps                    bool
 	inOnPermissions              bool
@@ -88,6 +91,7 @@ func newOnSectionCleanupState() *onSectionCleanupState {
 		currentSectionIndent:   -1,
 		deploymentStatusIndent: -1,
 		workflowRunIndent:      -1,
+		allowedCheckoutsIndent: -1,
 	}
 }
 
@@ -121,7 +125,7 @@ func collectNativeLabelFilterSections(frontmatter map[string]any) map[string]str
 }
 
 func (s *onSectionCleanupState) inEventSection() bool {
-	return s.inPullRequest || s.inPullRequestReview || s.inIssues || s.inDiscussion || s.inIssueComment
+	return s.inPullRequest || s.inPullRequestTarget || s.inPullRequestReview || s.inIssues || s.inDiscussion || s.inIssueComment
 }
 
 func (s *onSectionCleanupState) handleEventSectionEntry(info onSectionLine, result *[]string) bool {
@@ -142,7 +146,7 @@ func (s *onSectionCleanupState) detectEventSection(info onSectionLine) (string, 
 		return "", false
 	}
 	switch info.trimmed {
-	case "pull_request:", "pull_request_review:", "issues:", "discussion:", "issue_comment:", "deployment_status:", "workflow_run:":
+	case "pull_request:", "pull_request_target:", "pull_request_review:", "issues:", "discussion:", "issue_comment:", "deployment_status:", "workflow_run:":
 		return strings.TrimSuffix(info.trimmed, ":"), true
 	default:
 		return "", false
@@ -155,6 +159,7 @@ func (s *onSectionCleanupState) activateEventSection(section string, indent int)
 	s.inCommentBlock = false
 	s.commentBlockIndent = ""
 	s.inPullRequest = section == "pull_request"
+	s.inPullRequestTarget = section == "pull_request_target"
 	s.inPullRequestReview = section == "pull_request_review"
 	s.inIssues = section == "issues"
 	s.inDiscussion = section == "discussion"
@@ -163,6 +168,8 @@ func (s *onSectionCleanupState) activateEventSection(section string, indent int)
 	s.inWorkflowRun = section == "workflow_run"
 	s.inWorkflowRunConclusionArray = false
 	s.inForksArray = false
+	s.inAllowedCheckouts = false
+	s.allowedCheckoutsIndent = -1
 	s.currentSection, s.currentSectionIndent = "", -1
 	if s.inEventSection() {
 		s.currentSection, s.currentSectionIndent = section, indent
@@ -194,6 +201,7 @@ func (s *onSectionCleanupState) leaveEventSections(info onSectionLine) {
 	s.leaveCurrentEventSection(info)
 	s.leaveDeploymentStatusSection(info)
 	s.leaveWorkflowRunSection(info)
+	s.leaveAllowedCheckouts(info)
 }
 
 func (s *onSectionCleanupState) leaveCurrentEventSection(info onSectionLine) {
@@ -202,13 +210,26 @@ func (s *onSectionCleanupState) leaveCurrentEventSection(info onSectionLine) {
 	}
 	if s.currentSectionIndent >= 0 && info.indent <= s.currentSectionIndent {
 		s.inPullRequest = false
+		s.inPullRequestTarget = false
 		s.inPullRequestReview = false
 		s.inIssues = false
 		s.inDiscussion = false
 		s.inIssueComment = false
 		s.inForksArray = false
+		s.inAllowedCheckouts = false
+		s.allowedCheckoutsIndent = -1
 		s.currentSection = ""
 		s.currentSectionIndent = -1
+	}
+}
+
+func (s *onSectionCleanupState) leaveAllowedCheckouts(info onSectionLine) {
+	if !s.inAllowedCheckouts || info.trimmed == "" || strings.HasPrefix(info.trimmed, "#") {
+		return
+	}
+	if info.indent <= s.allowedCheckoutsIndent {
+		s.inAllowedCheckouts = false
+		s.allowedCheckoutsIndent = -1
 	}
 }
 
@@ -520,6 +541,14 @@ func (s *onSectionCleanupState) determineEventSectionComment(info onSectionLine,
 
 func (s *onSectionCleanupState) commentPullRequestAndTriggerField(info onSectionLine) (bool, string) {
 	switch {
+	case s.inAllowedCheckouts && info.indent > s.allowedCheckoutsIndent:
+		return true, ""
+	case s.inPullRequestTarget && info.indent == 4 && strings.HasPrefix(info.trimmed, "acknowledge-risk:"):
+		return true, " # Risk acknowledgment is compiler-only"
+	case s.inPullRequestTarget && info.indent == 4 && strings.HasPrefix(info.trimmed, "allowed-checkouts:"):
+		s.inAllowedCheckouts = true
+		s.allowedCheckoutsIndent = info.indent
+		return true, " # Trusted checkout policy is compiler-only"
 	case s.inPullRequest && strings.Contains(info.trimmed, "draft:"):
 		return true, " # Draft filtering applied via job conditions"
 	case (s.inPullRequest || s.inPullRequestReview) && strings.HasPrefix(info.trimmed, "max-stack:"):

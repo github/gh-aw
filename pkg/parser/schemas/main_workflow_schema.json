@@ -1730,6 +1730,34 @@
                     }
                   ],
                   "description": "When true, allows workflow to run on pull requests from forked repositories with write permissions. Security consideration: use cautiously as fork PRs run with base repository permissions."
+                },
+                "acknowledge-risk": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Acknowledge elevated permissions and secret access to suppress only the strict-mode pull_request_target trigger warning. Checkout validation remains enforced."
+                },
+                "allowed-checkouts": {
+                  "type": "array",
+                  "description": "Exact literal repository/ref pairs trusted by the maintainer in addition to the supported base-repository checkouts. Expressions, wildcards, omitted refs, and PR refs are not allowed.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["repository", "ref"],
+                    "properties": {
+                      "repository": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+                        "description": "Literal owner/repository slug. Matches exactly, including case."
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[^\\s${}*?\\[\\\\:~^]+$",
+                        "not": { "pattern": "^refs/pull/" },
+                        "description": "Literal trusted branch, tag, or commit SHA; not a pull request ref. Prefer an immutable commit SHA."
+                      }
+                    }
+                  }
                 }
               },
               "additionalProperties": false,
