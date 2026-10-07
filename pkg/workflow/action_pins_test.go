@@ -640,9 +640,6 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 			expectedVer:    "v7.0.1",
 			strictMode:     false,
 			shouldFallback: true,
-			// Note: When requesting v4 without dynamic resolution, the system uses v4.6.2's SHA
-			// (the highest v4.x.x version from hardcoded pins), but shows v4 in the comment
-			// to preserve the user's intent.
 		},
 		{
 			name:           "fallback to highest semver-compatible version for upload-artifact when requesting v5",
@@ -702,8 +699,8 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 					tt.repo, tt.requestedVer, result)
 			}
 
-			if tt.shouldFallback && !strings.Contains(result, "(source ") {
-				t.Errorf("getActionPinWithData(%s, %s) = %s, expected fallback to include resolved-version metadata",
+			if tt.shouldFallback && !strings.HasSuffix(result, "# "+expectedVersion) {
+				t.Errorf("getActionPinWithData(%s, %s) = %s, expected a single fallback version comment",
 					tt.repo, tt.requestedVer, result)
 			}
 		})

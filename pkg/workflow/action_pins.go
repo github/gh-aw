@@ -17,6 +17,9 @@ import (
 var actionPinsLog = logger.New("workflow:action_pins")
 var pinnedUsesLine = regexp.MustCompile(`(?m)^(?: {8}uses: | {6}- uses: )[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[a-fA-F0-9]{40}(?:[ \t]*#[ \t]*[^\r\n]*)?$`)
 
+// Keep exact mappings distinct from ordinary uses of the same target until prefix rewriting finishes.
+const exactPinMappingMarker = " [gh-aw-exact-pin]"
+
 // Type aliases — callers within pkg/workflow use these names directly.
 
 // ActionYAMLInput is defined in pkg/actionpins; aliased here so all files in
@@ -69,7 +72,8 @@ func getActionPin(repo string) string {
 		actionPinsLog.Printf("No embedded pins found for repo: %s", repo)
 		return ""
 	}
-	return actionpins.FormatPinnedActionReference(repo, pins[0].SHA, pins[0].Version)
+	pin := pins[0] //nolint:uncheckedsliceindex // The empty case returns above.
+	return actionpins.FormatPinnedActionReference(repo, pin.SHA, pin.Version)
 }
 
 func getActionPinForData(repo string, data *WorkflowData) string {
@@ -154,6 +158,9 @@ func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, w
 		}
 		before, reference, _ := strings.Cut(line, "uses: ")
 		indentation := before + "uses: "
+		if originalRef, marked := strings.CutSuffix(reference, exactPinMappingMarker); marked {
+			return indentation + originalRef
+		}
 		repo, suffix, _ := strings.Cut(reference, "@")
 		_, version, _ := strings.Cut(suffix, " # ")
 		version = strings.TrimSpace(version)
@@ -300,12 +307,22 @@ func applyContainerPinMappingFromData(image string, data *WorkflowData) string {
 // delegating to pkg/actionpins with a PinContext built from WorkflowData.
 func getActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
 	ctx := pinContextWithoutActionMappings(data)
+	exactMapped := false
 	if ctx != nil {
 		if _, mapped := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]; mapped {
 			ctx.GHES = false
+			ctx.Mappings = data.ActionPinMappings
+			exactMapped = true
 		}
 	}
-	return actionpins.ResolveActionPin(actionRepo, version, ctx)
+	ref, err := actionpins.ResolveActionPin(actionRepo, version, ctx)
+	if exactMapped && err == nil && ref != "" {
+		if !strings.Contains(ref, " # ") {
+			ref += " #"
+		}
+		ref += exactPinMappingMarker
+	}
+	return ref, err
 }
 
 func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext {

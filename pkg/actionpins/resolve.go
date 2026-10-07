@@ -197,7 +197,7 @@ func resolveNonStrictHardcodedPin(actionRepo, version string, matchingPins []Act
 	if foundCompatible {
 		actionPinsLog.Printf("No exact match for version %s, using highest semver-compatible version: %s", version, selectedPin.Version)
 	} else {
-		selectedPin = matchingPins[0]
+		selectedPin = matchingPins[0] //nolint:uncheckedsliceindex // The caller returns before this function when no pins exist.
 		actionPinsLog.Printf("No exact match for version %s, no semver-compatible versions found, using highest available: %s", version, selectedPin.Version)
 	}
 
@@ -225,7 +225,7 @@ func ResolveLatestActionPin(repo string, ctx *PinContext) string {
 		return getLatestActionPinReference(repo)
 	}
 
-	latestVersion := pins[0].Version
+	latestVersion := pins[0].Version //nolint:uncheckedsliceindex // The empty case returns above.
 	pinnedRef, err := ResolveActionPin(repo, latestVersion, ctx)
 	if err != nil || pinnedRef == "" {
 		actionPinsLog.Printf("Resolution failed for repo=%s latest version=%s, falling back to embedded latest pin", repo, latestVersion)
