@@ -76,6 +76,17 @@ export interface RuntimeObservationData {
   requestId?: JsonValue;
 }
 
+export interface ModelRoutingData {
+  stage?: JsonValue;
+  routed?: JsonValue;
+  outcome?: JsonValue;
+  selected_model?: JsonValue;
+  selected_effort?: JsonValue;
+  router?: JsonValue;
+  request_id?: JsonValue;
+  deviations?: JsonValue;
+}
+
 export interface McpObservationData {
   serverName?: JsonValue;
   direction?: JsonValue;
@@ -265,6 +276,7 @@ export interface UnifiedSessionEventDataMap {
   "mcp.event": RuntimeObservationData;
   "firewall.http_access": FirewallAccessData;
   "firewall.token_usage": UsageReportData;
+  "firewall.model_routing": ModelRoutingData;
   "firewall.steering": RuntimeObservationData;
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;

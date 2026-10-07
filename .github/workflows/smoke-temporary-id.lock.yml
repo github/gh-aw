@@ -91,7 +91,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && (((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
@@ -502,7 +502,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -1250,8 +1250,11 @@ jobs:
             /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent_usage.json
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
             /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl
             /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
+            /tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
@@ -1291,7 +1294,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
-    name: Check token telemetry
+    name: check_token_telemetry
     needs:
       - activation
       - agent
@@ -1363,7 +1366,7 @@ jobs:
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -1687,6 +1690,7 @@ jobs:
             /tmp/gh-aw/usage/graders/grader_results.json
             /tmp/gh-aw/usage/github_rate_limits.jsonl
             /tmp/gh-aw/usage/agent/token_usage.jsonl
+            /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
@@ -1721,6 +1725,7 @@ jobs:
             /tmp/gh-aw/usage/graders/grader_results.json
             /tmp/gh-aw/usage/github_rate_limits.jsonl
             /tmp/gh-aw/usage/agent/token_usage.jsonl
+            /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
@@ -1736,7 +1741,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -2079,7 +2084,7 @@ jobs:
             }
 
   evals:
-    name: Evaluations
+    name: evals
     needs:
       - activation
       - agent
@@ -2364,7 +2369,7 @@ jobs:
           persist-credentials: false
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     if: >
       ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
       ((github.event_name != 'pull_request' && github.event_name != 'pull_request_review') || github.event.pull_request.stack == null ||
@@ -2436,7 +2441,7 @@ jobs:
             await main();
 
   push_evals_state:
-    name: Push evaluations state
+    name: push_evals_state
     needs:
       - activation
       - evals
@@ -2523,7 +2528,7 @@ jobs:
           persist-credentials: false
 
   push_experiments_state:
-    name: Push experiments state
+    name: push_experiments_state
     needs: activation
     if: always() && (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-slim
@@ -2606,7 +2611,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent

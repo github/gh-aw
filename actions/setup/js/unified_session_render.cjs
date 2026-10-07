@@ -26,6 +26,7 @@ const RUNTIME_TYPES = new Set([
   "mcp.event",
   "firewall.http_access",
   "firewall.token_usage",
+  "firewall.model_routing",
   "firewall.steering",
   "firewall.event",
   "safe_output.request",
@@ -130,6 +131,8 @@ function eventDetail(event) {
     case "firewall.token_usage":
     case "usage.report":
       return fields(data, ["provider", "model", "aic", "totalAic", "premiumRequests", "durationMs"]) + " " + fields(data.usage, ["inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens"]);
+    case "firewall.model_routing":
+      return fields(data, ["stage", "routed", "outcome", "selected_model", "selected_effort", "router"]);
     case "mcp.event":
     case "firewall.event":
       return fields(data, ["event", "level", "status"]);

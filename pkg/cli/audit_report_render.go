@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/scanfindings"
@@ -44,6 +45,7 @@ func renderConsole(data AuditData, logsPath string) {
 	}
 	renderConsoleSession(data.SessionAnalysis)
 	renderConsoleTokenUsage(data.FirewallTokenUsage)
+	renderConsoleModelRouting(data.ModelRouting)
 	renderConsoleGitHubAPIUsage(data.GitHubRateLimitUsage)
 	renderConsoleJobs(data.Jobs)
 	renderConsolePrompt(data.PromptAnalysis)
@@ -108,7 +110,28 @@ func renderConsoleComparison(comparison *AuditComparisonData) {
 	if comparison.Recommendation != nil && comparison.Recommendation.Action != "" {
 		compLine += " | " + comparison.Recommendation.Action
 	}
+	if comparison.Delta != nil && comparison.Delta.ModelRouting != nil && comparison.Delta.ModelRouting.Changed {
+		compLine += " | model route changed: " + formatAuditComparisonRoute(comparison.Delta.ModelRouting.Before) +
+			" -> " + formatAuditComparisonRoute(comparison.Delta.ModelRouting.After)
+	}
 	fmt.Fprintln(os.Stderr, compLine)
+}
+
+func formatAuditComparisonRoute(route *AuditComparisonRoute) string {
+	if route == nil {
+		return "unavailable"
+	}
+	value := safeModelRoutingText(route.Model)
+	if route.Effort != "" {
+		value += ":" + safeModelRoutingText(route.Effort)
+	}
+	if route.Mode != "" {
+		value += " mode=" + safeModelRoutingText(route.Mode)
+	}
+	if route.RouterVersion != "" {
+		value += " router=" + safeModelRoutingText(route.RouterVersion)
+	}
+	return value
 }
 
 func renderConsoleFingerprint(fingerprint *BehaviorFingerprint) {
@@ -187,6 +210,118 @@ func renderConsoleTokenUsage(tokenUsage *TokenUsageSummary) {
 			fmt.Fprintf(os.Stderr, "    %s\n", warning)
 		}
 	}
+}
+
+func renderConsoleModelRouting(routing *ModelRoutingSummary) {
+	if routing == nil {
+		return
+	}
+	renderConsoleModelRoutingSelection(routing)
+	renderConsoleModelRoutingRequests(routing)
+	if routing.Failure != nil {
+		fmt.Fprintf(os.Stderr, "    failure: code=%s detail=%s\n",
+			safeModelRoutingText(routing.Failure.Code), safeModelRoutingText(routing.Failure.Detail))
+	}
+	fmt.Fprintf(os.Stderr, "    cost_aic: classifier=%.3f selected_model=%.3f deviated=%.3f\n",
+		routing.ClassifierCost.AIC, routing.SelectedModelCost.AIC, routing.DeviatedTrafficCost.AIC)
+}
+
+func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
+	line := "  model_routing: status=" + routing.Status
+	if routing.Objective != "" {
+		line += " objective=" + routing.Objective
+		if routing.ObjectiveMode != "" {
+			line += " mode=" + routing.ObjectiveMode
+		}
+	}
+	if routing.SelectedModel != "" {
+		line += " selected=" + routing.SelectedModel
+		if routing.SelectedEffort != "" {
+			line += ":" + routing.SelectedEffort
+		}
+	}
+	if routing.Endpoint != "" {
+		line += " endpoint=" + routing.Endpoint
+	}
+	if routing.RouterName != "" {
+		line += " router=" + routing.RouterName
+		if routing.RouterVersion != "" {
+			line += "@" + routing.RouterVersion
+		}
+	}
+	if routing.LatencyMs > 0 {
+		line += fmt.Sprintf(" latency=%dms", routing.LatencyMs)
+	}
+	fmt.Fprintln(os.Stderr, safeModelRoutingText(line))
+	if routing.Labels.TaskType != "" || routing.Labels.Scope != "" || routing.Labels.TaskComplexity != "" || routing.Mode != "" {
+		fmt.Fprintf(os.Stderr, "    labels: task_type=%s scope=%s complexity=%s mode=%s\n",
+			safeModelRoutingText(routing.Labels.TaskType), safeModelRoutingText(routing.Labels.Scope),
+			safeModelRoutingText(routing.Labels.TaskComplexity), safeModelRoutingText(routing.Mode))
+	}
+	if routing.ClassifierModel != "" {
+		fmt.Fprintf(os.Stderr, "    classifier: %s effort=%s attempts=%d\n",
+			safeModelRoutingText(routing.ClassifierModel), safeModelRoutingText(routing.ClassifierEffort), routing.ClassifierAttempts)
+	}
+	if routing.DegradedClassification {
+		fmt.Fprintf(os.Stderr, "    degraded_classification: %t reason=%s\n",
+			routing.DegradedClassification, safeModelRoutingText(routing.DegradedReason))
+	}
+	if len(routing.TopChoices) > 0 {
+		choices := make([]string, 0, len(routing.TopChoices))
+		for _, choice := range routing.TopChoices {
+			choices = append(choices, strings.TrimSpace(strings.Join([]string{
+				choice.Model, choice.Effort,
+			}, ":")))
+		}
+		fmt.Fprintln(os.Stderr, "    top_choices: "+safeModelRoutingText(strings.Join(choices, ", ")))
+	}
+}
+
+func renderConsoleModelRoutingRequests(routing *ModelRoutingSummary) {
+	if len(routing.RoutedCounts) > 0 || len(routing.OutcomeCounts) > 0 {
+		fmt.Fprintf(os.Stderr, "    requests: routed=%s outcome=%s\n",
+			formatModelRoutingCounts(routing.RoutedCounts), formatModelRoutingCounts(routing.OutcomeCounts))
+	}
+	for _, deviation := range routing.Deviations {
+		fmt.Fprintf(os.Stderr, "    deviation: requested=%s:%s selected=%s:%s cause=%s count=%d\n",
+			safeModelRoutingText(deviation.RequestedModel), safeModelRoutingText(deviation.RequestedEffort),
+			safeModelRoutingText(deviation.SelectedModel), safeModelRoutingText(deviation.SelectedEffort),
+			safeModelRoutingText(deviation.Deviation), deviation.Count)
+	}
+	if routing.EndpointOnlyDeviationNormalized {
+		fmt.Fprintln(os.Stderr, "    endpoint-only deviations from AWF before v0.28.39 are counted as selected-model traffic")
+	}
+}
+
+func formatModelRoutingCounts(counts map[string]int) string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", safeModelRoutingText(key), counts[key]))
+	}
+	return strings.Join(parts, ",")
+}
+
+func safeModelRoutingText(value string) string {
+	return strings.Map(func(char rune) rune {
+		switch char {
+		case '\r':
+			return ' '
+		case '\n':
+			return ' '
+		case '\t':
+			return ' '
+		default:
+			if unicode.IsControl(char) {
+				return -1
+			}
+			return char
+		}
+	}, value)
 }
 
 func renderConsoleGitHubAPIUsage(rateLimit *GitHubRateLimitUsage) {

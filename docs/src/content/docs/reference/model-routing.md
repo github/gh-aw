@@ -90,17 +90,25 @@ sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl
 
 It records classification labels and mode, ranked choices, the selection, router version, and one terminal record per inference request. Request records report `as_selected` or `deviated` and the outcome; requests whose model or effort cannot be observed can be marked `unobserved`.
 
-The adjacent `token-usage.jsonl` contains credits per request. Classifier usage is marked with `purpose: "routing_classification"`. Correlate inference usage with routing records by `request_id` when usage is available.
+The adjacent `token-usage.jsonl` contains credits per request. Classifier usage is marked with `purpose: "routing_classification"` and joined to routing requests by `request_id`.
 
-`gh aw logs` and `gh aw audit` do not yet provide a dedicated routing summary. Inspect the artifact's JSONL files for routing decisions and classifier-specific costs; dedicated CLI presentation will be available when routing-log support is added. See the [AWF routing audit-log schema](https://github.com/github/gh-aw-firewall/blob/main/docs/api-proxy-sidecar.md#model-routing-audit-log) for field definitions rather than relying on a fixed schema copied here.
+`gh aw audit <run-id>` reports whether routing selected a route or failed, the objective and classification, selected model/effort/endpoint, top ranked choices, router version and latency, request outcomes and deviations, and a cost split for classifier, selected-model, and deviated traffic. The comparison notes model, effort, mode, or router-version changes even when total cost is similar. With `gh aw logs --format pretty|markdown` (or `--json`), the Model Routing section aggregates label-to-selection routes across runs, including run counts, total and average AIC, classifier cost, and deviation share. For example:
+
+```text
+Model Routing
+  classifier_aic=0.059 deviated_requests=0/4 (0.0%)
+  explain/local/trivial mode=economy selected=gpt-5.6-luna:high router=0.1.3 runs=1 aic_total=0.760 aic_avg=0.760
+```
+
+The per-run audit JSON includes `model_routing` with the same decision, request, failure, and cost details; logs JSON includes the cross-run `model_routing.routes` aggregate. See the [AWF routing audit-log schema](https://github.com/github/gh-aw-firewall/blob/main/docs/api-proxy-sidecar.md#model-routing-audit-log) for the complete record definition.
 
 ## Troubleshooting
 
 | Signal | Meaning and checks |
 |---|---|
-| Exit code `78` | Routing failed, rather than silently falling back to a fixed model. Check for `no_route` (no eligible model-and-effort choice), unavailable classifier or router, or configuration/contract errors. An upstream failure using the selected provider and model can also cause this exit code. Check allowed models, plan availability, table coverage, and the pinned image versions. |
-| `degraded_reason` | Classification did not complete normally, and the record explains why. A degraded classification is not necessarily a terminal routing failure: inspect the following selection or failure record to see whether routing continued with fallback classification. |
-| `routed: "deviated"` | Compare requested model, effort, and provider with the selected values and read `deviations`, `outcome`, and HTTP `status`. An allowed sub-agent using its declared model can be a normal deviation. A deviation is not itself a policy violation; an excluded model is still rejected. Endpoint differences alone do not mark a request as deviated. |
+| Exit code `78` | Routing failed, rather than silently falling back to a fixed model. The audit routing section shows failure `code` and `detail`; check for `no_route`, unavailable classifier/router, or configuration errors. |
+| `degraded_reason` | The audit routing section reports why classification degraded and whether the router continued with fallback classification or failed. |
+| `routed: "deviated"` | Audit shows request counts and the requested/selected models and efforts for deviations. An allowed sub-agent using its declared model can be a normal deviation; deviation is not itself a policy violation. For records from AWF before v0.28.39, an endpoint-only deviation is counted as selected-model traffic and the report notes this normalization. |
 | Upstream HTTP or stream error | Inspect `sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl` in the `agent` artifact alongside the routing log. In particular, a sub-agent HTTP 400 can indicate the API-family mismatch rather than a model-policy rejection. |
 
 Use the [API proxy sidecar reference](https://github.com/github/gh-aw-firewall/blob/main/docs/api-proxy-sidecar.md) and [AWF configuration specification](https://github.com/github/gh-aw-firewall/blob/main/docs/awf-config-spec.md) for the upstream contracts and failure details.

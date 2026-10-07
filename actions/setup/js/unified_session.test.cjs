@@ -701,6 +701,25 @@ describe("Unified conclusion session", () => {
     expect(events.filter(event => event.type === "agent.execution")).toMatchObject([{ data: execution.data, provenance: { component: "execution", phase: "agent", path: "agent-stdio.log" } }]);
   });
 
+  it("preserves model-routing records as dedicated unified-session events", () => {
+    const record = {
+      _schema: "model-routing/v0.28.37",
+      timestamp: "2026-10-07T18:20:00Z",
+      event: "model_routing",
+      stage: "selection",
+      selected_model: "gpt-5.6-luna",
+      selected_effort: "high",
+      router: { name: "gh-aw-router", version: "0.1.3" },
+    };
+    write("sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", [record]);
+    const event = collectUnifiedSession({ rootDir: root }).events.find(item => item.type === "firewall.model_routing");
+    expect(event.data).toEqual(record);
+    expect(event.provenance).toMatchObject({
+      component: "firewall",
+      path: "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
+    });
+  });
+
   it.each(["", "{bad\n", '{"type":"result","usage":{}}\n'])("falls back from an unusable canonical session (%j) to native events", content => {
     const nativePath = "sandbox/agent/logs/copilot-session-state/uuid/events.jsonl";
     write("agent-session.jsonl", content);

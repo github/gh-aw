@@ -3674,7 +3674,12 @@
                 }
               },
               "repos": { "$ref": "#/$defs/enclave-repos" },
-              "runtime": { "type": "string", "enum": ["docker"], "default": "docker" },
+              "runtime": {
+                "type": "string",
+                "description": "⚠️ Experimental. 'cloud-hypervisor' selects the preview enclave microVM executor on GitHub-hosted Ubuntu x86_64 KVM runners. Unsupported configurations fail closed without fallback. Configuration and behavior may change without deprecation. Omit this field for Docker.",
+                "enum": ["docker", "cloud-hypervisor"],
+                "default": "docker"
+              },
               "image": { "type": "string", "minLength": 1, "maxLength": 500 },
               "timeout": { "type": "integer", "minimum": 1, "maximum": 4740, "default": 30 },
               "memory-limit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$", "default": "512m" },
@@ -3756,7 +3761,12 @@
               },
               "repos": { "$ref": "#/$defs/enclave-repos" },
               "dynamic": { "$ref": "#/$defs/enclave-dynamic-policy" },
-              "runtime": { "type": "string", "enum": ["docker"], "default": "docker" },
+              "runtime": {
+                "type": "string",
+                "description": "⚠️ Experimental. 'cloud-hypervisor' selects the preview enclave microVM executor on GitHub-hosted Ubuntu x86_64 KVM runners. Unsupported configurations fail closed without fallback. Configuration and behavior may change without deprecation. Omit this field for Docker.",
+                "enum": ["docker", "cloud-hypervisor"],
+                "default": "docker"
+              },
               "image": { "type": "string", "minLength": 1, "maxLength": 500 },
               "timeout": { "type": "integer", "minimum": 1, "maximum": 4740, "default": 120 },
               "memory-limit": { "type": "string", "pattern": "^[1-9][0-9]*[bkmgBKMG]$", "default": "512m" },

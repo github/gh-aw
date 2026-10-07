@@ -266,6 +266,7 @@ func processedRunFromSummary(summary *RunSummary, runOutputDir string) Processed
 		SkillActivations:        summary.SkillActivations,
 		GatewaySteeringEvents:   gatewaySteeringEvents,
 		TokenUsage:              summary.TokenUsage,
+		ModelRouting:            summary.ModelRouting,
 		SafeOutputs:             summary.SafeOutputs,
 		WorkingSet:              summary.WorkingSet,
 		Ledger:                  summary.Ledger,

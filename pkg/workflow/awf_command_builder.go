@@ -307,6 +307,19 @@ func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) s
 	if strings.Contains(awfConfigJSON, awfArcDindRootPathExpr) {
 		preservedVars = append(preservedVars, "RUNNER_TEMP")
 	}
+	for _, name := range []string{
+		"GH_AW_CLOUD_HYPERVISOR_BINARY",
+		"GH_AW_CLOUD_HYPERVISOR_KERNEL",
+		"GH_AW_CLOUD_HYPERVISOR_ROOTFS",
+		"GH_AW_CLOUD_HYPERVISOR_SUPERVISOR",
+		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST",
+		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE",
+		"GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG",
+	} {
+		if strings.Contains(awfConfigJSON, "${"+name+"}") {
+			preservedVars = append(preservedVars, name)
+		}
+	}
 	if len(preservedVars) > 0 {
 		return shellEscapeArgWithVarsPreserved(awfConfigJSON, preservedVars...)
 	}
@@ -679,6 +692,9 @@ func GetAWFCommandPrefix(workflowData *WorkflowData) string {
 	if agentConfig != nil && agentConfig.Command != "" {
 		awfHelpersLog.Printf("Using custom AWF command: %s", agentConfig.Command)
 		return agentConfig.Command
+	}
+	if hasCloudHypervisorEnclaves(workflowData) {
+		return constants.AWFCloudHypervisorCommand
 	}
 
 	// The runtime profile decides whether AWF runs rootless or with host privileges.
