@@ -32,6 +32,57 @@ func TestPiEngine_GetModelEnvVarName(t *testing.T) {
 	assert.Equal(t, "PI_MODEL", engine.GetModelEnvVarName(), "Model env var should be PI_MODEL")
 }
 
+func TestPiEngine_GetExecutionSteps_AutoModels(t *testing.T) {
+	for _, model := range []string{"", "auto", "copilot/auto"} {
+		t.Run(fmt.Sprintf("model=%q", model), func(t *testing.T) {
+			workflowData := &WorkflowData{
+				Name:               "test-pi-auto",
+				Model:              model,
+				EngineConfig:       &EngineConfig{ID: "pi"},
+				ParsedTools:        NewTools(map[string]any{}),
+				NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+			}
+			steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+			require.Len(t, steps, 1)
+			stepText := strings.Join(steps[0], "\n")
+			assert.Contains(t, stepText, "--model aw-gateway/auto")
+			assert.Contains(t, stepText, "GH_AW_PI_MODEL_ID=auto")
+			assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=github")
+			assert.Contains(t, stepText, "GH_AW_PI_GATEWAY_FALLBACK_PORT=10002")
+			assert.NotContains(t, stepText, "aw-gateway/gpt-5.4")
+			assert.Equal(t, model, workflowData.Model, "Defaulting must not mutate the caller's workflow data")
+		})
+	}
+}
+
+func TestPiEngine_GetExecutionSteps_DefaultWithOpenAIProvider(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:               "test-pi-openai-default",
+		EngineConfig:       &EngineConfig{ID: "pi", LLMProvider: LLMProviderOpenAI},
+		ParsedTools:        NewTools(map[string]any{}),
+		NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true}},
+	}
+	steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1)
+	stepText := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepText, "--model aw-gateway/gpt-5.4")
+	assert.Contains(t, stepText, "GH_AW_LLM_PROVIDER=openai")
+	assert.NotContains(t, stepText, "--model aw-gateway/auto")
+}
+
+func TestPiEngine_GetExecutionSteps_DefaultWithoutGateway(t *testing.T) {
+	workflowData := &WorkflowData{
+		Name:         "test-pi-native-default",
+		EngineConfig: &EngineConfig{ID: "pi"},
+		ParsedTools:  NewTools(map[string]any{}),
+	}
+	steps := NewPiEngine().GetExecutionSteps(workflowData, "/tmp/gh-aw/agent-stdio.log")
+	require.Len(t, steps, 1)
+	stepText := strings.Join(steps[0], "\n")
+	assert.Contains(t, stepText, "--model github-copilot/gpt-5.4")
+	assert.NotContains(t, stepText, "--model github-copilot/auto")
+}
+
 func TestPiEngine_ResolveLLMProvider_DefaultGitHub(t *testing.T) {
 	engine := NewPiEngine()
 	assert.Equal(t, LLMProviderGitHub, engine.ResolveLLMProvider(&WorkflowData{EngineConfig: &EngineConfig{ID: "pi"}}))
