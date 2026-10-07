@@ -34,6 +34,9 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require("./constants.cjs");
+const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
+const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
@@ -92,6 +95,62 @@ const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 In
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
 const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_(?:error|body)/i;
+
+function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
+  const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
+  const defaults = {
+    ...config.defaults,
+    mcp_servers: Object.fromEntries(
+      Object.entries(configuredServers).map(([name, value]) => [
+        name,
+        typeof value === "object" && value !== null && !Array.isArray(value)
+          ? { ...value, ...(Number.isSafeInteger(runtimeToolTimeoutSeconds) && runtimeToolTimeoutSeconds > 0 ? { tool_timeout_sec: runtimeToolTimeoutSeconds } : {}) }
+          : value,
+      ])
+    ),
+  };
+  const effectiveServers = mergeConfig(defaults, config.overrides || {}).mcp_servers || {};
+  return Object.fromEntries(
+    Object.entries(effectiveServers).flatMap(([name, value]) => (typeof value?.tool_timeout_sec === "number" && Number.isSafeInteger(value.tool_timeout_sec) && value.tool_timeout_sec > 0 ? [[name, value.tool_timeout_sec]] : []))
+  );
+}
+
+function createMCPCallWatchdog(timeoutMs, now = Date.now) {
+  const pending = new Map();
+  function track(eventType, item) {
+    if (item?.type !== "mcp_tool_call" || typeof item.id !== "string") return;
+    if (eventType === "item.started") {
+      const callTimeoutMs = typeof timeoutMs === "function" ? timeoutMs(item) : timeoutMs;
+      pending.set(item.id, { startedAt: now(), timeoutMs: Number.isSafeInteger(callTimeoutMs) && callTimeoutMs > 0 ? callTimeoutMs : DEFAULT_MCP_CALL_WATCHDOG_MS });
+    }
+    if (eventType === "item.completed" || eventType === "item.failed") pending.delete(item.id);
+  }
+  return {
+    observe(line) {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        return;
+      }
+      track(event?.type, event?.item);
+    },
+    observePrefix(prefix) {
+      const event = parseJsonPrefix(prefix);
+      track(event?.type, event?.item);
+    },
+    expiredTimeoutMs() {
+      const current = now();
+      for (const call of pending.values()) {
+        if (current - call.startedAt >= call.timeoutMs) return call.timeoutMs;
+      }
+      return null;
+    },
+    expired() {
+      return this.expiredTimeoutMs() !== null;
+    },
+  };
+}
 
 // Codex's `turn.failed` event nests the actual provider error as a JSON string inside
 // `error.message` (sometimes doubly-nested, e.g. `error.message` -> `{"error": {...}}`).
@@ -797,6 +856,9 @@ async function main() {
   // The deadline includes preflight time and is checked both between and during attempts.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   const contextRebuildCircuitBreaker = resolveContextRebuildCircuitBreakerConfig(process.env);
+  const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
+  const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
+  const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
   /** @type {string[] | null} */
   let resumeArgs = null;
   let lastThreadId = "";
@@ -820,6 +882,10 @@ async function main() {
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async attempt => {
       const terminalErrors = [];
+      const mcpWatchdog = createMCPCallWatchdog(item => {
+        const server = item.server ?? item.server_name ?? item.serverName;
+        return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;
+      });
       let nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
       // Track the file size before this attempt so the watchdog only arms on output
       // written by this attempt, not by a previous retry.
@@ -835,6 +901,7 @@ async function main() {
         stdin: resumeArgs ? resumePrompt : promptInput.stdin,
         maxCollectedOutputBytes: 4 * 1024 * 1024,
         onStdoutLine: line => {
+          mcpWatchdog.observe(line);
           try {
             const event = JSON.parse(line);
             if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
@@ -844,27 +911,36 @@ async function main() {
             }
           } catch {}
         },
-        runtimeGuard:
-          contextRebuildCircuitBreaker.enabled || softTimeoutGuard
-            ? {
-                pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
-                termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
-                shouldTerminate: async () => {
-                  if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
-                  if (!contextRebuildCircuitBreaker.enabled) return false;
-                  if (Date.now() < nextContextCheckAt) return false;
-                  nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
-                  return evaluateContextRebuildCircuitBreakerForAttempt(
-                    await readWorkingSetFromTokenUsage(tokenUsagePaths),
-                    {
-                      maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
-                      minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
-                    },
-                    { safeOutputsPath, safeOutputsByteOffset, logger: log }
-                  );
-                },
-              }
-            : undefined,
+        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
+        runtimeGuard: {
+          pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
+          termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+          onTriggered: decision => {
+            if (decision.event) process.stdout.write(`${JSON.stringify(decision.event)}\n`);
+          },
+          shouldTerminate: async () => {
+            if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
+            const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
+            if (expiredMCPCallTimeoutMs !== null) {
+              return {
+                terminate: true,
+                reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s`,
+                event: { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } },
+              };
+            }
+            if (!contextRebuildCircuitBreaker.enabled) return false;
+            if (Date.now() < nextContextCheckAt) return false;
+            nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
+            return evaluateContextRebuildCircuitBreakerForAttempt(
+              await readWorkingSetFromTokenUsage(tokenUsagePaths),
+              {
+                maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
+                minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
+              },
+              { safeOutputsPath, safeOutputsByteOffset, logger: log }
+            );
+          },
+        },
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () =>
@@ -1124,6 +1200,8 @@ if (typeof module !== "undefined" && module.exports) {
     injectModelFlagAfterExec,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
+    createMCPCallWatchdog,
+    resolveMCPServerToolTimeouts,
     POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
