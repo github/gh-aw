@@ -177,10 +177,17 @@ function validatePiModelAvailability(options) {
   }
 
   const normalizedProvider = normalizeReflectProviderName(provider);
-  const aliases = REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
+  const isCopilotProvider = REFLECT_PROVIDER_ALIASES.github.has(normalizedProvider);
+  const aliases = isCopilotProvider ? REFLECT_PROVIDER_ALIASES.github : REFLECT_PROVIDER_ALIASES[normalizedProvider] || new Set([normalizedProvider]);
   const endpoint = reflectData.endpoints?.find(endpoint => endpoint?.configured === true && aliases.has(normalizeReflectProviderName(endpoint.provider)));
   if (!endpoint) {
     logger(`awf-reflect: model availability check skipped (no configured endpoint for provider=${normalizedProvider})`);
+    return;
+  }
+  const normalizedModelId = modelId.split("?")[0].toLowerCase();
+  // Copilot auto is a gateway routing sentinel, not a concrete catalog model.
+  if (isCopilotProvider && normalizedModelId === "auto") {
+    logger("awf-reflect: Copilot auto selection delegated to the proxy");
     return;
   }
   if (!Array.isArray(endpoint.models)) {
@@ -188,7 +195,6 @@ function validatePiModelAvailability(options) {
     return;
   }
 
-  const normalizedModelId = modelId.split("?")[0].toLowerCase();
   const advertisedModels = endpoint.models.map(model => {
     if (typeof model === "string") return model.toLowerCase();
     if (model && typeof model === "object") return String(model.id || model.name || "").toLowerCase();
@@ -304,6 +310,8 @@ async function main(options = {}) {
     for (const key of ["name", "reasoning", "thinkingLevelMap", "input", "inputLimits", "cost", "promptCache", "contextWindow", "maxTokens", "samplingParams", "compat"]) {
       if (catalogModel[key] !== undefined) metadata[key] = catalogModel[key];
     }
+  } else if (nativeProvider === "github-copilot" && modelId.split("?")[0].toLowerCase() === "auto") {
+    logger("Copilot auto uses gateway-selected model metadata");
   } else {
     logger(`warning: Pi has no catalog metadata for ${nativeProvider}/${modelId}; configure engine.config.model for a custom model`);
   }

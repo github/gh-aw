@@ -23,7 +23,7 @@ func (c *Compiler) warnCodexCopilotModelCompatibility(data *WorkflowData, markdo
 	baseModel, _, _ := strings.Cut(model, "?")
 	usesGitHubInference := strings.HasPrefix(baseModel, "copilot/") ||
 		NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub
-	if !usesGitHubInference || isCodexCompatibleModel(baseModel) {
+	if !usesGitHubInference || codexModelID(baseModel) == "auto" || isCodexCompatibleModel(baseModel) {
 		return
 	}
 

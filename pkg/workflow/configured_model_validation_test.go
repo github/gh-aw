@@ -66,7 +66,13 @@ func TestWarnCodexCopilotModelCompatibility(t *testing.T) {
 				Model:        "copilot/auto",
 				EngineConfig: &EngineConfig{ID: "codex"},
 			},
-			wantWarning: true,
+		},
+		{
+			name: "bare auto with GitHub provider",
+			data: &WorkflowData{
+				Model:        "auto",
+				EngineConfig: &EngineConfig{ID: "codex", LLMProvider: LLMProviderGitHub},
+			},
 		},
 		{
 			name: "explicit GitHub provider",

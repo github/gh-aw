@@ -5,6 +5,40 @@ const require = createRequire(import.meta.url);
 const { injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
 
 describe("Claude model arguments", () => {
+  const autoReflect = {
+    endpoints: [{ provider: "copilot", configured: true, models: ["gpt-6.1-sol", "claude-sonnet-4.6", "claude-opus-5.5", "claude-sonnet-5"] }],
+  };
+
+  it.each(["auto", "copilot/auto"])("resolves %s in separate and equals-form flags to an advertised Claude model", model => {
+    const options = { reflectData: autoReflect };
+    expect(normalizeClaudeModelArgs(["--print", "--model", model], "github", {}, options)).toEqual(["--print", "--model", "claude-sonnet-5"]);
+    expect(normalizeClaudeModelArgs([`--model=${model}`], "github", {}, options)).toEqual(["--model=claude-sonnet-5"]);
+    expect(normalizeClaudeModelArgs(["--", "--model", model], "github", {}, options)).toEqual(["--", "--model", model]);
+  });
+
+  it.each(["auto", "copilot/auto"])("maps %s to the native sonnet alias when Anthropic is explicitly configured", model => {
+    expect(normalizeClaudeModelArgs(["--model", model], "anthropic", { GH_AW_LLM_PROVIDER_EXPLICIT: "1" })).toEqual(["--model", "sonnet"]);
+  });
+
+  it("preserves auto query parameters and selects only the configured Copilot endpoint", () => {
+    const reflectData = {
+      endpoints: [{ provider: "anthropic", configured: true, models: ["claude-sonnet-99"] }, { provider: "copilot", configured: false, models: ["claude-sonnet-98"] }, ...autoReflect.endpoints],
+    };
+    expect(normalizeClaudeModelArgs(["--model", "copilot/auto?effort=high"], "github", {}, { reflectData })).toEqual(["--model", "claude-sonnet-5?effort=high"]);
+  });
+
+  it.each([
+    [["claude-opus-4.6", "claude-opus-5.5", "claude-haiku-4.5"], "claude-opus-5.5"],
+    [["claude-haiku-4.5"], "claude-haiku-4.5"],
+  ])("selects an advertised alternate Claude family from %j", (models, expected) => {
+    expect(normalizeClaudeModelArgs(["--model", "auto"], "github", {}, { reflectData: { endpoints: [{ provider: "github-copilot", configured: true, models }] } })).toEqual(["--model", expected]);
+  });
+
+  it.each(["auto", "copilot/auto"])("rejects %s before startup when Copilot advertises no Claude models", model => {
+    expect(() => normalizeClaudeModelArgs(["--model", model], "github", {}, { reflectData: { endpoints: [{ provider: "copilot", configured: true, models: ["gpt-6.1-sol", "auto"] }] } })).toThrow("requires an advertised Claude");
+    expect(() => normalizeClaudeModelArgs(["--model", model], "github", {})).toThrow("requires an advertised Claude");
+  });
+
   it.each(["github", "copilot", "github-copilot", "github_models", " COPILOT "])("normalizes repository-variable models for provider %s", provider => {
     const env = { GH_AW_MODEL_AGENT_CLAUDE: "copilot/claude-haiku-4.5" };
     const args = ["--print", "--model", env.GH_AW_MODEL_AGENT_CLAUDE];
@@ -38,11 +72,20 @@ describe("Codex model arguments", () => {
   );
 
   it.each([
+    ["auto", "github", "auto"],
+    ["copilot/auto", "github", "auto"],
+    ["auto", "openai", "auto"],
     ["copilot/gpt-5", "github", "gpt-5"],
     ["openai/gpt-5", "openai", "gpt-5"],
     ["gpt-5", "github", "gpt-5"],
   ])("normalizes a model with a matching provisioned provider", (model, provider, expected) => {
     expect(normalizeCodexModel(model, provider)).toBe(expected);
+  });
+
+  it.each(["auto", "copilot/auto"])("preserves %s as the Codex gateway picker in every model flag form", model => {
+    for (const flags of [["--model", model], ["-m", model], [`--model=${model}`], [`-m=${model}`], [`-m${model}`]]) {
+      expect(normalizeCodexModelArgs(["exec", ...flags, "-"], "github")).toEqual(["exec", ...flags.map(flag => flag.replace("copilot/", "")), "-"]);
+    }
   });
 
   it("rejects a prefix requiring different credentials or a different proxy", () => {
