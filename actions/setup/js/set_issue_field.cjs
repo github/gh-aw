@@ -221,7 +221,13 @@ async function main(config = {}) {
       itemType: "set_issue_field",
       supportsIssue: true,
     });
-    if (!targetResult.success) return { success: false, error: targetResult.error };
+    if (!targetResult.success) {
+      if (targetResult.shouldFail === false) {
+        core.warning(targetResult.error);
+        return { success: false, skipped: true, reasonCode: "NO_CONTEXT", reason: targetResult.error, error: targetResult.error };
+      }
+      return { success: false, error: targetResult.error };
+    }
     const issueNumber = targetResult.number;
     core.info(`Resolved issue number: #${issueNumber}`);
 

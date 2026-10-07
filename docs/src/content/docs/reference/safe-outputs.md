@@ -697,6 +697,8 @@ safe-outputs:
 
 Agent calls `set_issue_field` with `value`, and either `field_name` (preferred) or `field_node_id`. It can also pass `issue_number`; if omitted, the triggering issue is targeted.
 
+With `target: "triggering"`, runs without an issue context (such as schedules, manual dispatches, or pull request events) warn and skip the operation without failing the workflow. Setting `target: "*"` requires an explicit `issue_number`. Invalid targets, malformed issue payloads, and API errors remain failures.
+
 #### `set_issue_field` tool schema
 
 | Parameter | Type | Required | Description | Example |

@@ -77,6 +77,8 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockContext.eventName = "issues";
+    mockContext.payload = { issue: { number: 123 } };
 
     mockGithub.rest.issues.get.mockResolvedValue({ data: { node_id: issueNodeId } });
     mockGraphql.mockImplementation(query => {
@@ -97,6 +99,99 @@ describe("set_issue_field (Handler Factory Architecture)", () => {
     const { main } = require("./set_issue_field.cjs");
     const result = await main({});
     expect(typeof result).toBe("function");
+  });
+
+  it.each([
+    ["schedule", {}],
+    ["workflow_dispatch", {}],
+    ["push", {}],
+    ["pull_request", { pull_request: { number: 123 } }],
+    ["issue_comment", { issue: { number: 123, pull_request: {} } }],
+  ])("should warn and skip a triggering target on %s without making API calls", async (eventName, payload) => {
+    mockContext.eventName = eventName;
+    mockContext.payload = payload;
+    const { main } = require("./set_issue_field.cjs");
+    const { computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
+    const triggeringHandler = await main({});
+
+    const result = await triggeringHandler({ type: "set_issue_field", field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result).toEqual({
+      success: false,
+      skipped: true,
+      reasonCode: "NO_CONTEXT",
+      reason: 'Target is "triggering" but not running in issue context, skipping set_issue_field',
+      error: 'Target is "triggering" but not running in issue context, skipping set_issue_field',
+    });
+    expect(mockCore.warning).toHaveBeenCalledWith(result.reason);
+    expect(mockCore.error).not.toHaveBeenCalled();
+    expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+    expect(mockGraphql).not.toHaveBeenCalled();
+    expect(isFailedProcessingResult({ success: result.success, result })).toBe(false);
+    expect(computeSafeOutputsStatus([{ success: result.success, result }])).toMatchObject({
+      status: "completed_with_skips",
+      itemsApplied: 0,
+      itemsSkipped: 1,
+      itemsFailed: 0,
+    });
+  });
+
+  it("should skip a triggering target without issue context in staged mode", async () => {
+    mockContext.eventName = "schedule";
+    mockContext.payload = {};
+    const { main } = require("./set_issue_field.cjs");
+    const stagedHandler = await main({ target: "triggering", staged: true });
+
+    const result = await stagedHandler({ type: "set_issue_field", field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result.skipped).toBe(true);
+    expect(result.staged).not.toBe(true);
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("not running in issue context"));
+    expect(mockGraphql).not.toHaveBeenCalled();
+  });
+
+  it("should still set an explicit wildcard target on a scheduled run", async () => {
+    mockContext.eventName = "schedule";
+    mockContext.payload = {};
+
+    const result = await handler({ type: "set_issue_field", issue_number: 42, field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result.success).toBe(true);
+    expect(result.issue_number).toBe(42);
+    expect(mockGraphql).toHaveBeenCalledWith(expect.stringContaining("setIssueFieldValue"), expect.anything());
+  });
+
+  it("should still fail a wildcard target with no issue number", async () => {
+    const result = await handler({ type: "set_issue_field", field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).not.toBe(true);
+    expect(result.error).toContain("issue_number");
+    expect(mockGraphql).not.toHaveBeenCalled();
+  });
+
+  it("should still fail an issue event with a missing issue payload", async () => {
+    mockContext.payload = {};
+    const { main } = require("./set_issue_field.cjs");
+    const triggeringHandler = await main({});
+
+    const result = await triggeringHandler({ type: "set_issue_field", field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).not.toBe(true);
+    expect(result.error).toBe("Issue context detected but no issue found in payload");
+    expect(mockGraphql).not.toHaveBeenCalled();
+  });
+
+  it("should still fail authentication errors rather than skip them", async () => {
+    mockGithub.rest.issues.get.mockRejectedValue(new Error("Bad credentials"));
+
+    const result = await handler({ type: "set_issue_field", issue_number: 42, field_name: "Customer Impact", value: "High" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).not.toBe(true);
+    expect(result.error).toBe("Bad credentials");
+    expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Bad credentials"));
   });
 
   it("should resolve issue number from temporary_id when create_issue precedes set_issue_field in same batch", async () => {
