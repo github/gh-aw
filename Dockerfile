@@ -2,7 +2,7 @@
 # Provides a minimal container with gh-aw, gh CLI, git, and jq
 
 # Use Alpine for minimal size (official distribution)
-FROM alpine:3.24
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 # Install required dependencies
 RUN apk add --no-cache \
