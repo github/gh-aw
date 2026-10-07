@@ -5,7 +5,7 @@ services:
     ports:
       - 8888:8888
     env:
-      JUPYTER_TOKEN: ${{ github.run_id }}
+      JUPYTER_TOKEN: ${{ secrets.JUPYTER_TOKEN }}
     options: >-
       --health-cmd "curl -f http://localhost:8888/api || exit 1"
       --health-interval 10s
@@ -18,7 +18,7 @@ services:
       - 3000:3000
     env:
       JUPYTER_URL: "http://jupyter:8888"
-      JUPYTER_TOKEN: "${{ github.run_id }}"
+      JUPYTER_TOKEN: "${{ secrets.JUPYTER_TOKEN }}"
       ALLOW_IMG_OUTPUT: "true"
       MCP_TRANSPORT: "http"
       MCP_PORT: "3000"
