@@ -86,7 +86,10 @@ function validateOperation(record, config) {
     decrement: ["name", "amount"],
   }[operation];
   const expected = new Set(["operation", ...fields, ...(record.id === undefined ? [] : ["id"])]);
-  if (Object.keys(record).some(key => !expected.has(key)) || fields.some(key => !Object.hasOwn(record, key))) throw new TypeError("Invalid ledger operation fields");
+  const invalidField = Object.keys(record).find(key => !expected.has(key));
+  if (invalidField !== undefined) throw new TypeError(`Invalid ledger operation fields: unexpected field ${JSON.stringify(invalidField)} for ${operation}`);
+  const missingField = fields.find(key => !Object.hasOwn(record, key));
+  if (missingField !== undefined) throw new TypeError(`Invalid ledger operation fields: missing field ${JSON.stringify(missingField)} for ${operation}`);
   if (config.type === "set" || config.type === "log" || operation === "put") {
     canonicalJSON(record.value);
     checkSchema(record.value, config.schema);
@@ -96,7 +99,7 @@ function validateOperation(record, config) {
   }
   if (config.type === "table") {
     if (operation === "insert" || operation === "upsert") {
-      if (!record.value || typeof record.value !== "object" || Array.isArray(record.value) || typeof record.value[config.key] !== "string") throw new TypeError("Table row must contain a string primary key");
+      if (!record.value || typeof record.value !== "object" || Array.isArray(record.value) || typeof record.value[config.key] !== "string") throw new TypeError(`Table row must contain a string primary key: ${JSON.stringify(config.key)}`);
       canonicalJSON(record.value);
       checkSchema(record.value, config.schema);
     }
