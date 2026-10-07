@@ -31,6 +31,12 @@ import {
 } from "./start_mcp_gateway.cjs";
 
 describe("start_mcp_gateway logging", () => {
+  it("reads piped configuration as a Buffer before decoding UTF-8", () => {
+    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
+    expect(source).toContain('fs.readFileSync(0).toString("utf8")');
+    expect(source).not.toContain('fs.readFileSync(0, "utf8")');
+  });
+
   it("does not create the legacy MCP gateway stderr log", () => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
     expect(source).not.toContain("/tmp/gh-aw/mcp-logs/stderr.log");
