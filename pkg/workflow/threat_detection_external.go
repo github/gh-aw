@@ -136,6 +136,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	delete(detectionData.SandboxConfig.Agent.Images, awfImageRoleRouter)
 	if ResolveEngineID(data) == engineID {
 		detectionData.ModelMappings = data.ModelMappings
 	} else {

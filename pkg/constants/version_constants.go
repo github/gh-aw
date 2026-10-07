@@ -126,6 +126,10 @@ const AWFArcDindMinVersion Version = "v0.27.20"
 // cloud-hypervisor preview runtime and its release assets.
 const AWFCloudHypervisorMinVersion Version = "v0.28.11"
 
+// AWFEnclaveCloudHypervisorMinVersion is the minimum AWF version supporting
+// the release-attested Cloud Hypervisor enclave executor preview.
+const AWFEnclaveCloudHypervisorMinVersion Version = "v0.28.47"
+
 // AWFLegacySecurityMinVersion is the minimum AWF version that supports the
 // --legacy-security flag and unconditional API proxy (gh-aw-firewall#6207).
 // Workflows pinning an older AWF version must use the old --security-mode compat behavior.

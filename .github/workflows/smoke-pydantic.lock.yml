@@ -91,7 +91,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && (((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
@@ -464,7 +464,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -1735,7 +1735,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -2085,7 +2085,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -2419,7 +2419,7 @@ jobs:
             }
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     if: >
       ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id) &&
       ((github.event_name != 'pull_request' && github.event_name != 'pull_request_review') || github.event.pull_request.stack == null ||
@@ -2490,7 +2490,7 @@ jobs:
             await main();
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent

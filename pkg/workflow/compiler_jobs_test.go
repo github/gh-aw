@@ -463,7 +463,7 @@ Marker: ${{ needs.select.outputs.marker }}
 		t.Fatal(err)
 	}
 	lock := string(lockContent)
-	if !strings.Contains(lock, "  activation:\n    name: Activation\n    needs: select") {
+	if !strings.Contains(lock, "  activation:\n    name: activation\n    needs: select") {
 		t.Fatalf("activation should depend on runtime-import referenced job; lock excerpt:\n%s", lock)
 	}
 	var compiledWorkflow map[string]any
