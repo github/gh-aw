@@ -286,13 +286,13 @@ describe("check_daily_aic_workflow_guardrail", () => {
       }
     );
 
-    expect(markdown).toContain("| 24h total AIC | 0 |");
+    expect(markdown).toContain("| 24h total AIC (recorded + estimated) | 0 |");
     expect(markdown).toContain("| Runs counted | 0 |");
     expect(markdown).toContain("| Avg AIC / run | — |");
     expect(markdown).toContain("| Std dev AIC | — |");
     expect(markdown).toContain("| Min / Max AIC | — / — |");
     expect(markdown).toContain("| _none_ | — | — | 0 |");
-    expect(markdown).not.toContain("| 24h total AIC |  |");
+    expect(markdown).not.toContain("| 24h total AIC (recorded + estimated) |  |");
     expect(markdown).not.toContain("| Avg AIC / run |  |");
     expect(markdown).not.toContain("| Min / Max AIC |  /  |");
   });
@@ -309,8 +309,10 @@ describe("check_daily_aic_workflow_guardrail", () => {
       null,
       { candidateRunsCount: 2, inspectedRunsCount: 2, truncatedByRateLimit: false }
     );
-    expect(markdown).toContain("| Recorded AIC | 810 |");
-    expect(markdown).toContain("| Estimated AIC (unresolved accounting) | 5K |");
+    expect(markdown).toContain("| Recorded AIC (guardrail basis) | 810 |");
+    expect(markdown).toContain("| Estimated AIC (not counted toward threshold) | 5K |");
+    expect(markdown).toContain("| Threshold used | 16.19% |");
+    expect(markdown).toContain("| Remaining headroom | 4.2K |");
     expect(markdown).toContain("| [#2](https://example.test/2) | 2026-05-31T11:00:00Z | cancelled | 5K | Estimated |");
     expect(markdown).toContain("Subsequent scans retry unresolved accounting");
   });
@@ -349,7 +351,7 @@ describe("check_daily_aic_workflow_guardrail", () => {
       }
     );
 
-    expect(markdown).toContain("| 24h total AIC | 1.5M |");
+    expect(markdown).toContain("| 24h total AIC (recorded + estimated) | 1.5M |");
     expect(markdown).toContain("| Threshold | 1.5M |");
     expect(markdown).toContain("| Avg AIC / run | 750K |");
     expect(markdown).toContain("| Std dev AIC | 636.4K |");
@@ -695,6 +697,89 @@ describe("check_daily_aic_workflow_guardrail", () => {
       delete global.github;
       delete global.context;
       delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_GITHUB_TOKEN;
+      delete process.env.GH_AW_WORKFLOW_NAME;
+      delete process.env.GH_AW_WORKFLOW_ID;
+      delete process.env.GITHUB_TRIGGERING_ACTOR;
+      delete process.env.GITHUB_EVENT_NAME;
+      getRunAICSpy.mockRestore();
+    }
+  });
+
+  it("does not block when unresolved estimates exceed the threshold but recorded credits are zero", async () => {
+    const getRunAICSpy = vi.spyOn(exports, "getRunAIC").mockRejectedValue(new Error("accounting unavailable"));
+    const coreOutputs = {};
+    const mockCore = {
+      setOutput: (key, value) => {
+        coreOutputs[key] = value;
+      },
+      setFailed: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
+      summary: { addDetails: vi.fn(), write: vi.fn() },
+    };
+    const nowIso = new Date().toISOString();
+    const mockGithub = {
+      rest: {
+        rateLimit: {
+          get: async () => ({
+            data: {
+              resources: {
+                core: { limit: 5000, remaining: 4990, used: 10, reset: Math.floor(Date.now() / 1000) + 3600 },
+              },
+            },
+            headers: {},
+          }),
+        },
+        actions: {
+          getWorkflowRun: async () => ({
+            data: { workflow_id: 777, actor: { login: "octocat" }, triggering_actor: { login: "octocat" } },
+            headers: {},
+          }),
+          listWorkflowRuns: async () => ({
+            data: {
+              workflow_runs: [
+                {
+                  id: 41,
+                  run_attempt: 1,
+                  updated_at: nowIso,
+                  status: "completed",
+                  html_url: "https://example.test/runs/41",
+                  created_at: nowIso,
+                  conclusion: "success",
+                },
+              ],
+            },
+            headers: {},
+          }),
+        },
+      },
+    };
+
+    global.core = mockCore;
+    global.github = mockGithub;
+    global.context = { repo: { owner: "test-owner", repo: "test-repo" }, runId: 42 };
+    process.env.GH_AW_MAX_DAILY_AI_CREDITS = "100";
+    process.env.GH_AW_MAX_AI_CREDITS = "1000";
+    process.env.GH_AW_GITHUB_TOKEN = "fake-token";
+    process.env.GH_AW_WORKFLOW_NAME = "Daily Guardrail Test";
+    process.env.GH_AW_WORKFLOW_ID = "daily-guardrail-test";
+    process.env.GITHUB_TRIGGERING_ACTOR = "octocat";
+    process.env.GITHUB_EVENT_NAME = "pull_request";
+
+    try {
+      await expect(runMain()).resolves.toBeUndefined();
+      expect(coreOutputs.daily_ai_credits_exceeded).toBe("false");
+      expect(coreOutputs.daily_ai_credits_guardrail_status).toBe("under_budget");
+      expect(coreOutputs.daily_ai_credits_total).toBe("1000");
+      expect(coreOutputs.daily_ai_credits_estimated).toBe("1000");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    } finally {
+      delete global.core;
+      delete global.github;
+      delete global.context;
+      delete process.env.GH_AW_MAX_DAILY_AI_CREDITS;
+      delete process.env.GH_AW_MAX_AI_CREDITS;
       delete process.env.GH_AW_GITHUB_TOKEN;
       delete process.env.GH_AW_WORKFLOW_NAME;
       delete process.env.GH_AW_WORKFLOW_ID;

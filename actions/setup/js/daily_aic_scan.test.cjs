@@ -98,6 +98,16 @@ describe("complete daily AIC scan observations", () => {
     );
   });
 
+  it("ages unresolved estimates out when their runs leave the 24-hour window", async () => {
+    const f = fixture([run(1), run(2, { created_at: new Date(now - 24 * 60 * 60 * 1000 - 1).toISOString() })]);
+    f.getRunAIC.mockRejectedValue(new Error("accounting unavailable"));
+
+    const result = await scanDailyAIC(f);
+
+    expect(result.countedRuns.map(item => item.id)).toEqual([1]);
+    expect(f.getRunAIC).toHaveBeenCalledOnce();
+  });
+
   it("reuses real artifact accounting, persists it, then avoids list and download calls", async () => {
     const f = fixture();
     f.getRunAIC = guardrail.getRunAIC;

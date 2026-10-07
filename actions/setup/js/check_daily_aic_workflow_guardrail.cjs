@@ -553,8 +553,9 @@ async function listCompletedWorkflowRunsPage(githubClient, params) {
 function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, meta) {
   const stats = calculateDailyAICStats(countedRuns);
   const estimatedAIC = countedRuns.reduce((sum, run) => sum + (run.source === "estimated" ? run.aic : 0), 0);
-  const remainingBudget = Math.max(0, threshold - stats.total);
-  const usagePercent = threshold > 0 ? ((stats.total / threshold) * 100).toFixed(2) : "0.00";
+  const recordedAIC = stats.total - estimatedAIC;
+  const remainingBudget = Math.max(0, threshold - recordedAIC);
+  const usagePercent = threshold > 0 ? ((recordedAIC / threshold) * 100).toFixed(2) : "0.00";
   const runRows =
     countedRuns.length > 0
       ? countedRuns
@@ -587,9 +588,9 @@ function renderDailyAICSummary(workflowName, actorLogin, threshold, countedRuns,
     "",
     "| Statistic | Value |",
     "| --- | ---: |",
-    `| 24h total AIC | ${totalAICFormatted} |`,
-    `| Recorded AIC | ${formatAICCredits(stats.total - estimatedAIC) || "0"} |`,
-    `| Estimated AIC (unresolved accounting) | ${formatAICCredits(estimatedAIC) || "0"} |`,
+    `| 24h total AIC (recorded + estimated) | ${totalAICFormatted} |`,
+    `| Recorded AIC (guardrail basis) | ${formatAICCredits(recordedAIC) || "0"} |`,
+    `| Estimated AIC (not counted toward threshold) | ${formatAICCredits(estimatedAIC) || "0"} |`,
     `| Threshold | ${formatAICCredits(threshold)} |`,
     `| Threshold used | ${usagePercent}% |`,
     `| Remaining headroom | ${formatAICCredits(remainingBudget) || "0"} |`,
@@ -741,6 +742,7 @@ async function main(options = {}) {
     });
     const totalAIC = countedRuns.reduce((sum, run) => sum + run.aic, 0);
     const estimatedAIC = countedRuns.reduce((sum, run) => sum + (run.source === "estimated" ? run.aic : 0), 0);
+    const recordedAIC = totalAIC - estimatedAIC;
     actorLogin = process.env.GITHUB_TRIGGERING_ACTOR || current.triggering_actor?.login || current.actor?.login || process.env.GITHUB_ACTOR || "";
     const rateLimit = budget.snapshot();
 
@@ -760,16 +762,18 @@ async function main(options = {}) {
       inspectedRunsCount: summaryMeta.inspectedRunsCount,
       countedRunIds: countedRuns.map(run => run.id),
       currentAIC: totalAIC,
+      recordedAIC,
+      estimatedAIC,
       threshold,
-      exceeded: totalAIC >= threshold,
+      exceeded: recordedAIC >= threshold,
     });
 
     logDailyGuardrail("Daily AIC business API requests", { requests: rateLimit.requests, cacheHits });
 
-    if (totalAIC < threshold) {
+    if (recordedAIC < threshold) {
       core.setOutput("daily_ai_credits_guardrail_status", "under_budget");
       await appendDailyAICSummary(workflowName, actorLogin, threshold, countedRuns, rateLimit, summaryMeta);
-      core.info(`Daily workflow AIC guardrail not exceeded (${totalAIC}/${threshold}).`);
+      core.info(`Daily workflow AIC guardrail not exceeded (${recordedAIC}/${threshold} recorded; ${estimatedAIC} estimated).`);
       return;
     }
 
@@ -785,7 +789,7 @@ async function main(options = {}) {
     // will skip the agent, and the conclusion job will handle reporting via the
     // daily_ai_credits_exceeded flag. Failing the activation job here causes the overall
     // workflow to fail even though hitting the daily limit is an expected, graceful outcome.
-    core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${totalAIC}/${threshold}.`);
+    core.info(`Daily workflow AIC guardrail exceeded for ${workflowName}: ${recordedAIC}/${threshold} recorded (${estimatedAIC} estimated).`);
   } catch (error) {
     const status = isStructuralGuardrailError(error) ? "structural_error" : "transient_error";
     const message = `Daily workflow AI Credits are unknown: ${getErrorMessage(error)}`;

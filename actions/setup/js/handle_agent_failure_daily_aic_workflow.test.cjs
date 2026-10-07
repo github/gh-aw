@@ -29,9 +29,9 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
   it("renders the daily workflow AI Credits guardrail context when exceeded", () => {
     const rendered = buildDailyAICExceededContext(true, "17.329230000000003", "10", "0");
     expect(rendered).toContain("Daily Workflow AIC Guardrail Exceeded");
-    expect(rendered).toContain("**24h AIC guardrail total:** `18` AI Credits");
-    expect(rendered).toContain("**Recorded AIC:** `18` AI Credits");
-    expect(rendered).toContain("**Estimated AIC (unresolved accounting):** `0` AI Credits");
+    expect(rendered).toContain("**24h recorded AIC (guardrail basis):** `18` AI Credits");
+    expect(rendered).toContain("**24h estimated AIC (informational only):** `0` AI Credits");
+    expect(rendered).toContain("**24h combined AIC (recorded + estimated):** `18` AI Credits");
     expect(rendered).toContain("**Configured threshold:** `10` AI Credits");
     expect(rendered).not.toContain("Activation Issue:");
     // Progressive disclosure sections
@@ -44,9 +44,11 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
   });
 
   it("does not claim estimated usage was consumed and explains reconciliation", () => {
-    const rendered = buildDailyAICExceededContext(true, "5809.28", "5000", "5000");
-    expect(rendered).toContain("**Recorded AIC:** `810` AI Credits");
-    expect(rendered).toContain("**Estimated AIC (unresolved accounting):** `5K` AI Credits");
+    const rendered = buildDailyAICExceededContext(true, "10809.28", "5000", "5000");
+    expect(rendered).toContain("**24h recorded AIC (guardrail basis):** `5.8K` AI Credits");
+    expect(rendered).toContain("**24h estimated AIC (informational only):** `5K` AI Credits");
+    expect(rendered).toContain("**24h combined AIC (recorded + estimated):** `10.8K` AI Credits");
+    expect(rendered).toContain("do not block a run by themselves");
     expect(rendered).toContain("replace estimates if recorded usage becomes available");
     expect(rendered).toContain("leave the rolling 24-hour window");
     expect(rendered).not.toContain("already consumed");

@@ -1,9 +1,9 @@
 > [!WARNING]
-> **Daily Workflow AIC Guardrail Exceeded**: The agent was not started because the 24-hour guardrail total reached the configured AI Credits threshold.
+> **Daily Workflow AIC Guardrail Exceeded**: The agent was not started because recorded credits reached the configured AI Credits threshold.
 
-- **24h AIC guardrail total:** `{total_aic}` AI Credits
-- **Recorded AIC:** `{recorded_aic}` AI Credits
-- **Estimated AIC (unresolved accounting):** `{estimated_aic}` AI Credits
+- **24h recorded AIC (guardrail basis):** `{recorded_aic}` AI Credits
+- **24h estimated AIC (informational only):** `{estimated_aic}` AI Credits
+- **24h combined AIC (recorded + estimated):** `{total_aic}` AI Credits
 - **Configured threshold:** `{threshold}` AI Credits
 
 {estimate_guidance}
@@ -40,11 +40,11 @@ Commit and push the updated `.lock.yml` file.
 <details>
 <summary>What is the daily AI Credits guardrail?</summary>
 
-The `max-daily-ai-credits` frontmatter option sets a per-workflow spending cap measured in *AI Credits* across the 24-hour window before the current run. The cap is scoped to the repository and workflow — it aggregates usage across all runs of this workflow regardless of who triggered them.
+The `max-daily-ai-credits` frontmatter option sets a per-workflow spending cap measured in *recorded AI Credits* across the 24-hour window before the current run. The cap is scoped to the repository and workflow — it aggregates usage across all runs of this workflow regardless of who triggered them.
 
-When the total of recorded AI Credits and unresolved conservative estimates across all completed runs of this workflow in the last 24 hours reaches the threshold, the activation job sets the `daily_ai_credits_exceeded` output to `true` and the agent job is skipped for that run. The conclusion job still runs and creates this report.
+Only recorded AI Credits count toward the threshold. Unresolved estimates are reported for visibility but do not block a run by themselves. Each activation scan retries unresolved accounting; estimates leave the scan when their runs exit the rolling 24-hour window. If accounting cannot be inspected and no estimate can be produced, the guardrail still fails closed with an accounting error.
 
-The guardrail is evaluated at activation time, not retrospectively, so a single very large run that pushes usage over the threshold only blocks *subsequent* runs in the same window — it does not cancel a run that is already in progress.
+The guardrail is evaluated at activation time, not retrospectively, so a single very large run that pushes recorded usage over the threshold only blocks *subsequent* runs in the same window — it does not cancel a run that is already in progress.
 
 </details>
 

@@ -2487,10 +2487,10 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold, 
   const estimated = Number(estimatedAIC);
   const hasBreakdown = estimatedAIC !== "" && Number.isFinite(total) && Number.isFinite(estimated) && estimated >= 0 && estimated <= total;
   const estimateGuidance = !hasBreakdown
-    ? "The accounting breakdown is unavailable for this run. The agent will resume when the guardrail total falls below the threshold."
+    ? "The accounting breakdown is unavailable for this run. The agent will resume when recorded credits fall below the threshold."
     : estimated > 0
-      ? "Estimated credits represent conservative per-run maximums where accounting is unavailable, not confirmed consumption. Subsequent scans retry unresolved accounting and replace estimates if recorded usage becomes available. Otherwise, these estimates stop counting when the affected runs leave the rolling 24-hour window."
-      : "The agent will resume automatically once the rolling 24-hour total falls below the threshold. No action is required if the current limit is appropriate for your usage.";
+      ? "Estimated credits represent conservative per-run maximums where accounting is unavailable, not confirmed consumption, and do not block a run by themselves. Subsequent scans retry unresolved accounting and replace estimates if recorded usage becomes available. Otherwise, these estimates stop counting when the affected runs leave the rolling 24-hour window."
+      : "The agent will resume automatically once recorded credits in the rolling 24-hour window fall below the threshold. No action is required if the current limit is appropriate for your usage.";
   return (
     "\n" +
     renderTemplateFromFile(templatePath, {
