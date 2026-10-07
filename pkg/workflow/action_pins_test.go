@@ -2077,3 +2077,58 @@ func TestMapPinnedUsesResolvesMirrorTag(t *testing.T) {
 		t.Fatalf("mirror tag was not resolved through the action cache: %s", output)
 	}
 }
+
+func TestMapPinnedUsesPreservesExactMappingPerStepThroughSanitization(t *testing.T) {
+	setupNode := getActionPin("actions/setup-node")
+	input := "steps:\n" +
+		"- name: Mapped__gh_aw_exact_pin__\n" +
+		"  uses: " + setupNode + "\n" +
+		"- name: Ordinary\n" +
+		"  uses: " + setupNode + "\n" +
+		"- name: Script\n" +
+		"  run: echo \"${{ github.event.issue.title }}\"\n"
+	sanitized, _, err := sanitizeCustomStepsYAML(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sanitized, "Mapped__gh_aw_exact_pin__") {
+		t.Fatalf("sanitization dropped the exact-mapping provenance:\n%s", sanitized)
+	}
+
+	mapped, err := mapPinnedUsesInYAML(
+		"      - name: Mapped"+exactPinMappingMarker+"\n"+
+			"        uses: "+setupNode+" "+exactPinMappingMarker+"\n"+
+			"      - name: Ordinary\n"+
+			"        uses: "+setupNode+"\n",
+		map[string]string{"actions/setup-node@v1": "internal/setup-node@v1"},
+		map[string]string{"actions/": "mirror/actions-"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(mapped, exactPinMappingMarker) {
+		t.Fatalf("internal mapping marker leaked into output:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: "+setupNode) {
+		t.Fatalf("exact-mapped step was prefix-rewritten:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: "+strings.Replace(setupNode, "actions/setup-node@", "mirror/actions-setup-node@", 1)) {
+		t.Fatalf("ordinary step using the same reference was not prefix-rewritten:\n%s", mapped)
+	}
+}
+
+func TestApplyActionPinToTypedStepRejectsUnresolvedExactMapping(t *testing.T) {
+	data := &WorkflowData{
+		ActionPinMappings: map[string]string{
+			"actions/github-script@v9": "internal/missing@v1",
+		},
+	}
+	step := &WorkflowStep{Uses: "actions/github-script@v9"}
+
+	_, err := applyActionPinToTypedStep(step, data)
+	if err == nil {
+		t.Fatal("expected unresolved exact mapping to fail")
+	}
+	if !strings.Contains(err.Error(), "action pin mapping") {
+		t.Fatalf("expected mapping error, got: %v", err)
+	}
+}

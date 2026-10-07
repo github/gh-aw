@@ -112,6 +112,21 @@ func TestResolveActionPin_GHESMappingTakesPrecedence(t *testing.T) {
 	assert.Equal(t, 1, resolver.called, "mapped enterprise action should use normal resolution")
 }
 
+func TestResolveActionPin_UnresolvedExactMappingFails(t *testing.T) {
+	t.Parallel()
+
+	for _, target := range []string{"internal/missing@v1", ""} {
+		t.Run(target, func(t *testing.T) {
+			_, err := ResolveActionPin("actions/github-script", "v9", &PinContext{
+				Resolver: &countingResolver{},
+				Mappings: map[string]string{"actions/github-script@v9": target},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "action pin mapping")
+		})
+	}
+}
+
 func TestBuildByRepoIndex_GroupsByRepoAndSortsDescending(t *testing.T) {
 	t.Parallel()
 	pins := []ActionPin{
@@ -334,6 +349,14 @@ func TestFormatPinnedActionWithResolution_ConsistentVersionComment(t *testing.T)
 			sourceVersion:   "v9.0.0",
 			resolvedVersion: "v9",
 			expected:        "actions/github-script@abc123 # v9.0.0",
+		},
+		{
+			name:            "does not prefer an unverified source minor tag",
+			repo:            "actions/github-script",
+			sha:             "abc123",
+			sourceVersion:   "v9.999",
+			resolvedVersion: "v9",
+			expected:        "actions/github-script@abc123 # v9",
 		},
 		{
 			name:            "uses resolved tag when source refers to another major",

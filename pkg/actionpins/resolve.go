@@ -49,7 +49,10 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 
 	// Apply repository/version mapping from aw.json action_pins before resolution.
 	originalRepo, originalVersion := actionRepo, version
-	_, exactMapped := ctx.Mappings[FormatCacheKey(actionRepo, version)]
+	_, exactMapped, mappingErr := validateActionPinMapping(actionRepo, version, ctx)
+	if mappingErr != nil {
+		return "", mappingErr
+	}
 	if !exactMapped {
 		defer func() { result = applyActionPinPrefix(originalRepo, result, ctx) }()
 	}
@@ -86,11 +89,18 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 		errorType = ResolutionErrorTypeDynamicResolutionFailed
 	}
 	recordPinResolutionFailure(ctx, actionRepo, version, errorType)
+	return handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersion, exactMapped, cacheKey, ctx)
+}
+
+func handleUnresolvedActionPin(actionRepo, version, originalRepo, originalVersion string, exactMapped bool, cacheKey string, ctx *PinContext) (string, error) {
 	if ctx.EnforcePinned && !ctx.AllowActionRefs {
 		if ctx.Resolver != nil {
 			return "", fmt.Errorf("unable to pin action %s@%s: resolution failed", actionRepo, version)
 		}
 		return "", fmt.Errorf("unable to pin action %s@%s", actionRepo, version)
+	}
+	if exactMapped {
+		return "", fmt.Errorf("unable to resolve action pin mapping for %s@%s to %s@%s", originalRepo, originalVersion, actionRepo, version)
 	}
 
 	warningMsg := fmt.Sprintf("Unable to pin action %s@%s", actionRepo, version)
@@ -99,6 +109,14 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 	}
 	ctx.emitOnce(cacheKey, warningMsg, console.FormatWarningMessage)
 	return "", nil
+}
+
+func validateActionPinMapping(actionRepo, version string, ctx *PinContext) (string, bool, error) {
+	mappingValue, exactMapped := ctx.Mappings[FormatCacheKey(actionRepo, version)]
+	if exactMapped && (ExtractRepo(mappingValue) == "" || ExtractVersion(mappingValue) == "") {
+		return "", true, fmt.Errorf("invalid action pin mapping for %s@%s: target %q must be in owner/repo@ref format", actionRepo, version, mappingValue)
+	}
+	return mappingValue, exactMapped, nil
 }
 
 // ResolveGHESActionPin returns the GHES-compatible pin for repo, if one is required.

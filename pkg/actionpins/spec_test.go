@@ -979,27 +979,21 @@ func TestSpec_PublicAPI_ResolveActionPin_AppliesMapping(t *testing.T) {
 		assert.Contains(t, result, "actions/checkout@", "result should reference the original repo when no mapping exists")
 	})
 
-	t.Run("invalid mapping value is skipped", func(t *testing.T) {
-		baseline, err := actionpins.ResolveActionPin("actions/checkout", "v4", &actionpins.PinContext{
-			Warnings: make(map[string]bool),
-		})
-		require.NoError(t, err)
-
+	t.Run("invalid mapping value fails", func(t *testing.T) {
 		ctx := &actionpins.PinContext{
 			Warnings: make(map[string]bool),
 			Mappings: map[string]string{
 				"actions/checkout@v4": "actions/checkout",
 			},
 		}
-		result, err := actionpins.ResolveActionPin("actions/checkout", "v4", ctx)
-		require.NoError(t, err, "invalid mapping should be skipped without error")
-		assert.Equal(t, baseline, result, "invalid mapping should leave resolution behavior unchanged")
+		_, err := actionpins.ResolveActionPin("actions/checkout", "v4", ctx)
+		require.Error(t, err, "invalid mapping should fail")
 		assert.NotContains(t, ctx.Warnings, "map:actions/checkout@v4", "invalid mappings should not record mapping notifications")
 	})
 }
 
 // TestSpec_PublicAPI_ResolveActionPin_MappingTargetUnknown validates that mapping to a repo
-// with no known pins yields an empty result without panicking.
+// with no known pins returns an error without panicking.
 func TestSpec_PublicAPI_ResolveActionPin_MappingTargetUnknown(t *testing.T) {
 	t.Parallel()
 	ctx := &actionpins.PinContext{
@@ -1010,9 +1004,8 @@ func TestSpec_PublicAPI_ResolveActionPin_MappingTargetUnknown(t *testing.T) {
 	}
 
 	require.NotPanics(t, func() {
-		result, err := actionpins.ResolveActionPin("actions/checkout", "v4", ctx)
-		require.NoError(t, err)
-		assert.Empty(t, result, "mapping to unknown repo should produce unresolved empty result")
+		_, err := actionpins.ResolveActionPin("actions/checkout", "v4", ctx)
+		require.Error(t, err, "mapping to unknown repo should fail")
 	})
 }
 

@@ -38,7 +38,9 @@ func formatPinnedActionWithResolution(repo, sha, sourceVersion, resolvedVersion 
 		return FormatPinnedActionReference(repo, sha, resolvedVersion)
 	}
 	actionPinsLog.Printf("Version resolved: source=%s resolved=%s for repo=%s", sourceVersion, resolvedVersion, repo)
-	if semverutil.IsActionVersionTag(sourceVersion) && strings.HasPrefix(sourceVersion, resolvedVersion+".") {
+	if semverutil.IsActionVersionTag(sourceVersion) &&
+		strings.Count(strings.TrimPrefix(sourceVersion, "v"), ".") == 2 &&
+		strings.HasPrefix(sourceVersion, resolvedVersion+".") {
 		return FormatPinnedActionReference(repo, sha, sourceVersion)
 	}
 	return FormatPinnedActionReference(repo, sha, resolvedVersion)
