@@ -21,7 +21,11 @@ permissions:
   discussions: read
   actions: read
 name: Smoke Copilot ARM64
-engine: copilot
+engine:
+  id: copilot
+  fallback-models:
+    - copilot/gpt-5.4
+    - copilot/claude-sonnet-5
 runs-on: ubuntu-24.04-arm
 imports:
   - shared/gh.md

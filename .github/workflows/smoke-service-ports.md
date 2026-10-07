@@ -16,7 +16,11 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Service Ports
-engine: pi
+engine:
+  id: pi
+  fallback-models:
+    - copilot/gpt-5.4
+    - copilot/gpt-5.4-mini
 model: copilot/gpt-5.3-codex
 strict: true
 sandbox:

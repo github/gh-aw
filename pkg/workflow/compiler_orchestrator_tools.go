@@ -379,7 +379,9 @@ func (c *Compiler) warnDeprecatedAPMImports(frontmatter map[string]any) {
 }
 
 func (c *Compiler) adjustToolsForEngineCapabilities(frontmatter map[string]any, agenticEngine CodingAgentEngine, tools map[string]any) map[string]any {
-	if agenticEngine.GetCapabilities().ToolsAllowlist {
+	capabilities := agenticEngine.GetCapabilities()
+	// Engines without native MCP use CLI proxies, which retain their own tool configuration.
+	if capabilities.ToolsAllowlist || !capabilities.MCP {
 		return tools
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Using experimental %s support (engine: %s)", agenticEngine.GetDisplayName(), agenticEngine.GetID())))

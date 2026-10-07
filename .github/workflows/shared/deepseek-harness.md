@@ -2,7 +2,7 @@
 engine:
   id: deepseek-harness
   detection-engine: copilot
-  version: "0.1.0-rc.6"
+  version: "0.2.0-rc.2"
   display-name: DeepSeek Harness
   description: DeepSeek Harness (dsh) with headless execution and multi-provider LLM support
   experimental: true
@@ -64,106 +64,102 @@ engine:
         DSH_TOOLS_MODE: native
         NO_COLOR: "1"
     harness-script: |
-      const { mkdirSync, readFileSync, writeFileSync } = require("fs");
+      const { mkdirSync, mkdtempSync, readFileSync, writeFileSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
-      const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL } = require("./awf_reflect.cjs");
+      const { constants } = require("os");
+      const { fetchAWFReflect, deriveBaseUrlFromModelsURL, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...commandArgs] = process.argv.slice(2);
       const log = message => process.stderr.write(`[deepseek-harness] ${message}\n`);
       const fail = (result, action) => {
         if (result.error) throw result.error;
         if (result.status !== 0) {
-          const error = new Error(`${action} failed with exit code ${result.status ?? "unknown"}`);
-          // Surface the child's own status so the step fails with the same code.
-          error.exitCode = typeof result.status === "number" && result.status !== 0 ? result.status : 1;
+          const exitCode = result.status ?? (result.signal && constants.signals[result.signal] ? 128 + constants.signals[result.signal] : 1);
+          const error = new Error(`${action} failed with exit code ${exitCode}${result.signal ? ` (signal=${result.signal})` : ""}`);
+          error.exitCode = exitCode;
           throw error;
         }
       };
 
       const main = async () => {
+        if (!command) throw new Error("DeepSeek Harness command is required");
         const workspace = process.env.GITHUB_WORKSPACE;
         if (!workspace) throw new Error("GITHUB_WORKSPACE is required");
 
         const selectedModel = process.env.DSH_MODEL;
-        if (!selectedModel || !selectedModel.includes("/")) {
+        const separator = selectedModel?.indexOf("/") ?? -1;
+        if (separator <= 0 || separator === selectedModel.length - 1) {
           throw new Error("DSH_MODEL must use provider/model format");
         }
-        const model = selectedModel.slice(selectedModel.indexOf("/") + 1);
-        if (!model) throw new Error("DSH_MODEL must include a model name");
+        const model = selectedModel.slice(separator + 1);
 
         const provider = process.env.GH_AW_LLM_PROVIDER;
-        if (!provider) throw new Error("GH_AW_LLM_PROVIDER is required");
+        if (!["github", "anthropic", "openai"].includes(provider)) {
+          throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
+        }
         const isAnthropic = provider === "anthropic";
+        const apiKeyEnv = isAnthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
 
-        let baseURL = process.env.OPENAI_BASE_URL;
+        let baseURL;
+        let apiKey;
         if (process.env.AWF_REFLECT_ENABLED === "1") {
           const result = await fetchAWFReflect({ logger: log });
           if (!result.ok || !result.reflectData) {
             throw new Error(`Unable to discover the DeepSeek Harness LLM endpoint from /reflect: ${result.reason || "empty response"}`);
           }
-          const endpoint = resolveProviderEndpointFromReflect({
-            provider,
-            reflectData: result.reflectData,
-            logger: log,
-          });
-          if (!endpoint?.baseUrl) {
-            throw new Error(`No configured /reflect endpoint found for provider ${provider}`);
+          const aliases = REFLECT_PROVIDER_ALIASES[provider];
+          const endpoint = result.reflectData.endpoints?.find(
+            entry => entry?.configured === true && aliases.has(normalizeReflectProviderName(entry.provider))
+          );
+          if (!endpoint || typeof endpoint.models_url !== "string") {
+            throw new Error(`No configured /reflect models endpoint found for provider ${provider}`);
           }
-          baseURL = endpoint.baseUrl;
-          if (!isAnthropic) {
-            // `resolveProviderEndpointFromReflect` returns the origin only, but an
-            // OpenAI-compatible route needs the path prefix carried by models_url
-            // (typically `/v1`); otherwise dsh would POST to `/chat/completions`.
-            const reflectedEndpoint = result.reflectData.endpoints?.find(
-              entry => entry?.configured === true && entry.provider === endpoint.endpointProvider
-            );
-            if (typeof reflectedEndpoint?.models_url === "string") {
-              baseURL = deriveBaseUrlFromModelsURL(reflectedEndpoint.models_url);
-            }
-          }
+          baseURL = deriveBaseUrlFromModelsURL(endpoint.models_url);
+          // AWF supplies the real credentials; dsh only needs a nonempty key.
+          apiKey = "awf-proxy";
+        } else {
+          if (provider === "github") throw new Error("DeepSeek Harness Copilot routing requires the AWF sandbox");
+          baseURL = isAnthropic ? process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com" : process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+          apiKey = isAnthropic ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY || process.env.CODEX_API_KEY;
+          if (!apiKey) throw new Error(`${apiKeyEnv} is required without AWF`);
         }
-        if (!baseURL) {
-          throw new Error("DeepSeek Harness requires AWF endpoint discovery or OPENAI_BASE_URL");
-        }
-
-        const dshHome = join(workspace, ".dsh");
-        mkdirSync(dshHome, { recursive: true, mode: 0o700 });
-        // dsh's settings provider picks the document format from the file
-        // extension, so `settings.yaml` must hold YAML. Every value written here
-        // is a scalar, and a JSON string literal is also a valid YAML
-        // double-quoted scalar, so quoting through JSON.stringify is safe.
-        const scalar = value => JSON.stringify(String(value));
-        const settings = [
-          "# Ephemeral DeepSeek Harness settings generated by gh-aw for this run.",
-          "agent-default-model:",
-          "  provider: awf-proxy",
-          `  model: ${scalar(model)}`,
-          "llm-pi-ai:",
-          "  providers:",
-          "    awf-proxy:",
-          `      displayName: ${scalar("GitHub Agentic Workflows")}`,
-          `      apiKeyEnv: ${scalar(isAnthropic ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY")}`,
-          `      api: ${scalar(isAnthropic ? "anthropic-messages" : "openai-completions")}`,
-          `      baseURL: ${scalar(baseURL)}`,
-          "      models:",
-          `        - id: ${scalar(model)}`,
-          `          name: ${scalar(model)}`,
-          "",
-        ].join("\n");
-        const settingsPath = join(dshHome, "settings.yaml");
-        writeFileSync(settingsPath, settings, { mode: 0o600 });
+        // The Anthropic SDK appends /v1/messages itself.
+        if (isAnthropic) baseURL = baseURL.replace(/\/+$/, "").replace(/\/v1$/, "");
 
         const promptPath = process.env.GH_AW_PROMPT;
         if (!promptPath) throw new Error("GH_AW_PROMPT is required");
         const prompt = readFileSync(promptPath, "utf8");
-        const env = { ...process.env, DSH_HOME: dshHome };
+        const homeRoot = join(workspace, ".dsh");
+        mkdirSync(homeRoot, { recursive: true, mode: 0o700 });
+        const dshHome = mkdtempSync(join(homeRoot, "gh-aw-"));
+        const patchPath = join(dshHome, "cordis.patch.yml");
+        const patch = [
+          { id: "agent-default-model", config: { provider: "awf-proxy", model } },
+          {
+            id: "llm-pi-ai",
+            config: {
+              providers: {
+                "awf-proxy": {
+                  displayName: "GitHub Agentic Workflows",
+                  apiKeyEnv,
+                  api: isAnthropic ? "anthropic-messages" : "openai-completions",
+                  baseURL,
+                  models: [{ id: model, name: model }],
+                },
+              },
+            },
+          },
+        ];
+        writeFileSync(patchPath, JSON.stringify(patch, null, 2) + "\n", { mode: 0o600 });
+        const env = { ...process.env, DSH_HOME: dshHome, [apiKeyEnv]: apiKey };
         log(`configured provider=${provider} model=${model}`);
         fail(
-          spawnSync(command, [...commandArgs, prompt], {
-            cwd: workspace,
+          spawnSync(command, [...commandArgs, "--patch", patchPath, "-"], {
+            cwd: process.env.GH_AW_ENGINE_CWD || workspace,
             env,
-            stdio: "inherit",
+            input: prompt,
+            stdio: ["pipe", "inherit", "inherit"],
           }),
           "DeepSeek Harness execution"
         );
@@ -190,10 +186,14 @@ imports:
   - shared/deepseek-harness.md
 ```
 
-The integration pins the developer-preview `@deepseek-ai/dsh` package and runs
-its one-shot `headless` profile. Provider credentials and the selected endpoint
-are routed through the AWF proxy and written as YAML to an ephemeral
-`$DSH_HOME/settings.yaml` under `.dsh`. Telemetry is disabled and the harness
+This unsupported sample pins `@deepseek-ai/dsh@0.2.0-rc.2` and runs its one-shot
+`headless` profile. The prompt is piped verbatim through stdin, not exposed in
+process arguments. Each run uses a fresh private `$DSH_HOME` under `.dsh`;
+`cordis.patch.yml` selects the model and provider endpoint without overwriting
+repository settings. The patch contains credential environment-variable names,
+never keys. AWF routing requires a configured endpoint matching the selected
+provider; Copilot requires AWF. With AWF disabled, Anthropic and OpenAI/Codex use
+their API-key and base-URL environment variables. Telemetry is disabled and the harness
 runs with `DSH_TOOLS_MODE: native`, which selects how dsh's own tools are
 presented to the model (every tool schema, rather than Code Mode's single
 `run_code` entry point). Native MCP configuration is intentionally disabled for

@@ -72,6 +72,16 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, and Pydantic 
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
 
+The DeepSeek Harness sample pins `dsh` v0.2.0-rc.2 and runs its headless profile
+with stdin prompts and a private per-run Cordis configuration patch. It routes
+Copilot, Anthropic, and OpenAI/Codex through matching configured AWF endpoints;
+Copilot requires AWF. Direct Anthropic/OpenAI API keys and base URLs are used
+only when AWF is disabled. Repository `.dsh` settings are preserved, telemetry
+is disabled, and native MCP is not enabled; configured tools use gh-aw's CLI proxy.
+GitHub toolsets, cache memory, and custom MCP servers remain configured on that
+transport. This does not enable restrictions on dsh's native shell/file tools;
+restricted bash command allowlists are rejected at compilation.
+
 The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
 through the selected AWF endpoint, retains configured MCP tools, and uses native
 JSONL session events for summaries and unified session artifacts. Copilot routing
@@ -483,6 +493,8 @@ Unqualified models use the primary provider. Provider prefixes such as `copilot/
 AWF v0.28.44 supports concrete same-provider chains only. Cross-provider chains and fallback model aliases fail compilation; cross-provider support is tracked in [github/gh-aw-firewall#9548](https://github.com/github/gh-aw-firewall/issues/9548). Custom drivers and harnesses can use AWF request recovery without implementing model switching. `engine.model-routing` cannot be combined with `fallback-models`.
 
 AWF's `token-usage.jsonl` records the actual serving model and `model_fallback` evidence; gh-aw uses that evidence for `aw_info.json`, telemetry, and generated output attribution.
+
+The repository's smoke workflows configure fallback chains across Copilot, Claude, Codex, Gemini, and Pi. Additional coverage includes Copilot SDK (`smoke-copilot-sdk`), ARM64 (`smoke-copilot-arm`), Claude on GitHub inference (`smoke-github-claude`), published service ports with `docker-sudo-iptables` (`smoke-service-ports`), and Cloud Hypervisor (`smoke-work-queue`). These workflows exercise their existing tasks with fallback enabled; they do not force provider failures or prove that a model switch occurred.
 
 Codex has no gh-aw-supplied default model. Set `engine.model`, a phase-specific `GH_AW_MODEL_*_CODEX` repository variable, or `GH_AW_DEFAULT_MODEL_CODEX` explicitly; an empty model selection never introduces an implicit `gpt-5.4` recovery model.
 
