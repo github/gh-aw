@@ -77,6 +77,42 @@ func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
 	}
 }
 
+func TestCompileDevelopmentAllowsOptionalDockerChecks(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{"false", "true"} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+			cmd := &cobra.Command{}
+			cmd.Flags().Bool("dry-run", false, "")
+			scanners := []string{
+				"validate-images", "zizmor", "actionlint", "poutine", "runner-guard",
+				"syft", "grype", "grant", "yamllint",
+			}
+			args := []string{"--dry-run"}
+			for _, name := range scanners {
+				cmd.Flags().Bool(name, false, "")
+				args = append(args, "--"+name+"="+value)
+			}
+			if err := cmd.ParseFlags(args); err != nil {
+				t.Fatal(err)
+			}
+			opts := getCompileCmdOptions(cmd)
+			if err := cli.ValidateDevelopmentCompileFlags(opts.dryRun, opts.explicitBoolFlags); err != nil {
+				t.Fatalf("Docker checks must remain optional in dry-run mode: %v", err)
+			}
+			config := opts.toCompileConfig(nil)
+			for _, actual := range []bool{
+				config.ValidateImages, config.Zizmor, config.Actionlint, config.Poutine,
+				config.RunnerGuard, config.Syft, config.Grype, config.Grant, config.Yamllint,
+			} {
+				if actual != (value == "true") {
+					t.Fatalf("optional Docker check value %q was not preserved", value)
+				}
+			}
+		})
+	}
+}
+
 func TestCompileOptionsPropagateForceRefreshContainerPins(t *testing.T) {
 	t.Parallel()
 	config := (&compileCmdOptions{forceRefreshContainerPins: true}).toCompileConfig(nil)

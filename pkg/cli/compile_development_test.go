@@ -22,9 +22,7 @@ func TestApplyDevelopmentCompileMode(t *testing.T) {
 	config := applyDevelopmentCompileMode(CompileConfig{DryRun: true, EnvironmentOverride: "debug"})
 	assert.Equal(t, "debug", config.EnvironmentOverride)
 	for _, enabled := range []bool{
-		config.Strict, config.Staged, config.Validate, config.ValidateImages,
-		config.Actionlint, config.Zizmor, config.Poutine, config.RunnerGuard,
-		config.Syft, config.Grype, config.Grant, config.Yamllint, config.Shellcheck, config.Models,
+		config.Strict, config.Staged, config.Validate, config.Shellcheck, config.Models,
 	} {
 		assert.True(t, enabled)
 	}
@@ -34,6 +32,43 @@ func TestApplyDevelopmentCompileMode(t *testing.T) {
 	assert.Empty(t, config.ActionMode, "--dry-run must not change action reference mode")
 	require.NoError(t, validateCompileConfig(config), "a test environment is not mandatory")
 	require.NoError(t, validateCompileConfig(applyDevelopmentCompileMode(CompileConfig{DryRun: true})))
+}
+
+func TestDevelopmentCompileModeKeepsDockerChecksOptional(t *testing.T) {
+	t.Parallel()
+	for _, enabled := range []bool{false, true} {
+		config := applyDevelopmentCompileMode(CompileConfig{
+			DryRun: true, ValidateImages: enabled, Actionlint: enabled, Zizmor: enabled,
+			Poutine: enabled, RunnerGuard: enabled, Syft: enabled, Grype: enabled,
+			Grant: enabled, Yamllint: enabled,
+		})
+		for _, actual := range []bool{
+			config.ValidateImages, config.Actionlint, config.Zizmor, config.Poutine,
+			config.RunnerGuard, config.Syft, config.Grype, config.Grant, config.Yamllint,
+		} {
+			assert.Equal(t, enabled, actual, "dry-run must preserve opt-in Docker checks")
+		}
+		for _, name := range []string{
+			"validate-images", "actionlint", "zizmor", "poutine", "runner-guard",
+			"syft", "grype", "grant", "yamllint",
+		} {
+			config.ExplicitBoolFlags = map[string]bool{name: enabled}
+			require.NoError(t, validateCompileConfig(config), "Docker checks may be explicitly enabled or disabled")
+		}
+		compiler := createAndConfigureCompiler(config)
+		assert.Equal(t, enabled, reflect.ValueOf(compiler).Elem().FieldByName("requireDocker").Bool())
+	}
+}
+
+func TestDevelopmentCompileFailsWithoutShellcheckOrDocker(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("GH_HOST", "github.com")
+
+	_, err := CompileWorkflows(context.Background(), CompileConfig{
+		DryRun: true, activeModels: &activeModelInventory{},
+	})
+	require.ErrorContains(t, err, "shellcheck not available")
+	assert.Contains(t, err.Error(), "install shellcheck")
 }
 
 func TestDevelopmentCompileModeRejectsBypasses(t *testing.T) {
@@ -66,7 +101,7 @@ func TestDevelopmentCompilerFlags(t *testing.T) {
 	assert.True(t, state.FieldByName("strictMode").Bool())
 	assert.True(t, state.FieldByName("forceStaged").Bool())
 	assert.True(t, state.FieldByName("dryRun").Bool())
-	assert.True(t, state.FieldByName("requireDocker").Bool())
+	assert.False(t, state.FieldByName("requireDocker").Bool())
 	assert.False(t, state.FieldByName("skipValidation").Bool())
 	assert.Equal(t, "debug", state.FieldByName("environmentOverride").String())
 	regular := createAndConfigureCompiler(CompileConfig{})
