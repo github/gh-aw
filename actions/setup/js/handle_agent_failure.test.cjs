@@ -420,6 +420,7 @@ describe("handle_agent_failure", () => {
 
     it("falls back to generic failed title when no specific condition matches", () => {
       expect(buildFailureIssueTitle(baseOptions)).toBe("[aw] Test Workflow failed");
+      expect(buildFailureIssueTitle({ ...baseOptions, transportWedge: true })).toBe("[aw] Test Workflow stalled on an MCP tool call");
     });
 
     it.each([
@@ -6443,6 +6444,24 @@ describe("handle_agent_failure", () => {
         isTimedOut: true,
       });
       expect(categories).toContain("timed_out");
+    });
+
+    it("classifies an MCP watchdog failure without a generic agent failure", () => {
+      expect(buildFailureMatchCategories({ agentConclusion: "failure", transportWedge: true })).toEqual(["transport_wedge"]);
+    });
+
+    it("classifies MCP watchdog failures from structured unified-session events", () => {
+      const { hasMCPTransportWedge, getAgentStdioLogPath, getAgentSessionPath } = require("./handle_agent_failure.cjs");
+      const event = { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } };
+      expect(hasMCPTransportWedge(JSON.stringify(event))).toBe(true);
+      expect(hasMCPTransportWedge(JSON.stringify({ type: "agent.execution", data: { categories: ["agent_failure"], errorCodes: [], errorTypes: [] } }))).toBe(false);
+      expect(hasMCPTransportWedge("not-json\n".repeat(10_000))).toBe(false);
+      expect(hasMCPTransportWedge('{"type":"item.failed","message":"transport_wedge: MCP tool call timed out after 120s"}')).toBe(false);
+      expect(hasMCPTransportWedge("[codex-harness] runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s)")).toBe(false);
+      expect(getAgentStdioLogPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-stdio.log");
+      expect(getAgentStdioLogPath("")).toBe("/tmp/gh-aw/agent-stdio.log");
+      expect(getAgentSessionPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-session.jsonl");
+      expect(getAgentSessionPath("")).toBe("/tmp/gh-aw/agent-session.jsonl");
     });
 
     it("returns missing_safe_outputs category", () => {
