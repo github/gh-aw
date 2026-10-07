@@ -334,6 +334,7 @@ function buildFailureMatchCategories(options) {
 }
 
 function hasMCPTransportWedge(sessionContent) {
+  if (!sessionContent.includes('"transport_wedge"')) return false;
   return sessionContent.split(/\r?\n/).some(line => {
     try {
       const event = JSON.parse(line);

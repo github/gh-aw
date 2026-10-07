@@ -35,6 +35,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
+const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
@@ -112,101 +113,6 @@ function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
   return Object.fromEntries(
     Object.entries(effectiveServers).flatMap(([name, value]) => (typeof value?.tool_timeout_sec === "number" && Number.isSafeInteger(value.tool_timeout_sec) && value.tool_timeout_sec > 0 ? [[name, value.tool_timeout_sec]] : []))
   );
-}
-
-function parseJsonPrefix(input) {
-  const incomplete = Symbol("incomplete");
-  let index = 0;
-
-  function isWhitespace(character) {
-    return character === " " || character === "\t" || character === "\n" || character === "\r";
-  }
-
-  function skipWhitespace() {
-    while (isWhitespace(input[index])) index++;
-  }
-
-  function parseString() {
-    const start = index++;
-    let escaped = false;
-    while (index < input.length) {
-      const character = input[index++];
-      if (escaped) {
-        escaped = false;
-      } else if (character === "\\") {
-        escaped = true;
-      } else if (character === '"') {
-        try {
-          return JSON.parse(input.slice(start, index));
-        } catch {
-          return incomplete;
-        }
-      }
-    }
-    return incomplete;
-  }
-
-  function parseValue(depth = 0) {
-    if (depth > 64) throw new Error("JSON nesting limit exceeded");
-    skipWhitespace();
-    const character = input[index];
-    if (character === '"') {
-      const value = parseString();
-      return { value, complete: value !== incomplete };
-    }
-    if (character === "{" || character === "[") {
-      const isObject = character === "{";
-      const endCharacter = isObject ? "}" : "]";
-      index++;
-      const value = isObject ? Object.create(null) : [];
-      skipWhitespace();
-      if (input[index] === endCharacter) {
-        index++;
-        return { value, complete: true };
-      }
-      while (index < input.length) {
-        let key;
-        if (isObject) {
-          if (input[index] !== '"') return { value, complete: false };
-          key = parseString();
-          if (key === incomplete) return { value, complete: false };
-          skipWhitespace();
-          if (input[index++] !== ":") return { value, complete: false };
-        }
-        const child = parseValue(depth + 1);
-        if (child.value !== incomplete) {
-          if (isObject) value[key] = child.value;
-          else value.push(child.value);
-        }
-        if (!child.complete) return { value, complete: false };
-        skipWhitespace();
-        if (input[index] === endCharacter) {
-          index++;
-          return { value, complete: true };
-        }
-        if (input[index++] !== ",") return { value, complete: false };
-        skipWhitespace();
-      }
-      return { value, complete: false };
-    }
-
-    const start = index;
-    while (index < input.length && !isWhitespace(input[index]) && !",[]{}".includes(input[index])) {
-      index++;
-    }
-    if (start === index) return { value: incomplete, complete: false };
-    try {
-      return { value: JSON.parse(input.slice(start, index)), complete: true };
-    } catch {
-      return { value: incomplete, complete: false };
-    }
-  }
-
-  try {
-    return parseValue().value;
-  } catch {
-    return undefined;
-  }
 }
 
 function createMCPCallWatchdog(timeoutMs, now = Date.now) {
@@ -939,6 +845,9 @@ async function main() {
   // The deadline includes preflight time and is checked both between and during attempts.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   const contextRebuildCircuitBreaker = resolveContextRebuildCircuitBreakerConfig(process.env);
+  const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
+  const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
+  const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
   /** @type {string[] | null} */
   let resumeArgs = null;
   let lastThreadId = "";
@@ -962,9 +871,6 @@ async function main() {
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async attempt => {
       const terminalErrors = [];
-      const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
-      const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
-      const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
       const mcpWatchdog = createMCPCallWatchdog(item => {
         const server = item.server ?? item.server_name ?? item.serverName;
         return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;

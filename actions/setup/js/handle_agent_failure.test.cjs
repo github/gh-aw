@@ -6418,6 +6418,7 @@ describe("handle_agent_failure", () => {
       const event = { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } };
       expect(hasMCPTransportWedge(JSON.stringify(event))).toBe(true);
       expect(hasMCPTransportWedge(JSON.stringify({ type: "agent.execution", data: { categories: ["agent_failure"], errorCodes: [], errorTypes: [] } }))).toBe(false);
+      expect(hasMCPTransportWedge("not-json\n".repeat(10_000))).toBe(false);
       expect(hasMCPTransportWedge('{"type":"item.failed","message":"transport_wedge: MCP tool call timed out after 120s"}')).toBe(false);
       expect(hasMCPTransportWedge("[codex-harness] runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s)")).toBe(false);
       expect(getAgentStdioLogPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-stdio.log");
