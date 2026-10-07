@@ -397,7 +397,7 @@ function buildFailureIssueTitle(options) {
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
   const terminalOutputFailureTitle =
     typeof options.terminalOutputFailureCause === "string" && Object.hasOwn(EMPTY_OUTPUT_FAILURE_CAUSES, options.terminalOutputFailureCause) ? EMPTY_OUTPUT_FAILURE_CAUSES[options.terminalOutputFailureCause] : "";
-  if (terminalOutputFailureTitle) return `[aw] ${workflowName} had ${terminalOutputFailureTitle}`;
+  if (terminalOutputFailureTitle) return `[aw] ${workflowName} ${terminalOutputFailureTitle}`;
   const emptyOutputCauseTitle = typeof options.emptyOutputCause === "string" && Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause) ? EMPTY_OUTPUT_CAUSES[options.emptyOutputCause] : "";
   if (emptyOutputCauseTitle) return `[aw] ${workflowName} ${emptyOutputCauseTitle}`;
   if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;

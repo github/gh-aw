@@ -432,9 +432,9 @@ describe("handle_agent_failure", () => {
     });
 
     it.each([
-      ["engine_outage", "[aw] Test Workflow had engine outage"],
-      ["request_rejection", "[aw] Test Workflow had request rejection"],
-      ["prompt_exhaustion", "[aw] Test Workflow had prompt exhaustion"],
+      ["engine_outage", "[aw] Test Workflow experienced an engine outage"],
+      ["request_rejection", "[aw] Test Workflow had a request rejected"],
+      ["prompt_exhaustion", "[aw] Test Workflow exhausted its prompt"],
     ])("uses the classified terminal-output cause %s in the issue title", (terminalOutputFailureCause, title) => {
       expect(buildFailureIssueTitle({ ...baseOptions, terminalOutputFailureCause })).toBe(title);
     });

@@ -18,12 +18,12 @@ const EMPTY_OUTPUT_CAUSES = Object.freeze({
   missing_terminal_safe_output: "finished without a terminal safe output",
 });
 const EMPTY_OUTPUT_FAILURE_CAUSES = Object.freeze({
-  engine_outage: "engine outage",
-  request_rejection: "request rejection",
-  prompt_exhaustion: "prompt exhaustion",
+  engine_outage: "experienced an engine outage",
+  request_rejection: "had a request rejected",
+  prompt_exhaustion: "exhausted its prompt",
 });
 
-const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded", "max_cache_misses_exceeded"]);
+const PROMPT_EXHAUSTION_ERROR_CATEGORIES = new Set(["effective_tokens_limit_exceeded", "invocation_cap_exceeded"]);
 const REQUEST_REJECTION_ERROR_CATEGORIES = new Set([
   "ai_credits_rate_limit_error",
   "authentication_failed",
@@ -31,6 +31,7 @@ const REQUEST_REJECTION_ERROR_CATEGORIES = new Set([
   "capi_quota_exceeded_error",
   "http_400_response_error",
   "inference_access_error",
+  "max_cache_misses_exceeded",
   "max_ai_credits_exceeded",
   "mcp_policy_error",
   "model_not_supported_error",
