@@ -39,7 +39,7 @@ imports:
   - shared/graders.md
 tools:
   cli-proxy: true
-  bash: ["cat:*", "git diff:*", "git diff --binary --no-ext-diff | wc -c", "git restore:*", "git status:*", grep, "head:*", jq, ls, "sed:*", tail, wc]
+  bash: ["cat:*", cut, "git diff:*", "git diff --binary --no-ext-diff | wc -c", "git restore:*", "git status:*", grep, "head:*", jq, ls, "sed:*", tail, wc]
   github:
     mode: local
     github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -114,6 +114,8 @@ Your goal is to:
 
 ## Workflow Steps
 
+Use native edit tools for writing cache records and report bodies rather than shell heredocs. Safe outputs are CLI-mounted: invoke `safeoutputs <tool>` through bash (use `--help` for parameters), not an invented native safe-output tool.
+
 ### 1. Check Cache for Previously Fixed, Oversized, or Stalled Alerts
 
 Before selecting an alert, check the cache memory for prior outcomes:
@@ -131,7 +133,7 @@ Before selecting an alert, check the cache memory for prior outcomes:
 
 ### 2. List All Open Alerts
 
-Use `list_code_scanning_alerts` to list all open code scanning alerts.
+Run `github list_code_scanning_alerts` through bash to list all open code scanning alerts. The GitHub CLI wrapper is available; do not invent a `github-list_code_scanning_alerts` tool name.
 - Sort the results in reverse importance/severity priority (highest first)
 - Use `rule.security_severity_level` when available (`critical > high > medium > low`)
 - Fall back to alert/rule severity when no security severity is present (`error > warning > note`)
@@ -156,7 +158,7 @@ Immediately after selecting the alert, and **before** doing any analysis or fix 
 
 ### 4. Get Alert Details
 
-Get detailed information about the selected alert using `get_code_scanning_alert`.
+Get detailed information about the selected alert using `github get_code_scanning_alert` through bash.
 - Extract key information:
   - Alert number
   - Severity level (critical, high, medium, low, warning, note, or error)

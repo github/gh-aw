@@ -34,6 +34,7 @@ safe-outputs:
   mentions: false
   allowed-github-references: []
 tools:
+  cli-proxy: true
   bash:
     - "cat /tmp/gh-aw/agent/graft-changed-files.txt"
     - "cat /tmp/gh-aw/agent/graft-recent-activity.txt"
@@ -69,17 +70,19 @@ You are a repository intelligence analyst. Produce a concise daily report for th
 
 ## Required workflow
 
-1. Read `/tmp/gh-aw/agent/graft-changed-files.txt`.
+1. Run `cat /tmp/gh-aw/agent/graft-changed-files.txt` as a separate bash call.
 2. If the file is empty, call `noop` with a message that no repository files changed in the last 24 full hours.
-3. Call `graft_check` to confirm the graph is current.
-4. Call `graft_map` to identify the most connected directories, symbols, and hotspots.
-5. Read `/tmp/gh-aw/agent/graft-recent-activity.txt` and identify the most meaningful changed files or subsystems.
+3. Run `graft graft_check` through bash to confirm the graph is current.
+4. Run `graft graft_map` through bash to identify the most connected directories, symbols, and hotspots.
+5. Run `cat /tmp/gh-aw/agent/graft-recent-activity.txt` as a separate bash call and identify the most meaningful changed files or subsystems.
 6. Use Graft tools to explain those changes:
    - `graft_ask` for high-level subsystem understanding
    - `graft_callers` for blast-radius analysis around the most important changed symbols or files
    - `graft_skeleton` when you need quick API-surface context for a changed file
    - `graft_grep` only for targeted confirmation of a pattern or term
 7. Synthesize one report issue with the highest-signal findings only.
+
+Graft and safe outputs are CLI-mounted in this workflow. Invoke every Graft tool as `graft <tool> [--param value...]` through bash, and emit the report or noop with `safeoutputs create_issue` or `safeoutputs noop`. Do not call CLI-mounted servers as native MCP tools.
 
 ## Analysis goals
 
