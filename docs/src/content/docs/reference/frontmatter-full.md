@@ -4328,14 +4328,13 @@ tools:
   # Format 2: Enable agentic-workflows tool with default settings (same as true)
   agentic-workflows: null
 
-  # Read work queue and claim state from the immutable activation snapshot. The
-  # snapshot can become stale while the agent runs. Issue storage requires the
-  # repository secret GH_AW_WORK_QUEUE_HMAC_SECRET; all accepted issue bodies and
-  # comments are signed.
+  # Read queue state from an immutable activation snapshot. The snapshot can
+  # become stale while the agent runs. This does not install queue policy or
+  # grant dispatch, producer, or worker authority.
   # (optional)
   # Accepted formats:
 
-  # Format 1: Enable or disable the work-queue MCP server.
+  # Format 1: Enable the work-queue MCP server.
   work-queue: true
 
   # Format 2: Enable the work-queue MCP server.
@@ -4343,19 +4342,23 @@ tools:
 
   # Format 3: object
   work-queue:
-    # Queue storage backend; defaults to git. Choose issues to store queue records on
-    # GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret.
+    # Queue storage backend. Git is the only supported value.
     storage: "git"
 
-    # Fail closed and block safe outputs when no trusted inbound worker assignment is
-    # present.
+    # Require a trusted inbound worker assignment before worker safe outputs.
     # (optional)
     require-assignment: true
 
-    # Declare this workflow as a work-queue worker eligible to receive trusted queue
-    # claims.
+    # Declare this workflow as a worker eligible to receive trusted assignments.
     # (optional)
     worker: true
+
+  # `false` and `storage: "issues"` are invalid. Omit `work-queue` entirely for a
+  # workflow that does not use the queue. Frontmatter configures the workflow's
+  # compiler/runtime role; only authenticated installation of the queue Policy
+  # grants producer and worker-profile authority. Dispatch workers are additionally
+  # constrained by `safe-outputs.dispatch-workflow.workflows` and the installed
+  # profile's immutable workflow revision and principal.
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)

@@ -23,10 +23,6 @@ strict: true
 
 # ESLint Factory Dispatcher
 
-Read the queue with `work_queue_read` (use `work-queue work_queue_read '{}'` if the tool is advertised under `<mcp-clis>`). Dispatch at most three available items, selecting the oldest available item for each distinct worker:
+Do not select Work IDs, workers, revisions, or targets from a queue snapshot. Request the trusted scheduler's fair prefix with `work_queue_dispatch_next`, for example `{"pool":"default","max_claims":3,"max_dispatches":3}`. Keep each request within the installed pool policy and this workflow's dispatch budget; issue at most one request for this pool in a run. The scheduler selects eligible Work and launches only the compatible worker profile at its installed immutable workflow revision. This workflow's `safe-outputs.dispatch-workflow.workflows` list is the compiler-approved worker-name allowlist; it does not replace the installed policy's profile, revision, or principal binding. Do not call ordinary `dispatch_workflow` or typed per-worker dispatch tools.
 
-- `eslint-miner:<identity>` → `eslint-miner`
-- `eslint-refiner:<identity>` → `eslint-refiner`
-- `eslint-monster:<identity>` → `eslint-monster`
-
-Only use exact, nonempty identities with one of these prefixes. Call the matching typed tool (`eslint_miner`, `eslint_refiner`, or `eslint_monster`) with `work_queue: {"work_id": "<selected id>"}` at the top level. Do not call `dispatch_workflow`, provide a claim ID, or construct `aw_context`; trusted safe-output processing claims the work and supplies the assignment. Do not dispatch a work item twice in one run. If nothing eligible is available, call `noop`. Queue entries are provisioned by an authorized operator; neither this agent nor its workers can submit work through the read-only queue tools.
+The authenticated operator provisions the queue Policy and authorized producers before this workflow runs. Do not create or select queue entries unless this workflow is separately authorized as a producer. If the request reports no eligible work, use `noop`; stale snapshot ordering is never authority to dispatch.

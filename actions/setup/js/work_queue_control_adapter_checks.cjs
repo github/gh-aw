@@ -183,6 +183,7 @@ function registerTests({ describe, it }) {
       const fixture = queueFixture({ granted: false, count: 1, workerPrincipal: "22" });
       let posts = 0;
       let identityReads = 0;
+      const controlFailures = [];
       try {
         const intentPath = path.join(root, "intents.jsonl");
         fs.writeFileSync(intentPath, `${JSON.stringify({ version: 3, intent_id: "wrong-launch-owner", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } })}\n`);
@@ -215,9 +216,11 @@ function registerTests({ describe, it }) {
           config: { work_queue_enabled: true, work_queue_workflows: ["worker"], aw_context_workflows: ["worker"], "github-token": "wrong-owner-token", work_queue_dispatch_credential: { kind: "authenticated" } },
           now: fixture.at,
           sleepFn: async () => {},
-          core: { setOutput: () => {}, info: () => {} },
+          core: { setOutput: () => {}, info: () => {}, setFailed: message => controlFailures.push(message) },
         });
         assert.equal(result.receipts[0].status, "blocked", JSON.stringify(result));
+        assert.equal(controlFailures.length, 1);
+        assert.match(controlFailures[0], /Work queue controls require recovery/);
         assert.equal(identityReads, 1);
         assert.equal(posts, 0);
         assert.equal([...fixture.state.dispatches.values()][0]?.state, "reserved");
@@ -434,6 +437,7 @@ function registerTests({ describe, it }) {
       let posts = 0;
       let originalAttemptReads = 0;
       const publicationErrors = [];
+      const controlFailures = [];
       actions.getWorkflowRun = async input => {
         const response = await getRun(input);
         if (input.run_id === "42") {
@@ -495,7 +499,7 @@ function registerTests({ describe, it }) {
           maxDispatches: 1,
           now: fixture.at,
           sleepFn: async () => {},
-          core: { setOutput: () => {}, info: () => {} },
+          core: { setOutput: () => {}, info: () => {}, setFailed: message => controlFailures.push(message) },
         };
         const first = await main(options);
         assert.deepEqual(publicationErrors, []);
@@ -515,6 +519,8 @@ function registerTests({ describe, it }) {
         delete process.env.GH_AW_WORK_QUEUE_INTENT_ORIGIN;
         const unproven = await main(options);
         assert.equal(unproven.receipts[0].status, "blocked");
+        assert.equal(controlFailures.length, 1);
+        assert.match(controlFailures[0], /Work queue controls require recovery/);
         assert.equal(fixture.state.claims.size, 1);
         assert.equal(posts, 1);
         await captureIntentOrigin(captureOptions);

@@ -57,6 +57,136 @@ An unassigned dispatcher's queue-control path is not permission to emit arbitrar
 resource-writing outputs. Ordinary non-queue dispatch remains separate. Agent
 execution and snapshot MCP receive no queue-publication credentials.
 
+## Minimal trusted deployment
+
+Queue frontmatter is not an installation mechanism. The first Policy must be
+installed explicitly by an authenticated administrator (or trusted host); this
+is unsupported as automatic workflow bootstrap. A deployment needs three
+separate pieces:
+
+1. A trusted producer whose authenticated principal has an installed producer
+   rule.
+2. A dispatcher compiled with an allowlist of worker workflow names and a
+   bounded dispatch budget.
+3. An installed Policy binding each worker profile to its exact workflow path,
+   immutable commit SHA, authenticated principal, trust domain and effect scope.
+
+First publish and compile the worker and dispatcher workflows on the repository's
+default branch. Configure the worker with a required assignment:
+
+```yaml
+tools:
+  work-queue:
+    storage: git
+    require-assignment: true
+    worker: true
+```
+
+Configure the dispatcher with only the worker names it may route to:
+
+```yaml
+tools:
+  work-queue: true
+safe-outputs:
+  dispatch-workflow:
+    workflows: [eslint-refiner]
+    target-ref: ${{ github.event.repository.default_branch }}
+    max: 3
+  noop:
+```
+
+The workflow-name list is compiler approval, not dispatch authority by itself.
+Queue dispatch uses the installed profile's immutable SHA and principal, not
+the dispatcher's moving `target-ref`. Add only the worker routes required by
+the pool. Do not give the dispatcher agent direct queue-branch write credentials.
+
+Create a complete `QueuePolicy` JSON file from this template. Replace both actor
+ID placeholders with verified positive decimal GitHub principal IDs, and replace
+the SHA with the actual 40- or 64-character commit containing the worker
+workflow. Add one producer entry per trusted submission identity; do not grant
+producer entitlement merely because an identity is the administrator. The
+producer ID must match the principal authenticated for its submission path. The
+worker profile principal must match the identity proven by the configured
+dispatch credential and worker-run authentication; do not guess it from a
+display name or `github.actor`.
+
+```json
+{
+  "mode": "weighted-priority",
+  "class_weights": [8, 4, 2, 1, 1],
+  "accounting_weights": { "shared": 1 },
+  "producers": {
+    "REPLACE_WITH_PRODUCER_ACTOR_ID": {
+      "pools": ["default"],
+      "priorities": [1, 2, 3, 4, 5],
+      "fairness_keys": ["shared"]
+    }
+  },
+  "pools": {
+    "default": {
+      "default_profile": "eslint-refiner",
+      "profiles": {
+        "eslint-refiner": {
+          "workflow": ".github/workflows/eslint-refiner.lock.yml",
+          "ref": "REPLACE_WITH_40_OR_64_HEX_COMMIT_SHA",
+          "principal": "REPLACE_WITH_WORKER_CREDENTIAL_ACTOR_ID",
+          "trust_domain": "eslint-refiner",
+          "credential_scope": "repository",
+          "effect_scope": "github/gh-aw",
+          "max_claims": 1,
+          "share_keys": false
+        }
+      },
+      "logical_limit": 16,
+      "native_limit": 16,
+      "allowed_repositories": ["github/gh-aw"],
+      "max_observation_age_ms": 60000,
+      "retry": { "max_attempts": 3, "backoff_ms": 1000 },
+      "reconciliation": { "max_attempts": 5, "deadline_ms": 300000 }
+    }
+  },
+  "limits": {
+    "ledger_bytes": 83886080,
+    "recovery_bytes": 16777216,
+    "payload_bytes": 4194304,
+    "graph_nodes": 4096,
+    "predecessors": 4096,
+    "pending_nodes": 4096,
+    "operations": 4096,
+    "assignment_bytes": 49152,
+    "result_bytes": 1048576,
+    "evidence_bytes": 1048576,
+    "observation_writes": 4096
+  }
+}
+```
+
+Before installation, independently provision branch protections so only the
+trusted operator/host can write the queue branch, force updates and deletion are
+prevented, and workflow-agent credentials cannot bypass those rules. Automated
+verification/provisioning of these restrictions is deferred; Policy installation
+does not provide that safeguard. Using the default queue branch, install the
+Policy once the worker route is active:
+
+```bash
+gh aw work-queue --repo github/gh-aw policy \
+  --file queue-policy.json --epoch eslint-queue-v1
+```
+
+Run this as an explicitly authenticated administrator with permission to update
+the protected queue branch. Use `--branch QUEUE_BRANCH` before `policy` when
+selecting a separately protected queue branch. Policy changes after initialization
+require a quiescent queue. The command installs the Policy in the causal ledger;
+frontmatter does not install or amend it.
+
+The trusted producer may now stage `work_queue_submit` requests only within its
+installed pools, priorities and accounting keys. The dispatcher requests a
+bounded pool prefix with `work_queue_dispatch_next`; the scheduler chooses the
+eligible Work and approved profile. The worker processes only the received
+version-3 assignment's `claims` array and scopes every effect to its original
+Claim handle. Use `gh aw work-queue --repo github/gh-aw replay --json` to inspect
+the resulting queue state.
+
 ## Worker workflows
 
 Declare the workflow as a queue worker. The compiler supplies reserved
