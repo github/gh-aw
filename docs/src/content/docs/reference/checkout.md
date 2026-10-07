@@ -172,22 +172,20 @@ checkout:
 
 This produces a configured checkout pointing at the safe base ref; the "Checkout PR branch" step remains disabled for `pull_request_target`. Do **not** use `github.event.pull_request.head.sha` or `refs/pull/.../head` in a privileged `pull_request_target` job — that would check out untrusted code in a context with write permissions.
 
-### Explicit Trusted Checkout Policy (`pull-request-target:`)
+### Explicit Trusted Checkout Policy
 
-Strict mode rejects `pull_request_target` checkouts unless checkout is explicitly disabled, targets the supported base repository/ref, or matches a literal pair in the top-level `pull-request-target.allowed-checkouts` policy. Declare this policy in the main workflow's frontmatter; it is not inherited from imports. The default restrictions remain unchanged when the policy is omitted.
+Strict mode rejects `pull_request_target` checkouts unless checkout is explicitly disabled, targets the supported base repository/ref, or matches a literal pair in `on.pull_request_target.allowed-checkouts`. Declare this policy in the main workflow's frontmatter; it is not inherited from imports. The default restrictions remain unchanged when the policy is omitted.
 
 ```aw wrap
 on:
   pull_request_target:
     types: [closed]
     branches: [main]
+    acknowledge-risk: true
+    allowed-checkouts:
+      - repository: dotnet/AspNetCore.Docs
+        ref: main
 if: github.event.pull_request.merged == true
-
-pull-request-target:
-  acknowledge-risk: true
-  allowed-checkouts:
-    - repository: dotnet/AspNetCore.Docs
-      ref: main
 
 checkout:
   - repository: dotnet/AspNetCore.Docs
@@ -196,9 +194,9 @@ checkout:
     current: true
 ```
 
-`allowed-checkouts` defaults to no additional trusted checkouts. Each entry requires a literal `owner/repository` and a non-empty literal branch, tag, or commit SHA. Matching is exact and case-sensitive; repository/ref pairs cannot be combined across entries. Expressions, wildcards, and `refs/pull/...` refs are rejected in the policy. Every configured checkout must independently satisfy the policy or the existing base-checkout rules. External repositories with omitted or PR-dependent refs remain rejected. Wiki checkouts are not covered by this allowlist.
+`on.pull_request_target.allowed-checkouts` defaults to no additional trusted checkouts. Each entry requires a literal `owner/repository` and a non-empty literal branch, tag, or commit SHA. Matching is exact and case-sensitive; repository/ref pairs cannot be combined across entries. Expressions, wildcards, and `refs/pull/...` refs are rejected in the policy. Every configured checkout must independently satisfy the policy or the existing base-checkout rules. External repositories with omitted or PR-dependent refs remain rejected. Wiki checkouts are not covered by this allowlist.
 
-`acknowledge-risk` defaults to `false`. Setting it to `true` suppresses **only** the strict-mode dangerous-trigger warning, including for `checkout: false` or a supported base checkout. It neither allows other checkouts nor disables unrelated warnings, strict validation, or safe-update checks. An allowlist without acknowledgment still emits the trigger warning.
+`on.pull_request_target.acknowledge-risk` defaults to `false`. Setting it to `true` suppresses **only** the strict-mode dangerous-trigger warning, including for `checkout: false` or a supported base checkout. It neither allows other checkouts nor disables unrelated warnings, strict validation, or safe-update checks. An allowlist without acknowledgment still emits the trigger warning.
 
 > [!CAUTION]
 > This policy records maintainer trust, not proof that checked-out code is safe. Prefer immutable commit SHAs; literal branches and tags can move. Keep workflow code and helpers on trusted base refs, read source PR changes as data, and never execute PR-controlled code with privileged credentials. Checkout authentication (`github-app` or `github-token`) and safe-output publication must still be configured separately. This example illustrates compilation policy, not runtime authentication or publication validation.

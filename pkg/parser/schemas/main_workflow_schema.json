@@ -1730,6 +1730,34 @@
                     }
                   ],
                   "description": "When true, allows workflow to run on pull requests from forked repositories with write permissions. Security consideration: use cautiously as fork PRs run with base repository permissions."
+                },
+                "acknowledge-risk": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Acknowledge elevated permissions and secret access to suppress only the strict-mode pull_request_target trigger warning. Checkout validation remains enforced."
+                },
+                "allowed-checkouts": {
+                  "type": "array",
+                  "description": "Exact literal repository/ref pairs trusted by the maintainer in addition to the supported base-repository checkouts. Expressions, wildcards, omitted refs, and PR refs are not allowed.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["repository", "ref"],
+                    "properties": {
+                      "repository": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+                        "description": "Literal owner/repository slug. Matches exactly, including case."
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[^\\s${}*?\\[\\\\:~^]+$",
+                        "not": { "pattern": "^refs/pull/" },
+                        "description": "Literal trusted branch, tag, or commit SHA; not a pull request ref. Prefer an immutable commit SHA."
+                      }
+                    }
+                  }
                 }
               },
               "additionalProperties": false,
@@ -13196,41 +13224,6 @@
       "$comment": "Strict mode enforces several security constraints that are validated in Go code (pkg/workflow/strict_mode_validation.go) rather than JSON Schema: (1) Write Permissions + Safe Outputs: When strict=true AND permissions contains write values (contents:write, issues:write, pull-requests:write), safe-outputs must be configured. This relationship is too complex for JSON Schema as it requires checking if ANY permission property has a 'write' value. (2) Network Requirements: When strict=true, the 'network' field must be present and cannot contain standalone wildcard '*' (but patterns like '*.example.com' ARE allowed). (3) MCP Container Network: Custom MCP servers with containers require explicit network configuration. (4) Action Pinning: Actions must be pinned to commit SHAs. These are enforced during compilation via validateStrictMode().",
       "description": "Enable strict mode validation for enhanced security and compliance. Strict mode enforces: (1) Write Permissions - refuses contents:write, issues:write, pull-requests:write; requires safe-outputs instead, (2) Network Configuration - requires explicit network configuration with no standalone wildcard '*' in allowed domains (patterns like '*.example.com' are allowed), (3) Action Pinning - enforces actions pinned to commit SHAs instead of tags/branches, (4) MCP Network - requires network configuration for custom MCP servers with containers, (5) Deprecated Fields - refuses deprecated frontmatter fields. Can be enabled per-workflow via 'strict: true' in frontmatter, or disabled via 'strict: false'. CLI flag takes precedence over frontmatter (gh aw compile --strict enforces strict mode). Defaults to true. See: https://github.github.com/gh-aw/reference/frontmatter/#strict-mode-strict",
       "examples": [true, false]
-    },
-    "pull-request-target": {
-      "type": "object",
-      "description": "Explicit security policy for pull_request_target triggers. Does not disable strict mode or other diagnostics.",
-      "additionalProperties": false,
-      "properties": {
-        "acknowledge-risk": {
-          "type": "boolean",
-          "default": false,
-          "description": "Acknowledge elevated permissions and secret access to suppress only the strict-mode pull_request_target trigger warning. Checkout validation remains enforced."
-        },
-        "allowed-checkouts": {
-          "type": "array",
-          "description": "Exact literal repository/ref pairs trusted by the maintainer in addition to the supported base-repository checkouts. Expressions, wildcards, omitted refs, and PR refs are not allowed.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["repository", "ref"],
-            "properties": {
-              "repository": {
-                "type": "string",
-                "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
-                "description": "Literal owner/repository slug. Matches exactly, including case."
-              },
-              "ref": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "^[^\\s${}*?\\[\\\\:~^]+$",
-                "not": { "pattern": "^refs/pull/" },
-                "description": "Literal trusted branch, tag, or commit SHA; not a pull request ref. Prefer an immutable commit SHA."
-              }
-            }
-          }
-        }
-      }
     },
     "private": {
       "type": "boolean",

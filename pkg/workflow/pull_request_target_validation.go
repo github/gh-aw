@@ -10,10 +10,10 @@
 // # Validation Rules
 //
 //  1. In strict mode: emit a warning about elevated permissions and secret access,
-//     unless pull-request-target.acknowledge-risk is explicitly true.
+//     unless on.pull_request_target.acknowledge-risk is explicitly true.
 //
 //  2. When checkout is neither explicitly disabled nor restricted to trusted
-//     base-repository refs or literal pull-request-target.allowed-checkouts:
+//     base-repository refs or literal on.pull_request_target.allowed-checkouts:
 //     - In strict mode: return a hard error (extremely insecure).
 //     - In non-strict mode: emit a warning.
 //
@@ -103,10 +103,12 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 	effectiveStrictMode := c.effectiveStrictMode(workflowData.RawFrontmatter)
 	var acknowledged bool
 	var allowedCheckouts []any
-	if policy, ok := workflowData.RawFrontmatter["pull-request-target"].(map[string]any); ok {
-		acknowledged = policy["acknowledge-risk"] == true
-		if entries, ok := policy["allowed-checkouts"].([]any); ok {
-			allowedCheckouts = entries
+	if on, ok := workflowData.RawFrontmatter["on"].(map[string]any); ok {
+		if trigger, ok := on["pull_request_target"].(map[string]any); ok {
+			acknowledged = trigger["acknowledge-risk"] == true
+			if entries, ok := trigger["allowed-checkouts"].([]any); ok {
+				allowedCheckouts = entries
+			}
 		}
 	}
 
@@ -121,7 +123,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			"the workflow elevated access even for PRs from untrusted fork contributors.\n" +
 			"Even with checkout: false, consider whether pull_request_target is truly necessary.\n" +
 			"If you only need to react to PR events without write access, use pull_request instead.\n" +
-			"To acknowledge this risk only, set pull-request-target.acknowledge-risk: true.\n" +
+			"To acknowledge this risk only, set on.pull_request_target.acknowledge-risk: true.\n" +
 			"See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg))
 		c.IncrementWarningCount()
@@ -162,7 +164,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		"  repository: ${{ github.repository }}\n\n" +
 		"You can also use 'ref: ${{ github.event.pull_request.base.ref }}'.\n" +
 		"For a fixed external checkout, declare its literal repository/ref pair in\n" +
-		"pull-request-target.allowed-checkouts and configure checkout to match exactly.\n" +
+		"on.pull_request_target.allowed-checkouts and configure checkout to match exactly.\n" +
 		"See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
 
 	if effectiveStrictMode {
