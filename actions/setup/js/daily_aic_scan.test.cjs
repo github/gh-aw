@@ -33,11 +33,12 @@ let cachePath;
 beforeEach(() => {
   directory = fs.mkdtempSync(path.join(os.tmpdir(), "aic-scan-test-"));
   cachePath = path.join(directory, "scan.jsonl");
-  global.core = { info: vi.fn(), warning: vi.fn() };
+  global.core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 });
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   delete global.core;
   delete global.github;
   delete global.context;
@@ -416,6 +417,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(global.github.rest.actions.listArtifactsForRepo).toHaveBeenCalledWith(expect.objectContaining({ name: "aic-usage-scan-v2" }));
     expect(getWorkflowRun).toHaveBeenCalledOnce();
     expect(global.github.rest.actions.listWorkflowRunsForRepo).toHaveBeenCalledOnce();
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('"request":3,"status":200,"x-ratelimit-remaining":"4000"'));
   });
 
   it("skips untrusted artifacts before downloading and searches the next page", async () => {
@@ -481,7 +483,90 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(fs.existsSync(cachePath)).toBe(false);
   });
 
-  it.each([403, 500])("does not fail activation when cache discovery fails with HTTP %i", async status => {
+  it("bounds repository artifact discovery even when every page is recent", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    const listArtifactsForRepo = vi.fn(async ({ page }) =>
+      response({
+        total_count: 10000,
+        artifacts: Array.from({ length: 100 }, (_, index) => ({ id: (page - 1) * 100 + index, name: "aic-usage-scan-v2", expired: true, created_at: new Date(now).toISOString() })),
+      })
+    );
+    const listWorkflowRunsForRepo = vi.fn();
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: vi.fn(async () => response({ workflow_id: 7 })),
+          listArtifactsForRepo,
+          listWorkflowRunsForRepo,
+        },
+      },
+    };
+    const downloadArtifact = vi.fn();
+    await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(listArtifactsForRepo).toHaveBeenCalledTimes(5);
+    expect(listWorkflowRunsForRepo).not.toHaveBeenCalled();
+    expect(downloadArtifact).not.toHaveBeenCalled();
+  });
+
+  it("bounds downloads of trusted but unusable snapshots", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    const producer = { ...current, id: 50, event: "schedule", repository: { full_name: repository }, head_repository: { full_name: repository }, head_branch: "main" };
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: vi.fn(async () => response(current)),
+          listArtifactsForRepo: vi.fn(async () =>
+            response({
+              total_count: 100,
+              artifacts: Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: "aic-usage-scan-v2", workflow_run: { id: 50 }, created_at: new Date(now).toISOString() })),
+            })
+          ),
+          listWorkflowRunsForRepo: vi.fn(async () => response({ total_count: 1, workflow_runs: [producer] })),
+        },
+      },
+    };
+    const downloadArtifact = vi.fn(async (_id, options) => ({ downloadPath: options.path }));
+    await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(downloadArtifact).toHaveBeenCalledTimes(3);
+    expect(global.github.rest.actions.getWorkflowRun).toHaveBeenCalledOnce();
+    expect(fs.existsSync(cachePath)).toBe(false);
+  });
+
+  it("logs response headers without fetching a separate rate-limit snapshot", async () => {
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    const getRateLimit = vi.fn();
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        rateLimit: { get: getRateLimit },
+        actions: {
+          getWorkflowRun: async () => ({
+            status: 200,
+            data: { workflow_id: 7 },
+            headers: { "x-ratelimit-remaining": "4000", "x-ratelimit-limit": "5000", "x-ratelimit-used": "1000", "x-ratelimit-reset": String(now / 1000), authorization: "private header" },
+          }),
+          listArtifactsForRepo: async () => ({ status: 200, data: { total_count: 0, artifacts: [] } }),
+        },
+      },
+    };
+    await restore(cachePath);
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('"x-ratelimit-remaining":"4000","x-ratelimit-used":"1000"'));
+    expect(core.info).toHaveBeenCalledWith('[daily-aic-cache] API response: {"request":2,"status":200}');
+    expect(JSON.stringify(core.info.mock.calls)).not.toMatch(/private header|authorization|synthetic/);
+    expect(getRateLimit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [403, false],
+    [403, true],
+    [500, false],
+    [500, true],
+  ])("applies the failure policy for discovery HTTP %i with continue-on-error=%s", async (status, continueOnError) => {
     vi.stubEnv("GITHUB_EVENT_NAME", "pull_request");
     global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
     global.github = {
@@ -495,26 +580,39 @@ describe("trusted artifact fallback without writable Actions cache", () => {
         },
       },
     };
-    await expect(restoreMain()).resolves.toBeUndefined();
-    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
+    await expect(restoreMain({ continueOnError })).resolves.toBeUndefined();
+    if (continueOnError) {
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
+      expect(core.setFailed).not.toHaveBeenCalled();
+    } else {
+      expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("stopping activation"));
+      expect(core.warning).not.toHaveBeenCalled();
+    }
     expect(fs.existsSync(cachePath)).toBe(false);
   });
 
-  it("does not fail activation when the initial run lookup is rate-limited", async () => {
+  it.each([undefined, false, true])("applies continue-on-error=%s when the initial run lookup is rate-limited", async continueOnError => {
     vi.stubEnv("GITHUB_EVENT_NAME", "pull_request");
     global.context = { repo: { owner: "example", repo: "project" }, runId: 99 };
     global.github = {
       rest: {
         actions: {
           getWorkflowRun: vi.fn(async () => {
-            throw apiError(403, { "x-ratelimit-remaining": "0" }, "private error");
+            throw apiError(403, { "x-ratelimit-remaining": "0", "x-ratelimit-limit": "5000", authorization: "private header" }, "private error");
           }),
         },
       },
     };
-    await expect(restoreMain()).resolves.toBeUndefined();
-    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
-    expect(core.warning.mock.calls[0][0]).not.toContain("private error");
+    await expect(restoreMain({ continueOnError })).resolves.toBeUndefined();
+    if (continueOnError === true) {
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("continuing without cached observations"));
+      expect(core.setFailed).not.toHaveBeenCalled();
+    } else {
+      expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("stopping activation"));
+      expect(core.warning).not.toHaveBeenCalled();
+    }
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('"x-ratelimit-remaining":"0"'));
+    expect(JSON.stringify([core.info.mock.calls, core.warning.mock.calls, core.setFailed.mock.calls])).not.toMatch(/private error|private header|authorization/);
   });
 
   it("rejects contributor workflow artifacts and non-default-branch dispatch snapshots", () => {

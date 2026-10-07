@@ -170,6 +170,10 @@ func (c *Compiler) buildActivationDailyAICGuardrailStep(data *WorkflowData) []st
 }
 
 func (c *Compiler) buildDailyAICScanObservationRestoreStep(data *WorkflowData) []string {
+	restoreCall := "await main();"
+	if data.MaxDailyAICContinueOnError {
+		restoreCall = "await main({ continueOnError: true });"
+	}
 	return []string{
 		"      - name: Restore daily AIC scan observations\n",
 		"        id: restore-daily-aic-cache-fallback\n",
@@ -184,7 +188,7 @@ func (c *Compiler) buildDailyAICScanObservationRestoreStep(data *WorkflowData) [
 		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
 		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
 		"            const { main } = require('" + SetupActionDestination + "/restore_aic_scan_cache.cjs');\n",
-		"            await main();\n",
+		"            " + restoreCall + "\n",
 	}
 }
 

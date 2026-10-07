@@ -223,6 +223,9 @@ Guardrail test workflow`
 	if strings.Contains(activationSection[restoreStart:scanStart], "continue-on-error: true") {
 		t.Fatal("restore API failure must stop activation before another scan")
 	}
+	if strings.Contains(activationSection[restoreStart:scanStart], "continueOnError: true") {
+		t.Fatal("restore must default to strict failure handling")
+	}
 }
 
 func TestDailyAICExecutionEvidenceSurroundsPreAgentFailure(t *testing.T) {
@@ -731,6 +734,11 @@ Daily AIC guardrail with warning-only unknown accounting`
 	guardrailStep := lockStr[stepStart : stepStart+stepEnd]
 	if !strings.Contains(guardrailStep, "continue-on-error: true") {
 		t.Fatal("expected unknown daily AI Credits accounting to be warning-only")
+	}
+	restoreStart := strings.Index(lockStr, "name: Restore daily AIC scan observations")
+	if restoreStart < 0 || restoreStart >= stepStart ||
+		!strings.Contains(lockStr[restoreStart:stepStart], "await main({ continueOnError: true });") {
+		t.Fatal("expected snapshot restore to inherit the warning-only policy")
 	}
 }
 

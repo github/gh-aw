@@ -477,6 +477,26 @@ The following environment variables govern bypass evaluation at runtime:
 
 A conforming implementation MUST evaluate bypass conditions before checking the daily AIC total. When any bypass condition is satisfied, the implementation MUST NOT read or compare the daily AIC usage data for the current run.
 
+### 9.9 Scan Snapshot Discovery and API Cost
+
+Scan snapshots are optional observations, not authoritative daily totals. The artifact backend MUST discover snapshots through repository-wide artifact and workflow-run endpoints, which also support required workflows. Producer verification MUST join candidate artifact run IDs to batched run-history pages rather than issue a run lookup per artifact. Restored observations MUST match the repository, workflow, run attempt, and completed-run timestamps; contributor-controlled `pull_request` producers MUST NOT be trusted.
+
+Each restore MUST bound discovery and downloads:
+
+| Operation | Maximum core REST requests |
+|-----------|---------------------------|
+| Resolve current workflow run | 1 |
+| List named repository artifacts (100 per page) | 5 |
+| List repository producer runs (100 per page, last 48 hours) | 5 |
+| Request a verified snapshot download URL | 3 |
+| **Total restore** | **14** |
+
+The estimate is `1 + artifact_pages + producer_run_pages + snapshot_downloads`. A typical restore with one page of each listing and one usable snapshot costs **4 core requests**, plus one blob-storage download. A repository with no candidates costs **2 core requests**. At most three blob downloads are additional HTTP requests, not core-API quota charges. These counts exclude transport-level retries and the subsequent authoritative scan. That scan still resolves the current run and lists the complete 24-hour window (up to 10 pages), then reads job metadata and usage artifacts for cache misses; reruns and multiple billable components can require additional requests.
+
+Reaching a restore search bound without finding usable observations MUST fall back to the authoritative scan, not report a partial daily total. On restore errors, activation MUST fail by default. When the resolved `max-daily-ai-credits.continue-on-error` policy is `true`, restore MUST emit a warning and continue without cached observations.
+
+Restore MUST log discovery limits, candidate counts, verified downloads, and available rate-limit response headers without exposing tokens or arbitrary error bodies. Rate-limit observations MUST come from business responses, including failed responses and artifact download-URL requests; logging MUST NOT add a `/rate_limit` request. Inspection MUST stop on an API error or when a response reports at most 100 remaining core requests, preserving the quota reserve. Reset and `Retry-After` deadlines MUST be surfaced when available.
+
 ---
 
 ## 10. Per-Run AI Credits Budget
