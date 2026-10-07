@@ -223,7 +223,7 @@ See [Harness Retry and Post-result Watchdog Policy](/gh-aw/reference/engines/#ha
 
 ### Model Routing (`engine.model-routing:`)
 
-Enables experimental per-run model and reasoning-effort selection for Copilot with the AWF firewall. Requires `goal` (`cost` or `cost-speed`), `mode` (`economy`, `balanced`, `robust`, or `auto`), and a non-empty `allowed-models` list. Overrides the fixed `engine.model` and effort settings. See [Model Routing](../model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
+Enables experimental per-run model and reasoning-effort selection for Copilot with the AWF firewall. Requires `goal` (`cost` or `cost-speed`), `mode` (`economy`, `balanced`, `robust`, or `auto`), and a non-empty `allowed-models` list. Overrides the fixed `engine.model` and effort settings. See [Model Routing](/gh-aw/reference/model-routing/) for value meanings, requirements, sub-agent constraints, known limitations, and logs.
 
 ### Engine Driver (`engine.driver:`)
 

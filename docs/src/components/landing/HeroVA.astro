@@ -1,16 +1,45 @@
 ---
-/** Hero A: "Intelligent GitHub repository automation" with prompt → workflow → result. */
+/** Hero A: "Intelligent automation for GitHub" with prompt → workflow → result. */
 import CtaRow from './CtaRow.astro';
 import HeroVAVisual from './HeroVAVisual.astro';
+import { engineLogos } from './HowItWorksEngineLogos';
+
+const engines = [
+  { id: 'copilot', name: 'Copilot' },
+  { id: 'claude', name: 'Claude' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'gemini', name: 'Gemini' },
+];
 ---
 
 <div class="aw-hero-inner">
   <div class="aw-hero-text">
-    <h1><span class="aw-line">Intelligent GitHub</span> <span class="aw-line">repository automation,</span> <span class="aw-line aw-muted">with your own agents.</span></h1>
+    <h1><span class="aw-line">Intelligent automation</span> <span class="aw-line">for GitHub, <span class="aw-muted">with your</span></span> <span class="aw-line aw-muted">own agents.</span></h1>
     <p class="aw-hero-sub">
-      Copilot, Claude Code, Codex or Gemini triage issues, investigate failures and open pull requests on your repo. Safely, with strong guardrails, in GitHub Actions.
+      {engines.map((e, i) => {
+        const logo = engineLogos[e.id];
+        const sep = i === engines.length - 1 ? '' : i === engines.length - 2 ? ' or ' : ', ';
+        return (
+          <Fragment>
+            <span class="aw-engine"><svg class="aw-engine-logo" viewBox={logo.viewBox} aria-hidden="true" focusable="false">{logo.paths.map((d) => <path d={d} />)}</svg>{e.name}</span>{sep}
+          </Fragment>
+        );
+      })} triage issues, investigate failures and open pull requests across your repos. With strong guardrails and cost controls, in GitHub Actions.
     </p>
     <div class="aw-hero-cta"><CtaRow /></div>
   </div>
   <div class="aw-hero-visual"><HeroVAVisual /></div>
 </div>
+
+<style>
+  .aw-engine {
+    white-space: nowrap;
+  }
+  .aw-engine-logo {
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.25em;
+    vertical-align: -0.05em;
+    fill: var(--aw-color-text-muted);
+  }
+</style>

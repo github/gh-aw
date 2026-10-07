@@ -54,7 +54,7 @@ Routing requires the Copilot engine and the AWF firewall enabled. The compiler r
 
 Since [gh-aw#66291](https://github.com/github/gh-aw/pull/66291), routed workflows default to AWF **v0.28.37** and router **0.1.3**, with version-matched, digest-pinned images. Most authors need no version or image overrides. An override of `sandbox.agent.version` must name a published AWF release, not just a Git tag.
 
-Organizations requiring approved registries can override the router image through `sandbox.agent.images.router`. Use a compatible, digest-pinned image; see [Sandbox image overrides](../sandbox/).
+Organizations requiring approved registries can override the router image through `sandbox.agent.images.router`. Use a compatible, digest-pinned image; see [Sandbox image overrides](/gh-aw/reference/sandbox/).
 
 `allowed-models` must satisfy the workflow's `models.allowed` and `models.blocked` policy. GitHub Actions expressions in `allowed-models` are rejected when either policy is set, because the compiler cannot validate their runtime values. Models must also be available to the organization's Copilot plan; unavailable models are skipped.
 
