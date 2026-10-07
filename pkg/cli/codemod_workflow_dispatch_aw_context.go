@@ -1,10 +1,6 @@
 package cli
 
-import (
-	"strings"
-
-	"github.com/github/gh-aw/pkg/logger"
-)
+import "github.com/github/gh-aw/pkg/logger"
 
 var workflowDispatchAwContextCodemodLog = logger.New("cli:codemod_workflow_dispatch_aw_context")
 
@@ -31,89 +27,11 @@ func getWorkflowDispatchAwContextRemovalCodemod() Codemod {
 				return content, false, nil
 			}
 
-			newContent, applied, err := applyFrontmatterLineTransform(content, func(lines []string) ([]string, bool) {
-				onLine := findFrontmatterKeyLine(lines, "on", 0, len(lines), -1)
-				if onLine < 0 || onLine >= len(lines) {
-					return lines, false
-				}
-				onEnd := frontmatterBlockEnd(lines, onLine, len(getIndentation(lines[onLine])))
-				onIndent := len(getIndentation(lines[onLine]))
-				dispatchLine := findFrontmatterKeyLine(lines, "workflow_dispatch", onLine+1, onEnd, onIndent)
-				if dispatchLine < 0 || dispatchLine >= len(lines) {
-					return lines, false
-				}
-				dispatchEnd := frontmatterBlockEnd(lines, dispatchLine, len(getIndentation(lines[dispatchLine])))
-				block, modified := removeFieldFromBlock(lines[dispatchLine:dispatchEnd], "aw_context", "inputs")
-				if !modified {
-					return lines, false
-				}
-				result := make([]string, 0, len(lines)-(dispatchEnd-dispatchLine)+len(block))
-				result = append(result, lines[:dispatchLine]...)
-				result = append(result, block...)
-				result = append(result, lines[dispatchEnd:]...)
-				return result, true
-			})
+			newContent, applied, err := removeYAMLMappingPath(content, []string{"on", "workflow_dispatch", "inputs", "aw_context"}, true)
 			if applied {
 				workflowDispatchAwContextCodemodLog.Print("Removed reserved on.workflow_dispatch.inputs.aw_context")
 			}
 			return newContent, applied, err
 		},
 	}
-}
-
-func findFrontmatterKeyLine(lines []string, key string, start, end, parentIndent int) int {
-	childIndent := -1
-	for i, line := range lines {
-		if i < start || i >= end {
-			continue
-		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := len(getIndentation(line))
-		if parentIndent >= 0 {
-			if indent <= parentIndent {
-				continue
-			}
-			if childIndent < 0 {
-				childIndent = indent
-			}
-			if indent < childIndent {
-				return -1
-			}
-			if indent > childIndent {
-				continue
-			}
-		}
-		if frontmatterLineKey(line) == key {
-			return i
-		}
-	}
-	return -1
-}
-
-func frontmatterBlockEnd(lines []string, start, parentIndent int) int {
-	for i, line := range lines {
-		if i <= start {
-			continue
-		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if len(getIndentation(line)) <= parentIndent {
-			return i
-		}
-	}
-	return len(lines)
-}
-
-func frontmatterLineKey(line string) string {
-	trimmed := strings.TrimSpace(line)
-	key, _, found := strings.Cut(trimmed, ":")
-	if !found {
-		return ""
-	}
-	return strings.Trim(key, `"'`)
 }
