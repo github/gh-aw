@@ -44,10 +44,11 @@ func TestOutputCollectionGitHubToken(t *testing.T) {
 			token: "${{ secrets.MENTIONS_PAT }}",
 		},
 		{
-			name: "safe outputs app token is not available in agent job",
+			name: "safe outputs app token is minted in agent job",
 			safeOutputs: &SafeOutputsConfig{
 				GitHubApp: &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
 			},
+			token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token }}",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,6 +62,115 @@ func TestOutputCollectionGitHubToken(t *testing.T) {
 			assert.Contains(t, yaml.String(), "setupGlobals(core, github, context, exec, io, getOctokit);")
 		})
 	}
+}
+
+func TestOutputCollectionGitHubAppToken(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		ignore bool
+		pat    string
+		token  string
+	}{
+		{name: "app overrides PAT", pat: "${{ secrets.PAT }}", token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token }}"},
+		{name: "missing credentials fall back to PAT", ignore: true, pat: "${{ secrets.PAT }}", token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token || secrets.PAT }}"},
+		{name: "missing credentials fall back to defaults", ignore: true, token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app := &GitHubAppConfig{
+				AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_KEY }}",
+				Owner: "my-org", Repositories: []string{"my-repo", "another-repo"}, IgnoreIfMissing: tt.ignore,
+			}
+			data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+				GitHubApp: app, GitHubToken: tt.pat, AddComments: &AddCommentsConfig{},
+				Mentions: &MentionsConfig{AllowedTeams: []string{"my-org/my-team"}},
+			}}
+			var yaml strings.Builder
+			require.NoError(t, NewCompiler().generateOutputCollectionStep(&yaml, data))
+			output := yaml.String()
+			assert.Contains(t, output, "owner: my-org\n")
+			assert.Contains(t, output, "repositories: |-\n            my-repo\n            another-repo\n")
+			assert.NotContains(t, output, "permission-contents:")
+			assert.Contains(t, output, "permission-issues: read\n")
+			assert.Contains(t, output, "permission-pull-requests: read\n")
+			assert.Contains(t, output, "permission-members: read\n")
+			assert.NotContains(t, output, ": write\n")
+			assert.Contains(t, output, "github-token: "+tt.token+"\n")
+			assert.NotContains(t, output, "steps.safe-outputs-app-token.outputs.token")
+			assert.Less(t, strings.Index(output, "id: safe-outputs-ingestion-app-token\n"), strings.Index(output, "- name: Ingest agent output\n"))
+			if tt.ignore {
+				assert.Contains(t, output, "if: ${{ always() && vars.APP_ID != '' && env.GH_AW_IGNORE_IF_MISSING_PRIVATE_KEY != '' }}")
+				assert.Contains(t, output, "GH_AW_IGNORE_IF_MISSING_PRIVATE_KEY: ${{ secrets.APP_KEY }}")
+				assert.NotContains(t, output, "if: ${{ secrets.")
+			} else {
+				assert.Contains(t, output, "- name: Generate GitHub App token for output ingestion\n        if: always()\n")
+			}
+			assert.Nil(t, app.Permissions, "minting must not mutate the configured app")
+		})
+	}
+}
+
+func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
+	for _, wildcard := range []bool{false, true} {
+		t.Run(map[bool]string{false: "repository-scoped", true: "installation-wide"}[wildcard], func(t *testing.T) {
+			app := &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_KEY }}"}
+			if wildcard {
+				app.Repositories = []string{"*"}
+			}
+			data := &WorkflowData{
+				On:          "on:\n  workflow_call:\n",
+				SafeOutputs: &SafeOutputsConfig{GitHubApp: app},
+			}
+			compiler := NewCompiler()
+			var yaml strings.Builder
+			require.NoError(t, compiler.generateOutputCollectionStep(&yaml, data))
+			output := yaml.String()
+			assert.Contains(t, output, "- name: Derive GitHub App owner for output ingestion\n        if: always()\n")
+			assert.Contains(t, output, "GH_AW_TARGET_REPOSITORY: ${{ needs.activation.outputs.target_repo }}")
+			assert.Contains(t, output, "owner: ${{ steps.safe-outputs-ingestion-app-token-owner.outputs.owner }}")
+			assert.NotContains(t, output, "permission-members:")
+			if wildcard {
+				assert.NotContains(t, output, "repositories:")
+				assert.True(t, compiler.wildcardAppTokenSteps[appTokenStepKey{
+					jobName: "agent", id: "safe-outputs-ingestion-app-token", clientID: app.AppID, privateKey: app.PrivateKey,
+				}])
+			} else {
+				assert.Contains(t, output, "repositories: ${{ needs.activation.outputs.target_repo_name }}")
+			}
+		})
+	}
+}
+
+func TestAgenticOutputCollectionWithGitHubApp(t *testing.T) {
+	workflowFile := writeStepTokenWorkflow(t, "ingestion-app", `---
+on: workflow_dispatch
+engine: claude
+strict: false
+safe-outputs:
+  github-token: ${{ secrets.PAT }}
+  github-app:
+    client-id: ${{ vars.APP_ID }}
+    private-key: ${{ secrets.APP_KEY }}
+    owner: my-org
+    repositories: [my-repo]
+    permissions:
+      members: read
+  mentions:
+    allowed-teams: [my-org/my-team]
+  add-comment:
+---
+# Ingestion app token
+`)
+	require.NoError(t, NewCompiler().CompileWorkflow(workflowFile))
+	content, err := os.ReadFile(strings.TrimSuffix(workflowFile, ".md") + ".lock.yml")
+	require.NoError(t, err)
+	agent := extractJobSection(string(content), "agent")
+	assert.Contains(t, agent, "id: safe-outputs-ingestion-app-token\n")
+	assert.Contains(t, agent, "github-token: ${{ steps.safe-outputs-ingestion-app-token.outputs.token }}")
+	assert.NotContains(t, agent, "steps.safe-outputs-app-token.outputs.token")
+	assert.Less(t, strings.Index(agent, "id: agentic_execution\n"), strings.Index(agent, "id: safe-outputs-ingestion-app-token\n"))
+	safeOutputs := extractJobSection(string(content), "safe_outputs")
+	assert.Contains(t, safeOutputs, "github-token: ${{ steps.safe-outputs-app-token.outputs.token }}")
+	assert.NotContains(t, safeOutputs, "steps.safe-outputs-ingestion-app-token.outputs.token")
 }
 
 func TestAgenticOutputCollection(t *testing.T) {
