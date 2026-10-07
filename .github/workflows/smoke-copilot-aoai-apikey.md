@@ -214,12 +214,12 @@ Run each check NOW and mark as ✅/❌. Do NOT create files to automate this —
 6. File + bash: create `/tmp/gh-aw/agent/smoke-test-copilot-${{ github.run_id }}.txt` with timestamped success text, then `cat` it.
 7. Discussion interaction: get latest discussion with `github-discussion-query` (`limit=1`, `jq=".[0]"`), extract number, then `add_comment` to that discussion.
 8. Build: run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build`.
-9. Artifact upload (only if build passes): stage `./gh-aw` at `$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/gh-aw` and call `upload_artifact` with `path: "gh-aw"`.
+9. Artifact upload (only if build passes): stage `./gh-aw` at `$RUNNER_TEMP/gh-aw/safeoutputs/upload-artifacts/gh-aw` and run `safeoutputs upload_artifact --path gh-aw` through bash.
 10. Discussion create: call `create_discussion` in `announcements` with label `ai-generated`, title `copilot was here`, and `temporary_id: "aw_discuss"`.
-11. Workflow dispatch: call `dispatch_workflow` for `haiku-printer`, set top-level `ref` to `${{ github.event.repository.default_branch }}`, and include `inputs.message` with an original testing/automation haiku (non-empty string).
+11. Workflow dispatch: use `safeoutputs dispatch_workflow` through bash for `haiku-printer`, set top-level `ref` to `${{ github.event.repository.default_branch }}`, and include `inputs.message` with an original testing/automation haiku (non-empty string).
 12. PR review tools: add 1-2 inline `create_pull_request_review_comment` comments, submit review with event `COMMENT`, then reply to most recent existing review comment ID when available.
 13. Comment memory: append an original 3-line haiku to `/tmp/gh-aw/comment-memory/*.md`.
-14. Sub-agent: use `file-summarizer` on `README.md`.
+14. Sub-agent: if delegation is available, invoke the inline `file-summarizer` agent on `README.md` using the delegation tool, not the skill tool. Otherwise, run `cat README.md` through bash and summarize it in 2–4 sentences; note that sub-agent delegation was unavailable in this bare BYOK run.
 15. Check run: call `create_check_run` with `conclusion=success`, title `Smoke Copilot - AOAI (apikey) - Run ${{ github.run_id }}`, summary `All smoke tests completed.`, text `Detailed results attached.`
 
 ## Output

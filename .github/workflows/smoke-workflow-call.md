@@ -35,11 +35,11 @@ imports:
   - shared/reporting.md
 tools:
   bash:
-    - "git status"
-    - "git log *"
-    - "git branch *"
-    - "git remote *"
-    - "echo *"
+    - "git status:*"
+    - "git log:*"
+    - "git branch:*"
+    - "git remote:*"
+    - "echo:*"
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:

@@ -78,6 +78,10 @@ func parseMentionsConfig(mentions any) *MentionsConfig {
 
 	// Handle object configuration
 	if mentionsMap, ok := mentions.(map[string]any); ok {
+		config.GitHubToken = extractStringFromMap(mentionsMap, "github-token", nil)
+		if app, ok := mentionsMap["github-app"].(map[string]any); ok {
+			config.GitHubApp = parseAppConfig(app)
+		}
 		// Parse allowed-collaborators (preferred) with fallback to deprecated allow-team-members
 		if allowedCollaborators, exists := mentionsMap["allowed-collaborators"]; exists {
 			if val, ok := allowedCollaborators.(bool); ok {

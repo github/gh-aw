@@ -43,6 +43,8 @@ tools:
     - python3
     - ls
     - pwd
+    - cd
+    - cut
 safe-outputs:
   create-issue:
     expires: 2d
@@ -91,6 +93,7 @@ For the most recent 3 failed runs, use `list_workflow_jobs` to get the jobs and 
 Summarize the top 2–3 failure patterns found.
 
 When parsing JSON from MCP tool output or local files, use `jq` (not inline `python3 -c`/heredoc parsing).
+Prefer a separate `jq` invocation with an absolute file path for each log file instead of shell loops.
 If a tool/command is denied for this step, do not retry near-identical variants: after 2 denied attempts for the
 same intent, stop and call `missing-tool` with the denied command and required capability.
 

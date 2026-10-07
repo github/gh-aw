@@ -181,6 +181,11 @@ async function main(config = {}) {
       supportsIssue: false,
     });
 
+    if (!targetResult.success && targetResult.shouldFail === false) {
+      core.warning(`Could not resolve PR for review: ${targetResult.error}`);
+      return { success: false, skipped: true, reason: targetResult.error, error: targetResult.error };
+    }
+
     if (!targetResult.success || !targetResult.number) {
       const errMsg = (targetResult.success === false ? targetResult.error : undefined) || "Could not determine target PR";
       core.warning(`Could not resolve PR for review: ${errMsg}`);

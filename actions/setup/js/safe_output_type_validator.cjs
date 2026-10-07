@@ -34,6 +34,7 @@ const ISSUE_INTENT_RATIONALE_MAX_LENGTH = 280;
  *   maxMentions?: number,
  *   allowedAliasesSeen?: Set<string>,
  *   maxBotMentions?: number,
+ *   deferMentions?: boolean,
  *   normalizeIssueClosingKeywords?: boolean,
  *   dataEnabled?: boolean,
  *   dataSchema?: any
@@ -91,6 +92,7 @@ function normalizeIssueIntentRationale(rationale, options) {
     maxMentions: options?.maxMentions,
     allowedAliasesSeen: options?.allowedAliasesSeen,
     maxBotMentions: options?.maxBotMentions,
+    deferMentions: options?.deferMentions,
   }).trim();
   // sanitizeContent appends "\n[Content truncated due to length]" when it truncates,
   // so clamp again to guarantee the GitHub API hard limit.
@@ -119,6 +121,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
         maxMentions: options?.maxMentions,
         allowedAliasesSeen: options?.allowedAliasesSeen,
         maxBotMentions: options?.maxBotMentions,
+        deferMentions: options?.deferMentions,
       });
       if (!name) {
         return { isValid: false, error: `Line ${lineNum}: ${itemType} ${fieldName}[${i}] must be a non-empty string` };
@@ -154,6 +157,7 @@ function validateIssueIntentLabels(value, lineNum, itemType, fieldName, options)
       maxMentions: options?.maxMentions,
       allowedAliasesSeen: options?.allowedAliasesSeen,
       maxBotMentions: options?.maxBotMentions,
+      deferMentions: options?.deferMentions,
     });
     if (!name) {
       return {
@@ -560,6 +564,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
           maxMentions: options?.maxMentions,
           allowedAliasesSeen: options?.allowedAliasesSeen,
           maxBotMentions: options?.maxBotMentions,
+          deferMentions: options?.deferMentions,
         });
       }
       return { isValid: true, normalizedValue: normalizedResult };
@@ -584,6 +589,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
         maxMentions: options?.maxMentions,
         allowedAliasesSeen: options?.allowedAliasesSeen,
         maxBotMentions: options?.maxBotMentions,
+        deferMentions: options?.deferMentions,
       });
     }
     if (options?.normalizeIssueClosingKeywords && fieldName === "body" && NORMALIZE_CLOSER_BODY_TYPES.has(itemType)) {
@@ -664,6 +670,7 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
                 maxMentions: options?.maxMentions,
                 allowedAliasesSeen: options?.allowedAliasesSeen,
                 maxBotMentions: options?.maxBotMentions,
+                deferMentions: options?.deferMentions,
               })
             : item
         );

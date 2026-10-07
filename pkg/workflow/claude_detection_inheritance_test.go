@@ -11,7 +11,7 @@ import (
 
 func TestClaudeDetectionPreservesProviderAndContextPolicy(t *testing.T) {
 	config := &EngineConfig{
-		ID: "claude", LLMProvider: LLMProviderGitHub, Bare: true, PermissionMode: "dontAsk",
+		ID: "claude", LLMProvider: LLMProviderAnthropic, Bare: true, PermissionMode: "dontAsk",
 		Auth:     &EngineAuthConfig{Type: "github-oidc", Provider: "anthropic"},
 		MaxTurns: "10", MaxAICredits: 50, Agent: "main-only", Cwd: "/main-only",
 	}
@@ -20,13 +20,13 @@ func TestClaudeDetectionPreservesProviderAndContextPolicy(t *testing.T) {
 		SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 	}
 	step := strings.Join(NewCompiler().buildDetectionEngineExecutionStep(data), "")
-	assert.Contains(t, step, "GH_AW_LLM_PROVIDER: github")
+	assert.Contains(t, step, "GH_AW_LLM_PROVIDER: anthropic")
 	assert.Contains(t, step, "--bare")
 	assert.Contains(t, step, "--permission-mode dontAsk")
 	external := resolveExternalDetectorEngineConfig(data, "claude")
 	assert.Equal(t, config.Auth, external.Auth)
 	assert.True(t, external.Bare)
-	assert.Equal(t, LLMProviderGitHub, external.LLMProvider)
+	assert.Equal(t, LLMProviderAnthropic, external.LLMProvider)
 	assert.Empty(t, external.MaxTurns)
 	assert.Zero(t, external.MaxAICredits)
 	assert.Empty(t, external.Agent)

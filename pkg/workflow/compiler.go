@@ -124,6 +124,7 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	if err := c.validateExpressions(workflowData, markdownPath); err != nil {
 		return err
 	}
+	c.validatePromptTools(workflowData, markdownPath)
 
 	if err := c.validateFeatureConfig(workflowData, markdownPath); err != nil {
 		return err
