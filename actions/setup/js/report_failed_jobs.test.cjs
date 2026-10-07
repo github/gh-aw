@@ -1,5 +1,5 @@
 // @ts-check
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createRequire } from "module";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -22,10 +22,11 @@ const mockCore = {
 };
 global.core = mockCore;
 
-const { formatFailedJobsList, getFailedNonBuiltinJobs, BUILTIN_REPORTED_JOB_NAMES } = req("./report_failed_jobs.cjs");
+const { main, formatFailedJobsList, getFailedNonBuiltinJobs, BUILTIN_REPORTED_JOB_IDS } = req("./report_failed_jobs.cjs");
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("formatFailedJobsList", () => {
@@ -70,40 +71,121 @@ describe("formatFailedJobsList", () => {
 });
 
 describe("getFailedNonBuiltinJobs", () => {
-  it("filters out builtin failed jobs including safe-outputs and detection", async () => {
+  beforeEach(() => {
     global.context = {
       repo: { owner: "owner", repo: "repo" },
       runId: 123,
     };
+    vi.stubEnv("GH_AW_JOB_RESULTS", "{}");
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", "{}");
+    vi.stubEnv("GH_AW_RUN_URL", "https://github.com/owner/repo/actions/runs/123");
     global.github = {
       rest: {
         actions: {
-          listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-            data: {
-              jobs: [
-                { name: "agent", conclusion: "failure", html_url: "https://example.com/agent" },
-                { name: "activation", conclusion: "failure", html_url: "https://example.com/activation" },
-                { name: "safe-outputs", conclusion: "failure", html_url: "https://example.com/safe-outputs" },
-                { name: "safe_outputs", conclusion: "failure", html_url: "https://example.com/safe_outputs" },
-                { name: "detection", conclusion: "failure", html_url: "https://example.com/detection" },
-                { name: "custom-job", conclusion: "failure", html_url: "https://example.com/custom-job" },
-              ],
-            },
-          }),
+          listJobsForWorkflowRun: vi.fn().mockResolvedValue({ data: { jobs: [] } }),
+        },
+        rateLimit: {
+          get: vi.fn().mockResolvedValue({ data: { resources: { core: { limit: 5000, remaining: 4999, reset: 0, used: 1 } } } }),
+        },
+        issues: {
+          create: vi.fn().mockResolvedValue({ data: { number: 1, html_url: "https://github.com/owner/repo/issues/1" } }),
         },
       },
     };
+  });
 
+  it("filters builtin failures by ID despite changed display names", async () => {
+    const names = { agent: "Agent", activation: "Activation", pre_activation: "Pre-activation", safe_outputs: "Safe outputs", detection: "Detection", conclusion: "Conclusion" };
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify(Object.fromEntries([...Object.keys(names), "custom-job"].map(id => [id, { result: "failure" }]))));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify(names));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: { jobs: [...Object.values(names), "custom-job"].map(name => ({ name, conclusion: "failure", html_url: `https://example.com/${name}` })) },
+    });
     const result = await getFailedNonBuiltinJobs();
 
     expect(result).toEqual([{ name: "custom-job", html_url: "https://example.com/custom-job" }]);
   });
 
-  it("exports builtin set with expected built-in jobs", () => {
-    expect(BUILTIN_REPORTED_JOB_NAMES.has("agent")).toBe(true);
-    expect(BUILTIN_REPORTED_JOB_NAMES.has("activation")).toBe(true);
-    expect(BUILTIN_REPORTED_JOB_NAMES.has("safe-outputs")).toBe(true);
-    expect(BUILTIN_REPORTED_JOB_NAMES.has("safe_outputs")).toBe(true);
-    expect(BUILTIN_REPORTED_JOB_NAMES.has("detection")).toBe(true);
+  it("does not query jobs or create a failed-jobs issue for an agent-only failure", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ agent: { result: "failure" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ agent: "Renamed agent" }));
+    await main();
+    expect(global.github.rest.actions.listJobsForWorkflowRun).not.toHaveBeenCalled();
+    expect(global.github.rest.issues.create).not.toHaveBeenCalled();
+  });
+
+  it("does not suppress a custom job whose display name is a builtin ID", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ agent: { result: "success" }, build: { result: "failure" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ agent: "Agent", build: "agent" }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({ data: { jobs: [{ name: "agent", conclusion: "failure", html_url: "https://example.com/build" }] } });
+    expect(await getFailedNonBuiltinJobs()).toEqual([{ name: "agent", html_url: "https://example.com/build" }]);
+  });
+
+  it("keeps a custom failure with a duplicate display name without linking to the wrong job", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ agent: { result: "failure" }, build: { result: "failure" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ agent: "Agent", build: "Agent" }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({ data: { jobs: [{ name: "Agent", conclusion: "failure", html_url: "https://example.com/agent" }] } });
+    expect(await getFailedNonBuiltinJobs()).toEqual([{ name: "build", html_url: process.env.GH_AW_RUN_URL }]);
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not uniquely match failed job ID build"));
+  });
+
+  it("keeps a failed job ID when its dynamic display name cannot be matched", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ build: { result: "failure" } }));
+    expect(await getFailedNonBuiltinJobs()).toEqual([{ name: "build", html_url: process.env.GH_AW_RUN_URL }]);
+  });
+
+  it("does not confuse a custom display name with a builtin matrix job", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ agent: { result: "failure" }, build: { result: "failure" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ agent: "Agent", build: "Agent (linux)" }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({ data: { jobs: [{ name: "Agent (linux)", conclusion: "failure", html_url: "https://example.com/agent" }] } });
+    expect(await getFailedNonBuiltinJobs()).toEqual([{ name: "build", html_url: process.env.GH_AW_RUN_URL }]);
+  });
+
+  it("reports only failures, preserving renamed, matrix and reusable-job links across pages", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ build: { result: "failure" }, deploy: { result: "failure" }, success: { result: "success" }, cancelled: { result: "cancelled" }, skipped: { result: "skipped" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ build: "Build project", deploy: "Deploy project" }));
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValueOnce({ data: { jobs: Array.from({ length: 100 }, () => ({ name: "Agent", conclusion: "failure", html_url: "https://example.com/agent" })) } }).mockResolvedValueOnce({
+      data: {
+        jobs: [
+          { name: "Build project (linux)", conclusion: "failure", html_url: "https://example.com/linux" },
+          { name: "Build project (windows)", conclusion: "failure", html_url: "https://example.com/windows" },
+          { name: "Build project (macos)", conclusion: "success", html_url: "https://example.com/macos" },
+          { name: "Deploy project / publish", conclusion: "failure", html_url: "https://example.com/deploy" },
+        ],
+      },
+    });
+    expect(await getFailedNonBuiltinJobs()).toEqual([
+      { name: "Build project (linux)", html_url: "https://example.com/linux" },
+      { name: "Build project (windows)", html_url: "https://example.com/windows" },
+      { name: "Deploy project / publish", html_url: "https://example.com/deploy" },
+    ]);
+    expect(global.github.rest.actions.listJobsForWorkflowRun).toHaveBeenNthCalledWith(2, { owner: "owner", repo: "repo", run_id: 123, per_page: 100, page: 2, filter: "latest" });
+  });
+
+  it("creates an issue containing custom failures but not the renamed agent", async () => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", JSON.stringify({ agent: { result: "failure" }, build: { result: "failure" } }));
+    vi.stubEnv("GH_AW_JOB_DISPLAY_NAMES", JSON.stringify({ agent: "Agent", build: "Build project" }));
+    vi.stubEnv("GH_AW_WORKFLOW_NAME", "Smoke Gemini");
+    global.github.rest.actions.listJobsForWorkflowRun.mockResolvedValue({
+      data: {
+        jobs: [
+          { name: "Agent", conclusion: "failure", html_url: "https://example.com/agent" },
+          { name: "Build project", conclusion: "failure", html_url: "https://example.com/build" },
+        ],
+      },
+    });
+    await main();
+    expect(global.github.rest.issues.create).toHaveBeenCalledWith(expect.objectContaining({ title: "[aw] Failed jobs: Smoke Gemini", body: expect.stringContaining("- [`Build project`](https://example.com/build)") }));
+    expect(global.github.rest.issues.create.mock.calls[0][0].body).not.toContain("https://example.com/agent");
+  });
+
+  it.each(["", "invalid JSON", "null", "[]"])("rejects invalid job result metadata %j rather than falling back to name-based filtering", async metadata => {
+    vi.stubEnv("GH_AW_JOB_RESULTS", metadata);
+    await expect(getFailedNonBuiltinJobs()).rejects.toThrow();
+    expect(global.github.rest.actions.listJobsForWorkflowRun).not.toHaveBeenCalled();
+  });
+
+  it("exports builtin IDs, including legacy aliases", () => {
+    expect([...BUILTIN_REPORTED_JOB_IDS]).toEqual(["agent", "conclusion", "activation", "pre_activation", "pre-activation", "safe_outputs", "safe-outputs", "detection"]);
   });
 });
