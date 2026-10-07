@@ -1,13 +1,8 @@
 {
-  "date": "2026-06-19",
-  "open_issues": 100,
-  "closed_issues": 100,
-  "open_prs": 9,
-  "merged_prs": 50,
-  "closed_prs": 30,
-  "commits_30d": 1681,
-  "unique_authors": 10,
-  "discussions": 50,
-  "latest_release": "v0.80.4",
-  "release_date": "2026-06-18"
+  "generated_on": "2026-10-07",
+  "issues_opened_in_sample_window": 197,
+  "issues_closed_in_sample_window": 100,
+  "prs_opened_in_sample_window": 94,
+  "prs_merged_in_sample_window": 50,
+  "commits_30d": 725
 }

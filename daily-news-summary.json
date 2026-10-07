@@ -1,18 +1,8 @@
 {
-  "date": "2026-09-23",
-  "issues_open_count": 100,
-  "issues_closed_count": 100,
-  "prs_open_count": 17,
-  "prs_merged_count": 50,
-  "prs_closed_count": 30,
-  "commits_count": 17898,
-  "discussions_count": 50,
-  "date_range": {
-    "start": "2026-08-25",
-    "end": "2026-09-23"
-  },
-  "charts": [
-    "issues_prs_trends.png",
-    "commit_trends.png"
-  ]
+  "date": "2026-10-07",
+  "headline": "v0.91.4 shipped; model routing + Claude/Copilot inference merged; agent safe-output cascade needs cleanup",
+  "merged_prs_highlight_count": 20,
+  "open_prs": 15,
+  "aw_top10_open": 9,
+  "commits_30d": 725
 }
