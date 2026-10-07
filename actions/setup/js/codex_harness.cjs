@@ -1172,6 +1172,7 @@ if (typeof module !== "undefined" && module.exports) {
     isInvalidModelError,
     isUnsupportedModelToolsError,
     isInvalidRequestError,
+    extractInvalidRequestErrorCode,
     isReconnectExhaustedError,
     countPermissionDeniedIssues,
     hasNumerousPermissionDeniedIssues,

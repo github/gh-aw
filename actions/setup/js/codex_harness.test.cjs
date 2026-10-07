@@ -18,6 +18,7 @@ const {
   isInvalidModelError,
   isUnsupportedModelToolsError,
   isInvalidRequestError,
+  extractInvalidRequestErrorCode,
   isReconnectExhaustedError,
   countPermissionDeniedIssues,
   hasNumerousPermissionDeniedIssues,
@@ -880,6 +881,12 @@ env_key = "OPENAI_API_KEY"
 
     it("returns true for an unescaped provider error field in a turn.failed event", () => {
       expect(isInvalidRequestError('{"type":"turn.failed","error":{"type":"invalid_request_error"}}')).toBe(true);
+    });
+
+    it("extracts the invalid request error code", () => {
+      expect(extractInvalidRequestErrorCode('{"type":"turn.failed","error":{"type":"invalid_request_error"}}')).toBe("invalid_request_error");
+      expect(extractInvalidRequestErrorCode('{"type":"turn.failed","error":{"code":"invalid_request_body"}}')).toBe("invalid_request_body");
+      expect(extractInvalidRequestErrorCode('{"type":"item.completed","item":{"text":"invalid_request_body"}}')).toBeNull();
     });
 
     it("returns true for the observed nested invalid_request_body item-ID rejection", () => {
