@@ -93,7 +93,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && (needs.pre_activation.outputs.activated == 'true' &&
@@ -484,7 +484,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -1330,7 +1330,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -1694,7 +1694,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -1998,7 +1998,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     runs-on: ubuntu-slim
     # Permissions for the pre_activation job (workflow permissions default to none).
     # Includes permissions declared in on.permissions.
@@ -2188,7 +2188,7 @@ jobs:
             await core.summary.write();
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent
