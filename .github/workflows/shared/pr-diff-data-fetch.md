@@ -17,7 +17,15 @@
 #     restore-keys:
 #       - pr-prefetch-${{ github.event.pull_request.number || github.event.issue.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}-
 #   imports:
-#     - shared/pr-diff-data-fetch.md
+#     - uses: shared/pr-diff-data-fetch.md
+#       with:
+#         max-diff-lines: "2000"  # optional; defaults to 2000
+
+import-schema:
+  max-diff-lines:
+    type: string
+    default: "2000"
+    description: "Maximum number of PR diff lines to pre-fetch"
 
 pre-agent-steps:
   - name: Pre-fetch PR diff and review comments
@@ -26,7 +34,7 @@ pre-agent-steps:
       PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       EXPR_GITHUB_REPOSITORY: ${{ github.repository }}
-      PR_DIFF_MAX_LINES: "2000"
+      PR_DIFF_MAX_LINES: ${{ github.aw.import-inputs.max-diff-lines }}
     run: |
       set -euo pipefail
       mkdir -p /tmp/gh-aw/agent
@@ -122,7 +130,7 @@ before the reviewer agents start.
 
 | File | Content |
 |---|---|
-| `/tmp/gh-aw/agent/pr-diff.patch` | Unified diff (linguist-generated/generated/dist/build excluded, capped at 2000 lines) |
+| `/tmp/gh-aw/agent/pr-diff.patch` | Unified diff (linguist-generated/generated/dist/build excluded, capped at `max-diff-lines`, default 2000) |
 | `/tmp/gh-aw/agent/pr-meta.json` | `number, title, body, headRefName, additions, deletions, changedFiles, files` |
 | `/tmp/gh-aw/agent/pr-review-comments.json` | Array of `{id, path, line, body, user}` (body capped at 200 chars) |
 -->

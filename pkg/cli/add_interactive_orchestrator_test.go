@@ -317,7 +317,7 @@ func TestAddInteractiveConfig_createWorkflowChangesLocallyDoesNotRequireCleanTre
 
 // TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSecretsAndPRSteps
 // drives the actual orchestration in prepareAndConfirmAddInteractive (not just the
-// downstream write helper) with a simulated "No, write files locally" answer to the
+// downstream write helper) with a stubbed "No, write files locally" answer to the
 // PR-vs-local prompt. It asserts that choosing local writes never invokes any gh
 // mutation (secret upload, PR creation/merge) and that no secret is returned for the
 // caller to configure.
@@ -345,9 +345,17 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 	t.Setenv("PATH", tmpDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	originalConfirmAuthoringSupport := addConfirmAuthoringSupport
+	originalConfirmChanges := addConfirmChanges
 	originalMissingInitMarkers := addMissingInitMarkers
 	originalInitRepository := addInitRepository
 	initializationRan := false
+	confirmationRan := false
+	addConfirmChanges = func(c *AddInteractiveConfig, workflowFiles, initFiles []string) (bool, error) {
+		confirmationRan = true
+		assert.Equal(t, []string{"test-workflow.md", "test-workflow.lock.yml"}, workflowFiles)
+		assert.Contains(t, initFiles, bootstrapAgenticSkillPath)
+		return false, nil
+	}
 	addConfirmAuthoringSupport = func(context.Context) (bool, error) { return true, nil }
 	addMissingInitMarkers = func(string, string) ([]string, error) {
 		return []string{bootstrapAgenticSkillPath}, nil
@@ -358,21 +366,10 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 	}
 	t.Cleanup(func() {
 		addConfirmAuthoringSupport = originalConfirmAuthoringSupport
+		addConfirmChanges = originalConfirmChanges
 		addMissingInitMarkers = originalMissingInitMarkers
 		addInitRepository = originalInitRepository
 	})
-
-	// Drive the delivery confirm form via accessible (line-based) mode, answering
-	// "no" to pull request creation.
-	t.Setenv("ACCESSIBLE", "1")
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	_, err = w.WriteString("n\n")
-	require.NoError(t, err)
-	require.NoError(t, w.Close())
-	oldStdin := os.Stdin
-	os.Stdin = r
-	defer func() { os.Stdin = oldStdin }()
 
 	config := &AddInteractiveConfig{
 		Ctx:            context.Background(),
@@ -399,6 +396,7 @@ func TestAddInteractiveConfig_prepareAndConfirmAddInteractive_localWriteSkipsSec
 	workflowFiles, initFiles, secretName, secretValue, createPR, err := config.prepareAndConfirmAddInteractive()
 	require.NoError(t, err)
 
+	assert.True(t, confirmationRan, "delivery confirmation must run before choosing local writes")
 	assert.False(t, createPR, "choosing local writes should report createPR=false")
 	assert.Empty(t, secretName, "local writes must not resolve a secret to configure")
 	assert.Empty(t, secretValue, "local writes must not resolve a secret value")

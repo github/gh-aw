@@ -329,6 +329,9 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 		return nil
 	}
 	enclavesLog.Printf("Validating %d enclave config(s)", len(workflowData.Enclaves))
+	if err := validateCloudHypervisorEnclavePrimaryRuntime(workflowData); err != nil {
+		return err
+	}
 	if !isAWFNetworkIsolationEnabled(workflowData) {
 		enclavesLog.Print("Rejecting enclaves: AWF network isolation is not enabled")
 		return errors.New("enclaves requires AWF network isolation; enable the agent sandbox with a network-isolated runtime such as sandbox.agent.runtime: docker")
@@ -339,6 +342,9 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 		if err := validateEnclaveEntry(i, enclave, seenTypes, repositorySensitivities); err != nil {
 			return err
 		}
+	}
+	if err := validateCloudHypervisorEnclaves(workflowData); err != nil {
+		return err
 	}
 	if err := validateEnclaveTrustedSensitivityVersion(workflowData); err != nil {
 		return err

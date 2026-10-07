@@ -56,6 +56,7 @@ type AuditData struct {
 	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`
 	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"`
 	FirewallTokenUsage      *TokenUsageSummary       `json:"firewall_token_usage,omitempty"`
+	ModelRouting            *ModelRoutingSummary     `json:"model_routing,omitempty"`
 	GitHubRateLimitUsage    *GitHubRateLimitUsage    `json:"github_rate_limit_usage,omitempty"`
 	FirewallAnalysis        *FirewallAnalysis        `json:"firewall_analysis,omitempty"`
 	PolicyAnalysis          *PolicyAnalysis          `json:"policy_analysis,omitempty"`
@@ -345,6 +346,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 		recommendations:       recommendations,
 		observabilityInsights: observabilityInsights,
 	})
+	auditData.ModelRouting = processedRun.ModelRouting
 	return auditData, createdItems
 }
 

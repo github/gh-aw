@@ -18,10 +18,10 @@ var inputLog = logger.New("console:input")
 func PromptSecretInput(title, description string) (string, error) {
 	inputLog.Printf("Showing secret input prompt: title=%s", title)
 
-	// Check if stdin is a TTY - if not, we can't show interactive forms
-	if !tty.IsStderrTerminal() {
+	// Both streams must be terminals to safely run an interactive form.
+	if !tty.IsStdinTerminal() || !tty.IsStderrTerminal() {
 		inputLog.Print("Non-TTY detected, cannot show interactive secret input")
-		return "", errors.New("interactive input not available (not a TTY)")
+		return "", errors.New("interactive input not available (stdin and stderr must be TTYs)")
 	}
 
 	var value string

@@ -474,12 +474,13 @@ func TestTryLoadCachedRunResultDoesNotPersistRejectedCurrentPathAfterMetadataRef
 	require.NoError(t, markArtifactDownloaded(runOutputDir, string(ArtifactSetAll)))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(runOutputDir, runAPIResponseFileName),
-		[]byte(`{"id":132,"status":"completed","conclusion":"success","name":"Refreshed Agentic","path":".github/workflows/refreshed.lock.yml"}`),
+		[]byte(`{"id":132,"html_url":"https://github.com/owner/repo/actions/runs/132","status":"completed","conclusion":"success","name":"Refreshed Agentic","path":".github/workflows/refreshed.lock.yml"}`),
 		0o600,
 	))
 
 	result, ok := tryLoadCachedRunResult(context.Background(), WorkflowRun{
 		DatabaseID:   132,
+		URL:          "https://github.com/owner/repo/actions/runs/132",
 		WorkflowPath: ".github/workflows/ci.yml",
 	}, runOutputDir, concurrentRunDownloadParams{})
 

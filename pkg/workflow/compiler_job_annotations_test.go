@@ -58,9 +58,9 @@ Run the agent.
 	for _, id := range []string{"pre_activation", "activation", "agent", "detection", "safe_outputs", "conclusion"} {
 		job, ok := jobs[id].(map[string]any)
 		require.True(t, ok, "missing generated job %s", id)
-		require.Equal(t, generatedJobNames[id], job["name"], "display name of %s", id)
+		require.Equal(t, id, job["name"], "display name of %s", id)
 	}
-	require.NotContains(t, jobs["probe"].(map[string]any), "name", "custom jobs must not get generated names")
+	require.Equal(t, "probe", jobs["probe"].(map[string]any)["name"], "unnamed custom jobs use their ID")
 	output := string(compiled)
 	for _, comment := range []string{
 		"# Grant read access to the issue",
@@ -124,10 +124,10 @@ func TestOptionalGeneratedJobAnnotations(t *testing.T) {
 	}}
 	compiler.annotateGeneratedJobs(&WorkflowData{})
 
-	require.Equal(t, "Evaluations", compiler.jobManager.jobs["evals"].DisplayName)
-	require.Equal(t, "Update cache memory", compiler.jobManager.jobs["update_cache_memory"].DisplayName)
-	require.Equal(t, "Update drive memory", compiler.jobManager.jobs[updateDriveMemoryJobName].DisplayName)
-	require.Empty(t, compiler.jobManager.jobs["custom"].DisplayName)
+	require.Equal(t, "evals", compiler.jobManager.jobs["evals"].DisplayName)
+	require.Equal(t, "update_cache_memory", compiler.jobManager.jobs["update_cache_memory"].DisplayName)
+	require.Equal(t, updateDriveMemoryJobName, compiler.jobManager.jobs[updateDriveMemoryJobName].DisplayName)
+	require.Equal(t, "custom", compiler.jobManager.jobs["custom"].DisplayName)
 	for _, job := range compiler.jobManager.jobs {
 		require.Contains(t, job.PermissionsComment, "# Permissions for the")
 	}
