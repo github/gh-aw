@@ -297,6 +297,8 @@ type AWFAPITargetConfig struct {
 // AWFContainerConfig is the "container" section of the AWF config file.
 // It maps to container execution CLI flags.
 type AWFContainerConfig struct {
+	ContainerRuntime string `json:"containerRuntime,omitempty"`
+
 	// ImageTag is the pinned AWF Docker image tag, with optional digest metadata.
 	// Format: "<tag>" or "<tag>,squid=sha256:...,agent=sha256:..."
 	// Maps to: --image-tag <value>

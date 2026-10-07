@@ -167,6 +167,12 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 		addUnique(enclaveMCPGatewayIdentityEnv)
 		addUnique(enclaveMCPReadinessTimeoutEnv)
 	}
+	if hasCloudHypervisorEnclaves(workflowData) {
+		addUnique("AWF_CLOUD_HYPERVISOR_ENCLAVE_SCRIPT_ROOTFS")
+		addUnique("AWF_CLOUD_HYPERVISOR_ENCLAVE_AGENT_ROOTFS")
+		addUnique("AWF_CLOUD_HYPERVISOR_ENCLAVE_MANIFEST")
+		addUnique("AWF_CLOUD_HYPERVISOR_ENCLAVE_MANIFEST_BUNDLE")
+	}
 	if enclaveGitHubIssuesEnabled(workflowData) {
 		addUnique(enclaveGitHubMCPAgentIDEnv)
 	}

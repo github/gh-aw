@@ -152,20 +152,15 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 	// Add AWF installation step if firewall is enabled
 	if isFirewallEnabled(workflowData) {
 		firewallConfig := getFirewallConfig(workflowData)
-		agentConfig := getAgentConfig(workflowData)
 		var awfVersion string
 		if firewallConfig != nil {
 			awfVersion = firewallConfig.Version
 		}
 
-		if isCloudHypervisorRuntime(workflowData) {
-			steps = append(steps, generateCloudHypervisorKVMAccessStep())
-			steps = append(steps, generateCloudHypervisorHostPreflightStep())
-			steps = append(steps, generateCloudHypervisorBundleSetupStep(getAWFVersionForSetup(workflowData)))
-		}
+		steps = appendCloudHypervisorSetupSteps(steps, workflowData)
 
 		// Install AWF binary (or skip if custom command is specified)
-		awfInstall := generateAWFInstallationStep(awfVersion, agentConfig)
+		awfInstall := generateAWFInstallationStepForWorkflow(awfVersion, workflowData)
 		if len(awfInstall) > 0 {
 			steps = append(steps, awfInstall)
 		}

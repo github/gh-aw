@@ -340,6 +340,9 @@ func validateEnclavesConfig(workflowData *WorkflowData) error {
 			return err
 		}
 	}
+	if err := validateCloudHypervisorEnclaves(workflowData); err != nil {
+		return err
+	}
 	if err := validateEnclaveTrustedSensitivityVersion(workflowData); err != nil {
 		return err
 	}

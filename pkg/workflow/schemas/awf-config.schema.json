@@ -616,6 +616,11 @@
       "description": "Container and Docker configuration.",
       "additionalProperties": false,
       "properties": {
+        "containerRuntime": {
+          "type": "string",
+          "enum": ["docker", "gvisor", "sbx", "cloud-hypervisor", "nvx"],
+          "description": "Runtime for the primary agent, independent of enclave executor runtimes."
+        },
         "memoryLimit": {
           "type": "string",
           "description": "Docker memory limit for the agent container (e.g. \"4g\", \"512m\"). Uses Docker memory limit syntax."
