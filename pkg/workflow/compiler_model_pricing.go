@@ -86,21 +86,19 @@ func normalizeProviderForPricing(provider string) string {
 
 func resolveProviderAndModelForPricing(workflowData *WorkflowData) (string, string, bool) {
 	provider := resolveEngineProviderForPricing(workflowData.EngineConfig)
-	model := strings.TrimSpace(workflowData.Model)
+	model, _, _ := strings.Cut(strings.TrimSpace(workflowData.Model), "?")
 	if model == "" {
 		return "", "", false
 	}
 	model = strings.ToLower(model)
 
 	if strings.Contains(model, "/") {
-		parts := strings.SplitN(model, "/", 2)
-		if parts[0] == "" || parts[1] == "" {
+		embeddedProvider, embeddedModel, found := strings.Cut(model, "/")
+		if !found || embeddedProvider == "" || embeddedModel == "" {
 			return "", "", false
 		}
-		embeddedProvider := normalizeProviderForPricing(parts[0])
-		embeddedModel := strings.TrimSpace(parts[1])
-		provider = embeddedProvider
-		model = strings.ToLower(embeddedModel)
+		provider = normalizeProviderForPricing(embeddedProvider)
+		model = strings.ToLower(strings.TrimSpace(embeddedModel))
 	}
 
 	if provider == "" || model == "" {
@@ -117,8 +115,8 @@ func isDynamicModelAliasForPricing(model string) bool {
 	return strings.EqualFold(strings.TrimSpace(model), "auto")
 }
 
-// modelCostsHasPricingFor reports whether the ModelCosts overlay already contains a models
-// entry for the given provider/model. An empty provider matches any provider entry.
+// modelCostsHasPricingFor reports whether the ModelCosts overlay contains non-empty pricing
+// for the given provider/model. An empty provider matches any provider entry.
 func modelCostsHasPricingFor(modelCosts map[string]any, provider, model string) bool {
 	if len(modelCosts) == 0 {
 		return false
@@ -147,13 +145,31 @@ func modelCostsHasPricingFor(modelCosts map[string]any, provider, model string) 
 		if !ok {
 			continue
 		}
-		for mName := range modelsMap {
+		for mName, rawModel := range modelsMap {
 			if strings.EqualFold(mName, model) {
-				return true
+				modelEntry, ok := rawModel.(map[string]any)
+				if !ok {
+					continue
+				}
+				cost, ok := modelEntry["cost"]
+				if ok && hasNonEmptyPricingMap(cost) {
+					return true
+				}
 			}
 		}
 	}
 	return false
+}
+
+func hasNonEmptyPricingMap(value any) bool {
+	switch cost := value.(type) {
+	case map[string]any:
+		return len(cost) > 0
+	case map[string]string:
+		return len(cost) > 0
+	default:
+		return false
+	}
 }
 
 // mergeModelPricingIntoModelCosts builds (or extends) the ModelCosts overlay map with a

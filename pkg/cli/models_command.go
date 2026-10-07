@@ -169,9 +169,9 @@ func refreshObservedArtifacts(ctx context.Context, logsDir string, refreshCount 
 }
 
 func buildModelCatalogRows() []modelCatalogRow {
-	initModelPrices()
-	rows := make([]modelCatalogRow, 0, len(modelPriceRecords))
-	for _, record := range modelPriceRecords {
+	records := modelPriceRecords()
+	rows := make([]modelCatalogRow, 0, len(records))
+	for _, record := range records {
 		rows = append(rows, modelCatalogRow{
 			Provider:   record.provider,
 			Model:      record.model,
@@ -458,12 +458,12 @@ type catalogIndex struct {
 }
 
 func makeCatalogIndex() catalogIndex {
-	initModelPrices()
+	records := modelPriceRecords()
 	index := catalogIndex{
-		fullIDs:    make(map[string]struct{}, len(modelPriceRecords)),
-		bareModels: make(map[string]struct{}, len(modelPriceRecords)),
+		fullIDs:    make(map[string]struct{}, len(records)),
+		bareModels: make(map[string]struct{}, len(records)),
 	}
-	for _, record := range modelPriceRecords {
+	for _, record := range records {
 		index.fullIDs[modelsdev.NormalizeComparableModelID(record.id)] = struct{}{}
 		index.bareModels[modelsdev.NormalizeComparableModelID(record.model)] = struct{}{}
 	}

@@ -133,6 +133,20 @@ func TestConfiguredModelPricingWarning(t *testing.T) {
 			},
 		},
 		{
+			name: "builtin sonnet alias",
+			data: &workflow.WorkflowData{
+				Model:         "sonnet",
+				ModelMappings: workflow.BuiltinModelAliases(),
+			},
+		},
+		{
+			name: "builtin haiku alias",
+			data: &workflow.WorkflowData{
+				Model:         "haiku",
+				ModelMappings: workflow.BuiltinModelAliases(),
+			},
+		},
+		{
 			name: "configured fallback",
 			data: &workflow.WorkflowData{
 				Model:                   "gpt-future-model",
@@ -157,6 +171,42 @@ func TestConfiguredModelPricingWarning(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "empty model entry does not count as pricing",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-future-model",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+				ModelCosts: map[string]any{
+					"providers": map[string]any{
+						"openai": map[string]any{
+							"models": map[string]any{
+								"gpt-future-model": map[string]any{},
+							},
+						},
+					},
+				},
+			},
+			warning: true,
+		},
+		{
+			name: "empty cost entry does not count as pricing",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-future-model",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+				ModelCosts: map[string]any{
+					"providers": map[string]any{
+						"openai": map[string]any{
+							"models": map[string]any{
+								"gpt-future-model": map[string]any{
+									"cost": map[string]any{},
+								},
+							},
+						},
+					},
+				},
+			},
+			warning: true,
 		},
 		{
 			name: "dynamic model",

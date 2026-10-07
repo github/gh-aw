@@ -225,7 +225,11 @@ func configuredModelHasPricing(provider, model string, aliases map[string][]stri
 			targetProvider, targetModel, ok := configuredModelPricingID(&workflow.WorkflowData{
 				EngineConfig: &workflow.EngineConfig{LLMProvider: workflow.LLMProvider(provider)},
 			}, target)
-			if !ok || !configuredModelHasPricing(targetProvider, targetModel, aliases, visited) {
+			hasPricing := ok && configuredModelHasPricing(targetProvider, targetModel, aliases, visited)
+			if ok && strings.ContainsAny(targetModel, "*[") {
+				hasPricing = hasCatalogPricingMatching(targetProvider, targetModel)
+			}
+			if !hasPricing {
 				delete(visited, alias)
 				return false
 			}
@@ -255,12 +259,31 @@ func hasModelCostOverlay(costs map[string]any, provider, model string) bool {
 			continue
 		}
 		for name := range models {
+			entry, ok := models[name].(map[string]any)
+			if !ok {
+				continue
+			}
+			cost, ok := entry["cost"]
+			if !ok || !hasNonEmptyCostMap(cost) {
+				continue
+			}
 			if strings.EqualFold(name, model) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func hasNonEmptyCostMap(value any) bool {
+	switch cost := value.(type) {
+	case map[string]any:
+		return len(cost) > 0
+	case map[string]string:
+		return len(cost) > 0
+	default:
+		return false
+	}
 }
 
 func stringSlice(value any) []string {

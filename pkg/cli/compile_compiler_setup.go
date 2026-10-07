@@ -265,8 +265,8 @@ func setupRepositoryContext(compiler *workflow.Compiler, config CompileConfig) {
 	// If a schedule seed is explicitly provided, use it directly
 	if config.ScheduleSeed != "" {
 		// Validate owner/repo format: must contain exactly one '/' with non-empty parts
-		parts := strings.SplitN(config.ScheduleSeed, "/", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		owner, repo, hasSeparator := strings.Cut(config.ScheduleSeed, "/")
+		if !hasSeparator || owner == "" || repo == "" || strings.Contains(repo, "/") {
 			compileCompilerSetupLog.Printf("Invalid --schedule-seed value %q: expected 'owner/repo' format", config.ScheduleSeed)
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(
 				fmt.Sprintf("--schedule-seed %q is not in 'owner/repo' format; ignoring and falling back to git remote detection", config.ScheduleSeed),

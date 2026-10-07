@@ -58,6 +58,13 @@ func TestFindModelPricing(t *testing.T) {
 	assert.InDelta(t, 0.000003, pricing["input"], 1e-12)
 }
 
+func TestFindExactModelPricingStripsQueryParameters(t *testing.T) {
+	t.Parallel()
+	pricing, ok := findExactModelPricing("openai", "gpt-6.1-sol?effort=high")
+	require.True(t, ok)
+	assert.InDelta(t, 0.000002, pricing["input"], 1e-12)
+}
+
 func TestFindKimiK3Pricing(t *testing.T) {
 	t.Parallel()
 	pricing, ok := findModelPricing("github-copilot", "kimi-k3")

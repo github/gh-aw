@@ -35,6 +35,24 @@ func TestModelCostsHasPricingFor(t *testing.T) {
 	assert.False(t, modelCostsHasPricingFor(costs, "anthropic", "does-not-exist"))
 	assert.False(t, modelCostsHasPricingFor(costs, "openai", "claude-new-model")) // wrong provider
 	assert.False(t, modelCostsHasPricingFor(nil, "anthropic", "claude-new-model"))
+	assert.False(t, modelCostsHasPricingFor(map[string]any{
+		"providers": map[string]any{
+			"openai": map[string]any{
+				"models": map[string]any{
+					"custom": map[string]any{},
+				},
+			},
+		},
+	}, "openai", "custom"))
+	assert.False(t, modelCostsHasPricingFor(map[string]any{
+		"providers": map[string]any{
+			"openai": map[string]any{
+				"models": map[string]any{
+					"custom": map[string]any{"cost": map[string]any{}},
+				},
+			},
+		},
+	}, "openai", "custom"))
 }
 
 // ── mergeModelPricingIntoModelCosts ─────────────────────────────────────────
@@ -196,7 +214,7 @@ func TestResolveModelPricingIfMissing_InjectsFromResolver(t *testing.T) {
 		return nil, false
 	}
 
-	result := c.resolveModelPricingIfMissing(nil, &WorkflowData{Model: "claude-new-model", EngineConfig: &EngineConfig{ID: "claude"}})
+	result := c.resolveModelPricingIfMissing(nil, &WorkflowData{Model: "claude-new-model?effort=high", EngineConfig: &EngineConfig{ID: "claude"}})
 	require.NotNil(t, result)
 	providers := result["providers"].(map[string]any)
 	require.Contains(t, providers, "anthropic")

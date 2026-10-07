@@ -3,6 +3,7 @@ package cli
 import (
 	_ "embed"
 	"encoding/json"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,51 +36,44 @@ type modelPriceRecord struct {
 	pricing  map[string]float64
 }
 
-var (
-	modelPriceRecords []modelPriceRecord
-	modelPricesOnce   sync.Once
-)
+var modelPriceRecords = sync.OnceValue(loadModelPriceRecords)
 
-func initModelPrices() {
-	modelPricesOnce.Do(func() {
-		var data modelsCatalogData
-		if err := json.Unmarshal(modelsJSON, &data); err != nil {
-			return
+func loadModelPriceRecords() []modelPriceRecord {
+	var data modelsCatalogData
+	if err := json.Unmarshal(modelsJSON, &data); err != nil {
+		return nil
+	}
+
+	records := make([]modelPriceRecord, 0)
+	for providerName, providerData := range data.Providers {
+		normalizedProvider := strings.ToLower(strings.TrimSpace(providerName))
+		if normalizedProvider == "" { //nolint:tolowerequalfold
+			continue
 		}
-
-		modelPriceRecords = make([]modelPriceRecord, 0)
-		for providerName, providerData := range data.Providers {
-			normalizedProvider := strings.ToLower(strings.TrimSpace(providerName))
-			if normalizedProvider == "" { //nolint:tolowerequalfold
+		for modelName, entry := range providerData.Models {
+			normalizedModel := strings.ToLower(strings.TrimSpace(modelName))
+			if normalizedModel == "" { //nolint:tolowerequalfold
 				continue
 			}
-			for modelName, entry := range providerData.Models {
-				normalizedModel := strings.ToLower(strings.TrimSpace(modelName))
-				if normalizedModel == "" { //nolint:tolowerequalfold
-					continue
-				}
-				normalizedID := normalizedProvider + "/" + normalizedModel
-				record := modelPriceRecord{
-					id:       normalizedID,
-					provider: normalizedProvider,
-					model:    normalizedModel,
-					pricing:  make(map[string]float64, len(entry.Cost)),
-				}
-				for key, value := range entry.Cost {
-					if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
-						record.pricing[key] = parsed
-					}
-				}
-				modelPriceRecords = append(modelPriceRecords, record)
+			record := modelPriceRecord{
+				id:       path.Join(normalizedProvider, normalizedModel),
+				provider: normalizedProvider,
+				model:    normalizedModel,
+				pricing:  make(map[string]float64, len(entry.Cost)),
 			}
+			for key, value := range entry.Cost {
+				if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
+					record.pricing[key] = parsed
+				}
+			}
+			records = append(records, record)
 		}
-		modelCostsLog.Printf("Initialized model price catalog: providers=%d, records=%d", len(data.Providers), len(modelPriceRecords))
-	})
+	}
+	modelCostsLog.Printf("Initialized model price catalog: providers=%d, records=%d", len(data.Providers), len(records))
+	return records
 }
 
 func findModelPricing(provider, model string) (map[string]float64, bool) {
-	initModelPrices()
-
 	normalizedProvider := modelsdev.NormalizeProvider(provider)
 	normalizedModel := strings.ToLower(strings.TrimSpace(model))
 	comparableModel := modelsdev.NormalizeComparableModelID(normalizedModel)
@@ -89,15 +83,13 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 
 	fullID := normalizedModel
 	if !strings.Contains(fullID, "/") && normalizedProvider != "" {
-		fullID = normalizedProvider + "/" + normalizedModel
+		fullID = path.Join(normalizedProvider, normalizedModel)
 	}
 	comparableFullID := modelsdev.NormalizeComparableModelID(fullID)
 
-	for _, record := range modelPriceRecords {
-		if (fullID != "" && record.id == fullID) || (comparableFullID != "" && modelsdev.NormalizeComparableModelID(record.id) == comparableFullID) {
-			modelCostsLog.Printf("Exact pricing match: provider=%s, model=%s -> %s", provider, model, record.id)
-			return record.pricing, true
-		}
+	if pricing, ok := findExactCatalogPricing(modelPriceRecords(), fullID, comparableFullID); ok {
+		modelCostsLog.Printf("Exact pricing match: provider=%s, model=%s -> %s", provider, model, fullID)
+		return pricing, true
 	}
 
 	var bestProviderScoped map[string]float64
@@ -105,7 +97,7 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 	var bestGeneric map[string]float64
 	bestGenericLen := -1
 
-	for _, record := range modelPriceRecords {
+	for _, record := range modelPriceRecords() {
 		comparableRecordModel := modelsdev.NormalizeComparableModelID(record.model)
 		if record.model == normalizedModel || comparableRecordModel == comparableModel {
 			if normalizedProvider != "" && record.provider == normalizedProvider {
@@ -141,15 +133,23 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 	return nil, false
 }
 
-func findExactModelPricing(provider, model string) (map[string]float64, bool) {
-	initModelPrices()
+func findExactCatalogPricing(records []modelPriceRecord, fullID, comparableFullID string) (map[string]float64, bool) {
+	for _, record := range records {
+		if (fullID != "" && record.id == fullID) || (comparableFullID != "" && modelsdev.NormalizeComparableModelID(record.id) == comparableFullID) {
+			return record.pricing, true
+		}
+	}
+	return nil, false
+}
 
+func findExactModelPricing(provider, model string) (map[string]float64, bool) {
 	normalizedProvider := modelsdev.NormalizeProvider(provider)
+	model, _, _ = strings.Cut(strings.TrimSpace(model), "?")
 	comparableModel := modelsdev.NormalizeComparableModelID(model)
 	if normalizedProvider == "" || comparableModel == "" {
 		return nil, false
 	}
-	for _, record := range modelPriceRecords {
+	for _, record := range modelPriceRecords() {
 		if record.provider == normalizedProvider &&
 			modelsdev.NormalizeComparableModelID(record.model) == comparableModel &&
 			len(record.pricing) > 0 {
@@ -157,6 +157,24 @@ func findExactModelPricing(provider, model string) (map[string]float64, bool) {
 		}
 	}
 	return nil, false
+}
+
+func hasCatalogPricingMatching(provider, pattern string) bool {
+	normalizedProvider := modelsdev.NormalizeProvider(provider)
+	comparablePattern := modelsdev.NormalizeComparableModelID(pattern)
+	if normalizedProvider == "" || comparablePattern == "" {
+		return false
+	}
+	for _, record := range modelPriceRecords() {
+		if record.provider != normalizedProvider || len(record.pricing) == 0 {
+			continue
+		}
+		matched, err := path.Match(comparablePattern, modelsdev.NormalizeComparableModelID(record.model))
+		if err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 func usdToAIC(usd float64) float64 {
