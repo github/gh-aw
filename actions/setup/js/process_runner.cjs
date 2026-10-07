@@ -91,9 +91,10 @@ function sleep(ms) {
  *     termGraceMs?: number
  *   },
  *   runtimeGuard?: {
- *     shouldTerminate: () => boolean | { terminate: boolean, reason?: string } | Promise<boolean | { terminate: boolean, reason?: string }>,
+ *     shouldTerminate: () => boolean | { terminate: boolean, reason?: string, event?: Record<string, any> } | Promise<boolean | { terminate: boolean, reason?: string, event?: Record<string, any> }>,
  *     pollIntervalMs?: number,
- *     termGraceMs?: number
+ *     termGraceMs?: number,
+ *     onTriggered?: (decision: { terminate: true, reason?: string, event?: Record<string, any> }) => void
  *   },
  *   stallWarningIntervalMs?: number
  * }} options
@@ -476,6 +477,13 @@ function runProcess({
         if (!terminate) return;
         runtimeGuardFired = true;
         runtimeGuardReason = typeof decision === "object" && decision !== null && typeof decision.reason === "string" ? decision.reason : "";
+        if (typeof decision === "object" && decision !== null) {
+          try {
+            runtimeGuard.onTriggered?.({ ...decision, terminate: true });
+          } catch {
+            log(`attempt ${attempt + 1}: runtime guard trigger callback failed`);
+          }
+        }
         const reasonSuffix = runtimeGuardReason ? ` (${runtimeGuardReason})` : "";
         guardSentSigtermAt = Date.now();
         log(`attempt ${attempt + 1}: runtime guard requested termination${reasonSuffix} (SIGTERM)`);

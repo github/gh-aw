@@ -31,6 +31,7 @@ const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES } = require("./empty_output_outcome.cjs");
+const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -332,12 +333,23 @@ function buildFailureMatchCategories(options) {
   return categories.sort();
 }
 
-function hasMCPTransportWedge(logContent) {
-  return /^\[codex-harness\](?: \d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?)? attempt \d+: runtime guard requested termination \(transport_wedge: MCP tool call timed out after \d+s\) \(SIGTERM\)\r?$/m.test(logContent);
+function hasMCPTransportWedge(sessionContent) {
+  return sessionContent.split(/\r?\n/).some(line => {
+    try {
+      const event = JSON.parse(line);
+      return isAgentExecutionEvent(event) && event.data.categories.includes("transport_wedge");
+    } catch {
+      return false;
+    }
+  });
 }
 
 function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
   return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+}
+
+function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
 }
 
 /**
@@ -4290,9 +4302,9 @@ async function main() {
     let transportWedge = false;
     if (agentConclusion === "failure") {
       try {
-        transportWedge = hasMCPTransportWedge(fs.readFileSync(getAgentStdioLogPath(), "utf8"));
+        transportWedge = hasMCPTransportWedge(fs.readFileSync(getAgentSessionPath(), "utf8"));
       } catch {
-        core.debug("Engine log unavailable for MCP watchdog classification");
+        core.debug("Unified agent session unavailable for MCP watchdog classification");
       }
     }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
@@ -5042,6 +5054,7 @@ module.exports = {
   buildFailureMatchCategories,
   hasMCPTransportWedge,
   getAgentStdioLogPath,
+  getAgentSessionPath,
   buildFailureIssueTitle,
   FAILURE_CATEGORIES_PATH,
 };

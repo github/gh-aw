@@ -6413,14 +6413,17 @@ describe("handle_agent_failure", () => {
       expect(buildFailureMatchCategories({ agentConclusion: "failure", transportWedge: true })).toEqual(["transport_wedge"]);
     });
 
-    it("recognizes only the harness MCP watchdog termination record", () => {
-      const { hasMCPTransportWedge, getAgentStdioLogPath } = require("./handle_agent_failure.cjs");
-      expect(hasMCPTransportWedge("[codex-harness] 2026-01-01T00:00:00.000Z attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)")).toBe(true);
-      expect(hasMCPTransportWedge("[codex-harness] attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)")).toBe(true);
-      expect(hasMCPTransportWedge("transport_wedge: MCP tool call timed out after 120s")).toBe(false);
-      expect(hasMCPTransportWedge('{"type":"item.failed","message":"[codex-harness] 2026-01-01T00:00:00.000Z attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)"}')).toBe(false);
+    it("classifies MCP watchdog failures from structured unified-session events", () => {
+      const { hasMCPTransportWedge, getAgentStdioLogPath, getAgentSessionPath } = require("./handle_agent_failure.cjs");
+      const event = { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } };
+      expect(hasMCPTransportWedge(JSON.stringify(event))).toBe(true);
+      expect(hasMCPTransportWedge(JSON.stringify({ type: "agent.execution", data: { categories: ["agent_failure"], errorCodes: [], errorTypes: [] } }))).toBe(false);
+      expect(hasMCPTransportWedge('{"type":"item.failed","message":"transport_wedge: MCP tool call timed out after 120s"}')).toBe(false);
+      expect(hasMCPTransportWedge("[codex-harness] runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s)")).toBe(false);
       expect(getAgentStdioLogPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-stdio.log");
       expect(getAgentStdioLogPath("")).toBe("/tmp/gh-aw/agent-stdio.log");
+      expect(getAgentSessionPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-session.jsonl");
+      expect(getAgentSessionPath("")).toBe("/tmp/gh-aw/agent-session.jsonl");
     });
 
     it("returns missing_safe_outputs category", () => {

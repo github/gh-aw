@@ -998,10 +998,19 @@ async function main() {
         runtimeGuard: {
           pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
           termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+          onTriggered: decision => {
+            if (decision.event) process.stdout.write(`${JSON.stringify(decision.event)}\n`);
+          },
           shouldTerminate: async () => {
             if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
             const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
-            if (expiredMCPCallTimeoutMs !== null) return { terminate: true, reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s` };
+            if (expiredMCPCallTimeoutMs !== null) {
+              return {
+                terminate: true,
+                reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s`,
+                event: { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } },
+              };
+            }
             if (!contextRebuildCircuitBreaker.enabled) return false;
             if (Date.now() < nextContextCheckAt) return false;
             nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;

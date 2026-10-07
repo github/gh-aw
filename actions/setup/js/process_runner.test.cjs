@@ -511,6 +511,7 @@ describe("process_runner.cjs", () => {
 
     it("terminates a running process when runtime guard requests it", async () => {
       const logs = [];
+      const triggered = [];
       let checks = 0;
       const result = await runProcess({
         command: process.execPath,
@@ -521,8 +522,9 @@ describe("process_runner.cjs", () => {
           shouldTerminate: () => {
             checks += 1;
             if (checks < 3) return false;
-            return { terminate: true, reason: "test guard tripped" };
+            return { terminate: true, reason: "test guard tripped", event: { type: "agent.execution", data: { categories: ["test_guard"], errorCodes: [], errorTypes: [] } } };
           },
+          onTriggered: decision => triggered.push(decision),
           pollIntervalMs: 25,
           termGraceMs: 200,
         },
@@ -531,6 +533,7 @@ describe("process_runner.cjs", () => {
       expect(result.runtimeGuardFired).toBe(true);
       expect(result.runtimeGuardReason).toContain("test guard tripped");
       expect(result.watchdogFired).toBe(false);
+      expect(triggered).toEqual([{ terminate: true, reason: "test guard tripped", event: { type: "agent.execution", data: { categories: ["test_guard"], errorCodes: [], errorTypes: [] } } }]);
       expect(logs.some(line => line.includes("runtime guard requested termination"))).toBe(true);
     });
 
