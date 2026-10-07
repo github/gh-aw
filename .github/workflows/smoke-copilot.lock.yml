@@ -107,7 +107,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     if: >
       needs.pre_activation.outputs.activated == 'true' && ((fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request') &&
@@ -572,7 +572,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -2627,7 +2627,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   check_token_telemetry:
-    name: Check token telemetry
+    name: check_token_telemetry
     needs:
       - activation
       - agent
@@ -2699,7 +2699,7 @@ jobs:
         run: echo "::notice::This engine does not provide proxy token counts; token telemetry assertions are not applicable."
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -3096,7 +3096,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -3435,7 +3435,7 @@ jobs:
             }
 
   evals:
-    name: Evaluations
+    name: evals
     needs:
       - activation
       - agent
@@ -3734,7 +3734,7 @@ jobs:
           persist-credentials: false
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     if: >
       (fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request') && (fromJSON(github.event.inputs.aw_context ||
       '{}').trigger_label == 'smoke') || !(fromJSON(github.event.inputs.aw_context || '{}').event_type == 'pull_request')
@@ -3804,7 +3804,7 @@ jobs:
             await main();
 
   push_evals_state:
-    name: Push evaluations state
+    name: push_evals_state
     needs:
       - activation
       - evals
@@ -3891,7 +3891,7 @@ jobs:
           persist-credentials: false
 
   push_experiments_state:
-    name: Push experiments state
+    name: push_experiments_state
     needs: activation
     if: always() && (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-slim
@@ -3974,7 +3974,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent
@@ -4123,7 +4123,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   send_slack_message:
-    name: Send Slack message
+    name: send_slack_message
     needs:
       - agent
       - detection
@@ -4177,7 +4177,7 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
 
   update_cache_memory:
-    name: Update cache memory
+    name: update_cache_memory
     needs:
       - activation
       - agent
