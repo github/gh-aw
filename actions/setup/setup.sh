@@ -334,6 +334,7 @@ SAFE_OUTPUTS_FILES=(
   "compact_numbers.cjs"
   "model_aliases.cjs"
   "model_fallback.cjs"
+  "resolve_model_alias.cjs"
   "awf_reflect.cjs"
   "awf_reflect_paths.cjs"
   "messages_header.cjs"

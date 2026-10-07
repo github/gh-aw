@@ -27,7 +27,9 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir)).toEqual({
       type: "report_incomplete",
       reason: "missing_terminal_safe_output",
-      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.",
+      failureCause: "prompt_exhaustion",
+      retryCount: 0,
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
     });
   });
 
@@ -35,7 +37,23 @@ describe("empty output outcome", () => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.reason).toBe("engine_driver_failure");
+    expect(outcome.failureCause).toBe("engine_outage");
+    expect(outcome.driverExitCode).toBe(exitCode);
     expect(outcome.details).toContain(`Driver exit code: ${exitCode}`);
+    expect(outcome.details).toContain("Failure classification: engine_outage");
+    expect(outcome.details).toContain("Last engine error type: unknown");
+  });
+
+  it("includes a successful driver exit code when no terminal output was emitted", () => {
+    writeEvents([
+      {
+        type: "agent.execution",
+        data: { categories: [], errorCodes: [], errorTypes: [], exitCode: 0 },
+      },
+    ]);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.driverExitCode).toBe(0);
+    expect(outcome.details).toContain("Driver exit code: 0");
   });
 
   it("preserves CLI parse classification when the bridge exits non-zero without copying payloads", () => {
@@ -132,15 +150,46 @@ describe("empty output outcome", () => {
   });
 
   it.each([
-    ["Error: Authentication failed with private-token", "Authentication failed"],
-    ["Access denied by policy settings: private-policy", "Inference access denied"],
-    ["CAPIError: 429 Too Many Requests private-provider", "Provider quota or rate limit exceeded"],
-    [JSON.stringify({ type: "session.error", data: { message: "Authentication failed", raw: "private-native-payload" } }), "Authentication failed"],
-  ])("preserves classified errors without copying raw diagnostics: %s", (log, summary) => {
+    ["Error: Authentication failed with private-token", "Authentication failed", "request_rejection", "authentication_failed"],
+    ["Access denied by policy settings: private-policy", "Inference access denied", "request_rejection", "inference_access_error"],
+    ["CAPIError: 429 Too Many Requests private-provider", "Provider quota or rate limit exceeded", "request_rejection", "capi_quota_exceeded_error"],
+    [JSON.stringify({ type: "session.error", data: { message: "Authentication failed", raw: "private-native-payload" } }), "Authentication failed", "request_rejection", "authentication_failed"],
+  ])("preserves classified errors without copying raw diagnostics: %s", (log, summary, failureCause, engineErrorType) => {
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), log);
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.details).toContain(summary);
+    expect(outcome.failureCause).toBe(failureCause);
+    expect(outcome.engineErrorType).toBe(engineErrorType);
+    expect(outcome.details).toContain(`Last engine error type: ${engineErrorType}`);
     expect(outcome.details).not.toContain("private-");
+  });
+
+  it.each([
+    ["capi_server_error", [502], "engine_outage"],
+    ["http_400_response_error", [400], "request_rejection"],
+    ["invocation_cap_exceeded", [], "prompt_exhaustion"],
+  ])("classifies %s using collector execution metadata", (category, errorCodes, failureCause) => {
+    writeEvents([
+      {
+        type: "agent.execution",
+        data: { categories: [category], errorCodes, errorTypes: [], exitCode: 1 },
+      },
+    ]);
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe(failureCause);
+    expect(outcome.driverExitCode).toBe(1);
+    expect(outcome.details).toContain(`Failure classification: ${failureCause}`);
+  });
+
+  it("captures retry count and HTTP status without copying retry messages", () => {
+    fs.writeFileSync(
+      path.join(rootDir, "agent-stdio.log"),
+      "[claude-harness] attempt 1: private retry message — retrying due to HTTP 502 (attempt 2/4)\n[claude-harness] attempt 2: private retry message — retrying due to HTTP 503 (attempt 3/4)"
+    );
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.retryCount).toBe(2);
+    expect(outcome.details).toContain("Retry attempts observed: 2 (HTTP 502, HTTP 503)");
+    expect(outcome.details).not.toContain("private retry message");
   });
 
   it("redacts overlapping runtime masks before pattern matching in validation details", () => {

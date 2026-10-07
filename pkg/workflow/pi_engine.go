@@ -313,6 +313,9 @@ func (e *PiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile string)
 	if workflowData.Model == "" {
 		withModel := *workflowData
 		withModel.Model = "copilot/gpt-5.4"
+		if resolvePiBackend(workflowData) == UniversalLLMBackendCopilot && isFirewallEnabled(workflowData) {
+			withModel.Model = "copilot/auto"
+		}
 		workflowData = &withModel
 	}
 	piLog.Printf("Generating execution steps for Pi engine: workflow=%s, firewall=%v",

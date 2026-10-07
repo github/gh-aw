@@ -2064,14 +2064,23 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 func TestConclusionReportFailedJobsExpression(t *testing.T) {
 	compiler := NewCompiler()
 	reportFailedJobs := TemplatableBool("${{ inputs.report-failed-jobs }}")
-	steps := compiler.buildConclusionReportFailedJobsStep(&WorkflowData{
+	steps, err := compiler.buildConclusionReportFailedJobsStep(&WorkflowData{
 		Name: "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{
 			ReportFailedJobs: &reportFailedJobs,
 		},
 	}, string(constants.AgentJobName))
+	if err != nil {
+		t.Fatalf("Failed to build failed-job reporting step: %v", err)
+	}
 
 	output := strings.Join(steps, "")
+	if !strings.Contains(output, "GH_AW_JOB_RESULTS: ${{ toJSON(needs) }}") {
+		t.Errorf("failed-job reporting must receive needs keyed by stable job IDs: %q", output)
+	}
+	if !strings.Contains(output, `\"agent\":\"Agent\"`) {
+		t.Errorf("failed-job reporting must receive the compiler's display-name mapping: %q", output)
+	}
 	if !strings.Contains(output, "GH_AW_REPORT_FAILED_JOBS: ${{ inputs.report-failed-jobs }}") {
 		t.Errorf("report-failed-jobs expression was not emitted unquoted: %q", output)
 	}

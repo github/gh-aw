@@ -24,6 +24,9 @@ func TestClaudeCopilotProviderResolution(t *testing.T) {
 		{"nil", nil, LLMProviderAnthropic},
 		{"default", &WorkflowData{Model: "claude-sonnet-4-6"}, LLMProviderAnthropic},
 		{"copilot", &WorkflowData{Model: "copilot/claude-haiku-4.5"}, LLMProviderGitHub},
+		{"copilot auto", &WorkflowData{Model: "copilot/auto"}, LLMProviderGitHub},
+		{"native auto", &WorkflowData{Model: "auto"}, LLMProviderAnthropic},
+		{"bare Copilot auto", &WorkflowData{Model: "auto", EngineConfig: &EngineConfig{LLMProvider: LLMProviderGitHub}}, LLMProviderGitHub},
 		{"expression", &WorkflowData{Model: "copilot/${{ inputs.model }}"}, LLMProviderGitHub},
 		{"case and whitespace", &WorkflowData{Model: " COPILOT/claude-sonnet-4.6 "}, LLMProviderGitHub},
 		{"explicit provider wins", &WorkflowData{
@@ -73,6 +76,8 @@ func TestClaudeCopilotCredentialsAndModel(t *testing.T) {
 
 func TestClaudeCopilotNativeModelIDs(t *testing.T) {
 	for _, test := range []struct{ input, expected string }{
+		{"auto", "auto"},
+		{"copilot/auto", "auto"},
 		{"copilot/claude-sonnet-4.6", "claude-sonnet-4.6"},
 		{"copilot/${{ inputs.model }}", "${{ inputs.model }}"},
 		{"claude-sonnet-4-6", "claude-sonnet-4-6"},
@@ -84,6 +89,34 @@ func TestClaudeCopilotNativeModelIDs(t *testing.T) {
 			applyClaudeModelEnvVars(env, &WorkflowData{Model: test.input})
 			assert.Equal(t, test.expected, env["ANTHROPIC_MODEL"])
 		})
+	}
+}
+
+func TestCopilotAutoModelCompilation(t *testing.T) {
+	for _, engine := range []string{"claude", "codex"} {
+		for _, model := range []string{"auto", "copilot/auto"} {
+			t.Run(engine+"/"+model, func(t *testing.T) {
+				compiler := NewCompiler()
+				compiler.SetSkipValidation(true)
+				workflowPath := filepath.Join(t.TempDir(), "copilot-auto.md")
+				source := "---\non: workflow_dispatch\nengine:\n  id: " + engine + "\n  model-provider: github\nmodel: " + model + "\npermissions:\n  contents: read\n  copilot-requests: write\ncheckout: false\ntools:\n  github: false\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nCall noop once."
+				require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+				require.NoError(t, compiler.CompileWorkflow(workflowPath))
+				lock, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+				require.NoError(t, err)
+				agent := extractJobSection(string(lock), "agent")
+				assert.Contains(t, agent, "GH_AW_LLM_PROVIDER: github")
+				assert.Contains(t, agent, "COPILOT_GITHUB_TOKEN: ${{ github.token }}")
+				assert.NotContains(t, agent, "secrets.ANTHROPIC_API_KEY")
+				assert.NotContains(t, agent, "secrets.OPENAI_API_KEY")
+				if engine == "claude" {
+					assert.Contains(t, agent, "ANTHROPIC_MODEL: auto")
+				} else {
+					assert.Contains(t, agent, "GH_AW_MODEL_AGENT_CODEX: auto")
+					assert.Zero(t, compiler.GetWarningCount())
+				}
+			})
+		}
 	}
 }
 

@@ -45,7 +45,7 @@ function makeHarnessTempDir(name) {
   return fs.mkdtempSync(path.join(agentTempDir, name));
 }
 
-function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = [], extraEnv = {} }) {
+function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = [], extraEnv = {}, reflectData }) {
   const tempDir = makeHarnessTempDir("claude-harness-");
   const stubPath = path.join(tempDir, "stub.cjs");
   const promptPath = path.join(tempDir, "prompt.txt");
@@ -53,19 +53,29 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
   fs.writeFileSync(stubPath, stubScript, "utf8");
   fs.writeFileSync(promptPath, prompt, "utf8");
 
-  const result = spawnSync(process.execPath, ["claude_harness.cjs", process.execPath, stubPath, "--print", ...extraArgs, "--prompt-file", promptPath], {
-    cwd: path.dirname(require.resolve("./claude_harness.cjs")),
-    env: { ...harnessChildEnv, ...extraEnv, CLAUDE_HARNESS_STUB_CALLS: callsPath },
-    encoding: "utf8",
-    timeout: 45000,
-  });
-  const calls = fs
-    .readFileSync(callsPath, "utf8")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map(line => JSON.parse(line));
-  return { result, calls };
+  const env = { ...harnessChildEnv, ...extraEnv, CLAUDE_HARNESS_STUB_CALLS: callsPath };
+  try {
+    if (reflectData) {
+      const preloadPath = path.join(tempDir, "reflect-fixture.cjs");
+      fs.writeFileSync(preloadPath, `require(${JSON.stringify(require.resolve("./awf_reflect.cjs"))}).fetchAWFReflect = async () => ({ ok: true, reflectData: ${JSON.stringify(reflectData)} });`, "utf8");
+      env.NODE_OPTIONS = `${env.NODE_OPTIONS || ""} --require=${JSON.stringify(preloadPath)}`;
+    }
+    const result = spawnSync(process.execPath, ["claude_harness.cjs", process.execPath, stubPath, "--print", ...extraArgs, "--prompt-file", promptPath], {
+      cwd: path.dirname(require.resolve("./claude_harness.cjs")),
+      env,
+      encoding: "utf8",
+      timeout: 45000,
+    });
+    const calls = fs
+      .readFileSync(callsPath, "utf8")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+    return { result, calls };
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 describe("claude_harness.cjs", () => {
@@ -77,6 +87,30 @@ describe("claude_harness.cjs", () => {
       ],
     };
 
+    it.each(["auto", "copilot/auto"])("starts the real harness with %s resolved in environment and CLI model inputs", model => {
+      const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol", "claude-sonnet-5"] }] };
+      const stubScript = `
+        const fs = require("fs");
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({
+          args: process.argv.slice(2), model: process.env.ANTHROPIC_MODEL, baseUrl: process.env.ANTHROPIC_BASE_URL
+        }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "done" }) + "\\n");
+      `;
+      for (const extraArgs of [[], ["--model", model], [`--model=${model}`]]) {
+        const { result, calls } = runHarnessWithStub({
+          stubScript,
+          reflectData: reflect,
+          extraArgs,
+          extraEnv: { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: model, GH_AW_SAFE_OUTPUTS: "", GH_AW_HARNESS_MAX_RETRIES: "0" },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toMatchObject({ model: "claude-sonnet-5", baseUrl: "http://api-proxy:43123" });
+        if (extraArgs.length > 0) expect(calls[0].args.join(" ")).toContain("claude-sonnet-5");
+        expect(calls[0].args.join(" ")).not.toContain(model);
+      }
+    });
+
     it.each(["github", "copilot", "github-copilot", "github_models"])("routes Claude's native Messages API to the reflected Copilot endpoint for %s", async provider => {
       const env = { GH_AW_LLM_PROVIDER: provider, ANTHROPIC_MODEL: "copilot/claude-haiku-4.5", ANTHROPIC_API_KEY: "sandbox-placeholder" };
       const child = await buildClaudeChildEnv(reflectData, env, () => {});
@@ -84,6 +118,31 @@ describe("claude_harness.cjs", () => {
       expect(child.ANTHROPIC_MODEL).toBe("claude-haiku-4.5");
       expect(child.ANTHROPIC_API_KEY).toBe("sandbox-placeholder");
       expect(env.ANTHROPIC_MODEL).toBe("copilot/claude-haiku-4.5");
+    });
+
+    it.each(["auto", "copilot/auto"])("resolves the %s environment model before native Messages inference", async model => {
+      const env = { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: model, ANTHROPIC_API_KEY: "sandbox-placeholder" };
+      const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol", "claude-sonnet-5", "claude-sonnet-4.6"] }] };
+      const logs = [];
+      const child = await buildClaudeChildEnv(reflect, env, message => logs.push(message));
+      expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-sonnet-5", ANTHROPIC_BASE_URL: "http://api-proxy:43123", ANTHROPIC_API_KEY: "sandbox-placeholder" });
+      expect(env.ANTHROPIC_MODEL).toBe(model);
+      expect(logs.join("\n")).toContain("Claude auto model selection");
+    });
+
+    it.each(["auto", "copilot/auto"])("resolves a %s fallback without changing the provisioned Copilot route", async model => {
+      const reflect = { endpoints: [{ ...reflectData.endpoints[1], models: ["claude-haiku-4.5"] }] };
+      const child = await buildClaudeChildEnv(reflect, { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_FALLBACK: model }, () => {});
+      expect(child.ANTHROPIC_MODEL).toBe("claude-haiku-4.5");
+    });
+
+    it("maps native Anthropic auto to sonnet without requiring Copilot credentials or reflection", async () => {
+      const env = { GH_AW_LLM_PROVIDER: "anthropic", ANTHROPIC_MODEL: "auto", ANTHROPIC_BASE_URL: "https://custom.example/anthropic" };
+      expect(await buildClaudeChildEnv(null, env, () => {})).toMatchObject({ ...env, ANTHROPIC_MODEL: "sonnet" });
+    });
+
+    it.each(["auto", "copilot/auto"])("fails before inference when %s has no advertised Claude model", async model => {
+      await expect(buildClaudeChildEnv({ endpoints: [{ ...reflectData.endpoints[1], models: ["gpt-6.1-sol"] }] }, { GH_AW_LLM_PROVIDER: "github", ANTHROPIC_MODEL: model }, () => {})).rejects.toThrow("requires an advertised Claude");
     });
 
     it.each([undefined, null, { endpoints: [{ provider: "anthropic", configured: true, port: 10001 }] }, { endpoints: [{ provider: "copilot", configured: false, port: 10002 }] }])(

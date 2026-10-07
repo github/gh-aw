@@ -321,6 +321,8 @@ Common categories include `agent_failure`, `timed_out`, `missing_safe_outputs`, 
 
 A workflow-level control field under `safe-outputs:` that applies to safe-output processing as a whole rather than to an individual handler. Set `report-failed-jobs: false` to disable the automatic failed-job reporting issue that the framework otherwise creates when a job in the workflow fails. The field also accepts a GitHub Actions expression that resolves to a boolean. It defaults to `true` when omitted, distinct from [Failure Issue Reporting (`report-failure-as-issue:`)](#failure-issue-reporting-report-failure-as-issue), which controls category-based failure reporting for the agent job itself.
 
+Failed jobs are filtered by stable workflow job IDs, not display names. The `agent`, `activation`, `pre_activation`, `safe_outputs`, `detection`, and `conclusion` jobs are excluded because their failures have dedicated reporting or are internal to reporting.
+
 ```yaml wrap
 safe-outputs:
   create-issue:

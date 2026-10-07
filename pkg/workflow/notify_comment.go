@@ -80,7 +80,11 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 		return nil, err
 	}
 	steps = append(steps, agentFailureSteps...)
-	steps = append(steps, c.buildConclusionReportFailedJobsStep(data, mainJobName)...)
+	failedJobsSteps, err := c.buildConclusionReportFailedJobsStep(data, mainJobName)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, failedJobsSteps...)
 	// Only add the conclusion update step if status comments are explicitly enabled
 	if data.StatusComment != nil && *data.StatusComment {
 		var token string

@@ -3,12 +3,14 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
 
@@ -665,15 +667,21 @@ func (c *Compiler) buildConclusionJobConcurrency(data *WorkflowData) string {
 // buildConclusionReportFailedJobsStep builds the step that queries the workflow run's jobs,
 // identifies failed non-builtin jobs, and creates a failure issue for them.
 // Returns nil when report-failed-jobs is explicitly set to false.
-func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJobName string) []string {
+func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJobName string) ([]string, error) {
 	// Skip when explicitly disabled via frontmatter
 	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailedJobs != nil && strings.EqualFold(strings.TrimSpace(data.SafeOutputs.ReportFailedJobs.String()), "false") {
 		notifyCommentLog.Print("Skipping report-failed-jobs step: disabled in frontmatter")
-		return nil
+		return nil, nil
+	}
+	displayNames, err := json.Marshal(buildFailedJobsDisplayNames(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize job display names for failed-job reporting: %w", err)
 	}
 	var envVars []string
 	envVars = append(envVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID, buildLocalWorkflowSourceURL(c.markdownPath))...)
 	envVars = append(envVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
+	envVars = append(envVars, "          GH_AW_JOB_RESULTS: ${{ toJSON(needs) }}\n")
+	envVars = append(envVars, fmt.Sprintf("          GH_AW_JOB_DISPLAY_NAMES: %q\n", displayNames))
 	if data.SafeOutputs != nil && data.SafeOutputs.ReportFailedJobs != nil {
 		envVars = append(envVars, buildTemplatableBoolEnvVar("GH_AW_REPORT_FAILED_JOBS", templatableBoolPtrToStringPtr(data.SafeOutputs.ReportFailedJobs))...)
 	} else {
@@ -686,5 +694,25 @@ func (c *Compiler) buildConclusionReportFailedJobsStep(data *WorkflowData, mainJ
 		CustomEnvVars: envVars,
 		ScriptFile:    "report_failed_jobs.cjs",
 		StepCondition: "always()",
-	})
+	}), nil
+}
+
+func buildFailedJobsDisplayNames(data *WorkflowData) map[string]string {
+	names := maps.Clone(generatedJobNames)
+	// Dynamic names fall back to job IDs rather than being interpolated into JSON.
+	for id, value := range data.Jobs {
+		if config, ok := value.(map[string]any); ok {
+			if name, ok := config["name"].(string); ok && name != "" && !containsExpression(name) {
+				names[id] = name
+			}
+		}
+	}
+	if data.SafeOutputs != nil {
+		for id, config := range data.SafeOutputs.Jobs {
+			if config != nil && config.Name != "" && !containsExpression(config.Name) {
+				names[stringutil.NormalizeSafeOutputIdentifier(id)] = config.Name
+			}
+		}
+	}
+	return names
 }

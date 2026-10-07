@@ -389,6 +389,35 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("validatePiModelAvailability", () => {
+    it.each(["github", "copilot", "github-copilot"].flatMap(provider => ["auto", "auto?effort=high"].map(modelId => [provider, modelId])))("accepts the %s/%s routing sentinel without a catalog entry", (provider, modelId) => {
+      const logs = [];
+      expect(() =>
+        piModelsJson.validatePiModelAvailability({
+          provider,
+          modelId,
+          logger: message => logs.push(message),
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, models: ["gpt-5.4"] }],
+          },
+        })
+      ).not.toThrow();
+      expect(logs).toContain("awf-reflect: Copilot auto selection delegated to the proxy");
+    });
+
+    it.each(["openai", "anthropic"].flatMap(provider => ["auto", "auto?effort=high"].map(modelId => [provider, modelId])))("still rejects an unadvertised auto model for %s/%s", (provider, modelId) => {
+      expect(() =>
+        piModelsJson.validatePiModelAvailability({
+          provider,
+          modelId,
+          reflectData: {
+            models_fetch_complete: true,
+            endpoints: [{ provider, configured: true, models: [] }],
+          },
+        })
+      ).toThrow(`Pi model "${modelId}" is not advertised by the configured ${provider} proxy endpoint`);
+    });
+
     it("rejects a model absent from a completed reflected endpoint inventory", () => {
       const logs = [];
       expect(() =>
@@ -423,6 +452,41 @@ describe("pi_models_json.cjs", () => {
   });
 
   describe("main", () => {
+    it.each(["auto", "auto?effort=high"])("writes the Copilot %s gateway model when completed discovery only advertises concrete models", async modelId => {
+      process.env.GH_AW_PI_MODEL_ID = modelId;
+      process.env.GH_AW_PI_GATEWAY_SECRET_ENV = "COPILOT_GITHUB_TOKEN";
+      process.env.GH_AW_PI_GATEWAY_FALLBACK_PORT = "10002";
+      process.env.GH_AW_LLM_PROVIDER = "github";
+      process.env.AWF_REFLECT_ENABLED = "1";
+      process.env.PI_CODING_AGENT_DIR = tmpDir;
+      process.env.GH_AW_PI_CONFIG = "{}";
+      delete process.env.GH_AW_PI_MODELS_JSON_PATH;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            models_fetch_complete: true,
+            endpoints: [{ provider: "copilot", configured: true, port: 10002, models: ["gpt-5.4"] }],
+          }),
+        })
+      );
+
+      await piModelsJson.main({ loadSDK, loadModelsJson: () => ({ providers: {} }) });
+
+      const written = JSON.parse(fs.readFileSync(path.join(tmpDir, "models.json"), "utf8"));
+      expect(written.providers["aw-gateway"]).toEqual({
+        baseUrl: "http://api-proxy:10002",
+        api: "openai-completions",
+        apiKey: "awf-proxy",
+        models: [{ id: modelId }],
+      });
+      expect(stderrOutput.join("")).toContain("Copilot auto selection delegated to the proxy");
+      expect(stderrOutput.join("")).toContain("Copilot auto uses gateway-selected model metadata");
+      expect(stderrOutput.join("")).not.toContain("configure engine.config.model for a custom model");
+    });
+
     it.each([
       [[], false],
       [["high"], true],
