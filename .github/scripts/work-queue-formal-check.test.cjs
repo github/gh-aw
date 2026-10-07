@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
@@ -16,8 +17,7 @@ const CONFIGS = [
 ];
 
 function fixture(t, config = CONFIGS[0].config) {
-  const dir = path.join(__dirname, `.work-queue-formal-test-${crypto.randomUUID()}`);
-  fs.mkdirSync(dir);
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-work-queue-formal-test-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const jar = path.join(dir, "test.jar");
   fs.writeFileSync(jar, "fixture, not a real TLC jar");

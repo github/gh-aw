@@ -1427,6 +1427,32 @@ describe("native queue launch fencing and conservative recovery", () => {
     }
   });
 
+  it("publishes submit-only intents without accessing protected launch credentials", async () => {
+    const { fixture, options, post } = setup({ granted: false });
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-submit-only-"));
+    const filename = path.join(directory, "intents.jsonl");
+    const config = { ...options.config };
+    const credentialAccess = vi.fn(() => {
+      throw new Error("submit-only processing consumed a launch credential");
+    });
+    Object.defineProperty(config, "github-token", { get: credentialAccess });
+    Object.defineProperty(config, "work_queue_dispatch_credential", { get: credentialAccess });
+    try {
+      fs.writeFileSync(
+        filename,
+        `${JSON.stringify({ version: 3, intent_id: "submit-without-launch-credentials", kind: "submit", parameters: { nodes: [{ graph_id: "public-submit-only", node_key: "root", payload: { task: "submit without launch" }, depends_on: [] }] } })}\n`
+      );
+      const before = fixture.state.works.size;
+      const result = await publishQueueControls({ ...options, config, intentPath: filename, dispatchClient: undefined, validateDispatchCredential: undefined, core: { info: vi.fn(), setOutput: vi.fn() } });
+      expect(result.receipts).toEqual([expect.objectContaining({ status: "durable", intent_id: "submit-without-launch-credentials" })]);
+      expect(fixture.state.works.size).toBe(before + 1);
+      expect(credentialAccess).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each(["options", "config"])("keeps the public %s staged preview independent of dispatch credentials", async location => {
     for (const credential of [undefined, null, { kind: "unsupported" }, { kind: "github_app" }, { kind: "github_token" }, "unreadable"]) {
       const { fixture, options, post } = setup({ granted: false });

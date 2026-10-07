@@ -22,12 +22,14 @@ const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
 
-/** @param {Record<string, any>} [config] @param {any} [suppliedClient] */
+/** @param {{ "target-ref"?: string, "coverage-dir"?: string, max?: number, "wait-for-processing-timeout"?: number, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
   if (!handle) throw new Error("Queue coverage requires a Claim factory");
   const factoryIdentity = claimIdentity(handle);
-  const github = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: handle });
+  /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
+  const selectedClient = suppliedClient || global.github;
+  const github = wrapClaimEffectClient(selectedClient, { claim_handle: handle });
   const repository = process.env.GITHUB_REPOSITORY;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue coverage requires its trusted native repository");
   const [owner, repo] = repository.split("/");
@@ -37,7 +39,8 @@ async function main(config = {}, suppliedClient) {
   const limit = Number(config.max || 1);
   let count = 0;
   const stagedMode = isStagedMode(config);
-  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(revision || "") || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(ref || "")) throw new Error("Queue coverage requires a trusted ref and immutable native revision");
+  if (typeof revision !== "string" || typeof ref !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(revision) || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(ref))
+    throw new Error("Queue coverage requires a trusted ref and immutable native revision");
   return async message => {
     if (currentClaimHandle() !== handle) throw new Error("Queue coverage cannot escape its original Claim");
     assertClaimIdentity(factoryIdentity);
@@ -59,7 +62,10 @@ async function main(config = {}, suppliedClient) {
       message.label.length > 128
     )
       throw new Error("Queue coverage requires declared isolated report metadata");
-    const resolved = await github.rest.repos.getCommit({ owner, repo, ref });
+    const getCommit = github.rest?.repos?.getCommit;
+    const request = github.request;
+    if (typeof getCommit !== "function" || typeof request !== "function") throw new Error("Queue coverage requires its native read and write endpoints");
+    const resolved = await getCommit({ owner, repo, ref });
     if (resolved.data.sha !== revision) throw new Error("Trusted coverage target differs from the immutable worker revision");
     const filename = path.join(root, message.file);
     assertClaimArtifactFile(filename, root);
@@ -76,7 +82,7 @@ async function main(config = {}, suppliedClient) {
     const label = `${message.label}/claim/${path.basename(claimArtifactPath("", handle))}`;
     const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
     const { data } = await withClaimResourceEffects([authorityResource], ["request:PUT /repos/{owner}/{repo}/code-coverage/report"], () =>
-      github.request("PUT /repos/{owner}/{repo}/code-coverage/report", {
+      request("PUT /repos/{owner}/{repo}/code-coverage/report", {
         owner,
         repo,
         commit_oid: revision,
@@ -86,14 +92,15 @@ async function main(config = {}, suppliedClient) {
         coverage_report: zlib.gzipSync(bytes).toString("base64"),
       })
     );
-    if (typeof data.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(data.id)) throw new Error("Queue coverage has no exact service upload receipt");
+    if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string" || !/^[A-Za-z0-9_-]{1,256}$/.test(data.id)) throw new Error("Queue coverage has no exact service upload receipt");
     const result = { success: true, report_id: data.id, repo: repository, ref, commit_sha: revision, sha256 };
     privateReceipts.set(result, { ...factoryIdentity, repository, ref, revision, path: message.file, language: message.language, label, sha256, report_id: data.id, timeout: config["wait-for-processing-timeout"] ?? 160, authorityResource });
     return result;
   };
 }
 
-async function verifyCodeCoverageDelivery({ claim, result, github }) {
+async function verifyCodeCoverageDelivery(options) {
+  const { claim, result, github } = options;
   const receipt = result && privateReceipts.get(result);
   if (!receiptMatchesClaim(receipt, claim) || !Number.isSafeInteger(receipt.timeout) || receipt.timeout < 0 || receipt.timeout > 600) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
@@ -113,7 +120,7 @@ async function verifyCodeCoverageDelivery({ claim, result, github }) {
     authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     evidence: { source: "github_code_coverage_api", report_id: receipt.report_id, processing_status: "succeeded", request_sha256: receipt.sha256, language: receipt.language },
   });
-  return withClaimResourceVerification(proof, () => proof);
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { main, verifyCodeCoverageDelivery };

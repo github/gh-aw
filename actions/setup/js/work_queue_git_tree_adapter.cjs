@@ -69,7 +69,7 @@ function validPath(value) {
   );
 }
 
-/** @returns {Array<Record<string, any>>} */
+/** @returns {Array<{path: string, mode: string, type: string, sha: null, content?: never} | {path: string, mode: string, type: string, content: Buffer, sha?: never}>} */
 function normalizeFiles(value, baseLeaves) {
   if (!Array.isArray(value) || value.length === 0 || value.length > 128) throw new Error("Trusted code adapter requires a bounded nonempty file declaration");
   let bytes = 0;
@@ -203,7 +203,8 @@ function createGitTreeEffectHandler(adapter, suppliedClient) {
   };
 }
 
-async function verifyGitTreeDelivery({ adapter, result, claim, github, verification = undefined }) {
+async function verifyGitTreeDelivery(options) {
+  const { adapter, result, claim, github, verification = undefined } = options;
   validateGitTreeAdapter(adapter);
   const receipt = result && privateReceipts.get(result);
   if (!receiptMatchesClaim(receipt, claim) || receipt.adapter !== canonical(adapter)) return { verified: false };
@@ -226,7 +227,7 @@ async function verifyGitTreeDelivery({ adapter, result, claim, github, verificat
     { kind: "git_commit", repository: receipt.repository, id: receipt.commit },
     { kind: "git_ref", repository: receipt.repository, id: receipt.commit },
   ];
-  /** @type {Record<string, any>} */
+  /** @type {{kind: string, repository: string, id: string, ref?: string, number?: number}} */
   let resource = { kind: "git_commit", repository: receipt.repository, id: receipt.commit, ref: `heads/${receipt.branch}` };
   if (receipt.pull) {
     const { data } = await github.rest.pulls.get({ owner, repo, pull_number: receipt.pull.number });
@@ -258,7 +259,7 @@ async function verifyGitTreeDelivery({ adapter, result, claim, github, verificat
     effect_resources: effects,
     evidence: { source: "independent_git_tree_readback", commit: receipt.commit, tree: receipt.tree, parent: receipt.parent, files_digest: digest(receipt.expected), content_digest: digest(receipt.blobs) },
   });
-  return withClaimResourceVerification(proof, () => proof);
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { validateGitTreeAdapter, createGitTreeEffectHandler, verifyGitTreeDelivery };

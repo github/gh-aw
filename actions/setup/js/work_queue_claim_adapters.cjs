@@ -15,6 +15,7 @@ const {
   claimIdentity,
   assertClaimIdentity,
   receiptMatchesClaim,
+  createClaimResourceVerification,
 } = require("./work_queue_claim_scope.cjs");
 const { verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
 const { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery } = require("./work_queue_rest_adapter.cjs");
@@ -98,7 +99,7 @@ function createDeclaredAdapterVerifier(adapters = {}, nativeConfig = {}, effects
       proof = await verifyBuiltinDeliveryOutput({ ...options, message: receipt.message, effects });
     } else proof = await verifyClaimAdapterOutput({ ...options, adapter });
     if (proof.verified !== true) return proof;
-    return { ...proof, evidence: { ...proof.evidence, verifier_id: verification.verifier_id, expected_digest: digest(verification.expected) } };
+    return createClaimResourceVerification({ ...proof, evidence: { ...proof.evidence, verifier_id: verification.verifier_id, expected_digest: digest(verification.expected) } });
   };
   declaredVerifiers.set(verify, registry);
   return verify;

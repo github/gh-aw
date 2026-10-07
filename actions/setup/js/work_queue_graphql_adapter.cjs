@@ -175,7 +175,7 @@ async function verifyGraphqlAdapterDelivery(options) {
     effect_resources: [{ kind: "graphql", repository: adapter["target-repo"], id: receipt.effect_id }],
     evidence: { source: "independent_native_readback", id: receipt.id, fields_digest: digest(receipt.fields) },
   });
-  return withClaimResourceVerification(proof, () => proof);
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { validateGraphqlAdapter, createGraphqlEffectHandler, verifyGraphqlAdapterDelivery };

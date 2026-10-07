@@ -4,7 +4,7 @@
 const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
 const { canonical, closed } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim } = require("./work_queue_claim_scope.cjs");
+const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -125,13 +125,14 @@ async function verifyRestAdapterDelivery(options) {
   const number = numberField === undefined ? undefined : data[numberField];
   if (numberField !== undefined && (!Number.isSafeInteger(number) || number < 1)) return { verified: false };
   const resource = { kind: adapter.verifier["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) };
-  return {
+  const proof = createClaimResourceVerification({
     verified: true,
     claim_handle: claim.handle,
     resource,
     authority_resource: ["issue", "pull_request"].includes(resource.kind) ? await resolveParentResourceTarget(github, { repository: resource.repository, kind: resource.kind, number }, data) : await resolveRepositoryTarget(github, resource),
     evidence: { source: "independent_native_readback", id: receipt.id, fields: Object.keys(adapter.verifier.fields) },
-  };
+  });
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery };

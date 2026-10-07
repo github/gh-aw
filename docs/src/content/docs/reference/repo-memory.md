@@ -18,6 +18,39 @@ tools:
 
 Creates branch `memory/default` at `/tmp/gh-aw/repo-memory-default/`. Files are stored within the branch at the branch name path (`memory/default/`). Files auto-commit/push after workflow completion.
 
+## Work-queue workers
+
+Workers using `tools.work-queue.worker: true` cannot use standalone
+`tools.repo-memory` persistence: its ordinary push job is not attributed to a
+Claim. Removing this restriction or adding a declaration alongside that push
+job does not make the writes Claim-scoped.
+
+For persistent snapshots, use a matching `safe-outputs.scripts` or custom
+preparation job and `safe-outputs.claim-adapters` with `effect-type: git_tree`.
+Pin an existing native base commit, a fixed target repository and a separate
+branch prefix. Credential-free preparation emits declared file content; the
+trusted handler creates an immutable Claim branch and independently verifies
+its commit, complete tree and blobs. The installed Work must freeze a positive
+numeric repository target and permit the output, intersecting the approved
+profile, Subject and every worker-created ancestor. Preparation and restored
+history are not authority or delivery proof.
+
+The repository's
+[ESLint Refiner workflow](https://github.com/github/gh-aw/blob/main/.github/workflows/eslint-refiner.md)
+preserves its legacy `memory/eslint-refiner` JSON/JSONL history and publishes new
+`eslint-refiner.json` snapshots under `memory/eslint-refiner-runs/claims/`.
+A read-only setup step restores both histories from exact native commit and
+blob identities. It rejects truncated trees, foreign repositories, malformed
+refs, altered bytes and exceeded bounds rather than silently dropping history.
+Its limits are 128 snapshots, 1 MiB per file and 16 MiB total; archive older
+history through an approved operator before exceeding them.
+
+This migration preserves memory continuity but does not update the old
+canonical branch. The Claim adapter cannot overwrite an existing Claim branch,
+and `memory/eslint-refiner-runs` avoids conflicting with the existing
+`memory/eslint-refiner` ref. Do not retain the ordinary unscoped memory push job
+or use a moving branch name as the configured base revision.
+
 ## Advanced Configuration
 
 ```aw wrap

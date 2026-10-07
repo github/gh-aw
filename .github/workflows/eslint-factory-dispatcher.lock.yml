@@ -587,7 +587,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${GH_AW_SECRET_GITHUB_TOKEN}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${GH_AW_SECRET_GH_AW_GITHUB_TOKEN}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${GH_AW_SECRET_GITHUB_TOKEN}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${GH_AW_SECRET_GH_AW_GITHUB_TOKEN}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
           GH_AW_SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}
           GH_AW_SECRET_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
@@ -604,23 +604,7 @@ jobs:
             {
               "description_suffixes": {},
               "repo_params": {},
-              "dynamic_tools": [
-                {
-                  "_workflow_name": "eslint-refiner",
-                  "description": "Dispatch the 'eslint-refiner' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository. Use the 'ref' parameter to target a specific branch or tag (allowed patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}).",
-                  "inputSchema": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "description": "The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.",
-                        "type": "string"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "name": "eslint_refiner"
-                }
-              ]
+              "dynamic_tools": []
             }
           GH_AW_VALIDATION_JSON: |
             {
@@ -722,7 +706,6 @@ jobs:
                 }
               }
             }
-          GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -1803,7 +1786,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"github-token\":\"${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":3,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"],\"workflow_files\":{\"eslint-miner\":\".lock.yml\",\"eslint-monster\":\".lock.yml\",\"eslint-refiner\":\".lock.yml\"},\"workflows\":[\"eslint-miner\",\"eslint-refiner\",\"eslint-monster\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":2,\"report-as-issue\":\"true\"},\"report_incomplete\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

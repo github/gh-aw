@@ -21,12 +21,14 @@ const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const privateReceipts = new WeakMap();
 
-/** @param {Record<string, any>} [config] @param {any} [suppliedClient] */
+/** @param {{ "target-repo"?: string, "target-ref"?: string, driver?: string, max?: number, workflow_filename?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const handle = currentClaimHandle();
   if (!handle) throw new Error("Queue code scanning requires a Claim factory");
   const factoryIdentity = claimIdentity(handle);
-  const github = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: handle });
+  /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
+  const selectedClient = suppliedClient || global.github;
+  const github = wrapClaimEffectClient(selectedClient, { claim_handle: handle });
   const repository = config["target-repo"] || process.env.GITHUB_REPOSITORY;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue code scanning requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
@@ -37,7 +39,8 @@ async function main(config = {}, suppliedClient) {
   const maximum = Number(config.max || 128);
   let count = 0;
   const stagedMode = isStagedMode(config);
-  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(revision || "") || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(ref || "")) throw new Error("Queue code scanning requires a trusted ref and immutable native revision");
+  if (typeof revision !== "string" || typeof ref !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(revision) || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(ref))
+    throw new Error("Queue code scanning requires a trusted ref and immutable native revision");
   return async message => {
     if (currentClaimHandle() !== handle) throw new Error("Queue code scanning cannot escape its original Claim");
     assertClaimIdentity(factoryIdentity);
@@ -61,7 +64,10 @@ async function main(config = {}, suppliedClient) {
       (message.column !== undefined && (!Number.isSafeInteger(message.column) || message.column < 1))
     )
       throw new Error("Queue code scanning finding is malformed");
-    const resolved = await github.rest.repos.getCommit({ owner, repo, ref });
+    const getCommit = github.rest?.repos?.getCommit;
+    const uploadSarif = github.rest?.codeScanning?.uploadSarif;
+    if (typeof getCommit !== "function" || typeof uploadSarif !== "function") throw new Error("Queue code scanning requires its native read and write endpoints");
+    const resolved = await getCommit({ owner, repo, ref });
     if (resolved.data.sha !== revision) throw new Error("Trusted code scanning ref differs from the immutable worker revision");
     const category = `${prefix}/${number}`;
     const finding = {
@@ -77,7 +83,7 @@ async function main(config = {}, suppliedClient) {
     };
     const authorityResource = await resolveRepositoryTarget(github, { repository, ref, path: message.file });
     const upload = await withClaimResourceEffects([authorityResource], ["rest.codeScanning.uploadSarif"], () =>
-      github.rest.codeScanning.uploadSarif({ owner, repo, commit_sha: revision, ref, sarif: zlib.gzipSync(Buffer.from(JSON.stringify(report))).toString("base64"), tool_name: driver, validate: true })
+      uploadSarif({ owner, repo, commit_sha: revision, ref, sarif: zlib.gzipSync(Buffer.from(JSON.stringify(report))).toString("base64"), tool_name: driver, validate: true })
     );
     if (typeof upload.data.id !== "string" || !upload.data.id) throw new Error("Queue code scanning has no exact service receipt");
     const result = { success: true, sarif_id: upload.data.id, repo: repository, ref, commit_sha: revision };
@@ -86,7 +92,8 @@ async function main(config = {}, suppliedClient) {
   };
 }
 
-async function verifyCodeScanningDelivery({ claim, result, github }) {
+async function verifyCodeScanningDelivery(options) {
+  const { claim, result, github } = options;
   const receipt = result && privateReceipts.get(result);
   if (!receiptMatchesClaim(receipt, claim)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
@@ -142,7 +149,7 @@ async function verifyCodeScanningDelivery({ claim, result, github }) {
     authority_resource: await resolveRepositoryTarget(github, receipt.authorityResource),
     evidence: { source: "github_code_scanning_api", sarif_id: receipt.sarif_id, analysis_id: analysis.id, result_sha256: crypto.createHash("sha256").update(canonical(receipt.finding)).digest("hex") },
   });
-  return withClaimResourceVerification(proof, () => proof);
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { main, verifyCodeScanningDelivery };

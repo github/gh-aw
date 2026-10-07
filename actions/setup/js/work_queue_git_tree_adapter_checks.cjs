@@ -147,7 +147,14 @@ function registerTests({ describe, it }) {
       const assignment = assigned();
       const adapter = configured();
       const host = native();
-      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
+      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
+      const authorize = async request => {
+        if (request.message.type === "work_queue_resource_verification") {
+          assert.equal(request.context, trustedContext);
+          assert.equal(request.github, host.github);
+        }
+        return { claim_handle: request.claim_handle, authorized: true };
+      };
       const effects = [];
       const message = {
         type: "code",
@@ -174,6 +181,7 @@ function registerTests({ describe, it }) {
             effects,
             github: host.github,
             authorize,
+            context: trustedContext,
             verifyOutput: input => verifyClaimAdapterOutput({ ...input, adapter }),
             verifyDeclaredOutput: createDeclaredAdapterVerifier({ code: adapter }),
           };

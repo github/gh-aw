@@ -103,7 +103,7 @@ function registerTests({ describe, it }) {
       const source = {
         rest: {
           issues: {
-            create: async () => {
+            create: async _parameters => {
               writes++;
             },
           },
@@ -129,7 +129,7 @@ function registerTests({ describe, it }) {
         let originalCategory;
         const source = {
           rest: {
-            repos: { getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) },
+            repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }), getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) },
             codeScanning: {
               uploadSarif: async input => {
                 writes++;
@@ -155,7 +155,14 @@ function registerTests({ describe, it }) {
             ],
           }),
         };
-        const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
+        const trustedContext = { repo: { owner: "owner", repo: "repo" } };
+        const authorize = async request => {
+          if (request.message.type === "work_queue_resource_verification") {
+            assert.equal(request.context, trustedContext);
+            assert.equal(request.github, source);
+          }
+          return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
+        };
         await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
           const handler = await scanning.main({ "target-ref": "refs/heads/approved" }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
           const message = { type: "create_code_scanning_alert", claim_handle: "h1", file: "src/one.js", line: 4, message: "Scoped finding", severity: "warning" };
@@ -164,7 +171,17 @@ function registerTests({ describe, it }) {
           originalHandler = handler;
           originalCategory = report.runs[0].automationDetails.id;
           assert.equal(writes, 1);
-          const options = { assignment, claim_handle: "h1", messages: [message], results: [{ messageIndex: 0, success: true, result }], effects, authorize, github: source, verifyOutput: scanning.verifyCodeScanningDelivery };
+          const options = {
+            assignment,
+            claim_handle: "h1",
+            messages: [message],
+            results: [{ messageIndex: 0, success: true, result }],
+            effects,
+            authorize,
+            context: trustedContext,
+            github: source,
+            verifyOutput: scanning.verifyCodeScanningDelivery,
+          };
           assert.equal((await verifyClaimDelivery(options)).verification, "verified");
           assert.equal((await scanning.verifyCodeScanningDelivery({ claim: assignment.claims[0], result: structuredClone(result), github: source })).verified, false);
           incorrect = true;
@@ -198,7 +215,7 @@ function registerTests({ describe, it }) {
         let originalResult;
         let originalHandler;
         const source = {
-          rest: { repos: { getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) } },
+          rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }), getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) } },
           request: async (route, input) => {
             if (route.startsWith("PUT ")) {
               writes++;
@@ -212,7 +229,14 @@ function registerTests({ describe, it }) {
             return { data: { processing_status: incorrect ? "failed" : "succeeded", errors: [] } };
           },
         };
-        const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
+        const trustedContext = { repo: { owner: "owner", repo: "repo" } };
+        const authorize = async request => {
+          if (request.message.type === "work_queue_resource_verification") {
+            assert.equal(request.context, trustedContext);
+            assert.equal(request.github, source);
+          }
+          return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
+        };
         try {
           const directory = claimArtifactPath(root, "h1", assignment);
           fs.mkdirSync(directory, { recursive: true });
@@ -224,7 +248,17 @@ function registerTests({ describe, it }) {
             originalResult = result;
             originalHandler = handler;
             assert.equal(writes, 1);
-            const options = { assignment, claim_handle: "h1", messages: [message], results: [{ messageIndex: 0, success: true, result }], effects, authorize, github: source, verifyOutput: coverage.verifyCodeCoverageDelivery };
+            const options = {
+              assignment,
+              claim_handle: "h1",
+              messages: [message],
+              results: [{ messageIndex: 0, success: true, result }],
+              effects,
+              authorize,
+              context: trustedContext,
+              github: source,
+              verifyOutput: coverage.verifyCodeCoverageDelivery,
+            };
             assert.equal((await verifyClaimDelivery(options)).verification, "verified");
             assert.equal((await coverage.verifyCodeCoverageDelivery({ claim: assignment.claims[0], result: structuredClone(result), github: source })).verified, false);
             incorrect = true;

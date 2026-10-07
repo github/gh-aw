@@ -50,7 +50,14 @@ function registerTests({ describe, it }) {
       let writes = 0;
       let observed;
       let cancelled = false;
-      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: !cancelled, ...(cancelled ? { suppressed: true, state: "cancelled" } : {}) });
+      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
+      const authorize = async request => {
+        if (request.message.type === "work_queue_resource_verification") {
+          assert.equal(request.context, trustedContext);
+          assert.equal(request.github, github);
+        }
+        return { claim_handle: request.claim_handle, authorized: !cancelled, ...(cancelled ? { suppressed: true, state: "cancelled" } : {}) };
+      };
       const github = {
         graphql: async (query, variables) => {
           if (query.startsWith("query ClaimAdapterRepository")) return { repository: { id: "repository", nameWithOwner: "owner/repo" } };
@@ -88,6 +95,7 @@ function registerTests({ describe, it }) {
             assignment: scoped,
             claim_handle: "h1",
             authorize,
+            context: trustedContext,
             effects,
             github,
             messages: [message],
@@ -123,7 +131,8 @@ function registerTests({ describe, it }) {
       const github = {
         graphql: async (query, variables) => {
           if (query.startsWith("query ClaimAdapterRepository")) return { repository: { id: "repository", nameWithOwner: "owner/repo" } };
-          if (query.startsWith("query WorkQueueEffectTargets")) return { nodes: variables.ids.map(id => ({ id, __typename: "Repository", nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo", databaseId: id === "foreign" ? 8 : 7 })) };
+          if (query.startsWith("query WorkQueueEffectTargets"))
+            return { nodes: variables.ids.map(id => ({ id, __typename: "Repository", nameWithOwner: id === "foreign" ? "other/repo" : "owner/repo", databaseId: id === "foreign" ? 8 : 7 })) };
           if (query.startsWith("query ClaimAdapterReadback")) return { node: observed };
           writes++;
           observed = { id: "native", __typename: "Discussion", number: 42, repository: { nameWithOwner: "owner/repo", databaseId: 7 }, title: variables.input.title, body: variables.input.body, category: { id: variables.input.categoryId } };

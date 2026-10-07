@@ -4,7 +4,17 @@
 const { canonicalResourceTarget, resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
 
 const { AsyncLocalStorage } = require("node:async_hooks");
-const { normalizeAssignment, normalizeClaimScope, assertClaimAuthorized, currentClaimHandle, currentClaimAssignment, withClaimExecution, claimEffectChannelMatches, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
+const {
+  normalizeAssignment,
+  normalizeClaimScope,
+  assertClaimAuthorized,
+  currentClaimHandle,
+  currentClaimAssignment,
+  withClaimExecution,
+  claimEffectChannelMatches,
+  createClaimResourceVerification,
+  withClaimResourceVerification,
+} = require("./work_queue_claim_scope.cjs");
 const { digest, canonical, canonicalBytes } = require("./work_queue_codec.cjs");
 const { BUILTIN_EFFECT_FIELDS, builtinTargetNumber } = require("./work_queue_declared_verification.cjs");
 
@@ -305,9 +315,11 @@ async function inspectClaimDelivery(options) {
       verifiedControls.add(control.request_id);
     }
     if (!["work_queue_submit", "work_queue_dispatch_next"].includes(message.type)) {
+      const authorityResources = proof.authority_resources || [Object.hasOwn(proof, "authority_resource") ? proof.authority_resource : proof.resource];
+      for (const resource of authorityResources) canonicalResourceTarget(resource);
       try {
-        await withClaimResourceVerification(proof, async () => {
-          for (const resource of proof.authority_resources || [proof.authority_resource]) {
+        const checkAuthorities = async () => {
+          for (const resource of authorityResources) {
             await assertClaimAuthorized(
               {
                 ...message,
@@ -317,10 +329,11 @@ async function inspectClaimDelivery(options) {
               { authorize, context: options.context, github: options.github, resource: canonicalResourceTarget(resource) }
             );
           }
-        });
+        };
+        await withClaimResourceVerification(proof, checkAuthorities, { authorize, context: options.context, github: options.github });
       } catch (error) {
-        const reason = error instanceof Error ? error.message : "unavailable protected authority receipt";
-        return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: `Independent scoped resource authorization failed: ${reason}` };
+        if (!(error instanceof Error) || error.message !== "work_queue_claim_scope: adapter verification requires its private in-process authority receipt") throw error;
+        return { ...receipt, disposition: outputs.length ? "partial" : "unknown", reason: "Independent scoped resource authorization requires its private in-process authority receipt" };
       }
     }
     outputs.push({ type: message.type, resource: proof.resource, evidence: proof.evidence });

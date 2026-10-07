@@ -27,7 +27,7 @@ function gitPushRepository(url) {
   return repository;
 }
 
-/** @param {Record<string, any>} options */
+/** @param {{remote?: string, cwd?: string, branch: string, execGitSync?: typeof execGitSync, gitAuthEnv?: NodeJS.ProcessEnv, github?: object, authorize?: (request: Record<string, unknown>) => unknown}} options */
 async function assertGitPushAuthorized(options) {
   if (!currentClaimHandle() && !readClaimScopeContext()) return;
   if (!currentClaimHandle()) throw new Error("Queue git pushes require a trusted per-Claim context");

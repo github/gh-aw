@@ -54,7 +54,8 @@ async function main(options = {}) {
   const scope = readClaimScopeContext();
   if (!scope?.assignment) throw new Error("Claim adapter preparation requires the authenticated immutable worker snapshot");
   const { loadAgentOutput } = require("./load_agent_output.cjs");
-  const output = loadAgentOutput();
+  const output = loadAgentOutput({ partitioning: true });
+  if (!output.success) throw new Error(`Claim adapter preparation cannot load agent output${output.error ? ": " + output.error : ""}`);
   const adapter = parseStrictJSON(process.env.GH_AW_CLAIM_ADAPTER_CONFIG || "{}");
   const result = await prepareAdapterContext({
     ...options,
@@ -62,7 +63,7 @@ async function main(options = {}) {
     adapter,
     index: process.env.GH_AW_CLAIM_ADAPTER_INDEX,
     type: process.env.GH_AW_CLAIM_ADAPTER_TYPE,
-    messages: output.success ? output.items : [],
+    messages: output.items,
   });
   coreApi.setOutput("active", result.active ? "true" : "false");
   if (!result.active) return result;

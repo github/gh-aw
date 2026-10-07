@@ -167,7 +167,11 @@ function normalizeRuntimeMessage(message) {
   return normalized;
 }
 
-/** @param {Record<string, any>} message @param {Record<string, any>} [options] */
+/**
+ * @template {Record<string, unknown>} Message
+ * @param {Message} message
+ * @param {{authorize?: (request: Record<string, unknown>) => unknown, github?: unknown, context?: unknown, effect?: boolean, resource?: object, requireCompletion?: boolean}} [options]
+ */
 async function assertClaimAuthorized(message, options = {}) {
   const normalized = normalizeRuntimeMessage(message);
   const execution = claimExecution.getStore();
@@ -332,15 +336,16 @@ function createClaimResourceVerification(proof) {
  * @template T
  * @param {unknown} proof
  * @param {() => T | Promise<T>} callback
+ * @param {{authorize?: (request: Record<string, unknown>) => unknown, context?: unknown, github?: unknown}} [options]
  * @returns {Promise<T>}
  */
-async function withClaimResourceVerification(proof, callback) {
+async function withClaimResourceVerification(proof, callback, options = {}) {
   const facts = proof !== null && typeof proof === "object" ? resourceVerifications.get(proof) : undefined;
   if (!facts) throw scopeError("adapter verification requires its private in-process authority receipt");
   assertClaimIdentity(facts.identity);
   return resourceExecution.run({ ...facts, operations: [], verification: true }, async () => {
     for (const resource of facts.targets) {
-      await assertClaimAuthorized({ type: "work_queue_resource_verification", claim_handle: facts.identity.claim_handle, repo: resource.repository }, { resource });
+      await assertClaimAuthorized({ type: "work_queue_resource_verification", claim_handle: facts.identity.claim_handle, repo: resource.repository }, { ...options, resource });
     }
     return callback();
   });

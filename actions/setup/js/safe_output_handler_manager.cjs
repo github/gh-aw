@@ -1886,7 +1886,7 @@ async function settleClaimDelivery(scope, messages, results, options = {}) {
   return delivery;
 }
 
-/** @param {{claimPartition?: boolean, messages?: any[], verifyOutput?: Function, finalizeResults?: Function, controlIntentPath?: string, authorize?: Function}} [options] */
+/** @param {{claimPartition?: boolean, messages?: object[], verifyOutput?: Function, finalizeResults?: Function, controlIntentPath?: string, authorize?: (request: Record<string, unknown>) => unknown}} [options] */
 async function main(options = {}) {
   const scope = readClaimScopeContext();
   if (scope && !options.claimPartition) {

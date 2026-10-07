@@ -3,14 +3,15 @@
 const assert = require("node:assert/strict");
 const { queueFixture, REF, REPOSITORY, WORKFLOW } = require("./work_queue_lifecycle.test_helpers.cjs");
 const { authorizeWorkerClaim, finalizeWorkerResults } = require("./finish_work_queue_claim.cjs");
-const { withClaimExecution, closeClaimEffectChannel, claimEffectChannelMatches, recordClaimEffect, assertClaimAuthorized } = require("./work_queue_claim_scope.cjs");
+const { withClaimExecution, closeClaimEffectChannel, claimEffectChannelMatches, recordClaimEffect, assertClaimAuthorized, createClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
 const { inspectClaimDelivery, createClaimDeliveryVerifier, verifyClaimDelivery, isTrustedClaimDelivery, readDeliveryControlInventory, verifyBuiltinDeliveryOutput, validateDeliveryContract } = require("./work_queue_delivery.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
-const { canonicalResourceTarget, nativeDecimalIdentity, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
+const { canonicalResourceTarget, nativeDecimalIdentity, resolveParentResourceTarget, resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createClaimAdapterHandler, preparedAdapterPath, createDeclaredAdapterVerifier, wrapDeclaredBuiltinHandler } = require("./work_queue_claim_adapters.cjs");
 const { temporaryDirectory } = require("./work_queue_effect_test_helpers.cjs");
+const { canonical } = require("./work_queue_codec.cjs");
 
 /** @typedef {{messages: Record<string, unknown>[], results: {messageIndex: number, success: boolean, claim_handle: string, result: Record<string, unknown>}[], effects: Record<string, unknown>[], effectChannel: ReturnType<typeof closeClaimEffectChannel>}} DeliveryProofRecord */
 
@@ -54,6 +55,85 @@ function fixture(options = {}) {
 
 function registerTests({ describe, it }) {
   describe("protected complete Claim delivery proof facade", () => {
+    it("authorizes all private authority targets while retaining rich effect metadata only for delivery coverage", async () => {
+      const f = fixture({ count: 1, workDefaults: { payload: { effect_contract: { version: 1, outputs: [{ type: "native_snapshot", min: 1, max: 1 }] }, resource_scope: deliveryResourceScope() } } });
+      const member = f.assignment.claims[0];
+      /** @type {Record<string, unknown>[]} */
+      const authorized = [];
+      const authorize = request => {
+        if (request.resource) authorized.push(request.resource);
+        return f.authorize({ ...request, context: request.context || f.runtime.context });
+      };
+      const targets = [
+        { host: "github.com", repository: REPOSITORY, repository_id: "7", ref: "heads/approved", path: "first.json", run_id: "42" },
+        { host: "github.com", repository: REPOSITORY, repository_id: "7", ref: "heads/approved", path: "second.json", run_id: "42" },
+      ];
+      let reads = 0;
+      const verifyOutput = async () => {
+        const repository = await resolveRepositoryTarget(f.queue.githubClient, { repository: REPOSITORY });
+        reads++;
+        assert.equal(repository.repository_id, "7");
+        const proof = createClaimResourceVerification({
+          verified: true,
+          claim_handle: member.handle,
+          resource: { kind: "snapshot", repository: REPOSITORY, id: "delivered", ref: "heads/approved", path: "first.json", sha256: "a".repeat(64) },
+          authority_resource: targets[0],
+          authority_resources: targets,
+          effect_resources: [{ kind: "git_blob", repository: REPOSITORY, id: "blob", url: "rich metadata is not an authority selector" }],
+          evidence: { source: "native_independent_readback" },
+        });
+        return proof;
+      };
+      const delivery = await f.inspect(member, {
+        authorize,
+        messages: [{ type: "native_snapshot", claim_handle: member.handle }],
+        results: [{ messageIndex: 0, success: true, claim_handle: member.handle, result: {} }],
+        verifyOutput,
+      });
+      assert.equal(delivery.verification, "verified", delivery.reason);
+      assert.equal(reads, 1);
+      for (const target of targets)
+        assert.ok(
+          authorized.some(resource => canonical(resource) === canonical(target)),
+          "every complete authority target must be freshly authorized"
+        );
+      assert.ok(
+        authorized.every(resource => resource.kind !== "git_blob"),
+        "rich effect metadata cannot grant or require authority"
+      );
+    });
+
+    it("rejects copied private authority receipts and a foreign secondary target without deriving no effects", async () => {
+      for (const scenario of ["copied", "foreign_secondary"]) {
+        const f = fixture({ count: 1, workDefaults: { payload: { effect_contract: { version: 1, outputs: [{ type: "native_snapshot", min: 1, max: 1 }] }, resource_scope: deliveryResourceScope() } } });
+        const member = f.assignment.claims[0];
+        const delivery = f.inspect(member, {
+          messages: [{ type: "native_snapshot", claim_handle: member.handle }],
+          results: [{ messageIndex: 0, success: true, claim_handle: member.handle, result: {} }],
+          verifyOutput: async () => {
+            const repository = await resolveRepositoryTarget(f.queue.githubClient, { repository: REPOSITORY });
+            const first = { ...repository, ref: "heads/approved", path: "first.json" };
+            const proof = createClaimResourceVerification({
+              verified: true,
+              claim_handle: member.handle,
+              resource: { kind: "snapshot", repository: REPOSITORY, id: "delivered" },
+              authority_resource: first,
+              authority_resources: [first, { ...first, repository: scenario === "foreign_secondary" ? "foreign/repo" : REPOSITORY, path: "second.json" }],
+              evidence: { source: "native_independent_readback" },
+            });
+            return scenario === "copied" ? structuredClone(proof) : proof;
+          },
+        });
+        if (scenario === "foreign_secondary") await assert.rejects(delivery, /scope|authorized/);
+        else {
+          const unknown = await delivery;
+          assert.equal(unknown.verification, "unknown");
+          assert.equal(unknown.disposition, "unknown");
+          assert.match(unknown.reason, /private in-process/);
+        }
+      }
+    });
+
     it("matches the canonical embedded delivery contract fixtures without deriving verifier authority", () => {
       const shared = require("../../../specs/work-queue/fixtures/effect-contract.json");
       for (const entry of shared.cases) {
@@ -381,6 +461,9 @@ function registerTests({ describe, it }) {
           },
         },
       };
+      const { getOctokit } = await import("@actions/github");
+      const nativeClient = getOctokit("fixture-token");
+      Object.assign(nativeClient.rest, github.rest);
       try {
         global.core = { ...oldCore, info() {}, debug() {}, warning() {}, error() {} };
         global.context = {
@@ -399,7 +482,7 @@ function registerTests({ describe, it }) {
         for (const member of f.assignment.claims) {
           const effects = [];
           await withClaimExecution({ assignment: f.assignment, claim_handle: member.handle, authorize: f.authorize, effects }, async () => {
-            global.github = wrapClaimEffectClient(github, { claim_handle: member.handle, authorize: f.authorize, context: f.queue.workerContext });
+            global.github = wrapClaimEffectClient(nativeClient, { claim_handle: member.handle, authorize: f.authorize, context: f.queue.workerContext });
             const handlers = await manager.loadHandlers(config, null);
             const handler = handlers.get("close_issue");
             if (typeof handler !== "function") throw new Error("Actual manager did not load the native close handler");
@@ -700,7 +783,8 @@ function registerTests({ describe, it }) {
           assert.deepEqual(parameters, { owner: "owner", repo: "repo", issue_number: 42 });
           return { data: { id: 100, number: 42, title: "delivered", html_url: "https://github.com/owner/repo/issues/42" } };
         },
-        create: async () => {
+        /** @param {{owner: string, repo: string}} _parameters */
+        create: async _parameters => {
           throw new Error("Receipt verification must not execute effects");
         },
       };
@@ -853,7 +937,8 @@ function registerTests({ describe, it }) {
           {
             rest: {
               issues: {
-                create: async () => {
+                /** @param {{owner: string, repo: string}} _parameters */
+                create: async _parameters => {
                   writes++;
                 },
               },

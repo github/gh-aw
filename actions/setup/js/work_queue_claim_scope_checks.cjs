@@ -654,20 +654,29 @@ function registerTests({ describe, it }) {
         claim_handle: "h1",
         messages: [{ type: "create_issue", repo: "owner/repo" }],
         results: [{ messageIndex: 0, success: true, claim_handle: "h1", result: { number: 42 } }],
+        github: {
+          rest: {
+            repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
+            issues: { get: async ({ issue_number }) => ({ data: { id: 100 + issue_number, number: issue_number, html_url: `https://github.com/owner/repo/issues/${issue_number}` } }) },
+          },
+        },
         authorize: async request => {
           if (request.message.repo && request.message.repo !== "owner/repo") return { authorized: false, claim_handle: request.claim_handle };
           return authorized(request);
         },
       };
-      const unknown = await verifyClaimDelivery(base);
+      const unverifiedGithub = { rest: { ...base.github.rest, issues: { get: async () => ({ data: null }) } } };
+      const unknown = await verifyClaimDelivery({ ...base, github: unverifiedGithub });
       assert.equal(unknown.verification, "unknown");
       const proof = { verified: true, claim_handle: "h1", resource: { repository: "owner/repo", number: 42 }, evidence: { source: "independent_read" } };
-      const delivered = await verifyClaimDelivery({ ...base, verifyOutput: async () => proof });
+      assert.equal((await verifyClaimDelivery({ ...base, github: unverifiedGithub, verifyOutput: async () => proof })).verification, "unknown");
+      const delivered = await verifyClaimDelivery({ ...base, verifyOutput: verifyBuiltinDeliveryOutput });
       assert.equal(delivered.verification, "verified");
       assert.equal(delivered.disposition, "complete");
-      const foreign = await verifyClaimDelivery({ ...base, verifyOutput: async () => ({ ...proof, claim_handle: "h2" }) });
+      const foreign = await verifyClaimDelivery({ ...base, github: unverifiedGithub, verifyOutput: async () => ({ ...proof, claim_handle: "h2" }) });
       assert.equal(foreign.verification, "unknown");
-      await assert.rejects(verifyClaimDelivery({ ...base, verifyOutput: async () => ({ ...proof, resource: { repository: "foreign/repo", number: 42 } }) }), /same-Claim/);
+      assert.equal((await verifyClaimDelivery({ ...base, github: unverifiedGithub, verifyOutput: async () => ({ ...proof, resource: { repository: "foreign/repo", number: 42 } }) })).verification, "unknown");
+      await assert.rejects(verifyClaimDelivery({ ...base, verifyOutput: verifyBuiltinDeliveryOutput, results: [{ messageIndex: 0, success: true, result: { number: 42, repo: "foreign/repo" } }] }), /same-Claim/);
       const mismatched = { ...base, results: [{ messageIndex: 0, success: true, claim_handle: "h2" }] };
       await assert.rejects(verifyClaimDelivery(mismatched), /Foreign Claim/);
     });
@@ -684,11 +693,17 @@ function registerTests({ describe, it }) {
         claim_handle: "h1",
         authorize: authorized,
         messages,
+        github: {
+          rest: {
+            repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
+            issues: { get: async ({ issue_number }) => ({ data: { id: 100 + issue_number, number: issue_number, html_url: `https://github.com/owner/repo/issues/${issue_number}` } }) },
+          },
+        },
         results: [
           { messageIndex: 0, claim_handle: "h1", success: true, result: { number: 41 } },
           { messageIndex: 1, claim_handle: "h1", success: true, result: { number: 42 } },
         ],
-        verifyOutput: async ({ result }) => (result.number === 41 ? { verified: true, claim_handle: "h1", resource: { repository: "owner/repo", number: 41 }, evidence: { source: "independent_read" } } : { verified: false }),
+        verifyOutput: async input => (input.result.number === 41 ? verifyBuiltinDeliveryOutput(input) : { verified: false }),
       };
       const partial = await verifyClaimDelivery(options);
       assert.equal(partial.verification, "unknown");

@@ -726,13 +726,16 @@ These invariants are intentionally **not** protocol requirements: their violatio
 
 ## Runtime smoke coverage
 
-The private `.github/workflows/smoke-work-queue.md` workflow
-exercises the activation snapshot read tool and the trusted finish-intent tool
-through the compiled MCP mount, verifies the finish intent in the downloaded
-agent artifact, and runs it through safe-output reconciliation. It runs without
-an inbound worker claim, so it must not append to the durable queue log.
-This smoke test validates tool wiring and finish-intent transport; it does not
-cover dispatcher transaction submission, recovery, or compaction.
+The private `.github/workflows/smoke-work-queue.md` workflow is a read-only
+observer. It exercises snapshot read/explain tools through the compiled MCP
+mount and verifies that unassigned finish is unavailable or rejected without
+recording an intent. Its verification job rejects a finish artifact or failure
+report and requires a `noop` result. Ordinary reports use the observer's normal
+workflow authorization; they do not acquire worker or queue-control authority.
+
+This smoke test checks observer wiring and unassigned-finish rejection. It does
+not establish dispatcher submission, native binding, verified worker delivery,
+recovery, or compaction.
 
 ## Limits
 

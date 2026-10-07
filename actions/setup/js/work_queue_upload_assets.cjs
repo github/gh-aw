@@ -23,12 +23,14 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 
 const receipts = new WeakMap();
 
-/** @param {Record<string, any>} [config] @param {any} [suppliedClient] */
+/** @param {{ "target-repo"?: string, "assets-dir"?: string, "allowed-exts"?: string[], "max-size"?: number, max?: number, branch?: string, staged?: boolean }} [config] @param {import("./types/work-queue-native-client").ClaimNativeClient} [suppliedClient] */
 async function main(config = {}, suppliedClient) {
   const factoryClaim = currentClaimHandle();
   if (!factoryClaim) throw new Error("Queue asset adapter requires an immutable Claim factory");
   const factoryIdentity = claimIdentity(factoryClaim);
-  const client = wrapClaimEffectClient(suppliedClient || global.github, { claim_handle: factoryClaim });
+  /** @type {import("./types/work-queue-native-client").ClaimNativeClient} */
+  const selectedClient = suppliedClient || global.github;
+  const client = wrapClaimEffectClient(selectedClient, { claim_handle: factoryClaim });
   const repository = config["target-repo"] || process.env.GITHUB_REPOSITORY || `${global.context.repo.owner}/${global.context.repo.repo}`;
   if (typeof repository !== "string" || !/^[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+$/.test(repository)) throw new Error("Queue asset requires its trusted repository destination");
   const [owner, repo] = repository.split("/");
@@ -67,25 +69,35 @@ async function main(config = {}, suppliedClient) {
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
     const assetPath = `claims/${namespace}/${sha256}${extension}`;
     const authorityResource = await resolveRepositoryTarget(client, { repository, ref: `refs/heads/${branch}`, path: assetPath });
+    const git = client.rest?.git;
+    const getRef = git?.getRef;
+    const createBlob = git?.createBlob;
+    const createTree = git?.createTree;
+    const createCommit = git?.createCommit;
+    if (typeof getRef !== "function" || typeof createBlob !== "function" || typeof createTree !== "function" || typeof createCommit !== "function") throw new Error("Queue asset requires its native read and write endpoints");
+    /** @type {string | null} */
     let head = null;
     let baseTree;
     try {
-      const { data } = await client.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+      const { data } = await getRef({ owner, repo, ref: `heads/${branch}` });
       head = data.object.sha;
     } catch (error) {
       if (error.status !== 404) throw error;
       if (!branch.startsWith("assets/")) throw new Error("Only the approved assets/ namespace can create a new asset branch");
     }
     if (head) {
-      const commit = await client.rest.git.getCommit({ owner, repo, commit_sha: head });
+      const getCommit = git?.getCommit;
+      if (typeof getCommit !== "function") throw new Error("Queue asset requires its native parent commit endpoint");
+      const commit = await getCommit({ owner, repo, commit_sha: head });
       baseTree = commit.data.tree.sha;
     }
+    const mutateRef = head ? git?.updateRef : git?.createRef;
+    if (typeof mutateRef !== "function") throw new Error("Queue asset requires its native branch write endpoint");
     const { blob, tree, commit } = await withClaimResourceEffects([authorityResource], ["rest.git.createBlob", "rest.git.createTree", "rest.git.createCommit", "rest.git.updateRef", "rest.git.createRef"], async () => {
-      const blob = await client.rest.git.createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
-      const tree = await client.rest.git.createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
-      const commit = await client.rest.git.createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
-      if (head) await client.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: false });
-      else await client.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+      const blob = await createBlob({ owner, repo, content: content.toString("base64"), encoding: "base64" });
+      const tree = await createTree({ owner, repo, ...(baseTree ? { base_tree: baseTree } : {}), tree: [{ path: assetPath, mode: "100644", type: "blob", sha: blob.data.sha }] });
+      const commit = await createCommit({ owner, repo, message: `Publish Claim ${factoryClaim} asset ${sha256}`, tree: tree.data.sha, parents: head ? [head] : [] });
+      await mutateRef({ owner, repo, ref: head ? `heads/${branch}` : `refs/heads/${branch}`, sha: commit.data.sha, ...(head ? { force: false } : {}) });
       return { blob, tree, commit };
     });
     const server = process.env.GITHUB_SERVER_URL || "https://github.com";
@@ -95,7 +107,8 @@ async function main(config = {}, suppliedClient) {
   };
 }
 
-async function verifyAssetDelivery({ claim, result, github }) {
+async function verifyAssetDelivery(options) {
+  const { claim, result, github } = options;
   const receipt = result && receipts.get(result);
   if (!receiptMatchesClaim(receipt, claim)) return { verified: false };
   const [owner, repo] = receipt.repository.split("/");
@@ -121,7 +134,7 @@ async function verifyAssetDelivery({ claim, result, github }) {
     ],
     evidence: { source: "github_git_api", commit: receipt.commit, tree: receipt.tree, blob: receipt.blob, sha256: receipt.sha256 },
   });
-  return withClaimResourceVerification(proof, () => proof);
+  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
 }
 
 module.exports = { main, verifyAssetDelivery };

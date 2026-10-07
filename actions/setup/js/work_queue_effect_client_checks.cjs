@@ -6,7 +6,7 @@ const path = require("node:path");
 const { withClaimExecution, claimArtifactPath } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient, withClaimEffectClients } = require("./work_queue_effect_client.cjs");
 const { assertGitPushAuthorized, gitPushRepository } = require("./work_queue_git_effects.cjs");
-const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
+const { verifyClaimDelivery, verifyBuiltinDeliveryOutput } = require("./work_queue_delivery.cjs");
 
 const assignment = {
   version: 3,
@@ -56,17 +56,17 @@ function registerTests({ describe, it }) {
         assert.equal(request.requireCompletion, true);
         return { claim_handle: request.claim_handle, authorized: !cancelled && request.message.repo === "owner/repo", ...(cancelled ? { state: "cancelled", suppressed: true } : {}) };
       };
-      const request = async () => {
+      const request = async (_route, _parameters = {}) => {
         writes++;
       };
       request.endpoint = { DEFAULTS: { method: "GET" } };
       const source = {
         rest: {
           issues: {
-            create: async () => {
+            create: async _parameters => {
               writes++;
             },
-            update: async () => {
+            update: async _parameters => {
               writes++;
             },
           },
@@ -89,7 +89,7 @@ function registerTests({ describe, it }) {
 
     it("cannot bypass targets with call/apply/bind and supports immutable SDK namespaces", async () => {
       let writes = 0;
-      const create = async () => {
+      const create = async _parameters => {
         writes++;
       };
       const source = Object.freeze({ rest: Object.freeze({ issues: Object.freeze({ create }) }) });
@@ -117,7 +117,7 @@ function registerTests({ describe, it }) {
         rest: {
           repos: { get: async () => ({ data: { full_name: "owner/repo", id: repositoryId } }) },
           issues: {
-            create: async () => {
+            create: async _parameters => {
               writes++;
               return { data: { id: 100, number: 42 } };
             },
@@ -177,10 +177,10 @@ function registerTests({ describe, it }) {
         return { claim_handle: request.claim_handle, authorized: true };
       };
       const source = {
-        request: async () => {
+        request: async (_route, _parameters = {}) => {
           writes++;
         },
-        paginate: async () => {
+        paginate: async (_route, _parameters = {}) => {
           writes++;
         },
         rest: {
@@ -211,13 +211,13 @@ function registerTests({ describe, it }) {
         return { claim_handle: request.claim_handle, authorized: request.message.item_number === 42 };
       };
       const source = {
-        request: async () => {
+        request: async (_route, _parameters = {}) => {
           writes++;
         },
         rest: {
           issues: {
             getComment: async ({ comment_id }) => ({ data: { id: comment_id, issue_url: `https://api.github.com/repos/owner/repo/issues/${comment_id === 1 ? 42 : 43}` } }),
-            updateComment: async () => {
+            updateComment: async _parameters => {
               writes++;
             },
           },
@@ -240,9 +240,11 @@ function registerTests({ describe, it }) {
       const authorize = async request => ({ claim_handle: request.claim_handle, authorized: true });
       const source = {
         rest: {
+          repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           issues: {
-            create: async () => ({ data: { id: 42, number: 10 } }),
-            update: async () => ({ data: { id: 43, number: 11 } }),
+            create: async _parameters => ({ data: { id: 42, number: 10 } }),
+            update: async _parameters => ({ data: { id: 43, number: 11 } }),
+            get: async ({ issue_number }) => ({ data: { id: issue_number === 10 ? 42 : 43, number: issue_number, html_url: `https://github.com/owner/repo/issues/${issue_number}` } }),
           },
         },
       };
@@ -253,10 +255,11 @@ function registerTests({ describe, it }) {
           assignment: scope,
           claim_handle: "h1",
           authorize,
+          github: client,
           effects,
           messages: [{ type: "create_issue", claim_handle: "h1", repo: "owner/repo" }],
           results: [{ messageIndex: 0, success: true, claim_handle: "h1", result: { number: 10 } }],
-          verifyOutput: async () => ({ verified: true, claim_handle: "h1", resource: { kind: "issue", repository: "owner/repo", id: "42", number: 10 }, evidence: { source: "independent_read" } }),
+          verifyOutput: verifyBuiltinDeliveryOutput,
         };
         assert.equal((await verifyClaimDelivery(options)).verification, "verified");
         await client.rest.issues.update({ owner: "owner", repo: "repo", issue_number: 11 });

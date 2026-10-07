@@ -246,7 +246,7 @@ function registerTests({ describe, it }) {
       }
     });
     it("freshly authorizes every independent frozen Work resource scope without publishing", async () => {
-      assert.equal(resourceFixture.cases.length, 33);
+      assert.equal(resourceFixture.cases.length, 47);
       for (const test of resourceFixture.cases) {
         const payload = { task: test.name, ...(Object.hasOwn(test, "scope") ? { resource_scope: test.scope } : {}) };
         const { fake, input, state } = authorizerFixture([payload], test.subject);

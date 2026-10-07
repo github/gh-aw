@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { createClaimAdapterHandler, preparedAdapterPath, verifyClaimAdapterOutput, createDeclaredAdapterVerifier } = require("./work_queue_claim_adapters.cjs");
-const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
+const { prepareAdapterContext, main: prepareAdapter } = require("./work_queue_prepare_claim_adapter.cjs");
 const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { claimArtifactPath } = require("./work_queue_claim_scope.cjs");
@@ -44,7 +44,7 @@ function registerTests({ describe, it }) {
         return { claim_handle: request.claim_handle, authorized: true };
       };
       const github = {
-        request: async () => {
+        request: async (_route, _parameters = {}) => {
           throw new Error("Preview cannot invoke a native effect");
         },
       };
@@ -112,8 +112,16 @@ function registerTests({ describe, it }) {
       let observed;
       let writes = 0;
       let cancelled = false;
-      const authorize = async request => ({ claim_handle: request.claim_handle, authorized: !cancelled && (request.message.repo === undefined || request.message.repo === "owner/repo") });
+      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
+      const authorize = async request => {
+        if (request.message.type === "work_queue_resource_verification") {
+          assert.equal(request.context, trustedContext);
+          assert.equal(request.github, source);
+        }
+        return { claim_handle: request.claim_handle, authorized: !cancelled && (request.message.repo === undefined || request.message.repo === "owner/repo") };
+      };
       const source = {
+        rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) } },
         request: async (route, fields) => {
           if (route.startsWith("POST ")) {
             writes++;
@@ -141,6 +149,7 @@ function registerTests({ describe, it }) {
             assignment: scoped,
             claim_handle: "h1",
             authorize,
+            context: trustedContext,
             effects,
             messages: [message],
             results: [{ messageIndex: 0, success: true, result }],
@@ -204,6 +213,69 @@ function registerTests({ describe, it }) {
       }
     });
 
+    it("loads assignment-level adapter inputs at the compiled entrypoint before selecting an immutable Claim", async () => {
+      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter-entrypoint");
+      const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
+      const { serializeTransactionLog } = require("./work_queue_replay.cjs");
+      const fixture = queueFixture({ bound: true, count: 2 });
+      const originalAssignment = fixture.assignment;
+      assert.ok(originalAssignment);
+      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_WORK_QUEUE_SNAPSHOT", "GH_AW_AGENT_OUTPUT", "GH_AW_CLAIM_ADAPTER_CONFIG", "GH_AW_CLAIM_ADAPTER_INDEX", "GH_AW_CLAIM_ADAPTER_TYPE"];
+      const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+      const previousCore = global.core;
+      const outputs = {};
+      const exported = {};
+      const core = {
+        ...previousCore,
+        info: () => {},
+        error: () => {},
+        setOutput: (name, value) => {
+          outputs[name] = value;
+        },
+        exportVariable: (name, value) => {
+          exported[name] = value;
+        },
+      };
+      try {
+        global.core = core;
+        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
+        process.env.GH_AW_WORK_QUEUE_ROLE = "worker";
+        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = path.join(root, "snapshot.json");
+        process.env.GH_AW_AGENT_OUTPUT = path.join(root, "agent-output.json");
+        process.env.GH_AW_CLAIM_ADAPTER_CONFIG = JSON.stringify(adapter);
+        process.env.GH_AW_CLAIM_ADAPTER_INDEX = "0";
+        process.env.GH_AW_CLAIM_ADAPTER_TYPE = "custom";
+        fs.writeFileSync(
+          process.env.GH_AW_WORK_QUEUE_SNAPSHOT,
+          JSON.stringify({ version: 3, sha: "head", transactionLog: serializeTransactionLog(fixture.transactions), captured_at: fixture.at, origin: fixture.workerActor, worker: originalAssignment, role: "worker" })
+        );
+        const [first, sibling] = originalAssignment.claims;
+        const message = { type: "custom", claim_handle: first.handle, number: 42, content: "one" };
+        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({ items: [message, { ...message, claim_handle: sibling.handle, content: "sibling" }, { type: "custom", content: "ambiguous" }] }));
+        const authorize = async request => {
+          assert.equal(request.requireCompletion, false);
+          assert.equal(request.claim_handle, first.handle);
+          return { claim_handle: first.handle, authorized: true };
+        };
+        const result = await prepareAdapter({ core, authorize, artifactRoot: root });
+        assert.equal(result.active, true);
+        assert.deepEqual(result.messages, [message]);
+        assert.equal(outputs.active, "true");
+        assert.equal(outputs.claim_handle, first.handle);
+        assert.equal(exported.GH_AW_CLAIM_HANDLE, first.handle);
+        assert.equal(JSON.parse(fs.readFileSync(result.assignmentFile, "utf8")).claims.length, 2);
+        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, "{");
+        await assert.rejects(prepareAdapter({ core, authorize, artifactRoot: root }), /cannot load agent output/);
+        fs.writeFileSync(process.env.GH_AW_AGENT_OUTPUT, JSON.stringify({ items: [] }));
+        assert.equal((await prepareAdapter({ core, authorize, artifactRoot: root })).active, false);
+        assert.equal(outputs.active, "false");
+      } finally {
+        global.core = previousCore;
+        for (const [key, value] of Object.entries(previous)) value === undefined ? delete process.env[key] : (process.env[key] = value);
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     it("applies prepared data only through fresh guarded effects and never accepts job success or uploaded receipts", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("claim-adapter");
       const scoped = assignment();
@@ -214,6 +286,7 @@ function registerTests({ describe, it }) {
       const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
       const source = {
         rest: {
+          repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           issues: {
             update: async args => {
               writes++;
@@ -303,6 +376,7 @@ function registerTests({ describe, it }) {
       let incorrect = false;
       const source = {
         rest: {
+          repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) },
           git: {
             getRef: async () => {
               if (!ref) throw Object.assign(new Error("missing"), { status: 404 });
@@ -335,8 +409,13 @@ function registerTests({ describe, it }) {
           },
         },
       };
+      const trustedContext = { repo: { owner: "owner", repo: "repo" } };
       const authorize = async request => {
         if (request.resource?.path) assert.match(request.resource.path, /^claims\//);
+        if (request.message.type === "work_queue_resource_verification") {
+          assert.equal(request.context, trustedContext);
+          assert.equal(request.github, source);
+        }
         return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
       };
       try {
@@ -352,7 +431,17 @@ function registerTests({ describe, it }) {
           assert.equal(result.sha, sha);
           assert.deepEqual(calls, ["blob", "tree", "commit", "ref"]);
           assert.equal((await verifyAssetDelivery({ claim: scoped.claims[0], result: structuredClone(result), github: source })).verified, false);
-          const options = { assignment: scoped, claim_handle: "h1", messages: [message], results: [{ messageIndex: 0, success: true, result }], effects, github: source, authorize, verifyOutput: verifyAssetDelivery };
+          const options = {
+            assignment: scoped,
+            claim_handle: "h1",
+            messages: [message],
+            results: [{ messageIndex: 0, success: true, result }],
+            effects,
+            github: source,
+            authorize,
+            context: trustedContext,
+            verifyOutput: verifyAssetDelivery,
+          };
           assert.equal((await verifyClaimDelivery(options)).verification, "verified");
           incorrect = true;
           assert.equal((await verifyClaimDelivery(options)).verification, "unknown");
