@@ -244,7 +244,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
     if (!persisted) return { persisted: 0, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: [] };
 
     execGitSync(["add", "--", "ledger/shards"], { cwd: workspaceDir, stdio: "pipe" });
-    execGitSync(["commit", "-m", `Append ${persisted} ledger record(s) from workflow run ${process.env.GITHUB_RUN_ID || "unknown"}`], {
+    execGitSync(["-c", "user.name=github-actions[bot]", "-c", "user.email=github-actions[bot]@users.noreply.github.com", "commit", "-m", `Append ${persisted} ledger record(s) from workflow run ${process.env.GITHUB_RUN_ID || "unknown"}`], {
       cwd: workspaceDir,
       stdio: "pipe",
     });
