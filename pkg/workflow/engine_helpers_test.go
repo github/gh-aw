@@ -135,6 +135,7 @@ func TestShellEscapeArgWithFullyQuotedAgentPath(t *testing.T) {
 
 func TestGetNpmBinPathSetup(t *testing.T) {
 	pathSetup := GetNpmBinPathSetup()
+	assert.NotContains(t, pathSetup, "'", "Nested harness and sandbox quoting must not introduce shellcheck SC1003 findings")
 
 	// Should require RUNNER_TOOL_CACHE instead of guessing fallback paths.
 	if !strings.Contains(pathSetup, "RUNNER_TOOL_CACHE must be set") {

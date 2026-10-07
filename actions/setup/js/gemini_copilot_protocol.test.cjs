@@ -75,6 +75,7 @@ describe("Gemini Copilot protocol", () => {
     expect(() => toChatRequest({ contents: [], generationConfig: { responseMimeType: "audio/wav" } }, "gemini")).toThrow("response MIME type");
     expect(() => toChatRequest({ contents: [], generationConfig: { seed: 12 } }, "gemini")).toThrow("generation options");
     expect(() => fromChatResponse({ choices: [] }, "gemini")).toThrow("no Chat Completions message");
+    expect(() => fromChatResponse({ choices: [{ message: { content: [] } }] }, "gemini")).toThrow("invalid Chat Completions response");
     expect(() => fromChatResponse({ choices: [{ message: {}, finish_reason: "stop" }] }, "gemini")).toThrow("empty completion");
   });
 

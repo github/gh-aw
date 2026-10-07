@@ -151,8 +151,25 @@ function toChatRequest(body, model) {
   return request;
 }
 
-/** @param {ChatResponse} body @param {string} model */
+/** @param {unknown} value @returns {value is ChatResponse} */
+function isChatResponse(value) {
+  if (!value || typeof value !== "object" || !("choices" in value) || !Array.isArray(value.choices)) return false;
+  return value.choices.every(choice => {
+    if (!choice || typeof choice !== "object" || !choice.message || typeof choice.message !== "object") return false;
+    const message = choice.message;
+    if (message.content != null && typeof message.content !== "string") return false;
+    if (message.reasoning_content !== undefined && typeof message.reasoning_content !== "string") return false;
+    return (
+      message.tool_calls === undefined ||
+      (Array.isArray(message.tool_calls) &&
+        message.tool_calls.every(call => call && typeof call.id === "string" && typeof call.type === "string" && call.function && typeof call.function.name === "string" && typeof call.function.arguments === "string"))
+    );
+  });
+}
+
+/** @param {unknown} body @param {string} model */
 function fromChatResponse(body, model) {
+  if (!isChatResponse(body)) throw new GeminiProtocolError("Copilot returned an invalid Chat Completions response.");
   const choice = body?.choices?.[0];
   if (!choice?.message) throw new GeminiProtocolError("Copilot returned no Chat Completions message.");
   const message = choice.message;
