@@ -38,11 +38,11 @@ network:
 tools:
   cache-memory: true
   github:
+    mode: gh-proxy
     toolsets: [repos, pull_requests]
   edit:
   bash:
     - "*"
-  web-fetch:
 safe-outputs:
   allowed-domains: [default-safe-outputs]
   add-comment:
@@ -72,15 +72,19 @@ sandbox:
 
 ## Test Requirements
 
-1. **GitHub MCP Testing**: Use GitHub MCP tools to fetch details of exactly 2 merged pull requests from ${{ github.repository }} (title and number only)
-2. **Web Fetch Testing**: Use the web-fetch MCP tool to fetch https://github.com and verify the response contains "GitHub" (do NOT use bash or playwright for this test - use the web-fetch MCP tool directly)
+DeepSeek Harness uses native shell/file tools and gh-aw's CLI proxies, not a
+native MCP client. Invoke configured CLI tools through the shell.
+
+1. **GitHub API Testing**: Run `gh pr list --repo ${{ github.repository }} --state merged --limit 2 --json title,number` and verify exactly 2 merged pull requests are returned (title and number only).
+2. **Web Fetch Testing**: Run `curl --fail --silent --show-error --location https://github.com` through the shell and verify the response contains "GitHub".
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-deepseek-harness-${{ github.run_id }}.txt` with content "Smoke test passed for DeepSeek Harness at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as failed and report the failure.
 
 ## Output
 
-**ALWAYS create an issue** with a summary of the smoke test run:
+**ALWAYS create an issue** with a summary of the smoke test run using
+`safeoutputs create_issue --title "..." --body "..."`:
 - Title: "Smoke Test: DeepSeek Harness - ${{ github.run_id }}"
 - Body should include:
   - Test results for each test
@@ -88,6 +92,9 @@ sandbox:
   - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
   - Timestamp
 
-**Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with each test result and the overall PASS or FAIL status.
+**Only if this workflow was triggered by a pull_request event**: Run
+`safeoutputs add_comment --body "..."` to add a **very brief** comment (max
+5-10 lines) with each test result and the overall PASS or FAIL status.
 
-If all tests pass and this workflow was triggered by a pull_request event, use the `add_labels` safe-output tool to add the label `smoke-deepseek-harness` to the pull request (omit the `item_number` parameter to auto-target the triggering PR).
+If all tests pass and this workflow was triggered by a pull_request event, run
+`safeoutputs add_labels --labels "smoke-deepseek-harness"`.

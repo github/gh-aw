@@ -72,6 +72,13 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Goose, Kiro, and Pydantic 
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
 
+The DeepSeek Harness sample pins `dsh` v0.2.0-rc.2 and runs its headless profile
+with stdin prompts and a private per-run Cordis configuration patch. It routes
+Copilot, Anthropic, and OpenAI/Codex through matching configured AWF endpoints;
+Copilot requires AWF. Direct Anthropic/OpenAI API keys and base URLs are used
+only when AWF is disabled. Repository `.dsh` settings are preserved, telemetry
+is disabled, and native MCP is not enabled; configured tools use gh-aw's CLI proxy.
+
 The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
 through the selected AWF endpoint, retains configured MCP tools, and uses native
 JSONL session events for summaries and unified session artifacts. Copilot routing
