@@ -382,6 +382,7 @@ describe("trusted artifact fallback without writable Actions cache", () => {
         actions: {
           getWorkflowRun,
           listArtifactsForRepo: vi.fn(async () => response({ total_count: 1, artifacts: [artifact] })),
+          listWorkflowRunsForRepo: vi.fn(async () => response({ total_count: 1, workflow_runs: [producer] })),
           listWorkflowRuns: vi.fn(async () => {
             throw new Error("Workflow-specific endpoint is unavailable");
           }),
@@ -400,7 +401,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     expect(f.getRunAIC).not.toHaveBeenCalled();
     expect(downloadArtifact).toHaveBeenCalledOnce();
     expect(global.github.rest.actions.listArtifactsForRepo).toHaveBeenCalledWith(expect.objectContaining({ name: "aic-usage-scan-v2" }));
-    expect(getWorkflowRun).toHaveBeenCalledWith({ owner: "example", repo: "project", run_id: 50 });
+    expect(getWorkflowRun).toHaveBeenCalledOnce();
+    expect(global.github.rest.actions.listWorkflowRunsForRepo).toHaveBeenCalledOnce();
   });
 
   it("skips untrusted artifacts before downloading and searches the next page", async () => {
@@ -411,12 +413,14 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     const trusted = { id: 51, ...current, event: "pull_request_target", repository: { full_name: repository } };
     const artifacts = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: "aic-usage-scan-v2", expired: index !== 0, workflow_run: { id: 50 }, created_at: new Date(now).toISOString() }));
     const listArtifactsForRepo = vi.fn(async ({ page }) => response({ total_count: 101, artifacts: page === 1 ? artifacts : [{ id: 101, name: "aic-usage-scan-v2", workflow_run: { id: 51 }, created_at: new Date(now).toISOString() }] }));
+    const listWorkflowRunsForRepo = vi.fn(async () => response({ total_count: 2, workflow_runs: [untrusted, trusted] }));
     global.github = {
       auth: async () => ({ token: "synthetic" }),
       rest: {
         actions: {
           getWorkflowRun: vi.fn(async ({ run_id }) => response(run_id === 99 ? current : run_id === 50 ? untrusted : trusted)),
           listArtifactsForRepo,
+          listWorkflowRunsForRepo,
         },
       },
     };
@@ -426,9 +430,42 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     });
     await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
     expect(listArtifactsForRepo).toHaveBeenCalledTimes(2);
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledOnce();
     expect(downloadArtifact).toHaveBeenCalledOnce();
     expect(downloadArtifact).toHaveBeenCalledWith(101, expect.anything());
+    expect(global.github.rest.actions.getWorkflowRun).toHaveBeenCalledOnce();
     expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).size).toBe(1);
+  });
+
+  it("bounds producer run verification when the artifact run is not in recent history", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const current = { workflow_id: 7, path: ".github/workflows/example.yml" };
+    global.context = { repo: { owner: "example", repo: "project" }, runId: 99, payload: { repository: { default_branch: "main" } } };
+    const listWorkflowRunsForRepo = vi.fn(async ({ page }) =>
+      response({
+        total_count: 501,
+        workflow_runs: Array.from({ length: 100 }, (_, index) => ({ id: 1000 + (page - 1) * 100 + index })),
+      })
+    );
+    global.github = {
+      auth: async () => ({ token: "synthetic" }),
+      rest: {
+        actions: {
+          getWorkflowRun: async () => response(current),
+          listArtifactsForRepo: async () =>
+            response({
+              total_count: 1,
+              artifacts: [{ id: 100, name: "aic-usage-scan-v2", expired: false, workflow_run: { id: 50 }, created_at: new Date(now).toISOString() }],
+            }),
+          listWorkflowRunsForRepo,
+        },
+      },
+    };
+    const downloadArtifact = vi.fn();
+    await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledTimes(5);
+    expect(downloadArtifact).not.toHaveBeenCalled();
+    expect(fs.existsSync(cachePath)).toBe(false);
   });
 
   it.each([403, 500])("does not fail activation when cache discovery fails with HTTP %i", async status => {
