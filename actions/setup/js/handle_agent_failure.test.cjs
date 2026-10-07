@@ -6414,11 +6414,13 @@ describe("handle_agent_failure", () => {
     });
 
     it("recognizes only the harness MCP watchdog termination record", () => {
-      const { hasMCPTransportWedge } = require("./handle_agent_failure.cjs");
+      const { hasMCPTransportWedge, getAgentStdioLogPath } = require("./handle_agent_failure.cjs");
       expect(hasMCPTransportWedge("[codex-harness] 2026-01-01T00:00:00.000Z attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)")).toBe(true);
       expect(hasMCPTransportWedge("[codex-harness] attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)")).toBe(true);
       expect(hasMCPTransportWedge("transport_wedge: MCP tool call timed out after 120s")).toBe(false);
       expect(hasMCPTransportWedge('{"type":"item.failed","message":"[codex-harness] 2026-01-01T00:00:00.000Z attempt 1: runtime guard requested termination (transport_wedge: MCP tool call timed out after 120s) (SIGTERM)"}')).toBe(false);
+      expect(getAgentStdioLogPath("/tmp/call-workflow/agent_output.json")).toBe("/tmp/call-workflow/agent-stdio.log");
+      expect(getAgentStdioLogPath("")).toBe("/tmp/gh-aw/agent-stdio.log");
     });
 
     it("returns missing_safe_outputs category", () => {

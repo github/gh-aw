@@ -2281,6 +2281,10 @@ sandbox:
       # (optional)
       api-proxy: "example-value"
 
+      # Model router sidecar image used by engine.model-routing.
+      # (optional)
+      router: "example-value"
+
       # CLI proxy sidecar image used by tools.github.mode: gh-proxy,
       # integrity-reactions, or raw --difc-proxy-host AWF arguments.
       # (optional)
@@ -2614,6 +2618,8 @@ engine:
     mode: "economy"
 
     # Copilot model candidates; provider qualification is added by the compiler.
+    # GitHub Actions expressions are accepted, and candidate lists from imported
+    # workflows using the same engine are merged.
     allowed-models: []
       # Array of strings
 
@@ -4326,6 +4332,16 @@ tools:
     # Queue storage backend; defaults to git. Choose issues to store queue records on
     # GitHub Issues; this requires the GH_AW_WORK_QUEUE_HMAC_SECRET repository secret.
     storage: "git"
+
+    # Fail closed and block safe outputs when no trusted inbound worker assignment is
+    # present.
+    # (optional)
+    require-assignment: true
+
+    # Declare this workflow as a work-queue worker eligible to receive trusted queue
+    # claims.
+    # (optional)
+    worker: true
 
   # Cache memory MCP configuration for persistent memory storage
   # (optional)
@@ -8502,9 +8518,12 @@ safe-outputs:
 
     # Protected files prevent workflow run approval when modified by the associated
     # pull request. Use exclude to remove filenames or path prefixes from the default
-    # protected set.
+    # protected set, or a leading / for an exact repository path.
     # (optional)
     protected-files:
+      # Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection
+      # everywhere they match. A leading / excludes only the exact repository path (e.g.
+      # /pyproject.toml), leaving same-named nested files protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -9898,8 +9917,8 @@ safe-outputs:
 
       # List of filenames or path prefixes to remove from the default protected-file
       # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). Use this to allow the agent to modify specific files that are
-      # otherwise blocked by default.
+      # ".agents/"). A leading / matches only the exact repository path (e.g.
+      # "/pyproject.toml"), keeping nested files with the same name protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -16993,8 +17012,8 @@ safe-outputs:
 
       # List of filenames or path prefixes to remove from the default protected-file
       # set. Items are matched by basename (e.g. "AGENTS.md") or path prefix (e.g.
-      # ".agents/"). Use this to allow the agent to modify specific files that are
-      # otherwise blocked by default.
+      # ".agents/"). A leading / matches only the exact repository path (e.g.
+      # "/pyproject.toml"), keeping nested files with the same name protected.
       # (optional)
       exclude: []
         # Array of strings
@@ -21073,6 +21092,8 @@ safe-outputs:
         mode: "economy"
 
         # Copilot model candidates; provider qualification is added by the compiler.
+        # GitHub Actions expressions are accepted, and candidate lists from imported
+        # workflows using the same engine are merged.
         allowed-models: []
           # Array of strings
 
@@ -22196,9 +22217,10 @@ safe-outputs:
   # those categories trigger issues. If only prefixed (excluded) categories are
   # specified, all categories except those trigger issues. If both are specified,
   # categories must match included AND not match excluded. Common categories:
-  # agent_failure, timed_out, missing_safe_outputs, report_incomplete, missing_tool,
-  # missing_data, inference_access_error, mcp_policy_error,
-  # ai_credits_rate_limit_error, max_ai_credits_exceeded, daily_ai_credits_unknown.
+  # agent_failure, timed_out, transport_wedge, missing_safe_outputs,
+  # report_incomplete, missing_tool, missing_data, inference_access_error,
+  # mcp_policy_error, ai_credits_rate_limit_error, max_ai_credits_exceeded,
+  # daily_ai_credits_unknown.
   report-failure-as-issue: []
     # Array items: string
 

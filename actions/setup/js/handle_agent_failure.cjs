@@ -336,6 +336,10 @@ function hasMCPTransportWedge(logContent) {
   return /^\[codex-harness\](?: \d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?)? attempt \d+: runtime guard requested termination \(transport_wedge: MCP tool call timed out after \d+s\) \(SIGTERM\)\r?$/m.test(logContent);
 }
 
+function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+}
+
 /**
  * Build a precise failure issue title for known failure classes.
  * Falls back to the generic failure title when no specific class matches.
@@ -4286,7 +4290,7 @@ async function main() {
     let transportWedge = false;
     if (agentConclusion === "failure") {
       try {
-        transportWedge = hasMCPTransportWedge(fs.readFileSync("/tmp/gh-aw/agent-stdio.log", "utf8"));
+        transportWedge = hasMCPTransportWedge(fs.readFileSync(getAgentStdioLogPath(), "utf8"));
       } catch {
         core.debug("Engine log unavailable for MCP watchdog classification");
       }
@@ -5037,6 +5041,7 @@ module.exports = {
   FAILURE_TITLE_PATTERN,
   buildFailureMatchCategories,
   hasMCPTransportWedge,
+  getAgentStdioLogPath,
   buildFailureIssueTitle,
   FAILURE_CATEGORIES_PATH,
 };
