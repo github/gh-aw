@@ -86,11 +86,12 @@ const MISSING_API_KEY_PATTERN = /Missing environment variable:\s*`?(?:CODEX_API_
 // These are transient infrastructure failures that may resolve on retry.
 const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 Internal Server Error|503 Service Unavailable/i;
 
-// Pattern to detect deterministic request-validation failures (HTTP 400 `invalid_request_error`)
+// Pattern to detect deterministic request-validation failures (HTTP 400 `invalid_request_error`
+// or `invalid_request_body`, including invalid replayed item IDs during resume)
 // within Codex's outer `turn.failed` event. The provider rejects the serialized request itself
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
-const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
+const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_(?:error|body)/i;
 
 // Codex's `turn.failed` event nests the actual provider error as a JSON string inside
 // `error.message` (sometimes doubly-nested, e.g. `error.message` -> `{"error": {...}}`).
@@ -240,21 +241,32 @@ function isInvalidModelError(output) {
 
 /**
  * Determines if Codex emitted a `turn.failed` provider event containing a deterministic
- * request-validation failure (HTTP 400 `invalid_request_error`). Such schema-level rejections
- * can never succeed on a fresh run with the same input, so they are treated as terminal.
+ * request-validation failure (HTTP 400 `invalid_request_error` or `invalid_request_body`).
+ * Such schema-level rejections cannot succeed by replaying the same request or session.
  * Tokens in agent transcripts and tool responses are intentionally ignored.
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
 function isInvalidRequestError(output) {
-  return output.split(/\r?\n/).some(line => {
+  return extractInvalidRequestErrorCode(output) !== null;
+}
+
+/**
+ * @param {string} output
+ * @returns {string | null}
+ */
+function extractInvalidRequestErrorCode(output) {
+  for (const line of output.split(/\r?\n/)) {
     try {
       const event = JSON.parse(line);
-      return event?.type === "turn.failed" && event.error && INVALID_REQUEST_ERROR_PATTERN.test(JSON.stringify(event.error));
+      if (event?.type !== "turn.failed" || !event.error) continue;
+      const match = JSON.stringify(event.error).match(INVALID_REQUEST_ERROR_PATTERN);
+      if (match) return match[0].toLowerCase();
     } catch {
-      return false;
+      // Ignore non-JSON diagnostic lines.
     }
-  });
+  }
+  return null;
 }
 
 /**
@@ -911,7 +923,8 @@ async function main() {
       const isServer = isServerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
       const isUnsupportedModelTools = isUnsupportedModelToolsError(result.output);
-      const isInvalidRequest = isInvalidRequestError(result.output);
+      const invalidRequestErrorCode = extractInvalidRequestErrorCode(result.output);
+      const isInvalidRequest = invalidRequestErrorCode !== null;
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
       log(
@@ -1004,7 +1017,10 @@ async function main() {
       }
 
       if (isInvalidRequest) {
-        log(`attempt ${attempt + 1}: invalid_request_error (HTTP 400) — not retrying (the provider rejected the request payload; an identical fresh run would fail the same way)`);
+        emitInfrastructureIncomplete(`Codex request-body rejection (${invalidRequestErrorCode}): the provider rejected the request payload; not retrying because replaying the same request or session would fail identically.`, {
+          logger: log,
+        });
+        log(`attempt ${attempt + 1}: ${invalidRequestErrorCode} (HTTP 400) — not retrying (the provider rejected the request payload; replaying the same request or session would fail the same way)`);
         return { action: "stop" };
       }
 
