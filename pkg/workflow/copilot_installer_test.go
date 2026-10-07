@@ -110,7 +110,7 @@ func TestCopilotEngineWithoutVersion(t *testing.T) {
 	}
 }
 
-func TestCopilotEngineWithWebSearchWithoutPinnedVersionInjectsMinVersion(t *testing.T) {
+func TestCopilotEngineWithWebSearchWithoutPinnedVersionOmitsMinVersion(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
 		Name:            "test-workflow",
@@ -135,15 +135,15 @@ func TestCopilotEngineWithWebSearchWithoutPinnedVersionInjectsMinVersion(t *test
 	if installStep == "" {
 		t.Fatal("Could not find install step with install_copilot_cli.sh")
 	}
-	if !strings.Contains(installStep, "GH_AW_COPILOT_MIN_VERSION: "+string(constants.CopilotWebSearchMinVersion)) {
-		t.Errorf("Expected web-search workflow without pinned engine.version to inject GH_AW_COPILOT_MIN_VERSION, got:\n%s", installStep)
+	if strings.Contains(installStep, "GH_AW_COPILOT_MIN_VERSION:") {
+		t.Errorf("Unavailable web-search must not impose a minimum CLI version, got:\n%s", installStep)
 	}
 	if strings.Contains(installStep, "install_copilot_cli.sh\" "+string(constants.DefaultCopilotVersion)) {
 		t.Errorf("Install step must not embed an explicit version arg when engine.version is unset; got:\n%s", installStep)
 	}
 }
 
-func TestCopilotEngineWithWebSearchExpressionVersionInjectsMinVersion(t *testing.T) {
+func TestCopilotEngineWithWebSearchExpressionVersionOmitsMinVersion(t *testing.T) {
 	engine := NewCopilotEngine()
 	expressionVersion := "${{ inputs.engine-version }}"
 	workflowData := &WorkflowData{
@@ -174,8 +174,8 @@ func TestCopilotEngineWithWebSearchExpressionVersionInjectsMinVersion(t *testing
 	if !strings.Contains(installStep, "ENGINE_VERSION: "+expressionVersion) {
 		t.Errorf("Expected ENGINE_VERSION env var with expression, got:\n%s", installStep)
 	}
-	if !strings.Contains(installStep, "GH_AW_COPILOT_MIN_VERSION: "+string(constants.CopilotWebSearchMinVersion)) {
-		t.Errorf("Expected web-search workflow with expression engine.version to inject GH_AW_COPILOT_MIN_VERSION, got:\n%s", installStep)
+	if strings.Contains(installStep, "GH_AW_COPILOT_MIN_VERSION:") {
+		t.Errorf("Unavailable web-search must not impose a minimum CLI version, got:\n%s", installStep)
 	}
 	if !strings.Contains(installStep, `"${ENGINE_VERSION}"`) {
 		t.Errorf(`Expected install step to pass resolved ENGINE_VERSION to script, got:\n%s`, installStep)

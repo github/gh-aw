@@ -74,8 +74,19 @@ func (c *Compiler) getActionPinMappings() map[string]string {
 	if err != nil || repoConfig == nil || len(repoConfig.ActionPins) == 0 {
 		return nil
 	}
+
 	repoConfigLog.Printf("getActionPinMappings: loaded %d action-pin mapping(s) from aw.json", len(repoConfig.ActionPins))
 	cp := make(map[string]string, len(repoConfig.ActionPins))
 	maps.Copy(cp, repoConfig.ActionPins)
+	return cp
+}
+
+func (c *Compiler) getActionPinPrefixes() map[string]string {
+	repoConfig, err := c.loadRepoConfig()
+	if err != nil || repoConfig == nil || len(repoConfig.ActionPinPrefixes) == 0 {
+		return nil
+	}
+	cp := make(map[string]string, len(repoConfig.ActionPinPrefixes))
+	maps.Copy(cp, repoConfig.ActionPinPrefixes)
 	return cp
 }

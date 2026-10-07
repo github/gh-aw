@@ -32,7 +32,7 @@ function readScanCache(content, repository, workflowId, now = Date.now()) {
     }
     if (
       entry?.version !== 2 ||
-      entry.coverage_version !== 1 ||
+      entry.coverage_version !== 2 ||
       entry.repository !== repository ||
       entry.workflow_id !== workflowId ||
       !Number.isSafeInteger(entry.run_id) ||
@@ -72,7 +72,7 @@ function scanCacheEntry(run, aic, repository, workflowId, now = Date.now(), sour
   }
   return {
     version: 2,
-    coverage_version: 1,
+    coverage_version: 2,
     repository,
     workflow_id: workflowId,
     run_id: run.id,

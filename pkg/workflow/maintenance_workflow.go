@@ -139,6 +139,7 @@ func isNoOpReportAsIssueEnabled(reportAsIssue *string) bool {
 // trigger; pass an empty string to fall back to "main".
 func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWorkflowOptions) error { //nolint:largefunc // Existing workflow orchestration remains centralized.
 	workflowDataList := opts.WorkflowDataList
+	pinWarnings := actionPinWarningsForWorkflows(workflowDataList) //nolint:seenmapbool // PinContext.Warnings requires map[string]bool for shared deduplication.
 	workflowDir := opts.WorkflowDir
 	version := opts.Version
 	actionMode := opts.ActionMode
@@ -165,6 +166,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 			return err
 		}
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
+			PinWarnings:     pinWarnings,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig.IsAutoUpgradeEnabled(),
@@ -226,6 +229,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		// for safe_outputs, create_labels, and validate operations.
 		if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 			workflowDataList: workflowDataList,
+			pinWarnings:      pinWarnings,
+			repoConfig:       repoConfig,
 			workflowDir:      workflowDir,
 			version:          version,
 			actionMode:       actionMode,
@@ -239,6 +244,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		}
 
 		return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+			RepoConfig:      repoConfig,
+			PinWarnings:     pinWarnings,
 			Context:         ctx,
 			WorkflowDir:     workflowDir,
 			Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),
@@ -321,6 +328,12 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	if err != nil {
 		return fmt.Errorf("failed to configure maintenance artifact retention: %w", err)
 	}
+	if repoConfig != nil {
+		content, err = mapPinnedUsesInYAML(content, repoConfig.ActionPins, repoConfig.ActionPinPrefixes, pinWarnings, resolver)
+		if err != nil {
+			return err
+		}
+	}
 
 	// Write the maintenance workflow file
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")
@@ -338,6 +351,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	// Generate side-repo maintenance workflows for any SideRepoOps targets detected.
 	if err := generateAllSideRepoMaintenanceWorkflows(ctx, generateAllSideRepoMaintenanceWorkflowsOptions{
 		workflowDataList: workflowDataList,
+		pinWarnings:      pinWarnings,
+		repoConfig:       repoConfig,
 		workflowDir:      workflowDir,
 		version:          version,
 		actionMode:       actionMode,
@@ -351,6 +366,8 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 	}
 
 	return GenerateAutoUpdateWorkflow(GenerateAutoUpdateWorkflowOptions{
+		RepoConfig:      repoConfig,
+		PinWarnings:     pinWarnings,
 		Context:         ctx,
 		WorkflowDir:     workflowDir,
 		Enabled:         repoConfig != nil && repoConfig.IsAutoUpgradeEnabled(),

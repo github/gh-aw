@@ -7,6 +7,8 @@ sidebar:
 
 Use the Tavily Model Context Protocol (MCP) server to add web search to workflows. Alternatives such as Exa, SerpAPI, and Brave Search also exist, but this page covers Tavily.
 
+Copilot's native `web_search` tool is unavailable in offline BYOK mode, including SDK mode. `gh aw compile` rejects `tools.web-search` for Copilot; configure an MCP server as shown below instead.
+
 ## Tavily Search
 
 [Tavily](https://tavily.com/) provides structured JSON search results, news search, and an MCP server at [@tavily/mcp](https://github.com/tavily-ai/tavily-mcp).
@@ -74,4 +76,3 @@ network:
 - [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification)
 - [Tavily MCP Server](https://github.com/tavily-ai/tavily-mcp)
 - [Tavily Documentation](https://tavily.com/)
-

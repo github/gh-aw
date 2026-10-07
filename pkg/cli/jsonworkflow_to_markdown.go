@@ -209,7 +209,7 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 	}
 
 	if len(a.Tools) > 0 {
-		toolsConfig, toolWarnings := convertToolsToConfig(a.Tools)
+		toolsConfig, toolWarnings := convertToolsToConfig(a.Tools, a.Engine)
 		warnings = append(warnings, toolWarnings...)
 		if len(toolsConfig) > 0 {
 			toolsYAML, err := marshalFrontmatterValue(toolsConfig)
@@ -536,9 +536,9 @@ var jsonGeneralTools = map[string]bool{
 //
 //	github/*         →  tools: github: toolsets: [<toolset>]
 //	execute          →  tools: bash: "*"  (+ warning)
-//	web_search       →  tools: web-search: (direct mapping, hyphen-normalised)
+//	web_search       →  tools: web-search: (for non-Copilot engines)
 //	read/edit/search →  (built-in capability, no config needed, no warning)
-func convertToolsToConfig(tools []string) (map[string]any, []string) {
+func convertToolsToConfig(tools []string, engine string) (map[string]any, []string) {
 	if len(tools) == 0 {
 		return nil, nil
 	}
@@ -558,8 +558,12 @@ func convertToolsToConfig(tools []string) (map[string]any, []string) {
 		case "execute":
 			needsBash = true
 		case "web_search":
-			// JSON uses underscore; gh-aw frontmatter uses hyphen.
-			config["web-search"] = nil
+			if engine == "" || strings.EqualFold(engine, "copilot") {
+				warnings = append(warnings, `tool "web_search" was skipped because Copilot native web search is unavailable; use a web-search MCP server or select a supported engine`)
+			} else {
+				// JSON uses underscore; gh-aw frontmatter uses hyphen.
+				config["web-search"] = nil
+			}
 		default:
 			if ts := jsonToolToToolset[bare]; ts != "" {
 				toolsets[ts] = struct {

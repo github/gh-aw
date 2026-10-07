@@ -105,7 +105,7 @@ Capabilities that an AI agent can use during workflow execution. Tools are confi
 
 ### Native Web Search (`tools.web-search`)
 
-Engine-provided web search that runs without a third-party MCP server. The Copilot CLI engine exposes its built-in `web_search` tool when `tools: web-search:` is declared, working even in workflows that do not use GitHub repository tools. For the Codex, Claude, and Copilot engines, `web-search:` is disabled unless explicitly declared: Codex otherwise runs with `-c web_search="disabled"`, Claude omits the `WebSearch` tool, and Copilot CLI is not granted `--allow-tool web_search`. See [Using Web Search](/gh-aw/reference/web-search/) and [engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
+Engine-provided web search that runs without a third-party MCP server. Claude enables `WebSearch` only when `tools: web-search:` is declared. Codex enables shared native search/browsing through either `web-search:` or `web-fetch:` and otherwise runs with `-c web_search="disabled"`. Copilot's offline BYOK mode disables native web search; configure an MCP search server instead. See [Using Web Search](/gh-aw/reference/web-search/) and [engine feature comparison](/gh-aw/reference/engines/#engine-feature-comparison).
 
 ### GitHub Access Mode (`tools.github.mode`)
 
@@ -1392,6 +1392,10 @@ An `aw.json` configuration field that redirects action references to replacement
   }
 }
 ```
+
+### Action-Pin Prefix Mapping (`action_pin_prefixes`)
+
+An `aw.json` mapping of action repository prefixes to mirror prefixes, such as `"actions/": "acme-corp/actions-"`. Unlike `action_pins`, it rewrites the repository *after* the original action has been SHA-pinned, retaining its SHA and version comment. The longest prefix wins; exact `action_pins` entries override it. See [Action and container substitutions](/gh-aw/reference/self-hosted-runners/#version-independent-action-mirrors-action_pin_prefixes).
 
 ### actionlint
 

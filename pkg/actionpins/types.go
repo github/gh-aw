@@ -92,6 +92,9 @@ type PinContext struct {
 	// repository@version references before pin resolution. Keys and values use
 	// the format "owner/repo@ref". Set from aw.json action_pins.
 	Mappings map[string]string
+	// PrefixMappings rewrites the repository of a resolved pin without changing
+	// its SHA or version. Exact Mappings take precedence.
+	PrefixMappings map[string]string
 	// ContainerMappings redirects container image references to replacement
 	// image references before pin resolution. Keys are source image references
 	// (e.g. "ghcr.io/owner/image:tag") and values are replacement image
