@@ -17,7 +17,7 @@ const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { controlReceiptForRequest } = require("./work_queue_control_receipts.cjs");
-const { createDispatchCredentialValidator, isDispatchCredentialProof } = require("./work_queue_dispatch_credential.cjs");
+const { normalizeDispatchCredential, createDispatchCredentialValidator, isDispatchCredentialProof } = require("./work_queue_dispatch_credential.cjs");
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
@@ -378,6 +378,10 @@ async function dispatchQueueIntent(options) {
 async function processWorkQueueIntents(options) {
   const runtime = assertQueueControlRole(options);
   const { intents, errors } = readStagedIntentBatch(options.intentPath || process.env.GH_AW_WORK_QUEUE_INTENTS || DEFAULT_INTENT_PATH);
+  return processParsedWorkQueueIntents(options, runtime, intents, errors);
+}
+
+async function processParsedWorkQueueIntents(options, runtime, intents, errors) {
   let remaining = options.maxDispatches ?? 1;
   /** @type {Array<{status: string, intent_id?: string, reason?: string, line?: number, claim_handle?: string, request_id?: string, commit_id?: string, success?: boolean, staged?: boolean, dispatches?: number, recovered?: boolean, launches?: object[], acknowledgement_only?: boolean, control?: object | null}>} */
   const receipts = errors.map(error => ({ ...error, status: "blocked" }));
@@ -456,13 +460,19 @@ async function main(options = {}) {
   const config = options.config || {};
   let result;
   try {
-    assertQueueControlRole({ ...options, context });
+    const runtime = assertQueueControlRole({ ...options, context });
+    const { intents, errors } = readStagedIntentBatch(options.intentPath || process.env.GH_AW_WORK_QUEUE_INTENTS || DEFAULT_INTENT_PATH);
     const preview = isStagedMode(options) || isStagedMode(config);
-    const dispatchClient = options.dispatchClient || (preview ? githubClient : await require("./handler_auth.cjs").createAuthenticatedGitHubClient(config));
-    const validateDispatchCredential =
-      options.validateDispatchCredential ||
-      (preview || config.work_queue_dispatch_credential === undefined ? undefined : createDispatchCredentialValidator(dispatchClient, config.work_queue_dispatch_credential, config["github-token"]));
-    result = await processWorkQueueIntents({ ...options, core: coreApi, githubClient, context, config, dispatchClient, validateDispatchCredential, maxDispatches: configuredDispatchBudget({ ...options, config }) });
+    const launching = intents.some(intent => intent.kind === "dispatch_next") && !preview;
+    if (launching && !options.validateDispatchCredential) normalizeDispatchCredential(config.work_queue_dispatch_credential);
+    const dispatchClient = options.dispatchClient || (launching ? await require("./handler_auth.cjs").createAuthenticatedGitHubClient(config) : githubClient);
+    const validateDispatchCredential = options.validateDispatchCredential || (!launching ? undefined : createDispatchCredentialValidator(dispatchClient, config.work_queue_dispatch_credential, config["github-token"]));
+    result = await processParsedWorkQueueIntents(
+      { ...options, core: coreApi, githubClient, context, config, dispatchClient, validateDispatchCredential, maxDispatches: configuredDispatchBudget({ ...options, config }) },
+      runtime,
+      intents,
+      errors
+    );
   } catch {
     result = { version: 3, receipts: [{ status: "blocked", reason: "staged_queue_intents_invalid" }], remaining_dispatches: 0 };
   }

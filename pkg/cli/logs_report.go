@@ -424,8 +424,8 @@ func extractRunEngineInfo(pr ProcessedRun) runEngineInfo {
 func applyAwInfoToRunData(runData *RunData, awInfo *AwInfo) {
 	if awInfo.Repository != "" {
 		runData.Repository = awInfo.Repository
-		if parts := strings.SplitN(awInfo.Repository, "/", 2); len(parts) == 2 {
-			runData.Organization = parts[0]
+		if organization, _, found := strings.Cut(awInfo.Repository, "/"); found {
+			runData.Organization = organization
 		}
 	}
 	if awInfo.Ref != "" {
@@ -474,8 +474,8 @@ func applyGitHubMetadataToRunData(runData *RunData, run WorkflowRun) {
 	if run.Attempt > 0 {
 		runData.RunAttempt = strconv.Itoa(run.Attempt)
 	}
-	if parts := strings.SplitN(run.Repository, "/", 2); len(parts) == 2 {
-		runData.Organization = parts[0]
+	if organization, _, found := strings.Cut(run.Repository, "/"); found {
+		runData.Organization = organization
 	}
 }
 
@@ -544,11 +544,6 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 // newRunData assembles the base RunData fields for a processed run.
 func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutputChainMetrics, comparison *AuditComparisonData, failureKind string, gitHubAPICalls int) RunData {
 	run := pr.Run
-	var ambientContext *AmbientContextMetrics
-	if pr.TokenUsage != nil {
-		ambientContext = pr.TokenUsage.AmbientContext
-	}
-
 	runData := RunData{
 		RunID:                      run.DatabaseID,
 		Number:                     run.Number,
@@ -563,7 +558,7 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 		FailureKind:                failureKind,
 		TokenUsage:                 run.TokenUsage,
 		AIC:                        0,
-		AmbientContext:             ambientContext,
+		AmbientContext:             runAmbientContext(pr),
 		WorkingSet:                 pr.WorkingSet,
 		WSRF:                       wsrfDisplayValue(pr.WorkingSet),
 		Friction:                   pr.Friction,
@@ -606,6 +601,13 @@ func newRunData(pr ProcessedRun, engineInfo runEngineInfo, chainMetrics SafeOutp
 	}
 	applyGitHubMetadataToRunData(&runData, run)
 	return runData
+}
+
+func runAmbientContext(pr ProcessedRun) *AmbientContextMetrics {
+	if pr.TokenUsage == nil {
+		return nil
+	}
+	return pr.TokenUsage.AmbientContext
 }
 
 // buildLogsData creates structured logs data from processed runs
@@ -836,10 +838,16 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 	mcpFailures := data.MCPFailures
 	consoleData := data
 	consoleData.MCPFailures = nil
-	fmt.Fprint(w, console.RenderStruct(consoleData))
-	fmt.Fprint(w, console.RenderStruct(struct {
+	if _, err := fmt.Fprint(w, console.RenderStruct(consoleData)); err != nil {
+		console.PrintErrorMessage("Cannot render log diagnostics: " + err.Error())
+		return
+	}
+	if _, err := fmt.Fprint(w, console.RenderStruct(struct {
 		MCPFailures []mcpFailureSummaryDisplay `console:"title:⚠️  MCP Server Failures,omitempty"`
-	}{MCPFailures: mcpFailureSummaryDisplays(mcpFailures)}))
+	}{MCPFailures: mcpFailureSummaryDisplays(mcpFailures)})); err != nil {
+		console.PrintErrorMessage("Cannot render log diagnostics: " + err.Error())
+		return
+	}
 	if err := renderLogsWorkQueueToWriter(w, data.Runs); err != nil {
 		console.PrintErrorMessage("Cannot render work queue diagnostics: " + err.Error())
 		return

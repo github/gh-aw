@@ -26,12 +26,33 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	// explicitly disabled. When engine is false with no custom steps, the detection job has
 	// nothing to run so it is skipped entirely.
 	threatDetectionEnabled := IsDetectionJobEnabled(data.SafeOutputs)
+	if err := c.addSafeOutputDetectionJob(data, threatDetectionEnabled); err != nil {
+		return err
+	}
+	safeOutputJobNames, err := c.buildPrimarySafeOutputJobs(data, jobName, markdownPath, threatDetectionEnabled)
+	if err != nil {
+		return err
+	}
+	uploadJobs, err := c.buildSafeOutputUploadJobs(data, jobName, threatDetectionEnabled)
+	if err != nil {
+		return err
+	}
+	safeOutputJobNames = append(safeOutputJobNames, uploadJobs...)
+	callWorkflowJobNames, err := c.buildCallWorkflowJobs(data, markdownPath)
+	if err != nil {
+		return fmt.Errorf("failed to build call-workflow fan-out jobs: %w", err)
+	}
+	safeOutputJobNames = append(safeOutputJobNames, callWorkflowJobNames...)
+	compilerSafeOutputJobsLog.Printf("Added %d call-workflow fan-out jobs", len(callWorkflowJobNames))
+	return c.addSafeOutputConclusionJobs(data, jobName, safeOutputJobNames, threatDetectionEnabled)
+}
 
+func (c *Compiler) addSafeOutputDetectionJob(data *WorkflowData, enabled bool) error {
 	// Build the separate detection job. Detection runs by default for all safe-outputs workflows
 	// and is only skipped when ThreatDetection is nil (i.e. threat-detection: false was set).
 	// The detection job runs after the agent job, downloads the agent artifact,
 	// and outputs detection_success and detection_conclusion for downstream jobs.
-	if threatDetectionEnabled {
+	if enabled {
 		detectionJob, err := c.buildDetectionJob(data)
 		if err != nil {
 			return fmt.Errorf("failed to build detection job: %w", err)
@@ -43,7 +64,10 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 			compilerSafeOutputJobsLog.Print("Added separate detection job")
 		}
 	}
+	return nil
+}
 
+func (c *Compiler) buildPrimarySafeOutputJobs(data *WorkflowData, jobName, markdownPath string, threatDetectionEnabled bool) ([]string, error) {
 	// Track safe output job names to establish dependencies for conclusion job
 	var safeOutputJobNames []string
 	var preparedJobs []string
@@ -52,19 +76,19 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 		var err error
 		preparedJobs, err = c.buildWorkQueuePreparedAdapterJobs(data, threatDetectionEnabled)
 		if err != nil {
-			return fmt.Errorf("failed to build trusted Claim adapter preparation: %w", err)
+			return nil, fmt.Errorf("failed to build trusted Claim adapter preparation: %w", err)
 		}
 	}
 
 	// Build consolidated safe outputs job containing all safe output operations as steps
 	consolidatedJob, consolidatedStepNames, err := c.buildConsolidatedSafeOutputsJob(data, jobName, markdownPath)
 	if err != nil {
-		return fmt.Errorf("failed to build consolidated safe outputs job: %w", err)
+		return nil, fmt.Errorf("failed to build consolidated safe outputs job: %w", err)
 	}
 	if consolidatedJob != nil {
 		addWorkQueuePreparedAdapterNeeds(consolidatedJob, preparedJobs)
 		if err := c.jobManager.AddJob(consolidatedJob); err != nil {
-			return fmt.Errorf("failed to add consolidated safe outputs job: %w", err)
+			return nil, fmt.Errorf("failed to add consolidated safe outputs job: %w", err)
 		}
 		safeOutputJobNames = append(safeOutputJobNames, consolidatedJob.Name)
 		compilerSafeOutputJobsLog.Printf("Added consolidated safe outputs job with %d steps: %v", len(consolidatedStepNames), consolidatedStepNames)
@@ -77,13 +101,17 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 	if !isWorkQueueParticipant(data) {
 		safeJobNames, err = c.buildSafeJobs(data, threatDetectionEnabled)
 		if err != nil {
-			return fmt.Errorf("failed to build safe-jobs: %w", err)
+			return nil, fmt.Errorf("failed to build safe-jobs: %w", err)
 		}
 	}
 	// Add custom safe-job names to the list of safe output jobs
 	safeOutputJobNames = append(safeOutputJobNames, safeJobNames...)
 	compilerSafeOutputJobsLog.Printf("Added %d custom safe-job names to conclusion dependencies", len(safeJobNames))
+	return safeOutputJobNames, nil
+}
 
+func (c *Compiler) buildSafeOutputUploadJobs(data *WorkflowData, jobName string, threatDetectionEnabled bool) ([]string, error) {
+	var safeOutputJobNames []string
 	// Build upload_assets job as a separate job if configured
 	// This needs to be separate from the consolidated safe_outputs job because it requires:
 	// 1. Git configuration for pushing to orphaned branches
@@ -93,10 +121,10 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 		compilerSafeOutputJobsLog.Print("Building separate upload_assets job")
 		uploadAssetsJob, err := c.buildUploadAssetsJob(data, jobName, threatDetectionEnabled)
 		if err != nil {
-			return fmt.Errorf("failed to build upload_assets job: %w", err)
+			return nil, fmt.Errorf("failed to build upload_assets job: %w", err)
 		}
 		if err := c.jobManager.AddJob(uploadAssetsJob); err != nil {
-			return fmt.Errorf("failed to add upload_assets job: %w", err)
+			return nil, fmt.Errorf("failed to add upload_assets job: %w", err)
 		}
 		safeOutputJobNames = append(safeOutputJobNames, uploadAssetsJob.Name)
 		compilerSafeOutputJobsLog.Printf("Added separate upload_assets job")
@@ -112,10 +140,10 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 		compilerSafeOutputJobsLog.Print("Building separate upload_code_scanning_sarif job")
 		codeScanningJob, err := c.buildCodeScanningUploadJob(data)
 		if err != nil {
-			return fmt.Errorf("failed to build upload_code_scanning_sarif job: %w", err)
+			return nil, fmt.Errorf("failed to build upload_code_scanning_sarif job: %w", err)
 		}
 		if err := c.jobManager.AddJob(codeScanningJob); err != nil {
-			return fmt.Errorf("failed to add upload_code_scanning_sarif job: %w", err)
+			return nil, fmt.Errorf("failed to add upload_code_scanning_sarif job: %w", err)
 		}
 		safeOutputJobNames = append(safeOutputJobNames, codeScanningJob.Name)
 		compilerSafeOutputJobsLog.Printf("Added separate upload_code_scanning_sarif job")
@@ -132,25 +160,18 @@ func (c *Compiler) buildSafeOutputsJobs(data *WorkflowData, jobName, markdownPat
 		compilerSafeOutputJobsLog.Print("Building separate upload_code_coverage job")
 		codeCoverageJob, err := c.buildUploadCodeCoverageJob(data, jobName)
 		if err != nil {
-			return fmt.Errorf("failed to build upload_code_coverage job: %w", err)
+			return nil, fmt.Errorf("failed to build upload_code_coverage job: %w", err)
 		}
 		if err := c.jobManager.AddJob(codeCoverageJob); err != nil {
-			return fmt.Errorf("failed to add upload_code_coverage job: %w", err)
+			return nil, fmt.Errorf("failed to add upload_code_coverage job: %w", err)
 		}
 		safeOutputJobNames = append(safeOutputJobNames, codeCoverageJob.Name)
 		compilerSafeOutputJobsLog.Printf("Added separate upload_code_coverage job")
 	}
+	return safeOutputJobNames, nil
+}
 
-	// Build conditional call-workflow fan-out jobs if configured.
-	// Each allowed worker gets its own `uses:` job with an `if:` condition that
-	// checks whether safe_outputs selected it. Only one runs per execution.
-	callWorkflowJobNames, err := c.buildCallWorkflowJobs(data, markdownPath)
-	if err != nil {
-		return fmt.Errorf("failed to build call-workflow fan-out jobs: %w", err)
-	}
-	safeOutputJobNames = append(safeOutputJobNames, callWorkflowJobNames...)
-	compilerSafeOutputJobsLog.Printf("Added %d call-workflow fan-out jobs", len(callWorkflowJobNames))
-
+func (c *Compiler) addSafeOutputConclusionJobs(data *WorkflowData, jobName string, safeOutputJobNames []string, threatDetectionEnabled bool) error {
 	// Build dedicated unlock job if lock-for-agent is enabled
 	// This job is separate from conclusion to ensure it always runs, even if other jobs fail
 	// It depends on agent and detection (if enabled) to run after workflow execution completes
@@ -224,166 +245,179 @@ func (c *Compiler) buildCallWorkflowJobs(data *WorkflowData, markdownPath string
 	var jobNames []string
 
 	for _, workflowName := range config.Workflows {
-		// Build the job name: "call-{sanitized-workflow-name}"
-		// sanitizeJobName normalizes underscores and periods to hyphens.
-		sanitizedName := sanitizeJobName(workflowName)
-		jobName := "call-" + sanitizedName
-
-		// Determine the relative path to the worker workflow file
-		workflowPath, ok := config.WorkflowFiles[workflowName]
-		if !ok || workflowPath == "" {
-			// Fallback: construct path from name
-			workflowPath = fmt.Sprintf("./.github/workflows/%s.lock.yml", workflowName)
-		}
-
-		// Build the with: block. Forward one entry per declared workflow_call input
-		// on the worker, derived from the payload, so that worker steps can reference
-		// inputs.<name> directly without parsing JSON. The canonical `payload`
-		// envelope is only forwarded when the worker explicitly declares a `payload`
-		// input; GitHub Actions rejects a `uses:` step that passes an input the
-		// called workflow does not declare, so it must not be added unconditionally.
-		jobNeeds := []string{"safe_outputs"}
-		with := map[string]any{}
-
-		if markdownPath != "" {
-			fileResult, findErr := findWorkflowFile(workflowName, markdownPath)
-			if findErr != nil {
-				compilerSafeOutputJobsLog.Printf("Warning: could not find worker workflow file for '%s': %v. "+
-					"Typed inputs will not be forwarded in the with: block.", workflowName, findErr)
-			} else {
-				var workflowInputs map[string]any
-				var inputErr error
-				switch {
-				case fileResult.lockExists:
-					workflowInputs, inputErr = extractWorkflowCallInputs(fileResult.lockPath)
-				case fileResult.ymlExists:
-					workflowInputs, inputErr = extractWorkflowCallInputs(fileResult.ymlPath)
-				case fileResult.mdExists:
-					workflowInputs, inputErr = extractMDWorkflowCallInputs(fileResult.mdPath)
-				default:
-					compilerSafeOutputJobsLog.Printf("Warning: no worker file found for '%s'; "+
-						"typed inputs will not be forwarded in the with: block.", workflowName)
-				}
-				if inputErr != nil {
-					compilerSafeOutputJobsLog.Printf("Warning: could not extract workflow_call inputs for '%s': %v. "+
-						"Typed inputs will not be forwarded in the with: block.", workflowName, inputErr)
-				} else if workflowInputs != nil {
-					typedInputCount := 0
-					for inputName := range workflowInputs {
-						if inputName == "payload" {
-							// The worker explicitly declares the canonical payload
-							// envelope input; forward the raw transport rather than a
-							// fromJSON expression.
-							with["payload"] = "${{ needs.safe_outputs.outputs.call_workflow_payload }}"
-							continue
-						}
-						with[inputName] = buildCallWorkflowInputExpression(inputName)
-						typedInputCount++
-					}
-					compilerSafeOutputJobsLog.Printf("Forwarding %d typed inputs for call-workflow job '%s'", typedInputCount, jobName)
-				}
-
-			}
-		}
-
-		callJob := &Job{
-			Name:  jobName,
-			Needs: jobNeeds,
-			If:    fmt.Sprintf("needs.safe_outputs.outputs.call_workflow_name == '%s'", workflowName),
-			Uses:  workflowPath,
-			With:  with,
-		}
-		if c.dryRun {
-			callJob.If = "false"
-		}
-
-		// Infer the minimal set of secrets required by the worker workflow so we can
-		// pass them explicitly instead of using secrets: inherit. This requires the
-		// worker to have been compiled with on.workflow_call.secrets declarations.
-		// If the worker has not yet been compiled (no .lock.yml/.yml), or declares no
-		// secrets, fall back to secrets: inherit for backward compatibility.
-		if markdownPath != "" {
-			workerSecrets, secretsErr := extractCallWorkflowSecrets(workflowName, markdownPath)
-			if secretsErr != nil {
-				compilerSafeOutputJobsLog.Printf("Warning: could not extract secrets for call-workflow job '%s': %v. "+
-					"Falling back to secrets: inherit.", jobName, secretsErr)
-				callJob.SecretsInherit = true
-			} else if len(workerSecrets) == 0 {
-				// No secrets were extracted from the worker. This can mean either the
-				// worker declares no workflow_call secrets or its compiled file was not
-				// found yet. Fall back to secrets: inherit for backward compatibility.
-				compilerSafeOutputJobsLog.Printf("No workflow_call secrets could be extracted for worker '%s' "+
-					"(worker may declare none or its compiled file may not exist yet); using secrets: inherit", workflowName)
-				callJob.SecretsInherit = true
-			} else {
-				// Map each declared secret explicitly.
-				callJob.Secrets = make(map[string]string, len(workerSecrets))
-				for _, s := range workerSecrets {
-					callJob.Secrets[s] = fmt.Sprintf("${{ secrets.%s }}", s)
-				}
-				compilerSafeOutputJobsLog.Printf("Mapped %d explicit secrets for call-workflow job '%s'", len(workerSecrets), jobName)
-			}
-		} else {
-			callJob.SecretsInherit = true
-		}
-
-		// Compute the call-<worker> job's permission envelope as the union of:
-		//   1. The caller's own declared permissions (the base scope the caller controls).
-		//   2. The worker's job-level permissions (the minimum the worker needs to run).
-		// GitHub validates reusable workflow calls against the caller job's declared
-		// permissions and rejects the run at startup when the caller grants less than
-		// the worker requires. Taking the union ensures the call job always holds a
-		// sufficient grant without requiring the caller's markdown to enumerate every
-		// permission the worker needs.
-		callerPerms := data.CachedPermissions
-		if callerPerms == nil {
-			callerPerms = NewPermissionsParser(data.Permissions).ToPermissions()
-		}
-
-		effectivePerms := callerPerms
-		var importedPerms *callWorkflowPermissionImport
-		var permErr error
-		if markdownPath != "" {
-			importedPerms, permErr = extractCallWorkflowPermissionImport(workflowName, markdownPath)
-			if permErr != nil {
-				// Non-fatal: log and continue. The worker file may not exist yet (it may be
-				// compiled in the same batch), in which case we fall back to the caller's
-				// own declared permissions.
-				compilerSafeOutputJobsLog.Printf("Could not extract worker permissions for call-workflow job '%s' (falling back to caller-only permissions): %v", jobName, permErr)
-			} else if importedPerms != nil && importedPerms.permissions != nil {
-				// Compute the union by merging caller and worker permissions into a
-				// fresh map-based Permissions. Starting from a blank slate (rather
-				// than a clone of callerPerms) ensures shorthand values like
-				// "read-all" are correctly expanded before the worker's explicit
-				// scopes are merged on top — cloning a shorthand Permissions and then
-				// merging a map into it would clear the shorthand field without first
-				// expanding it, silently dropping the caller's baseline grant.
-				merged := NewPermissions()
-				merged.Merge(callerPerms)
-				merged.Merge(importedPerms.permissions)
-				effectivePerms = merged
-				compilerSafeOutputJobsLog.Printf("Merged caller and worker permissions for call-workflow job '%s'", jobName)
-			}
-		}
-
-		if effectivePerms != nil {
-			rendered := effectivePerms.RenderToYAML()
-			if rendered != "" {
-				callJob.PermissionsComment = buildCallWorkflowPermissionsComment(workflowName, importedPerms)
-				callJob.Permissions = rendered
-				compilerSafeOutputJobsLog.Printf("Set permissions on call-workflow job '%s': %s", jobName, rendered)
-			}
-		}
-
+		callJob := c.buildCallWorkflowJob(data, workflowName, markdownPath)
 		if err := c.jobManager.AddJob(callJob); err != nil {
-			return nil, fmt.Errorf("failed to add call-workflow job '%s': %w", jobName, err)
+			return nil, fmt.Errorf("failed to add call-workflow job '%s': %w", callJob.Name, err)
 		}
+		jobNames = append(jobNames, callJob.Name)
+		compilerSafeOutputJobsLog.Printf("Added call-workflow job: %s (uses: %s)", callJob.Name, callJob.Uses)
+	}
+	return jobNames, nil
+}
 
-		jobNames = append(jobNames, jobName)
-		compilerSafeOutputJobsLog.Printf("Added call-workflow job: %s (uses: %s)", jobName, workflowPath)
+func (c *Compiler) buildCallWorkflowJob(data *WorkflowData, workflowName, markdownPath string) *Job {
+	// Build the job name: "call-{sanitized-workflow-name}"
+	// sanitizeJobName normalizes underscores and periods to hyphens.
+	sanitizedName := sanitizeJobName(workflowName)
+	jobName := "call-" + sanitizedName
+
+	// Determine the relative path to the worker workflow file
+	workflowPath, ok := data.SafeOutputs.CallWorkflow.WorkflowFiles[workflowName]
+	if !ok || workflowPath == "" {
+		// Fallback: construct path from name
+		workflowPath = fmt.Sprintf("./.github/workflows/%s.lock.yml", workflowName)
 	}
 
-	return jobNames, nil
+	// Build the with: block. Forward one entry per declared workflow_call input
+	// on the worker, derived from the payload, so that worker steps can reference
+	// inputs.<name> directly without parsing JSON. The canonical `payload`
+	// envelope is only forwarded when the worker explicitly declares a `payload`
+	// input; GitHub Actions rejects a `uses:` step that passes an input the
+	// called workflow does not declare, so it must not be added unconditionally.
+	callJob := &Job{
+		Name:  jobName,
+		Needs: []string{"safe_outputs"},
+		If:    fmt.Sprintf("needs.safe_outputs.outputs.call_workflow_name == '%s'", workflowName),
+		Uses:  workflowPath,
+		With:  buildCallWorkflowInputs(workflowName, markdownPath, jobName),
+	}
+	if c.dryRun {
+		callJob.If = "false"
+	}
+	addCallWorkflowSecrets(callJob, workflowName, markdownPath)
+	addCallWorkflowPermissions(callJob, data, workflowName, markdownPath)
+	return callJob
+}
+
+func buildCallWorkflowInputs(workflowName, markdownPath, jobName string) map[string]any {
+	with := make(map[string]any)
+	if markdownPath != "" {
+		fileResult, findErr := findWorkflowFile(workflowName, markdownPath)
+		if findErr != nil {
+			compilerSafeOutputJobsLog.Printf("Warning: could not find worker workflow file for '%s': %v. "+
+				"Typed inputs will not be forwarded in the with: block.", workflowName, findErr)
+		} else {
+			var workflowInputs map[string]any
+			var inputErr error
+			switch {
+			case fileResult.lockExists:
+				workflowInputs, inputErr = extractWorkflowCallInputs(fileResult.lockPath)
+			case fileResult.ymlExists:
+				workflowInputs, inputErr = extractWorkflowCallInputs(fileResult.ymlPath)
+			case fileResult.mdExists:
+				workflowInputs, inputErr = extractMDWorkflowCallInputs(fileResult.mdPath)
+			default:
+				compilerSafeOutputJobsLog.Printf("Warning: no worker file found for '%s'; "+
+					"typed inputs will not be forwarded in the with: block.", workflowName)
+			}
+			if inputErr != nil {
+				compilerSafeOutputJobsLog.Printf("Warning: could not extract workflow_call inputs for '%s': %v. "+
+					"Typed inputs will not be forwarded in the with: block.", workflowName, inputErr)
+			} else if workflowInputs != nil {
+				typedInputCount := 0
+				for inputName := range workflowInputs {
+					if inputName == "payload" {
+						// The worker explicitly declares the canonical payload
+						// envelope input; forward the raw transport rather than a
+						// fromJSON expression.
+						with["payload"] = "${{ needs.safe_outputs.outputs.call_workflow_payload }}"
+						continue
+					}
+					with[inputName] = buildCallWorkflowInputExpression(inputName)
+					typedInputCount++
+				}
+				compilerSafeOutputJobsLog.Printf("Forwarding %d typed inputs for call-workflow job '%s'", typedInputCount, jobName)
+			}
+
+		}
+	}
+
+	return with
+}
+
+func addCallWorkflowSecrets(callJob *Job, workflowName, markdownPath string) {
+	jobName := callJob.Name
+	// Infer the minimal set of secrets required by the worker workflow so we can
+	// pass them explicitly instead of using secrets: inherit. This requires the
+	// worker to have been compiled with on.workflow_call.secrets declarations.
+	// If the worker has not yet been compiled (no .lock.yml/.yml), or declares no
+	// secrets, fall back to secrets: inherit for backward compatibility.
+	if markdownPath != "" {
+		workerSecrets, secretsErr := extractCallWorkflowSecrets(workflowName, markdownPath)
+		if secretsErr != nil {
+			compilerSafeOutputJobsLog.Printf("Warning: could not extract secrets for call-workflow job '%s': %v. "+
+				"Falling back to secrets: inherit.", jobName, secretsErr)
+			callJob.SecretsInherit = true
+		} else if len(workerSecrets) == 0 {
+			// No secrets were extracted from the worker. This can mean either the
+			// worker declares no workflow_call secrets or its compiled file was not
+			// found yet. Fall back to secrets: inherit for backward compatibility.
+			compilerSafeOutputJobsLog.Printf("No workflow_call secrets could be extracted for worker '%s' "+
+				"(worker may declare none or its compiled file may not exist yet); using secrets: inherit", workflowName)
+			callJob.SecretsInherit = true
+		} else {
+			// Map each declared secret explicitly.
+			callJob.Secrets = make(map[string]string, len(workerSecrets))
+			for _, s := range workerSecrets {
+				callJob.Secrets[s] = fmt.Sprintf("${{ secrets.%s }}", s)
+			}
+			compilerSafeOutputJobsLog.Printf("Mapped %d explicit secrets for call-workflow job '%s'", len(workerSecrets), jobName)
+		}
+	} else {
+		callJob.SecretsInherit = true
+	}
+}
+
+func addCallWorkflowPermissions(callJob *Job, data *WorkflowData, workflowName, markdownPath string) {
+	jobName := callJob.Name
+	// Compute the call-<worker> job's permission envelope as the union of:
+	//   1. The caller's own declared permissions (the base scope the caller controls).
+	//   2. The worker's job-level permissions (the minimum the worker needs to run).
+	// GitHub validates reusable workflow calls against the caller job's declared
+	// permissions and rejects the run at startup when the caller grants less than
+	// the worker requires. Taking the union ensures the call job always holds a
+	// sufficient grant without requiring the caller's markdown to enumerate every
+	// permission the worker needs.
+	callerPerms := data.CachedPermissions
+	if callerPerms == nil {
+		callerPerms = NewPermissionsParser(data.Permissions).ToPermissions()
+	}
+
+	effectivePerms := callerPerms
+	var importedPerms *callWorkflowPermissionImport
+	var permErr error
+	if markdownPath != "" {
+		importedPerms, permErr = extractCallWorkflowPermissionImport(workflowName, markdownPath)
+		if permErr != nil {
+			// Non-fatal: log and continue. The worker file may not exist yet (it may be
+			// compiled in the same batch), in which case we fall back to the caller's
+			// own declared permissions.
+			compilerSafeOutputJobsLog.Printf("Could not extract worker permissions for call-workflow job '%s' (falling back to caller-only permissions): %v", jobName, permErr)
+		} else if importedPerms != nil && importedPerms.permissions != nil {
+			// Compute the union by merging caller and worker permissions into a
+			// fresh map-based Permissions. Starting from a blank slate (rather
+			// than a clone of callerPerms) ensures shorthand values like
+			// "read-all" are correctly expanded before the worker's explicit
+			// scopes are merged on top — cloning a shorthand Permissions and then
+			// merging a map into it would clear the shorthand field without first
+			// expanding it, silently dropping the caller's baseline grant.
+			merged := NewPermissions()
+			merged.Merge(callerPerms)
+			merged.Merge(importedPerms.permissions)
+			effectivePerms = merged
+			compilerSafeOutputJobsLog.Printf("Merged caller and worker permissions for call-workflow job '%s'", jobName)
+		}
+	}
+
+	if effectivePerms != nil {
+		rendered := effectivePerms.RenderToYAML()
+		if rendered != "" {
+			callJob.PermissionsComment = buildCallWorkflowPermissionsComment(workflowName, importedPerms)
+			callJob.Permissions = rendered
+			compilerSafeOutputJobsLog.Printf("Set permissions on call-workflow job '%s': %s", jobName, rendered)
+		}
+	}
+
 }
 
 func buildCallWorkflowInputExpression(inputName string) string {

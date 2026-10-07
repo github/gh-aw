@@ -1393,6 +1393,40 @@ describe("native queue launch fencing and conservative recovery", () => {
     }
   });
 
+  it.each([undefined, null, { kind: "unsupported" }, { kind: "github_app" }])("rejects public dispatch credential metadata %j before constructing a client or publishing", async credential => {
+    const { fixture, options, post } = setup({ granted: false });
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-public-credential-"));
+    const filename = path.join(directory, "intents.jsonl");
+    const publish = vi.fn(options.publishWorkQueueRequest);
+    const read = vi.fn(options.readWorkQueueLog);
+    const config = { ...options.config, work_queue_dispatch_credential: credential };
+    const tokenAccess = vi.fn(() => {
+      throw new Error("invalid protected metadata consumed a credential");
+    });
+    Object.defineProperty(config, "github-token", { get: tokenAccess });
+    try {
+      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "missing-protected-binding", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } })}\n`);
+      const result = await publishQueueControls({
+        ...options,
+        config,
+        intentPath: filename,
+        dispatchClient: undefined,
+        validateDispatchCredential: undefined,
+        publishWorkQueueRequest: publish,
+        readWorkQueueLog: read,
+        core: { info: vi.fn(), setOutput: vi.fn() },
+      });
+      expect(result.receipts).toEqual([expect.objectContaining({ status: "blocked" })]);
+      expect(tokenAccess).not.toHaveBeenCalled();
+      expect(read).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
+      expect(fixture.state.claims.size).toBe(0);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it.each(["options", "config"])("keeps the public %s staged preview independent of dispatch credentials", async location => {
     for (const credential of [undefined, null, { kind: "unsupported" }, { kind: "github_app" }, { kind: "github_token" }, "unreadable"]) {
       const { fixture, options, post } = setup({ granted: false });
@@ -1402,7 +1436,11 @@ describe("native queue launch fencing and conservative recovery", () => {
       const publish = vi.fn(options.publishWorkQueueRequest);
       const core = { info: vi.fn(), setOutput: vi.fn() };
       const config = { ...options.config, ...(location === "config" ? { staged: true } : {}) };
-      Object.defineProperty(config, "github-token", { get: () => { throw new Error("preview read a dispatch token"); } });
+      Object.defineProperty(config, "github-token", {
+        get: () => {
+          throw new Error("preview read a dispatch token");
+        },
+      });
       Object.defineProperty(config, "work_queue_dispatch_credential", {
         get: () => {
           if (credential === "unreadable") throw new Error("preview read dispatch credential metadata");

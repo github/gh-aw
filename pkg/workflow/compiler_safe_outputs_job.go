@@ -263,71 +263,72 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 	// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
 	if isWorkQueueEnabled(data) {
-		steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
-			ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
-			DownloadPath: constants.TmpGhAwDirSlash,
-			SetupEnvStep: false,
-			StepName:     "Download activation artifact for work queue",
-		}, c.getActionPin)...)
-		if len(workQueuePreparedAdapterNames(data)) > 0 {
-			for _, name := range workQueuePreparedAdapterNames(data) {
-				for index := range 16 {
-					artifactID := fmt.Sprintf("needs.%s.outputs.artifact_id", workQueuePreparedJobName(name, index))
-					steps = append(steps,
-						fmt.Sprintf("      - name: Download isolated Claim adapter preparations %s slot %d\n", name, index),
-						fmt.Sprintf("        if: always() && %s != ''\n", artifactID),
-						"        continue-on-error: true\n",
-						fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
-						"        with:\n",
-						fmt.Sprintf("          artifact-ids: ${{ %s }}\n", artifactID),
-						fmt.Sprintf("          path: %s/claim-adapters/%s/%d/claims/\n", constants.TmpGhAwDir, name, index),
-					)
-				}
-			}
-		}
-		if data.SafeOutputs.UploadAssets != nil {
-			steps = append(steps,
-				"      - name: Download Claim-scoped staged assets\n",
-				"        continue-on-error: true\n",
-				fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
-				"        with:\n",
-				"          name: "+agentArtifactPrefix+"safe-outputs-assets\n",
-				"          path: "+constants.TmpGhAwAssetsDir+"\n",
-			)
-		}
-		if data.SafeOutputs.UploadCodeCoverage != nil {
-			steps = append(steps,
-				"      - name: Download Claim-scoped coverage reports\n",
-				"        continue-on-error: true\n",
-				fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
-				"        with:\n",
-				"          name: "+agentArtifactPrefix+SafeOutputsUploadCodeCoverageStagingArtifactName+"\n",
-				"          path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-code-coverage/\n",
-			)
-		}
+		steps = append(steps, c.buildWorkQueueSafeOutputDownloadSteps(data, agentArtifactPrefix)...)
 	}
 
-	// Add patch artifact download if create-pull-request or push-to-pull-request-branch is enabled
-	// Both of these safe outputs require the patch file to apply changes
-	// Download from unified agent artifact (prefixed in workflow_call context)
+	// Add patch artifact download if create-pull-request or push-to-pull-request-branch is enabled.
 	if usesPatchesAndCheckouts(data.SafeOutputs) {
 		consolidatedSafeOutputsJobLog.Print("Adding patch artifact download for create-pull-request or push-to-pull-request-branch")
-		patchDownloadSteps := buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
 			ArtifactName: agentArtifactPrefix + constants.AgentArtifactName.String(),
 			DownloadPath: constants.TmpGhAwDirSlash,
-			SetupEnvStep: false, // No environment variable needed, the script checks the file directly
+			SetupEnvStep: false,
 			StepName:     "Download patch artifact",
-		}, c.getActionPin)
-		steps = append(steps, patchDownloadSteps...)
-
-		// Add checkout and git config steps for PR operations. These mirror the agent job's
-		// checkout layout exactly (same CheckoutManager generators); the base branch is
-		// resolved by the JS handler at apply time, so no checkout-time base ref is needed.
+		}, c.getActionPin)...)
 		consolidatedSafeOutputsJobLog.Print("Adding shared checkout step for PR operations")
-		checkoutSteps := c.buildSharedPRCheckoutSteps(data)
-		steps = append(steps, checkoutSteps...)
+		steps = append(steps, c.buildSharedPRCheckoutSteps(data)...)
 	}
+	return steps
+}
 
+func (c *Compiler) buildWorkQueueSafeOutputDownloadSteps(data *WorkflowData, agentArtifactPrefix string) []string {
+	var steps []string
+	steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
+		ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
+		DownloadPath: constants.TmpGhAwDirSlash,
+		SetupEnvStep: false,
+		StepName:     "Download activation artifact for work queue",
+	}, c.getActionPin)...)
+	steps = append(steps, c.buildWorkQueuePreparedAdapterDownloadSteps(data)...)
+	if data.SafeOutputs.UploadAssets != nil {
+		steps = append(steps,
+			"      - name: Download Claim-scoped staged assets\n",
+			"        continue-on-error: true\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+			"        with:\n",
+			"          name: "+agentArtifactPrefix+"safe-outputs-assets\n",
+			"          path: "+constants.TmpGhAwAssetsDir+"\n",
+		)
+	}
+	if data.SafeOutputs.UploadCodeCoverage != nil {
+		steps = append(steps,
+			"      - name: Download Claim-scoped coverage reports\n",
+			"        continue-on-error: true\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+			"        with:\n",
+			"          name: "+agentArtifactPrefix+SafeOutputsUploadCodeCoverageStagingArtifactName+"\n",
+			"          path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-code-coverage/\n",
+		)
+	}
+	return steps
+}
+
+func (c *Compiler) buildWorkQueuePreparedAdapterDownloadSteps(data *WorkflowData) []string {
+	var steps []string
+	for _, name := range workQueuePreparedAdapterNames(data) {
+		for index := range 16 {
+			artifactID := fmt.Sprintf("needs.%s.outputs.artifact_id", workQueuePreparedJobName(name, index))
+			steps = append(steps,
+				fmt.Sprintf("      - name: Download isolated Claim adapter preparations %s slot %d\n", name, index),
+				fmt.Sprintf("        if: always() && %s != ''\n", artifactID),
+				"        continue-on-error: true\n",
+				fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+				"        with:\n",
+				fmt.Sprintf("          artifact-ids: ${{ %s }}\n", artifactID),
+				fmt.Sprintf("          path: %s/claim-adapters/%s/%d/claims/\n", constants.TmpGhAwDir, name, index),
+			)
+		}
+	}
 	return steps
 }
 

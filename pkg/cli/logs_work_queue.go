@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -205,20 +204,24 @@ func parseWorkQueueTransaction(data []byte) (WorkQueueTransaction, error) {
 		(tx.Claim != nil && *tx.Claim == "") || (tx.Attempt != nil && *tx.Attempt == "") {
 		return tx, errors.New("invalid transaction version or identifiers")
 	}
-	valid := false
-	switch tx.Kind {
-	case "Work", "WorkCancellation":
-		valid = tx.Claim == nil && tx.Attempt == nil
-	case "Claim", "ClaimCancellation":
-		valid = tx.Claim != nil && tx.Attempt == nil
-	case "Completion":
-		valid = tx.Claim != nil && tx.Attempt != nil
-	}
-	if !valid {
+	if !validHistoricalWorkQueueTransaction(tx) {
 		return tx, fmt.Errorf("invalid %q transaction", tx.Kind)
 	}
 	tx.Version = workQueueTransactionVersion
 	return tx, nil
+}
+
+func validHistoricalWorkQueueTransaction(tx WorkQueueTransaction) bool {
+	switch tx.Kind {
+	case "Work", "WorkCancellation":
+		return tx.Claim == nil && tx.Attempt == nil
+	case "Claim", "ClaimCancellation":
+		return tx.Claim != nil && tx.Attempt == nil
+	case "Completion":
+		return tx.Claim != nil && tx.Attempt != nil
+	default:
+		return false
+	}
 }
 
 func readWorkQueueFinishIntent(path string) (string, error) {
@@ -381,10 +384,11 @@ func mergeWorkQueueReport(report **WorkQueueReport, extracted *WorkQueueReport) 
 		return true
 	}
 	changed := false
-	if extracted.Snapshot != nil && !reflect.DeepEqual((*report).Snapshot, extracted.Snapshot) {
+	if extracted.Snapshot != nil && !equalWorkQueueSnapshots((*report).Snapshot, extracted.Snapshot) {
 		(*report).Snapshot = extracted.Snapshot
 		changed = true
 	}
+
 	if (*report).FinishIntent != extracted.FinishIntent {
 		(*report).FinishIntent = extracted.FinishIntent
 		changed = true
@@ -398,6 +402,47 @@ func mergeWorkQueueReport(report **WorkQueueReport, extracted *WorkQueueReport) 
 		changed = true
 	}
 	return changed
+}
+
+func equalWorkQueueReceiptPointers[T comparable](left, right *T) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
+}
+
+func equalWorkQueueSnapshots(left, right *WorkQueueSnapshot) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.Version == right.Version &&
+		equalWorkQueueReceiptPointers(left.SHA, right.SHA) &&
+		equalWorkQueueReceiptPointers(left.Worker, right.Worker) &&
+		(left.Transactions == nil) == (right.Transactions == nil) &&
+		slices.EqualFunc(left.Transactions, right.Transactions, func(a, b WorkQueueTransaction) bool {
+			return a.Version == b.Version && a.Kind == b.Kind && a.Work == b.Work &&
+				equalWorkQueueReceiptPointers(a.Claim, b.Claim) &&
+				equalWorkQueueReceiptPointers(a.Attempt, b.Attempt) &&
+				equalWorkQueueReceiptPointers(a.Enqueued, b.Enqueued)
+		}) && equalCurrentWorkQueueSnapshots(left.Current, right.Current)
+}
+
+func equalCurrentWorkQueueSnapshots(left, right *WorkQueueCurrentSnapshot) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	leftValue, rightValue := *left, *right
+	leftValue.Assignment, rightValue.Assignment = nil, nil
+	if leftValue != rightValue {
+		return false
+	}
+	a, b := left.Assignment, right.Assignment
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.DispatchID == b.DispatchID && a.RequestID == b.RequestID && a.CommitID == b.CommitID &&
+		a.State == b.State && a.Released == b.Released && (a.Claims == nil) == (b.Claims == nil) &&
+		slices.Equal(a.Claims, b.Claims)
 }
 
 func isWorkQueueStepLog(source string) bool {

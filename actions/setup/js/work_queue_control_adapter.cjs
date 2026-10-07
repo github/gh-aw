@@ -7,7 +7,23 @@ const { readStagedIntentBatch } = require("./work_queue_intents.cjs");
 const { DEFAULT_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
 const { API_VERSION, nativeId } = require("./work_queue_native.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
+const { normalizeDispatchCredential, createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
+
+/**
+ * @typedef {Record<string, unknown> & {
+ *   env?: NodeJS.ProcessEnv,
+ *   state?: {credential_generation: string, policy: {pools: Record<string, {allowed_repositories: string[]}>}},
+ *   context?: {repo: {owner: string, repo: string}},
+ *   core?: {setOutput: (name: string, value: unknown) => unknown, info: (message: string) => unknown},
+ *   github?: object,
+ *   githubClient?: object,
+ *   dispatchClient?: object,
+ *   getOctokit?: (token: string, options?: {baseUrl: string}) => object | Promise<object>,
+ *   config?: Record<string, unknown> & {"github-token"?: string, work_queue_dispatch_credential?: unknown, work_queue_enabled?: boolean},
+ *   intentPath?: string,
+ *   validateDispatchCredential?: ReturnType<typeof createDispatchCredentialValidator>
+ * }} CompilerControlOptions
+ */
 
 function credentialBindings(raw) {
   const value = raw === undefined ? {} : parseStrictJSON(raw);
@@ -48,7 +64,7 @@ function readOnlyRepositoryClient(client, scope) {
   });
 }
 
-/** @param {Record<string, any>} options */
+/** @param {CompilerControlOptions & {context: {repo: {owner: string, repo: string}}}} options */
 function createCompilerDependencyResolver(options) {
   const env = options.env || process.env;
   const server = new URL(env.GITHUB_SERVER_URL || "https://github.com");
@@ -110,21 +126,30 @@ function createCompilerDependencyResolver(options) {
   return Object.freeze({ scopes, getClient });
 }
 
-/** @param {Record<string, any>} [options] */
+/** @param {CompilerControlOptions} [options] */
 async function main(options = {}) {
-  /** @type {Record<string, any>} */
+  /** @type {CompilerControlOptions & {githubClient: object, context: {repo: {owner: string, repo: string}}}} */
   const configured = { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context };
   const intents = readStagedIntentBatch(configured.intentPath || process.env.GH_AW_WORK_QUEUE_INTENTS || DEFAULT_INTENT_PATH).intents;
-  if (isStagedMode(configured) || isStagedMode(configured.config)) {
+  const preview = isStagedMode(configured) || isStagedMode(configured.config);
+  const launching = intents.some(intent => intent.kind === "dispatch_next") && !preview;
+  if (launching) {
+    const credential = configured.config?.work_queue_dispatch_credential;
+    if (credential !== undefined) normalizeDispatchCredential(credential);
+    else if (configured.config?.work_queue_enabled === true || process.env.GH_AW_WORK_QUEUE_ROLE === "worker" || process.env.GH_AW_WORK_QUEUE_ROLE === "dispatcher") {
+      throw new Error("work_queue_dispatch_credential_binding_required");
+    }
+  }
+  if (preview) {
     configured.validateDispatchCredential = async () => {
       throw new Error("work_queue_preview_cannot_validate_launch_credential");
     };
   }
-  if (intents.some(intent => ["submit", "dispatch_next"].includes(intent.kind)) && !isStagedMode(configured) && !isStagedMode(configured.config)) {
+  if (intents.some(intent => ["submit", "dispatch_next"].includes(intent.kind)) && !preview) {
     const latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
     configured.dependencyResolver = createCompilerDependencyResolver({ ...configured, state: latest.projection });
   }
-  if (intents.some(intent => intent.kind === "dispatch_next") && !isStagedMode(configured) && !isStagedMode(configured.config)) {
+  if (launching) {
     const token = configured.config?.["github-token"];
     if (token !== undefined) {
       if (typeof token !== "string" || !token || token.length > 16384 || /[\x00-\x1f\x7f]/.test(token)) throw new Error("work_queue_dispatch_credential_token_invalid");
@@ -134,8 +159,6 @@ async function main(options = {}) {
     } else configured.dispatchClient ||= configured.githubClient;
     if (configured.config?.work_queue_dispatch_credential !== undefined) {
       configured.validateDispatchCredential = createDispatchCredentialValidator(configured.dispatchClient, configured.config.work_queue_dispatch_credential, token);
-    } else if (configured.config?.work_queue_enabled === true || process.env.GH_AW_WORK_QUEUE_ROLE === "worker" || process.env.GH_AW_WORK_QUEUE_ROLE === "dispatcher") {
-      throw new Error("work_queue_dispatch_credential_binding_required");
     }
   }
   return require("./work_queue_dispatch.cjs").main(configured);

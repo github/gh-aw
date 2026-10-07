@@ -30,7 +30,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 		yaml.WriteString("          container = \"" + image + "\"\n")
 		yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 		yaml.WriteString("          env_vars = [\"RUNNER_TEMP\"]\n")
-		yaml.WriteString(fmt.Sprintf("          env = { GH_AW_WORK_QUEUE_ROLE = %q }\n", role))
+		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ROLE = %q }\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		yaml.WriteString("          entrypoint = \"node\"\n")
 		yaml.WriteString("          entrypointArgs = [\"" + workQueueMCPServerEntrypoint + "\"]\n")
 		return
@@ -45,7 +45,7 @@ func (r *MCPConfigRendererUnified) RenderWorkQueueMCP(yaml *strings.Builder, wor
 	yaml.WriteString("                \"mounts\": [\"" + strings.Join(mounts, "\", \"") + "\"],\n")
 	yaml.WriteString("                \"env\": {\n")
 	yaml.WriteString("                  \"RUNNER_TEMP\": \"\\${RUNNER_TEMP}\",\n")
-	yaml.WriteString(fmt.Sprintf("                  \"GH_AW_WORK_QUEUE_ROLE\": %q\n", role))
+	fmt.Fprintf(yaml, "                  \"GH_AW_WORK_QUEUE_ROLE\": %q\n", role) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("                },\n")
 	yaml.WriteString("                \"entrypoint\": \"node\",\n")
 	yaml.WriteString("                \"entrypointArgs\": [\"" + workQueueMCPServerEntrypoint + "\"]\n")
@@ -143,7 +143,7 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 	mounts := []string{constants.DefaultWorkspaceMount, constants.DefaultSafeOutputsMount, constants.DefaultTmpGhAwMount}
 	if isWorkQueueEnabled(workflowData) {
 		mounts = append(mounts, constants.WorkQueueSnapshotMount)
-		yaml.WriteString(fmt.Sprintf("          env = { GH_AW_WORK_QUEUE_ENABLED = \"true\", GH_AW_WORK_QUEUE_ROLE = %q }\n", workQueueRuntimeRole(workflowData)))
+		fmt.Fprintf(yaml, "          env = { GH_AW_WORK_QUEUE_ENABLED = \"true\", GH_AW_WORK_QUEUE_ROLE = %q }\n", workQueueRuntimeRole(workflowData)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 	yaml.WriteString("          mounts = [\"" + strings.Join(mounts, "\", \"") + "\"]\n")
 	yaml.WriteString("          args = [\"-w\", \"$GITHUB_WORKSPACE\"]\n")

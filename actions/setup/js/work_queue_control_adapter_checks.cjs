@@ -235,6 +235,7 @@ function registerTests({ describe, it }) {
       const fixture = queueFixture({ granted: false, count: 1, workerPrincipal: "22" });
       let credentialCalls = 0;
       let writes = 0;
+      let reads = 0;
       try {
         const intentPath = path.join(root, "intents.jsonl");
         fs.writeFileSync(intentPath, `${JSON.stringify({ version: 3, intent_id: "credential-preview", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } })}\n`);
@@ -247,7 +248,10 @@ function registerTests({ describe, it }) {
           context: fixture.dispatcherContext,
           workflowRef: `${REPOSITORY}/${DISPATCHER}@${REF}`,
           intentOrigin: fixture.dispatcher,
-          readWorkQueueLog: fixture.readWorkQueueLog,
+          readWorkQueueLog: async () => {
+            reads++;
+            return fixture.readWorkQueueLog();
+          },
           publishWorkQueueRequest: async () => {
             writes++;
             throw new Error("preview or missing binding must not publish");
@@ -262,6 +266,12 @@ function registerTests({ describe, it }) {
           core: { setOutput: () => {}, info: () => {} },
         };
         await assert.rejects(main(options), /dispatch_credential_binding_required/);
+        for (const credential of [null, { kind: "unsupported" }, { kind: "github_app" }]) {
+          await assert.rejects(main({ ...options, config: { ...options.config, "github-token": "protected-selected-token", work_queue_dispatch_credential: credential } }), /dispatch_(credential_kind_invalid|app_metadata_missing)/);
+        }
+        assert.equal(reads, 0, "invalid protected metadata must fail before queue or dependency reads");
+        assert.equal(credentialCalls, 0, "invalid protected metadata must fail before client construction");
+        assert.equal(writes, 0);
         const result = await main({ ...options, staged: true, config: { ...options.config, "github-token": "", work_queue_dispatch_credential: { kind: "agent-spoof" } } });
         assert.equal(result.receipts[0].status, "staged_preview", JSON.stringify(result));
         assert.equal(credentialCalls, 0);

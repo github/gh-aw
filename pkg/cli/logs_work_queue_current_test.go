@@ -30,6 +30,58 @@ func mustWorkQueueOperation(t testing.TB, value any) workqueue.Operation {
 	return operation
 }
 
+func TestWorkQueueSnapshotEqualityPreservesValuesAndNilShape(t *testing.T) {
+	sha, claim, attempt, enqueued := "snapshot-sha", "historical-claim", "historical-attempt", int64(7)
+	seed := WorkQueueSnapshot{
+		Version: 3, SHA: &sha, Worker: &WorkQueueWorker{WorkID: "work", ClaimID: "claim"},
+		Transactions: []WorkQueueTransaction{{Version: 2, Kind: "Completion", Work: "work", Claim: &claim, Attempt: &attempt, Enqueued: &enqueued}},
+		Current: &WorkQueueCurrentSnapshot{Role: "worker", PolicyInstalled: true, Tip: "tip", PolicyEpoch: "epoch",
+			Assignment: &WorkQueueAssignmentReceipt{DispatchID: "dispatch", RequestID: "request", CommitID: "commit",
+				Claims: []WorkQueueClaimReceipt{{Handle: "handle", ClaimID: "claim", WorkID: "work", State: "completed", Barrier: "pending"}}}},
+	}
+	encoded, err := json.Marshal(seed)
+	require.NoError(t, err)
+	for name, change := range map[string]func(*WorkQueueSnapshot){
+		"version":       func(s *WorkQueueSnapshot) { s.Version++ },
+		"sha":           func(s *WorkQueueSnapshot) { *s.SHA = "other" },
+		"worker":        func(s *WorkQueueSnapshot) { s.Worker.ClaimID = "other" },
+		"transaction":   func(s *WorkQueueSnapshot) { s.Transactions[0].Kind = "Claim" },
+		"claim":         func(s *WorkQueueSnapshot) { *s.Transactions[0].Claim = "other" },
+		"attempt":       func(s *WorkQueueSnapshot) { *s.Transactions[0].Attempt = "other" },
+		"enqueue":       func(s *WorkQueueSnapshot) { *s.Transactions[0].Enqueued++ },
+		"origin":        func(s *WorkQueueSnapshot) { s.Current.Role = "observer" },
+		"policy":        func(s *WorkQueueSnapshot) { s.Current.PolicyInstalled = false },
+		"tip":           func(s *WorkQueueSnapshot) { s.Current.Tip = "other" },
+		"epoch":         func(s *WorkQueueSnapshot) { s.Current.PolicyEpoch = "other" },
+		"clock":         func(s *WorkQueueSnapshot) { s.Current.CapturedAt++ },
+		"count":         func(s *WorkQueueSnapshot) { s.Current.CommitCount++ },
+		"admission":     func(s *WorkQueueSnapshot) { s.Current.Paused = true },
+		"grants":        func(s *WorkQueueSnapshot) { s.Current.GrantsPaused = true },
+		"dispatch":      func(s *WorkQueueSnapshot) { s.Current.Assignment.DispatchID = "other" },
+		"request":       func(s *WorkQueueSnapshot) { s.Current.Assignment.RequestID = "other" },
+		"commit":        func(s *WorkQueueSnapshot) { s.Current.Assignment.CommitID = "other" },
+		"native":        func(s *WorkQueueSnapshot) { s.Current.Assignment.State = "other" },
+		"released":      func(s *WorkQueueSnapshot) { s.Current.Assignment.Released = true },
+		"claim receipt": func(s *WorkQueueSnapshot) { s.Current.Assignment.Claims[0].Barrier = "verified" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var copy WorkQueueSnapshot
+			require.NoError(t, json.Unmarshal(encoded, &copy))
+			require.True(t, equalWorkQueueSnapshots(&seed, &copy), "pointer identity is not value identity")
+			change(&copy)
+			require.False(t, equalWorkQueueSnapshots(&seed, &copy))
+			report := &WorkQueueReport{Snapshot: &seed}
+			require.True(t, mergeWorkQueueReport(&report, &WorkQueueReport{Snapshot: &copy}))
+			require.False(t, mergeWorkQueueReport(&report, &WorkQueueReport{Snapshot: &copy}))
+		})
+	}
+	require.False(t, equalWorkQueueSnapshots(nil, &seed))
+	require.False(t, equalWorkQueueSnapshots(&WorkQueueSnapshot{}, &WorkQueueSnapshot{Transactions: []WorkQueueTransaction{}}))
+	require.False(t, equalCurrentWorkQueueSnapshots(nil, seed.Current))
+	require.False(t, equalCurrentWorkQueueSnapshots(&WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{}},
+		&WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{}}}))
+}
+
 func currentWorkQueueFixture(t *testing.T) map[string]any {
 	t.Helper()
 	policy := workqueue.DefaultPolicy("42", "owner/repo")

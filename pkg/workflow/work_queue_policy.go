@@ -545,6 +545,18 @@ func (c *Compiler) validateWorkQueueTargets(data *WorkflowData, markdownPath str
 	if data.WorkQueuePolicy == nil || !isWorkQueueParticipant(data) {
 		return nil
 	}
+	if err := validateApprovedWorkQueueTargets(data, markdownPath); err != nil {
+		return err
+	}
+	if !hasExplicitWorkQueueProfiles(data) {
+		if err := populateDefaultWorkQueueProfiles(data, markdownPath); err != nil {
+			return err
+		}
+	}
+	return validateWorkQueueProfileTargets(data, markdownPath)
+}
+
+func validateApprovedWorkQueueTargets(data *WorkflowData, markdownPath string) error {
 	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
 		for _, name := range data.SafeOutputs.DispatchWorkflow.Workflows {
 			target, err := findWorkflowFile(name, markdownPath)
@@ -563,45 +575,51 @@ func (c *Compiler) validateWorkQueueTargets(data *WorkflowData, markdownPath str
 			}
 		}
 	}
-	if !hasExplicitWorkQueueProfiles(data) {
-		pool := data.WorkQueuePolicy.Policy.Pools["default"]
-		template := pool.Profiles["default"]
-		template.Ref = "${{ github.sha }}"
-		template.Workflow = constants.WorkflowsDirSlash + GetWorkflowIDFromPath(markdownPath) + ".lock.yml"
-		pool.Profiles = map[string]workqueue.WorkerProfile{"default": template}
-		if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
-			pool.Profiles = map[string]workqueue.WorkerProfile{}
-			for _, name := range data.SafeOutputs.DispatchWorkflow.Workflows {
-				target, err := findWorkflowFile(name, markdownPath)
-				if err != nil {
-					return fmt.Errorf("work-queue: worker profile %q: %w", name, err)
-				}
-				if !target.mdExists {
-					return fmt.Errorf("work-queue: worker profile %q requires compiler-managed workflow source", name)
-				}
-				worker, err := mdHasWorkQueueWorker(target.mdPath)
-				if err != nil {
-					return err
-				}
-				if !worker {
-					continue
-				}
-				profile := template
-				profile.Workflow = constants.WorkflowsDirSlash + name + ".lock.yml"
-				pool.Profiles[name] = profile
+	return nil
+}
+
+func populateDefaultWorkQueueProfiles(data *WorkflowData, markdownPath string) error {
+	pool := data.WorkQueuePolicy.Policy.Pools["default"]
+	template := pool.Profiles["default"]
+	template.Ref = "${{ github.sha }}"
+	template.Workflow = constants.WorkflowsDirSlash + GetWorkflowIDFromPath(markdownPath) + ".lock.yml"
+	pool.Profiles = map[string]workqueue.WorkerProfile{"default": template}
+	if data.SafeOutputs != nil && data.SafeOutputs.DispatchWorkflow != nil {
+		pool.Profiles = map[string]workqueue.WorkerProfile{}
+		for _, name := range data.SafeOutputs.DispatchWorkflow.Workflows {
+			target, err := findWorkflowFile(name, markdownPath)
+			if err != nil {
+				return fmt.Errorf("work-queue: worker profile %q: %w", name, err)
 			}
-			names := make([]string, 0, len(pool.Profiles))
-			for name := range pool.Profiles {
-				names = append(names, name)
+			if !target.mdExists {
+				return fmt.Errorf("work-queue: worker profile %q requires compiler-managed workflow source", name)
 			}
-			slices.Sort(names)
-			if len(names) == 0 {
-				return errors.New("work-queue: dispatcher must approve at least one compiler-managed queue worker")
+			worker, err := mdHasWorkQueueWorker(target.mdPath)
+			if err != nil {
+				return err
 			}
-			pool.DefaultProfile = slices.Min(names)
+			if !worker {
+				continue
+			}
+			profile := template
+			profile.Workflow = constants.WorkflowsDirSlash + name + ".lock.yml"
+			pool.Profiles[name] = profile
 		}
-		data.WorkQueuePolicy.Policy.Pools["default"] = pool
+		names := make([]string, 0, len(pool.Profiles))
+		for name := range pool.Profiles {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		if len(names) == 0 {
+			return errors.New("work-queue: dispatcher must approve at least one compiler-managed queue worker")
+		}
+		pool.DefaultProfile = slices.Min(names)
 	}
+	data.WorkQueuePolicy.Policy.Pools["default"] = pool
+	return nil
+}
+
+func validateWorkQueueProfileTargets(data *WorkflowData, markdownPath string) error {
 	for poolName, pool := range data.WorkQueuePolicy.Policy.Pools {
 		for profileName, profile := range pool.Profiles {
 			name := filepath.Base(profile.Workflow)
