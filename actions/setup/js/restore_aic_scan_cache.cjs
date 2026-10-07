@@ -31,6 +31,7 @@ async function listRequiredWorkflowRuns(owner, repo, current, repository, defaul
 
 async function listRecentWorkflowRuns(owner, repo, current, repository, defaultBranch, budget) {
   let response;
+  core.info(`[daily-aic-cache] Querying workflow-specific run history: ${JSON.stringify({ workflowId: current.workflow_id })}`);
   try {
     response = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: current.workflow_id, per_page: 10 });
   } catch (error) {
@@ -39,6 +40,7 @@ async function listRecentWorkflowRuns(owner, repo, current, repository, defaultB
     return listRequiredWorkflowRuns(owner, repo, current, repository, defaultBranch, budget);
   }
   budget.observe(response);
+  core.info(`[daily-aic-cache] Workflow-specific run history returned candidates: ${JSON.stringify({ workflowId: current.workflow_id, runs: response.data.workflow_runs?.length ?? 0 })}`);
   return response.data.workflow_runs;
 }
 

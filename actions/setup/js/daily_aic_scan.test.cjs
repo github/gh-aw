@@ -518,6 +518,8 @@ describe("trusted artifact fallback without writable Actions cache", () => {
     // An old prefix cache may exist; it does not suppress the verified artifact.
     writeEntries([{ run_id: 1, aic: 1 }]);
     await restore(cachePath, { createArtifactClient: () => ({ downloadArtifact }) });
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Querying workflow-specific run history"));
+    expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("Workflow-specific run history returned candidates"));
     const f = fixture();
     expect((await scanDailyAIC(f)).cacheHits).toBe(3);
     expect(f.getRunAIC).not.toHaveBeenCalled();
