@@ -178,6 +178,7 @@ func TestMCPGatewayDockerCommandUsesPinnedImage(t *testing.T) {
 		image    string
 		version  string
 		mappings map[string]string
+		expected string
 	}{
 		{name: "default gateway", image: constants.DefaultMCPGatewayContainer, version: string(constants.DefaultMCPGatewayVersion)},
 		{
@@ -185,6 +186,7 @@ func TestMCPGatewayDockerCommandUsesPinnedImage(t *testing.T) {
 			image:    constants.DefaultMCPGatewayContainer,
 			version:  string(constants.DefaultMCPGatewayVersion),
 			mappings: map[string]string{constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion): "registry.example.com/mcpg:v1@sha256:" + digest},
+			expected: "registry.example.com/mcpg:v1@sha256:" + digest,
 		},
 		{name: "unrecognized custom gateway", image: "registry.example.com/custom", version: "v1"},
 	}
@@ -201,6 +203,9 @@ func TestMCPGatewayDockerCommandUsesPinnedImage(t *testing.T) {
 			image := tt.image + ":" + tt.version
 			expected := resolveContainerImage(image, data)
 			assert.Contains(t, command, " "+expected)
+			if tt.expected != "" {
+				assert.Equal(t, tt.expected, expected)
+			}
 			if tt.name == "default gateway" {
 				assert.Contains(t, expected, "@sha256:")
 			}
