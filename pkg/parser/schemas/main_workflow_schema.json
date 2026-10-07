@@ -26,6 +26,11 @@
       "description": "Optional statement of the durable outcome the workflow exists to achieve. Unlike 'description', which explains what the workflow does, 'intent' explains why the workflow exists and should stay implementation-independent. Rendered as a comment in the generated GitHub Actions YAML file (.lock.yml).",
       "examples": ["Reduce manual issue-triage work while keeping classifications evidence-based."]
     },
+    "docker-image-pull-policy": {
+      "type": "string",
+      "enum": ["always", "never"],
+      "description": "Policy for pre-start Docker images in agent and detection jobs. 'always' (default) pulls images; 'never' validates exact local RepoDigests and does not contact a registry."
+    },
     "emoji": {
       "type": "string",
       "description": "Optional emoji to represent the workflow visually in listings and UI surfaces.",

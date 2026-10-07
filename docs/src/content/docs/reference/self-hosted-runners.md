@@ -199,7 +199,21 @@ Enterprises running in private clouds or air-gapped environments can redirect ac
 }
 ```
 
-Keys and values must use the `owner/repo@ref` format. Each source version must be mapped individually — wildcard and prefix matching are not supported. A console message is emitted once per applied mapping during compilation.
+Keys and values must use the `owner/repo@ref` format. Each source version must be mapped individually. A console message is emitted once per applied mapping during compilation.
+
+### Version-independent action mirrors (`action_pin_prefixes`)
+
+Use `action_pin_prefixes` to mirror an entire family of actions without updating the configuration when action versions change:
+
+```json title=".github/workflows/aw.json"
+{
+  "action_pin_prefixes": {
+    "actions/": "acme-corp/actions-"
+  }
+}
+```
+
+For example, `actions/checkout@<sha> # v4` becomes `acme-corp/actions-checkout@<sha> # v4`. The original repository is pinned first; the mirror must contain the same commits, and no network lookup of the mirror is needed. The longest matching prefix wins, and an exact `action_pins` entry takes precedence. A console message is emitted once per redirected repository.
 
 ### Container image substitutions (`container_pins`)
 
@@ -260,7 +274,7 @@ When this manifest is set, AWF uses these references as authoritative runtime ro
 Re-run `gh aw compile` after modifying `aw.json` to regenerate all affected lock files.
 
 > [!NOTE]
-> Neither `action_pins` nor `container_pins` is supported in individual workflow frontmatter. Both are repository-level settings in `aw.json` that apply across all workflows in the repository.
+> `action_pins`, `action_pin_prefixes`, and `container_pins` are repository-level settings in `aw.json`, not individual workflow frontmatter.
 
 ## Learn More
 

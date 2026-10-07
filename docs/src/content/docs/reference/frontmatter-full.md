@@ -35,6 +35,12 @@ description: "Description of the workflow"
 # (optional)
 intent: "example-value"
 
+# Policy for pre-start Docker images in agent and detection jobs. 'always'
+# (default) pulls images; 'never' validates exact local RepoDigests and does not
+# contact a registry.
+# (optional)
+docker-image-pull-policy: "always"
+
 # Optional emoji to represent the workflow visually in listings and UI surfaces.
 # (optional)
 emoji: "example-value"

@@ -120,6 +120,9 @@ function validateToolPermissionParity(config) {
   if (config.capabilities.webSearch !== allowed.has("web_search")) {
     throw new Error("SDK tool contract mismatch: web_search visibility and permissions differ");
   }
+  if (config.capabilities.webSearch) {
+    throw new Error("Copilot native web_search is unavailable in offline BYOK mode; configure an MCP search server instead");
+  }
   if (config.capabilities.dynamicWorkflows !== allowed.has("workflow")) {
     throw new Error("SDK tool contract mismatch: workflow visibility and permissions differ");
   }
@@ -216,10 +219,9 @@ function buildCopilotSDKSessionToolConfig(config, sdk, options = {}) {
   availableTools.addBuiltIn(COPILOT_SDK_NEUTRAL_BUILTIN_TOOLS);
   if (config.capabilities.bash) availableTools.addBuiltIn(COPILOT_SDK_SHELL_BUILTIN_TOOLS);
   if (config.capabilities.edit) availableTools.addBuiltIn(COPILOT_SDK_EDIT_BUILTIN_TOOLS);
-  // web_search is a Copilot SDK built-in tool; the compiler emits webSearch: true
-  // only when the workflow declares tools.web-search, and the parity check above
-  // makes a stray webSearch: true without a matching permission fail closed.
-  if (config.capabilities.webSearch) availableTools.addBuiltIn("web_search");
+  if (config.capabilities.webSearch) {
+    throw new Error("Copilot native web_search is unavailable in offline BYOK mode; configure an MCP search server instead");
+  }
   if (config.capabilities.dynamicWorkflows) availableTools.addBuiltIn(COPILOT_SDK_WORKFLOW_BUILTIN_TOOLS);
   if (config.capabilities.mcp) availableTools.addMcp("*");
   // cliProxy mounts MCP servers as CLI wrapper scripts on PATH; those scripts are

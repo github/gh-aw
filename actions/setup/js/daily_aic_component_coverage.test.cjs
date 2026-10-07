@@ -391,6 +391,25 @@ it("accepts a completed run with no jobs as zero usage", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"no_billable_jobs"'));
 });
 
+it("counts usage for compiler-generated job display names", async () => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":18.02604}', "detection_usage.jsonl": '{"aic":30.08748}' }, [job("Agent"), job("Detection")]);
+  await expect(f.result).resolves.toBeCloseTo(48.11352);
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"agent"'));
+  expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"detection"'));
+});
+
+it("maps the Evaluations display name and job_id to their components", async () => {
+  const f = evaluate({ "agent_usage.jsonl": '{"aic":1}', "evals/token_usage.jsonl": '{"aic":2}' }, [job("Agent"), job("Evaluations")]);
+  await expect(f.result).resolves.toBeCloseTo(3);
+  const g = evaluate({ "agent_usage.jsonl": '{"aic":4}' }, [job("Display", { job_id: "agent" })]);
+  await expect(g.result).resolves.toBeCloseTo(4);
+});
+
+it("requires accounting for executed jobs with generated display names", async () => {
+  const f = evaluate({}, [job("Agent")]);
+  await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
+});
+
 it("accepts a completed run with all billable jobs skipped as zero usage", async () => {
   const f = evaluate({}, [job("agent", { conclusion: "skipped" }), job("detection", { conclusion: "skipped" })]);
   await expect(f.result).resolves.toBe(0);

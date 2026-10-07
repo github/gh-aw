@@ -125,7 +125,9 @@ tools:
 
 **Note:** Some engines require third-party Model Context Protocol (MCP) servers for web search. See [Using Web Search](/gh-aw/reference/web-search/).
 
-Web search is disabled by default for **Codex**, **Claude**, and **Copilot**. Claude and Copilot enable it only when `web-search:` is declared. Codex enables a shared native search/browsing tool when either `web-search:` or `web-fetch:` is declared; the two capabilities cannot be disabled independently. With neither tool, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict Codex's hosted retrieval.
+Web search is disabled by default for **Codex** and **Claude**. Claude enables it only when `web-search:` is declared. Codex enables a shared native search/browsing tool when either `web-search:` or `web-fetch:` is declared; the two capabilities cannot be disabled independently. With neither tool, Codex runs with `-c web_search="disabled"`. Use `network.hosted-web` to restrict Codex's hosted retrieval.
+
+**Copilot** runs in offline BYOK mode, which disables its native web tools. Compilation rejects `web-search:` and, in CLI mode, `web-fetch:`. Use an MCP server for search or fetch. With `engine.copilot-sdk: true`, `web-fetch:` remains supported by a custom proxy-aware tool that follows `network.allowed`; this does not enable native web search.
 
 The **Gemini** and **Pi** engines have no built-in web search. Declaring `web-search:` with either engine has no effect, and `gh aw compile` prints a warning. To search the web with these engines, configure a third-party MCP server as described in [Using Web Search](/gh-aw/reference/web-search/).
 

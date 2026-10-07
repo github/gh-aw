@@ -37,7 +37,6 @@ tools:
     - "*"
   github:
   playwright:
-  web-fetch:
 runtimes:
   go:
     version: "1.25"

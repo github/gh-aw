@@ -1,8 +1,10 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	actionpins "github.com/github/gh-aw/pkg/actionpins"
@@ -13,6 +15,7 @@ import (
 )
 
 var actionPinsLog = logger.New("workflow:action_pins")
+var pinnedUsesLine = regexp.MustCompile(`(?m)^(?: {8}uses: | {6}- uses: )[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[a-fA-F0-9]{40}(?:[ \t]*#[ \t]*[^\r\n]*)?$`)
 
 // Type aliases — callers within pkg/workflow use these names directly.
 
@@ -134,6 +137,60 @@ func (c *Compiler) getActionPin(repo string) string {
 	return getActionPin(repo)
 }
 
+// mapPinnedUsesInYAML covers standalone generators which build action steps
+// without a Compiler or WorkflowData. Only resolved uses references are changed.
+func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, warnings map[string]bool, resolver SHAResolver) (string, error) {
+	if len(mappings) == 0 && len(prefixes) == 0 {
+		return content, nil
+	}
+	if warnings == nil {
+		warnings = make(map[string]bool)
+	}
+	ctx := &actionpins.PinContext{Mappings: mappings, PrefixMappings: prefixes, Warnings: warnings, Resolver: resolver}
+	var mappingErr error
+	rewritten := pinnedUsesLine.ReplaceAllStringFunc(content, func(line string) string {
+		if mappingErr != nil {
+			return line
+		}
+		before, reference, _ := strings.Cut(line, "uses: ")
+		indentation := before + "uses: "
+		repo, suffix, _ := strings.Cut(reference, "@")
+		_, version, _ := strings.Cut(suffix, " # ")
+		version = strings.TrimSpace(version)
+		if _, sourceVersion, found := strings.Cut(version, " (source "); found && strings.HasSuffix(sourceVersion, ")") {
+			version = strings.TrimSuffix(sourceVersion, ")")
+		}
+		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
+			ref, err := actionpins.ResolveActionPin(repo, version, ctx)
+			if err == nil && ref != "" {
+				return indentation + ref
+			}
+			if err == nil {
+				err = errors.New("mapped target has no resolvable pin")
+			}
+			mappingErr = fmt.Errorf("unable to resolve action pin mapping for %s@%s: %w", repo, version, err)
+			return line
+		}
+		return indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
+	})
+	return rewritten, mappingErr
+}
+
+func actionPinWarningsForWorkflows(workflows []*WorkflowData) map[string]bool {
+	for _, data := range workflows {
+		if data != nil && data.ActionPinWarnings != nil {
+			return data.ActionPinWarnings
+		}
+	}
+	warnings := make(map[string]bool) //nolint:seenmapbool // PinContext.Warnings requires map[string]bool for shared deduplication.
+	for _, data := range workflows {
+		if data != nil {
+			data.ActionPinWarnings = warnings
+		}
+	}
+	return warnings
+}
+
 // getCachedActionPinFromResolver returns the pinned action reference for repo,
 // preferring dynamic resolution via resolver over the embedded pins.
 // For use within pkg/workflow when only a resolver is available (no WorkflowData).
@@ -242,13 +299,28 @@ func applyContainerPinMappingFromData(image string, data *WorkflowData) string {
 // getActionPinWithData returns the pinned action reference for a given action@version,
 // delegating to pkg/actionpins with a PinContext built from WorkflowData.
 func getActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
-	return actionpins.ResolveActionPin(actionRepo, version, data.PinContext())
+	ctx := pinContextWithoutActionMappings(data)
+	if ctx != nil {
+		if _, mapped := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]; mapped {
+			ctx.GHES = false
+		}
+	}
+	return actionpins.ResolveActionPin(actionRepo, version, ctx)
+}
+
+func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext {
+	ctx := data.PinContext()
+	if ctx != nil {
+		ctx.Mappings = nil
+		ctx.PrefixMappings = nil
+	}
+	return ctx
 }
 
 // getCachedActionPin returns the pinned action reference for a given repository,
 // preferring the dynamic resolver from WorkflowData over the embedded pins.
 func getCachedActionPin(repo string, data *WorkflowData) string {
-	return actionpins.ResolveLatestActionPin(repo, data.PinContext())
+	return actionpins.ResolveLatestActionPin(repo, pinContextWithoutActionMappings(data))
 }
 
 // --------------------------------------------------------------------------

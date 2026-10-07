@@ -188,6 +188,19 @@ describe("complete daily AIC scan observations", () => {
     expect(f.getRunAIC).toHaveBeenCalledOnce();
   });
 
+  it("reinspects recorded zero usage cached with the old component coverage", async () => {
+    const entry = scanCacheEntry(run(1), 0, repository, 7, now);
+    entry.coverage_version = 1;
+    writeEntries([entry]);
+    const f = fixture([run(1)]);
+    f.getRunAIC.mockResolvedValue(48.11352);
+    const result = await scanDailyAIC(f);
+    expect(result.cacheHits).toBe(0);
+    expect(result.countedRuns[0]).toMatchObject({ aic: 48.11352, source: "recorded" });
+    expect(f.getRunAIC).toHaveBeenCalledOnce();
+    expect(readScanCache(fs.readFileSync(cachePath, "utf8"), repository, 7, now).get(1)?.aic).toBe(48.11352);
+  });
+
   it("accepts corrected estimates without replacing recorded accounting for the same attempt", () => {
     const recorded = scanCacheEntry(run(1), 4, repository, 7, now - 2000, "recorded");
     const estimated = scanCacheEntry(run(1), 1000, repository, 7, now - 1000, "estimated");

@@ -176,12 +176,10 @@ func buildCopilotSDKToolConfig(workflowData *WorkflowData, toolArgs []string) co
 		Version:      copilotSDKToolConfigVersion,
 		MaxToolCalls: maxToolCalls,
 		Capabilities: copilotSDKToolCapabilities{
-			Bash:     isCopilotBashToolEnabled(workflowData),
-			Edit:     isCopilotEditToolEnabled(tools, workflowData),
-			WebFetch: isCopilotToolValueEnabled(tools, "web-fetch"),
-			// The Copilot SDK runtime exposes web_search as a built-in tool when the
-			// installed Copilot CLI is new enough to support it.
-			WebSearch:        isCopilotToolValueEnabled(tools, "web-search") && copilotSupportsWebSearch(workflowData.EngineConfig),
+			Bash:             isCopilotBashToolEnabled(workflowData),
+			Edit:             isCopilotEditToolEnabled(tools, workflowData),
+			WebFetch:         isCopilotToolValueEnabled(tools, "web-fetch"),
+			WebSearch:        false,
 			DynamicWorkflows: dynamicWorkflows,
 			MCP:              hasCopilotSDKMCPTools(workflowData),
 			CLIProxy:         workflowData.ParsedTools != nil && workflowData.ParsedTools.CLIProxy,

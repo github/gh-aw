@@ -252,6 +252,35 @@ func (c *Compiler) validateUniversalLLMConsumerModel(frontmatter map[string]any,
 	return nil
 }
 
+// validateCopilotWebToolsSupport uses the resolved engine configuration so imported
+// SDK settings are honored. Native web tools are unavailable in offline BYOK mode.
+func (c *Compiler) validateCopilotWebToolsSupport(engine CodingAgentEngine, engineConfig *EngineConfig, tools map[string]any) error {
+	if engine.GetID() != string(constants.CopilotEngine) {
+		return nil
+	}
+
+	collector := NewErrorCollector(c.failFast)
+	for _, tool := range []string{"web-fetch", "web-search"} {
+		if !isCopilotToolValueEnabled(tools, tool) || (tool == "web-fetch" && engineConfig != nil && engineConfig.CopilotSDK) {
+			continue
+		}
+		suggestion := fmt.Sprintf("Remove tools.%s and configure an MCP server instead, or use a supported engine, for example:\n\nengine: codex", tool)
+		if tool == "web-fetch" {
+			suggestion += "\n\nFor Copilot's proxy-aware custom fetch tool, enable SDK mode:\n\nengine:\n  id: copilot\n  copilot-sdk: true"
+		}
+		err := NewValidationError(
+			"tools."+tool,
+			tool,
+			fmt.Sprintf("Copilot's native '%s' tool is unavailable because offline BYOK mode disables web tools (COPILOT_OFFLINE=true)", tool),
+			suggestion,
+		)
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr
+		}
+	}
+	return collector.FormattedError("Copilot web tools")
+}
+
 // validateWebSearchSupport validates that web-search tool is only used with engines that support this feature
 func (c *Compiler) validateWebSearchSupport(frontmatter map[string]any, tools map[string]any, engine CodingAgentEngine) {
 	// Check if web-search tool is requested
@@ -259,6 +288,10 @@ func (c *Compiler) validateWebSearchSupport(frontmatter map[string]any, tools ma
 
 	if !hasWebSearch {
 		// No web-search specified, no validation needed
+		return
+	}
+	if engine.GetID() == string(constants.CopilotEngine) {
+		// Copilot's unavailable native tools are rejected after engine imports resolve.
 		return
 	}
 
@@ -270,21 +303,6 @@ func (c *Compiler) validateWebSearchSupport(frontmatter map[string]any, tools ma
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Engine '%s' does not support the web-search tool. See https://github.github.com/gh-aw/guides/web-search/ for alternatives.", engine.GetID())))
 		c.IncrementWarningCount()
 		return
-	}
-
-	if engine.GetID() == string(constants.CopilotEngine) {
-		_, engineConfig, _ := c.ExtractEngineConfig(frontmatter)
-		if !copilotSupportsWebSearch(engineConfig) {
-			version := ""
-			if engineConfig != nil {
-				version = engineConfig.Version
-			}
-			agentValidationLog.Printf("Copilot CLI version %s does not support web-search tool, emitting warning", version)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf(
-				"Copilot CLI versions before %s do not support the web-search tool. Upgrade engine.version or omit it to use the default Copilot CLI version.",
-				constants.CopilotWebSearchMinVersion)))
-			c.IncrementWarningCount()
-		}
 	}
 }
 

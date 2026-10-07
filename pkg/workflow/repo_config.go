@@ -206,6 +206,9 @@ type RepoConfig struct {
 	// can use this to redirect actions to internal mirrors. Keys and values
 	// must use the format "owner/repo@ref".
 	ActionPins map[string]string
+	// ActionPinPrefixes maps source repository prefixes to mirror prefixes.
+	// Matching is performed after resolving the original action's SHA.
+	ActionPinPrefixes map[string]string
 
 	// ContainerPins maps container image references to replacement image
 	// targets. Enterprises running in a private cloud can use this to
@@ -254,6 +257,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 		AutoUpgrade              json.RawMessage               `json:"auto_upgrade,omitempty"`
 		Maintenance              json.RawMessage               `json:"maintenance,omitempty"`
 		ActionPins               map[string]string             `json:"action_pins,omitempty"`
+		ActionPinPrefixes        map[string]string             `json:"action_pin_prefixes,omitempty"`
 		ContainerPins            map[string]ContainerPinTarget `json:"container_pins,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -267,6 +271,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	r.HelpCommand = raw.HelpCommand
 	r.UTC = strings.TrimSpace(raw.UTC)
 	r.ActionPins = raw.ActionPins
+	r.ActionPinPrefixes = raw.ActionPinPrefixes
 	r.ContainerPins = raw.ContainerPins
 
 	// Parse polymorphic auto_upgrade: boolean or { "cron": "..." } object.
