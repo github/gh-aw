@@ -36,7 +36,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 		codexLogsDir = path.Join(codexHomeDir, "logs")
 	}
 	detectionData := buildExternalDetectorWorkflowData(data, "codex")
-	detectionData.Model = inheritedDetectionModel(data)
+	detectionData.Model = inheritedDetectionModel(data, engineID)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		detectionData.Model = data.SafeOutputs.ThreatDetection.Model
 	}
@@ -136,6 +136,11 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	if ResolveEngineID(data) == engineID {
+		detectionData.ModelMappings = data.ModelMappings
+	} else {
+		detectionData.ModelMappings = MergeImportedModelAliases(nil, nil)
+	}
 	if pullPolicy := dockerImagePullPolicy(data); pullPolicy != "" {
 		detectionData.RawFrontmatter = map[string]any{"docker-image-pull-policy": pullPolicy}
 	}
@@ -229,16 +234,15 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 // It mirrors threat-detection engine resolution: threat-detection.engine overrides main engine.
 func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	var engineID string
-
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil &&
+	hasExplicitEngine := data.SafeOutputs != nil &&
+		data.SafeOutputs.ThreatDetection != nil &&
 		data.SafeOutputs.ThreatDetection.EngineConfig != nil &&
-		data.SafeOutputs.ThreatDetection.EngineConfig.ID != "" {
+		data.SafeOutputs.ThreatDetection.EngineConfig.ID != ""
+
+	if hasExplicitEngine {
 		engineID = data.SafeOutputs.ThreatDetection.EngineConfig.ID
 	} else {
-		engineID = data.AI
-		if engineID == "" && data.EngineConfig != nil && data.EngineConfig.ID != "" {
-			engineID = data.EngineConfig.ID
-		}
+		engineID = ResolveEngineID(data)
 	}
 
 	if engineID == "" {
@@ -246,8 +250,17 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	}
 	threatLog.Printf("Resolved base threat detection engine: %s", engineID)
 
-	// Threat detection currently does not support the Pi engine backend.
-	// Normalize to Copilot so workflows with engine: pi still get a working detector.
+	if !hasExplicitEngine {
+		if provider, ok := resolveWorkflowEngineProvider(data, engineID); ok {
+			if detectionEngineID := threatDetectionEngineForProvider(provider); detectionEngineID != "" {
+				threatLog.Printf("Selecting threat detection engine %q for main provider %q", detectionEngineID, provider)
+				return detectionEngineID
+			}
+		}
+	}
+
+	// Threat detection currently does not support the Pi engine backend. If Pi's
+	// provider has no matching detector, fall back to Copilot.
 	if engineID == "pi" {
 		threatLog.Print("Normalizing pi engine to copilot for threat detection")
 		return "copilot"
@@ -264,6 +277,19 @@ func (c *Compiler) getThreatDetectionEngineID(data *WorkflowData) string {
 	}
 
 	return engineID
+}
+
+func threatDetectionEngineForProvider(provider LLMProvider) string {
+	switch provider {
+	case LLMProviderGitHub:
+		return "copilot"
+	case LLMProviderAnthropic:
+		return "claude"
+	case LLMProviderOpenAI:
+		return "codex"
+	default:
+		return ""
+	}
 }
 
 // defaultThreatDetectionEngineID is the built-in engine used for threat detection when
@@ -457,7 +483,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || ... || 'auto' }}, and when no org var
 	// is set COPILOT_MODEL is 'auto'. The AWF API proxy has no pricing for 'auto' and
 	// returns HTTP 400, causing every inference attempt to fail.
-	resolvedDetectionModel := inheritedDetectionModel(data)
+	resolvedDetectionModel := inheritedDetectionModel(data, engineID)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		resolvedDetectionModel = data.SafeOutputs.ThreatDetection.Model
 	}
@@ -471,8 +497,8 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	if resolvedDetectionModel == "" {
 		resolvedDetectionModel = "detection"
 	}
-	// Pi workflows normalise to Copilot; strip the provider prefix so the Copilot CLI
-	// receives a bare model ID rather than a "pi/model-name" string.
+	// Pi workflows use a provider-matched built-in detection engine; strip the
+	// provider prefix so it receives a bare model ID.
 	// Precedence mirrors the inline path: explicit threat-detection.engine.id overrides
 	// the main engine config, which overrides the legacy top-level AI field.
 	originalEngineID := data.AI
@@ -484,20 +510,16 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		data.SafeOutputs.ThreatDetection.EngineConfig.ID != "" {
 		originalEngineID = data.SafeOutputs.ThreatDetection.EngineConfig.ID
 	}
-	if engineID == "copilot" && originalEngineID == "pi" {
+	if originalEngineID == "pi" {
 		resolvedDetectionModel = extractPiModelID(resolvedDetectionModel)
 	}
 	threatDetectionData.Model = resolvedDetectionModel
-	// Propagate the model alias map so the detection AWF config includes
-	// apiProxy.models, enabling the harness to resolve aliases (e.g. "haiku") to
-	// concrete model IDs before the Copilot CLI makes inference requests.
-	threatDetectionData.ModelMappings = data.ModelMappings
 	// Propagate default AI credits pricing so the detection AWF config includes
 	// apiProxy.defaultAiCreditsPricing when the main workflow configures it.
 	threatDetectionData.DefaultAiCreditsPricing = data.DefaultAiCreditsPricing
 
 	threatDetectionData.NetworkPermissions = &NetworkPermissions{
-		Allowed: getThreatDetectionAdditionalAllowedDomains(data),
+		Allowed: getThreatDetectionAdditionalAllowedDomains(data, engineID),
 	}
 	// Add a read-write mount so the threat-detect binary can write
 	// detection_result.json inside the container and it becomes visible

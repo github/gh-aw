@@ -176,7 +176,7 @@ func TestGetThreatDetectionAdditionalAllowedDomains_WithCustomProviderBaseURL(t 
 				},
 			}
 
-			got := getThreatDetectionAdditionalAllowedDomains(data)
+			got := getThreatDetectionAdditionalAllowedDomains(data, ResolveEngineID(data))
 			want := []string{
 				"llm-router.internal.example.com",
 				"anthropic-router.internal.example.com",
@@ -220,7 +220,7 @@ func TestGetThreatDetectionAdditionalAllowedDomains_DetectionOnlyBaseURL(t *test
 		},
 	}
 
-	got := getThreatDetectionAdditionalAllowedDomains(data)
+	got := getThreatDetectionAdditionalAllowedDomains(data, ResolveEngineID(data))
 	want := []string{
 		"detection-router.internal.example.com",
 		"api.openai.com",

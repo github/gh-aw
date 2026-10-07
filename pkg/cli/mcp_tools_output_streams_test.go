@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"slices"
 	"strings"
@@ -17,7 +18,7 @@ import (
 
 func TestCompileToolDevelopmentRejectsExplicitFalseChecks(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"strict", "zizmor", "poutine", "actionlint", "runner-guard", "syft", "grype", "grant", "yamllint"} {
+	for _, name := range []string{"strict"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			executed := false
@@ -38,6 +39,36 @@ func TestCompileToolDevelopmentRejectsExplicitFalseChecks(t *testing.T) {
 				assert.Contains(t, extractTextResult(t, result), "--"+name+"=false")
 			}
 			assert.False(t, executed, "conflicting flags must be rejected before execution")
+		})
+	}
+}
+
+func TestCompileToolDevelopmentAllowsOptionalDockerChecks(t *testing.T) {
+	t.Parallel()
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			t.Parallel()
+			var capturedArgs []string
+			mockExec := func(ctx context.Context, args ...string) *exec.Cmd {
+				capturedArgs = slices.Clone(args)
+				return mockCommandWithOutput(`[]`, "")(ctx, args...)
+			}
+			server := mcp.NewServer(&mcp.Implementation{Name: "gh-aw", Version: "test"}, nil)
+			require.NoError(t, registerCompileTool(server, mockExec, ""))
+			session := connectInMemory(t, server)
+			args := map[string]any{"dry_run": true, "validate_images": enabled}
+			scanners := []string{"zizmor", "poutine", "actionlint", "runner-guard", "syft", "grype", "grant", "yamllint"}
+			for _, name := range scanners {
+				args[name] = enabled
+			}
+			result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "compile", Arguments: args})
+			require.NoError(t, err)
+			assert.False(t, result.IsError)
+			assert.Contains(t, capturedArgs, "--dry-run")
+			assert.Equal(t, enabled, slices.Contains(capturedArgs, "--validate-images"))
+			for _, name := range scanners {
+				assert.Equal(t, enabled, slices.Contains(capturedArgs, "--"+name))
+			}
 		})
 	}
 }
@@ -110,6 +141,7 @@ func TestCompileToolDevelopmentAndEnvironmentArguments(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Contains(t, capturedArgs, "--dry-run")
+	assert.NotContains(t, capturedArgs, "--validate-images", "image validation remains opt-in")
 	index := slices.Index(capturedArgs, "--environment")
 	require.NotEqual(t, -1, index)
 	require.Greater(t, len(capturedArgs), index+1)

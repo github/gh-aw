@@ -409,7 +409,7 @@ func (c *Compiler) shouldEmitPiThreatDetectionAuthWarning(workflowData *Workflow
 		return false
 	}
 
-	effectiveEnv := mergeThreatDetectionEngineEnv(workflowData, detectionEnv)
+	effectiveEnv := mergeThreatDetectionEngineEnv(workflowData, c.getThreatDetectionEngineID(workflowData), detectionEnv)
 	if strings.TrimSpace(effectiveEnv[constants.CopilotGitHubToken]) != "" {
 		return false
 	}

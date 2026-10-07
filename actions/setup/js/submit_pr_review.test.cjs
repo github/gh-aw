@@ -847,16 +847,30 @@ describe("submit_pr_review multi-buffer (registry mode)", () => {
     expect(entries[0].prNumber).toBe(7);
   });
 
-  it("returns success:false when target cannot be resolved in registry mode", async () => {
-    // workflow_dispatch with target:triggering => can't resolve PR
+  it("returns a skipped result when triggering target is outside PR context in registry mode", async () => {
+    // workflow_dispatch with target:triggering => soft skip because no PR context exists
     const registry = createPrReviewBufferRegistry();
     const { main } = require("./submit_pr_review.cjs");
     const handler = await main({ max: 1, target: "triggering", _prReviewBufferRegistry: registry });
 
     const result = await handler({ body: "Review", event: "COMMENT" }, {});
 
+    expect(result).toMatchObject({ success: false, skipped: true });
+    expect(result.error).toContain("not running in pull request context");
+    // Registry should be empty — nothing was buffered
+    expect(registry.getAllEntries()).toHaveLength(0);
+  });
+
+  it("returns a failure when target resolution has a hard error in registry mode", async () => {
+    const registry = createPrReviewBufferRegistry();
+    const { main } = require("./submit_pr_review.cjs");
+    const handler = await main({ max: 1, target: "*", _prReviewBufferRegistry: registry });
+
+    const result = await handler({ body: "Review", event: "COMMENT" }, {});
+
     expect(result.success).toBe(false);
-    expect(result.error).toBeTruthy();
+    expect(result.skipped).toBeUndefined();
+    expect(result.error).toContain('Target is "*"');
     // Registry should be empty — nothing was buffered
     expect(registry.getAllEntries()).toHaveLength(0);
   });
