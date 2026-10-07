@@ -107,6 +107,14 @@ func cloudHypervisorEnclaveCopilotRouteConfigured(workflowData *WorkflowData) bo
 	}
 	applyEngineAndAgentEnv(env, workflowData, enclavesLog)
 	applyMCPScriptsSecretEnv(env, workflowData)
+	if engineID == "" {
+		engineID = "copilot"
+	}
+	engine, err := GetGlobalEngineRegistry().GetEngine(engineID)
+	if err != nil {
+		return false
+	}
+	env = FilterEnvForSecrets(env, engine.GetRequiredSecretNames(workflowData))
 	// Provider routes are configured by credentials in the emitted step environment,
 	// not by apiProxy.providers (pricing overlays) or a target hostname alone.
 	return strings.TrimSpace(env["COPILOT_GITHUB_TOKEN"]) != "" || strings.TrimSpace(env["COPILOT_PROVIDER_API_KEY"]) != ""

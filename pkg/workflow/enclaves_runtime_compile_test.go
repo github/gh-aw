@@ -71,6 +71,7 @@ func TestEnclavesCloudHypervisorCompileAgentRoute(t *testing.T) {
 		{"old AWF", "copilot", "v0.28.46", "requires AWF v0.28.47 or newer"},
 		{"Copilot route", "copilot", "v0.28.47", ""},
 		{"OpenAI primary lacks Copilot route", "codex", "v0.28.47", "configured Copilot API proxy provider route"},
+		{"OpenAI primary filters enclave credential", "\n  id: codex\n  env:\n    COPILOT_PROVIDER_API_KEY: ${{ secrets.ENCLAVE_KEY }}", "v0.28.47", "configured Copilot API proxy provider route"},
 		{"GitHub-backed Codex route", "\n  id: codex\n  model-provider: github", "v0.28.47", ""},
 		{"GitHub-backed Claude route", "\n  id: claude\n  model-provider: github", "v0.28.47", ""},
 		{"BYOK target without credential", "\n  id: copilot\n  env:\n    COPILOT_PROVIDER_BASE_URL: https://provider.example.com", "v0.28.47", "configured Copilot API proxy provider route"},
@@ -81,6 +82,7 @@ func TestEnclavesCloudHypervisorCompileAgentRoute(t *testing.T) {
 			content := `---
 on: workflow_dispatch
 engine: ` + tc.engine + `
+strict: false
 permissions:
   contents: read
 sandbox:

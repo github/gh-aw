@@ -152,6 +152,11 @@ func TestValidateCloudHypervisorAgentEnclave(t *testing.T) {
 		{"OpenAI primary has no Copilot route", func(data *WorkflowData) {
 			data.EngineConfig = &EngineConfig{ID: "codex"}
 		}, "configured Copilot API proxy provider route"},
+		{"OpenAI primary filters enclave credential", func(data *WorkflowData) {
+			data.EngineConfig = &EngineConfig{ID: "codex", Env: map[string]string{
+				"COPILOT_PROVIDER_API_KEY": "${{ secrets.ENCLAVE_KEY }}",
+			}}
+		}, "configured Copilot API proxy provider route"},
 		{"GitHub-backed Codex primary", func(data *WorkflowData) {
 			data.EngineConfig = &EngineConfig{ID: "codex", LLMProvider: LLMProviderGitHub}
 		}, ""},
