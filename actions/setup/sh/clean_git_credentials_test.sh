@@ -8,6 +8,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEAN_SCRIPT="${SCRIPT_DIR}/clean_git_credentials.sh"
+VERIFY_SCRIPT="${SCRIPT_DIR}/verify_git_credentials.sh"
 
 # Test counters
 TESTS_PASSED=0
@@ -172,6 +173,59 @@ assert "submodule url extraheader removed" "! git config --file '${REPO}/.git/mo
 assert "submodule remote URL credentials stripped" "[ \"\$(git config --file '${REPO}/.git/modules/sub/config' remote.origin.url)\" = 'https://github.com/org/sub.git' ]"
 assert "nested submodule credential section removed" "! grep -q '\[credential' '${REPO}/.git/modules/sub/modules/nested/config'"
 assert "nested submodule http.extraheader removed" "! git config --file '${REPO}/.git/modules/sub/modules/nested/config' http.extraheader 2>/dev/null"
+echo ""
+
+# ── Test 9: Checkout includeIf credentials in repos and submodules ───────────
+echo "Test 9: Removes checkout includeIf credentials without touching other includes"
+REPO="${TEST_WORKSPACE}/repo9"
+RUNNER_TEMP="${TEST_WORKSPACE}/runner-temp"
+mkdir -p "${RUNNER_TEMP}" "${REPO}/.git/modules/sub"
+git init -q "${REPO}"
+git init --bare -q "${REPO}/.git/modules/sub"
+printf '[core]\n\tfilemode = true\n' >"${TEST_WORKSPACE}/git-credentials-deadbeef.config"
+printf '[http "https://github.com/"]\n\textraheader = Authorization: Basic abc123\n' >"${RUNNER_TEMP}/git-credentials-abc123.config"
+printf '[core]\n\tignorecase = true\n' >"${RUNNER_TEMP}/other.config"
+git config --file "${REPO}/.git/config" --add "includeIf.gitdir:${REPO}/.git.path" "${RUNNER_TEMP}/git-credentials-abc123.config"
+git config --file "${REPO}/.git/config" --add "includeIf.gitdir:${REPO}/.git.path" "${RUNNER_TEMP}/git-credentials-abc123.config"
+git config --file "${REPO}/.git/config" --add "includeIf.gitdir:/github/workspace/.git.path" "${RUNNER_TEMP}/git-credentials-abc123.config"
+git config --file "${REPO}/.git/config" --add "includeIf.gitdir:${REPO}/.git/worktrees/*.path" "${TEST_WORKSPACE}/git-credentials-deadbeef.config"
+git config --file "${REPO}/.git/config" --add "includeIf.gitdir:${REPO}/.git.path" "${RUNNER_TEMP}/other.config"
+git config --file "${REPO}/.git/modules/sub/config" --add "includeIf.gitdir:${REPO}/.git/modules/sub.path" "${RUNNER_TEMP}/git-credentials-abc123.config"
+assert "verifier detects included credentials before cleanup" "! RUNNER_TEMP='${RUNNER_TEMP}' bash '${VERIFY_SCRIPT}' '${REPO}/.git/config' >/dev/null 2>&1"
+RUNNER_TEMP="${RUNNER_TEMP}" GITHUB_WORKSPACE="${REPO}" bash "${CLEAN_SCRIPT}" >/dev/null 2>&1
+assert "verifier accepts repository and submodule after cleanup" "RUNNER_TEMP='${RUNNER_TEMP}' bash '${VERIFY_SCRIPT}' '${REPO}/.git/config' '${REPO}/.git/modules/sub/config' >/dev/null 2>&1"
+assert "credential include references removed" "! git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' | grep -q 'git-credentials-abc123.config'"
+assert "worktree credential include removed" "! git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' | grep -q 'git-credentials-deadbeef.config'"
+assert "submodule credential include removed" "! git config --file '${REPO}/.git/modules/sub/config' --get-regexp '^includeif\\..*\\.path$' 2>/dev/null"
+assert "runner temp credential file removed" "[ ! -e '${RUNNER_TEMP}/git-credentials-abc123.config' ]"
+assert "credential file outside runner temp retained" "[ -f '${TEST_WORKSPACE}/git-credentials-deadbeef.config' ]"
+assert "unrelated include preserved" "git --git-dir='${REPO}/.git' config --file '${REPO}/.git/config' --includes core.ignorecase | grep -q true"
+echo ""
+
+# ── Test 10: Include cleanup iteration boundary ────────────────────────────
+echo "Test 10: Include cleanup succeeds at the iteration limit"
+REPO="${TEST_WORKSPACE}/repo10"
+make_git_config "${REPO}" '[includeIf "gitdir:/workspace/.git"]'
+for ((i = 0; i < 1000; i++)); do
+  printf '\tpath = /nonexistent/git-credentials-abc123.config\n' >>"${REPO}/.git/config"
+done
+assert "cleanup succeeds at 1000 includes" "GITHUB_WORKSPACE='${REPO}' bash '${CLEAN_SCRIPT}' >/dev/null 2>&1"
+assert "all credential includes removed at limit" "! git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' 2>/dev/null"
+echo ""
+
+# ── Test 11: Include cleanup iteration limit exceeded ──────────────────────
+echo "Test 11: Include cleanup fails when the iteration limit is exceeded"
+make_git_config "${REPO}" '[includeIf "gitdir:/workspace/.git"]'
+for ((i = 0; i < 1001; i++)); do
+  printf '\tpath = /nonexistent/other.config\n' >>"${REPO}/.git/config"
+done
+printf '\tpath = /nonexistent/git-credentials-abc123.config\n' >>"${REPO}/.git/config"
+EXIT_CODE=0
+OUTPUT=$(GITHUB_WORKSPACE="${REPO}" bash "${CLEAN_SCRIPT}" 2>&1) || EXIT_CODE=$?
+assert "cleanup exits 1 when limit exceeded" "[ ${EXIT_CODE} -eq 1 ]"
+assert "reports iteration limit without include values" "echo '${OUTPUT}' | grep -q 'ERROR: Checkout credential include cleanup exceeded 1000 iterations'"
+assert "credential include beyond limit is not processed" "git config --file '${REPO}/.git/config' --get-regexp '^includeif\\..*\\.path$' | grep -q 'git-credentials-abc123.config'"
+rm -rf "${REPO}"
 echo ""
 
 # ── Summary ──────────────────────────────────────────────────────────────────
