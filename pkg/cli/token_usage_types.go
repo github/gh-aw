@@ -25,6 +25,7 @@ type TokenUsageEntry struct {
 	Timestamp string `json:"timestamp"`
 	Event     string `json:"event"`
 	RequestID string `json:"request_id"`
+	Purpose   string `json:"purpose,omitempty"`
 	Provider  string `json:"provider"`
 	Model     string `json:"model"`
 	Path      string `json:"path"`

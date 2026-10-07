@@ -254,6 +254,15 @@ func TestRecommendAuditComparisonAction(t *testing.T) {
 			expectedContains: "Compare prompt or task-shape changes",
 		},
 		{
+			name:              "routing change",
+			label:             "changed",
+			currentConclusion: "success",
+			delta: &AuditComparisonDelta{
+				ModelRouting: &AuditComparisonRouteDelta{Changed: true},
+			},
+			expectedContains: "Review the model-routing change",
+		},
+		{
 			name:              "fallback default review message",
 			label:             "changed",
 			currentConclusion: "success",
@@ -268,8 +277,9 @@ func TestRecommendAuditComparisonAction(t *testing.T) {
 			label:             "risky",
 			currentConclusion: "success",
 			delta: &AuditComparisonDelta{
-				Posture:    AuditComparisonStringDelta{Before: "read_only", After: "write_capable"},
-				MCPFailure: newlyPresentMCPFailure,
+				Posture:      AuditComparisonStringDelta{Before: "read_only", After: "write_capable"},
+				MCPFailure:   newlyPresentMCPFailure,
+				ModelRouting: &AuditComparisonRouteDelta{Changed: true},
 			},
 			expectedContains: "Review first-time write-capable behavior",
 		},
@@ -280,6 +290,7 @@ func TestRecommendAuditComparisonAction(t *testing.T) {
 			delta: &AuditComparisonDelta{
 				MCPFailure:      newlyPresentMCPFailure,
 				BlockedRequests: AuditComparisonIntDelta{Before: 1, After: 5},
+				ModelRouting:    &AuditComparisonRouteDelta{Changed: true},
 			},
 			expectedContains: "Inspect the new MCP failure",
 		},
@@ -290,6 +301,7 @@ func TestRecommendAuditComparisonAction(t *testing.T) {
 			delta: &AuditComparisonDelta{
 				BlockedRequests: AuditComparisonIntDelta{Before: 1, After: 5},
 				Turns:           AuditComparisonIntDelta{Before: 2, After: 8},
+				ModelRouting:    &AuditComparisonRouteDelta{Changed: true},
 			},
 			expectedContains: "Review network policy changes",
 		},

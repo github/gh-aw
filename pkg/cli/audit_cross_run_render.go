@@ -36,12 +36,44 @@ func renderCrossRunReportMarkdownToWriter(w io.Writer, report *CrossRunAuditRepo
 
 	renderMarkdownExecutiveSummaryToWriter(w, report)
 	renderMarkdownMetricsTrendToWriter(w, report.MetricsTrend)
+	renderMarkdownModelRoutingToWriter(w, report.ModelRouting)
 	renderMarkdownMCPHealthToWriter(w, report)
 	renderMarkdownErrorTrendToWriter(w, report)
 	renderMarkdownDomainInventoryToWriter(w, report)
 	renderMarkdownDrain3InsightsToWriter(w, report.Drain3Insights)
 	renderMarkdownClusterAnalysisToWriter(w, report.ClusterAnalysis)
 	renderMarkdownPerRunBreakdownToWriter(w, report.PerRunBreakdown)
+}
+
+func renderMarkdownModelRoutingToWriter(w io.Writer, routing *ModelRoutingLogsSummary) {
+	if routing == nil {
+		return
+	}
+	writeModelRoutingReportLine(w, "## Model Routing\n\n")
+	writeModelRoutingReportLine(w, "Classifier AIC: %.3f; deviated requests: %d/%d (%.1f%%)\n\n",
+		routing.ClassifierAIC, routing.DeviatedRequests, routing.TotalRequests, routing.DeviatedTrafficShare*100)
+	if len(routing.Routes) == 0 {
+		return
+	}
+	writeModelRoutingReportLine(w, "| Labels (type / scope / complexity) | Mode | Selected | Router | Runs | Total AIC | Average AIC |\n")
+	writeModelRoutingReportLine(w, "|---|---|---|---|---:|---:|---:|\n")
+	for _, route := range routing.Routes {
+		writeModelRoutingReportLine(w, "| %s / %s / %s | %s | %s:%s | %s | %d | %.3f | %.3f |\n",
+			modelRoutingMarkdownCell(route.TaskType), modelRoutingMarkdownCell(route.Scope), modelRoutingMarkdownCell(route.Complexity),
+			modelRoutingMarkdownCell(route.Mode), modelRoutingMarkdownCell(route.Model), modelRoutingMarkdownCell(route.Effort),
+			modelRoutingMarkdownCell(route.RouterVersion), route.RunCount, route.TotalAIC, route.AverageAIC)
+	}
+	writeModelRoutingReportLine(w, "\n")
+}
+
+func writeModelRoutingReportLine(w io.Writer, format string, values ...any) {
+	if _, err := fmt.Fprintf(w, format, values...); err != nil {
+		crossRunRenderLog.Printf("Failed to write model routing report: %v", err)
+	}
+}
+
+func modelRoutingMarkdownCell(value string) string {
+	return strings.NewReplacer("|", `\|`, "`", "\\`").Replace(safeModelRoutingText(value))
 }
 
 func renderMarkdownExecutiveSummaryToWriter(w io.Writer, report *CrossRunAuditReport) {
@@ -216,6 +248,7 @@ func renderCrossRunReportPretty(report *CrossRunAuditReport) {
 
 	renderPrettyExecutiveSummary(report)
 	renderPrettyMetricsTrend(report.MetricsTrend)
+	renderPrettyModelRouting(report.ModelRouting)
 	renderPrettyMCPHealth(report)
 	renderPrettyErrorTrend(report)
 	renderPrettyDomainInventory(report)
@@ -223,6 +256,22 @@ func renderCrossRunReportPretty(report *CrossRunAuditReport) {
 	renderPrettyClusterAnalysis(report.ClusterAnalysis)
 	renderPrettyPerRunBreakdown(report.PerRunBreakdown)
 	renderPrettyFinalStatus(report)
+}
+
+func renderPrettyModelRouting(routing *ModelRoutingLogsSummary) {
+	if routing == nil {
+		return
+	}
+	writeModelRoutingReportLine(os.Stderr, "%s\n", console.FormatInfoMessage("Model Routing"))
+	writeModelRoutingReportLine(os.Stderr, "  classifier_aic=%.3f deviated_requests=%d/%d (%.1f%%)\n",
+		routing.ClassifierAIC, routing.DeviatedRequests, routing.TotalRequests, routing.DeviatedTrafficShare*100)
+	for _, route := range routing.Routes {
+		writeModelRoutingReportLine(os.Stderr, "  %s/%s/%s mode=%s selected=%s:%s router=%s runs=%d aic_total=%.3f aic_avg=%.3f\n",
+			safeModelRoutingText(route.TaskType), safeModelRoutingText(route.Scope), safeModelRoutingText(route.Complexity),
+			safeModelRoutingText(route.Mode), safeModelRoutingText(route.Model), safeModelRoutingText(route.Effort),
+			safeModelRoutingText(route.RouterVersion), route.RunCount, route.TotalAIC, route.AverageAIC)
+	}
+	writeModelRoutingReportLine(os.Stderr, "\n")
 }
 
 func renderPrettyExecutiveSummary(report *CrossRunAuditReport) {

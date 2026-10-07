@@ -78,6 +78,7 @@ type auditAnalysisResults struct {
 	policyAnalysis          *PolicyAnalysis
 	mcpToolUsage            *MCPToolUsageData
 	tokenUsageSummary       *TokenUsageSummary
+	modelRouting            *ModelRoutingSummary
 	workingSet              *WorkingSetMetrics
 	ledger                  *LedgerActivity
 	workQueue               *WorkQueueReport
