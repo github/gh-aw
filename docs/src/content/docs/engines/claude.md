@@ -7,7 +7,7 @@ description: Select and authenticate Claude Code as the AI engine for GitHub Age
 
 ## Selecting Claude Code as the AI engine
 
-To select Claude Code as the AI engine, with inference hosted and and billed through an Anthropic subscription, add this to the workflow frontmatter:
+To select Claude Code as the AI engine, with inference hosted and billed through an Anthropic subscription, add this to the workflow frontmatter:
 
 ```yaml
 engine: claude
