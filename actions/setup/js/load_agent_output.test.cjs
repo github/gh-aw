@@ -163,6 +163,29 @@ describe("load_agent_output.cjs", () => {
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Agent output content length:"));
     });
 
+    it("preserves validated collector diagnostics metadata", () => {
+      const outputFile = path.join(tempDir, "collector-diagnostics.json");
+      fs.writeFileSync(
+        outputFile,
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "engine_driver_failure" }],
+          collectorFailureCause: "engine_outage",
+          collectorDriverExitCode: 139,
+          collectorRetryCount: 2,
+          collectorEngineErrorType: "sandbox_runtime_crash",
+        })
+      );
+      process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+      expect(loadAgentOutputModule.loadAgentOutput()).toMatchObject({
+        success: true,
+        collectorFailureCause: "engine_outage",
+        collectorDriverExitCode: 139,
+        collectorRetryCount: 2,
+        collectorEngineErrorType: "sandbox_runtime_crash",
+      });
+    });
+
     it("should log file content length on successful parse", () => {
       const validFile = path.join(tempDir, "valid.json");
       const content = JSON.stringify({ items: [{ type: "test" }] });
