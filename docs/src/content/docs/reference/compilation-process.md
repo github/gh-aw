@@ -252,9 +252,8 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 ### Development Testing Mode
 
-`--dry-run` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
-`--actionlint`, `--zizmor`, `--poutine`, `--runner-guard`, `--syft`, `--grype`,
-`--grant`, `--yamllint`, `--shellcheck`, and `--models`. These settings are
+`--dry-run` enables `--strict`, `--staged`, `--validate`, `--shellcheck`,
+and `--models`. These settings are
 forced regardless of frontmatter; explicitly disabling a required flag is rejected. Compiler warnings,
 including safe-update warnings, and scanner failures cause a nonzero exit status
 and invalid JSON validation results. Missing required tools block compilation
@@ -262,6 +261,19 @@ rather than silently skipping checks. Model checking uses the observed active
 model inventory; development compilation fails if that inventory is unavailable
 and the workflow declares `models` policies or `engine.models`. It does not prove
 live model availability.
+
+Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
+does not block the dry-run gate; install native `shellcheck` for required run-step
+linting without Docker. When Docker is available, running `gh aw validate my-workflow`
+is recommended for source checks, alongside
+`gh aw compile my-workflow --dry-run --zizmor --actionlint --poutine` for scanner
+checks. `validate` uses `--no-emit` and skips these scanners; its success does not
+establish scanner coverage. Run the scanner-enabled compile command when possible
+and report unavailable checks as unverified. Explicitly requested checks
+still fail the dry-run gate on findings or scanner failures.
+
+MCP callers can opt into required image validation with `validate_images: true`,
+including with `dry_run: true`; Docker unavailability then fails compilation.
 
 ```bash
 gh aw compile my-workflow --dry-run --environment gh-aw-debug

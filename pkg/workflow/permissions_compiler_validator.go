@@ -99,6 +99,9 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 	if err := validateGitHubMCPAppPermissionsNoWrite(workflowData); err != nil {
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := validateMentionGitHubAppPermissionsReadOnly(workflowData); err != nil {
+		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 
 	// Warn when github-app.permissions is set in contexts that don't support it
 	warnGitHubAppPermissionsUnsupportedContexts(workflowData)

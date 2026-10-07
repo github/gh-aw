@@ -809,7 +809,7 @@ func configureCompileBuildFlags() {
 	compileCmd.Flags().Bool("no-emit", false, "Validate workflow without generating lock files")
 	compileCmd.Flags().Bool("purge", false, "Delete .lock.yml files that were not regenerated during compilation (only when no specific files are provided)")
 	compileCmd.Flags().Bool("strict", false, "Override frontmatter to enforce strict mode validation for all workflows (enforces action pinning, network config, safe-outputs, disallows write permissions and deprecated fields). Note: Workflows default to strict mode unless frontmatter sets strict: false")
-	compileCmd.Flags().Bool("dry-run", false, "Compile with strict validation and all checks; disable compiler-managed GitHub mutations, stage safe outputs, and record dry_run in aw_info.json; custom scripts and external MCP effects remain unverified; does not upload or dispatch workflows")
+	compileCmd.Flags().Bool("dry-run", false, "Compile with strict validation, shellcheck, and model checks; Docker-based scanners are opt-in; disable compiler-managed GitHub mutations, stage safe outputs, and record dry_run in aw_info.json; custom scripts and external MCP effects remain unverified; does not upload or dispatch workflows")
 	compileCmd.Flags().String("environment", "", "Override the environment on every generated job; fails for reusable-workflow caller jobs, which cannot declare an environment")
 	compileCmd.Flags().Bool("require-self-hosted-runners", false, "Fail compilation unless every generated workflow job selects a self-hosted runner")
 	compileCmd.Flags().Bool("trial", false, "Enable trial mode compilation (modifies workflows for trial execution)")

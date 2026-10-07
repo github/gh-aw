@@ -1325,6 +1325,9 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
+      - name: Warn if threat detection produced no verdict
+        if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')
+        run: echo "::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs."
       - name: Download detection artifact
         id: download-detection-artifact
         continue-on-error: true
@@ -2397,6 +2400,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
+          GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
           GH_AW_ALLOWED_DOMAINS: "api.npms.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,bun.sh,cdn.jsdelivr.net,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,deb.nodesource.com,deno.land,esm.sh,get.pnpm.io,googleapis.deno.dev,googlechromelabs.github.io,json-schema.org,json.schemastore.org,jsr.io,keyserver.ubuntu.com,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.yarnpkg.com,s.symcb.com,s.symcd.com,security.ubuntu.com,skimdb.npmjs.com,storage.googleapis.com,telemetry.vercel.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com,www.npmjs.com,www.npmjs.org,yarnpkg.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}

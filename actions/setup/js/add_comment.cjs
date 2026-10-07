@@ -25,7 +25,7 @@ const { createDiscussionComment, resolveTopLevelDiscussionCommentId } = require(
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_NOT_FOUND } = require("./error_codes.cjs");
 const { isPayloadUserBot } = require("./resolve_mentions.cjs");
-const { resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
+const { getMentionsGithubClient, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
@@ -753,7 +753,8 @@ async function main(config = {}) {
         if (itemTargetResult.number != null || hasExplicitCommentId) {
           // Explicit item_number/issue_number: fetch the issue/PR to get its author
           try {
-            const { data: issueData } = await githubClient.rest.issues.get({
+            const mentionsGithubClient = getMentionsGithubClient(githubClient);
+            const { data: issueData } = await mentionsGithubClient.rest.issues.get({
               owner: repoParts.owner,
               repo: repoParts.repo,
               issue_number: itemNumber,

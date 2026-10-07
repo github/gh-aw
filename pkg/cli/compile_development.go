@@ -11,8 +11,7 @@ import (
 // DryRunRequiredBoolFlags lists checks that development compilation cannot disable.
 func DryRunRequiredBoolFlags() []string {
 	return []string{
-		"strict", "staged", "validate", "validate-images", "actionlint", "zizmor",
-		"poutine", "runner-guard", "syft", "grype", "grant", "yamllint", "shellcheck", "models",
+		"strict", "staged", "validate", "shellcheck", "models",
 	}
 }
 
@@ -35,15 +34,6 @@ func applyDevelopmentCompileMode(config CompileConfig) CompileConfig {
 	config.Strict = true
 	config.Staged = true
 	config.Validate = true
-	config.ValidateImages = true
-	config.Actionlint = true
-	config.Zizmor = true
-	config.Poutine = true
-	config.RunnerGuard = true
-	config.Syft = true
-	config.Grype = true
-	config.Grant = true
-	config.Yamllint = true
 	config.Shellcheck = true
 	config.Models = true
 	return config

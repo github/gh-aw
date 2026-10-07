@@ -20,7 +20,7 @@ var notifyCommentLog = logger.New("workflow:notify_comment")
 // This job runs when:
 // 1. always() - runs even if agent fails
 // 2. Agent job was not skipped
-// 3. NO add_comment output was produced by the agent (avoids duplicate updates)
+// 3. NO add_comment output was produced, or detection produced no verdict
 // This job depends on all safe output jobs to ensure it runs last
 func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, safeOutputJobNames []string) (*Job, error) {
 	notifyCommentLog.Printf("Building conclusion job: main_job=%s, safe_output_jobs_count=%d", mainJobName, len(safeOutputJobNames))
@@ -84,8 +84,12 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 	// Only add the conclusion update step if status comments are explicitly enabled
 	if data.StatusComment != nil && *data.StatusComment {
 		var token string
+		var stepCondition string
 		if data.SafeOutputs != nil && data.SafeOutputs.AddComments != nil {
 			token = data.SafeOutputs.AddComments.GitHubToken
+		}
+		if slices.Contains(safeOutputJobNames, "add_comment") {
+			stepCondition = "always() && !(needs.add_comment.outputs.comment_id)"
 		}
 		steps = append(steps, c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
 			StepName:      "Update reaction comment with completion status",
@@ -95,6 +99,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 			Script:        getNotifyCommentErrorScript(),
 			ScriptFile:    "notify_comment_error.cjs",
 			CustomToken:   token,
+			StepCondition: stepCondition,
 		})...)
 	}
 	steps = append(steps, c.buildConclusionSteeringIssueStep(data, mainJobName, steeringToken)...)

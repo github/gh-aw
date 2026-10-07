@@ -18,7 +18,7 @@ vi.mock("./error_helpers.cjs", () => ({
   getErrorMessage: vi.fn(err => (err instanceof Error ? err.message : String(err))),
 }));
 
-const { resolveAllowedMentionsFromPayload, extractKnownAuthorsFromPayload, fetchTeamMembers, pushNonBotUser, pushNonBotAssignees } = await import("./resolve_mentions_from_payload.cjs");
+const { getMentionsGithubClient, resolveAllowedMentionsFromPayload, extractKnownAuthorsFromPayload, fetchTeamMembers, pushNonBotUser, pushNonBotAssignees } = await import("./resolve_mentions_from_payload.cjs");
 
 /** @returns {{ info: ReturnType<typeof vi.fn>, warning: ReturnType<typeof vi.fn>, error: ReturnType<typeof vi.fn> }} */
 function makeMockCore() {
@@ -29,6 +29,33 @@ function makeMockCore() {
 function makeMockGithub() {
   return {};
 }
+
+describe("getMentionsGithubClient", () => {
+  it("uses the configured mention token instead of the handler client", () => {
+    const fallback = makeMockGithub();
+    const mentionClient = makeMockGithub();
+    const originalToken = process.env.GH_AW_MENTIONS_GITHUB_TOKEN;
+    const originalGetOctokit = global.getOctokit;
+    process.env.GH_AW_MENTIONS_GITHUB_TOKEN = "mention-token";
+    global.getOctokit = vi.fn(token => (token === "mention-token" ? mentionClient : fallback));
+
+    try {
+      expect(getMentionsGithubClient(fallback)).toBe(mentionClient);
+      expect(global.getOctokit).toHaveBeenCalledWith("mention-token");
+    } finally {
+      if (originalToken === undefined) {
+        delete process.env.GH_AW_MENTIONS_GITHUB_TOKEN;
+      } else {
+        process.env.GH_AW_MENTIONS_GITHUB_TOKEN = originalToken;
+      }
+      if (originalGetOctokit === undefined) {
+        delete global.getOctokit;
+      } else {
+        global.getOctokit = originalGetOctokit;
+      }
+    }
+  });
+});
 
 describe("pushNonBotUser", () => {
   it("pushes a regular user login", () => {
