@@ -40,6 +40,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Apps and secrets | `live`, `revoked`, `appScope`, `appRepos`, `agentSecrets` | Read-only checkout credentials, authorized engine credentials, and privileged installation tokens have different consumers and lifetimes. |
 | Networking | `ToolCall`, `egress`, `NetworkPolicy` | Authorized GitHub/inference services, blocked destinations, and service-bound engine authentication. |
 | Git | `checkouts`, `cleanup`, `agentBegan`, `privilegedCheckout`, `operations`, `errors` | Per-repository auth, temporary setup credentials, verified cleanup/failure, available blobs/refs, sparse/shallow state, local operations, REST, and privileged push. |
+| `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
 
 The `issue` effect creates at most one validated issue in the main public
 repository. The `pull-request` effect prepares a full checkout in the privileged
@@ -65,12 +66,39 @@ represented by a skipped state-machine slot, not a real runtime job.
 
 Reviewed baseline: `542e937dd8447172c8c484cda3a9a5716ae99245`.
 The authorities are [Security Architecture v1.1.0](../security-architecture-spec.md),
-[Compiler Threat Detection v1.0.42](../compiler-threat-detection-spec.md),
+[Compiler Threat Detection v1.0.43](../compiler-threat-detection-spec.md),
 [Checkout Behavior](../../docs/src/content/docs/specs/checkout-behavior-specification.md),
 and the [Safe Outputs specification](../../docs/src/content/docs/specs/safe-outputs-specification.md).
 Line references describe that baseline; symbols are the more durable mapping.
 The checkout specification's 1.3.1 amendment requires verified cleanup before
 agent execution, including the failure paths found by the corpus trial.
+
+### `pull_request_target` checkout policy
+
+[`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) is a separate,
+bounded model of compiler rule CTR-008. It exhaustively checks the finite
+combinations of trigger, strict mode, warning acknowledgment, checkout class,
+and fetch class. The successful external allowlist class represents an exact
+literal repository/ref pair; expressions, wildcard/PR refs, wiki checkouts,
+omitted external refs, and unmatched pairs have distinct untrusted classes.
+Any configured `fetch` makes a configured checkout untrusted. A `Fault`
+constant provides negative controls for acknowledgment or fetch bypassing
+checkout authorization.
+
+Run the baseline model with the same pinned TLA+ Tools installation:
+
+```bash
+java -cp /path/to/tla2tools.jar tlc2.TLC \
+  -config specs/workflow-security/PullRequestTargetCheckout.cfg \
+  specs/workflow-security/PullRequestTargetCheckout.tla
+```
+
+The baseline exhausts 400 input combinations. To verify either negative
+control, copy the `.cfg` to a temporary file, set `Fault` to
+`"acknowledgment-bypasses-checkout"` or `"fetch-bypasses-checkout"`, and
+confirm TLC reports `NoUntrustedCheckoutAcceptance`. This model specifies the
+compiler decision boundary; it does not model Git's parser or prove safety of
+the contents at an otherwise trusted mutable ref.
 
 | Predicate | Required safety condition | Architecture / threat rule | Compiler/runtime evidence |
 |---|---|---|---|

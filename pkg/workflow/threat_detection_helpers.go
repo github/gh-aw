@@ -231,6 +231,7 @@ func resetDetectionEngineTaskSettings(config *EngineConfig) {
 	config.Cwd = ""
 	config.Concurrency = ""
 	config.CopilotSDK = false
+	config.ModelRouting = nil
 }
 
 // cloneThreatDetectionEngineConfig returns a shallow copy of source with engine ID
@@ -243,6 +244,7 @@ func cloneThreatDetectionEngineConfig(engineID string, source *EngineConfig) *En
 	}
 	cloned := *source
 	cloned.ID = engineID
+	cloned.ModelRouting = nil
 	if source.ID != "" && source.ID != engineID {
 		threatLog.Printf("Resetting runtime settings when normalizing %q to detection engine %q", source.ID, engineID)
 		cloned.Version = ""

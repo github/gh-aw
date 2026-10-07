@@ -363,6 +363,22 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	if isCloudHypervisorRuntime(config.WorkflowData) {
 		awfConfig.CloudHypervisor = buildAWFCloudHypervisorConfig()
+	} else if hasCloudHypervisorEnclaves(config.WorkflowData) {
+		if awfConfig.Container == nil {
+			awfConfig.Container = &AWFContainerConfig{}
+		}
+		awfConfig.Container.ContainerRuntime = "docker"
+		awfConfig.CloudHypervisor = &AWFCloudHypervisorConfig{
+			PreviewEnabled:             true,
+			MountPolicy:                "workspace-only",
+			CloudHypervisorBinary:      "${GH_AW_CLOUD_HYPERVISOR_BINARY}",
+			KernelPath:                 "${GH_AW_CLOUD_HYPERVISOR_KERNEL}",
+			RootfsPath:                 "${GH_AW_CLOUD_HYPERVISOR_ROOTFS}",
+			SupervisorPath:             "${GH_AW_CLOUD_HYPERVISOR_SUPERVISOR}",
+			ArtifactManifestPath:       "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST}",
+			ArtifactManifestBundlePath: "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE}",
+			ArtifactReleaseTag:         "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG}",
+		}
 	}
 
 	// ── Logging section ──────────────────────────────────────────────────────

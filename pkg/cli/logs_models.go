@@ -132,6 +132,7 @@ type ProcessedRun struct {
 	GatewaySteeringEvents   []GatewaySteeringEvent
 	MCPToolUsage            *MCPToolUsageData
 	TokenUsage              *TokenUsageSummary
+	ModelRouting            *ModelRoutingSummary
 	WorkingSet              *WorkingSetMetrics
 	Ledger                  *LedgerActivity
 	WorkQueue               *WorkQueueReport
@@ -295,6 +296,7 @@ type RunAnalysis struct {
 	SkillActivations        []SkillActivation        `json:"skill_activations,omitempty"`       // Detected skill invocations
 	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`          // MCP tool usage data
 	TokenUsage              *TokenUsageSummary       `json:"token_usage_summary,omitempty"`     // Token usage from firewall proxy
+	ModelRouting            *ModelRoutingSummary     `json:"model_routing,omitempty"`           // AWF model routing decisions and cost attribution
 	GatewaySteeringEvents   []GatewaySteeringEvent   `json:"gateway_steering_events,omitempty"` // AI-credit and timeout steering events
 	WorkingSet              *WorkingSetMetrics       `json:"working_set,omitempty"`             // Working-set rebuild metric from usage summary
 	Ledger                  *LedgerActivity          `json:"ledger,omitempty"`                  // Recorded ledger append transactions

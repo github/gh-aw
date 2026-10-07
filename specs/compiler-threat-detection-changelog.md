@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.43 | Clarified CTR-008 for the scoped `pull_request_target` checkout policy: exact literal allowlist matching, warning-only risk acknowledgment, and rejection of configured `fetch` values. |
 | 1.0.42 | Audit-only clarification that same-repository bot PR checkout authorization is a runtime trust control governed by Security Architecture Specification RS-05a, not a new compiler threat rule. |
 | 1.0.41 | Added CTR-031 for strict rejection and non-strict warning of `tools.github.private-to-public-flows`, which can expose private data through public logs or destinations. |
 | 1.0.40 | Added CTR-030 for PR-base provenance of activation sparse checkout before loading imports or skills; preserves non-PR refs and the `GITHUB_TOKEN` same-repo fallback guard. |

@@ -78,7 +78,9 @@ gh aw audit 12345 12346 --group                # Group findings by run and code
 gh aw audit 12345 12346 --group --json         # JSON grouped findings
 ```
 
-**Single-run report sections**: Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Friction, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders.
+**Single-run report sections**: Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Model Routing, Friction, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders.
+
+When routing data is available, Model Routing summarizes the classifier and selected route, ranked alternatives, router version and latency, request outcomes and deviations, and classifier/selected/deviated token and AIC costs. Older AWF endpoint-only deviations are attributed to the selected route. The Comparison section identifies changes in selected model, effort, mode, or router version even when overall cost is stable.
 
 The Friction section attributes execution-friction costs by driver and source. In JSON, `friction.drivers[]` provides each driver's `source`, counted and deduplicated occurrences, attribution state, and cost dimensions; `friction.events[]` provides the corresponding event-level source and label. Console output includes the source and available AIC, token, turn, tool-call, and latency costs on each driver and event, so a high-cost source such as `firewall`, `mcp_gateway`, or `agent_session` can be investigated directly. Unavailable dimensions are omitted rather than presented as measured zeroes.
 
@@ -140,7 +142,7 @@ The Metrics section and JSON output also include `working_set` from the compact 
 
 Working-Set Rebuild Factor measures cumulative context reconstruction relative to peak invocation context. It is an efficiency/trajectory metric, not a measurement of semantic coherence debt and not a predictor of task success. Equal factors can occur on successful and failed runs, and missing required facts cannot be inferred from the value.
 
-**Diff output** includes network changes (new, removed, and allow/deny flips), anomaly flags, MCP tool invocation changes, run-level metric deltas, token and AIC breakdowns, tokens per turn, per-tool call counts with max input/output sizes, and aggregated bash command usage.
+**Diff output** includes network changes (new, removed, and allow/deny flips), anomaly flags, MCP tool invocation changes, run-level metric deltas, token and AIC breakdowns, tokens per turn, per-tool call counts with max input/output sizes, aggregated bash command usage, and model-routing changes.
 
 With multiple comparisons, `--json` emits a single object for one comparison or an array for many, while `--format pretty` and `--format markdown` separate each diff with dividers. With `--group`, audit emits `runs_analyzed`, `entries`, and (when applicable) `skipped_runs`; each entry contains `run_id`, `code`, `occurrences`, and `representative_entry`. Only actionable findings (severity of low or above) are grouped. Runs excluded by `--experiment`, `--runtime`, or `--evals`, or whose audit data could not be loaded, are listed in `skipped_runs` and excluded from `runs_analyzed`.
 
@@ -158,10 +160,13 @@ gh aw json-schema logs-jsonl > logs-jsonl.schema.json
 
 `make recompile` regenerates the checked-in schemas, including `schemas/logs-jsonl.schema.json`. These schemas derive directly from the corresponding Go output types.
 
+When routing records are available, single-run `audit --json` includes `model_routing` with status, objective, labels, classifier and selected model details, ranked choices, router metadata, request outcome/deviation counts, failure details, and classifier/selected/deviated cost buckets. Logs JSON includes `model_routing.routes` entries keyed by labels, mode, model, effort, and router version, with `run_count`, `total_aic`, and `average_aic`, plus classifier AIC and deviation totals.
+
 ## `gh aw logs --format <fmt>`
 
 Generate a cross-run security and performance audit report across multiple recent workflow runs.
 This feature is built into the `gh aw logs` command via the `--format` flag.
+When routed runs are present, the report's Model Routing section groups labels and mode by selected model, effort, and router version, with run counts and total/average AIC. It also reports classifier AIC and the share of requests marked deviated. The same aggregate is available as `model_routing` in `--json` output.
 
 **Flags:**
 

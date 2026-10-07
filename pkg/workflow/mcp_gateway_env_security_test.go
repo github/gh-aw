@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -168,6 +169,51 @@ func TestMCPGatewayCustomEnvCommandContract(t *testing.T) {
 	assert.Contains(t, string(launcher), mcpGatewayCustomEnvNamesVar)
 	assert.Contains(t, string(launcher), `const customGatewayEnvTransportPrefix = "`+mcpGatewayCustomEnvTransportPrefix+`"`)
 	assert.Contains(t, string(launcher), "${customGatewayEnvTransportPrefix}${index}")
+}
+
+func TestMCPGatewayDockerCommandUsesPinnedImage(t *testing.T) {
+	const digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		name     string
+		image    string
+		version  string
+		mappings map[string]string
+		expected string
+	}{
+		{name: "default gateway", image: constants.DefaultMCPGatewayContainer, version: string(constants.DefaultMCPGatewayVersion)},
+		{
+			name:     "mapped gateway",
+			image:    constants.DefaultMCPGatewayContainer,
+			version:  string(constants.DefaultMCPGatewayVersion),
+			mappings: map[string]string{constants.DefaultMCPGatewayContainer + ":" + string(constants.DefaultMCPGatewayVersion): "registry.example.com/mcpg:v1@sha256:" + digest},
+			expected: "registry.example.com/mcpg:v1@sha256:" + digest,
+		},
+		{name: "unrecognized custom gateway", image: "registry.example.com/custom", version: "v1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &WorkflowData{ContainerPinMappings: tt.mappings}
+			config := &MCPGatewayRuntimeConfig{Container: tt.image, Version: tt.version}
+			command := buildMCPGatewayContainerCommand(buildMCPGatewayContainerCommandOptions{
+				engine:        NewClaudeEngine(),
+				workflowData:  data,
+				gatewayConfig: config,
+			})
+			image := tt.image + ":" + tt.version
+			expected := resolveContainerImage(image, data)
+			assert.Contains(t, command, " "+expected)
+			if tt.expected != "" {
+				assert.Equal(t, tt.expected, expected)
+			}
+			if tt.name == "default gateway" {
+				assert.Contains(t, expected, "@sha256:")
+			}
+			if tt.name == "unrecognized custom gateway" {
+				assert.Equal(t, expected, image)
+			}
+		})
+	}
 }
 
 func TestMCPGatewayCustomEnvNamesAreFilteredAtEmissionBoundary(t *testing.T) {

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -29,7 +30,7 @@ func (cm *CheckoutManager) writeDefaultCheckoutInputs(sb *strings.Builder, overr
 		fmt.Fprintf(sb, "          repository: %s\n", override.key.repository)
 	}
 	if override.ref != "" && cm.defaultRefOverride == "" {
-		fmt.Fprintf(sb, "          ref: %s\n", override.ref)
+		writeCheckoutRef(sb, override.ref)
 	}
 	if len(override.sparsePatterns) > 0 {
 		// Fetch blobs up front rather than requiring authenticated lazy fetches.
@@ -42,6 +43,10 @@ func (cm *CheckoutManager) writeDefaultCheckoutInputs(sb *strings.Builder, overr
 	writeCheckoutDepthAndSparse(sb, override)
 	writeCheckoutSubmodulesAndLFS(sb, override)
 	return token != ""
+}
+
+func writeCheckoutRef(sb *strings.Builder, ref string) {
+	fmt.Fprintf(sb, "          ref: %s\n", strconv.Quote(ref)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 }
 
 func writeCheckoutDepthAndSparse(sb *strings.Builder, entry *resolvedCheckout) {
