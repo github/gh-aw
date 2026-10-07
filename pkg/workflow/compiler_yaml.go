@@ -102,8 +102,6 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 
 func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string, []string, []string, error) { //nolint:largefunc // Existing workflow YAML assembly keeps generation steps in order.
 	compilerYamlLog.Printf("Generating YAML for workflow: %s", data.Name)
-	data.MarkExactActionMappings = true
-	defer func() { data.MarkExactActionMappings = false }()
 
 	repoConfig, err := c.loadRepoConfig()
 	if err != nil {

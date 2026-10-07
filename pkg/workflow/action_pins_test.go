@@ -2034,11 +2034,7 @@ func TestMapPinnedUsesPreservesExactMappingWithinPrefix(t *testing.T) {
 	nodeSHA, _, _ := strings.Cut(strings.TrimPrefix(node, "actions/setup-node@"), " ")
 	checkoutVersion := latestActionVersionForRepo(t, "actions/checkout")
 	mappings := map[string]string{"actions/checkout@" + checkoutVersion: "actions/setup-node@" + nodeSHA}
-	compiler := NewCompiler()
-	compiler.repoConfig = &RepoConfig{ActionPins: mappings}
-	compiler.repoConfigLoaded = true
-	exact := compiler.mapGeneratedActionPin("actions/checkout", checkout)
-	content := "      - uses: " + exact + "\n        uses: " + node + "\n" +
+	content := "      - uses: " + checkout + "\n        uses: " + node + "\n" +
 		"        uses: " + getActionPin("docker/setup-buildx-action") + "\n"
 	mapped, err := mapPinnedUsesInYAML(content, mappings,
 		map[string]string{"actions/": "mirror/actions-", "docker/": "mirror/docker-"}, nil, nil)
@@ -2054,8 +2050,19 @@ func TestMapPinnedUsesPreservesExactMappingWithinPrefix(t *testing.T) {
 	if !strings.Contains(mapped, "uses: actions/setup-node@"+nodeSHA) {
 		t.Fatalf("exact target missing: %s", mapped)
 	}
-	if strings.Contains(mapped, "[gh-aw-exact-pin]") {
-		t.Fatalf("internal exact mapping marker leaked into workflow: %s", mapped)
+}
+
+func TestMapPinnedUsesMatchesExactMappingSourceVersion(t *testing.T) {
+	const sha = "0123456789012345678901234567890123456789"
+	input := "        uses: actions/upload-artifact@" + sha + " # v7.0.1 (source v4)\n"
+	mapped, err := mapPinnedUsesInYAML(input,
+		map[string]string{"actions/upload-artifact@v4": "internal/artifacts@" + sha},
+		map[string]string{"actions/": "mirror/actions-"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(mapped, "uses: internal/artifacts@"+sha) {
+		t.Fatalf("exact mapping should use the source version before applying prefixes:\n%s", mapped)
 	}
 }
 

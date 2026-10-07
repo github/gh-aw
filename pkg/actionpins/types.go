@@ -95,9 +95,6 @@ type PinContext struct {
 	// PrefixMappings rewrites the repository of a resolved pin without changing
 	// its SHA or version. Exact Mappings take precedence.
 	PrefixMappings map[string]string
-	// MarkExactMappings marks resolved exact mappings for generated YAML so a
-	// subsequent prefix rewrite can distinguish them from unrelated references.
-	MarkExactMappings bool
 	// ContainerMappings redirects container image references to replacement
 	// image references before pin resolution. Keys are source image references
 	// (e.g. "ghcr.io/owner/image:tag") and values are replacement image

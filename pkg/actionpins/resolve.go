@@ -52,8 +52,6 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 	_, exactMapped := ctx.Mappings[FormatCacheKey(actionRepo, version)]
 	if !exactMapped {
 		defer func() { result = applyActionPinPrefix(originalRepo, result, ctx) }()
-	} else if ctx.MarkExactMappings {
-		defer func() { result = markExactActionPinMapping(result) }()
 	}
 	actionRepo, version = applyActionPinMapping(actionRepo, version, ctx)
 	mapped := actionRepo != originalRepo || version != originalVersion

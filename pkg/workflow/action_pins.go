@@ -90,7 +90,7 @@ func getActionPinForData(repo string, data *WorkflowData) string {
 func (c *Compiler) getActionPin(repo string) string {
 	if c.ghesArtifactCompat {
 		if pin, ok := actionpins.ResolveGHESActionPin(repo); ok {
-			return c.mapGeneratedActionPin(repo, pin)
+			return pin
 		}
 	}
 
@@ -108,7 +108,7 @@ func (c *Compiler) getActionPin(repo string) string {
 				if cachedVersion == nil {
 					actionPinsLog.Printf("Ignoring cache entry with unparseable cached version for compiler-generated action %s: cache=%s embedded=%s",
 						repo, entry.Version, latestEmbedded.Version)
-					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version))
+					return actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version)
 				}
 				if embeddedVersion == nil {
 					actionPinsLog.Printf("Using cached version for compiler-generated action %s because embedded version is unparseable: cache=%s embedded=%s",
@@ -116,12 +116,12 @@ func (c *Compiler) getActionPin(repo string) string {
 					if resolver != nil {
 						resolver.MarkCacheKeyAsUsed(cacheKey)
 					}
-					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version))
+					return actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version)
 				}
 				if embeddedVersion.IsNewer(cachedVersion) {
 					actionPinsLog.Printf("Ignoring stale cache entry for compiler-generated action %s: cache=%s embedded=%s",
 						repo, entry.Version, latestEmbedded.Version)
-					return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version))
+					return actionpins.FormatPinnedActionReference(repo, latestEmbedded.SHA, latestEmbedded.Version)
 				}
 				// Equal or newer cached versions intentionally fall through to the cache entry below.
 			}
@@ -129,38 +129,12 @@ func (c *Compiler) getActionPin(repo string) string {
 			if resolver != nil {
 				resolver.MarkCacheKeyAsUsed(cacheKey)
 			}
-			return c.mapGeneratedActionPin(repo, actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version))
+			return actionpins.FormatPinnedActionReference(repo, entry.SHA, entry.Version)
 		}
 	}
 
 	// Fall back to embedded pins if no suitable cache entry exists
-	return c.mapGeneratedActionPin(repo, getActionPin(repo))
-}
-
-func (c *Compiler) mapGeneratedActionPin(repo, pin string) string {
-	if pin == "" {
-		return pin
-	}
-	// Resolve against the original repository first; the cache/embedded pin has
-	// already been selected by the caller.
-	version := strings.TrimSpace(strings.TrimPrefix(pin, repo+"@"))
-	_, version, _ = strings.Cut(version, " # ")
-	ctx := &actionpins.PinContext{
-		Mappings:          c.getActionPinMappings(),
-		Warnings:          c.actionPinWarnings,
-		MarkExactMappings: true,
-	}
-	if resolver := c.GetSharedActionResolver(); resolver != nil {
-		ctx.Resolver = resolver
-	}
-	if mapped, ok := ctx.Mappings[actionpins.FormatCacheKey(repo, version)]; ok {
-		if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
-			return ref
-		}
-		actionPinsLog.Printf("Unable to resolve mapped action %s to %s", repo, mapped)
-		return pin
-	}
-	return pin
+	return getActionPin(repo)
 }
 
 // mapPinnedUsesInYAML covers standalone generators which build action steps
@@ -183,11 +157,8 @@ func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, w
 		repo, suffix, _ := strings.Cut(reference, "@")
 		_, version, _ := strings.Cut(suffix, " # ")
 		version = strings.TrimSpace(version)
-		if ref, found := strings.CutSuffix(reference, " # [gh-aw-exact-pin]"); found {
-			return indentation + ref
-		}
-		if ref, found := strings.CutSuffix(reference, " [gh-aw-exact-pin]"); found {
-			return indentation + ref
+		if _, sourceVersion, found := strings.Cut(version, " (source "); found && strings.HasSuffix(sourceVersion, ")") {
+			version = strings.TrimSuffix(sourceVersion, ")")
 		}
 		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
 			ref, err := actionpins.ResolveActionPin(repo, version, ctx)
@@ -328,13 +299,28 @@ func applyContainerPinMappingFromData(image string, data *WorkflowData) string {
 // getActionPinWithData returns the pinned action reference for a given action@version,
 // delegating to pkg/actionpins with a PinContext built from WorkflowData.
 func getActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
-	return actionpins.ResolveActionPin(actionRepo, version, data.PinContext())
+	ctx := pinContextWithoutActionMappings(data)
+	if ctx != nil {
+		if _, mapped := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]; mapped {
+			ctx.GHES = false
+		}
+	}
+	return actionpins.ResolveActionPin(actionRepo, version, ctx)
+}
+
+func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext {
+	ctx := data.PinContext()
+	if ctx != nil {
+		ctx.Mappings = nil
+		ctx.PrefixMappings = nil
+	}
+	return ctx
 }
 
 // getCachedActionPin returns the pinned action reference for a given repository,
 // preferring the dynamic resolver from WorkflowData over the embedded pins.
 func getCachedActionPin(repo string, data *WorkflowData) string {
-	return actionpins.ResolveLatestActionPin(repo, data.PinContext())
+	return actionpins.ResolveLatestActionPin(repo, pinContextWithoutActionMappings(data))
 }
 
 // --------------------------------------------------------------------------
