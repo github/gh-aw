@@ -34,6 +34,9 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require("./constants.cjs");
+const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
+const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
 const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
@@ -86,11 +89,68 @@ const MISSING_API_KEY_PATTERN = /Missing environment variable:\s*`?(?:CODEX_API_
 // These are transient infrastructure failures that may resolve on retry.
 const SERVER_ERROR_PATTERN = /InternalServerError|ServiceUnavailableError|500 Internal Server Error|503 Service Unavailable/i;
 
-// Pattern to detect deterministic request-validation failures (HTTP 400 `invalid_request_error`)
+// Pattern to detect deterministic request-validation failures (HTTP 400 `invalid_request_error`
+// or `invalid_request_body`, including invalid replayed item IDs during resume)
 // within Codex's outer `turn.failed` event. The provider rejects the serialized request itself
 // (e.g. `"code": "empty_array"` on `messages[N].content`), so an identical fresh run produces
 // an identical rejection: retrying only re-bills the turns that succeeded before the failure point.
-const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_error/i;
+const INVALID_REQUEST_ERROR_PATTERN = /invalid_request_(?:error|body)/i;
+
+function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
+  const configuredServers = config.defaults?.mcp_servers && typeof config.defaults.mcp_servers === "object" ? config.defaults.mcp_servers : {};
+  const defaults = {
+    ...config.defaults,
+    mcp_servers: Object.fromEntries(
+      Object.entries(configuredServers).map(([name, value]) => [
+        name,
+        typeof value === "object" && value !== null && !Array.isArray(value)
+          ? { ...value, ...(Number.isSafeInteger(runtimeToolTimeoutSeconds) && runtimeToolTimeoutSeconds > 0 ? { tool_timeout_sec: runtimeToolTimeoutSeconds } : {}) }
+          : value,
+      ])
+    ),
+  };
+  const effectiveServers = mergeConfig(defaults, config.overrides || {}).mcp_servers || {};
+  return Object.fromEntries(
+    Object.entries(effectiveServers).flatMap(([name, value]) => (typeof value?.tool_timeout_sec === "number" && Number.isSafeInteger(value.tool_timeout_sec) && value.tool_timeout_sec > 0 ? [[name, value.tool_timeout_sec]] : []))
+  );
+}
+
+function createMCPCallWatchdog(timeoutMs, now = Date.now) {
+  const pending = new Map();
+  function track(eventType, item) {
+    if (item?.type !== "mcp_tool_call" || typeof item.id !== "string") return;
+    if (eventType === "item.started") {
+      const callTimeoutMs = typeof timeoutMs === "function" ? timeoutMs(item) : timeoutMs;
+      pending.set(item.id, { startedAt: now(), timeoutMs: Number.isSafeInteger(callTimeoutMs) && callTimeoutMs > 0 ? callTimeoutMs : DEFAULT_MCP_CALL_WATCHDOG_MS });
+    }
+    if (eventType === "item.completed" || eventType === "item.failed") pending.delete(item.id);
+  }
+  return {
+    observe(line) {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        return;
+      }
+      track(event?.type, event?.item);
+    },
+    observePrefix(prefix) {
+      const event = parseJsonPrefix(prefix);
+      track(event?.type, event?.item);
+    },
+    expiredTimeoutMs() {
+      const current = now();
+      for (const call of pending.values()) {
+        if (current - call.startedAt >= call.timeoutMs) return call.timeoutMs;
+      }
+      return null;
+    },
+    expired() {
+      return this.expiredTimeoutMs() !== null;
+    },
+  };
+}
 
 // Codex's `turn.failed` event nests the actual provider error as a JSON string inside
 // `error.message` (sometimes doubly-nested, e.g. `error.message` -> `{"error": {...}}`).
@@ -240,21 +300,32 @@ function isInvalidModelError(output) {
 
 /**
  * Determines if Codex emitted a `turn.failed` provider event containing a deterministic
- * request-validation failure (HTTP 400 `invalid_request_error`). Such schema-level rejections
- * can never succeed on a fresh run with the same input, so they are treated as terminal.
+ * request-validation failure (HTTP 400 `invalid_request_error` or `invalid_request_body`).
+ * Such schema-level rejections cannot succeed by replaying the same request or session.
  * Tokens in agent transcripts and tool responses are intentionally ignored.
  * @param {string} output - Collected stdout+stderr from the process
  * @returns {boolean}
  */
 function isInvalidRequestError(output) {
-  return output.split(/\r?\n/).some(line => {
+  return extractInvalidRequestErrorCode(output) !== null;
+}
+
+/**
+ * @param {string} output
+ * @returns {string | null}
+ */
+function extractInvalidRequestErrorCode(output) {
+  for (const line of output.split(/\r?\n/)) {
     try {
       const event = JSON.parse(line);
-      return event?.type === "turn.failed" && event.error && INVALID_REQUEST_ERROR_PATTERN.test(JSON.stringify(event.error));
+      if (event?.type !== "turn.failed" || !event.error) continue;
+      const match = JSON.stringify(event.error).match(INVALID_REQUEST_ERROR_PATTERN);
+      if (match) return match[0].toLowerCase();
     } catch {
-      return false;
+      // Ignore non-JSON diagnostic lines.
     }
-  });
+  }
+  return null;
 }
 
 /**
@@ -785,6 +856,9 @@ async function main() {
   // The deadline includes preflight time and is checked both between and during attempts.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
   const contextRebuildCircuitBreaker = resolveContextRebuildCircuitBreakerConfig(process.env);
+  const configuredToolTimeout = Number(codexEnv.GH_AW_TOOL_TIMEOUT);
+  const fallbackToolTimeoutMs = Number.isSafeInteger(configuredToolTimeout) && configuredToolTimeout > 0 ? configuredToolTimeout * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : DEFAULT_MCP_CALL_WATCHDOG_MS;
+  const serverToolTimeouts = resolveMCPServerToolTimeouts(loadCompiledConfig(), configuredToolTimeout);
   /** @type {string[] | null} */
   let resumeArgs = null;
   let lastThreadId = "";
@@ -808,6 +882,10 @@ async function main() {
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
     runAttempt: async attempt => {
       const terminalErrors = [];
+      const mcpWatchdog = createMCPCallWatchdog(item => {
+        const server = item.server ?? item.server_name ?? item.serverName;
+        return serverToolTimeouts[server] ? serverToolTimeouts[server] * 1000 + MCP_CALL_TRANSPORT_GRACE_MS : fallbackToolTimeoutMs;
+      });
       let nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
       // Track the file size before this attempt so the watchdog only arms on output
       // written by this attempt, not by a previous retry.
@@ -823,6 +901,7 @@ async function main() {
         stdin: resumeArgs ? resumePrompt : promptInput.stdin,
         maxCollectedOutputBytes: 4 * 1024 * 1024,
         onStdoutLine: line => {
+          mcpWatchdog.observe(line);
           try {
             const event = JSON.parse(line);
             if (event.type === "thread.started" && typeof event.thread_id === "string") lastThreadId = event.thread_id;
@@ -832,27 +911,36 @@ async function main() {
             }
           } catch {}
         },
-        runtimeGuard:
-          contextRebuildCircuitBreaker.enabled || softTimeoutGuard
-            ? {
-                pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
-                termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
-                shouldTerminate: async () => {
-                  if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
-                  if (!contextRebuildCircuitBreaker.enabled) return false;
-                  if (Date.now() < nextContextCheckAt) return false;
-                  nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
-                  return evaluateContextRebuildCircuitBreakerForAttempt(
-                    await readWorkingSetFromTokenUsage(tokenUsagePaths),
-                    {
-                      maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
-                      minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
-                    },
-                    { safeOutputsPath, safeOutputsByteOffset, logger: log }
-                  );
-                },
-              }
-            : undefined,
+        onStdoutLinePrefix: prefix => mcpWatchdog.observePrefix(prefix),
+        runtimeGuard: {
+          pollIntervalMs: Math.min(contextRebuildCircuitBreaker.pollIntervalMs, 1000),
+          termGraceMs: contextRebuildCircuitBreaker.termGraceMs,
+          onTriggered: decision => {
+            if (decision.event) process.stdout.write(`${JSON.stringify(decision.event)}\n`);
+          },
+          shouldTerminate: async () => {
+            if (softTimeoutGuard && Date.now() >= softTimeoutGuard.softDeadlineMs) return { terminate: true, reason: "Codex reached the soft execution deadline; stopping to preserve structured output before the step timeout." };
+            const expiredMCPCallTimeoutMs = mcpWatchdog.expiredTimeoutMs();
+            if (expiredMCPCallTimeoutMs !== null) {
+              return {
+                terminate: true,
+                reason: `transport_wedge: MCP tool call timed out after ${Math.round(expiredMCPCallTimeoutMs / 1000)}s`,
+                event: { type: "agent.execution", data: { categories: ["transport_wedge"], errorCodes: [], errorTypes: [] } },
+              };
+            }
+            if (!contextRebuildCircuitBreaker.enabled) return false;
+            if (Date.now() < nextContextCheckAt) return false;
+            nextContextCheckAt = Date.now() + contextRebuildCircuitBreaker.pollIntervalMs;
+            return evaluateContextRebuildCircuitBreakerForAttempt(
+              await readWorkingSetFromTokenUsage(tokenUsagePaths),
+              {
+                maxRebuildFactor: contextRebuildCircuitBreaker.maxRebuildFactor,
+                minCumulativeInputTokens: contextRebuildCircuitBreaker.minCumulativeInputTokens,
+              },
+              { safeOutputsPath, safeOutputsByteOffset, logger: log }
+            );
+          },
+        },
         postResultWatchdog: safeOutputsPath
           ? {
               shouldArm: () =>
@@ -911,7 +999,8 @@ async function main() {
       const isServer = isServerError(result.output);
       const isInvalidModel = isInvalidModelError(result.output);
       const isUnsupportedModelTools = isUnsupportedModelToolsError(result.output);
-      const isInvalidRequest = isInvalidRequestError(result.output);
+      const invalidRequestErrorCode = extractInvalidRequestErrorCode(result.output);
+      const isInvalidRequest = invalidRequestErrorCode !== null;
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
       log(
@@ -1004,7 +1093,10 @@ async function main() {
       }
 
       if (isInvalidRequest) {
-        log(`attempt ${attempt + 1}: invalid_request_error (HTTP 400) — not retrying (the provider rejected the request payload; an identical fresh run would fail the same way)`);
+        emitInfrastructureIncomplete(`Codex request-body rejection (${invalidRequestErrorCode}): the provider rejected the request payload; not retrying because replaying the same request or session would fail identically.`, {
+          logger: log,
+        });
+        log(`attempt ${attempt + 1}: ${invalidRequestErrorCode} (HTTP 400) — not retrying (the provider rejected the request payload; replaying the same request or session would fail the same way)`);
         return { action: "stop" };
       }
 
@@ -1080,6 +1172,7 @@ if (typeof module !== "undefined" && module.exports) {
     isInvalidModelError,
     isUnsupportedModelToolsError,
     isInvalidRequestError,
+    extractInvalidRequestErrorCode,
     isReconnectExhaustedError,
     countPermissionDeniedIssues,
     hasNumerousPermissionDeniedIssues,
@@ -1108,6 +1201,8 @@ if (typeof module !== "undefined" && module.exports) {
     injectModelFlagAfterExec,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
+    createMCPCallWatchdog,
+    resolveMCPServerToolTimeouts,
     POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
     MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
