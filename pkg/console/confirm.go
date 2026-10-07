@@ -3,6 +3,7 @@
 package console
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,7 +21,13 @@ var confirmLog = logger.New("console:confirm")
 func ConfirmAction(title, affirmative, negative string) (bool, error) {
 	confirmLog.Printf("Showing confirmation: title=%s", title)
 
-	// Check if we're in a TTY environment
+	if !tty.IsStdinTerminal() {
+		confirmLog.Print("Non-TTY stdin detected, cannot read confirmation input")
+		return false, errors.New("interactive input not available (stdin is not a TTY)")
+	}
+
+	// The text fallback reads from stdin, while the Huh form also requires a
+	// terminal on stderr for rendering.
 	if !tty.IsStderrTerminal() {
 		confirmLog.Print("Non-TTY detected, falling back to text confirm")
 		return showTextConfirm(title, affirmative, negative, os.Stdin)

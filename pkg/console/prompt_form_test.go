@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -48,6 +49,21 @@ func TestPromptFormDoesNotClearAccessibleOrNonTTYQuestion(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "\n", output.String())
+}
+
+func TestPromptFormRunRejectsNonTTYStdin(t *testing.T) {
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Stdin = oldStdin })
+	t.Cleanup(func() { r.Close() })
+	t.Cleanup(func() { w.Close() })
+	os.Stdin = r
+
+	form := &PromptForm{}
+	err = form.Run()
+
+	require.ErrorContains(t, err, "stdin and stderr must be TTYs")
 }
 
 func TestIsCancelled(t *testing.T) {

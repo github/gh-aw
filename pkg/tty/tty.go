@@ -11,6 +11,11 @@ import (
 	"golang.org/x/term"
 )
 
+// IsStdinTerminal returns true if stdin is connected to a terminal.
+func IsStdinTerminal() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
 // IsStdoutTerminal returns true if stdout is connected to a terminal.
 func IsStdoutTerminal() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))

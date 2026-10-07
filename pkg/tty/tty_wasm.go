@@ -2,6 +2,11 @@
 
 package tty
 
+// IsStdinTerminal returns false in Wasm environments (no TTY support).
+func IsStdinTerminal() bool {
+	return false
+}
+
 // IsStdoutTerminal returns false in Wasm environments (no TTY support).
 func IsStdoutTerminal() bool {
 	return false
