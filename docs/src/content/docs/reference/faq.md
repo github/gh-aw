@@ -141,6 +141,28 @@ Yes. Private repositories can support proprietary code, a "sidecar" repository w
 
 Yes, for the **markdown body** (AI instructions) — loaded at runtime, takes effect on the next run. **Frontmatter** (tools, permissions, triggers, network rules) is embedded at compile time and requires `gh aw compile my-workflow` after edits. See [Editing Workflows](/gh-aw/guides/working-with-workflows/#editing-workflows).
 
+### How can I use parameters in a workflow prompt?
+
+Declare `workflow_dispatch` inputs for values chosen when starting a run, or use workflow-level `env` for values configured in one place. Reference them with GitHub Actions expressions in the markdown body:
+
+```aw wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to report on
+        type: string
+        default: main
+env:
+  PRODUCT: Contoso
+---
+
+Build a report for ${{ env.PRODUCT }} on branch ${{ inputs.branch }}.
+```
+
+The prompt is populated with the input and environment values before the agent receives it. A shell-style placeholder such as `${PRODUCT}` in the markdown body is **not** expanded; use `${{ env.PRODUCT }}` instead. Recompile after changing frontmatter values or input definitions.
+
 ### Can workflows trigger other workflows?
 
 Yes, using the `dispatch-workflow` safe output (default `max: 1`):
