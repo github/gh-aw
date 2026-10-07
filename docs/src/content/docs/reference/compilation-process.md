@@ -263,9 +263,15 @@ live model availability.
 Docker-based scanners and `--validate-images` remain opt-in. Docker unavailability
 does not block the dry-run gate; install native `shellcheck` for required run-step
 linting without Docker. When Docker is available, running `gh aw validate my-workflow`
-is recommended; it includes zizmor, actionlint, and poutine. Run these scanners when
-possible and report unavailable checks as unverified. Explicitly requested checks
+is recommended for source checks, alongside
+`gh aw compile my-workflow --dry-run --zizmor --actionlint --poutine` for scanner
+checks. `validate` uses `--no-emit` and skips these scanners; its success does not
+establish scanner coverage. Run the scanner-enabled compile command when possible
+and report unavailable checks as unverified. Explicitly requested checks
 still fail the dry-run gate on findings or scanner failures.
+
+MCP callers can opt into required image validation with `validate_images: true`,
+including with `dry_run: true`; Docker unavailability then fails compilation.
 
 ```bash
 gh aw compile my-workflow --dry-run --environment gh-aw-debug

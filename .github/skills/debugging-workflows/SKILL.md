@@ -493,7 +493,7 @@ gh aw compile <workflow> --dry-run
 # Recommended when using a reviewed test environment
 gh aw compile <workflow> --dry-run --environment gh-aw-debug
 
-# Recommended when Docker is available (runs zizmor, actionlint and poutine)
+# Additional source validation; does not run scanners
 gh aw validate <workflow>
 
 # Run those scanners on the emitted dry-run lock file when possible
@@ -503,6 +503,10 @@ gh aw compile <workflow> --dry-run --zizmor --actionlint --poutine
 Docker unavailability does not block the dry-run gate. Use native `shellcheck`
 for required run-step linting without Docker, and report unavailable optional
 checks as unverified.
+
+When Docker is available, recommend both commands: `validate` checks source
+without emitting files, while the scanner-enabled compile command runs zizmor,
+actionlint and poutine. A successful `validate` does not establish scanner coverage.
 
 ## Reference Commands
 

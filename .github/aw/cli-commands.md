@@ -65,9 +65,15 @@ gh aw compile --approve           # Approve new secrets / action changes
 **MCP equivalent**: `compile` tool
 
 Docker-based checks are optional for the dry-run gate. Recommend
-`gh aw validate <workflow-name>` when Docker is available; run zizmor, actionlint
-and poutine when possible. Without Docker, required run-step linting uses a native
+`gh aw validate <workflow-name>` for source checks when Docker is available,
+alongside the scanner-enabled compile command above for zizmor, actionlint and
+poutine when possible. `validate` uses `--no-emit` and skips these scanners;
+its success does not establish scanner coverage.
+Without Docker, required run-step linting uses a native
 `shellcheck` binary. Report unavailable optional checks as unverified.
+
+The compile MCP input `validate_images: true` opts into `--validate-images`,
+including with `dry_run: true`; it fails when Docker is unavailable.
 
 ---
 

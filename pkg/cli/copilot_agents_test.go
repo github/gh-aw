@@ -377,6 +377,7 @@ func TestUnifiedDebuggingInstructions(t *testing.T) {
 	assert.Contains(t, string(content), "Docker unavailability does not block the gate")
 	assert.Contains(t, string(content), "gh aw validate WORKFLOW")
 	assert.Contains(t, string(content), "gh aw compile WORKFLOW --dry-run --zizmor --actionlint --poutine")
+	assert.Contains(t, string(content), "`validate` itself skips them")
 	_, err = os.Stat(filepath.Join(awDir, "local-debug.md"))
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }

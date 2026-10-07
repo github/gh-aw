@@ -56,7 +56,7 @@ func TestCompileToolDevelopmentAllowsOptionalDockerChecks(t *testing.T) {
 			server := mcp.NewServer(&mcp.Implementation{Name: "gh-aw", Version: "test"}, nil)
 			require.NoError(t, registerCompileTool(server, mockExec, ""))
 			session := connectInMemory(t, server)
-			args := map[string]any{"dry_run": true}
+			args := map[string]any{"dry_run": true, "validate_images": enabled}
 			scanners := []string{"zizmor", "poutine", "actionlint", "runner-guard", "syft", "grype", "grant", "yamllint"}
 			for _, name := range scanners {
 				args[name] = enabled
@@ -65,6 +65,7 @@ func TestCompileToolDevelopmentAllowsOptionalDockerChecks(t *testing.T) {
 			require.NoError(t, err)
 			assert.False(t, result.IsError)
 			assert.Contains(t, capturedArgs, "--dry-run")
+			assert.Equal(t, enabled, slices.Contains(capturedArgs, "--validate-images"))
 			for _, name := range scanners {
 				assert.Equal(t, enabled, slices.Contains(capturedArgs, "--"+name))
 			}
@@ -140,6 +141,7 @@ func TestCompileToolDevelopmentAndEnvironmentArguments(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Contains(t, capturedArgs, "--dry-run")
+	assert.NotContains(t, capturedArgs, "--validate-images", "image validation remains opt-in")
 	index := slices.Index(capturedArgs, "--environment")
 	require.NotEqual(t, -1, index)
 	require.Greater(t, len(capturedArgs), index+1)

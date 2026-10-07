@@ -60,6 +60,17 @@ func TestDevelopmentCompileModeKeepsDockerChecksOptional(t *testing.T) {
 	}
 }
 
+func TestDevelopmentCompileFailsWithoutShellcheckOrDocker(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("GH_HOST", "github.com")
+
+	_, err := CompileWorkflows(context.Background(), CompileConfig{
+		DryRun: true, activeModels: &activeModelInventory{},
+	})
+	require.ErrorContains(t, err, "shellcheck not available")
+	assert.Contains(t, err.Error(), "install shellcheck")
+}
+
 func TestDevelopmentCompileModeRejectsBypasses(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
