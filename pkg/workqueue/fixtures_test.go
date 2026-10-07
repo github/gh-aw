@@ -85,7 +85,7 @@ func TestIndependentCanonicalEveryPrefixFixture(t *testing.T) {
 			t.Fatalf("prefix %d exact debt differs %s/%s expected %s/%s", index+1, classV, keyV, expected.ClassV, expected.KeyV)
 		}
 		for _, operation := range fixture.Commits[index].Operations {
-			operationKinds[operationKind(operation)] = true
+			operationKinds[mustOperationKind(t, operation)] = true
 		}
 	}
 	if len(operationKinds) != 12 {
@@ -178,7 +178,7 @@ func TestSharedReasonValidationFixtures(t *testing.T) {
 	commits := testGenesis(t, nil)
 	for _, test := range fixture.Cases {
 		t.Run(test.Name, func(t *testing.T) {
-			operation := Op(map[string]any{
+			operation := mustOp(t, map[string]any{
 				"kind": "Control", "control": "admission_paused", "value": false, "reason": test.Reason,
 			})
 			actor := testActor("administrator")

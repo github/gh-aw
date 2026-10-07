@@ -121,7 +121,7 @@ func TestIndependentWorkerChildEntitlementFixtures(t *testing.T) {
 								operations := []Operation{}
 								if kind == "delivery_failure" {
 									evidence.Attempts, evidence.Effects = 5, "unknown"
-									operations = append(operations, Op(map[string]any{
+									operations = append(operations, mustOp(t, map[string]any{
 										"kind": "DeliveryFailure", "work_id": parent.WorkID, "claim_id": parent.ClaimID,
 										"completion_id": parent.CompletionID, "reason": "verification_exhausted",
 										"disposition": "unknown", "evidence": evidence,
@@ -129,13 +129,13 @@ func TestIndependentWorkerChildEntitlementFixtures(t *testing.T) {
 								} else {
 									for _, member := range dispatch.Claims {
 										if before.Claims[member.ClaimID].State == "open" {
-											operations = append(operations, Op(map[string]any{
+											operations = append(operations, mustOp(t, map[string]any{
 												"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 												"reason": "native_terminal", "retry_not_before": 34000,
 											}))
 										}
 									}
-									operations = append(operations, Op(map[string]any{
+									operations = append(operations, mustOp(t, map[string]any{
 										"kind": "Release", "dispatch_id": dispatch.DispatchID, "evidence": evidence,
 									}))
 								}

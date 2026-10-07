@@ -120,7 +120,7 @@ func TestNativeUnboundReconciliationDoesNotConsumeLifecycleCapacity(t *testing.T
 		t.Fatal(err)
 	}
 	sender := state.Dispatches[assignment.DispatchID].Sender
-	commits = testOperations(t, commits, *sender, "uncertain-launch", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, *sender, "uncertain-launch", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID,
 		"state": "uncertain", "reason": "dispatch_response_unknown",
 	}))
@@ -332,7 +332,7 @@ func TestNativeTerminalRecoveryExhaustedBudgetCancelsWork(t *testing.T) {
 	pool := initial.Policy.Pools["default"]
 	pool.Retry.MaxAttempts = 1
 	initial.Policy.Pools["default"] = pool
-	genesis.Operations[0] = Op(initial)
+	genesis.Operations[0] = mustOp(t, initial)
 	genesis.Request, _ = NewRequest(genesis.Request.ID, "policy", genesis.Actor, OperationsParameters{Operations: genesis.Operations})
 	installMockLog(t, mock, commits)
 	configureNativeRun(mock, assignment)
@@ -354,13 +354,13 @@ func TestHistoricalNativeEvidenceUsesFrozenProfileAfterEpochChange(t *testing.T)
 	}
 	cancellations := []Operation{}
 	for _, member := range assignment.Claims {
-		cancellations = append(cancellations, Op(map[string]string{
+		cancellations = append(cancellations, mustOp(t, map[string]string{
 			"kind": "WorkCancellation", "work_id": member.WorkID, "reason": "operator_cancelled",
 		}))
 	}
 	commits = testOperations(t, commits, testActor("administrator"), "cancel-work", "cancel_work", cancellations...)
 	state, _ := Replay(commits)
-	commits = testOperations(t, commits, testActor("reconciler"), "release", "release", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "release", "release", mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminalFor(state, assignment),
 	}))
 	state, _ = Replay(commits)
@@ -370,7 +370,7 @@ func TestHistoricalNativeEvidenceUsesFrozenProfileAfterEpochChange(t *testing.T)
 	profile.Ref = "1111111111111111111111111111111111111111"
 	pool.Profiles["default"] = profile
 	policy.Pools["default"] = pool
-	commits = testOperations(t, commits, testActor("administrator"), "new-epoch", "policy", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("administrator"), "new-epoch", "policy", mustOp(t, map[string]any{
 		"kind": "Policy", "epoch": "next", "policy": policy,
 	}))
 	installMockLog(t, mock, commits)

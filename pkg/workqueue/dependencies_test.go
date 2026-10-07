@@ -20,14 +20,14 @@ func TestCredentialGenerationCannotReviveStaleObservations(t *testing.T) {
 		State: "ready", ObservedAt: 3500, CredentialGeneration: "initial",
 		ReadStatus: "ok", StateReason: "completed", ResourceState: "closed",
 	}
-	commits = testOperations(t, commits, testActor("reconciler"), "observe", "observe", Op(observation))
+	commits = testOperations(t, commits, testActor("reconciler"), "observe", "observe", mustOp(t, observation))
 	state, _ := Replay(commits)
 	next, err := PlanNext(state, "default", 4000)
 	if err != nil || next.WorkID != node.WorkID {
 		t.Fatalf("current authorized observation should satisfy the gate: %+v %v", next, err)
 	}
 	control := func(generation string) Operation {
-		return Op(map[string]any{"kind": "Control", "control": "credential_generation", "value": generation, "reason": "cutover"})
+		return mustOp(t, map[string]any{"kind": "Control", "control": "credential_generation", "value": generation, "reason": "cutover"})
 	}
 	commits = testOperations(t, commits, testActor("administrator"), "rotate", "control", control("rotated"))
 	commits = testOperations(t, commits, testActor("administrator"), "same-current", "control", control("rotated"))
@@ -112,7 +112,7 @@ func TestNativeNoGrantDiscardsTentativeObservationsWithoutAnyWrite(t *testing.T)
 			node.DependsOn = []Dependency{{Kind: "issue", Resource: &resource, Condition: "completed"}}
 			commits = testSubmit(t, commits, "submit", node)
 			if test.staleReady {
-				commits = testOperations(t, commits, testActor("reconciler"), "seed-ready", "observe", Op(Observation{
+				commits = testOperations(t, commits, testActor("reconciler"), "seed-ready", "observe", mustOp(t, Observation{
 					Kind: "Observation", ObservationID: "stale-ready", Resource: resource, Condition: "completed",
 					State: "ready", ObservedAt: 3000, CredentialGeneration: "initial",
 					ReadStatus: "ok", StateReason: "completed", ResourceState: "closed",

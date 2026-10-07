@@ -54,7 +54,7 @@ func TestObservedDispatchReservesAtomicOperationBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if commit == nil || len(commit.Operations) != 3 || operationKind(commit.Operations[0]) != "Observation" ||
+	if commit == nil || len(commit.Operations) != 3 || mustOperationKind(t, commit.Operations[0]) != "Observation" ||
 		len(decision.Operations) != 2 || decision.Reason != "operation_budget_reached" {
 		t.Fatalf("observations did not reserve their atomic operation slot: %+v %+v", commit, decision)
 	}

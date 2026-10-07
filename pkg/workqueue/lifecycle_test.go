@@ -2,6 +2,7 @@ package workqueue
 
 import (
 	"encoding/json"
+	"maps"
 	"os/exec"
 	"strings"
 	"testing"
@@ -34,7 +35,7 @@ func boundAssignmentWithWork(t *testing.T, adjust func(*WorkDefinition), updates
 	assignment := decision.Assignments[0]
 	sender := testActor("dispatcher")
 	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, commits, sender, "start", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, sender, "start", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": sender,
 	}))
 	state, _ := Replay(commits)
@@ -48,7 +49,7 @@ func boundAssignmentWithWork(t *testing.T, adjust func(*WorkDefinition), updates
 		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
 		CheckedAt: 4000, RunID: "202", RunAttempt: 1,
 	}
-	commits = testOperations(t, commits, testActor("reconciler"), "bind", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "bind", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": binding, "evidence": evidence,
 	}))
 	return commits, assignment
@@ -91,7 +92,7 @@ func terminalFor(state Projection, assignment Assignment) Evidence {
 }
 
 func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
-	commits, assignment := boundAssignment(t)
+	commits, assignment, target := boundEffectAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed")
 	commits = finishMember(t, commits, assignment, 1, "cancelled")
 	state, _ := Replay(commits)
@@ -99,11 +100,11 @@ func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
 		state.Stats.Dispatches != 1 {
 		t.Fatalf("one member outcome settled the shared native reservation: %+v", state.Stats)
 	}
-	if err := AuthorizeEffect(state, workerActor(assignment, "h1"), EffectResource{"repository": testRepository}); err != nil {
+	if err := AuthorizeEffect(state, workerActor(assignment, "h1"), target); err != nil {
 		t.Fatal(err)
 	}
 	for _, handle := range []string{"h2", "h3"} {
-		if err := AuthorizeEffect(state, workerActor(assignment, handle), EffectResource{"repository": testRepository}); err == nil {
+		if err := AuthorizeEffect(state, workerActor(assignment, handle), target); err == nil {
 			t.Fatal("cancelled/open sibling borrowed completed member authority")
 		}
 	}
@@ -113,8 +114,8 @@ func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
 	terminal := terminalFor(state, assignment)
 	third := assignment.Claims[2]
 	commits = testOperations(t, commits, testActor("reconciler"), "release", "release",
-		Op(map[string]any{"kind": "ClaimCancellation", "work_id": third.WorkID, "claim_id": third.ClaimID, "reason": "run_terminal", "retry_not_before": 34000}),
-		Op(map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
+		mustOp(t, map[string]any{"kind": "ClaimCancellation", "work_id": third.WorkID, "claim_id": third.ClaimID, "reason": "run_terminal", "retry_not_before": 34000}),
+		mustOp(t, map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
 	state, err := Replay(commits)
 	if err != nil || state.Stats.Completed != 1 || state.Stats.Dispatches != 0 || state.Stats.Available != 2 {
 		t.Fatalf("terminal recovery rolled back completed sibling: %+v %v", state.Stats, err)
@@ -127,12 +128,11 @@ func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
 func TestCompletionIsNotResultAndBarriersAreExclusive(t *testing.T) {
 	commits, assignment := boundAssignment(t)
 	root := assignment.Claims[0]
-	state, _ := Replay(commits)
 	child := testNode(t, commits, "child")
 	child.DependsOn = []Dependency{{Kind: "work", WorkID: root.WorkID}}
 	commits = testSubmit(t, commits, "child-submit", child)
 	commits = finishMember(t, commits, assignment, 0, "completed")
-	state, _ = Replay(commits)
+	state, _ := Replay(commits)
 	explanation, _ := ExplainWork(state, child.WorkID, 4000)
 	if explanation.Ready || explanation.Reason != "dependency_result_unavailable" {
 		t.Fatal("Completion released predecessor readiness without verified Result")
@@ -141,7 +141,7 @@ func TestCompletionIsNotResultAndBarriersAreExclusive(t *testing.T) {
 	delivery := terminal
 	delivery.Kind, delivery.Source, delivery.Receipt = "delivery", "verified_receipts", "verified-h1"
 	completionID := state.Works[root.WorkID].CompletionID
-	result := Op(map[string]any{
+	result := mustOp(t, map[string]any{
 		"kind": "Result", "work_id": root.WorkID, "claim_id": root.ClaimID,
 		"completion_id": completionID, "descriptor": map[string]any{"ok": true}, "evidence": delivery,
 	})
@@ -152,7 +152,7 @@ func TestCompletionIsNotResultAndBarriersAreExclusive(t *testing.T) {
 		t.Fatalf("verified Result did not release child: %+v", explanation)
 	}
 	terminal.Attempts, terminal.Effects = 5, "unknown"
-	failure := Op(map[string]any{
+	failure := mustOp(t, map[string]any{
 		"kind": "DeliveryFailure", "work_id": root.WorkID, "claim_id": root.ClaimID,
 		"completion_id": completionID, "reason": "receipts_unknown", "disposition": "unknown", "evidence": terminal,
 	})
@@ -166,11 +166,11 @@ func TestCompletionIsNotResultAndBarriersAreExclusive(t *testing.T) {
 func TestUncertainRunNeverExpiresOrReleases(t *testing.T) {
 	commits, assignment := boundAssignment(t)
 	commits = commits[:len(commits)-1]
-	commits = testOperations(t, commits, testActor("reconciler"), "uncertain", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "uncertain", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "uncertain", "reason": "response_lost",
 	}))
 	state, _ := Replay(commits)
-	release := Op(map[string]any{
+	release := mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID,
 		"evidence": Evidence{Kind: "nonlaunch", Source: "github_api", Repository: testRepository,
 			Workflow: ".github/workflows/worker.lock.yml", Ref: state.Policy.Pools["default"].Profiles["default"].Ref,
@@ -252,20 +252,18 @@ func TestCancellationMetadataIsImmutableAndIdempotent(t *testing.T) {
 	}
 	for _, field := range []string{"reason", "retry_not_before"} {
 		changed := make(map[string]any, len(cancellation))
-		for key, value := range cancellation {
-			changed[key] = value
-		}
+		maps.Copy(changed, cancellation)
 		if field == "reason" {
 			changed[field] = "changed"
 		} else {
 			changed[field] = 35000
 		}
-		request, _ := NewRequest("changed-"+field, "cancel_claim", testActor("reconciler"), OperationsParameters{Operations: []Operation{Op(changed)}})
+		request, _ := NewRequest("changed-"+field, "cancel_claim", testActor("reconciler"), OperationsParameters{Operations: []Operation{mustOp(t, changed)}})
 		if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil {
 			t.Fatalf("Claim cancellation %s changed after terminal fact", field)
 		}
 	}
-	workCancellation := Op(map[string]string{
+	workCancellation := mustOp(t, map[string]string{
 		"kind": "WorkCancellation", "work_id": assignment.Claims[2].WorkID, "reason": "operator_cancelled",
 	})
 	commits = testOperations(t, commits, testActor("administrator"), "cancel-work", "cancel_work", workCancellation)
@@ -283,7 +281,7 @@ func TestCancellationMetadataIsImmutableAndIdempotent(t *testing.T) {
 		t.Fatal("idempotent cancellation rewrote original terminal provenance")
 	}
 	changed, _ := NewRequest("changed-work-cancel", "cancel_work", testActor("administrator"), OperationsParameters{Operations: []Operation{
-		Op(map[string]string{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "changed"}),
+		mustOp(t, map[string]string{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "changed"}),
 	}})
 	if _, _, _, err := BuildCandidate(commits, testActor("administrator"), changed, 4000); err == nil {
 		t.Fatal("Work terminal reason was overwritten")
@@ -291,12 +289,12 @@ func TestCancellationMetadataIsImmutableAndIdempotent(t *testing.T) {
 }
 
 func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
-	commits, assignment := boundAssignment(t)
+	commits, assignment, target := boundEffectAssignment(t)
 	reserved := commits[:len(commits)-2]
 	sender := testActor("dispatcher")
 	sender.Principal = "2002"
 	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, reserved, sender, "different-origin-start", "dispatch", Op(map[string]any{
+	commits = testOperations(t, reserved, sender, "different-origin-start", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": sender,
 	}))
 	state, err := Replay(commits)
@@ -315,7 +313,7 @@ func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
 	}
 	impostorRun, impostorEvidence := binding, evidence
 	impostorRun.Principal, impostorEvidence.Principal = sender.Principal, sender.Principal
-	operation := Op(map[string]any{
+	operation := mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound",
 		"run": impostorRun, "evidence": impostorEvidence,
 	})
@@ -328,7 +326,7 @@ func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
 		!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
 		t.Fatalf("dispatcher origin replaced the approved native worker principal: %v", err)
 	}
-	commits = testOperations(t, commits, testActor("reconciler"), "different-origin-bind", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "different-origin-bind", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound",
 		"run": binding, "evidence": evidence,
 	}))
@@ -342,11 +340,11 @@ func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
 		t.Fatal("binding or Completion conflated logical sender and native worker principals")
 	}
 	worker := workerActor(assignment, "h1")
-	if err := AuthorizeEffect(state, worker, EffectResource{"repository": testRepository}); err != nil {
+	if err := AuthorizeEffect(state, worker, target); err != nil {
 		t.Fatalf("approved native worker lost authority under a different logical sender: %v", err)
 	}
 	worker.Principal = sender.Principal
-	if err := AuthorizeEffect(state, worker, EffectResource{"repository": testRepository}); err == nil ||
+	if err := AuthorizeEffect(state, worker, target); err == nil ||
 		!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
 		t.Fatalf("logical dispatcher borrowed native worker effect authority: %v", err)
 	}
@@ -367,8 +365,8 @@ func TestFinalRetryWorkerCancellationAtomicallyClosesWork(t *testing.T) {
 	}
 	next, commit, _, err := BuildCandidate(commits, actor, request, 4000)
 	if err != nil || commit == nil || len(commit.Operations) != 2 ||
-		operationKind(commit.Operations[0]) != "ClaimCancellation" ||
-		operationKind(commit.Operations[1]) != "WorkCancellation" || commit.Actor.Role != "worker" {
+		mustOperationKind(t, commit.Operations[0]) != "ClaimCancellation" ||
+		mustOperationKind(t, commit.Operations[1]) != "WorkCancellation" || commit.Actor.Role != "worker" {
 		t.Fatalf("final retry did not atomically close its original Work under worker authority: %v %+v", err, commit)
 	}
 	state, err := Replay(next)
@@ -395,7 +393,7 @@ func TestFinalRetryWorkerCancellationAtomicallyClosesWork(t *testing.T) {
 			fork := append([]QueueCommit{}, next...)
 			tip := &fork[len(fork)-1]
 			tip.Operations = append([]Operation{}, tip.Operations...)
-			tip.Operations[1] = Op(map[string]any{
+			tip.Operations[1] = mustOp(t, map[string]any{
 				"kind": "WorkCancellation", "work_id": invalid.workID, "reason": invalid.reason,
 			})
 			if _, err := Replay(fork); err == nil || !strings.HasPrefix(err.Error(), "ownership_unauthorized:") {
@@ -416,7 +414,7 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 	target := decision.Assignments[0]
 	sender := testActor("dispatcher")
 	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, commits, sender, "other-start", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, sender, "other-start", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "started", "sender": sender,
 	}))
 	state, err := Replay(commits)
@@ -430,7 +428,7 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
 		CheckedAt: 4000, RunID: originalRun.RunID, RunAttempt: 1,
 	}
-	operation := Op(map[string]any{
+	operation := mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "bound", "run": originalRun, "evidence": evidence,
 	})
 	actor := testActor("reconciler")
@@ -462,12 +460,12 @@ func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
 	})
 	operations := []Operation{}
 	for _, member := range original.Claims {
-		operations = append(operations, Op(map[string]any{
+		operations = append(operations, mustOp(t, map[string]any{
 			"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"reason": "native_terminal", "retry_not_before": 34000,
 		}))
 	}
-	operations = append(operations, Op(map[string]any{
+	operations = append(operations, mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": original.DispatchID, "evidence": terminalFor(state, original),
 	}))
 	commits = testOperations(t, commits, testActor("reconciler"), "release-original", "release", operations...)

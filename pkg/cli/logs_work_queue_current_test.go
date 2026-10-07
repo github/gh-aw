@@ -23,6 +23,13 @@ func currentWorkQueueTestDir(t *testing.T) string {
 	return t.TempDir()
 }
 
+func mustWorkQueueOperation(t testing.TB, value any) workqueue.Operation {
+	t.Helper()
+	operation, err := workqueue.Op(value)
+	require.NoError(t, err)
+	return operation
+}
+
 func currentWorkQueueFixture(t *testing.T) map[string]any {
 	t.Helper()
 	policy := workqueue.DefaultPolicy("42", "owner/repo")
@@ -48,7 +55,7 @@ func currentWorkQueueFixture(t *testing.T) map[string]any {
 		}
 		commits = append(commits, commit)
 	}
-	ops := []workqueue.Operation{workqueue.Op(map[string]any{"kind": "Policy", "epoch": "epoch-1", "policy": policy})}
+	ops := []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Policy", "epoch": "epoch-1", "policy": policy})}
 	appendCommit(admin, "policy", workqueue.OperationsParameters{Operations: ops}, ops)
 	nodes := []workqueue.WorkDefinition{}
 	for _, key := range []string{"a", "b"} {
@@ -56,7 +63,7 @@ func currentWorkQueueFixture(t *testing.T) map[string]any {
 		require.NoError(t, err)
 		nodes = append(nodes, node)
 	}
-	ops = []workqueue.Operation{workqueue.Op(nodes[0]), workqueue.Op(nodes[1])}
+	ops = []workqueue.Operation{mustWorkQueueOperation(t, nodes[0]), mustWorkQueueOperation(t, nodes[1])}
 	appendCommit(admin, "submit", workqueue.SubmitParameters{Nodes: nodes}, ops)
 	state, err := workqueue.Replay(commits)
 	require.NoError(t, err)
@@ -67,7 +74,7 @@ func currentWorkQueueFixture(t *testing.T) map[string]any {
 	require.Len(t, decision.Assignments[0].Claims, 2)
 	appendCommit(dispatcher, "dispatch_next", parameters, decision.Operations)
 	assignment := decision.Assignments[0]
-	ops = []workqueue.Operation{workqueue.Op(map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": dispatcher})}
+	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": dispatcher})}
 	appendCommit(dispatcher, "dispatch", workqueue.OperationsParameters{Operations: ops}, ops)
 	worker := workqueue.Actor{Role: "worker", Principal: "42", Repository: "owner/repo",
 		Workflow: profile.Workflow, RunID: "20", RunAttempt: 1, DispatchID: assignment.DispatchID}
@@ -75,15 +82,15 @@ func currentWorkQueueFixture(t *testing.T) map[string]any {
 		Workflow: profile.Workflow, Ref: profile.Ref, Principal: "42", Event: "workflow_dispatch"}
 	evidence := workqueue.Evidence{Kind: "reconciliation", Source: "trusted_activation", Repository: "owner/repo",
 		Workflow: profile.Workflow, Ref: profile.Ref, Principal: "42", RunID: "20", RunAttempt: 1, CheckedAt: 5}
-	ops = []workqueue.Operation{workqueue.Op(map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": run, "evidence": evidence})}
+	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": run, "evidence": evidence})}
 	appendCommit(worker, "dispatch", workqueue.OperationsParameters{Operations: ops}, ops)
 	first, second := assignment.Claims[0], assignment.Claims[1]
 	worker.ClaimHandle = first.Handle
-	ops = []workqueue.Operation{workqueue.Op(map[string]any{"kind": "Completion", "work_id": first.WorkID,
+	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Completion", "work_id": first.WorkID,
 		"claim_id": first.ClaimID, "dispatch_id": assignment.DispatchID, "claim_handle": first.Handle, "run_id": "20", "run_attempt": 1})}
 	appendCommit(worker, "finish", workqueue.FinishParameters{DispatchID: assignment.DispatchID, ClaimHandle: first.Handle, Outcome: "completed"}, ops)
 	worker.ClaimHandle = second.Handle
-	ops = []workqueue.Operation{workqueue.Op(map[string]any{"kind": "ClaimCancellation", "work_id": second.WorkID,
+	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "ClaimCancellation", "work_id": second.WorkID,
 		"claim_id": second.ClaimID, "reason": "worker_cancelled", "retry_not_before": 30007})}
 	appendCommit(worker, "finish", workqueue.FinishParameters{DispatchID: assignment.DispatchID, ClaimHandle: second.Handle, Outcome: "cancelled"}, ops)
 	worker.ClaimHandle = ""
@@ -732,7 +739,7 @@ func TestWorkQueueCurrentVerifiedAndFailedDelivery(t *testing.T) {
 					"claim_id": member.ClaimID, "completion_id": "commit-6", "reason": "verification_exhausted",
 					"disposition": "unknown", "evidence": evidence}
 			}
-			ops := []workqueue.Operation{workqueue.Op(operation)}
+			ops := []workqueue.Operation{mustWorkQueueOperation(t, operation)}
 			actor := workqueue.Actor{Role: "reconciler", Principal: "42", Repository: "owner/repo"}
 			request, err := workqueue.NewRequest("settlement", kind, actor, workqueue.OperationsParameters{Operations: ops})
 			require.NoError(t, err)

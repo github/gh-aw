@@ -184,7 +184,7 @@ func TestReplayRejectsUnscheduledClaimAndRegrouping(t *testing.T) {
 	var claim ClaimOperation
 	_ = json.Unmarshal(next[len(next)-1].Operations[0], &claim)
 	claim.WorkID = b.WorkID
-	next[len(next)-1].Operations[0] = Op(claim)
+	next[len(next)-1].Operations[0] = mustOp(t, claim)
 	if _, err := Replay(next); err == nil || !strings.Contains(err.Error(), "selection_invalid") {
 		t.Fatalf("arbitrary Work Claim accepted: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestReplayRejectsValidMembershipOutsideExactFairPrefix(t *testing.T) {
 	_ = json.Unmarshal(regrouped[len(regrouped)-1].Operations[0], &first)
 	_ = json.Unmarshal(regrouped[len(regrouped)-1].Operations[1], &second)
 	second.DispatchID, second.Handle = first.DispatchID, "h2"
-	regrouped[len(regrouped)-1].Operations[1] = Op(second)
+	regrouped[len(regrouped)-1].Operations[1] = mustOp(t, second)
 	if _, err := Replay(regrouped); err == nil || !strings.Contains(err.Error(), "selection_invalid") {
 		t.Fatalf("valid selected membership was regrouped outside approved packing: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestAssignmentByteFitOpensAnotherCompatibleGroup(t *testing.T) {
 	nodes := []WorkDefinition{}
 	for _, key := range []string{"a", "b", "c"} {
 		node := testNode(t, commits, key)
-		node.Payload = Op(map[string]string{"task": strings.Repeat("x", 2000)})
+		node.Payload = mustOp(t, map[string]string{"task": strings.Repeat("x", 2000)})
 		nodes = append(nodes, node)
 	}
 	commits = testSubmit(t, commits, "submit", nodes...)

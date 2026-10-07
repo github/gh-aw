@@ -69,9 +69,9 @@ func TestBranchCompactionPreservesCompleteAuthorityAndIsIdempotent(t *testing.T)
 	terminal := terminalFor(after, assignment)
 	third := assignment.Claims[2]
 	closed := testOperations(t, commits, testActor("reconciler"), "compact-released", "release",
-		Op(map[string]any{"kind": "ClaimCancellation", "work_id": third.WorkID, "claim_id": third.ClaimID,
+		mustOp(t, map[string]any{"kind": "ClaimCancellation", "work_id": third.WorkID, "claim_id": third.ClaimID,
 			"reason": "run_terminal", "retry_not_before": 34000}),
-		Op(map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
+		mustOp(t, map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
 	closedState, err := Replay(closed)
 	if err != nil {
 		t.Fatal(err)

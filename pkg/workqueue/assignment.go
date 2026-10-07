@@ -64,12 +64,14 @@ func ParseAssignment(data []byte) (Assignment, error) {
 	if err := json.Unmarshal(data, &assignment); err != nil {
 		return Assignment{}, err
 	}
-	handles, claims, works := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	handles, claims, works := identitySet{}, identitySet{}, identitySet{}
 	for _, member := range assignment.Claims {
-		if handles[member.Handle] || claims[member.ClaimID] || works[member.WorkID] {
+		if handles.contains(member.Handle) || claims.contains(member.ClaimID) || works.contains(member.WorkID) {
 			return Assignment{}, queueError("assignment_invalid", "assignment repeats a handle, Claim, or Work")
 		}
-		handles[member.Handle], claims[member.ClaimID], works[member.WorkID] = true, true, true
+		handles.add(member.Handle)
+		claims.add(member.ClaimID)
+		works.add(member.WorkID)
 	}
 	return assignment, nil
 }
@@ -87,7 +89,9 @@ func NormalizeFinishIntent(assignment Assignment, data []byte) (FinishParameters
 		ClaimHandle *string `json:"claim_handle"`
 		Outcome     string  `json:"outcome"`
 	}
-	_ = json.Unmarshal(data, &intent)
+	if err := json.Unmarshal(data, &intent); err != nil {
+		return FinishParameters{}, err
+	}
 	handle, err := NormalizeClaimHandle(assignment, intent.ClaimHandle)
 	if err != nil {
 		return FinishParameters{}, err

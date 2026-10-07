@@ -326,130 +326,170 @@ func extending(previous, current []QueueCommit) bool {
 // discards selections, handles, charges and clocks and recovers uncertain ref
 // acknowledgments by stable request identity before constructing another grant.
 func (b Branch) Publish(ctx context.Context, actor Actor, request Request) (Publication, error) {
-	b, err := b.withClient()
+	b, err := b.authenticatePublication(ctx, actor, request)
 	if err != nil {
-		return Publication{}, err
-	}
-	authenticated, err := b.Authenticate(ctx, actor.Role)
-	if err != nil || !sameJSON(authenticated, actor) {
-		if err != nil {
-			return Publication{}, err
-		}
-		return Publication{}, queueError("actor_unauthorized", "request actor differs from authenticated operator")
-	}
-	b.Remote = authenticated.Repository
-	if err := validateRequestOrigin(actor, request); err != nil {
-		return Publication{}, err
-	}
-	if err := validateRequestRole(actor, request.Kind); err != nil {
 		return Publication{}, err
 	}
 	var last []QueueCommit
 	var pendingErr error
 	for attempt := range maxRetries {
-		transactions, snapshot, err := b.read(ctx)
+		prefix, err := b.readPublicationPrefix(ctx, actor, request, last)
 		if err != nil {
 			return Publication{}, err
 		}
-		if len(last) > 0 && (snapshot.head == "" || !extending(last, transactions)) {
-			return Publication{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during publication")
-		}
-		creating := snapshot.head == ""
-		var initial *QueueCommit
-		if creating {
-			genesis, genuine, err := b.initialPolicyCommit(ctx, actor, request)
-			if err != nil {
-				return Publication{}, err
-			}
-			transactions = []QueueCommit{genesis}
-			if genuine {
-				initial = &genesis
-			}
-		}
-		state, err := Replay(transactions)
+		candidate, err := b.preparePublicationCandidate(ctx, actor, request, prefix, pendingErr)
 		if err != nil {
 			return Publication{}, err
 		}
-		if existing, ok := state.Requests[request.ID]; ok && initial == nil {
-			if existing.Request.Fingerprint != request.Fingerprint || !sameJSON(existing.Actor, actor) {
-				return Publication{}, queueError("request_reuse", "request identity has different accepted meaning")
-			}
-			_, commit, decision, err := BuildCandidate(transactions, actor, request, time.Now().UnixMilli())
-			return Publication{Commit: commit, Decision: decision, Changed: false}, err
+		if candidate.settled {
+			return candidate.publication, nil
 		}
-		if err := validateRequestRole(actor, request.Kind); err != nil {
-			return Publication{}, err
-		}
-		if pendingErr != nil && !hasStatus(pendingErr, http.StatusConflict) &&
-			!hasStatus(pendingErr, http.StatusUnprocessableEntity) &&
-			(hasStatus(pendingErr, http.StatusUnauthorized) || hasStatus(pendingErr, http.StatusForbidden)) {
-			return Publication{}, pendingErr
-		}
-		if initial == nil {
-			if err := b.verifyRequestEvidence(ctx, state, actor, request); err != nil {
-				return Publication{}, err
-			}
-		}
-		var observations []Observation
-		if request.Kind == "dispatch_next" {
-			var params DispatchParameters
-			if err := json.Unmarshal(request.Parameters, &params); err != nil {
-				return Publication{}, err
-			}
-			observations, err = b.refreshForDispatch(ctx, state, params.Pool, request.ID)
-			if err != nil {
-				return Publication{}, err
-			}
-		}
-		var next []QueueCommit
-		var commit *QueueCommit
-		var decision Decision
-		if initial != nil {
-			next, commit = transactions, initial
-			decision = Decision{Tip: state.Tip, Operations: commit.Operations, Assignments: []Assignment{}}
-		} else {
-			next, commit, decision, err = buildCandidateWithObservations(transactions, actor, request, time.Now().UnixMilli(), observations)
-		}
-		if err != nil {
-			return Publication{}, err
-		}
-		if commit == nil {
-			return Publication{Decision: decision}, nil
-		}
-		conflict, err := b.publish(ctx, snapshot, next)
+		_, err = b.publish(ctx, prefix.snapshot, candidate.commits)
 		if err == nil {
-			return Publication{Commit: commit, Decision: decision, Changed: true}, nil
+			candidate.publication.Changed = true
+			return candidate.publication, nil
 		}
 		if ctx.Err() != nil {
 			return Publication{}, ctx.Err()
 		}
-		// Ref update may have succeeded even when the response was lost. Safe
-		// reads find the stable request before any new candidate is published.
+		// A lost ref response may be an accepted request, not a failed grant.
 		pendingErr = err
-		if !creating {
-			last = transactions
+		if prefix.snapshot.head != "" {
+			last = prefix.commits
 		}
 		if attempt == maxRetries-1 {
-			current, _, readErr := b.read(ctx)
-			if readErr == nil && len(current) > 0 {
-				projection, replayErr := Replay(current)
-				if replayErr == nil {
-					if existing, ok := projection.Requests[request.ID]; ok &&
-						existing.Request.Fingerprint == request.Fingerprint && sameJSON(existing.Actor, actor) {
-						_, committed, decision, err := BuildCandidate(current, actor, request, time.Now().UnixMilli())
-						return Publication{Commit: committed, Decision: decision}, err
-					}
-				}
-			}
-			return Publication{}, fmt.Errorf("queue publication unresolved after %d attempts: %w", maxRetries, err)
+			return b.recoverPublicationAcknowledgment(ctx, actor, request, err)
 		}
-		_ = conflict
 		if err := waitForPublicationRetry(ctx, attempt); err != nil {
 			return Publication{}, err
 		}
 	}
-
 	return Publication{}, errors.New("queue publication exhausted retries")
+}
+
+func (b Branch) authenticatePublication(ctx context.Context, actor Actor, request Request) (Branch, error) {
+	b, err := b.withClient()
+	if err != nil {
+		return b, err
+	}
+	authenticated, err := b.Authenticate(ctx, actor.Role)
+	if err != nil || !sameJSON(authenticated, actor) {
+		if err != nil {
+			return b, err
+		}
+		return b, queueError("actor_unauthorized", "request actor differs from authenticated operator")
+	}
+	b.Remote = authenticated.Repository
+	if err := validateRequestOrigin(actor, request); err != nil {
+		return b, err
+	}
+	if err := validateRequestRole(actor, request.Kind); err != nil {
+		return b, err
+	}
+	return b, nil
+}
+
+type publicationPrefix struct {
+	commits  []QueueCommit
+	snapshot branchSnapshot
+	initial  *QueueCommit
+	state    Projection
+}
+
+func (b Branch) readPublicationPrefix(ctx context.Context, actor Actor, request Request, previous []QueueCommit) (publicationPrefix, error) {
+	commits, snapshot, err := b.read(ctx)
+	if err != nil {
+		return publicationPrefix{}, err
+	}
+	if len(previous) > 0 && (snapshot.head == "" || !extending(previous, commits)) {
+		return publicationPrefix{}, queueError("ledger_nonextending", "queue history was deleted or rewritten during publication")
+	}
+	var initial *QueueCommit
+	if snapshot.head == "" {
+		genesis, genuine, err := b.initialPolicyCommit(ctx, actor, request)
+		if err != nil {
+			return publicationPrefix{}, err
+		}
+		commits = []QueueCommit{genesis}
+		if genuine {
+			initial = &genesis
+		}
+	}
+	state, err := Replay(commits)
+	if err != nil {
+		return publicationPrefix{}, err
+	}
+	return publicationPrefix{commits: commits, snapshot: snapshot, initial: initial, state: state}, nil
+}
+
+type publicationCandidate struct {
+	commits     []QueueCommit
+	publication Publication
+	settled     bool
+}
+
+func (b Branch) preparePublicationCandidate(ctx context.Context, actor Actor, request Request, prefix publicationPrefix, pendingErr error) (publicationCandidate, error) {
+	if existing, ok := prefix.state.Requests[request.ID]; ok && prefix.initial == nil {
+		if existing.Request.Fingerprint != request.Fingerprint || !sameJSON(existing.Actor, actor) {
+			return publicationCandidate{}, queueError("request_reuse", "request identity has different accepted meaning")
+		}
+		_, commit, decision, err := BuildCandidate(prefix.commits, actor, request, time.Now().UnixMilli())
+		return publicationCandidate{publication: Publication{Commit: commit, Decision: decision}, settled: true}, err
+	}
+	if err := validateRequestRole(actor, request.Kind); err != nil {
+		return publicationCandidate{}, err
+	}
+	if pendingErr != nil && !hasStatus(pendingErr, http.StatusConflict) &&
+		!hasStatus(pendingErr, http.StatusUnprocessableEntity) &&
+		(hasStatus(pendingErr, http.StatusUnauthorized) || hasStatus(pendingErr, http.StatusForbidden)) {
+		return publicationCandidate{}, pendingErr
+	}
+	if prefix.initial == nil {
+		if err := b.verifyRequestEvidence(ctx, prefix.state, actor, request); err != nil {
+			return publicationCandidate{}, err
+		}
+	}
+	var observations []Observation
+	if request.Kind == "dispatch_next" {
+		var params DispatchParameters
+		if err := json.Unmarshal(request.Parameters, &params); err != nil {
+			return publicationCandidate{}, err
+		}
+		var err error
+		observations, err = b.refreshForDispatch(ctx, prefix.state, params.Pool, request.ID)
+		if err != nil {
+			return publicationCandidate{}, err
+		}
+	}
+	var candidate publicationCandidate
+	var err error
+	if prefix.initial != nil {
+		candidate.commits, candidate.publication.Commit = prefix.commits, prefix.initial
+		candidate.publication.Decision = Decision{Tip: prefix.state.Tip, Operations: prefix.initial.Operations, Assignments: []Assignment{}}
+	} else {
+		candidate.commits, candidate.publication.Commit, candidate.publication.Decision, err =
+			buildCandidateWithObservations(prefix.commits, actor, request, time.Now().UnixMilli(), observations)
+	}
+	if err != nil {
+		return publicationCandidate{}, err
+	}
+	candidate.settled = candidate.publication.Commit == nil
+	return candidate, nil
+}
+
+func (b Branch) recoverPublicationAcknowledgment(ctx context.Context, actor Actor, request Request, pendingErr error) (Publication, error) {
+	current, _, readErr := b.read(ctx)
+	if readErr == nil && len(current) > 0 {
+		projection, replayErr := Replay(current)
+		if replayErr == nil {
+			if existing, ok := projection.Requests[request.ID]; ok &&
+				existing.Request.Fingerprint == request.Fingerprint && sameJSON(existing.Actor, actor) {
+				_, committed, decision, err := BuildCandidate(current, actor, request, time.Now().UnixMilli())
+				return Publication{Commit: committed, Decision: decision}, err
+			}
+		}
+	}
+	return Publication{}, fmt.Errorf("queue publication unresolved after %d attempts: %w", maxRetries, pendingErr)
 }
 
 func waitForPublicationRetry(ctx context.Context, attempt int) error {

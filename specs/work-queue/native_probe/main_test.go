@@ -56,6 +56,24 @@ func TestTypedCanonicalRejectsOriginalInvalidUnicode(t *testing.T) {
 	}
 }
 
+func TestTypedCanonicalPublicAPIRejectsInvalidUTF8WithoutTransportGuard(t *testing.T) {
+	invalid := string([]byte{0xff})
+	for name, value := range map[string]any{
+		"value":  invalid,
+		"object": map[string]any{"value": invalid},
+		"key":    map[string]any{invalid: "value"},
+		"nested": []any{map[string]any{"value": invalid}},
+		"struct": struct{ Value string }{invalid},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data, err := workqueue.CanonicalValue(value)
+			if err == nil || !strings.HasPrefix(err.Error(), "invalid_utf8:") || data != nil {
+				t.Fatalf("public API repaired invalid typed UTF8: %q %v", data, err)
+			}
+		})
+	}
+}
+
 func TestTypedCanonicalPreservesTypedParsingAndValidStrings(t *testing.T) {
 	tests := []struct {
 		name, data, expected string

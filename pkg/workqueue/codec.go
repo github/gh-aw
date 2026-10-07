@@ -68,29 +68,7 @@ func readValue(decoder *json.Decoder, depth int) (any, error) {
 	case json.Delim:
 		switch value {
 		case '{':
-			result := map[string]any{}
-			for decoder.More() {
-				key, err := decoder.Token()
-				if err != nil {
-					return nil, err
-				}
-				name, ok := key.(string)
-				if !ok {
-					return nil, errors.New("JSON object key must be a string")
-				}
-				if _, exists := result[name]; exists {
-					return nil, queueError("duplicate_key", "%q", name)
-				}
-				child, err := readValue(decoder, depth+1)
-				if err != nil {
-					return nil, err
-				}
-				result[name] = child
-			}
-			if _, err := decoder.Token(); err != nil {
-				return nil, err
-			}
-			return result, nil
+			return readObject(decoder, depth)
 		case '[':
 			result := []any{}
 			for decoder.More() {
@@ -120,20 +98,47 @@ func readValue(decoder *json.Decoder, depth int) (any, error) {
 	}
 }
 
+func readObject(decoder *json.Decoder, depth int) (any, error) {
+	result := map[string]any{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+		name, ok := key.(string)
+		if !ok {
+			return nil, errors.New("JSON object key must be a string")
+		}
+		if _, exists := result[name]; exists {
+			return nil, queueError("duplicate_key", "%q", name)
+		}
+		child, err := readValue(decoder, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		result[name] = child
+	}
+	if _, err := decoder.Token(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func decodeStrict(data []byte) (any, error) {
 	if !utf8.Valid(data) {
 		return nil, queueError("invalid_utf8", "JSON must be valid UTF-8")
 	}
 	// encoding/json replaces lone surrogate escapes; reject them instead.
-	for i := 0; i < len(data); i++ {
-		if data[i] != '\\' || i+1 >= len(data) {
+	skipUntil := 0
+	for i, char := range data {
+		if i < skipUntil || char != '\\' || i+1 >= len(data) {
 			continue
 		}
-		if data[i+1] == '\\' {
-			i++
+		if bytes.HasPrefix(data[i:], []byte(`\\`)) {
+			skipUntil = i + 2
 			continue
 		}
-		if data[i+1] != 'u' || i+6 > len(data) {
+		if !bytes.HasPrefix(data[i:], []byte(`\u`)) || i+6 > len(data) {
 			continue
 		}
 		unit, err := strconv.ParseUint(string(data[i+2:i+6]), 16, 16)
@@ -151,7 +156,7 @@ func decodeStrict(data []byte) (any, error) {
 			if err != nil || low < 0xdc00 || low > 0xdfff {
 				return nil, queueError("invalid_unicode", "unpaired surrogate escape")
 			}
-			i += 11
+			skipUntil = i + 12
 		}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -200,32 +205,7 @@ func writeCanonical(buffer *bytes.Buffer, value any) error {
 		}
 		buffer.WriteByte(']')
 	case string:
-		buffer.WriteByte('"')
-		for _, char := range value {
-			switch char {
-			case '"':
-				buffer.WriteString(`\"`)
-			case '\\':
-				buffer.WriteString(`\\`)
-			case '\b':
-				buffer.WriteString(`\b`)
-			case '\f':
-				buffer.WriteString(`\f`)
-			case '\n':
-				buffer.WriteString(`\n`)
-			case '\r':
-				buffer.WriteString(`\r`)
-			case '\t':
-				buffer.WriteString(`\t`)
-			default:
-				if char < 0x20 {
-					fmt.Fprintf(buffer, `\u%04x`, char)
-				} else {
-					buffer.WriteRune(char)
-				}
-			}
-		}
-		buffer.WriteByte('"')
+		writeCanonicalString(buffer, value)
 	case json.Number:
 		buffer.WriteString(string(value))
 	case bool:
@@ -236,6 +216,35 @@ func writeCanonical(buffer *bytes.Buffer, value any) error {
 		return fmt.Errorf("unsupported canonical value %T", value)
 	}
 	return nil
+}
+
+func writeCanonicalString(buffer *bytes.Buffer, value string) {
+	buffer.WriteByte('"')
+	for _, char := range value {
+		switch char {
+		case '"':
+			buffer.WriteString(`\"`)
+		case '\\':
+			buffer.WriteString(`\\`)
+		case '\b':
+			buffer.WriteString(`\b`)
+		case '\f':
+			buffer.WriteString(`\f`)
+		case '\n':
+			buffer.WriteString(`\n`)
+		case '\r':
+			buffer.WriteString(`\r`)
+		case '\t':
+			buffer.WriteString(`\t`)
+		default:
+			if char < 0x20 {
+				fmt.Fprintf(buffer, `\u%04x`, char) //nolint:fprintferrorunchecked // bytes.Buffer writes cannot fail.
+			} else {
+				buffer.WriteRune(char)
+			}
+		}
+	}
+	buffer.WriteByte('"')
 }
 
 // Canonical uses the contract's integer-only JSON profile and UTF-8 key order.
@@ -251,9 +260,9 @@ func Canonical(data []byte) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// CanonicalValue encodes typed JSON data using the integer-only wire profile.
+// CanonicalValue encodes typed JSON without repairing strings or losing numeric values.
 func CanonicalValue(value any) ([]byte, error) {
-	if err := validateTypedNumbers(reflect.ValueOf(value), 0); err != nil {
+	if err := validateTypedValue(reflect.ValueOf(value), 0); err != nil {
 		return nil, err
 	}
 	data, err := json.Marshal(value)
@@ -263,7 +272,7 @@ func CanonicalValue(value any) ([]byte, error) {
 	return Canonical(data)
 }
 
-func validateTypedNumbers(value reflect.Value, depth int) error {
+func validateTypedValue(value reflect.Value, depth int) error {
 	for wrappers := 0; value.IsValid() &&
 		(value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer); wrappers++ {
 		if value.IsNil() {
@@ -281,6 +290,10 @@ func validateTypedNumbers(value reflect.Value, depth int) error {
 		return queueError("resource_limit", "typed JSON nesting exceeds 64")
 	}
 	switch value.Kind() {
+	case reflect.String:
+		if !utf8.ValidString(value.String()) {
+			return queueError("invalid_utf8", "JSON must be valid UTF-8")
+		}
 	case reflect.Float32, reflect.Float64:
 		number := value.Float()
 		if math.IsNaN(number) || math.IsInf(number, 0) || math.Abs(number) > float64(MaxTimestamp) ||
@@ -289,7 +302,11 @@ func validateTypedNumbers(value reflect.Value, depth int) error {
 		}
 	case reflect.Map:
 		for entries := value.MapRange(); entries.Next(); {
-			if err := validateTypedNumbers(entries.Value(), depth+1); err != nil {
+			key := entries.Key()
+			if key.Kind() == reflect.String && !utf8.ValidString(key.String()) {
+				return queueError("invalid_utf8", "JSON must be valid UTF-8")
+			}
+			if err := validateTypedValue(entries.Value(), depth+1); err != nil {
 				return err
 			}
 		}
@@ -301,24 +318,28 @@ func validateTypedNumbers(value reflect.Value, depth int) error {
 			return queueError("resource_limit", "JSON array exceeds 16384 members")
 		}
 		for index := range value.Len() {
-			if err := validateTypedNumbers(value.Index(index), depth+1); err != nil {
+			if err := validateTypedValue(value.Index(index), depth+1); err != nil {
 				return err
 			}
 		}
 	case reflect.Struct:
-		for index := range value.NumField() {
-			field := value.Type().Field(index)
-			if field.PkgPath != "" || field.Tag.Get("json") == "-" {
-				continue
-			}
-			if err := validateTypedNumbers(value.Field(index), depth+1); err != nil {
-				return err
-			}
-		}
+		return validateTypedFields(value, depth)
 	}
 	return nil
 }
 
+func validateTypedFields(value reflect.Value, depth int) error {
+	for index := range value.NumField() {
+		field := value.Type().Field(index)
+		if field.PkgPath != "" || field.Tag.Get("json") == "-" {
+			continue
+		}
+		if err := validateTypedValue(value.Field(index), depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func canonicalValue(value any) ([]byte, error) {
 	return CanonicalValue(value)
 }
@@ -358,20 +379,41 @@ func NewRequest(id, kind string, actor Actor, parameters any) (Request, error) {
 	return Request{ID: id, Kind: kind, Parameters: data, Fingerprint: fingerprint}, err
 }
 
-func Op(value any) Operation {
+func Op(value any) (Operation, error) {
 	data, err := canonicalValue(value)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return data
+	return data, nil
 }
 
-func operationKind(op Operation) string {
+func appendOperation(operations *[]Operation, value any) error {
+	operation, err := Op(value)
+	if err != nil {
+		return err
+	}
+	*operations = append(*operations, operation)
+	return nil
+}
+
+func operationKind(op Operation) (string, error) {
 	var value struct {
 		Kind string `json:"kind"`
 	}
-	_ = json.Unmarshal(op, &value)
-	return value.Kind
+	if err := json.Unmarshal(op, &value); err != nil {
+		return "", err
+	}
+	return value.Kind, nil
+}
+
+func singleOperation(operations []Operation) (Operation, bool) {
+	if len(operations) != 1 {
+		return nil, false
+	}
+	for _, operation := range operations {
+		return operation, true
+	}
+	return nil, false
 }
 
 func ValidateCommit(commit QueueCommit) error {
@@ -415,7 +457,7 @@ func Parse(data []byte) ([]QueueCommit, error) {
 	if len(data) > maxParseBytes {
 		return nil, queueError("resource_limit", "ledger exceeds 80 MiB parser bound")
 	}
-	if len(data) == 0 || data[len(data)-1] != '\n' {
+	if len(data) == 0 || !bytes.HasSuffix(data, []byte{'\n'}) {
 		return nil, queueError("ledger_invalid", "queue log must be nonempty and newline terminated")
 	}
 	result := []QueueCommit{}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -84,16 +85,22 @@ func TestNativeDeliveryHostMissingCapabilityIsUnknown(t *testing.T) {
 			return NativeDeliveryInventory{Closed: true}, nil
 		},
 	})
-	serialized, err := json.Marshal(configured)
+	type hostEnvelope struct {
+		Host *NativeDeliveryHost `json:"host"`
+	}
+	serialized, err := json.Marshal(hostEnvelope{Host: configured})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var copied NativeDeliveryHost
+	var copied hostEnvelope
 	if err := json.Unmarshal(serialized, &copied); err != nil {
 		t.Fatal(err)
 	}
-	proof, err := copied.Verifier(branch)(context.Background(), state, *state.Claims[assignment.Claims[0].ClaimID])
-	if err != nil || proof.Verified || proof.Receipt != "" || proof.Disposition != "unknown" {
+	if copied.Host == nil || copied.Host == configured || copied.Host.options.Inventory != nil {
+		t.Fatal("copyable envelope retained protected native host capabilities")
+	}
+	proof, err := copied.Host.Verifier(branch)(context.Background(), state, *state.Claims[assignment.Claims[0].ClaimID])
+	if err != nil || proof.Verified || proof.PositiveNoEffects || proof.Receipt != "" || proof.Disposition != "unknown" {
 		t.Fatalf("copyable native host serialization became a process capability: %+v %v", proof, err)
 	}
 }
@@ -279,8 +286,163 @@ func TestNativeDeliveryHostProfileAloneCannotGrantResourceReadback(t *testing.T)
 	}
 }
 
+func TestNativeDeliveryHostGenericTargetsRequireExactImmutableSelectors(t *testing.T) {
+	for _, field := range []string{"run_id", "ref", "path"} {
+		t.Run(field, func(t *testing.T) {
+			branch, mock, state, assignment := nativeHostFixture(t, `{"version":1,"outputs":[{"type":"update_issue","min":1,"max":1}]}`)
+			output := nativeHostOutput("update_issue")
+			output.Target[field] = map[string]string{"run_id": "202", "ref": "heads/foreign", "path": "foreign.json"}[field]
+			credentials, reads := 0, 0
+			host := NewNativeDeliveryHost(NativeDeliveryHostOptions{
+				Inventory: func(context.Context, NativeDeliveryScope) (NativeDeliveryInventory, error) {
+					return NativeDeliveryInventory{Closed: true, Outputs: []NativeDeliveryOutput{output}}, nil
+				},
+				Credentials: func(context.Context, NativeDeliveryScope, EffectResource) error {
+					credentials++
+					return nil
+				},
+				Builtin: map[string]NativeOutputVerifier{
+					"update_issue": func(context.Context, NativeDeliveryScope, NativeDeliveryOutput, json.RawMessage) (json.RawMessage, bool, error) {
+						reads++
+						return json.RawMessage(`{}`), true, nil
+					},
+				},
+			})
+			member := assignment.Claims[0]
+			proof, err := host.Verifier(branch)(context.Background(), state, *state.Claims[member.ClaimID])
+			if err == nil || !strings.Contains(err.Error(), "claim_scope_invalid") ||
+				proof.Verified || credentials != 0 || reads != 0 || mock.resourceReads != 0 {
+				t.Fatalf("generic target bypassed immutable selector before SDK credentials/readback: %+v %v", proof, err)
+			}
+		})
+	}
+}
+
+func TestNativeDeliveryHostFullSubjectIntersectsPartialExactGenericSelector(t *testing.T) {
+	branch, mock := newQueueAPI(t)
+	commits, assignment := boundAssignmentWithWork(t, func(work *WorkDefinition) {
+		work.Subject = &Resource{Kind: "issue", Host: "github.com", Repository: testRepository,
+			RepositoryID: "1", ResourceID: "2", Number: "7"}
+		work.Payload = json.RawMessage(`{"effect_contract":{"version":1,"outputs":[{"type":"update_issue","min":1,"max":1}]},"resource_scope":{"version":1,"resources":[{"repository":"owner/repo","path":"src/a.go"}]}}`)
+	})
+	commits = finishMember(t, commits, assignment, 0, "completed", time.Now().UnixMilli())
+	installMockLog(t, mock, commits)
+	configureNativeRun(mock, assignment)
+	mock.issue = map[string]any{"id": 2, "number": 7, "title": "delivered"}
+	output := nativeHostOutput("update_issue")
+	output.Target["path"] = "src/a.go"
+	credentials := 0
+	host := NewNativeDeliveryHost(NativeDeliveryHostOptions{
+		Inventory: func(context.Context, NativeDeliveryScope) (NativeDeliveryInventory, error) {
+			return NativeDeliveryInventory{Closed: true, Outputs: []NativeDeliveryOutput{output}}, nil
+		},
+		Credentials: func(_ context.Context, _ NativeDeliveryScope, target EffectResource) error {
+			credentials++
+			if !sameJSON(target, output.Target) {
+				t.Fatal("native credential callback lost exact Subject and generic target")
+			}
+			return nil
+		},
+		Builtin: map[string]NativeOutputVerifier{"update_issue": func(ctx context.Context, _ NativeDeliveryScope, _ NativeDeliveryOutput, _ json.RawMessage) (json.RawMessage, bool, error) {
+			var issue struct {
+				ID     json.Number `json:"id"`
+				Number int         `json:"number"`
+				Title  string      `json:"title"`
+			}
+			if err := branch.request(ctx, http.MethodGet, "issues/7", nil, &issue); err != nil {
+				return nil, false, err
+			}
+			descriptor, err := canonicalValue(map[string]string{"resource_id": issue.ID.String(), "title": issue.Title})
+			return descriptor, issue.ID.String() == "2" && issue.Number == 7 && issue.Title == "delivered", err
+		}},
+	})
+	branch.DeliveryVerifier = host.Verifier(branch)
+	recovery, err := branch.RecoverDelivery(context.Background(), assignment.Claims[0].WorkID, "subject-generic-readback")
+	if err != nil || recovery.Reason != "delivery_verified" || credentials != 2 || mock.resourceReads != 2 {
+		t.Fatalf("native host narrowed the authoritative Subject/selector intersection: %+v %v credentials=%d reads=%d",
+			recovery, err, credentials, mock.resourceReads)
+	}
+	latest, err := branch.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := Replay(latest)
+	if err != nil || state.Works[assignment.Claims[0].WorkID].Barrier != "verified" || state.Stats.Dispatches != 1 {
+		t.Fatalf("verified generic-target Result released native capacity or lost delivery: %+v %v", state.Stats, err)
+	}
+}
+
+func TestNativeDeliveryHostRequiresWorkerCreatedAncestorTargetBinding(t *testing.T) {
+	branch, mock := newQueueAPI(t)
+	contract := `{"effect_contract":{"version":1,"outputs":[{"type":"persistent_snapshot","min":1,"max":1,"verification":{"verifier_id":"approved","expected":{}}}]},"resource_scope":{"version":1,"resources":[{"host":"github.com","repository":"owner/repo","repository_id":"1","path":"%s"}]}}`
+	commits, original := boundAssignmentWithWork(t, func(work *WorkDefinition) {
+		work.Payload = json.RawMessage(fmt.Sprintf(contract, "original.json"))
+	})
+	commits = finishMember(t, commits, original, 0, "completed", time.Now().UnixMilli())
+	child := testNode(t, commits, "broader-worker-child")
+	child.Payload = json.RawMessage(fmt.Sprintf(contract, "foreign.json"))
+	commits = testSubmitAsWorker(t, commits, workerActor(original, "h1"), "worker-child-target", child)
+	commits, decision := testGrant(t, commits, "grant-worker-child", 1, 1)
+	if len(decision.Assignments) != 1 {
+		t.Fatal("worker-created child must receive an ordinary fair grant")
+	}
+	assignment := decision.Assignments[0]
+	state, _ := Replay(commits)
+	profile := state.Dispatches[assignment.DispatchID].Profile
+	sender := testActor("dispatcher")
+	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
+	commits = testOperations(t, commits, sender, "start-worker-child", "dispatch", mustOp(t, map[string]any{
+		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": sender,
+	}))
+	binding := RunBinding{RunID: "303", RunAttempt: 1, Repository: testRepository, Workflow: profile.Workflow,
+		Ref: profile.Ref, Principal: profile.Principal, Event: "workflow_dispatch"}
+	evidence := Evidence{Kind: "reconciliation", Source: "github_api", Repository: testRepository,
+		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal, CheckedAt: 4000, RunID: "303", RunAttempt: 1}
+	commits = testOperations(t, commits, testActor("reconciler"), "bind-worker-child", "dispatch", mustOp(t, map[string]any{
+		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": binding, "evidence": evidence,
+	}))
+	actor := workerActor(assignment, assignment.Claims[0].Handle)
+	actor.RunID = "303"
+	request, err := NewRequest("finish-worker-child", "finish", actor,
+		FinishParameters{DispatchID: assignment.DispatchID, ClaimHandle: actor.ClaimHandle, Outcome: "completed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commits, _, _, err = BuildCandidate(commits, actor, request, time.Now().UnixMilli())
+	if err != nil {
+		t.Fatal(err)
+	}
+	commits = testSubmit(t, commits, "producer-retries-worker-child", child)
+	installMockLog(t, mock, commits)
+	configureNativeRun(mock, assignment)
+	mock.nativeRun.ID = json.Number("303")
+	state, _ = Replay(commits)
+	credentials, reads := 0, 0
+	host := NewNativeDeliveryHost(NativeDeliveryHostOptions{
+		Inventory: func(context.Context, NativeDeliveryScope) (NativeDeliveryInventory, error) {
+			return NativeDeliveryInventory{Closed: true, Outputs: []NativeDeliveryOutput{{
+				Type: "persistent_snapshot", Target: EffectResource{
+					"host": "github.com", "repository": testRepository, "repository_id": "1", "path": "foreign.json",
+				},
+			}}}, nil
+		},
+		Credentials: func(context.Context, NativeDeliveryScope, EffectResource) error {
+			credentials++
+			return nil
+		},
+		Declared: map[string]NativeOutputVerifier{"approved": func(context.Context, NativeDeliveryScope, NativeDeliveryOutput, json.RawMessage) (json.RawMessage, bool, error) {
+			reads++
+			return json.RawMessage(`{}`), true, nil
+		}},
+	})
+	proof, err := host.Verifier(branch)(context.Background(), state, *state.Claims[assignment.Claims[0].ClaimID])
+	if err == nil || !strings.Contains(err.Error(), "claim_scope_invalid") || proof.Verified || credentials != 0 || reads != 0 {
+		t.Fatalf("producer retry erased worker child's immutable ancestor readback authority: %+v %v", proof, err)
+	}
+}
+
 func TestNativeDeliveryHostCompleteControlCASFence(t *testing.T) {
-	branch, mock, state, assignment := nativeHostFixture(t, `{"version":1,"outputs":[{"type":"work_queue_submit","min":1,"max":1}]}`)
+	branch, mock, _, assignment := nativeHostFixture(t, `{"version":1,"outputs":[{"type":"work_queue_submit","min":1,"max":1}]}`)
 	member := assignment.Claims[0]
 	commits, _ := branch.Read(context.Background())
 	actor := workerActor(assignment, member.Handle)
@@ -302,7 +464,10 @@ func TestNativeDeliveryHostCompleteControlCASFence(t *testing.T) {
 		},
 	})
 	branch.DeliveryVerifier = host.Verifier(branch)
-	state, _ = Replay(commits)
+	state, err := Replay(commits)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proof, err := branch.DeliveryVerifier(context.Background(), state, *state.Claims[member.ClaimID])
 	if err != nil || !proof.Verified {
 		t.Fatalf("committed exact control was not independently verified: %+v %v", proof, err)
@@ -314,7 +479,7 @@ func TestNativeDeliveryHostCompleteControlCASFence(t *testing.T) {
 	installMockLog(t, mock, commits)
 	state, _ = Replay(commits)
 	actor = testActor("reconciler")
-	result := Op(map[string]any{
+	result := mustOp(t, map[string]any{
 		"kind": "Result", "work_id": member.WorkID, "claim_id": member.ClaimID,
 		"completion_id": state.Works[member.WorkID].CompletionID, "descriptor": proof.Descriptor,
 		"evidence": Evidence{

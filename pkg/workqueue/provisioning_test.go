@@ -66,7 +66,7 @@ func TestAuthenticatedInitialPolicyUsesExactProposalAndGenuineGenesisIdentity(t 
 			pool.Profiles["default"] = profile
 			policy.Pools["default"] = pool
 			request, err := NewRequest("submit", "policy", actor, OperationsParameters{Operations: []Operation{
-				Op(map[string]any{"kind": "Policy", "epoch": "installed", "policy": policy}),
+				mustOp(t, map[string]any{"kind": "Policy", "epoch": "installed", "policy": policy}),
 			}})
 			if err != nil {
 				t.Fatal(err)
@@ -104,7 +104,7 @@ func TestInitialPolicyRejectsConstructorPlaceholderBeforeNativeWrites(t *testing
 		t.Fatal(err)
 	}
 	request, err := NewRequest("install-placeholder", "policy", actor, OperationsParameters{Operations: []Operation{
-		Op(map[string]any{"kind": "Policy", "epoch": "installed", "policy": DefaultPolicy(actor.Principal, actor.Repository)}),
+		mustOp(t, map[string]any{"kind": "Policy", "epoch": "installed", "policy": DefaultPolicy(actor.Principal, actor.Repository)}),
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +133,7 @@ func TestProspectivePolicyVerifiesRoutesWithoutRewritingInstalledPolicy(t *testi
 	pool.Profiles["default"] = profile
 	policy.Pools["default"] = pool
 	request, err := NewRequest("prospective", "policy", actor, OperationsParameters{Operations: []Operation{
-		Op(map[string]any{"kind": "Policy", "epoch": "prospective", "policy": policy}),
+		mustOp(t, map[string]any{"kind": "Policy", "epoch": "prospective", "policy": policy}),
 	}})
 	if err != nil {
 		t.Fatal(err)

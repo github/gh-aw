@@ -2,7 +2,7 @@ package workqueue
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"regexp"
 	"slices"
 	"strings"
@@ -13,6 +13,10 @@ import (
 
 var reasonPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$`)
 var revisionPattern = regexp.MustCompile(`^[a-f0-9]{40}$|^[a-f0-9]{64}$`)
+
+const workerWorkflowDirectory = ".github/workflows/"
+const defaultWorkerWorkflow = workerWorkflowDirectory + "worker.lock.yml"
+
 var policySchema = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	data, err := schemas.ReadFile("schema/QueuePolicy.json")
 	if err != nil {
@@ -42,7 +46,7 @@ func DefaultPolicy(principal, repository string) Policy {
 			Retry:          RetryPolicy{MaxAttempts: 3, BackoffMS: 30000},
 			Reconciliation: ReconciliationPolicy{MaxAttempts: 5, DeadlineMS: 300000},
 			Profiles: map[string]WorkerProfile{"default": {
-				Workflow: ".github/workflows/worker.lock.yml", Ref: strings.Repeat("0", 40),
+				Workflow: defaultWorkerWorkflow, Ref: strings.Repeat("0", 40),
 				Principal: principal, TrustDomain: "default",
 				CredentialScope: "repository", EffectScope: repository,
 				MaxClaims: 1, ShareKeys: false,
@@ -103,33 +107,47 @@ func validatePolicy(policy Policy) error {
 		}
 	}
 	for _, pool := range policy.Pools {
-		if _, ok := pool.Profiles[pool.DefaultProfile]; !ok || len(pool.Profiles) > 256 {
-			return queueError("policy_invalid", "pool default profile must be approved")
-		}
-		for _, profile := range pool.Profiles {
-			if !decimalIdentity(profile.Principal) {
-				return queueError("policy_invalid", "worker principal must be an immutable positive GitHub actor ID")
-			}
-			if profile.MaxClaims < 1 || profile.MaxClaims > MaxClaimsPerDispatch ||
-				!revisionPattern.MatchString(profile.Ref) ||
-				!strings.HasPrefix(profile.Workflow, ".github/workflows/") ||
-				!strings.HasSuffix(profile.Workflow, ".lock.yml") || strings.Contains(profile.Workflow, "..") {
-				return queueError("policy_invalid", "profiles require immutable revisions, approved workflow paths, and assignment bounds 1..16")
-			}
-			if policy.Limits.Operations < 2*profile.MaxClaims+1 {
-				return queueError("policy_invalid", "operation budget cannot hold bounded worst-case assignment closure")
-			}
-		}
-		if pool.LogicalLimit < 1 || pool.LogicalLimit > 4096 || pool.NativeLimit < 1 ||
-			pool.NativeLimit > 4096 || pool.PerAccountLimit < 0 || pool.PerAccountLimit > 4096 ||
-			pool.Retry.MaxAttempts < 1 || pool.Retry.MaxAttempts > 16 ||
-			pool.Reconciliation.MaxAttempts < 1 || pool.Reconciliation.MaxAttempts > 64 ||
-			pool.Reconciliation.DeadlineMS < 1 || pool.Reconciliation.DeadlineMS > 3600000 ||
-			pool.Retry.BackoffMS < 1 || pool.Retry.BackoffMS > 3600000 ||
-			pool.MaxObservationAgeMS < 1 || pool.MaxObservationAgeMS > 3600000 {
-			return queueError("policy_invalid", "pool capacity/recovery limits")
+		if err := validatePoolPolicy(pool, policy.Limits); err != nil {
+			return err
 		}
 	}
+	if err := validateProducerRules(policy); err != nil {
+		return err
+	}
+	return validatePolicyLimits(policy.Limits)
+}
+
+func validatePoolPolicy(pool PoolPolicy, limits Limits) error {
+	if _, ok := pool.Profiles[pool.DefaultProfile]; !ok || len(pool.Profiles) > 256 {
+		return queueError("policy_invalid", "pool default profile must be approved")
+	}
+	for _, profile := range pool.Profiles {
+		if !decimalIdentity(profile.Principal) {
+			return queueError("policy_invalid", "worker principal must be an immutable positive GitHub actor ID")
+		}
+		if profile.MaxClaims < 1 || profile.MaxClaims > MaxClaimsPerDispatch ||
+			!revisionPattern.MatchString(profile.Ref) ||
+			!strings.HasPrefix(profile.Workflow, workerWorkflowDirectory) ||
+			!strings.HasSuffix(profile.Workflow, ".lock.yml") || strings.Contains(profile.Workflow, "..") {
+			return queueError("policy_invalid", "profiles require immutable revisions, approved workflow paths, and assignment bounds 1..16")
+		}
+		if limits.Operations < 2*profile.MaxClaims+1 {
+			return queueError("policy_invalid", "operation budget cannot hold bounded worst-case assignment closure")
+		}
+	}
+	if pool.LogicalLimit < 1 || pool.LogicalLimit > 4096 || pool.NativeLimit < 1 ||
+		pool.NativeLimit > 4096 || pool.PerAccountLimit < 0 || pool.PerAccountLimit > 4096 ||
+		pool.Retry.MaxAttempts < 1 || pool.Retry.MaxAttempts > 16 ||
+		pool.Reconciliation.MaxAttempts < 1 || pool.Reconciliation.MaxAttempts > 64 ||
+		pool.Reconciliation.DeadlineMS < 1 || pool.Reconciliation.DeadlineMS > 3600000 ||
+		pool.Retry.BackoffMS < 1 || pool.Retry.BackoffMS > 3600000 ||
+		pool.MaxObservationAgeMS < 1 || pool.MaxObservationAgeMS > 3600000 {
+		return queueError("policy_invalid", "pool capacity/recovery limits")
+	}
+	return nil
+}
+
+func validateProducerRules(policy Policy) error {
 	for principal, rule := range policy.Producers {
 		if !decimalIdentity(principal) {
 			return queueError("policy_invalid", "producer principal must be an immutable positive GitHub actor ID")
@@ -153,7 +171,10 @@ func validatePolicy(policy Policy) error {
 			}
 		}
 	}
-	limit := policy.Limits
+	return nil
+}
+
+func validatePolicyLimits(limit Limits) error {
 	if limit.LedgerBytes < 1 || limit.LedgerBytes > 64<<20 ||
 		limit.RecoveryBytes < 1 || limit.RecoveryBytes > 16<<20 ||
 		limit.PayloadBytes < 1 || limit.PayloadBytes > 16<<10 ||
@@ -234,14 +255,16 @@ func validateRequest(commit QueueCommit) error {
 		"cancel_work": {"WorkCancellation"}, "cancel_claim": {"ClaimCancellation", "WorkCancellation"},
 	}
 	for _, operation := range commit.Operations {
-		kind := operationKind(operation)
-		if !slices.Contains(kinds[commit.Request.Kind], kind) || !permitted(commit.Actor.Role, kind) {
+		kind, err := operationKind(operation)
+		if err != nil || !slices.Contains(kinds[commit.Request.Kind], kind) || !permitted(commit.Actor.Role, kind) {
 			return queueError("unauthorized_operation", "%s cannot publish %s through %s", commit.Actor.Role, kind, commit.Request.Kind)
 		}
 		var reason struct {
 			Reason json.RawMessage `json:"reason"`
 		}
-		_ = json.Unmarshal(operation, &reason)
+		if err := json.Unmarshal(operation, &reason); err != nil {
+			return err
+		}
 		if len(reason.Reason) > 0 {
 			var code string
 			if err := json.Unmarshal(reason.Reason, &code); err != nil || !reasonPattern.MatchString(code) {
@@ -249,6 +272,10 @@ func validateRequest(commit QueueCommit) error {
 			}
 		}
 	}
+	return validateRequestIntent(commit, len(parameters))
+}
+
+func validateRequestIntent(commit QueueCommit, parameterCount int) error {
 	switch commit.Request.Kind {
 	case "submit":
 		var params SubmitParameters
@@ -259,6 +286,9 @@ func validateRequest(commit QueueCommit) error {
 			return queueError("request_invalid", "submission differs from stable intent")
 		}
 		for i, node := range params.Nodes {
+			if i < 0 || i >= len(commit.Operations) {
+				return queueError("request_invalid", "submission differs from stable intent")
+			}
 			if !sameJSON(node, commit.Operations[i]) {
 				return queueError("request_invalid", "submission changes immutable node")
 			}
@@ -271,7 +301,7 @@ func validateRequest(commit QueueCommit) error {
 		if err := validateDispatchParameters(params); err != nil {
 			return err
 		}
-		if len(parameters) != 4 {
+		if parameterCount != 4 {
 			return queueError("request_invalid", "dispatch_next requires exactly pool/max_claims/max_dispatches/max_bytes")
 		}
 	case "finish":
@@ -281,10 +311,17 @@ func validateRequest(commit QueueCommit) error {
 			(len(commit.Operations) != 1 && len(commit.Operations) != 2) {
 			return queueError("request_invalid", "finish requires one immutable Claim scope plus its exhausted retry closure")
 		}
-		if len(commit.Operations) == 2 &&
-			(params.Outcome != "cancelled" || operationKind(commit.Operations[0]) != "ClaimCancellation" ||
-				operationKind(commit.Operations[1]) != "WorkCancellation") {
-			return queueError("request_invalid", "only exhausted cancellation may have a second operation")
+		if len(commit.Operations) == 2 {
+			for index, operation := range commit.Operations {
+				expected := "ClaimCancellation"
+				if index == 1 {
+					expected = "WorkCancellation"
+				}
+				kind, err := operationKind(operation)
+				if err != nil || params.Outcome != "cancelled" || kind != expected {
+					return queueError("request_invalid", "only exhausted cancellation may have a second operation")
+				}
+			}
 		}
 	default:
 		var params OperationsParameters
@@ -333,7 +370,7 @@ func NewWork(payload []byte, graphID, nodeKey, pool string, policy Policy, at in
 
 	var object map[string]any
 	if err := json.Unmarshal(canonical, &object); err != nil || object == nil {
-		return WorkDefinition{}, fmt.Errorf("work payload must be a JSON object")
+		return WorkDefinition{}, errors.New("work payload must be a JSON object")
 	}
 	poolPolicy, ok := policy.Pools[pool]
 	if !ok {

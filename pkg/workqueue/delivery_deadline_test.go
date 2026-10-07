@@ -55,7 +55,7 @@ func TestDeliveryExhaustionDeadlineAndAttemptNativeParity(t *testing.T) {
 			evidence.Attempts, evidence.Effects, evidence.Receipt = test.Attempts, test.Effects, test.Receipt
 			actor := testActor("reconciler")
 			request, err := NewRequest(test.ID, "delivery_failure", actor, OperationsParameters{
-				Operations: []Operation{Op(map[string]any{
+				Operations: []Operation{mustOp(t, map[string]any{
 					"kind": "DeliveryFailure", "work_id": assignment.Claims[0].WorkID,
 					"claim_id":      assignment.Claims[0].ClaimID,
 					"completion_id": state.Works[assignment.Claims[0].WorkID].CompletionID,
@@ -206,7 +206,7 @@ func TestNativeExpiredDeliveryDeadlineDoesNotRestartOrRelease(t *testing.T) {
 					t.Fatal("missing receipt became positive no-effects proof")
 				}
 				tip := latest[len(latest)-1]
-				if len(tip.Operations) != 1 || operationKind(tip.Operations[0]) != "DeliveryFailure" {
+				if len(tip.Operations) != 1 || mustOperationKind(t, tip.Operations[0]) != "DeliveryFailure" {
 					t.Fatal("expired recovery published Result, Release or unrelated operations")
 				}
 				var failure struct {

@@ -25,7 +25,7 @@ func TestNativeEffectAndContinuationAuthorityParity(t *testing.T) {
 	}
 	failure := terminalFor(state, assignment)
 	failure.Attempts, failure.Effects = 5, "unknown"
-	failed := testOperations(t, commits, testActor("reconciler"), "authority-failure", "delivery_failure", Op(map[string]any{
+	failed := testOperations(t, commits, testActor("reconciler"), "authority-failure", "delivery_failure", mustOp(t, map[string]any{
 		"kind": "DeliveryFailure", "work_id": assignment.Claims[0].WorkID,
 		"claim_id": assignment.Claims[0].ClaimID, "completion_id": state.Works[assignment.Claims[0].WorkID].CompletionID,
 		"reason": "verification_exhausted", "disposition": "unknown", "evidence": failure,

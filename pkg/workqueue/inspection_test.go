@@ -8,6 +8,17 @@ import (
 	"testing"
 )
 
+func TestExplainClaimPrefixRejectsOutOfRangeOrdinals(t *testing.T) {
+	for _, ordinal := range []int{-1, 0, 1} {
+		t.Run(strconv.Itoa(ordinal), func(t *testing.T) {
+			_, err := explainClaimPrefix(nil, ordinal, "tip", "claim")
+			if err == nil || err.Error() != "claim_missing: Claim has no original commit" {
+				t.Fatalf("invalid historical ordinal did not fail closed: %v", err)
+			}
+		})
+	}
+}
+
 func TestBeforeClaimUsesExactEarlierChargesAndKeepsSnapshotReadOnly(t *testing.T) {
 	commits, assignment := boundAssignment(t)
 	commits = finishMember(t, commits, assignment, 0, "completed")
@@ -103,19 +114,19 @@ func TestClaimTraceDistinguishesDeliveryFailureAndIndependentNativeRelease(t *te
 	}
 	evidence := terminalFor(state, assignment)
 	evidence.Attempts, evidence.Effects = 5, "unknown"
-	commits = testOperations(t, commits, testActor("reconciler"), "trace-failure", "delivery_failure", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "trace-failure", "delivery_failure", mustOp(t, map[string]any{
 		"kind": "DeliveryFailure", "work_id": assignment.Claims[0].WorkID,
 		"claim_id": assignment.Claims[0].ClaimID, "completion_id": state.Works[assignment.Claims[0].WorkID].CompletionID,
 		"reason": "verification_exhausted", "disposition": "unknown", "evidence": evidence,
 	}))
 	operations := []Operation{}
 	for _, member := range assignment.Claims[1:] {
-		operations = append(operations, Op(map[string]any{
+		operations = append(operations, mustOp(t, map[string]any{
 			"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"reason": "run_terminal", "retry_not_before": 34000,
 		}))
 	}
-	operations = append(operations, Op(map[string]any{
+	operations = append(operations, mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminalFor(state, assignment),
 	}))
 	commits = testOperations(t, commits, testActor("reconciler"), "trace-release", "release", operations...)

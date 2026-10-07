@@ -104,7 +104,7 @@ func TestExactExistingWorkSubmissionConsumesNoLedgerOrReserve(t *testing.T) {
 	work := testNode(t, commits, "existing")
 	commits = testSubmit(t, commits, "first-submit", work)
 	commits = testOperations(t, commits, testActor("administrator"), "pause-admission", "control",
-		Op(map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "pause"}))
+		mustOp(t, map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "pause"}))
 	request, _ := NewRequest("same-node-new-logical-request", "submit", testActor("producer"), SubmitParameters{Nodes: []WorkDefinition{work}})
 	next, commit, decision, err := BuildCandidate(commits, testActor("producer"), request, 4000)
 	if err != nil || commit != nil || len(next) != len(commits) || decision.Reason != "already_submitted" ||
@@ -124,7 +124,7 @@ func TestExactExistingWorkSubmissionConsumesNoLedgerOrReserve(t *testing.T) {
 		!strings.Contains(err.Error(), "admission_unauthorized") {
 		t.Fatalf("fresh duplicate request bypassed current producer entitlement: %v", err)
 	}
-	work.Payload = Op(map[string]string{"task": "different immutable meaning"})
+	work.Payload = mustOp(t, map[string]string{"task": "different immutable meaning"})
 	request, _ = NewRequest("changed-existing-node", "submit", testActor("producer"), SubmitParameters{Nodes: []WorkDefinition{work}})
 	if _, _, _, err := BuildCandidate(commits, testActor("producer"), request, 4000); err == nil ||
 		!strings.Contains(err.Error(), "work_conflict") {

@@ -3,10 +3,68 @@ package workqueue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestIdentityContractRejectsMalformedCachedSchemas(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		schema any
+	}{
+		{name: "non-object-cache", schema: "not an object"},
+		{name: "nil-object-cache", schema: map[string]any(nil)},
+		{name: "missing-definitions", schema: map[string]any{}},
+		{name: "non-object-definitions", schema: map[string]any{"$defs": []any{}}},
+		{name: "nil-definitions", schema: map[string]any{"$defs": map[string]any(nil)}},
+		{name: "non-object-alternative", schema: map[string]any{"$defs": map[string]any{}, "anyOf": []any{"not an object"}}},
+		{name: "nil-object-alternative", schema: map[string]any{"$defs": map[string]any{}, "anyOf": []any{map[string]any(nil)}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			name := t.Name()
+			identitySchemas.Store(name, test.schema)
+			t.Cleanup(func() { identitySchemas.Delete(name) })
+			err := validateContractIdentityBytes(name, map[string]any{"principal": testPrincipal})
+			var protocol *ProtocolError
+			if !errors.As(err, &protocol) || protocol.Code != "unsupported_protocol" {
+				t.Fatalf("malformed identity contract was accepted or used the wrong code: %v", err)
+			}
+		})
+	}
+}
+
+func TestIdentityOptionalPropertySchemasUseCheckedObjects(t *testing.T) {
+	tight := map[string]any{"x-utf8-max-bytes": float64(1)}
+	for _, test := range []struct {
+		name   string
+		schema map[string]any
+		code   string
+	}{
+		{name: "missing", schema: map[string]any{}},
+		{name: "additional-true", schema: map[string]any{"additionalProperties": true}},
+		{name: "additional-false", schema: map[string]any{"additionalProperties": false}},
+		{name: "declared-identity", schema: map[string]any{"properties": map[string]any{"field": tight}}, code: "identity_invalid"},
+		{name: "additional-identity", schema: map[string]any{"additionalProperties": tight}, code: "identity_invalid"},
+		{name: "declared-overrides-additional", schema: map[string]any{"properties": map[string]any{"field": map[string]any{"x-utf8-max-bytes": float64(2)}}, "additionalProperties": tight}},
+		{name: "unknown-uses-additional", schema: map[string]any{"properties": map[string]any{"other": map[string]any{}}, "additionalProperties": tight}, code: "identity_invalid"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := walkContractIdentities(test.schema, map[string]any{}, map[string]any{"field": "é"}, "optional-properties")
+			if test.code == "" {
+				if err != nil {
+					t.Fatalf("optional schema traversal changed: %v", err)
+				}
+				return
+			}
+			var protocol *ProtocolError
+			if !errors.As(err, &protocol) || protocol.Code != test.code {
+				t.Fatalf("identity byte rejection changed: %v", err)
+			}
+		})
+	}
+}
 
 func TestNativeDecimalIdentityBoundsBeforeWireValidation(t *testing.T) {
 	for _, test := range []struct {
@@ -82,7 +140,7 @@ func TestNativeDecimalOriginRejectedBeforeNoOpAndAcknowledgment(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			commits := testGenesis(t, nil)
 			if kind == "accepted-request" {
-				commits = testOperations(t, commits, testActor("administrator"), "accepted", "control", Op(map[string]any{
+				commits = testOperations(t, commits, testActor("administrator"), "accepted", "control", mustOp(t, map[string]any{
 					"kind": "Control", "control": "admission_paused", "value": true, "reason": "incident",
 				}))
 			}
@@ -181,7 +239,7 @@ func TestSharedIdentityByteValidationFixtures(t *testing.T) {
 func TestIdentityByteBoundsDoNotInspectOpaqueApplicationData(t *testing.T) {
 	commits := testGenesis(t, nil)
 	work := testNode(t, commits, "opaque")
-	work.Payload = Op(map[string]any{
+	work.Payload = mustOp(t, map[string]any{
 		"graph_id": strings.Repeat("😀", 100),
 		"nested":   map[string]string{"principal": strings.Repeat("é", 200)},
 	})
@@ -241,7 +299,7 @@ func TestStandalonePolicyAndAssignmentIdentityByteBounds(t *testing.T) {
 		t.Fatal("standalone assignment accepted an oversized UTF-8 dispatch identity")
 	}
 	if _, err := NormalizeFinishIntent(decision.Assignments[0],
-		Op(map[string]string{"claim_handle": strings.Repeat("😀", 65), "outcome": "completed"})); err == nil {
+		mustOp(t, map[string]string{"claim_handle": strings.Repeat("😀", 65), "outcome": "completed"})); err == nil {
 		t.Fatal("finish normalizer accepted an oversized UTF-8 member identity")
 	}
 }

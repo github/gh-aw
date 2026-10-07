@@ -10,7 +10,7 @@ func TestResourceBudgetsFailBeforePublication(t *testing.T) {
 	commits := testGenesis(t, nil)
 	state, _ := Replay(commits)
 	node := testNode(t, commits, "oversized")
-	node.Payload = Op(map[string]string{"task": strings.Repeat("x", 16<<10)})
+	node.Payload = mustOp(t, map[string]string{"task": strings.Repeat("x", 16<<10)})
 	request, _ := NewRequest("oversized", "submit", testActor("producer"), SubmitParameters{Nodes: []WorkDefinition{node}})
 	if _, _, _, err := BuildCandidate(commits, testActor("producer"), request, 2000); err == nil ||
 		!strings.Contains(err.Error(), "payload_limit") {
@@ -47,7 +47,7 @@ func TestLedgerAdmissionWatermarkPreservesRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	control := Op(map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "limit"})
+	control := mustOp(t, map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "limit"})
 	req, _ := NewRequest("pause", "control", testActor("administrator"), OperationsParameters{Operations: []Operation{control}})
 	next, _, _, err = BuildCandidate(next, testActor("administrator"), req, 3000)
 	if err != nil {

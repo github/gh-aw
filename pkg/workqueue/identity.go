@@ -9,9 +9,26 @@ import (
 
 var identitySchemas sync.Map
 
+type identitySet map[string]struct{}
+
+func (set identitySet) contains(id string) bool {
+	_, present := set[id]
+	return present
+}
+
+func (set identitySet) add(ids ...string) {
+	for _, id := range ids {
+		set[id] = struct{}{}
+	}
+}
+
 func contractIdentitySchema(name string) (map[string]any, error) {
 	if cached, ok := identitySchemas.Load(name); ok {
-		return cached.(map[string]any), nil
+		schema, ok := cached.(map[string]any)
+		if !ok || schema == nil {
+			return nil, queueError("unsupported_protocol", "identity contract %s must be an object", name)
+		}
+		return schema, nil
 	}
 	data, err := schemas.ReadFile("schema/" + name + ".json")
 	if err != nil {
@@ -22,7 +39,11 @@ func contractIdentitySchema(name string) (map[string]any, error) {
 		return nil, err
 	}
 	cached, _ := identitySchemas.LoadOrStore(name, resource)
-	return cached.(map[string]any), nil
+	schema, ok := cached.(map[string]any)
+	if !ok || schema == nil {
+		return nil, queueError("unsupported_protocol", "identity contract %s must be an object", name)
+	}
+	return schema, nil
 }
 
 // JSON Schema maxLength counts Unicode scalars, not UTF-8 bytes. The generated
@@ -32,7 +53,11 @@ func validateContractIdentityBytes(name string, value any) error {
 	if err != nil {
 		return err
 	}
-	return walkContractIdentities(schema, schema["$defs"].(map[string]any), value, name)
+	definitions, ok := schema["$defs"].(map[string]any)
+	if !ok || definitions == nil {
+		return queueError("unsupported_protocol", "identity contract %s requires object definitions", name)
+	}
+	return walkContractIdentities(schema, definitions, value, name)
 }
 
 func walkContractIdentities(schema, definitions map[string]any, value any, path string) error {
@@ -62,7 +87,11 @@ func walkContractIdentities(schema, definitions map[string]any, value any, path 
 	}
 	if alternatives, ok := schema["anyOf"].([]any); ok {
 		for _, alternative := range alternatives {
-			if err := walkContractIdentities(alternative.(map[string]any), definitions, value, path); err != nil {
+			branch, ok := alternative.(map[string]any)
+			if !ok || branch == nil {
+				return queueError("unsupported_protocol", "identity contract %s alternative must be an object", path)
+			}
+			if err := walkContractIdentities(branch, definitions, value, path); err != nil {
 				return err
 			}
 		}
@@ -77,26 +106,36 @@ func walkContractIdentities(schema, definitions map[string]any, value any, path 
 			}
 		}
 	case map[string]any:
-		properties, _ := schema["properties"].(map[string]any)
-		additional, _ := schema["additionalProperties"].(map[string]any)
-		for key, member := range value {
-			if minimum, ok := schema["x-key-min-utf8-bytes"].(float64); ok && len(key) < int(minimum) {
-				return queueError("identity_invalid", "%s contains an empty identity key", path)
-			}
-			if limit, ok := schema["x-key-utf8-max-bytes"].(float64); ok && len(key) > int(limit) {
-				return queueError("identity_invalid", "%s contains an oversized identity key", path)
-			}
-			if schema["x-forbid-key-ascii-controls"] == true && asciiControl(key) {
-				return queueError("identity_invalid", "%s contains a forbidden identity key control", path)
-			}
-			child, ok := properties[key].(map[string]any)
-			if !ok {
-				child = additional
-			}
-			if child != nil {
-				if err := walkContractIdentities(child, definitions, member, path+"."+key); err != nil {
-					return err
-				}
+		return walkIdentityProperties(schema, definitions, value, path)
+	}
+	return nil
+}
+
+func walkIdentityProperties(schema, definitions, value map[string]any, path string) error {
+	var properties, additional map[string]any
+	if object, ok := schema["properties"].(map[string]any); ok {
+		properties = object
+	}
+	if object, ok := schema["additionalProperties"].(map[string]any); ok {
+		additional = object
+	}
+	for key, member := range value {
+		if minimum, ok := schema["x-key-min-utf8-bytes"].(float64); ok && len(key) < int(minimum) {
+			return queueError("identity_invalid", "%s contains an empty identity key", path)
+		}
+		if limit, ok := schema["x-key-utf8-max-bytes"].(float64); ok && len(key) > int(limit) {
+			return queueError("identity_invalid", "%s contains an oversized identity key", path)
+		}
+		if schema["x-forbid-key-ascii-controls"] == true && asciiControl(key) {
+			return queueError("identity_invalid", "%s contains a forbidden identity key control", path)
+		}
+		child, ok := properties[key].(map[string]any)
+		if !ok {
+			child = additional
+		}
+		if child != nil {
+			if err := walkContractIdentities(child, definitions, member, path+"."+key); err != nil {
+				return err
 			}
 		}
 	}

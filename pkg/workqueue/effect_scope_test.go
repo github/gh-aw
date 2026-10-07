@@ -30,7 +30,7 @@ func verifiedMemberResult(t *testing.T, commits []QueueCommit, assignment Assign
 	member := assignment.Claims[index]
 	evidence := terminalFor(state, assignment)
 	evidence.Kind, evidence.Source, evidence.Receipt = "delivery", "verified_receipts", "verified-"+member.Handle
-	return testOperations(t, commits, testActor("reconciler"), "result-"+member.Handle, "result", Op(map[string]any{
+	return testOperations(t, commits, testActor("reconciler"), "result-"+member.Handle, "result", mustOp(t, map[string]any{
 		"kind": "Result", "work_id": member.WorkID, "claim_id": member.ClaimID,
 		"completion_id": state.Works[member.WorkID].CompletionID,
 		"descriptor":    map[string]any{"ok": true}, "evidence": evidence,
@@ -47,7 +47,7 @@ func retireAssignmentEpoch(t *testing.T, commits []QueueCommit, assignment Assig
 	if err != nil {
 		t.Fatal(err)
 	}
-	commits = testOperations(t, commits, testActor("reconciler"), "drained-native-release", "release", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "drained-native-release", "release", mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminalFor(state, assignment),
 	}))
 	state, err = Replay(commits)
@@ -57,7 +57,7 @@ func retireAssignmentEpoch(t *testing.T, commits []QueueCommit, assignment Assig
 	if !state.quiescent() {
 		t.Fatal("all independent outcomes and native reservation must settle before the Policy transition")
 	}
-	return testOperations(t, commits, testActor("administrator"), "drained-policy-transition", "policy", Op(map[string]any{
+	return testOperations(t, commits, testActor("administrator"), "drained-policy-transition", "policy", mustOp(t, map[string]any{
 		"kind": "Policy", "epoch": "after-drained-epoch", "policy": *state.Policy,
 	}))
 }
@@ -121,7 +121,7 @@ func TestVerifiedResultClosesFreshWorkerControlsAndPreservesAcknowledgments(t *t
 		params any
 	}{
 		{"submit", SubmitParameters{Nodes: []WorkDefinition{child}}},
-		{"observe", OperationsParameters{Operations: []Operation{Op(observation)}}},
+		{"observe", OperationsParameters{Operations: []Operation{mustOp(t, observation)}}},
 		{"dispatch_next", DispatchParameters{Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: 48 << 10}},
 	} {
 		request, err := NewRequest("before-result-"+intent.kind, intent.kind, actor, intent.params)
@@ -181,13 +181,13 @@ func TestVerifiedResultClosesFreshWorkerControlsAndPreservesAcknowledgments(t *t
 	operations := []Operation{}
 	for _, member := range assignment.Claims {
 		if state.Claims[member.ClaimID].State == "open" {
-			operations = append(operations, Op(map[string]any{
+			operations = append(operations, mustOp(t, map[string]any{
 				"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 				"reason": "native_terminal", "retry_not_before": 34000,
 			}))
 		}
 	}
-	operations = append(operations, Op(map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
+	operations = append(operations, mustOp(t, map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
 	commits = testOperations(t, commits, testActor("reconciler"), "release-after-result", "release", operations...)
 	for _, request := range requests {
 		_, recovered, decision, err := BuildCandidate(commits, actor, request, 6000)

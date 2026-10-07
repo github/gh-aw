@@ -64,7 +64,10 @@ func workBranch(cmd *cobra.Command) workqueue.Branch {
 	repo, _ := cmd.Flags().GetString("repo")
 	branch, _ := cmd.Flags().GetString("branch")
 	result := workqueue.Branch{Remote: repo, Name: branch}
-	host, _ := cmd.Context().Value(nativeDeliveryHostKey{}).(*workqueue.NativeDeliveryHost)
+	var host *workqueue.NativeDeliveryHost
+	if provided, ok := cmd.Context().Value(nativeDeliveryHostKey{}).(*workqueue.NativeDeliveryHost); ok {
+		host = provided
+	}
 	result.DeliveryVerifier = host.Verifier(result)
 	return result
 }
@@ -152,21 +155,8 @@ func workExplainCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if beforeClaim != "" {
-				explanation, err := workqueue.ExplainBeforeClaim(commits, beforeClaim)
-				if err != nil {
-					return err
-				}
-				return workPrint(cmd, explanation, fmt.Sprintf("Committed Claim %s: selected %s before %s operation %d; tip %s",
-					explanation.ClaimID, explanation.Selection.WorkID, explanation.CommitID, explanation.Position.Operation, explanation.Tip))
-			}
-			if requestID != "" {
-				explanation, err := workqueue.ExplainRequest(commits, requestID)
-				if err != nil {
-					return err
-				}
-				return workPrint(cmd, explanation, fmt.Sprintf("Committed request %s (%s): %d Claims in %s; tip %s",
-					explanation.RequestID, explanation.Kind, len(explanation.Claims), explanation.CommitID, explanation.Tip))
+			if beforeClaim != "" || requestID != "" {
+				return workExplainCommitted(cmd, commits, beforeClaim, requestID)
 			}
 			state, err := workqueue.Replay(commits)
 			if err != nil {
@@ -205,6 +195,23 @@ func workExplainCommand() *cobra.Command {
 	cmd.Flags().String("work-id", "", "Inspect this Work's dependency path (read only)")
 	cmd.Flags().String("before-claim", "", "Replay the exact predecessor and earlier operations before this committed Claim")
 	return cmd
+}
+
+func workExplainCommitted(cmd *cobra.Command, commits []workqueue.QueueCommit, beforeClaim, requestID string) error {
+	if beforeClaim != "" {
+		explanation, err := workqueue.ExplainBeforeClaim(commits, beforeClaim)
+		if err != nil {
+			return err
+		}
+		return workPrint(cmd, explanation, fmt.Sprintf("Committed Claim %s: selected %s before %s operation %d; tip %s",
+			explanation.ClaimID, explanation.Selection.WorkID, explanation.CommitID, explanation.Position.Operation, explanation.Tip))
+	}
+	explanation, err := workqueue.ExplainRequest(commits, requestID)
+	if err != nil {
+		return err
+	}
+	return workPrint(cmd, explanation, fmt.Sprintf("Committed request %s (%s): %d Claims in %s; tip %s",
+		explanation.RequestID, explanation.Kind, len(explanation.Claims), explanation.CommitID, explanation.Tip))
 }
 
 func workCompactCommand() *cobra.Command {
@@ -326,74 +333,7 @@ func workSubmitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "submit-work", Short: "Admit immutable Work with queue-like defaults and trusted policy entitlements",
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			graph, _ := cmd.Flags().GetString("graph-id")
-			key, _ := cmd.Flags().GetString("node-key")
-			if cmd.Flags().Changed("graph-id") && graph == "" || cmd.Flags().Changed("node-key") && key == "" {
-				return errors.New("work_invalid: explicitly supplied graph/node identities are empty. Use nonempty values, for example --graph-id review --node-key root, or omit the flags for payload-hash/root defaults")
-			}
-			payload, err := workReadJSON(cmd)
-			if err != nil {
-				return err
-			}
-			branch := workBranch(cmd)
-			actor, err := branch.Authenticate(cmd.Context(), "producer")
-			if err != nil {
-				return err
-			}
-			state, err := workRead(cmd)
-			var policy workqueue.Policy
-			var protocolError *workqueue.ProtocolError
-			if err == nil {
-				policy = *state.Policy
-			} else if errors.As(err, &protocolError) && protocolError.Code == "queue_missing" {
-				policy = workqueue.DefaultPolicy(actor.Principal, actor.Repository)
-			} else {
-				return err
-			}
-			pool, _ := cmd.Flags().GetString("pool")
-			if !cmd.Flags().Changed("graph-id") {
-				graph, err = workqueue.IndependentGraphID(payload)
-				if err != nil {
-					return err
-				}
-			}
-			work, err := workqueue.NewWork(payload, graph, key, pool, policy, time.Now().UnixMilli())
-			if err != nil {
-				return err
-			}
-			work.Priority, _ = cmd.Flags().GetInt("priority")
-			work.FairnessKey, _ = cmd.Flags().GetString("fairness-key")
-			profile, _ := cmd.Flags().GetString("worker-profile")
-			if profile != "" {
-				approved, ok := policy.Pools[pool].Profiles[profile]
-				if !ok {
-					return errors.New("profile_invalid: worker profile is not approved")
-				}
-				work.WorkerProfile, work.BatchTrustDomain = profile, approved.TrustDomain
-			}
-			if existing := state.Works[work.WorkID]; existing != nil {
-				work.Enqueued = existing.Enqueued
-				left, _ := json.Marshal(existing.WorkDefinition)
-				right, _ := json.Marshal(work)
-				left, _ = workqueue.Canonical(left)
-				right, _ = workqueue.Canonical(right)
-				if !bytes.Equal(left, right) {
-					return errors.New("work_conflict: idempotent submission changes immutable metadata")
-				}
-			}
-			published, err := workPublish(cmd, "producer", "submit", workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{work}})
-			if err != nil {
-				return err
-			}
-			if !published.Changed {
-				return workPrint(cmd, map[string]any{
-					"work_id": work.WorkID, "created": false, "status": "already_admitted", "publication": published,
-				}, "Work "+work.WorkID+" already admitted")
-			}
-			return workPrint(cmd, map[string]any{"work_id": work.WorkID, "created": published.Changed, "publication": published},
-				"Admitted Work "+work.WorkID)
-		},
+		RunE: workRunSubmitCommand,
 	}
 	cmd.Flags().String("file", "", "JSON work object path (- for stdin)")
 	cmd.Flags().String("graph-id", "", "Nonempty graph namespace (when omitted: canonical payload SHA256)")
@@ -403,6 +343,95 @@ func workSubmitCommand() *cobra.Command {
 	cmd.Flags().String("fairness-key", "", "Entitled accounting key (default: one shared bucket)")
 	cmd.Flags().String("worker-profile", "", "Approved profile (default: pool default)")
 	return cmd
+}
+
+func workRunSubmitCommand(cmd *cobra.Command, _ []string) error {
+	graph, _ := cmd.Flags().GetString("graph-id")
+	key, _ := cmd.Flags().GetString("node-key")
+	if cmd.Flags().Changed("graph-id") && graph == "" || cmd.Flags().Changed("node-key") && key == "" {
+		return errors.New("work_invalid: explicitly supplied graph/node identities are empty. Use nonempty values, for example --graph-id review --node-key root, or omit the flags for payload-hash/root defaults")
+	}
+	payload, err := workReadJSON(cmd)
+	if err != nil {
+		return err
+	}
+	branch := workBranch(cmd)
+	actor, err := branch.Authenticate(cmd.Context(), "producer")
+	if err != nil {
+		return err
+	}
+	state, policy, err := workReadSubmissionPolicy(cmd, actor.Principal, actor.Repository)
+	if err != nil {
+		return err
+	}
+	pool, _ := cmd.Flags().GetString("pool")
+	if !cmd.Flags().Changed("graph-id") {
+		graph, err = workqueue.IndependentGraphID(payload)
+		if err != nil {
+			return err
+		}
+	}
+	work, err := workqueue.NewWork(payload, graph, key, pool, policy, time.Now().UnixMilli())
+	if err != nil {
+		return err
+	}
+	work.Priority, _ = cmd.Flags().GetInt("priority")
+	work.FairnessKey, _ = cmd.Flags().GetString("fairness-key")
+	profile, _ := cmd.Flags().GetString("worker-profile")
+	if profile != "" {
+		approved, ok := policy.Pools[pool].Profiles[profile]
+		if !ok {
+			return errors.New("profile_invalid: worker profile is not approved")
+		}
+		work.WorkerProfile, work.BatchTrustDomain = profile, approved.TrustDomain
+	}
+	work, err = workReuseSubmission(state, work)
+	if err != nil {
+		return err
+	}
+	published, err := workPublish(cmd, "producer", "submit", workqueue.SubmitParameters{Nodes: []workqueue.WorkDefinition{work}})
+	if err != nil {
+		return err
+	}
+	if !published.Changed {
+		return workPrint(cmd, map[string]any{
+			"work_id": work.WorkID, "created": false, "status": "already_admitted", "publication": published,
+		}, "Work "+work.WorkID+" already admitted")
+	}
+	return workPrint(cmd, map[string]any{"work_id": work.WorkID, "created": published.Changed, "publication": published},
+		"Admitted Work "+work.WorkID)
+}
+
+func workReadSubmissionPolicy(cmd *cobra.Command, principal, repository string) (workqueue.Projection, workqueue.Policy, error) {
+	state, err := workRead(cmd)
+	if err == nil {
+		return state, *state.Policy, nil
+	}
+	var protocolError *workqueue.ProtocolError
+	if errors.As(err, &protocolError) && protocolError.Code == "queue_missing" {
+		return state, workqueue.DefaultPolicy(principal, repository), nil
+	}
+	return workqueue.Projection{}, workqueue.Policy{}, err
+}
+
+func workReuseSubmission(state workqueue.Projection, work workqueue.WorkDefinition) (workqueue.WorkDefinition, error) {
+	existing := state.Works[work.WorkID]
+	if existing == nil {
+		return work, nil
+	}
+	work.Enqueued = existing.Enqueued
+	left, err := workqueue.CanonicalValue(existing.WorkDefinition)
+	if err != nil {
+		return workqueue.WorkDefinition{}, err
+	}
+	right, err := workqueue.CanonicalValue(work)
+	if err != nil {
+		return workqueue.WorkDefinition{}, err
+	}
+	if !bytes.Equal(left, right) {
+		return workqueue.WorkDefinition{}, errors.New("work_conflict: idempotent submission changes immutable metadata")
+	}
+	return work, nil
 }
 
 func workSubmitGraphCommand() *cobra.Command {
@@ -478,7 +507,10 @@ func workPolicyCommand() *cobra.Command {
 			if err := json.Unmarshal(data, &policy); err != nil {
 				return err
 			}
-			operation := workqueue.Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": json.RawMessage(data)})
+			operation, err := workqueue.Op(map[string]any{"kind": "Policy", "epoch": epoch, "policy": json.RawMessage(data)})
+			if err != nil {
+				return err
+			}
 			published, err := workPublish(cmd, "administrator", "policy", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
 			if err != nil {
 				return err
@@ -514,9 +546,11 @@ func workControlCommand() *cobra.Command {
 				}
 				value, _ = cmd.Flags().GetBool("paused")
 			}
-			published, err := workPublish(cmd, "administrator", "control", workqueue.OperationsParameters{Operations: []workqueue.Operation{
-				workqueue.Op(map[string]any{"kind": "Control", "control": control, "value": value, "reason": reason}),
-			}})
+			operation, err := workqueue.Op(map[string]any{"kind": "Control", "control": control, "value": value, "reason": reason})
+			if err != nil {
+				return err
+			}
+			published, err := workPublish(cmd, "administrator", "control", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
 			if err != nil {
 				return err
 			}
@@ -540,9 +574,11 @@ func workCancelCommand() *cobra.Command {
 			if id == "" || reason == "" {
 				return errors.New("--work-id and --reason are required")
 			}
-			published, err := workPublish(cmd, "administrator", "cancel_work", workqueue.OperationsParameters{Operations: []workqueue.Operation{
-				workqueue.Op(map[string]any{"kind": "WorkCancellation", "work_id": id, "reason": reason}),
-			}})
+			operation, err := workqueue.Op(map[string]any{"kind": "WorkCancellation", "work_id": id, "reason": reason})
+			if err != nil {
+				return err
+			}
+			published, err := workPublish(cmd, "administrator", "cancel_work", workqueue.OperationsParameters{Operations: []workqueue.Operation{operation}})
 			if err != nil {
 				return err
 			}

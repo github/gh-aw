@@ -35,7 +35,7 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 	}
 	actor = testActor("producer")
 	foreign, err := NewRequest("foreign-cancellation", "cancel_work", actor,
-		OperationsParameters{Operations: []Operation{Op(map[string]any{
+		OperationsParameters{Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "WorkCancellation", "work_id": other.WorkID, "reason": "producer_cancelled",
 		})}})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestProducerCancellationPreservesForeignScopeAndNativeProjection(t *testing
 		t.Fatalf("producer cancellation escaped its installed accounting entitlement: %v", err)
 	}
 	open := slices.Clone(commits)
-	commits = testOperations(t, commits, actor, "owned-cancellation", "cancel_work", Op(map[string]any{
+	commits = testOperations(t, commits, actor, "owned-cancellation", "cancel_work", mustOp(t, map[string]any{
 		"kind": "WorkCancellation", "work_id": own.WorkID, "reason": "producer_cancelled",
 	}))
 	state, err := Replay(commits)
@@ -153,7 +153,7 @@ try {
 		t.Run("foreign-"+test.name, func(t *testing.T) {
 			actor := testActor("producer")
 			actor.Principal = "1002"
-			operations := []Operation{Op(map[string]any{
+			operations := []Operation{mustOp(t, map[string]any{
 				"kind": "WorkCancellation", "work_id": own.WorkID, "reason": "producer_cancelled",
 			})}
 			request, err := NewRequest("foreign-"+test.name, "cancel_work", actor,

@@ -21,7 +21,7 @@ func BenchmarkQueueColdReplay(b *testing.B) {
 			total := len(encoded) + 1
 			target := min(size<<20, maxParseBytes-1024)
 			for index := 0; total < target; index++ {
-				operations := []Operation{Op(map[string]any{
+				operations := []Operation{mustOp(b, map[string]any{
 					"kind": "Control", "control": "grants_paused", "value": index%2 == 0,
 					"reason": strings.Repeat("b", 128),
 				})}

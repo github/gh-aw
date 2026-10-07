@@ -2591,7 +2591,7 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 
 | Requirement | Implementation/evidence status |
 |---|---|
-| Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented native contract and strict literal conformance fixtures; captured passes describe their recorded source versions. Final combined-source parity and authorization regressions remain integration gates |
+| Current-only QueueCommit contract and native Go/JavaScript conformance | Implemented native contract and strict literal conformance fixtures. Typed Go canonicalization rejects invalid Unicode before JSON encoding can repair it; operation-construction errors propagate through native CLI and delivery consumers. Captured passes describe their recorded source versions. Final combined-source parity and authorization regressions remain integration gates |
 | Exact fairness, FIFO defaults, deterministic fair-prefix packing and CAS recovery | In progress |
 | Work/Issue/PR DAG, observations, Result/DeliveryFailure and replacements | In progress |
 | Immutable arrays, actual run binding and conservative native recovery | In progress |

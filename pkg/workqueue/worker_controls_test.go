@@ -49,12 +49,12 @@ func TestWorkerDispatchControlRequiresCompletedOriginalScope(t *testing.T) {
 	terminal := terminalFor(state, assignment)
 	operations := []Operation{}
 	for _, member := range assignment.Claims[1:] {
-		operations = append(operations, Op(map[string]any{
+		operations = append(operations, mustOp(t, map[string]any{
 			"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"reason": "native_terminal", "retry_not_before": 34000,
 		}))
 	}
-	operations = append(operations, Op(map[string]any{
+	operations = append(operations, mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal,
 	}))
 	next = testOperations(t, next, testActor("reconciler"), "release-parent", "release", operations...)
@@ -90,7 +90,7 @@ func TestWorkerChildAdmissionNeedsCompletionAndInheritedScope(t *testing.T) {
 	state, _ := Replay(commits)
 	failure := terminalFor(state, assignment)
 	failure.Attempts, failure.Effects = 5, "unknown"
-	commits = testOperations(t, commits, testActor("reconciler"), "failure", "delivery_failure", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "failure", "delivery_failure", mustOp(t, map[string]any{
 		"kind": "DeliveryFailure", "work_id": assignment.Claims[0].WorkID,
 		"claim_id": assignment.Claims[0].ClaimID, "completion_id": state.Works[assignment.Claims[0].WorkID].CompletionID,
 		"reason": "verification_exhausted", "disposition": "unknown", "evidence": failure,
@@ -123,7 +123,7 @@ func TestWorkerDerivedObservationsUseSameEffectiveScope(t *testing.T) {
 		Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: 48 << 10,
 	})
 	next, commit, _, err := buildCandidateWithObservations(commits, actor, request, 4000, []Observation{observation})
-	if err != nil || commit == nil || operationKind(commit.Operations[0]) != "Observation" {
+	if err != nil || commit == nil || mustOperationKind(t, commit.Operations[0]) != "Observation" {
 		t.Fatalf("trusted worker refresh could not precede its fair prefix: %v", err)
 	}
 	state, err = Replay(next)

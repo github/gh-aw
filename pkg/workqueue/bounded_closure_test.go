@@ -22,7 +22,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	pool := genesis.Policy.Pools["default"]
 	pool.Retry.MaxAttempts = 1
 	genesis.Policy.Pools["default"] = pool
-	commits[0].Operations = []Operation{Op(genesis)}
+	commits[0].Operations = []Operation{mustOp(t, genesis)}
 	request, err := NewRequest(commits[0].Request.ID, "policy", commits[0].Actor,
 		OperationsParameters{Operations: commits[0].Operations})
 	if err != nil {
@@ -38,7 +38,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 		rejected := false
 		for index := range 512 {
 			control, err := NewRequest(fmt.Sprintf("fill-%s-%d", stage, index), "control", testActor("administrator"),
-				OperationsParameters{Operations: []Operation{Op(map[string]any{
+				OperationsParameters{Operations: []Operation{mustOp(t, map[string]any{
 					"kind": "Control", "control": "grants_paused", "value": true, "reason": "x",
 				})}})
 			if err != nil {
@@ -53,7 +53,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 				rejectedCommit := QueueCommit{
 					Version: Version, ID: ProposedCommitID(state, control), Previous: &previous,
 					Request: control, Actor: testActor("administrator"), PolicyEpoch: state.PolicyEpoch, At: 4000,
-					Operations: []Operation{Op(map[string]any{
+					Operations: []Operation{mustOp(t, map[string]any{
 						"kind": "Control", "control": "grants_paused", "value": true, "reason": "x",
 					})},
 				}
@@ -93,7 +93,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	member := assignment.Claims[0]
 	reconciler := maximumClosureActor()
 	result, err := NewRequest(strings.Repeat("\\", 256), "result", reconciler, OperationsParameters{
-		Operations: []Operation{Op(map[string]any{
+		Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "Result", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"completion_id": state.Works[member.WorkID].CompletionID,
 			"descriptor":    json.RawMessage(`{"x":"` + strings.Repeat("x", 4096-8) + `"}`),
@@ -117,14 +117,14 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 	fillUnallocated(t, "native-release")
 	operations := []Operation{}
 	for _, member := range assignment.Claims[1:] {
-		operations = append(operations, Op(map[string]any{
+		operations = append(operations, mustOp(t, map[string]any{
 			"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"reason": strings.Repeat("x", 128), "retry_not_before": 34000,
-		}), Op(map[string]any{
+		}), mustOp(t, map[string]any{
 			"kind": "WorkCancellation", "work_id": member.WorkID, "reason": strings.Repeat("x", 128),
 		}))
 	}
-	operations = append(operations, Op(map[string]any{
+	operations = append(operations, mustOp(t, map[string]any{
 		"kind": "Release", "dispatch_id": assignment.DispatchID,
 		"evidence": maximumClosureEvidence(t, state, assignment, false),
 	}))
@@ -156,7 +156,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 			evidence := terminalFor(state, assignment)
 			evidence.Kind, evidence.Status, evidence.Conclusion = "reconciliation", "", ""
 			commits = testOperations(t, commits, testActor("reconciler"), fmt.Sprintf("exhaust-native-%d", dispatch.LifecycleWrites),
-				"dispatch", Op(map[string]any{
+				"dispatch", mustOp(t, map[string]any{
 					"kind": "Dispatch", "dispatch_id": dispatch.DispatchID, "state": "bound",
 					"run": dispatch.Run, "evidence": evidence,
 				}))
@@ -172,7 +172,7 @@ func TestLastAttemptCompletionCanSpendReservedClosureBytes(t *testing.T) {
 		}
 		fillUnallocated(t, "native-escrow-only")
 		request, err := NewRequest(strings.Repeat("\\", 255)+"\"", "release", reconciler, OperationsParameters{
-			Operations: []Operation{Op(map[string]any{
+			Operations: []Operation{mustOp(t, map[string]any{
 				"kind": "Release", "dispatch_id": assignment.DispatchID,
 				"evidence": maximumClosureEvidence(t, state, assignment, false),
 			})},

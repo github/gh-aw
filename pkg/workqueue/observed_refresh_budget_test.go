@@ -159,7 +159,7 @@ func TestNativeObservationRefreshStopsBeforeDependencyProbes(t *testing.T) {
 			node.DependsOn = []Dependency{{Kind: "issue", Resource: &resource, Condition: "completed"}}
 			commits = testSubmit(t, commits, "watermark-submit", node)
 			if test.grantsPaused {
-				commits = testOperations(t, commits, testActor("administrator"), "pause-refresh", "control", Op(map[string]any{
+				commits = testOperations(t, commits, testActor("administrator"), "pause-refresh", "control", mustOp(t, map[string]any{
 					"kind": "Control", "control": "grants_paused", "value": true, "reason": "incident",
 				}))
 			}
@@ -172,7 +172,7 @@ func TestNativeObservationRefreshStopsBeforeDependencyProbes(t *testing.T) {
 					t.Fatal("fixture did not exhaust its optional observation watermark")
 				}
 				commits = testOperations(t, commits, testActor("administrator"), fmt.Sprintf("pad-watermark-%d", index),
-					"control", Op(map[string]any{
+					"control", mustOp(t, map[string]any{
 						"kind": "Control", "control": "admission_paused", "value": false,
 						"reason": strings.Repeat("x", 128),
 					}))
@@ -278,7 +278,7 @@ func TestNativeObservedDispatchValidatesBeforeDependencyProbes(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				commits[1].Request, commits[1].Operations = request, []Operation{Op(node)}
+				commits[1].Request, commits[1].Operations = request, []Operation{mustOp(t, node)}
 			}
 			installMockLog(t, mock, commits)
 			initialHead, initialLogs, initialCommits := mock.head, len(mock.logs), len(mock.commits)

@@ -89,7 +89,7 @@ func TestNativeFreshResultRequiresSupportedFrozenContract(t *testing.T) {
 		calls++
 		return DeliveryVerification{Verified: true, Descriptor: json.RawMessage(`{}`), Receipt: "unsubstantiated"}, nil
 	}
-	operation := Op(map[string]any{
+	operation := mustOp(t, map[string]any{
 		"kind": "Result", "work_id": claim.WorkID, "claim_id": claim.ClaimID,
 		"completion_id": state.Works[claim.WorkID].CompletionID, "descriptor": json.RawMessage(`{}`),
 		"evidence": Evidence{

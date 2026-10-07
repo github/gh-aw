@@ -3,6 +3,7 @@ package workqueue
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"slices"
 )
 
@@ -60,9 +61,7 @@ func NewNativeDeliveryHost(options NativeDeliveryHostOptions) *NativeDeliveryHos
 
 func copyNativeVerifiers(values map[string]NativeOutputVerifier) map[string]NativeOutputVerifier {
 	copy := make(map[string]NativeOutputVerifier, len(values))
-	for key, value := range values {
-		copy[key] = value
-	}
+	maps.Copy(copy, values)
 	return copy
 }
 
@@ -77,55 +76,8 @@ func copyNativeDeliveryScope(scope NativeDeliveryScope) NativeDeliveryScope {
 
 func copyNativeEffectResource(resource EffectResource) EffectResource {
 	copy := make(EffectResource, len(resource))
-	for field, value := range resource {
-		copy[field] = value
-	}
+	maps.Copy(copy, resource)
 	return copy
-}
-
-func nativeDeliveryTargetBinding(state Projection, work *WorkState, actor Actor, target EffectResource) error {
-	if err := AuthorizeEffect(state, actor, target); err != nil {
-		return err
-	}
-	scope, err := frozenResourceScope(work.Payload)
-	if err != nil {
-		return err
-	}
-	nativeSelector := func(selector EffectResource) bool {
-		if selector["host"] != "github.com" || !decimalIdentity(selector["repository_id"]) {
-			return false
-		}
-		if selector["kind"] != "" || selector["number"] != "" || selector["resource_id"] != "" || selector["comment_id"] != "" {
-			return selector["kind"] != "" && decimalIdentity(selector["number"]) && decimalIdentity(selector["resource_id"])
-		}
-		return true
-	}
-	matched := false
-	if scope != nil {
-		for _, selector := range scope.Resources {
-			if nativeSelector(selector) && matchesEffectResource(selector, target) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return queueError("claim_scope_invalid", "native readback requires a positive immutable Work resource selector")
-		}
-	}
-	if subject := work.Subject; subject != nil {
-		selector := EffectResource{
-			"kind": subject.Kind, "host": subject.Host, "repository": subject.Repository,
-			"repository_id": subject.RepositoryID, "resource_id": subject.ResourceID, "number": subject.Number,
-		}
-		if !nativeSelector(selector) || !matchesEffectResource(selector, target) {
-			return queueError("claim_scope_invalid", "native readback requires the exact immutable Work subject")
-		}
-		matched = true
-	}
-	if !matched {
-		return queueError("claim_scope_invalid", "native readback requires immutable repository and resource identities")
-	}
-	return nil
 }
 
 type nativeDeclaredOutput struct {
@@ -136,6 +88,19 @@ type nativeDeclaredOutput struct {
 		VerifierID string          `json:"verifier_id"`
 		Expected   json.RawMessage `json:"expected"`
 	} `json:"verification,omitempty"`
+}
+
+// Preserve the anonymous wire shape, including its JSON decoding errors.
+type nativeDeliveryContract = struct {
+	Kind     string                 `json:"kind"`
+	NoWrites bool                   `json:"no_writes"`
+	Outputs  []nativeDeclaredOutput `json:"outputs"`
+}
+
+type nativeDeliveryContext struct {
+	work     *WorkState
+	dispatch *DispatchState
+	scope    NativeDeliveryScope
 }
 
 func nativeControlInventory(state Projection, scope NativeDeliveryScope, dispatchID string) []QueueCommit {
@@ -167,172 +132,228 @@ func nativeControlInventory(state Projection, scope NativeDeliveryScope, dispatc
 // a copied receipt/digest or successful job can never bypass those reads.
 func (host *NativeDeliveryHost) Verifier(branch Branch) DeliveryVerifier {
 	return func(ctx context.Context, state Projection, supplied ClaimState) (DeliveryVerification, error) {
-		unknown := DeliveryVerification{Disposition: "unknown"}
-		if host == nil || host.options.Inventory == nil {
-			return unknown, nil
-		}
-		claim := state.Claims[supplied.ClaimID]
-		if claim == nil || !sameJSON(claim, supplied) {
-			return unknown, queueError("claim_scope_invalid", "native delivery requires the original retained Claim")
-		}
-		work := state.Works[claim.WorkID]
-		dispatch := state.Dispatches[claim.DispatchID]
-		if work == nil || dispatch == nil || dispatch.Run == nil || claim.State != "completed" ||
-			work.State != "completed" || work.ClaimID != claim.ClaimID || work.Barrier != "pending" {
-			return unknown, nil
-		}
-		if err := validateDeliveryContract(work.Payload); err != nil {
-			return unknown, err
-		}
-		scope := NativeDeliveryScope{Run: *dispatch.Run, CompletionID: work.CompletionID, CredentialGeneration: state.CredentialGeneration}
-		for _, member := range dispatch.Claims {
-			if member.ClaimID == claim.ClaimID {
-				scope.Member = member
-				break
-			}
-		}
-		if scope.Member.ClaimID == "" || !sameJSON(scope.Member.Work, work.Payload) {
-			return unknown, queueError("assignment_invalid", "native delivery lost immutable member payload")
-		}
-		bound, err := branch.withClient()
-		if err != nil {
-			return unknown, err
-		}
-		binding, _, err := bound.runForDispatch(ctx, state, dispatch, scope.Run.RunID)
-		if err != nil || !sameJSON(binding, scope.Run) {
-			return unknown, queueError("run_binding_conflict", "native delivery requires exact authenticated attempt one")
-		}
-		// Copy mutable callback arguments so a callback cannot alter the queue
-		// projection that will subsequently be used to build a CAS candidate.
-		scope = copyNativeDeliveryScope(scope)
-		inventory, err := host.options.Inventory(ctx, copyNativeDeliveryScope(scope))
-		if err != nil || !inventory.Closed || len(inventory.Outputs) > 128 {
-			return unknown, err
-		}
-		encodedInventory, err := canonicalValue(inventory)
-		if err != nil || json.Unmarshal(encodedInventory, &inventory) != nil {
-			return unknown, queueError("delivery_evidence_required", "native process inventory must be canonical")
-		}
-		var payload struct {
-			Contract struct {
-				Kind     string                 `json:"kind"`
-				NoWrites bool                   `json:"no_writes"`
-				Outputs  []nativeDeclaredOutput `json:"outputs"`
-			} `json:"effect_contract"`
-		}
-		if err := json.Unmarshal(work.Payload, &payload); err != nil {
-			return unknown, err
-		}
-		contract := payload.Contract
-		controls := nativeControlInventory(state, scope, dispatch.DispatchID)
-		if (contract.Kind == "none" || contract.NoWrites) && (len(inventory.Outputs) != 0 || len(controls) != 0) {
-			return unknown, nil
-		}
-		declared := map[string]nativeDeclaredOutput{}
-		counts := map[string]int{}
-		for _, output := range contract.Outputs {
-			if output.Type != "work_queue_submit" && output.Type != "work_queue_dispatch_next" {
-				verify := host.options.Builtin[output.Type]
-				if output.Verification != nil {
-					verify = host.options.Declared[output.Verification.VerifierID]
-				}
-				if verify == nil || host.options.Credentials == nil {
-					return unknown, nil
-				}
-			}
-			declared[output.Type] = output
-		}
-		for _, output := range inventory.Outputs {
-			if _, ok := declared[output.Type]; !ok {
-				return unknown, nil
-			}
-			counts[output.Type]++
-		}
-		for name, expected := range declared {
-			if counts[name] < expected.Min || counts[name] > expected.Max {
-				return unknown, nil
-			}
-		}
-		verifiedControls := map[string]bool{}
-		descriptors := []json.RawMessage{}
-		for _, output := range inventory.Outputs {
-			expected, ok := declared[output.Type]
-			if !ok {
-				return unknown, nil
-			}
-			var descriptor json.RawMessage
-			if output.Type == "work_queue_submit" || output.Type == "work_queue_dispatch_next" {
-				kind := "submit"
-				if output.Type == "work_queue_dispatch_next" {
-					kind = "dispatch_next"
-				}
-				matched := false
-				for _, control := range controls {
-					if control.Request.ID == output.RequestID && control.Request.Kind == kind &&
-						sameJSON(control.Request.Parameters, output.Intent) && !verifiedControls[output.RequestID] {
-						descriptor, err = canonicalValue(map[string]string{"type": output.Type, "commit_id": control.ID, "request_id": control.Request.ID})
-						matched = err == nil
-						verifiedControls[output.RequestID] = matched
-						break
-					}
-				}
-				if !matched {
-					return unknown, nil
-				}
-			} else {
-				if err := nativeDeliveryTargetBinding(state, work, workerDeliveryActor(scope, dispatch.DispatchID), output.Target); err != nil {
-					return unknown, err
-				}
-				verify := host.options.Builtin[output.Type]
-				var intent json.RawMessage
-				if expected.Verification != nil {
-					verify = host.options.Declared[expected.Verification.VerifierID]
-					intent = slices.Clone(expected.Verification.Expected)
-				}
-				if verify == nil || host.options.Credentials == nil {
-					return unknown, nil
-				}
-				if err := host.options.Credentials(ctx, copyNativeDeliveryScope(scope), copyNativeEffectResource(output.Target)); err != nil {
-					return unknown, err
-				}
-				var verified bool
-				output.Target = copyNativeEffectResource(output.Target)
-				output.Intent = slices.Clone(output.Intent)
-				descriptor, verified, err = verify(ctx, copyNativeDeliveryScope(scope), output, intent)
-				if err != nil || !verified {
-					return unknown, err
-				}
-				var object map[string]json.RawMessage
-				descriptor, err = Canonical(descriptor)
-				if err != nil || json.Unmarshal(descriptor, &object) != nil || object == nil {
-					return unknown, queueError("result_invalid", "native readback descriptor must be a canonical object")
-				}
-			}
-			descriptors = append(descriptors, descriptor)
-		}
-		if len(verifiedControls) != len(controls) {
-			return unknown, nil
-		}
-		descriptor, err := canonicalValue(map[string]any{"outputs": descriptors})
-		if err != nil || int64(len(descriptor)) > state.Policy.Limits.ResultBytes {
-			return unknown, queueError("result_invalid", "native readback descriptor exceeds Result byte budget")
-		}
-		record, err := canonicalValue(map[string]any{
-			"scope": scope, "contract": json.RawMessage(work.Payload), "controls": controls,
-			"outputs": inventory.Outputs, "descriptor": json.RawMessage(descriptor),
-		})
-		if err != nil {
-			return unknown, err
-		}
-		if err := ctx.Err(); err != nil {
-			return unknown, err
-		}
-		disposition := "partial"
-		if contract.Kind == "none" || contract.NoWrites {
-			disposition = "none"
-		}
-		return DeliveryVerification{Verified: true, Descriptor: descriptor, Receipt: hashBytes(record), Disposition: disposition, PositiveNoEffects: disposition == "none"}, nil
+		return host.verifyNativeDelivery(ctx, branch, state, supplied)
 	}
+}
+
+func (host *NativeDeliveryHost) verifyNativeDelivery(ctx context.Context, branch Branch, state Projection, supplied ClaimState) (DeliveryVerification, error) {
+	unknown := DeliveryVerification{Disposition: "unknown"}
+	if host == nil || host.options.Inventory == nil {
+		return unknown, nil
+	}
+	delivery, ready, err := nativeDeliveryClaim(ctx, branch, state, supplied)
+	if err != nil || !ready {
+		return unknown, err
+	}
+	inventory, closed, err := host.readNativeDeliveryInventory(ctx, delivery.scope)
+	if err != nil || !closed {
+		return unknown, err
+	}
+	contract, err := decodeNativeDeliveryContract(delivery.work.Payload)
+	if err != nil {
+		return unknown, err
+	}
+	controls := nativeControlInventory(state, delivery.scope, delivery.dispatch.DispatchID)
+	declared, complete := host.nativeDeliveryDeclarations(contract, inventory, controls)
+	if !complete {
+		return unknown, nil
+	}
+	descriptors, verified, err := host.verifyNativeDeliveryOutputs(ctx, state, delivery, inventory, declared, controls)
+	if err != nil || !verified {
+		return unknown, err
+	}
+	return nativeDeliveryReceipt(ctx, state, delivery, contract, controls, inventory, descriptors)
+}
+
+func nativeDeliveryClaim(ctx context.Context, branch Branch, state Projection, supplied ClaimState) (nativeDeliveryContext, bool, error) {
+	claim := state.Claims[supplied.ClaimID]
+	if claim == nil || !sameJSON(claim, supplied) {
+		return nativeDeliveryContext{}, false, queueError("claim_scope_invalid", "native delivery requires the original retained Claim")
+	}
+	work := state.Works[claim.WorkID]
+	dispatch := state.Dispatches[claim.DispatchID]
+	if work == nil || dispatch == nil || dispatch.Run == nil || claim.State != "completed" ||
+		work.State != "completed" || work.ClaimID != claim.ClaimID || work.Barrier != "pending" {
+		return nativeDeliveryContext{}, false, nil
+	}
+	if err := validateDeliveryContract(work.Payload); err != nil {
+		return nativeDeliveryContext{}, false, err
+	}
+	scope := NativeDeliveryScope{Run: *dispatch.Run, CompletionID: work.CompletionID, CredentialGeneration: state.CredentialGeneration}
+	for _, member := range dispatch.Claims {
+		if member.ClaimID == claim.ClaimID {
+			scope.Member = member
+			break
+		}
+	}
+	if scope.Member.ClaimID == "" || !sameJSON(scope.Member.Work, work.Payload) {
+		return nativeDeliveryContext{}, false, queueError("assignment_invalid", "native delivery lost immutable member payload")
+	}
+	bound, err := branch.withClient()
+	if err != nil {
+		return nativeDeliveryContext{}, false, err
+	}
+	binding, _, err := bound.runForDispatch(ctx, state, dispatch, scope.Run.RunID)
+	if err != nil || !sameJSON(binding, scope.Run) {
+		return nativeDeliveryContext{}, false, queueError("run_binding_conflict", "native delivery requires exact authenticated attempt one")
+	}
+	// Callback arguments must not alias the projection used by the CAS candidate.
+	scope = copyNativeDeliveryScope(scope)
+	return nativeDeliveryContext{work: work, dispatch: dispatch, scope: scope}, true, nil
+}
+
+func (host *NativeDeliveryHost) readNativeDeliveryInventory(ctx context.Context, scope NativeDeliveryScope) (NativeDeliveryInventory, bool, error) {
+	inventory, err := host.options.Inventory(ctx, copyNativeDeliveryScope(scope))
+	if err != nil || !inventory.Closed || len(inventory.Outputs) > 128 {
+		return NativeDeliveryInventory{}, false, err
+	}
+	encodedInventory, err := canonicalValue(inventory)
+	if err != nil || json.Unmarshal(encodedInventory, &inventory) != nil {
+		return NativeDeliveryInventory{}, false, queueError("delivery_evidence_required", "native process inventory must be canonical")
+	}
+	return inventory, true, nil
+}
+
+func decodeNativeDeliveryContract(work json.RawMessage) (nativeDeliveryContract, error) {
+	var payload struct {
+		Contract nativeDeliveryContract `json:"effect_contract"`
+	}
+	err := json.Unmarshal(work, &payload)
+	return payload.Contract, err
+}
+
+func (host *NativeDeliveryHost) nativeDeliveryDeclarations(contract nativeDeliveryContract, inventory NativeDeliveryInventory, controls []QueueCommit) (map[string]nativeDeclaredOutput, bool) {
+	if (contract.Kind == "none" || contract.NoWrites) && (len(inventory.Outputs) != 0 || len(controls) != 0) {
+		return nil, false
+	}
+	declared := map[string]nativeDeclaredOutput{}
+	counts := map[string]int{}
+	for _, output := range contract.Outputs {
+		if output.Type != "work_queue_submit" && output.Type != "work_queue_dispatch_next" {
+			verify := host.options.Builtin[output.Type]
+			if output.Verification != nil {
+				verify = host.options.Declared[output.Verification.VerifierID]
+			}
+			if verify == nil || host.options.Credentials == nil {
+				return nil, false
+			}
+		}
+		declared[output.Type] = output
+	}
+	for _, output := range inventory.Outputs {
+		if _, ok := declared[output.Type]; !ok {
+			return nil, false
+		}
+		counts[output.Type]++
+	}
+	for name, expected := range declared {
+		if counts[name] < expected.Min || counts[name] > expected.Max {
+			return nil, false
+		}
+	}
+	return declared, true
+}
+
+func (host *NativeDeliveryHost) verifyNativeDeliveryOutputs(ctx context.Context, state Projection, delivery nativeDeliveryContext, inventory NativeDeliveryInventory, declared map[string]nativeDeclaredOutput, controls []QueueCommit) ([]json.RawMessage, bool, error) {
+	verifiedControls := map[string]struct{}{}
+	descriptors := []json.RawMessage{}
+	for _, output := range inventory.Outputs {
+		expected, ok := declared[output.Type]
+		if !ok {
+			return nil, false, nil
+		}
+		var descriptor json.RawMessage
+		var verified bool
+		var err error
+		if output.Type == "work_queue_submit" || output.Type == "work_queue_dispatch_next" {
+			descriptor, verified = verifyNativeDeliveryControl(output, controls, verifiedControls)
+		} else {
+			descriptor, verified, err = host.readNativeDeliveryOutput(ctx, state, delivery, output, expected)
+		}
+		if err != nil || !verified {
+			return nil, false, err
+		}
+		descriptors = append(descriptors, descriptor)
+	}
+	if len(verifiedControls) != len(controls) {
+		return nil, false, nil
+	}
+	return descriptors, true, nil
+}
+
+func verifyNativeDeliveryControl(output NativeDeliveryOutput, controls []QueueCommit, verifiedControls map[string]struct{}) (json.RawMessage, bool) {
+	kind := "submit"
+	if output.Type == "work_queue_dispatch_next" {
+		kind = "dispatch_next"
+	}
+	for _, control := range controls {
+		if control.Request.ID == output.RequestID && control.Request.Kind == kind &&
+			sameJSON(control.Request.Parameters, output.Intent) {
+			if _, verified := verifiedControls[output.RequestID]; verified {
+				continue
+			}
+			descriptor, err := canonicalValue(map[string]string{"type": output.Type, "commit_id": control.ID, "request_id": control.Request.ID})
+			if err != nil {
+				return descriptor, false
+			}
+			verifiedControls[output.RequestID] = struct{}{}
+			return descriptor, true
+		}
+	}
+	return nil, false
+}
+
+func (host *NativeDeliveryHost) readNativeDeliveryOutput(ctx context.Context, state Projection, delivery nativeDeliveryContext, output NativeDeliveryOutput, expected nativeDeclaredOutput) (json.RawMessage, bool, error) {
+	if err := AuthorizeEffect(state, workerDeliveryActor(delivery.scope, delivery.dispatch.DispatchID), output.Target); err != nil {
+		return nil, false, err
+	}
+	verify := host.options.Builtin[output.Type]
+	var intent json.RawMessage
+	if expected.Verification != nil {
+		verify = host.options.Declared[expected.Verification.VerifierID]
+		intent = slices.Clone(expected.Verification.Expected)
+	}
+	if verify == nil || host.options.Credentials == nil {
+		return nil, false, nil
+	}
+	if err := host.options.Credentials(ctx, copyNativeDeliveryScope(delivery.scope), copyNativeEffectResource(output.Target)); err != nil {
+		return nil, false, err
+	}
+	output.Target = copyNativeEffectResource(output.Target)
+	output.Intent = slices.Clone(output.Intent)
+	descriptor, verified, err := verify(ctx, copyNativeDeliveryScope(delivery.scope), output, intent)
+	if err != nil || !verified {
+		return nil, false, err
+	}
+	var object map[string]json.RawMessage
+	descriptor, err = Canonical(descriptor)
+	if err != nil || json.Unmarshal(descriptor, &object) != nil || object == nil {
+		return nil, false, queueError("result_invalid", "native readback descriptor must be a canonical object")
+	}
+	return descriptor, true, nil
+}
+
+func nativeDeliveryReceipt(ctx context.Context, state Projection, delivery nativeDeliveryContext, contract nativeDeliveryContract, controls []QueueCommit, inventory NativeDeliveryInventory, descriptors []json.RawMessage) (DeliveryVerification, error) {
+	unknown := DeliveryVerification{Disposition: "unknown"}
+	descriptor, err := canonicalValue(map[string]any{"outputs": descriptors})
+	if err != nil || int64(len(descriptor)) > state.Policy.Limits.ResultBytes {
+		return unknown, queueError("result_invalid", "native readback descriptor exceeds Result byte budget")
+	}
+	record, err := canonicalValue(map[string]any{
+		"scope": delivery.scope, "contract": delivery.work.Payload, "controls": controls,
+		"outputs": inventory.Outputs, "descriptor": json.RawMessage(descriptor),
+	})
+	if err != nil {
+		return unknown, err
+	}
+	if err := ctx.Err(); err != nil {
+		return unknown, err
+	}
+	disposition := "partial"
+	if contract.Kind == "none" || contract.NoWrites {
+		disposition = "none"
+	}
+	return DeliveryVerification{Verified: true, Descriptor: descriptor, Receipt: hashBytes(record), Disposition: disposition, PositiveNoEffects: disposition == "none"}, nil
 }
 
 func workerDeliveryActor(scope NativeDeliveryScope, dispatchID string) Actor {

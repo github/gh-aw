@@ -1,6 +1,7 @@
 package workqueue
 
 import (
+	"maps"
 	"math/big"
 	"slices"
 	"sort"
@@ -16,12 +17,8 @@ func copyClock(clock Clock) Clock {
 	if clock.V != "" {
 		result.V = clock.V
 	}
-	for key, pass := range clock.Pass {
-		result.Pass[key] = pass
-	}
-	for key, active := range clock.Active {
-		result.Active[key] = active
-	}
+	maps.Copy(result.Pass, clock.Pass)
+	maps.Copy(result.Active, clock.Active)
 	return result
 }
 
@@ -47,9 +44,9 @@ func pick(clock Clock, eligible []string, weights map[string]int, numeric bool) 
 	result := copyClock(clock)
 	scale := tickScale(weights)
 	v := integer(result.V)
-	eligibleSet := map[string]bool{}
+	result.Active = map[string]bool{}
 	for _, key := range eligible {
-		eligibleSet[key] = true
+		result.Active[key] = true
 		if !clock.Active[key] {
 			stride := new(big.Int).Div(new(big.Int).Set(scale), big.NewInt(int64(weights[key])))
 			floor := new(big.Int).Add(v, stride)
@@ -60,7 +57,6 @@ func pick(clock Clock, eligible []string, weights map[string]int, numeric bool) 
 			result.Pass[key] = pass.String()
 		}
 	}
-	result.Active = eligibleSet
 	if len(eligible) == 0 {
 		return "", result
 	}
@@ -70,9 +66,7 @@ func pick(clock Clock, eligible []string, weights map[string]int, numeric bool) 
 			return order
 		}
 		if numeric {
-			left, _ := strconv.Atoi(a)
-			right, _ := strconv.Atoi(b)
-			return left - right
+			return integer(a).Cmp(integer(b))
 		}
 		if a < b {
 			return -1
@@ -82,11 +76,13 @@ func pick(clock Clock, eligible []string, weights map[string]int, numeric bool) 
 		}
 		return 0
 	})
-	key := keys[0]
-	result.V = result.Pass[key]
-	stride := new(big.Int).Div(new(big.Int).Set(scale), big.NewInt(int64(weights[key])))
-	result.Pass[key] = new(big.Int).Add(integer(result.Pass[key]), stride).String()
-	return key, result
+	for _, key := range keys {
+		result.V = result.Pass[key]
+		stride := new(big.Int).Div(new(big.Int).Set(scale), big.NewInt(int64(weights[key])))
+		result.Pass[key] = new(big.Int).Add(integer(result.Pass[key]), stride).String()
+		return key, result
+	}
+	return "", result
 }
 
 func (state Projection) outstanding(pool string) (int, int, map[string]int) {
@@ -156,6 +152,17 @@ func planNext(state Projection, poolName string, at int64) (Selection, PoolClock
 		selection.Reason = "capacity_blocked"
 		return selection, PoolClocks{}, nil
 	}
+	buckets, hasAvailable := state.eligibleBuckets(poolName, at, logical, accounts)
+	if len(buckets) == 0 {
+		if !hasAvailable {
+			selection.Reason = "no_work"
+		}
+		return selection, PoolClocks{}, nil
+	}
+	return selectBucket(state, poolName, at, buckets)
+}
+
+func (state Projection) eligibleBuckets(poolName string, at int64, logical int, accounts map[string]int) (map[int]map[string]*WorkState, bool) {
 	buckets := map[int]map[string]*WorkState{}
 	hasAvailable := false
 	for _, work := range state.Works {
@@ -173,12 +180,10 @@ func planNext(state Projection, poolName string, at int64) (Selection, PoolClock
 			buckets[work.Priority][work.FairnessKey] = work
 		}
 	}
-	if len(buckets) == 0 {
-		if !hasAvailable {
-			selection.Reason = "no_work"
-		}
-		return selection, PoolClocks{}, nil
-	}
+	return buckets, hasAvailable
+}
+
+func selectBucket(state Projection, poolName string, at int64, buckets map[int]map[string]*WorkState) (Selection, PoolClocks, error) {
 	current := state.Clocks[poolName]
 	classes := []string{}
 	weights := map[string]int{}
@@ -195,11 +200,17 @@ func planNext(state Projection, poolName string, at int64) (Selection, PoolClock
 	var selectedClass string
 	if state.Policy.Mode == "strict-priority" {
 		sort.Strings(classes)
-		selectedClass = classes[0]
+		for _, class := range classes {
+			selectedClass = class
+			break
+		}
 	} else {
 		selectedClass, clocks.Classes = pick(current.Classes, classes, weights, true)
 	}
-	priority, _ := strconv.Atoi(selectedClass)
+	priority, err := strconv.Atoi(selectedClass)
+	if err != nil {
+		return Selection{}, PoolClocks{}, err
+	}
 	keys := []string{}
 	for key := range buckets[priority] {
 		keys = append(keys, key)
@@ -239,17 +250,11 @@ func cloneProjection(state Projection) Projection {
 		copy.Dispatches[id] = &item
 	}
 	copy.Clocks = make(map[string]PoolClocks, len(state.Clocks))
-	for id, clocks := range state.Clocks {
-		copy.Clocks[id] = clocks
-	}
+	maps.Copy(copy.Clocks, state.Clocks)
 	copy.Observations = make(map[string]*Observation, len(state.Observations))
-	for id, observation := range state.Observations {
-		copy.Observations[id] = observation
-	}
+	maps.Copy(copy.Observations, state.Observations)
 	copy.ObservationWrites = make(map[string]int, len(state.ObservationWrites))
-	for id, writes := range state.ObservationWrites {
-		copy.ObservationWrites[id] = writes
-	}
+	maps.Copy(copy.ObservationWrites, state.ObservationWrites)
 	return copy
 }
 
@@ -330,7 +335,7 @@ func planDispatch(state Projection, params DispatchParameters, requestID, commit
 	prefix := hashBytes([]byte(requestID))
 	commit := QueueCommit{ID: commitID, Request: Request{ID: requestID}, PolicyEpoch: state.PolicyEpoch}
 	limit := min(params.MaxClaims, operationBudget)
-	for index := 0; index < limit; index++ {
+	for index := range limit {
 		selection, clocks, err := planNext(working, params.Pool, at)
 		if err != nil {
 			return decision, err
@@ -341,67 +346,23 @@ func planDispatch(state Projection, params DispatchParameters, requestID, commit
 			break
 		}
 		work := working.Works[selection.WorkID]
-		group := -1
-		for i, assignment := range decision.Assignments {
-			if !compatible(working, assignment, work) {
-				continue
-			}
-			member := ClaimOperation{
-				Kind: "Claim", WorkID: work.WorkID, ClaimID: "c_" + prefix + "_" + strconv.Itoa(index+1),
-				DispatchID: assignment.DispatchID, Handle: "h" + strconv.Itoa(len(assignment.Claims)+1),
-				Observations: selection.Observations,
-			}
-			candidate := assignment
-			candidate.Claims = append(slices.Clone(candidate.Claims), assignmentMember(working, work, member))
-			data, _ := canonicalValue(candidate)
-			if int64(len(data)) > min(params.MaxBytes, state.Policy.Limits.AssignmentBytes) {
-				continue
-			}
-			group = i
+		assignment, existing, reason, err := packingAssignment(working, &decision, params, commit, prefix, index, selection)
+		if err != nil {
+			return Decision{}, err
+		}
+		if reason != "" {
+			decision.Reason = reason
 			break
 		}
-		opening := group < 0
-		if opening {
-			if len(decision.Assignments) >= params.MaxDispatches {
-				decision.Reason = "dispatch_budget_blocked"
-				break
-			}
-			_, native, _ := working.outstanding(params.Pool)
-			if native >= state.Policy.Pools[params.Pool].NativeLimit {
-				decision.Reason = "native_capacity_blocked"
-				break
-			}
-			group = len(decision.Assignments)
+		claim := packingClaim(prefix, index, work, assignment, selection.Observations)
+		accepted, err := appendPackingClaim(&working, &decision, assignment, existing, claim, commit, clocks, min(params.MaxBytes, state.Policy.Limits.AssignmentBytes))
+		if err != nil {
+			return Decision{}, err
 		}
-		var assignment Assignment
-		if opening {
-			assignment = Assignment{
-				Version: Version, DispatchID: "d_" + prefix + "_" + strconv.Itoa(group+1),
-				RequestID: requestID, CommitID: commitID, PolicyEpoch: state.PolicyEpoch,
-				Pool: work.Pool, WorkerProfile: work.WorkerProfile, Claims: []AssignmentClaim{},
-			}
-		} else {
-			assignment = decision.Assignments[group]
-			assignment.Claims = slices.Clone(assignment.Claims)
-		}
-		claim := ClaimOperation{
-			Kind: "Claim", WorkID: work.WorkID, ClaimID: "c_" + prefix + "_" + strconv.Itoa(index+1),
-			DispatchID: assignment.DispatchID, Handle: "h" + strconv.Itoa(len(assignment.Claims)+1),
-			Observations: selection.Observations,
-		}
-		assignment.Claims = append(assignment.Claims, assignmentMember(working, work, claim))
-		data, _ := canonicalValue(assignment)
-		if int64(len(data)) > min(params.MaxBytes, state.Policy.Limits.AssignmentBytes) {
+		if !accepted {
 			decision.Reason = "assignment_bytes_blocked"
 			break
 		}
-		if opening {
-			decision.Assignments = append(decision.Assignments, assignment)
-		} else {
-			decision.Assignments[group] = assignment
-		}
-		decision.Operations = append(decision.Operations, Op(claim))
-		recordClaim(&working, claim, commit, clocks)
 		decision.Reason = "claim_budget_reached"
 		if limit < params.MaxClaims {
 			decision.Reason = "operation_budget_reached"
@@ -411,4 +372,68 @@ func planDispatch(state Projection, params DispatchParameters, requestID, commit
 		decision.Reason = "prefix_complete"
 	}
 	return decision, nil
+}
+
+func appendPackingClaim(state *Projection, decision *Decision, assignment Assignment, existing *Assignment, claim ClaimOperation, commit QueueCommit, clocks PoolClocks, byteLimit int64) (bool, error) {
+	assignment.Claims = append(assignment.Claims, assignmentMember(*state, state.Works[claim.WorkID], claim))
+	data, err := canonicalValue(assignment)
+	if err != nil {
+		return false, err
+	}
+	if int64(len(data)) > byteLimit {
+		return false, nil
+	}
+	operation, err := Op(claim)
+	if err != nil {
+		return false, err
+	}
+	if existing == nil {
+		decision.Assignments = append(decision.Assignments, assignment)
+	} else {
+		*existing = assignment
+	}
+	decision.Operations = append(decision.Operations, operation)
+	recordClaim(state, claim, commit, clocks)
+	return true, nil
+}
+
+func packingClaim(prefix string, index int, work *WorkState, assignment Assignment, observations []string) ClaimOperation {
+	return ClaimOperation{
+		Kind: "Claim", WorkID: work.WorkID, ClaimID: "c_" + prefix + "_" + strconv.Itoa(index+1),
+		DispatchID: assignment.DispatchID, Handle: "h" + strconv.Itoa(len(assignment.Claims)+1),
+		Observations: observations,
+	}
+}
+
+func packingAssignment(state Projection, decision *Decision, params DispatchParameters, commit QueueCommit, prefix string, index int, selection Selection) (Assignment, *Assignment, string, error) {
+	work := state.Works[selection.WorkID]
+	for i, assignment := range decision.Assignments {
+		if !compatible(state, assignment, work) {
+			continue
+		}
+		member := packingClaim(prefix, index, work, assignment, selection.Observations)
+		candidate := assignment
+		candidate.Claims = append(slices.Clone(candidate.Claims), assignmentMember(state, work, member))
+		data, err := canonicalValue(candidate)
+		if err != nil {
+			return Assignment{}, nil, "", err
+		}
+		if int64(len(data)) > min(params.MaxBytes, state.Policy.Limits.AssignmentBytes) {
+			continue
+		}
+		assignment.Claims = slices.Clone(assignment.Claims)
+		return assignment, &decision.Assignments[i], "", nil
+	}
+	if len(decision.Assignments) >= params.MaxDispatches {
+		return Assignment{}, nil, "dispatch_budget_blocked", nil
+	}
+	_, native, _ := state.outstanding(params.Pool)
+	if native >= state.Policy.Pools[params.Pool].NativeLimit {
+		return Assignment{}, nil, "native_capacity_blocked", nil
+	}
+	return Assignment{
+		Version: Version, DispatchID: "d_" + prefix + "_" + strconv.Itoa(len(decision.Assignments)+1),
+		RequestID: commit.Request.ID, CommitID: commit.ID, PolicyEpoch: state.PolicyEpoch,
+		Pool: work.Pool, WorkerProfile: work.WorkerProfile, Claims: []AssignmentClaim{},
+	}, nil, "", nil
 }

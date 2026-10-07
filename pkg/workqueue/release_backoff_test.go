@@ -13,7 +13,7 @@ func TestReleaseBackoffUsesOnlyItsOwnValidatedNativeProof(t *testing.T) {
 	other := decision.Assignments[0]
 	sender := testActor("dispatcher")
 	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, commits, sender, "other-start", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, sender, "other-start", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": other.DispatchID, "state": "started", "sender": sender,
 	}))
 	state, err := Replay(commits)
@@ -24,7 +24,7 @@ func TestReleaseBackoffUsesOnlyItsOwnValidatedNativeProof(t *testing.T) {
 	binding.RunID = "303"
 	proof := terminalFor(state, other)
 	proof.Kind, proof.RunID, proof.CheckedAt = "reconciliation", binding.RunID, 4000
-	commits = testOperations(t, commits, testActor("reconciler"), "other-bind", "dispatch", Op(map[string]any{
+	commits = testOperations(t, commits, testActor("reconciler"), "other-bind", "dispatch", mustOp(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": other.DispatchID, "state": "bound", "run": binding, "evidence": proof,
 	}))
 	state, err = Replay(commits)
@@ -49,18 +49,18 @@ func TestReleaseBackoffUsesOnlyItsOwnValidatedNativeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			operations := []Operation{}
 			for _, member := range original.Claims {
-				operations = append(operations, Op(map[string]any{
+				operations = append(operations, mustOp(t, map[string]any{
 					"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 					"reason": "native_terminal", "retry_not_before": 34000,
 				}))
 			}
 			member := other.Claims[0]
-			operations = append(operations, Op(map[string]any{
+			operations = append(operations, mustOp(t, map[string]any{
 				"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
 				"reason": "native_terminal", "retry_not_before": test.retry,
-			}), Op(map[string]any{"kind": "Release", "dispatch_id": original.DispatchID, "evidence": firstProof}))
+			}), mustOp(t, map[string]any{"kind": "Release", "dispatch_id": original.DispatchID, "evidence": firstProof}))
 			if test.releaseOwn {
-				operations = append(operations, Op(map[string]any{
+				operations = append(operations, mustOp(t, map[string]any{
 					"kind": "Release", "dispatch_id": other.DispatchID, "evidence": test.proof,
 				}))
 			}

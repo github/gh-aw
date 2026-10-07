@@ -54,7 +54,7 @@ func TestBranchAuthenticatesCanonicalRepositoryAndRejectsForeignLedger(t *testin
 	if err != nil || actor.Repository != testRepository {
 		t.Fatalf("operator selected repository spelling became authority: %+v %v", actor, err)
 	}
-	control := Op(map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "operator"})
+	control := mustOp(t, map[string]any{"kind": "Control", "control": "admission_paused", "value": true, "reason": "operator"})
 	request, _ := NewRequest("pause", "control", actor, OperationsParameters{Operations: []Operation{control}})
 	if _, err := branch.Publish(context.Background(), actor, request); err != nil {
 		t.Fatal(err)
@@ -285,7 +285,7 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 		t.Fatalf("new queue initialization: %+v %v", published, err)
 	}
 	commits, err := branch.Read(context.Background())
-	if err != nil || len(commits) != 2 || operationKind(commits[0].Operations[0]) != "Policy" {
+	if err != nil || len(commits) != 2 || mustOperationKind(t, commits[0].Operations[0]) != "Policy" {
 		t.Fatalf("mandatory policy genesis absent: %v", err)
 	}
 	if commits[0].Request.ID != "init_75490bd7b93e6fa7d18cfdea90cc6bcb983d5f3ea326249d2709ca6c94bc07ba" ||
@@ -299,7 +299,7 @@ func TestBranchCurrentOnlyMandatoryInitializationAndIdempotency(t *testing.T) {
 	if err != nil || again.Changed || mock.refWrites != writes || again.Commit.ID != published.Commit.ID {
 		t.Fatalf("stable request did not recover accepted result: %v", err)
 	}
-	request.Parameters = Op(SubmitParameters{Nodes: []WorkDefinition{testNode(t, commits, "different")}})
+	request.Parameters = mustOp(t, SubmitParameters{Nodes: []WorkDefinition{testNode(t, commits, "different")}})
 	request.Fingerprint, _ = Fingerprint(actor, request.Kind, request.Parameters)
 	if _, err := branch.Publish(context.Background(), actor, request); err == nil || !strings.Contains(err.Error(), "request_reuse") {
 		t.Fatalf("reused request changed meaning: %v", err)

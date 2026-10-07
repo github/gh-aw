@@ -53,6 +53,9 @@ func capacity(state Projection, work *WorkState) Capacity {
 }
 
 func explainClaimPrefix(ordered []QueueCommit, ordinal int, tip, wanted string) ([]ClaimExplanation, error) {
+	if ordinal < 0 || ordinal >= len(ordered) {
+		return nil, queueError("claim_missing", "Claim has no original commit")
+	}
 	commit := ordered[ordinal]
 	state, err := Replay(ordered[:ordinal])
 	if err != nil {
@@ -60,7 +63,11 @@ func explainClaimPrefix(ordered []QueueCommit, ordinal int, tip, wanted string) 
 	}
 	result := []ClaimExplanation{}
 	for index, operation := range commit.Operations {
-		switch operationKind(operation) {
+		kind, err := operationKind(operation)
+		if err != nil {
+			return nil, err
+		}
+		switch kind {
 		case "Observation":
 			var observation Observation
 			if err := json.Unmarshal(operation, &observation); err != nil {
@@ -70,47 +77,55 @@ func explainClaimPrefix(ordered []QueueCommit, ordinal int, tip, wanted string) 
 				return nil, err
 			}
 		case "Claim":
-			var claim ClaimOperation
-			if err := json.Unmarshal(operation, &claim); err != nil {
-				return nil, err
-			}
-			work := state.Works[claim.WorkID]
-			selection, clocks, err := planNext(state, work.Pool, commit.At)
+			explanation, err := explainAndRecordClaim(&state, operation, commit, Position{Commit: ordinal, Operation: index}, tip)
 			if err != nil {
 				return nil, err
 			}
-			if selection.WorkID != claim.WorkID {
-				return nil, queueError("selection_invalid", "historical Claim differs from its native prefix selector")
-			}
-			current := state.Clocks[work.Pool]
-			explanation := ClaimExplanation{
-				Tip: tip, At: commit.At, Status: "committed_claim_prefix",
-				BeforeTip: state.Tip, Position: Position{Commit: ordinal, Operation: index},
-				RequestID: commit.Request.ID, CommitID: commit.ID, PolicyEpoch: commit.PolicyEpoch,
-				ClaimID: claim.ClaimID, DispatchID: claim.DispatchID, Handle: claim.Handle,
-				WorkID: work.WorkID, Pool: work.Pool, Priority: work.Priority, FairnessKey: work.FairnessKey,
-				WorkPosition: work.Position, Selection: selection,
-				ClassPassPrior: current.Classes.Pass[strconv.Itoa(work.Priority)],
-				KeyPassPrior:   current.Keys[work.Priority].Pass[work.FairnessKey],
-				CapacityBefore: capacity(state, work),
-			}
-			if explanation.ClassPassPrior == "" {
-				explanation.ClassPassPrior = "0"
-			}
-			if explanation.KeyPassPrior == "" {
-				explanation.KeyPassPrior = "0"
-			}
-			recordClaim(&state, claim, commit, clocks)
-			explanation.CapacityAfter = capacity(state, work)
-			if wanted == "" || wanted == claim.ClaimID {
+			if wanted == "" || wanted == explanation.ClaimID {
 				result = append(result, explanation)
 			}
-			if wanted == claim.ClaimID {
+			if wanted == explanation.ClaimID {
 				return result, nil
 			}
 		}
 	}
 	return result, nil
+}
+
+func explainAndRecordClaim(state *Projection, operation Operation, commit QueueCommit, position Position, tip string) (ClaimExplanation, error) {
+	var claim ClaimOperation
+	if err := json.Unmarshal(operation, &claim); err != nil {
+		return ClaimExplanation{}, err
+	}
+	work := state.Works[claim.WorkID]
+	selection, clocks, err := planNext(*state, work.Pool, commit.At)
+	if err != nil {
+		return ClaimExplanation{}, err
+	}
+	if selection.WorkID != claim.WorkID {
+		return ClaimExplanation{}, queueError("selection_invalid", "historical Claim differs from its native prefix selector")
+	}
+	current := state.Clocks[work.Pool]
+	explanation := ClaimExplanation{
+		Tip: tip, At: commit.At, Status: "committed_claim_prefix",
+		BeforeTip: state.Tip, Position: position,
+		RequestID: commit.Request.ID, CommitID: commit.ID, PolicyEpoch: commit.PolicyEpoch,
+		ClaimID: claim.ClaimID, DispatchID: claim.DispatchID, Handle: claim.Handle,
+		WorkID: work.WorkID, Pool: work.Pool, Priority: work.Priority, FairnessKey: work.FairnessKey,
+		WorkPosition: work.Position, Selection: selection,
+		ClassPassPrior: current.Classes.Pass[strconv.Itoa(work.Priority)],
+		KeyPassPrior:   current.Keys[work.Priority].Pass[work.FairnessKey],
+		CapacityBefore: capacity(*state, work),
+	}
+	if explanation.ClassPassPrior == "" {
+		explanation.ClassPassPrior = "0"
+	}
+	if explanation.KeyPassPrior == "" {
+		explanation.KeyPassPrior = "0"
+	}
+	recordClaim(state, claim, commit, clocks)
+	explanation.CapacityAfter = capacity(*state, work)
+	return explanation, nil
 }
 
 // ExplainBeforeClaim validates the whole authority, then reduces the exact
@@ -137,7 +152,10 @@ func ExplainBeforeClaim(commits []QueueCommit, claimID string) (ClaimExplanation
 			if len(explanations) != 1 {
 				return ClaimExplanation{}, queueError("claim_missing", "Claim has no original causal operation")
 			}
-			return explanations[0], nil
+			for _, explanation := range explanations {
+				return explanation, nil
+			}
+			return ClaimExplanation{}, queueError("claim_missing", "Claim has no original causal operation")
 		}
 	}
 	return ClaimExplanation{}, queueError("claim_missing", "Claim has no original commit")
@@ -250,52 +268,9 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 	if err != nil {
 		return TracePage{}, err
 	}
-	works, claims, dispatches, observations, epochs := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
-	if options.ClaimID != "" {
-		claim := state.Claims[options.ClaimID]
-		if claim == nil {
-			return TracePage{}, queueError("claim_missing", "unknown Claim %q", options.ClaimID)
-		}
-		claims[claim.ClaimID], works[claim.WorkID] = true, true
-	} else {
-		commit, ok := state.Requests[options.RequestID]
-		if !ok {
-			return TracePage{}, queueError("request_missing", "unknown committed request %q", options.RequestID)
-		}
-		epochs[commit.PolicyEpoch] = true
-		for _, operation := range commit.Operations {
-			var scope struct {
-				WorkID     string `json:"work_id"`
-				ClaimID    string `json:"claim_id"`
-				DispatchID string `json:"dispatch_id"`
-			}
-			_ = json.Unmarshal(operation, &scope)
-			if scope.WorkID != "" {
-				works[scope.WorkID] = true
-			}
-			if scope.ClaimID != "" {
-				claims[scope.ClaimID] = true
-			}
-			if scope.DispatchID != "" {
-				dispatches[scope.DispatchID] = true
-				dispatch := state.Dispatches[scope.DispatchID]
-				for _, member := range dispatch.Claims {
-					claims[member.ClaimID], works[member.WorkID] = true, true
-				}
-			}
-		}
-	}
-	for id, claim := range state.Claims {
-		if options.ClaimID == "" && works[claim.WorkID] {
-			claims[id] = true
-		}
-		if claims[id] {
-			dispatches[claim.DispatchID] = true
-			epochs[state.Dispatches[claim.DispatchID].PolicyEpoch] = true
-			for _, id := range claim.Observations {
-				observations[id] = true
-			}
-		}
+	scope, err := traceScopeFor(state, options)
+	if err != nil {
+		return TracePage{}, err
 	}
 	ordered, err := causalOrder(commits)
 	if err != nil {
@@ -312,22 +287,10 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 			if err := json.Unmarshal(operation, &event); err != nil {
 				return TracePage{}, err
 			}
-			if commit.Request.ID != options.RequestID && !claims[event.ClaimID] &&
-				!(event.Kind == "Work" && works[event.WorkID]) &&
-				!(event.Kind == "WorkCancellation" && works[event.WorkID]) &&
-				!((event.Kind == "Dispatch" || event.Kind == "Release") && dispatches[event.DispatchID]) &&
-				!(event.Kind == "Observation" && observations[event.ObservationID]) &&
-				!(event.Kind == "Policy" && epochs[commit.PolicyEpoch]) &&
-				!(event.Kind == "Control" && len(works) > 0) {
+			if !scope.matches(event, commit, options) {
 				continue
 			}
-			if event.ClaimID != "" {
-				event.DispatchID = state.Claims[event.ClaimID].DispatchID
-				event.ClaimHandle = state.Claims[event.ClaimID].Handle
-			}
-			event.Position, event.CommitID, event.Previous = Position{Commit: ordinal, Operation: index}, commit.ID, commit.Previous
-			event.RequestID, event.RequestKind, event.PolicyEpoch = commit.Request.ID, commit.Request.Kind, commit.PolicyEpoch
-			event.At, event.Actor, event.Trace = commit.At, commit.Actor, commit.Trace
+			annotateTraceEvent(&event, state, commit, Position{Commit: ordinal, Operation: index})
 			if event.Trace != nil && event.Trace.TraceID != "" {
 				result.TraceAvailability = "correlated"
 			}
@@ -346,4 +309,88 @@ func TraceQueue(commits []QueueCommit, options TraceOptions, at int64) (TracePag
 	}
 	result.Events = slices.Clip(result.Events)
 	return result, nil
+}
+
+type traceScope struct {
+	works, claims, dispatches, observations, epochs identitySet
+}
+
+func traceScopeFor(state Projection, options TraceOptions) (traceScope, error) {
+	scope := traceScope{identitySet{}, identitySet{}, identitySet{}, identitySet{}, identitySet{}}
+	if options.ClaimID != "" {
+		claim := state.Claims[options.ClaimID]
+		if claim == nil {
+			return scope, queueError("claim_missing", "unknown Claim %q", options.ClaimID)
+		}
+		scope.claims.add(claim.ClaimID)
+		scope.works.add(claim.WorkID)
+	} else {
+		commit, ok := state.Requests[options.RequestID]
+		if !ok {
+			return scope, queueError("request_missing", "unknown committed request %q", options.RequestID)
+		}
+		scope.epochs.add(commit.PolicyEpoch)
+		if err := scope.addRequestRoots(state, commit); err != nil {
+			return scope, err
+		}
+	}
+	for id, claim := range state.Claims {
+		if options.ClaimID == "" && scope.works.contains(claim.WorkID) {
+			scope.claims.add(id)
+		}
+		if scope.claims.contains(id) {
+			scope.dispatches.add(claim.DispatchID)
+			scope.epochs.add(state.Dispatches[claim.DispatchID].PolicyEpoch)
+			scope.observations.add(claim.Observations...)
+		}
+	}
+	return scope, nil
+}
+
+func (scope traceScope) addRequestRoots(state Projection, commit QueueCommit) error {
+	for _, operation := range commit.Operations {
+		var root struct {
+			WorkID     string `json:"work_id"`
+			ClaimID    string `json:"claim_id"`
+			DispatchID string `json:"dispatch_id"`
+		}
+		if err := json.Unmarshal(operation, &root); err != nil {
+			return err
+		}
+		if root.WorkID != "" {
+			scope.works.add(root.WorkID)
+		}
+		if root.ClaimID != "" {
+			scope.claims.add(root.ClaimID)
+		}
+		if root.DispatchID != "" {
+			scope.dispatches.add(root.DispatchID)
+			dispatch := state.Dispatches[root.DispatchID]
+			for _, member := range dispatch.Claims {
+				scope.claims.add(member.ClaimID)
+				scope.works.add(member.WorkID)
+			}
+		}
+	}
+	return nil
+}
+
+func (scope traceScope) matches(event TraceEvent, commit QueueCommit, options TraceOptions) bool {
+	return commit.Request.ID == options.RequestID || scope.claims.contains(event.ClaimID) ||
+		event.Kind == "Work" && scope.works.contains(event.WorkID) ||
+		event.Kind == "WorkCancellation" && scope.works.contains(event.WorkID) ||
+		(event.Kind == "Dispatch" || event.Kind == "Release") && scope.dispatches.contains(event.DispatchID) ||
+		event.Kind == "Observation" && scope.observations.contains(event.ObservationID) ||
+		event.Kind == "Policy" && scope.epochs.contains(commit.PolicyEpoch) ||
+		event.Kind == "Control" && len(scope.works) != 0
+}
+
+func annotateTraceEvent(event *TraceEvent, state Projection, commit QueueCommit, position Position) {
+	if event.ClaimID != "" {
+		event.DispatchID = state.Claims[event.ClaimID].DispatchID
+		event.ClaimHandle = state.Claims[event.ClaimID].Handle
+	}
+	event.Position, event.CommitID, event.Previous = position, commit.ID, commit.Previous
+	event.RequestID, event.RequestKind, event.PolicyEpoch = commit.Request.ID, commit.Request.Kind, commit.PolicyEpoch
+	event.At, event.Actor, event.Trace = commit.At, commit.Actor, commit.Trace
 }

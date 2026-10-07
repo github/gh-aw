@@ -29,7 +29,7 @@ func TestRecoveryHeadroomReportsActualReservationWithoutMutation(t *testing.T) {
 		t.Fatal("headroom diagnostics mutated the replayed projection")
 	}
 	commits = testOperations(t, commits, testActor("administrator"), "cancel-headroom-diagnostic", "cancel_work",
-		Op(map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}))
+		mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}))
 	closed, err := Replay(commits)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestOperationalControlsCannotConsumeOutstandingRecoveryReserve(t *testing.T
 	}
 	rejected := false
 	for index := range 100 {
-		operation := Op(map[string]any{
+		operation := mustOp(t, map[string]any{
 			"kind": "Control", "control": "grants_paused", "value": true, "reason": strings.Repeat("x", 128),
 		})
 		request, err := NewRequest(fmt.Sprintf("retained-control-%d", index), "control", testActor("administrator"),
@@ -90,7 +90,7 @@ func TestOperationalControlsCannotConsumeOutstandingRecoveryReserve(t *testing.T
 		t.Fatal("fixture did not exercise Control writes within the recovery region")
 	}
 	commits = testOperations(t, commits, testActor("administrator"), "close-reserved", "cancel_work",
-		Op(map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}))
+		mustOp(t, map[string]any{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "operator_cancelled"}))
 	closed, err := Replay(commits)
 	if err != nil || closed.Works[work.WorkID].State != "cancelled" || remainingHeadroom(closed) != 0 {
 		t.Fatalf("genuine closure could not discharge its reserved budget: %v", err)

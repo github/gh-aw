@@ -16,17 +16,17 @@ func (b Branch) verifyWorkerRoutes(ctx context.Context, policy Policy) error {
 	if err := ValidatePolicy(policy); err != nil {
 		return err
 	}
-	seen := map[string]bool{}
+	seen := identitySet{}
 	for _, pool := range policy.Pools {
 		for _, profile := range pool.Profiles {
 			key := profile.Workflow + "\n" + profile.Ref
-			if seen[key] {
+			if seen.contains(key) {
 				continue
 			}
 			if err := b.verifyWorkerRoute(ctx, profile); err != nil {
 				return err
 			}
-			seen[key] = true
+			seen.add(key)
 		}
 	}
 	return nil
@@ -87,15 +87,22 @@ func (b Branch) initialPolicyCommit(ctx context.Context, actor Actor, request Re
 	}
 	if request.Kind == "policy" {
 		var parameters OperationsParameters
-		if err := json.Unmarshal(request.Parameters, &parameters); err != nil || len(parameters.Operations) != 1 ||
-			operationKind(parameters.Operations[0]) != "Policy" {
+		if err := json.Unmarshal(request.Parameters, &parameters); err != nil {
+			return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
+		}
+		only, unique := singleOperation(parameters.Operations)
+		if !unique {
+			return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
+		}
+		kind, err := operationKind(only)
+		if err != nil || kind != "Policy" {
 			return QueueCommit{}, false, queueError("request_invalid", "initial policy requires exactly one Policy operation")
 		}
 		var operation struct {
 			Policy Policy `json:"policy"`
 			Epoch  string `json:"epoch"`
 		}
-		if err := json.Unmarshal(parameters.Operations[0], &operation); err != nil {
+		if err := json.Unmarshal(only, &operation); err != nil {
 			return QueueCommit{}, false, queueError("request_invalid", "initial policy operation is malformed")
 		}
 		if err := b.verifyWorkerRoutes(ctx, operation.Policy); err != nil {

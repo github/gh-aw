@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"os"
 	"os/exec"
@@ -12,6 +13,68 @@ import (
 	"testing"
 	"time"
 )
+
+func TestCanonicalValueRejectsInvalidTypedUTF8(t *testing.T) {
+	type namedString string
+	type payload struct {
+		Value string `json:"value,omitempty"`
+	}
+	invalid := string([]byte{0xff})
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{name: "root", value: invalid},
+		{name: "named-string", value: namedString(invalid)},
+		{name: "pointer", value: &invalid},
+		{name: "map-value", value: map[string]any{"value": invalid}},
+		{name: "map-key", value: map[string]any{invalid: "value"}},
+		{name: "named-map-key", value: map[namedString]string{namedString(invalid): "value"}},
+		{name: "array-value", value: []any{invalid}},
+		{name: "nested-value", value: map[string]any{"payload": []any{map[string]string{"value": invalid}}}},
+		{name: "nested-key", value: []any{map[string]any{"payload": map[string]any{invalid: "value"}}}},
+		{name: "struct", value: payload{Value: invalid}},
+		{name: "struct-pointer", value: &payload{Value: invalid}},
+		{name: "nested-struct", value: map[string]any{"payload": []payload{{Value: invalid}}}},
+		{name: "truncated-sequence", value: string([]byte{0xe2, 0x82})},
+		{name: "overlong-sequence", value: string([]byte{0xc0, 0x80})},
+		{name: "encoded-surrogate", value: string([]byte{0xed, 0xa0, 0x80})},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := CanonicalValue(test.value)
+			var protocol *ProtocolError
+			if !errors.As(err, &protocol) || protocol.Code != "invalid_utf8" ||
+				err.Error() != "invalid_utf8: JSON must be valid UTF-8" || data != nil {
+				t.Fatalf("public canonical API repaired invalid typed UTF-8: %s / %v", data, err)
+			}
+		})
+	}
+}
+
+func TestCanonicalValuePreservesValidTypedUnicodeAndBinaryFields(t *testing.T) {
+	type payload struct {
+		Value   string `json:"value"`
+		Ignored string `json:"-"`
+		private string
+	}
+	for _, test := range []struct {
+		name     string
+		value    any
+		expected string
+	}{
+		{name: "replacement-scalar", value: "�", expected: `"�"`},
+		{name: "unicode-map-key", value: map[string]string{"�": "日本語𐀀"}, expected: `{"�":"日本語𐀀"}`},
+		{name: "struct", value: payload{Value: "日本語𐀀", Ignored: string([]byte{0xff}), private: string([]byte{0xff})}, expected: `{"value":"日本語𐀀"}`},
+		{name: "binary", value: []byte{0xff}, expected: `"/w=="`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := CanonicalValue(test.value)
+			if err != nil || string(data) != test.expected {
+				t.Fatalf("valid wire representation changed: %s / %v", data, err)
+			}
+		})
+	}
+}
 
 func TestIndependentTypedCanonicalFixtures(t *testing.T) {
 	node, err := exec.LookPath("node")

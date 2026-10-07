@@ -9,6 +9,36 @@ import (
 	"time"
 )
 
+func TestNativeTitleLiteralBoundaries(t *testing.T) {
+	tests := []struct {
+		name, title, dispatchID string
+		valid                   bool
+	}{
+		{"empty-id", "worker", "", false},
+		{"empty-title", "", "dispatch", false},
+		{"exact", "dispatch", "dispatch", true},
+		{"unicode-boundaries", "日本dispatch語", "dispatch", true},
+		{"supplementary-boundaries", "😀dispatch🦊", "dispatch", true},
+		{"repeated-with-later-match", "xdispatch dispatch!", "dispatch", true},
+		{"repeated-without-match", "xdispatch dispatch_", "dispatch", false},
+		{"literal-metacharacters", "worker [d.+*] result", "[d.+*]", true},
+		{"metacharacters-not-regex", "worker dxxx result", "d.+*", false},
+		{"unicode-id", "(日本語)", "日本語", true},
+		{"word-before-unicode-id", "x日本語)", "日本語", false},
+		{"overlapping-literal", "!!!", "!!", true},
+		{"invalid-first-overlap-valid-later", "x!!!", "!!", true},
+		{"underscore-before", "_dispatch!", "dispatch", false},
+		{"decimal-after", "!dispatch0", "dispatch", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if actual := correlatedNativeTitle(test.title, test.dispatchID); actual != test.valid {
+				t.Fatalf("literal native title correlation = %t, want %t", actual, test.valid)
+			}
+		})
+	}
+}
+
 func TestNativeRunTitleCorrelationParity(t *testing.T) {
 	branch, mock := newQueueAPI(t)
 	commits, assignment := boundAssignment(t)

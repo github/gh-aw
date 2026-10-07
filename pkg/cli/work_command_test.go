@@ -105,14 +105,14 @@ func TestWorkCommandProtectedNativeDeliveryEntryPoint(t *testing.T) {
 	actor.Role, actor.Workflow, actor.RunID, actor.RunAttempt = "dispatcher", ".github/workflows/dispatcher.lock.yml", "101", 1
 	decision := appendRequest(actor, "grant", "dispatch_next", workqueue.DispatchParameters{Pool: "default", MaxClaims: 1, MaxDispatches: 1, MaxBytes: policy.Limits.AssignmentBytes})
 	assignment := decision.Assignments[0]
-	appendRequest(actor, "start", "dispatch", workqueue.OperationsParameters{Operations: []workqueue.Operation{workqueue.Op(map[string]any{
+	appendRequest(actor, "start", "dispatch", workqueue.OperationsParameters{Operations: []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": actor,
 	})}})
 	profile := policy.Pools["default"].Profiles["default"]
 	binding := workqueue.RunBinding{RunID: "202", RunAttempt: 1, Repository: remote, Workflow: profile.Workflow, Ref: profile.Ref, Principal: principal, Event: "workflow_dispatch"}
 	evidence := workqueue.Evidence{Kind: "reconciliation", Source: "github_api", Repository: remote, Workflow: profile.Workflow, Ref: profile.Ref, Principal: principal, CheckedAt: time.Now().UnixMilli(), RunID: "202", RunAttempt: 1}
 	actor.Role, actor.Workflow, actor.RunID, actor.RunAttempt = "reconciler", "", "", 0
-	appendRequest(actor, "bind", "dispatch", workqueue.OperationsParameters{Operations: []workqueue.Operation{workqueue.Op(map[string]any{
+	appendRequest(actor, "bind", "dispatch", workqueue.OperationsParameters{Operations: []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{
 		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": binding, "evidence": evidence,
 	})}})
 	actor.Role, actor.Workflow, actor.RunID, actor.RunAttempt = "worker", profile.Workflow, "202", 1

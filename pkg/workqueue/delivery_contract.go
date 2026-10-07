@@ -55,39 +55,46 @@ func validateDeliveryContract(payload json.RawMessage) error {
 	if len(outputs) == 0 && !noWrites || len(outputs) != 0 && noWrites {
 		return queueError("delivery_contract_required", "empty effect_contract outputs require explicit no_writes without contradictory outputs")
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]struct{}, len(outputs))
 	for _, value := range outputs {
-		output, ok := closedDeliveryObject(value, []string{"type", "min", "max"}, []string{"verification"})
+		if err := validateDeliveryOutput(value, seen); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateDeliveryOutput(value any, seen map[string]struct{}) error {
+	output, ok := closedDeliveryObject(value, []string{"type", "min", "max"}, []string{"verification"})
+	if !ok {
+		return queueError("delivery_contract_required", "effect_contract output requires closed type and min/max bounds")
+	}
+	name, ok := output["type"].(string)
+	if _, exists := seen[name]; !ok || name == "" || exists {
+		return queueError("delivery_contract_required", "effect_contract output types must be nonempty and unique")
+	}
+	seen[name] = struct{}{}
+	minimum, minOK := output["min"].(json.Number)
+	maximum, maxOK := output["max"].(json.Number)
+	if !minOK || !maxOK {
+		return queueError("delivery_contract_required", "effect_contract output bounds must be canonical integers")
+	}
+	minCount, minErr := minimum.Int64()
+	maxCount, maxErr := maximum.Int64()
+	if minErr != nil || maxErr != nil || minCount < 0 || maxCount > 128 || minCount > maxCount {
+		return queueError("delivery_contract_required", "effect_contract output bounds must satisfy 0 <= min <= max <= 128")
+	}
+	if value, declared := output["verification"]; declared {
+		verification, ok := closedDeliveryObject(value, []string{"verifier_id", "expected"}, nil)
 		if !ok {
-			return queueError("delivery_contract_required", "effect_contract output requires closed type and min/max bounds")
+			return queueError("delivery_contract_required", "effect_contract verification requires closed verifier_id and expected")
 		}
-		name, ok := output["type"].(string)
-		if !ok || name == "" || seen[name] {
-			return queueError("delivery_contract_required", "effect_contract output types must be nonempty and unique")
+		id, ok := verification["verifier_id"].(string)
+		if !ok || !reasonPattern.MatchString(id) {
+			return queueError("delivery_contract_required", "effect_contract verifier_id must be a bounded ASCII code")
 		}
-		seen[name] = true
-		minimum, minOK := output["min"].(json.Number)
-		maximum, maxOK := output["max"].(json.Number)
-		if !minOK || !maxOK {
-			return queueError("delivery_contract_required", "effect_contract output bounds must be canonical integers")
-		}
-		minCount, minErr := minimum.Int64()
-		maxCount, maxErr := maximum.Int64()
-		if minErr != nil || maxErr != nil || minCount < 0 || maxCount > 128 || minCount > maxCount {
-			return queueError("delivery_contract_required", "effect_contract output bounds must satisfy 0 <= min <= max <= 128")
-		}
-		if value, declared := output["verification"]; declared {
-			verification, ok := closedDeliveryObject(value, []string{"verifier_id", "expected"}, nil)
-			if !ok {
-				return queueError("delivery_contract_required", "effect_contract verification requires closed verifier_id and expected")
-			}
-			id, ok := verification["verifier_id"].(string)
-			if !ok || !reasonPattern.MatchString(id) {
-				return queueError("delivery_contract_required", "effect_contract verifier_id must be a bounded ASCII code")
-			}
-			if _, ok := verification["expected"].(map[string]any); !ok {
-				return queueError("delivery_contract_required", "effect_contract expected verification intent must be a canonical object")
-			}
+		if _, ok := verification["expected"].(map[string]any); !ok {
+			return queueError("delivery_contract_required", "effect_contract expected verification intent must be a canonical object")
 		}
 	}
 	return nil

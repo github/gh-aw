@@ -6,12 +6,159 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+func mustOp(t testing.TB, value any) Operation {
+	t.Helper()
+	operation, err := Op(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return operation
+}
+
+func mustOperationKind(t testing.TB, operation Operation) string {
+	t.Helper()
+	kind, err := operationKind(operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kind
+}
+
+func TestOperationEncodingPreservesCanonicalFailuresWithoutPartialOperations(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		value any
+	}{
+		{name: "nonfinite", value: map[string]any{"kind": "Control", "value": math.NaN()}},
+		{name: "unsupported-type", value: make(chan int)},
+		{name: "invalid-raw-json", value: json.RawMessage(`{"kind":`)},
+		{name: "duplicate-key", value: json.RawMessage(`{"kind":"Control","kind":"Policy"}`)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, expected := canonicalValue(test.value)
+			if expected == nil {
+				t.Fatal("test requires a canonical codec error")
+			}
+			operation, err := Op(test.value)
+			if err == nil || operation != nil || err.Error() != expected.Error() {
+				t.Fatalf("operation encoding lost its exact error or returned partial data: %s %v", operation, err)
+			}
+			operations := []Operation{Operation(`{"kind":"Control"}`)}
+			before := slices.Clone(operations)
+			if err := appendOperation(&operations, test.value); err == nil || !reflect.DeepEqual(operations, before) {
+				t.Fatalf("failed operation append changed the accepted prefix: %s %v", operations, err)
+			}
+		})
+	}
+	operation, err := Op(map[string]any{"value": true, "kind": "Control"})
+	if err != nil || string(operation) != `{"kind":"Control","value":true}` {
+		t.Fatalf("canonical operation bytes changed: %s %v", operation, err)
+	}
+}
+
+func TestOperationKindPropagatesExactDecodeFailures(t *testing.T) {
+	for _, raw := range []string{`{"kind":`, `{"kind":7}`, `[]`, `"Control"`} {
+		t.Run(raw, func(t *testing.T) {
+			var expected struct {
+				Kind string `json:"kind"`
+			}
+			decodeErr := json.Unmarshal([]byte(raw), &expected)
+			kind, err := operationKind(Operation(raw))
+			if decodeErr == nil || err == nil || kind != "" || err.Error() != decodeErr.Error() {
+				t.Fatalf("operation kind silently discarded or changed the decoder failure: %q %v", kind, err)
+			}
+		})
+	}
+	kind, err := operationKind(Operation(`{"kind":"Control"}`))
+	if err != nil || kind != "Control" {
+		t.Fatalf("valid operation kind changed: %q %v", kind, err)
+	}
+}
+
+func TestGenesisPropagatesOperationCodecFailureBeforePublication(t *testing.T) {
+	actor := testActor("administrator")
+	policy := DefaultPolicy(actor.Principal, actor.Repository)
+	for name, pool := range policy.Pools {
+		pool.Retry.BackoffMS = MaxTimestamp + 1
+		policy.Pools[name] = pool
+		break
+	}
+	_, expected := canonicalValue(map[string]any{"kind": "Policy", "epoch": "epoch", "policy": policy})
+	if expected == nil {
+		t.Fatal("test requires a noncanonical policy number")
+	}
+	commit, err := Genesis(actor, policy, "invalid-policy-encoding", "epoch", 1000)
+	if err == nil || err.Error() != expected.Error() || commit.ID != "" || commit.Operations != nil {
+		t.Fatalf("genesis discarded codec failure or returned a partial commit: %+v %v", commit, err)
+	}
+}
+
+func TestSingleOperationRequiresExactlyOne(t *testing.T) {
+	policy := Operation(`{"kind":"Policy"}`)
+	for _, test := range []struct {
+		name       string
+		operations []Operation
+		unique     bool
+	}{
+		{name: "nil"},
+		{name: "empty", operations: []Operation{}},
+		{name: "one", operations: []Operation{policy}, unique: true},
+		{name: "multiple", operations: []Operation{policy, policy}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			operation, unique := singleOperation(test.operations)
+			if unique != test.unique || unique && !bytes.Equal(operation, policy) {
+				t.Fatalf("singleton operation changed: %s unique=%t", operation, unique)
+			}
+		})
+	}
+}
+
+func TestStrictSurrogateScannerPreservesEscapedBackslashes(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		input string
+		want  string
+		code  string
+	}{
+		{name: "escaped-high", input: `"\\uD800"`, want: `\uD800`},
+		{name: "escaped-low", input: `"\\uDC00"`, want: `\uDC00`},
+		{name: "escaped-pair", input: `"\\uD800\\uDC00"`, want: `\uD800\uDC00`},
+		{name: "pair", input: `"\uD800\uDC00"`, want: "𐀀"},
+		{name: "adjacent-pairs", input: `"\uD800\uDC00\uD800\uDC00"`, want: "𐀀𐀀"},
+		{name: "backslash-before-pair", input: `"\\\uD800\uDC00"`, want: `\𐀀`},
+		{name: "backslash-before-high", input: `"\\\uD800"`, code: "invalid_unicode"},
+		{name: "high", input: `"\uD800"`, code: "invalid_unicode"},
+		{name: "low", input: `"\uDC00"`, code: "invalid_unicode"},
+		{name: "two-highs", input: `"\uD800\uD800"`, code: "invalid_unicode"},
+		{name: "truncated-pair", input: `"\uD800\uDC`, code: "invalid_unicode"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			value, err := decodeStrict([]byte(test.input))
+			if test.code != "" {
+				var protocol *ProtocolError
+				if !errors.As(err, &protocol) || protocol.Code != test.code {
+					t.Fatalf("surrogate rejection changed: %v", err)
+				}
+				return
+			}
+			text, ok := value.(string)
+			if err != nil || !ok || text != test.want {
+				t.Fatalf("escaped text changed: %q %v", value, err)
+			}
+		})
+	}
+}
 
 func TestProtocolErrorPreservesCodeThroughWrapping(t *testing.T) {
 	rejection := queueError("queue_missing", "queue branch %s does not exist", "work-queue")

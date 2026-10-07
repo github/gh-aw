@@ -127,7 +127,7 @@ func TestNativeEnginesStrictEveryPrefixParity(t *testing.T) {
 			t.Fatal(err)
 		}
 		check(t, next, 3000)
-		commits = testOperations(t, commits, actor, "observe-parity", "observe", Op(observation))
+		commits = testOperations(t, commits, actor, "observe-parity", "observe", mustOp(t, observation))
 		check(t, commits, 4000)
 	})
 }

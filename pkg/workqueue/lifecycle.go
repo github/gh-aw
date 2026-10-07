@@ -51,7 +51,10 @@ func NormalizeClaimHandle(assignment Assignment, selector *string) (string, erro
 		if len(assignment.Claims) != 1 {
 			return "", queueError("claim_scope_required", "multi-Claim assignment requires an explicit handle")
 		}
-		return assignment.Claims[0].Handle, nil
+		for _, member := range assignment.Claims {
+			return member.Handle, nil
+		}
+		return "", queueError("assignment_invalid", "immutable assignment provenance is required")
 	}
 	if *selector == "" {
 		return "", queueError("claim_scope_invalid", "selector must be a nonempty original handle")
@@ -212,7 +215,9 @@ func (state Projection) applyCompletion(op Operation, commit QueueCommit) error 
 		RunID       string `json:"run_id"`
 		RunAttempt  int    `json:"run_attempt"`
 	}
-	_ = json.Unmarshal(op, &completion)
+	if err := json.Unmarshal(op, &completion); err != nil {
+		return err
+	}
 	claim, err := state.scopedClaim(commit.Actor, completion.DispatchID, completion.ClaimHandle)
 	if err != nil {
 		return err
@@ -222,7 +227,9 @@ func (state Projection) applyCompletion(op Operation, commit QueueCommit) error 
 		return queueError("claim_scope_invalid", "Completion changes assignment/run identity")
 	}
 	var params FinishParameters
-	_ = json.Unmarshal(commit.Request.Parameters, &params)
+	if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+		return err
+	}
 	if params.DispatchID != completion.DispatchID || params.ClaimHandle != completion.ClaimHandle ||
 		params.Outcome != "completed" {
 		return queueError("request_invalid", "Completion differs from finish intent")
@@ -249,7 +256,9 @@ func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
 		Reason         string `json:"reason"`
 		RetryNotBefore int64  `json:"retry_not_before"`
 	}
-	_ = json.Unmarshal(op, &cancellation)
+	if err := json.Unmarshal(op, &cancellation); err != nil {
+		return err
+	}
 	claim := state.Claims[cancellation.ClaimID]
 	if claim == nil || claim.WorkID != cancellation.WorkID {
 		return queueError("claim_missing", "cancellation references missing Claim")
@@ -260,7 +269,9 @@ func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
 			return queueError("claim_scope_invalid", "worker may cancel only its scoped Claim")
 		}
 		var params FinishParameters
-		_ = json.Unmarshal(commit.Request.Parameters, &params)
+		if err := json.Unmarshal(commit.Request.Parameters, &params); err != nil {
+			return err
+		}
 		if params.DispatchID != claim.DispatchID || params.ClaimHandle != claim.Handle || params.Outcome != "cancelled" {
 			return queueError("request_invalid", "cancellation differs from finish intent")
 		}
@@ -276,25 +287,9 @@ func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
 		return queueError("ownership_terminal", "cannot cancel completed/frozen ownership")
 	}
 	pool := state.Policy.Pools[work.Pool]
-	backoffOrigin := commit.At
-	if commit.Request.Kind == "release" {
-		for _, operation := range commit.Operations {
-			if operationKind(operation) == "Release" {
-				var release struct {
-					DispatchID string   `json:"dispatch_id"`
-					Evidence   Evidence `json:"evidence"`
-				}
-				_ = json.Unmarshal(operation, &release)
-				if release.DispatchID != claim.DispatchID {
-					continue
-				}
-				if err := releaseEvidence(state, state.Dispatches[claim.DispatchID], release.Evidence, commit.At); err != nil {
-					return err
-				}
-				backoffOrigin = release.Evidence.CheckedAt
-				break
-			}
-		}
+	backoffOrigin, err := state.cancellationBackoffOrigin(claim, commit)
+	if err != nil {
+		return err
 	}
 	if cancellation.RetryNotBefore < backoffOrigin ||
 		cancellation.RetryNotBefore-backoffOrigin < pool.Retry.BackoffMS {
@@ -308,12 +303,42 @@ func (state Projection) cancelClaim(op Operation, commit QueueCommit) error {
 	return nil
 }
 
+func (state Projection) cancellationBackoffOrigin(claim *ClaimState, commit QueueCommit) (int64, error) {
+	if commit.Request.Kind == "release" {
+		for _, operation := range commit.Operations {
+			kind, err := operationKind(operation)
+			if err != nil {
+				return 0, err
+			}
+			if kind == "Release" {
+				var release struct {
+					DispatchID string   `json:"dispatch_id"`
+					Evidence   Evidence `json:"evidence"`
+				}
+				if err := json.Unmarshal(operation, &release); err != nil {
+					return 0, err
+				}
+				if release.DispatchID != claim.DispatchID {
+					continue
+				}
+				if err := releaseEvidence(state, state.Dispatches[claim.DispatchID], release.Evidence, commit.At); err != nil {
+					return 0, err
+				}
+				return release.Evidence.CheckedAt, nil
+			}
+		}
+	}
+	return commit.At, nil
+}
+
 func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	var cancellation struct {
 		WorkID string `json:"work_id"`
 		Reason string `json:"reason"`
 	}
-	_ = json.Unmarshal(op, &cancellation)
+	if err := json.Unmarshal(op, &cancellation); err != nil {
+		return err
+	}
 	work := state.Works[cancellation.WorkID]
 	if work == nil {
 		return queueError("work_missing", "cancellation references missing Work")
@@ -358,16 +383,20 @@ func (state Projection) cancelWork(op Operation, commit QueueCommit) error {
 	return nil
 }
 
+type dispatchLifecycle struct {
+	DispatchID string      `json:"dispatch_id"`
+	State      string      `json:"state"`
+	Sender     *Actor      `json:"sender"`
+	Run        *RunBinding `json:"run"`
+	Evidence   *Evidence   `json:"evidence"`
+	Reason     string      `json:"reason"`
+}
+
 func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
-	var lifecycle struct {
-		DispatchID string      `json:"dispatch_id"`
-		State      string      `json:"state"`
-		Sender     *Actor      `json:"sender"`
-		Run        *RunBinding `json:"run"`
-		Evidence   *Evidence   `json:"evidence"`
-		Reason     string      `json:"reason"`
+	var lifecycle dispatchLifecycle
+	if err := json.Unmarshal(op, &lifecycle); err != nil {
+		return err
 	}
-	_ = json.Unmarshal(op, &lifecycle)
 	dispatch := state.Dispatches[lifecycle.DispatchID]
 	if dispatch == nil || dispatch.Released {
 		return queueError("dispatch_invalid", "missing or released native reservation")
@@ -375,7 +404,14 @@ func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
 	if dispatch.LifecycleWrites >= state.Policy.Pools[dispatch.Pool].Reconciliation.MaxAttempts+4 {
 		return queueError("reconciliation_limit", "finite lifecycle-write budget exhausted; preserve reservation")
 	}
-	profile := dispatch.Profile
+	if err := state.applyDispatchState(dispatch, lifecycle, commit); err != nil {
+		return err
+	}
+	dispatch.LifecycleWrites++
+	return nil
+}
+
+func (state Projection) applyDispatchState(dispatch *DispatchState, lifecycle dispatchLifecycle, commit QueueCommit) error {
 	switch lifecycle.State {
 	case "started":
 		if state.GrantsPaused {
@@ -389,38 +425,7 @@ func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
 		}
 		dispatch.State, dispatch.Sender = "started", lifecycle.Sender
 	case "bound":
-		if lifecycle.Run == nil || lifecycle.Evidence == nil ||
-			!slices.Contains([]string{"started", "uncertain", "unresolved", "bound"}, dispatch.State) {
-			return queueError("run_binding_conflict", "binding requires a start marker and authenticated evidence")
-		}
-		run := lifecycle.Run
-		if !decimalIdentity(run.RunID) || run.RunAttempt != 1 || run.Event != "workflow_dispatch" ||
-			run.Repository != commit.Actor.Repository || run.Workflow != profile.Workflow ||
-			run.Ref != profile.Ref || run.Principal != profile.Principal {
-			return queueError("run_binding_conflict", "native run does not match immutable approved target")
-		}
-		if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
-			return err
-		}
-		if lifecycle.Evidence.RunID != run.RunID || lifecycle.Evidence.RunAttempt != 1 ||
-			!slices.Contains([]string{"github_api", "trusted_activation"}, lifecycle.Evidence.Source) {
-			return queueError("evidence_invalid", "binding lacks authenticated exact run provenance")
-		}
-		if commit.Actor.Role == "worker" &&
-			(commit.Actor.RunID != run.RunID || commit.Actor.RunAttempt != 1 ||
-				commit.Actor.DispatchID != dispatch.DispatchID || commit.Actor.Principal != run.Principal ||
-				commit.Actor.Workflow != run.Workflow) {
-			return queueError("run_binding_conflict", "activation context does not match the actual worker run")
-		}
-		if dispatch.Run != nil && !sameJSON(dispatch.Run, run) {
-			return queueError("run_binding_conflict", "assignment already bound to another run")
-		}
-		for id, other := range state.Dispatches {
-			if id != dispatch.DispatchID && other.Run != nil && other.Run.RunID == run.RunID {
-				return queueError("run_binding_conflict", "native run is already assigned to another dispatch")
-			}
-		}
-		dispatch.State, dispatch.Run = "bound", run
+		return state.bindDispatch(dispatch, lifecycle, commit)
 	case "uncertain", "unresolved":
 		if dispatch.Run != nil || !slices.Contains([]string{"started", "uncertain", "unresolved"}, dispatch.State) ||
 			lifecycle.Reason == "" {
@@ -445,7 +450,43 @@ func (state Projection) applyDispatch(op Operation, commit QueueCommit) error {
 	default:
 		return queueError("dispatch_invalid", "unknown lifecycle state")
 	}
-	dispatch.LifecycleWrites++
+	return nil
+}
+
+func (state Projection) bindDispatch(dispatch *DispatchState, lifecycle dispatchLifecycle, commit QueueCommit) error {
+	profile := dispatch.Profile
+	if lifecycle.Run == nil || lifecycle.Evidence == nil ||
+		!slices.Contains([]string{"started", "uncertain", "unresolved", "bound"}, dispatch.State) {
+		return queueError("run_binding_conflict", "binding requires a start marker and authenticated evidence")
+	}
+	run := lifecycle.Run
+	if !decimalIdentity(run.RunID) || run.RunAttempt != 1 || run.Event != "workflow_dispatch" ||
+		run.Repository != commit.Actor.Repository || run.Workflow != profile.Workflow ||
+		run.Ref != profile.Ref || run.Principal != profile.Principal {
+		return queueError("run_binding_conflict", "native run does not match immutable approved target")
+	}
+	if err := evidenceFits(state, dispatch, *lifecycle.Evidence, commit.At); err != nil {
+		return err
+	}
+	if lifecycle.Evidence.RunID != run.RunID || lifecycle.Evidence.RunAttempt != 1 ||
+		!slices.Contains([]string{"github_api", "trusted_activation"}, lifecycle.Evidence.Source) {
+		return queueError("evidence_invalid", "binding lacks authenticated exact run provenance")
+	}
+	if commit.Actor.Role == "worker" &&
+		(commit.Actor.RunID != run.RunID || commit.Actor.RunAttempt != 1 ||
+			commit.Actor.DispatchID != dispatch.DispatchID || commit.Actor.Principal != run.Principal ||
+			commit.Actor.Workflow != run.Workflow) {
+		return queueError("run_binding_conflict", "activation context does not match the actual worker run")
+	}
+	if dispatch.Run != nil && !sameJSON(dispatch.Run, run) {
+		return queueError("run_binding_conflict", "assignment already bound to another run")
+	}
+	for id, other := range state.Dispatches {
+		if id != dispatch.DispatchID && other.Run != nil && other.Run.RunID == run.RunID {
+			return queueError("run_binding_conflict", "native run is already assigned to another dispatch")
+		}
+	}
+	dispatch.State, dispatch.Run = "bound", run
 	return nil
 }
 
@@ -454,7 +495,9 @@ func (state Projection) release(op Operation, commit QueueCommit) error {
 		DispatchID string   `json:"dispatch_id"`
 		Evidence   Evidence `json:"evidence"`
 	}
-	_ = json.Unmarshal(op, &release)
+	if err := json.Unmarshal(op, &release); err != nil {
+		return err
+	}
 	dispatch := state.Dispatches[release.DispatchID]
 	if dispatch == nil {
 		return queueError("dispatch_missing", "release references missing reservation")
@@ -484,7 +527,9 @@ func (state Projection) settleResult(op Operation, commit QueueCommit, failed bo
 		Disposition  string          `json:"disposition"`
 		Evidence     Evidence        `json:"evidence"`
 	}
-	_ = json.Unmarshal(op, &result)
+	if err := json.Unmarshal(op, &result); err != nil {
+		return err
+	}
 	work := state.Works[result.WorkID]
 	if work == nil || work.State != "completed" || work.ClaimID != result.ClaimID ||
 		work.CompletionID != result.CompletionID {

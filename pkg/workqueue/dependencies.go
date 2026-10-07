@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"path"
 	"slices"
 	"strconv"
 	"time"
@@ -54,74 +55,82 @@ func (b Branch) readObservation(ctx context.Context, edge Dependency, generation
 		return observation
 	}
 	if edge.Kind == "issue" {
-		var issue struct {
-			ID          json.Number     `json:"id"`
-			Number      json.Number     `json:"number"`
-			State       string          `json:"state"`
-			StateReason string          `json:"state_reason"`
-			PullRequest json.RawMessage `json:"pull_request"`
-		}
-		err := client.DoWithContext(ctx, http.MethodGet, "repos/"+edge.Resource.Repository+"/issues/"+edge.Resource.Number, nil, &issue)
-		if err != nil {
-			observation.ReadStatus = dependencyReadStatus(err)
-			return observation
-		}
-		if issue.ID.String() != edge.Resource.ResourceID || issue.Number.String() != edge.Resource.Number ||
-			len(issue.PullRequest) > 0 {
-			observation.ReadStatus = "resource_identity_conflict"
-			return observation
-		}
-		observation.ReadStatus = "ok"
-		if !slices.Contains([]string{"open", "closed"}, issue.State) {
-			observation.ReadStatus = "predicate_unknown"
-			return observation
-		}
-		observation.ResourceState = issue.State
-		if slices.Contains([]string{"completed", "not_planned", "reopened"}, issue.StateReason) {
-			observation.StateReason = issue.StateReason
-		}
-		observation.State = "waiting"
-		if issue.State == "closed" && edge.Condition == "closed" ||
-			issue.State == "closed" && issue.StateReason == "completed" && edge.Condition == "completed" {
-			observation.State = "ready"
-		} else if issue.State == "closed" {
-			if issue.StateReason == "" {
-				observation.State = "unknown"
-			} else {
-				observation.State = "failed"
-			}
-		}
-	} else {
-		var pull struct {
-			ID       json.Number `json:"id"`
-			Number   json.Number `json:"number"`
-			State    string      `json:"state"`
-			Merged   *bool       `json:"merged"`
-			MergeSHA string      `json:"merge_commit_sha"`
-		}
-		err := client.DoWithContext(ctx, http.MethodGet, "repos/"+edge.Resource.Repository+"/pulls/"+edge.Resource.Number, nil, &pull)
-		if err != nil {
-			observation.ReadStatus = dependencyReadStatus(err)
-			return observation
-		}
-		if pull.ID.String() != edge.Resource.ResourceID || pull.Number.String() != edge.Resource.Number {
-			observation.ReadStatus = "resource_identity_conflict"
-			return observation
-		}
-		observation.ReadStatus = "ok"
-		if pull.Merged == nil || !slices.Contains([]string{"open", "closed"}, pull.State) {
-			observation.ReadStatus = "predicate_unknown"
-			return observation
-		}
-		observation.Merged = pull.Merged
-		observation.ResourceState = pull.State
-		if *pull.Merged && pull.MergeSHA != "" {
-			observation.State, observation.MergeCommit = "ready", pull.MergeSHA
-		} else if pull.State == "closed" {
-			observation.State = "failed"
+		return readIssueObservation(ctx, client, edge, observation)
+	}
+	return readPullObservation(ctx, client, edge, observation)
+}
+
+func readIssueObservation(ctx context.Context, client *api.RESTClient, edge Dependency, observation Observation) Observation {
+	var issue struct {
+		ID          json.Number     `json:"id"`
+		Number      json.Number     `json:"number"`
+		State       string          `json:"state"`
+		StateReason string          `json:"state_reason"`
+		PullRequest json.RawMessage `json:"pull_request"`
+	}
+	err := client.DoWithContext(ctx, http.MethodGet, path.Join("repos", edge.Resource.Repository, "issues", edge.Resource.Number), nil, &issue)
+	if err != nil {
+		observation.ReadStatus = dependencyReadStatus(err)
+		return observation
+	}
+	if issue.ID.String() != edge.Resource.ResourceID || issue.Number.String() != edge.Resource.Number ||
+		len(issue.PullRequest) > 0 {
+		observation.ReadStatus = "resource_identity_conflict"
+		return observation
+	}
+	observation.ReadStatus = "ok"
+	if !slices.Contains([]string{"open", "closed"}, issue.State) {
+		observation.ReadStatus = "predicate_unknown"
+		return observation
+	}
+	observation.ResourceState = issue.State
+	if slices.Contains([]string{"completed", "not_planned", "reopened"}, issue.StateReason) {
+		observation.StateReason = issue.StateReason
+	}
+	observation.State = "waiting"
+	if issue.State == "closed" && edge.Condition == "closed" ||
+		issue.State == "closed" && issue.StateReason == "completed" && edge.Condition == "completed" {
+		observation.State = "ready"
+	} else if issue.State == "closed" {
+		if issue.StateReason == "" {
+			observation.State = "unknown"
 		} else {
-			observation.State = "waiting"
+			observation.State = "failed"
 		}
+	}
+	return observation
+}
+
+func readPullObservation(ctx context.Context, client *api.RESTClient, edge Dependency, observation Observation) Observation {
+	var pull struct {
+		ID       json.Number `json:"id"`
+		Number   json.Number `json:"number"`
+		State    string      `json:"state"`
+		Merged   *bool       `json:"merged"`
+		MergeSHA string      `json:"merge_commit_sha"`
+	}
+	err := client.DoWithContext(ctx, http.MethodGet, path.Join("repos", edge.Resource.Repository, "pulls", edge.Resource.Number), nil, &pull)
+	if err != nil {
+		observation.ReadStatus = dependencyReadStatus(err)
+		return observation
+	}
+	if pull.ID.String() != edge.Resource.ResourceID || pull.Number.String() != edge.Resource.Number {
+		observation.ReadStatus = "resource_identity_conflict"
+		return observation
+	}
+	observation.ReadStatus = "ok"
+	if pull.Merged == nil || !slices.Contains([]string{"open", "closed"}, pull.State) {
+		observation.ReadStatus = "predicate_unknown"
+		return observation
+	}
+	observation.Merged = pull.Merged
+	observation.ResourceState = pull.State
+	if *pull.Merged && pull.MergeSHA != "" {
+		observation.State, observation.MergeCommit = "ready", pull.MergeSHA
+	} else if pull.State == "closed" {
+		observation.State = "failed"
+	} else {
+		observation.State = "waiting"
 	}
 	return observation
 }
@@ -157,22 +166,8 @@ func (b Branch) refreshForDispatch(ctx context.Context, state Projection, poolNa
 		return observations, nil
 	}
 	at := time.Now().UnixMilli()
-	works := []*WorkState{}
-	for _, work := range state.Works {
-		if work.Pool == poolName && work.State == "available" && work.RetryNotBefore <= at {
-			works = append(works, work)
-		}
-	}
-	slices.SortFunc(works, func(a, b *WorkState) int {
-		if positionLess(a.Position, b.Position) {
-			return -1
-		}
-		if positionLess(b.Position, a.Position) {
-			return 1
-		}
-		return 0
-	})
-	seen := map[string]bool{}
+	works := refreshableWorks(state, poolName, at)
+	seen := identitySet{}
 	for _, work := range works {
 		workReady := true
 		for _, edge := range work.DependsOn {
@@ -188,10 +183,10 @@ func (b Branch) refreshForDispatch(ctx context.Context, state Projection, poolNa
 				continue
 			}
 			key := resourceKey(*edge.Resource, edge.Condition)
-			if seen[key] {
+			if seen.contains(key) {
 				continue
 			}
-			seen[key] = true
+			seen.add(key)
 			current := state.Observations[key]
 			if current != nil &&
 				current.CredentialGeneration == state.CredentialGeneration &&
@@ -206,4 +201,23 @@ func (b Branch) refreshForDispatch(ctx context.Context, state Projection, poolNa
 		}
 	}
 	return observations, nil
+}
+
+func refreshableWorks(state Projection, poolName string, at int64) []*WorkState {
+	works := []*WorkState{}
+	for _, work := range state.Works {
+		if work.Pool == poolName && work.State == "available" && work.RetryNotBefore <= at {
+			works = append(works, work)
+		}
+	}
+	slices.SortFunc(works, func(a, b *WorkState) int {
+		if positionLess(a.Position, b.Position) {
+			return -1
+		}
+		if positionLess(b.Position, a.Position) {
+			return 1
+		}
+		return 0
+	})
+	return works
 }

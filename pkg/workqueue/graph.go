@@ -24,7 +24,7 @@ func validateResource(resource Resource, pool PoolPolicy) error {
 		return queueError("resource_unauthorized", "host/repository is not approved")
 	}
 	for _, id := range []string{resource.RepositoryID, resource.ResourceID, resource.Number} {
-		if id == "" || id == "0" || id[0] == '0' {
+		if id == "" || strings.HasPrefix(id, "0") {
 			return queueError("resource_invalid", "resource IDs must be positive canonical decimal strings")
 		}
 		for _, char := range id {
@@ -37,7 +37,7 @@ func validateResource(resource Resource, pool PoolPolicy) error {
 }
 
 func (state Projection) validateGraph() error {
-	vertices := map[string]map[string]bool{}
+	vertices := map[string]identitySet{}
 	pending := map[string]int{}
 	graphPools := map[string]string{}
 	for _, work := range state.Works {
@@ -46,45 +46,17 @@ func (state Projection) validateGraph() error {
 		}
 		graphPools[work.GraphID] = work.Pool
 		if vertices[work.GraphID] == nil {
-			vertices[work.GraphID] = map[string]bool{}
+			vertices[work.GraphID] = identitySet{}
 		}
-		vertices[work.GraphID]["work:"+work.WorkID] = true
+		vertices[work.GraphID].add("work:" + work.WorkID)
 		if work.State != "completed" && work.State != "cancelled" || work.Barrier == "pending" {
 			pending[work.Pool]++
 		}
 		if len(work.DependsOn) > state.Policy.Limits.Predecessors {
 			return queueError("graph_limit", "too many predecessors at %s", work.NodeKey)
 		}
-		seen := map[string]bool{}
-		for _, edge := range work.DependsOn {
-			var key string
-			if edge.Kind == "work" {
-				predecessor, ok := state.Works[edge.WorkID]
-				if !ok || predecessor.GraphID != work.GraphID {
-					return queueError("dependency_missing", "%s -> %s", work.NodeKey, edge.WorkID)
-				}
-				if edge.WorkID == work.WorkID {
-					return queueError("dependency_cycle", "%s -> %s", work.NodeKey, work.NodeKey)
-				}
-				key = "work:" + edge.WorkID
-			} else {
-				if edge.Resource == nil || edge.Resource.Kind != edge.Kind {
-					return queueError("resource_invalid", "dependency type does not match resource")
-				}
-				if err := validateResource(*edge.Resource, state.Policy.Pools[work.Pool]); err != nil {
-					return err
-				}
-				if edge.Kind == "issue" && edge.Condition != "completed" && edge.Condition != "closed" ||
-					edge.Kind == "pull_request" && edge.Condition != "merged" {
-					return queueError("condition_invalid", "condition does not match resource type")
-				}
-				key = resourceKey(*edge.Resource, edge.Condition)
-				vertices[work.GraphID][key] = true
-			}
-			if seen[key] {
-				return queueError("dependency_duplicate", "duplicate edge at %s", work.NodeKey)
-			}
-			seen[key] = true
+		if err := state.validatePredecessors(work, vertices[work.GraphID]); err != nil {
+			return err
 		}
 	}
 	for graph, nodes := range vertices {
@@ -97,6 +69,45 @@ func (state Projection) validateGraph() error {
 			return queueError("pending_limit", "pool %s exceeds pending-node bound", pool)
 		}
 	}
+	return state.validateGraphCycles()
+}
+
+func (state Projection) validatePredecessors(work *WorkState, vertices identitySet) error {
+	seen := identitySet{}
+	for _, edge := range work.DependsOn {
+		var key string
+		if edge.Kind == "work" {
+			predecessor, ok := state.Works[edge.WorkID]
+			if !ok || predecessor.GraphID != work.GraphID {
+				return queueError("dependency_missing", "%s -> %s", work.NodeKey, edge.WorkID)
+			}
+			if edge.WorkID == work.WorkID {
+				return queueError("dependency_cycle", "%s -> %s", work.NodeKey, work.NodeKey)
+			}
+			key = "work:" + edge.WorkID
+		} else {
+			if edge.Resource == nil || edge.Resource.Kind != edge.Kind {
+				return queueError("resource_invalid", "dependency type does not match resource")
+			}
+			if err := validateResource(*edge.Resource, state.Policy.Pools[work.Pool]); err != nil {
+				return err
+			}
+			if edge.Kind == "issue" && edge.Condition != "completed" && edge.Condition != "closed" ||
+				edge.Kind == "pull_request" && edge.Condition != "merged" {
+				return queueError("condition_invalid", "condition does not match resource type")
+			}
+			key = resourceKey(*edge.Resource, edge.Condition)
+			vertices.add(key)
+		}
+		if seen.contains(key) {
+			return queueError("dependency_duplicate", "duplicate edge at %s", work.NodeKey)
+		}
+		seen.add(key)
+	}
+	return nil
+}
+
+func (state Projection) validateGraphCycles() error {
 	color := map[string]int{}
 	path := []string{}
 	var visit func(string) error
@@ -185,17 +196,22 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 	state.Works[node.WorkID] = &WorkState{
 		WorkDefinition: node, State: "available", Position: position, Barrier: "none",
 	}
+	return state.validateWorkAssignmentSize(node, commit, payload)
+}
+
+func (state Projection) validateWorkAssignmentSize(node WorkDefinition, commit QueueCommit, payload []byte) error {
 	// Valid identities forbid C0 controls; quotes/backslashes have the maximum
 	// canonical escaping cost per UTF-8 byte.
 	worstIdentity := strings.Repeat("\\", 256)
+	member := AssignmentClaim{
+		Handle: "h16", ClaimID: strings.Repeat("c", 70), WorkID: node.WorkID,
+		Work: payload, ResultRefs: []ResultReference{},
+	}
 	testAssignment := Assignment{
 		Version: Version, DispatchID: strings.Repeat("d", 70),
 		RequestID: worstIdentity, CommitID: worstIdentity, PolicyEpoch: commit.PolicyEpoch,
 		Pool: node.Pool, WorkerProfile: node.WorkerProfile,
-		Claims: []AssignmentClaim{{
-			Handle: "h16", ClaimID: strings.Repeat("c", 70), WorkID: node.WorkID,
-			Work: payload, ResultRefs: []ResultReference{},
-		}},
+		Claims: []AssignmentClaim{},
 	}
 	var unresolvedBytes int64
 	for _, edge := range node.DependsOn {
@@ -210,10 +226,14 @@ func (state Projection) admitWork(node WorkDefinition, commit QueueCommit, posit
 			} else {
 				unresolvedBytes += max(0, state.Policy.Limits.ResultBytes-2)
 			}
-			testAssignment.Claims[0].ResultRefs = append(testAssignment.Claims[0].ResultRefs, reference)
+			member.ResultRefs = append(member.ResultRefs, reference)
 		}
 	}
-	encoded, _ := canonicalValue(testAssignment)
+	testAssignment.Claims = append(testAssignment.Claims, member)
+	encoded, err := canonicalValue(testAssignment)
+	if err != nil {
+		return err
+	}
 	assignmentBytes := int64(len(encoded)) + unresolvedBytes
 	if assignmentBytes > state.Policy.Limits.AssignmentBytes {
 		return queueError("assignment_limit", "Work and bounded declared Result inputs cannot fit a single-Claim assignment")
@@ -348,7 +368,10 @@ func (state Projection) recordObservation(observation Observation, commit QueueC
 	if current := state.Observations[key]; current != nil && observation.ObservedAt < current.ObservedAt {
 		return queueError("observation_invalid", "observation time moved backwards")
 	}
-	data, _ := json.Marshal(observation)
+	data, err := json.Marshal(observation)
+	if err != nil {
+		return err
+	}
 	if int64(len(data)) > state.Policy.Limits.EvidenceBytes {
 		return queueError("evidence_limit", "observation evidence too large")
 	}
@@ -371,12 +394,12 @@ func (state Projection) resultRefs(work *WorkState) []ResultReference {
 }
 
 func (state Projection) nodeCount() int {
-	nodes := map[string]bool{}
+	nodes := identitySet{}
 	for _, work := range state.Works {
-		nodes["work:"+work.WorkID] = true
+		nodes.add("work:" + work.WorkID)
 		for _, dependency := range work.DependsOn {
 			if dependency.Kind != "work" {
-				nodes[work.GraphID+resourceKey(*dependency.Resource, dependency.Condition)] = true
+				nodes.add(work.GraphID + resourceKey(*dependency.Resource, dependency.Condition))
 			}
 		}
 	}

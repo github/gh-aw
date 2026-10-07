@@ -48,7 +48,7 @@ func TestMaximumStartedDispatchFitsLifecycleReservedBytes(t *testing.T) {
 	actor := maximumClosureActor()
 	actor.Role = "dispatcher"
 	request, err := NewRequest(strings.Repeat("\\", 256), "dispatch", actor, OperationsParameters{
-		Operations: []Operation{Op(map[string]any{
+		Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": actor,
 		})},
 	})
@@ -88,7 +88,7 @@ func TestMaximumNativeReleaseFitsFinalReservedBytes(t *testing.T) {
 		evidence := terminalFor(state, assignment)
 		evidence.Kind, evidence.Status, evidence.Conclusion = "reconciliation", "", ""
 		commits = testOperations(t, commits, testActor("reconciler"), fmt.Sprintf("bind-again-%d", dispatch.LifecycleWrites),
-			"dispatch", Op(map[string]any{
+			"dispatch", mustOp(t, map[string]any{
 				"kind": "Dispatch", "dispatch_id": dispatch.DispatchID, "state": "bound",
 				"run": dispatch.Run, "evidence": evidence,
 			}))
@@ -100,7 +100,7 @@ func TestMaximumNativeReleaseFitsFinalReservedBytes(t *testing.T) {
 	}
 	actor := maximumClosureActor()
 	request, err := NewRequest(strings.Repeat("\\", 256), "release", actor, OperationsParameters{
-		Operations: []Operation{Op(map[string]any{
+		Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "Release", "dispatch_id": assignment.DispatchID,
 			"evidence": maximumClosureEvidence(t, state, assignment, false),
 		})},
@@ -147,7 +147,7 @@ func testMaximumResultFitsDeliveryReserve(t *testing.T, releaseNative bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		commits = testOperations(t, commits, testActor("reconciler"), "native-release", "release", Op(map[string]any{
+		commits = testOperations(t, commits, testActor("reconciler"), "native-release", "release", mustOp(t, map[string]any{
 			"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminalFor(state, assignment),
 		}))
 	}
@@ -159,7 +159,7 @@ func testMaximumResultFitsDeliveryReserve(t *testing.T, releaseNative bool) {
 	member := assignment.Claims[0]
 	descriptor := json.RawMessage(`{"x":"` + strings.Repeat("x", int(state.Policy.Limits.ResultBytes)-8) + `"}`)
 	request, err := NewRequest(strings.Repeat("\\", 256), "result", actor, OperationsParameters{
-		Operations: []Operation{Op(map[string]any{
+		Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "Result", "work_id": member.WorkID, "claim_id": member.ClaimID,
 			"completion_id": state.Works[member.WorkID].CompletionID, "descriptor": descriptor,
 			"evidence": maximumClosureEvidence(t, state, assignment, true),
@@ -197,7 +197,7 @@ func TestStartMarkerCannotCarryPrematureNativeEvidence(t *testing.T) {
 	actor := testActor("dispatcher")
 	actor.Workflow, actor.RunID, actor.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
 	request, err := NewRequest("start-with-evidence", "dispatch", actor, OperationsParameters{
-		Operations: []Operation{Op(map[string]any{
+		Operations: []Operation{mustOp(t, map[string]any{
 			"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": actor,
 			"evidence": terminalFor(state, assignment),
 		})},

@@ -156,7 +156,7 @@ func TestLedgerRejectsBrokenCausalAndAuthority(t *testing.T) {
 			return append(c, other)
 		},
 		"policy epoch": func(c []QueueCommit) []QueueCommit { c[1].PolicyEpoch = "wrong"; return c },
-		"policyless":   func(c []QueueCommit) []QueueCommit { c[0].Operations = []Operation{Op(node)}; return c },
+		"policyless":   func(c []QueueCommit) []QueueCommit { c[0].Operations = []Operation{mustOp(t, node)}; return c },
 		"unauthorized actor": func(c []QueueCommit) []QueueCommit {
 			c[1].Actor.Role = "reconciler"
 			c[1].Request.Fingerprint, _ = Fingerprint(c[1].Actor, c[1].Request.Kind, c[1].Request.Parameters)
@@ -256,7 +256,7 @@ func TestGraphAtomicForwardReferencesCyclesAndSharedGates(t *testing.T) {
 		Kind: "Observation", ObservationID: "o1", Resource: gate, Condition: "completed", State: "ready",
 		ObservedAt: 4000, CredentialGeneration: "initial", ReadStatus: "ok", StateReason: "completed", ResourceState: "closed",
 	}
-	commits = testOperations(t, commits, testActor("reconciler"), "observe", "observe", Op(observation))
+	commits = testOperations(t, commits, testActor("reconciler"), "observe", "observe", mustOp(t, observation))
 	state, _ = Replay(commits)
 	selected, _ = PlanNext(state, "default", 4000)
 	if selected.WorkID != a.WorkID || !slices.Equal(selected.Observations, []string{"o1"}) {
@@ -275,14 +275,14 @@ func TestControlDoesNotResetDebtAndPolicyRequiresDrain(t *testing.T) {
 	commits, _ = testGrant(t, commits, "grant", 1, 1)
 	before, _ := Replay(commits)
 	commits = testOperations(t, commits, testActor("administrator"), "pause", "control",
-		Op(map[string]any{"kind": "Control", "control": "grants_paused", "value": true, "reason": "incident"}))
+		mustOp(t, map[string]any{"kind": "Control", "control": "grants_paused", "value": true, "reason": "incident"}))
 	paused, _ := Replay(commits)
 	selected, _ := PlanNext(paused, "default", 4000)
 	if selected.Reason != "grants_paused" || !sameJSON(before.Clocks, paused.Clocks) {
 		t.Fatal("pause reset debt or granted work")
 	}
 	commits = testOperations(t, commits, testActor("administrator"), "resume", "control",
-		Op(map[string]any{"kind": "Control", "control": "grants_paused", "value": false, "reason": "restored"}))
+		mustOp(t, map[string]any{"kind": "Control", "control": "grants_paused", "value": false, "reason": "restored"}))
 	resumed, _ := Replay(commits)
 	if !sameJSON(before.Clocks, resumed.Clocks) {
 		t.Fatal("resume reset fairness debt")
@@ -290,7 +290,7 @@ func TestControlDoesNotResetDebtAndPolicyRequiresDrain(t *testing.T) {
 	policy := *resumed.Policy
 	policy.Mode = "strict-priority"
 	request, _ := NewRequest("reset", "policy", testActor("administrator"), OperationsParameters{Operations: []Operation{
-		Op(map[string]any{"kind": "Policy", "epoch": "epoch2", "policy": policy}),
+		mustOp(t, map[string]any{"kind": "Policy", "epoch": "epoch2", "policy": policy}),
 	}})
 	if _, _, _, err := BuildCandidate(commits, testActor("administrator"), request, 5000); err == nil ||
 		!strings.Contains(err.Error(), "policy_not_quiescent") {
