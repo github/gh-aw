@@ -194,7 +194,7 @@ checkout:
     current: true
 ```
 
-`on.pull_request_target.allowed-checkouts` defaults to no additional trusted checkouts. Each entry requires a literal `owner/repository` and a non-empty literal branch, tag, or commit SHA. Matching is exact and case-sensitive; repository/ref pairs cannot be combined across entries. Expressions, wildcards, and `refs/pull/...` refs are rejected in the policy. Every configured checkout must independently satisfy the policy or the existing base-checkout rules. External repositories with omitted or PR-dependent refs remain rejected. Wiki checkouts are not covered by this allowlist.
+`on.pull_request_target.allowed-checkouts` defaults to no additional trusted checkouts. Each entry requires a literal `owner/repository` and a non-empty literal branch, tag, or commit SHA. Matching is exact and case-sensitive; repository/ref pairs cannot be combined across entries. Expressions, wildcards, and `refs/pull/...` refs are rejected in the policy. Every configured checkout must independently satisfy the policy or the existing base-checkout rules. Do not configure `checkout.fetch` for these checkouts: follow-up fetches can add refs beyond the trusted checkout, so they do not satisfy the policy. External repositories with omitted or PR-dependent refs remain rejected. Wiki checkouts are not covered by this allowlist.
 
 `on.pull_request_target.acknowledge-risk` defaults to `false`. Setting it to `true` suppresses **only** the strict-mode dangerous-trigger warning, including for `checkout: false` or a supported base checkout. It neither allows other checkouts nor disables unrelated warnings, strict validation, or safe-update checks. An allowlist without acknowledgment still emits the trigger warning.
 

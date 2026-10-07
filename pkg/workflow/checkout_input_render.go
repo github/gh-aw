@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/goccy/go-yaml"
 )
 
 func (cm *CheckoutManager) defaultCheckoutIndex(entry *resolvedCheckout) int {
@@ -48,13 +46,7 @@ func (cm *CheckoutManager) writeDefaultCheckoutInputs(sb *strings.Builder, overr
 }
 
 func writeCheckoutRef(sb *strings.Builder, ref string) {
-	// Preserve literal refs that YAML would otherwise interpret as numbers or indicators.
-	value := ref
-	var scalar any
-	if err := yaml.Unmarshal([]byte(ref), &scalar); err != nil || scalar != ref {
-		value = strconv.Quote(ref)
-	}
-	fmt.Fprintf(sb, "          ref: %s\n", value) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(sb, "          ref: %s\n", strconv.Quote(ref)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 }
 
 func writeCheckoutDepthAndSparse(sb *strings.Builder, entry *resolvedCheckout) {

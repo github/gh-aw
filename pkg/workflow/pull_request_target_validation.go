@@ -191,7 +191,7 @@ func hasOnlyTrustedPullRequestTargetCheckouts(configs []*CheckoutConfig, allowed
 }
 
 func isAllowedPullRequestTargetCheckout(cfg *CheckoutConfig, allowedCheckouts []any) bool {
-	if cfg == nil || cfg.Wiki {
+	if cfg == nil || cfg.Wiki || len(cfg.Fetch) > 0 {
 		return false
 	}
 	// Fail closed even when called without schema validation. Never allow expressions
@@ -216,7 +216,7 @@ func isAllowedPullRequestTargetCheckout(cfg *CheckoutConfig, allowedCheckouts []
 }
 
 func isTrustedPullRequestTargetCheckout(cfg *CheckoutConfig) bool {
-	if cfg == nil {
+	if cfg == nil || len(cfg.Fetch) > 0 {
 		return false
 	}
 
