@@ -211,6 +211,7 @@ func (c *Compiler) ParseWorkflowString(content string, virtualPath string) (*Wor
 	workflowData.ActionResolver = actionResolver
 	workflowData.ActionPinWarnings = c.actionPinWarnings
 	workflowData.ActionPinMappings = c.getActionPinMappings()
+	workflowData.ActionPinPrefixes = c.getActionPinPrefixes()
 	workflowData.ContainerPinMappings = c.getContainerPinMappings()
 
 	// Extract YAML configuration sections

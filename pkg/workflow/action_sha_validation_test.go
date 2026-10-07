@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,6 +14,8 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 // TestGeneratedWorkflowsUseSHAs ensures that all generated workflows use SHAs instead of version tags
@@ -398,4 +401,130 @@ jobs:
 	// The test verifies the code compiles and runs without errors
 	// In CI with gh CLI access, the cache would be saved if updates were found
 	t.Logf("Validation completed successfully")
+}
+
+func TestCompiledWorkflowAppliesActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"action_pin_prefixes": {"actions/": "mirror/actions-"}}`)
+	path := filepath.Join(dir, "test.md")
+	content := "---\non: push\nengine: copilot\npermissions:\n  contents: read\n---\n\n# Test\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	compiler.gitRoot = dir
+	if err := compiler.CompileWorkflow(path); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(lock), "uses: mirror/actions-") || strings.Contains(string(lock), "uses: actions/") {
+		t.Fatalf("expected all compiler-emitted actions to use the mirror: %s", lock)
+	}
+}
+
+func TestCompiledWorkflowPreservesParsedExactMappings(t *testing.T) {
+	for _, stringAPI := range []bool{false, true} {
+		t.Run(map[bool]string{false: "file", true: "string"}[stringAPI], func(t *testing.T) {
+			dir := t.TempDir()
+			checkoutVersion := latestActionVersionForRepo(t, "actions/checkout")
+			node := getActionPin("actions/setup-node")
+			nodeSHA, _, _ := strings.Cut(strings.TrimPrefix(node, "actions/setup-node@"), " ")
+			target := "actions/setup-node@" + nodeSHA
+			writeAWJSON(t, dir, `{"action_pins":{"actions/checkout@`+checkoutVersion+`":"`+target+`"},"action_pin_prefixes":{"actions/":"mirror/actions-"}}`)
+			imported := "---\nsteps:\n  - id: exact_imported\n    uses: actions/checkout@" + checkoutVersion + "\n    with:\n      persist-credentials: false\n---\n\nShared steps.\n"
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte(imported), 0644))
+			onSection := "on: workflow_dispatch\n"
+			exactIDs := []string{"exact_custom", "exact_imported"}
+			if !stringAPI {
+				onSection = "on:\n  workflow_dispatch:\n  steps:\n    - id: exact_gate\n      uses: actions/checkout@" + checkoutVersion + "\n      with:\n        persist-credentials: false\n"
+				exactIDs = append(exactIDs, "exact_gate")
+			}
+			content := "---\n" + onSection + "imports:\n  - ./shared.md\nsteps:\n  - id: exact_custom\n    uses: actions/checkout@" + checkoutVersion +
+				"\n    with:\n      persist-credentials: false\n  - id: prefix_custom\n    uses: actions/setup-node@" + latestActionVersionForRepo(t, "actions/setup-node") +
+				"\nengine: copilot\npermissions:\n  contents: read\n---\n\nTest exact precedence.\n"
+			path := filepath.Join(dir, "test.md")
+			c := NewCompiler()
+			c.gitRoot = dir
+			var output string
+			if stringAPI {
+				data, err := c.ParseWorkflowString(content, path)
+				require.NoError(t, err)
+				output, err = c.CompileToYAML(data, path)
+				require.NoError(t, err)
+			} else {
+				require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+				require.NoError(t, c.CompileWorkflow(path))
+				lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+				require.NoError(t, err)
+				output = string(lock)
+			}
+			var compiled struct {
+				Jobs map[string]struct {
+					Steps []struct{ ID, Uses string }
+				}
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
+			found := make(map[string]string)
+			for _, job := range compiled.Jobs {
+				for _, step := range job.Steps {
+					found[step.ID] = step.Uses
+				}
+			}
+			for _, id := range exactIDs {
+				require.Equal(t, target, found[id], id)
+			}
+			require.Equal(t, "mirror/actions-setup-node@"+nodeSHA, found["prefix_custom"])
+			require.NotContains(t, output, "[gh-aw-exact-pin]")
+		})
+	}
+}
+
+func TestCompiledWorkflowAppliesExactMappingsToGeneratedActions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.md")
+	content := "---\non: push\nengine: copilot\npermissions:\n  contents: read\n---\n\n# Test\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	compile := func() string {
+		t.Helper()
+		c := NewCompiler()
+		c.gitRoot = dir
+		if err := c.CompileWorkflow(path); err != nil {
+			t.Fatal(err)
+		}
+		lock, err := os.ReadFile(stringutil.MarkdownToLockFile(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(lock)
+	}
+	baseline := compile()
+	pinLines := regexp.MustCompile(`(?m)^        uses: (actions/[A-Za-z0-9._/-]+)@([a-f0-9]{40}) # (\S+)`)
+	matches := pinLines.FindAllStringSubmatch(baseline, -1)
+	if len(matches) == 0 {
+		t.Fatal("expected generated actions in baseline workflow")
+	}
+	mappings := make(map[string]string)
+	for _, match := range matches {
+		mappings[match[1]+"@"+match[3]] = "internal/" + strings.ReplaceAll(match[1], "/", "-") + "@" + match[2]
+	}
+	config, err := json.Marshal(map[string]any{"action_pins": mappings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeAWJSON(t, dir, string(config))
+	mapped := compile()
+	if strings.Contains(mapped, "uses: actions/") {
+		t.Fatalf("compiler emitted unmapped actions:\n%s", mapped)
+	}
+	for _, target := range mappings {
+		if !strings.Contains(mapped, "uses: "+target) {
+			t.Errorf("mapped action missing: %s", target)
+		}
+	}
 }

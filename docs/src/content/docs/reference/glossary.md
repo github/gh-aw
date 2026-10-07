@@ -1393,6 +1393,10 @@ An `aw.json` configuration field that redirects action references to replacement
 }
 ```
 
+### Action-Pin Prefix Mapping (`action_pin_prefixes`)
+
+An `aw.json` mapping of action repository prefixes to mirror prefixes, such as `"actions/": "acme-corp/actions-"`. Unlike `action_pins`, it rewrites the repository *after* the original action has been SHA-pinned, retaining its SHA and version comment. The longest prefix wins; exact `action_pins` entries override it. See [Action and container substitutions](/gh-aw/reference/self-hosted-runners/#version-independent-action-mirrors-action_pin_prefixes).
+
 ### actionlint
 
 A static analysis tool for GitHub Actions workflow files that detects syntax errors, type mismatches, and other issues. Integrated into `gh aw compile` via the `--actionlint` flag. Runs in a Docker container and reports lint findings separately from tooling/integration errors (such as Docker failures or timeouts) that prevent the linter from running. See `--actionlint --zizmor --poutine` in the [Compilation Reference](/gh-aw/reference/compilation-process/).

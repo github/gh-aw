@@ -34,6 +34,17 @@
         "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@[A-Za-z0-9._/+:-]+$"
       }
     },
+    "action_pin_prefixes": {
+      "description": "Replace a matching action repository prefix after resolving its SHA. The longest prefix wins; exact action_pins entries take precedence.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]*$"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]*$"
+      }
+    },
     "container_pins": {
       "description": "Mapping of container image references to SHA-256 digest-pinned replacement image objects. Enables enterprises running in a private cloud to redirect container images to internal mirrors. Keys are source image references (e.g. 'ghcr.io/owner/image:tag') and values are objects with separate 'image' and 'digest' fields.",
       "type": "object",

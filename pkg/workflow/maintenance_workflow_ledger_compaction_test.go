@@ -140,6 +140,7 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	for name := range jobs {
 		assert.False(t, strings.HasPrefix(name, "ledger_compaction_plan_") || strings.HasPrefix(name, "ledger_compaction_apply_"), "unexpected per-ledger job %s", name)
 	}
+
 	assert.Contains(t, plan, "contents: read")
 	assert.NotContains(t, plan, "contents: write")
 	assert.NotContains(t, plan, "secrets.GITHUB_TOKEN")
@@ -180,6 +181,72 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	assert.Contains(t, yaml, "ledger:")
 	assert.Contains(t, jobs["run_operation"], "'compact_ledger'", "the generic operation job must not handle compact_ledger")
 	assert.Contains(t, yaml, "schedule:")
+}
+
+func TestGeneratedWorkflowActionPinNotificationsAreShared(t *testing.T) {
+	dir := t.TempDir()
+	enabled := true
+	warnings := make(map[string]bool)
+	data := &WorkflowData{
+		Name: "test", WorkflowID: "test",
+		Command: []string{"test"}, CommandEvents: []string{"issue_comment"}, CommandCentralized: true,
+		ActionPinWarnings: warnings,
+		CheckoutConfigs: []*CheckoutConfig{
+			{Repository: "org/side-a", Current: true},
+			{Repository: "org/side-b", Current: true},
+		},
+		SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{Expires: 48}},
+	}
+	script := getActionPin("actions/github-script")
+	scriptSHA, _, _ := strings.Cut(strings.TrimPrefix(script, "actions/github-script@"), " ")
+	exactKey := "actions/github-script@" + latestActionVersionForRepo(t, "actions/github-script")
+	config := &RepoConfig{
+		AutoUpgrade:       &enabled,
+		ActionPins:        map[string]string{exactKey: "internal/github-script@" + scriptSHA},
+		ActionPinPrefixes: map[string]string{"actions/": "mirror/actions-"},
+	}
+	workflows := []*WorkflowData{nil, data}
+	output := captureStderrOutput(t, func() {
+		_, err := mapPinnedUsesInYAML("        uses: "+script+"\n", config.ActionPins, config.ActionPinPrefixes, warnings, nil)
+		require.NoError(t, err)
+		require.NoError(t, GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+			WorkflowDataList: workflows, WorkflowDir: dir, Version: "v1.0.0", ActionMode: ActionModeDev, RepoConfig: config,
+		}))
+		require.NoError(t, GenerateCentralSlashCommandWorkflow(context.Background(), workflows, dir, config))
+	})
+	require.Equal(t, 1, strings.Count(output, "Action pin mapping applied: "+exactKey+" →"))
+	require.Equal(t, 1, strings.Count(output, "Action pin mapping applied: actions/checkout →"))
+	files, err := filepath.Glob(filepath.Join(dir, "*.yml"))
+	require.NoError(t, err)
+	require.Len(t, files, 5)
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		require.NoError(t, err)
+		require.NotContains(t, string(content), "uses: actions/", file)
+		require.Contains(t, string(content), "uses: internal/github-script@"+scriptSHA, file)
+	}
+}
+
+func TestMaintenanceActionPinPrefixes(t *testing.T) {
+	dir := t.TempDir()
+	data := &WorkflowData{
+		Name: "test",
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{Expires: 48},
+		},
+	}
+	err := GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+		WorkflowDataList: []*WorkflowData{data},
+		WorkflowDir:      dir,
+		Version:          "v1.0.0",
+		ActionMode:       ActionModeDev,
+		RepoConfig:       &RepoConfig{ActionPinPrefixes: map[string]string{"actions/": "mirror/actions-"}},
+	})
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(dir, "agentics-maintenance.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "uses: mirror/actions-")
+	assert.NotContains(t, string(content), "uses: actions/")
 }
 
 func TestGenerateMaintenanceWorkflow_NoLedgerCompactionInputsWithoutLedgers(t *testing.T) {
