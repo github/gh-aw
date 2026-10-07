@@ -81,6 +81,7 @@ run_model BrokenDAGCycle DAGValidity Invariant 151 FairWorkQueue \
     "The invariant of DAGValidity is equal to FALSE"
 run_model BrokenExternalDependency ExternalAuthorization Invariant 12 FairWorkQueue
 run_model BrokenPRClosedAsMerged ExternalTruth Invariant 12 FairWorkQueue
+run_model BrokenProjection ProjectionSoundness Invariant 12 FairWorkQueue
 run_model BatchedAssignmentWitness NoBatchedAssignment Invariant 12 FairWorkQueue
 run_model PartialCompletionWitness NoPartialCompletion Invariant 12 FairWorkQueue
 run_model DAGJoinWitness NoJoinClaim Invariant 12 FairWorkQueue

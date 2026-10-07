@@ -17,6 +17,7 @@ const jar = process.env.TLA2TOOLS_JAR;
 assert(jar && path.isAbsolute(jar), "TLA2TOOLS_JAR must be an absolute pinned jar path");
 const hash = value => crypto.createHash("sha256").update(value).digest("hex");
 assert.equal(hash(fs.readFileSync(jar)), TLC_SHA256, "unexpected TLC jar checksum");
+assert.notEqual(output, path.parse(output).root, "results must not be the filesystem root");
 fs.mkdirSync(output, { recursive: true });
 assert(!fs.existsSync(path.join(output, "comparison.json")), "do not overwrite previous comparison evidence");
 const cases = [
@@ -30,8 +31,26 @@ const cases = [
 ];
 const variables = {
   WorkQueue: "log, head, dispatch, workers, compact, recovery, deadRuns, terminalHistory, authorizations, effects",
-  FairWorkQueue: "log, head, pending, worker, intents, handled, authorized, effects, completed",
+  FairWorkQueue: "log, head, pending, worker, intents, handled, authorized, effects, completed, projection",
 };
+const sources = new Map(
+  [...new Set(cases.map(c => c[0]))].map(moduleName => [
+    moduleName,
+    {
+      original: fs.readFileSync(path.join(baseline, `${moduleName}.tla`), "utf8"),
+      current: fs.readFileSync(path.join(root, `${moduleName}.tla`), "utf8"),
+    },
+  ])
+);
+const configurations = new Map(
+  [...new Set(cases.map(c => c[1]))].map(config => {
+    const configuration = fs.readFileSync(path.join(baseline, `${config}.cfg`), "utf8");
+    assert.equal(fs.readFileSync(path.join(root, `${config}.cfg`), "utf8"), configuration, "comparison configuration differs from its baseline");
+    return [config, configuration];
+  })
+);
+const javaVersion = spawnSync(java, ["-version"], { encoding: "utf8", timeout: 10_000 });
+assert.equal(javaVersion.status, 0, javaVersion.error?.message || javaVersion.stderr);
 const constants = {
   WorkQueue: "WorkCount, ClaimCount, WorkerCount, DispatcherCount, RetryLimit, MaxHead, MaxLog",
   FairWorkQueue: "WorkCount, DispatcherCount, MaxBatch, ClaimLimit, RunLimit, KeyLimit, RetryLimit, MaxLog, Mode, Dependencies, ExternalDependencies",
@@ -41,8 +60,7 @@ for (const [moduleName, config, mutation] of cases) {
   const name = mutation ? `${config}-${mutation}` : config;
   const directory = path.join(output, name);
   fs.mkdirSync(directory);
-  const original = fs.readFileSync(path.join(baseline, `${moduleName}.tla`), "utf8");
-  const current = fs.readFileSync(path.join(root, `${moduleName}.tla`), "utf8");
+  const { original, current } = sources.get(moduleName);
   let candidate = current;
   if (mutation === "missing-transition") {
     candidate = candidate.replace(/^Next ==[\s\S]*?(?=^Spec ==)/m, "Next == FALSE\n");
@@ -68,23 +86,25 @@ Original == INSTANCE ${moduleName}Original
 Revised == INSTANCE ${moduleName}Revised
 ${
   fair
-    ? `IndependentDependencies == Original!IndependentDependencies
+    ? `OriginalInit == Original!Init /\\ projection = Original!Replay(log)
+OriginalNext == Original!Next /\\ projection' = Original!Replay(log')
+IndependentDependencies == Original!IndependentDependencies
 NoExternalDependencies == Original!NoExternalDependencies
 GitHubDependencies == Original!GitHubDependencies`
     : ""
 }
 vars == <<${variables[moduleName]}>>
-Init == Original!Init \\/ Revised!Init
-Next == Original!Next \\/ Revised!Next
+Init == ${fair ? "OriginalInit" : "Original!Init"} \\/ Revised!Init
+Next == ${fair ? "OriginalNext" : "Original!Next"} \\/ Revised!Next
 Spec == Init /\\ [][Next]_vars
 Safety == Original!Safety /\\ Revised!Safety
 Bound == Original!Bound
 ${fair ? "OneObservationPerResource == Original!OneObservationPerResource" : ""}
-InitialEquivalence == Original!Init = Revised!Init
-NextEquivalence == [] [Original!Next = Revised!Next]_vars
+InitialEquivalence == ${fair ? "OriginalInit" : "Original!Init"} = Revised!Init
+NextEquivalence == [] [${fair ? "OriginalNext" : "Original!Next"} = Revised!Next]_vars
 ${
   fair
-    ? "ReplayEquivalence == Original!State = Revised!State"
+    ? "ReplayEquivalence == Original!State = Revised!State /\\ Revised!ProjectionSoundness"
     : `WorkerOneShot == Original!WorkerOneShot /\\ Revised!WorkerOneShot
 QueueSelection == Original!QueueSelection /\\ Revised!QueueSelection
 WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissionNoOp`
@@ -92,9 +112,9 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
 =============================================================================
 `;
   fs.writeFileSync(path.join(directory, "Comparison.tla"), wrapper);
-  const configuration = fs.readFileSync(path.join(baseline, `${config}.cfg`), "utf8");
-  assert.equal(fs.readFileSync(path.join(root, `${config}.cfg`), "utf8"), configuration, "comparison configuration differs from its baseline");
-  fs.writeFileSync(path.join(directory, "Comparison.cfg"), `${configuration}\nPROPERTY InitialEquivalence\nPROPERTY NextEquivalence\n${fair ? "INVARIANT ReplayEquivalence\n" : ""}`);
+  const configuration = configurations.get(config);
+  const checkedConfiguration = fair ? configuration.replace("INVARIANT Safety", "INVARIANT ReplayEquivalence\nINVARIANT Safety") : configuration;
+  fs.writeFileSync(path.join(directory, "Comparison.cfg"), `${checkedConfiguration}\nPROPERTY InitialEquivalence\nPROPERTY NextEquivalence\n`);
   const command = ["-XX:+UseParallelGC", "-Xmx1g", "-cp", jar, "tlc2.TLC", "-workers", "2", "-seed", "1", "-fp", "0", "-config", "Comparison.cfg", "-metadir", "state", "Comparison.tla"];
   const started = Date.now();
   const logPath = path.join(directory, "tlc.log");
@@ -128,7 +148,10 @@ WorkResubmissionNoOp == Original!WorkResubmissionNoOp /\\ Revised!WorkResubmissi
   };
   comparisons.push(result);
   const complete = comparisons.length === cases.length;
-  fs.writeFileSync(path.join(output, "comparison.json"), `${JSON.stringify({ complete, passed: complete && comparisons.every(c => c.passed), comparisons }, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(output, "comparison.json"),
+    `${JSON.stringify({ complete, passed: complete && comparisons.every(c => c.passed), java_version: javaVersion.stderr, runner_sha256: hash(fs.readFileSync(fileURLToPath(import.meta.url))), comparisons }, null, 2)}\n`
+  );
   console.log(`${name}: ${result.passed ? "expected result" : "FAILED"} (${result.elapsed_seconds}s)`);
   assert(result.passed, `comparison failed; inspect ${logPath}`);
 }

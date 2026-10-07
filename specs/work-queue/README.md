@@ -398,11 +398,22 @@ oldest eligible Work. `Normalize` retains the exact class-1/key-1 wake-up clocks
 inactive clocks and active-set updates using the simplified formulas.
 Weighted/strict selection is unchanged. The recursive DAG closure also
 evaluates its preceding finite set before reusing it; `TLCEval(x) = x`.
-There is no cached authoritative projection, new state variable, `VIEW`,
-symmetry reduction or extra exploration constraint.
+There is no `VIEW`, symmetry reduction or extra exploration constraint.
+
+`projection` is a **deterministic, non-authoritative cache**: initialization
+sets it to `Replay(log)`, every nonstuttering action sets it to `Replay(log')`,
+and `ProjectionSoundness` independently checks complete replay equality in
+every state. `Safety` retains every preceding conjunct and adds this check.
+Normal, guarded-witness and deliberately broken protocol transitions all
+update the cache; a separate corruption control bypasses that update and must
+violate `ProjectionSoundness`. Scheduling, observations and accounting remain
+solely in `log`. This adds a functional state component, not an independent
+choice or a reduced state space. It avoids replaying the same log separately
+for each guard and projected-state invariant.
 
 [`compare-evaluation.mjs`](compare-evaluation.mjs) independently instantiates
-the original and revised modules over the same variables/constants. It explores
+the original and revised modules over shared protocol variables/constants,
+lifting the original relation with the same replay-derived cache update. It explores
 the **union** of their transitions and checks `NextEquivalence` on each edge,
 so a missing revised transition cannot disappear from the comparison. Both
 initial-state predicates and safety predicates must agree/hold; fair-model
@@ -410,7 +421,9 @@ replay projections must be exactly equal, including accounting clocks.
 The five comparison configurations cover historical recovery, default batches,
 weighted/strict selection and typed external gates. Missing-transition and
 changed-clock mutations must produce the exact action-property/invariant
-diagnostics. These finite comparisons supplement the algebraic equivalence
+diagnostics. Removing the deterministic cache maps each revised state to
+exactly one original state; complete replay reconstructs it uniquely.
+These finite comparisons supplement this extension/algebraic equivalence
 argument; they do not exhaust the three larger requested configurations or
 prove runtime refinement.
 
@@ -505,6 +518,7 @@ The same `check.sh` additionally runs:
 | `FairDAGFork.cfg` | Siblings become independently schedulable after their common predecessor succeeds |
 | `FairDAGGitHub.cfg` | A child needs its Work predecessor and both foreign Issue/PR conditions; bounded to one observation/resource plus checked boundary successors |
 | `FairGitHubDependencies.cfg` | Both Issue-completed and PR-merged observations must satisfy the external gate |
+| `BrokenProjection.cfg` | A cache-only forged completion must violate complete log-replay equality |
 | `BrokenBatchSelection.cfg` | Deliberately bypass selection; `DecisionValidity` must fail |
 | `BrokenClaimEffects.cfg` | Use another unfinished Claim's effects after one Claim completes; `EffectAuthorization` must fail |
 | `BrokenAssignmentHandle.cfg` | Finish another worker's Claim; `ClaimClosureAuthority` must fail |

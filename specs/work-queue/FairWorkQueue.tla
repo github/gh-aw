@@ -163,9 +163,12 @@ ValidOps(s, ops) ==
 \* Observe abstracts a trusted exact-resource GitHub metadata read.
 \* One group abstracts one approved worker profile and its actual bound run.
 \* Claims are individually charged; a group's native run slot survives closure.
-VARIABLES log, head, pending, worker, intents, handled, authorized, effects, completed
-vars == <<log, head, pending, worker, intents, handled, authorized, effects, completed>>
-State == Replay(log)
+VARIABLES log, head, pending, worker, intents, handled, authorized, effects, completed, projection
+vars == <<log, head, pending, worker, intents, handled, authorized, effects, completed, projection>>
+\* The cache has no independent authority: every checked state must equal complete log replay.
+State == projection
+ProjectionSoundness == projection = Replay(log)
+Projected(action) == action /\ projection' = Replay(log')
 Record(source, id, request, ops) ==
     Append(source, [id |-> id, previous |-> IF source = <<>> THEN 0 ELSE Last(source).id,
                     request |-> request, ops |-> ops])
@@ -177,6 +180,7 @@ Init ==
     /\ worker = [g \in Groups |-> "waiting"]
     /\ intents = [c \in Claims |-> "none"]
     /\ handled = {} /\ authorized = {} /\ effects = <<>> /\ completed = {}
+    /\ projection = Replay(log)
 AppendOps(ops) == /\ log' = Record(log, head + 1, 0, ops) /\ head' = head + 1
 Prepare(g) ==
     /\ pending[g].phase = "idle" /\ Plan(State, g, MaxBatch) # <<>>
@@ -269,7 +273,7 @@ Observe(e, status) ==
     /\ e \in Resources /\ status \in ResourceStatuses(e) /\ State.reads[e] < 2
     /\ AppendOps(<<Op("Observe", 0, e, status)>>)
     /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
-Next ==
+RawNext ==
     \/ \E g \in Groups : Prepare(g) \/ Push(g) \/ Retry(g) \/ Launch(g) \/ Bind(g)
                          \/ BeginFinalize(g) \/ Terminate(g) \/ Crash(g) \/ Release(g)
     \/ \E g \in Groups, c \in Claims :
@@ -277,6 +281,7 @@ Next ==
          \/ PublishResult(g, c) \/ RepairResult(g, c) \/ Recover(g, c)
          \/ \E outcome \in {"completed", "cancelled"} : FinishIntent(g, c, outcome)
     \/ \E e \in Resources : \E status \in ResourceStatuses(e) : Observe(e, status)
+Next == Projected(RawNext)
 Spec == Init /\ [][Next]_vars
 Bound == Len(log) <= MaxLog
 OneObservationPerResource == \A e \in Resources : State.reads[e] <= 1
@@ -392,7 +397,7 @@ EffectAuthorization ==
        LET g == effects[i][1] c == effects[i][2]
        IN /\ g = GroupOf(c) /\ c \in authorized /\ State.cs[c] = "completed"
 TerminalPersistence == \A c \in completed : State.cs[c] = "completed"
-Safety == TypeOK /\ DAGValidity /\ CausalChain /\ DecisionValidity /\ Capacity /\ ClaimChargeCount /\ RequestOnce
+Safety == ProjectionSoundness /\ TypeOK /\ DAGValidity /\ CausalChain /\ DecisionValidity /\ Capacity /\ ClaimChargeCount /\ RequestOnce
           /\ AssignmentIntegrity /\ NoDuplicateEffects
           /\ ClaimClosureAuthority
           /\ RunReleaseAuthority
@@ -424,7 +429,7 @@ JoinNext ==
          FinishIntent(g, c, "completed") \/ Finalize(g, c) \/ Effect(g, c)
          \/ VerifyDelivery(g, c) \/ PublishResult(g, c)
 \* A guarded success-path subset witnesses reachability, not full coverage.
-JoinWitnessSpec == Init /\ [][JoinNext]_vars
+JoinWitnessSpec == Init /\ [][Projected(JoinNext)]_vars
 BrokenSelect(g) ==
     /\ pending[g].phase = "idle" /\ Eligible(State) # {}
     /\ LET w == CHOOSE w \in Eligible(State) : \A v \in Eligible(State) : w >= v
@@ -475,13 +480,17 @@ BrokenPRObservation ==
     /\ 2 \in Resources /\ State.reads[2] < 2
     /\ AppendOps(<<Op("Observe", 1, 2, "closed_unmerged")>>)
     /\ UNCHANGED <<pending, worker, intents, handled, authorized, effects, completed>>
-BrokenSelectionSpec == Init /\ [][Next \/ \E g \in Groups : BrokenSelect(g)]_vars
-BrokenEffectsSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenEffect(g, c)]_vars
-BrokenHandleSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenHandle(g, c)]_vars
-BrokenCASSpec == Init /\ [][Next \/ \E g \in Groups : BrokenPush(g)]_vars
-BrokenReleaseSpec == Init /\ [][Next \/ \E g \in Groups : BrokenRelease(g)]_vars
-BrokenDependencySpec == Init /\ [][Next \/ \E g \in Groups, w \in Works : BrokenDependency(g, w)]_vars
-BrokenResultSpec == Init /\ [][Next \/ \E g \in Groups, c \in Claims : BrokenResult(g, c)]_vars
-BrokenExternalSpec == Init /\ [][Next \/ \E g \in Groups, w \in Works : BrokenExternal(g, w)]_vars
-BrokenPRSpec == Init /\ [][Next \/ BrokenPRObservation]_vars
+BrokenSelectionSpec == Init /\ [][Projected(Next \/ \E g \in Groups : BrokenSelect(g))]_vars
+BrokenEffectsSpec == Init /\ [][Projected(Next \/ \E g \in Groups, c \in Claims : BrokenEffect(g, c))]_vars
+BrokenHandleSpec == Init /\ [][Projected(Next \/ \E g \in Groups, c \in Claims : BrokenHandle(g, c))]_vars
+BrokenCASSpec == Init /\ [][Projected(Next \/ \E g \in Groups : BrokenPush(g))]_vars
+BrokenReleaseSpec == Init /\ [][Projected(Next \/ \E g \in Groups : BrokenRelease(g))]_vars
+BrokenDependencySpec == Init /\ [][Projected(Next \/ \E g \in Groups, w \in Works : BrokenDependency(g, w))]_vars
+BrokenResultSpec == Init /\ [][Projected(Next \/ \E g \in Groups, c \in Claims : BrokenResult(g, c))]_vars
+BrokenExternalSpec == Init /\ [][Projected(Next \/ \E g \in Groups, w \in Works : BrokenExternal(g, w))]_vars
+BrokenPRSpec == Init /\ [][Projected(Next \/ BrokenPRObservation)]_vars
+BrokenProjection ==
+    /\ projection' = [projection EXCEPT !.ws[1] = "completed"]
+    /\ UNCHANGED <<log, head, pending, worker, intents, handled, authorized, effects, completed>>
+BrokenProjectionSpec == Init /\ [][Next \/ BrokenProjection]_vars
 =================================================================
