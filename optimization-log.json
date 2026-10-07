@@ -1,14 +1,5 @@
 [
   {
-    "date": "2026-06-18",
-    "workflow_name": "PR Description Updater",
-    "workflow_file": "pr-description-caveman",
-    "total_aic_analyzed": 382.3265,
-    "runs_audited": 3,
-    "recommendations_count": 4,
-    "estimated_aic_savings_per_run": 75
-  },
-  {
     "date": "2026-06-19",
     "workflow_name": "Glossary Maintainer",
     "workflow_file": "glossary-maintainer",
@@ -38,7 +29,7 @@
   },
   {
     "date": "2026-06-24",
-    "workflow_name": "Design Decision Gate 🏗️",
+    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 432.592,
     "runs_audited": 7,
@@ -288,5 +279,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 90
+  },
+  {
+    "date": "2026-10-07",
+    "workflow_name": "PR Code Quality Reviewer",
+    "workflow_file": "pr-code-quality-reviewer",
+    "total_aic_analyzed": 267.7,
+    "runs_audited": 5,
+    "recommendations_count": 5,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 30
   }
 ]
