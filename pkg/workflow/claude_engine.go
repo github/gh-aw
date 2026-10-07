@@ -72,9 +72,9 @@ func (e *ClaudeEngine) GetAPMTarget() string {
 func (e *ClaudeEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
 	provider := e.ResolveLLMProvider(workflowData)
 	if claudeSkipsStaticSecret(provider, workflowData) {
-		return collectCommonMCPSecrets(workflowData)
+		return append(collectCommonMCPSecrets(workflowData), fallbackProviderSecretNames(workflowData)...)
 	}
-	return append(llmProviderSecretNames(provider), collectCommonMCPSecrets(workflowData)...)
+	return append(append(llmProviderSecretNames(provider), collectCommonMCPSecrets(workflowData)...), fallbackProviderSecretNames(workflowData)...)
 }
 
 // GetSupportedEnvVarKeys returns the engine.env variable names that the Claude engine

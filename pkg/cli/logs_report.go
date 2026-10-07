@@ -44,6 +44,29 @@ type LogsData struct {
 	StaleWarning        string                      `json:"stale_warning,omitempty" console:"-"`
 	GitHubAPIRateLimit  *GitHubAPIRateLimitReport   `json:"github_api_rate_limit,omitempty" console:"-"`
 	GitHubAPIRateLimits []*GitHubAPIRateLimitReport `json:"github_api_rate_limits,omitempty" console:"-"`
+	ModelRouting        *ModelRoutingLogsSummary    `json:"model_routing,omitempty" console:"title:Model Routing,omitempty"`
+}
+
+type ModelRoutingLogsSummary struct {
+	Routes                 []ModelRoutingRouteSummary `json:"routes,omitempty" console:"title:Model Routing Mix,omitempty"`
+	ClassifierAIC          float64                    `json:"classifier_aic,omitempty" console:"header:Classifier AIC"`
+	TotalRequests          int                        `json:"total_requests,omitempty" console:"header:Routing Requests"`
+	DeviatedRequests       int                        `json:"deviated_requests,omitempty" console:"header:Deviated Requests"`
+	DeviatedTrafficShare   float64                    `json:"deviated_traffic_share,omitempty" console:"header:Deviated Traffic Share"`
+	EndpointOnlyNormalized bool                       `json:"endpoint_only_deviation_normalized,omitempty" console:"header:Legacy Endpoint Normalized"`
+}
+
+type ModelRoutingRouteSummary struct {
+	TaskType      string  `json:"task_type,omitempty" console:"header:Task"`
+	Scope         string  `json:"scope,omitempty" console:"header:Scope"`
+	Complexity    string  `json:"task_complexity,omitempty" console:"header:Complexity"`
+	Mode          string  `json:"mode,omitempty" console:"header:Mode"`
+	Model         string  `json:"model,omitempty" console:"header:Model"`
+	Effort        string  `json:"effort,omitempty" console:"header:Effort"`
+	RouterVersion string  `json:"router_version,omitempty" console:"header:Router"`
+	RunCount      int     `json:"run_count" console:"header:Runs"`
+	TotalAIC      float64 `json:"total_aic" console:"header:Total AIC"`
+	AverageAIC    float64 `json:"average_aic" console:"header:Average AIC"`
 }
 
 // ContinuationData provides parameters to continue an incomplete logs query.
@@ -203,6 +226,7 @@ type RunData struct {
 	AgenticAssessments         []AgenticAssessment    `json:"agentic_assessments,omitempty" console:"-"`
 	AwContext                  *AwContext             `json:"context,omitempty" console:"-"`                                                        // aw_context data from aw_info.json
 	TokenUsageSummary          *TokenUsageSummary     `json:"token_usage_summary,omitempty" console:"-"`                                            // Token usage from firewall proxy
+	ModelRouting               *ModelRoutingSummary   `json:"model_routing,omitempty" console:"-"`                                                  // AWF model routing and per-run cost attribution
 	GitHubAPICalls             int                    `json:"github_api_calls,omitempty" console:"header:GitHub API Calls,format:number,omitempty"` // GitHub API calls made during the run
 	AvgTimeBetweenTurns        string                 `json:"avg_time_between_turns,omitempty" console:"-"`                                         // Average time between consecutive LLM API calls (TBT)
 	Experiments                *ExperimentData        `json:"experiments,omitempty" console:"-"`                                                    // A/B experiment assignments for this run
@@ -511,6 +535,7 @@ func buildRunData(pr ProcessedRun, processedRuns []ProcessedRun, localRepo strin
 	comparison := buildAuditComparisonForProcessedRuns(pr, processedRuns)
 
 	runData := newRunData(pr, engineInfo, chainMetrics, comparison, failureKind, gitHubAPICalls)
+	runData.ModelRouting = pr.ModelRouting
 	runData.Ledger = pr.Ledger
 	runData.awInfo = engineInfo.awInfo
 	if engineInfo.awInfo != nil {
@@ -678,6 +703,7 @@ func buildLogsSections(processedRuns []ProcessedRun) LogsData {
 		FirewallLog: buildFirewallLogSummary(processedRuns),
 		// Build redacted domains summary
 		RedactedDomains: buildRedactedDomainsSummary(processedRuns),
+		ModelRouting:    buildModelRoutingLogsSummary(processedRuns),
 	}
 }
 

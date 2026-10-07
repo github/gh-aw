@@ -1,11 +1,11 @@
 ---
 services:
   jupyter:
-    image: jupyter/base-notebook:latest
+    image: jupyter/base-notebook:latest@sha256:8c903974902b0e9d45d9823c2234411de0614c5c98c4bb782b3d4f55b3e435e6
     ports:
       - 8888:8888
     env:
-      JUPYTER_TOKEN: ${{ github.run_id }}
+      JUPYTER_TOKEN: "${{ secrets.JUPYTER_TOKEN || fromJSON('Missing required secret: JUPYTER_TOKEN') }}"
     options: >-
       --health-cmd "curl -f http://localhost:8888/api || exit 1"
       --health-interval 10s
@@ -13,12 +13,12 @@ services:
       --health-retries 5
   
   jupyter-mcp:
-    image: datalayer/jupyter-mcp-server:latest
+    image: datalayer/jupyter-mcp-server:2.2.3@sha256:889fcbddbc816612c657e8ac10b4434e5df8d6298125c17e763947baae6bc27a
     ports:
       - 3000:3000
     env:
       JUPYTER_URL: "http://jupyter:8888"
-      JUPYTER_TOKEN: "${{ github.run_id }}"
+      JUPYTER_TOKEN: "${{ secrets.JUPYTER_TOKEN || fromJSON('Missing required secret: JUPYTER_TOKEN') }}"
       ALLOW_IMG_OUTPUT: "true"
       MCP_TRANSPORT: "http"
       MCP_PORT: "3000"

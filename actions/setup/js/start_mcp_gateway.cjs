@@ -776,7 +776,8 @@ async function main() {
   const configReadStart = nowMs();
   let mcpConfig;
   try {
-    mcpConfig = fs.readFileSync(0, "utf8"); // fd 0 = stdin
+    // Avoid Node's UTF-8 pipe short-read overflow (nodejs/node#66341).
+    mcpConfig = fs.readFileSync(0).toString("utf8");
   } catch (err) {
     throw new Error(`Failed to read MCP configuration from stdin: ${getErrorMessage(err)}`, { cause: err });
   }

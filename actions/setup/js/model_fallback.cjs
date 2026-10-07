@@ -1,6 +1,7 @@
 "use strict";
 
 const { normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+const { buildCatalogFromReflect, selectLatestGlobMatch, splitModelIdentifier } = require("./resolve_model_alias.cjs");
 
 const MODEL_FALLBACK_ENV_VAR = "GH_AW_MODEL_FALLBACK";
 
@@ -73,25 +74,68 @@ function normalizeCodexModel(model, provider, options = {}) {
   return match[2];
 }
 
-/** @param {string} model @param {string} provider @param {NodeJS.ProcessEnv} env @returns {string} */
-function normalizeClaudeModel(model, provider, env) {
+/**
+ * @param {string} model
+ * @param {string} provider
+ * @param {{ reflectData?: import("./awf_reflect.cjs").ReflectData | null, logger?: (message: string) => void }} [options]
+ * @returns {string}
+ */
+function resolveClaudeAutoModel(model, provider, options = {}) {
+  const { base } = splitModelIdentifier(model);
+  if (base.toLowerCase() !== "auto") return model;
+  const suffix = model.slice(base.length);
+  const normalizedProvider = normalizeReflectProviderName(provider, "anthropic");
+  if (normalizedProvider === "anthropic") {
+    options.logger?.("Claude auto model selection uses the native sonnet alias");
+    return `sonnet${suffix}`;
+  }
+  if (!REFLECT_PROVIDER_ALIASES.github.has(normalizedProvider)) {
+    throw new Error(`Claude auto model selection is not supported for provider '${provider}'`);
+  }
+  const endpoints = options.reflectData?.endpoints?.filter(endpoint => endpoint?.configured === true && REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(endpoint.provider))) || [];
+  const catalog = buildCatalogFromReflect({ endpoints });
+  // Claude's Messages API cannot use Copilot's general-purpose auto picker.
+  for (const family of ["sonnet", "opus", "haiku"]) {
+    const selected = selectLatestGlobMatch(`claude-*${family}*`, catalog);
+    if (selected) {
+      options.logger?.(`Claude auto model selection: '${model}' -> '${selected}${suffix}' (provider=${provider})`);
+      return selected + suffix;
+    }
+  }
+  throw new Error("Claude auto model selection requires an advertised Claude Sonnet, Opus, or Haiku model on the configured Copilot endpoint");
+}
+
+/**
+ * @param {string} model
+ * @param {string} provider
+ * @param {NodeJS.ProcessEnv} env
+ * @param {{ reflectData?: import("./awf_reflect.cjs").ReflectData | null, logger?: (message: string) => void }} [options]
+ * @returns {string}
+ */
+function normalizeClaudeModel(model, provider, env, options = {}) {
   const match = /^copilot\/(.+)$/i.exec(model.trim());
-  if (!match) return model.trim();
+  if (!match) return resolveClaudeAutoModel(model.trim(), provider, options);
   if (!REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(provider)) && env.GH_AW_LLM_PROVIDER_EXPLICIT !== "1") {
     throw new Error("A copilot/ Claude model requires engine.model-provider: github when the model is selected dynamically; configure the provider and its credentials before running Claude");
   }
-  return match[1];
+  return resolveClaudeAutoModel(match[1], provider, options);
 }
 
-/** @param {string[]} args @param {string} provider @param {NodeJS.ProcessEnv} env @returns {string[]} */
-function normalizeClaudeModelArgs(args, provider, env) {
+/**
+ * @param {string[]} args
+ * @param {string} provider
+ * @param {NodeJS.ProcessEnv} env
+ * @param {{ reflectData?: import("./awf_reflect.cjs").ReflectData | null, logger?: (message: string) => void }} [options]
+ * @returns {string[]}
+ */
+function normalizeClaudeModelArgs(args, provider, env, options = {}) {
   const normalized = [...args];
   for (let i = 0; i < normalized.length; i++) {
     if (normalized[i] === "--") break;
     if (normalized[i] === "--model" && i + 1 < normalized.length) {
-      normalized[++i] = normalizeClaudeModel(normalized[i], provider, env);
+      normalized[++i] = normalizeClaudeModel(normalized[i], provider, env, options);
     } else if (normalized[i].startsWith("--model=")) {
-      normalized[i] = `--model=${normalizeClaudeModel(normalized[i].slice("--model=".length), provider, env)}`;
+      normalized[i] = `--model=${normalizeClaudeModel(normalized[i].slice("--model=".length), provider, env, options)}`;
     }
   }
   return normalized;

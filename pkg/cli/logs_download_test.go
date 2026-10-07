@@ -19,6 +19,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLogsBuildBulkDownloadArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		owner    string
+		repo     string
+		hostname string
+		repoFlag string
+	}{
+		{name: "default host", owner: "octo", repo: "repo", repoFlag: "octo/repo"},
+		{name: "github.com", owner: "octo", repo: "repo", hostname: "github.com", repoFlag: "octo/repo"},
+		{name: "enterprise host", owner: "octo", repo: "repo", hostname: "ghe.example.com", repoFlag: "ghe.example.com/octo/repo"},
+		{name: "implicit repository"},
+		{name: "missing owner", repo: "repo", hostname: "ghe.example.com"},
+		{name: "missing repo", owner: "octo", hostname: "ghe.example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			outputDir := filepath.Join("logs", "run-42")
+			args := buildBulkDownloadArgs(downloadArtifactsOptions{
+				runID:     42,
+				outputDir: outputDir,
+				owner:     tt.owner,
+				repo:      tt.repo,
+				hostname:  tt.hostname,
+			})
+			want := []string{"run", "download", "42", "--dir", outputDir}
+			if tt.repoFlag != "" {
+				want = append(want, "-R", tt.repoFlag)
+			}
+			assert.Equal(t, want, args)
+		})
+	}
+}
+
 func TestDownloadWorkflowLogs(t *testing.T) {
 	t.Skip("Skipping slow network-dependent test")
 

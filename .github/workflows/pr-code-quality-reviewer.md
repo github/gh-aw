@@ -37,7 +37,9 @@ imports:
     with:
       min-integrity: approved
   - shared/otlp.md
-  - shared/pr-diff-data-fetch.md
+  - uses: shared/pr-diff-data-fetch.md
+    with:
+      max-diff-lines: "1500"
 tools:
   cli-proxy: true
   github:
@@ -102,15 +104,17 @@ You are a highly critical code reviewer. Your mission is to aggressively find co
 ### Step 1: Load Pre-Fetched PR Data and Launch Sub-Agent
 
 The PR diff and metadata have already been pre-fetched and are available as local files:
-- **PR diff** (capped at 2000 lines, lock/generated/dist/build files excluded): `/tmp/gh-aw/agent/pr-diff.patch`
+- **PR diff** (capped at 1500 lines, lock/generated/dist/build files excluded): `/tmp/gh-aw/agent/pr-diff.patch`
 - **PR metadata** (files list, additions, deletions): `/tmp/gh-aw/agent/pr-meta.json`
 
-In **one parallel turn**, read those three files:
+In **one parallel turn**, read the PR diff and metadata, plus the review-comments file only if it is at least 3 bytes:
 - `/tmp/gh-aw/agent/pr-diff.patch` — PR diff
 - `/tmp/gh-aw/agent/pr-meta.json` — PR metadata
 - `/tmp/gh-aw/agent/pr-review-comments.json` — existing review comments (use to avoid duplication; each entry has `id`, `path`, `line`, `body`, `user`)
 
 If this PR has been reviewed before, also read `/tmp/gh-aw/comment-memory/pr-code-quality-reviewer.md` before Step 2 to inform theme continuity; otherwise skip.
+
+Use the `view`/`grep` tools for file reads. Do not retry a failed command unless you change it.
 
 **Do not** call `get_diff` or `get_review_comments`; use the pre-fetched files instead — they are already capped to prevent token-heavy context payloads.
 
@@ -134,6 +138,8 @@ While `grumpy-coder` runs in the background, run your own independent analysis o
 - Commented-out dead code, duplicated logic, excessive nesting
 - Inconsistent patterns, over-engineering or under-engineering
 - Missing or weak test coverage
+
+Review from the pre-fetched diff and never re-read it. Open at most 5 additional source files, batching those reads in one parallel call. Stop analysis and proceed to adjudication once you have 10 candidate findings.
 
 ### Step 3: Judge Agent-to-Agent Findings
 
@@ -165,6 +171,8 @@ For each significant issue, create a `create-pull-request-review-comment` with t
 
 ### Step 5: Submit the Overall Review
 
+Always call `submit-pull-request-review` before the 15-minute timeout, including when there are zero findings. At about 10 minutes elapsed, stop analyzing and submit; do not replace the review with another output.
+
 Call `submit-pull-request-review` with:
 - `COMMENT` if there are no actionable blocking issues
 - `REQUEST_CHANGES` if there are issues that must be fixed before merging
@@ -179,7 +187,7 @@ Use `COMMENT` when all findings are non-blocking. Keep the overall review body c
 
 ### Step 6: Update PR Continuity Memory
 
-After submitting the review, update `/tmp/gh-aw/comment-memory/pr-code-quality-reviewer.md` so repeat reviews of this PR can load continuity context in Step 1.
+After submitting the review, update `/tmp/gh-aw/comment-memory/pr-code-quality-reviewer.md` only when `comment_count > 0`, so repeat reviews of this PR can load continuity context in Step 1. Skip the memory write when no inline comments were posted.
 
 Include the same compact continuity fields:
 - `reviewed_at` timestamp

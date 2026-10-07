@@ -138,6 +138,10 @@ func subAgentRequestModels(data *WorkflowData, candidates, allowed, blocked []st
 }
 
 func expandSubAgentModel(request string, aliases map[string][]string) []string {
+	return expandModelPatterns(request, aliases, "github-copilot")
+}
+
+func expandModelPatterns(request string, aliases map[string][]string, defaultProvider string) []string {
 	var patterns []string
 	var expand func(string, map[string]bool, bool)
 	expand = func(model string, visited map[string]bool, fromAlias bool) {
@@ -162,7 +166,7 @@ func expandSubAgentModel(request string, aliases map[string][]string) []string {
 			if !routingModelNamePattern.MatchString(model) {
 				return
 			}
-			model = "github-copilot/" + model
+			model = path.Join(defaultProvider, model)
 		}
 		if provider, name, ok := strings.Cut(model, "/"); ok && provider != "" && name != "" {
 			patterns = append(patterns, model)

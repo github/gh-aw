@@ -21,7 +21,11 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Codex
-engine: codex
+engine:
+  id: codex
+  fallback-models:
+    - openai/gpt-5.4
+    - openai/gpt-5.4-mini
 imports:
   - shared/gh.md
   - shared/reporting-otlp.md

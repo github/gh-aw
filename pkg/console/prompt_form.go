@@ -61,11 +61,17 @@ func NewConfirmForm(confirm *huh.Confirm) *PromptForm {
 
 // Run runs the form and removes its rendered question when it exits.
 func (f *PromptForm) Run() error {
+	if !tty.IsStdinTerminal() || !tty.IsStderrTerminal() {
+		return errors.New("interactive form not available (stdin and stderr must be TTYs)")
+	}
 	return f.run(func() error { return f.Form.Run() })
 }
 
 // RunWithContext runs the form with a context and removes its rendered question when it exits.
 func (f *PromptForm) RunWithContext(ctx context.Context) error {
+	if !tty.IsStdinTerminal() || !tty.IsStderrTerminal() {
+		return errors.New("interactive form not available (stdin and stderr must be TTYs)")
+	}
 	return f.run(func() error { return f.Form.RunWithContext(ctx) })
 }
 

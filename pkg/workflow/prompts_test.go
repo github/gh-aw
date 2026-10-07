@@ -709,8 +709,8 @@ func TestCodexWorkflowsUseCodexModels(t *testing.T) {
 func isCodexCompatibleWorkflowModel(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
 	model, _, _ = strings.Cut(model, "?")
-	// Empty selects Codex's native default; copilot/auto is used by the inference canary.
-	return model == "" || model == "copilot/auto" || isCodexCompatibleModel(model)
+	// Empty selects Codex's native default; both auto spellings are inference pickers.
+	return model == "" || codexModelID(model) == "auto" || isCodexCompatibleModel(model)
 }
 
 func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
@@ -719,6 +719,7 @@ func TestIsCodexCompatibleWorkflowModel(t *testing.T) {
 		want  bool
 	}{
 		{model: "", want: true},
+		{model: "auto", want: true},
 		{model: "copilot/auto", want: true},
 		{model: "copilot/gpt-5.3-codex", want: true},
 		{model: "gpt-6.1-sol", want: true},

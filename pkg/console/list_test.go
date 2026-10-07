@@ -3,6 +3,7 @@
 package console
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,23 @@ func TestShowInteractiveList_EmptyItems(t *testing.T) {
 	_, err := ShowInteractiveList("Test", items)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no items to display")
+}
+
+func TestShowInteractiveList_NonTTYStdin(t *testing.T) {
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Stdin = oldStdin })
+	t.Cleanup(func() { r.Close() })
+	t.Cleanup(func() { w.Close() })
+	os.Stdin = r
+	_, err = w.WriteString("1\n")
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	_, err = ShowInteractiveList("Choose", []ListItem{NewListItem("One", "", "one")})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "stdin is not a TTY")
 }
 
 // Note: Full interactive list testing requires TTY and cannot be automated.

@@ -141,6 +141,7 @@ The following fields previously existed in schema but were missed in spec CLI ma
 | `apiProxy.models` | config-only (model alias rewriting) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.modelMultipliers` | config-only (AI Credits accounting) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.modelFallback` | config-only (model fallback policy; set `sandbox.agent.model-fallback: false` to prevent deployment-name rewriting for BYOK Azure) | `pkg/workflow/awf_config_test.go` (`TestAWFConfig_ModelFallback*`) |
+| `apiProxy.fallbackModels` | config-only (AWF v0.28.31+ ordered request-level fallback; `engine.fallback-models` uses this for concrete same-provider chains, with model-policy and budget guards unchanged) | `pkg/workflow/engine_fallback_awf_test.go` |
 | `apiProxy.enableTokenSteering` | config-only (set `sandbox.agent.token-steering: false` to preserve the explicitly configured provider and model) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.maxRuns` | config-only (LLM invocation hard cap) | `pkg/workflow/awf_config_test.go` |
 | `apiProxy.auth.*` | config-only (maps to `AWF_AUTH_*` env vars) | `pkg/workflow/awf_config_test.go` |

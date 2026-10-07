@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -281,7 +282,7 @@ func applyNonZero[T comparable](target *T, value T) bool {
 func fetchAndCacheWorkflowRunMetadata(ctx context.Context, currentRun WorkflowRun, outputDir, owner, repo, hostname string, verbose bool) (WorkflowRun, error) {
 	responsePath := filepath.Join(outputDir, runAPIResponseFileName)
 	if output, err := os.ReadFile(responsePath); err == nil {
-		if run, parseErr := parseWorkflowRunAPIResponse(output); parseErr == nil && cachedWorkflowRunMetadataIsCurrent(run, currentRun, owner, repo) {
+		if run, parseErr := parseWorkflowRunAPIResponse(output); parseErr == nil && cachedWorkflowRunMetadataIsCurrent(run, currentRun, owner, repo, hostname) {
 			return run, nil
 		}
 		logsGitHubAPILog.Printf("Ignoring invalid cached workflow run API response: path=%s", responsePath)
@@ -307,7 +308,7 @@ func fetchAndCacheWorkflowRunMetadata(ctx context.Context, currentRun WorkflowRu
 	return run, nil
 }
 
-func workflowRunMetadataCacheNeedsRefresh(outputDir string, currentRun WorkflowRun, owner, repo string) (bool, error) {
+func workflowRunMetadataCacheNeedsRefresh(outputDir string, currentRun WorkflowRun, owner, repo, hostname string) (bool, error) {
 	output, err := os.ReadFile(filepath.Join(outputDir, runAPIResponseFileName))
 	if errors.Is(err, os.ErrNotExist) {
 		return true, nil
@@ -316,14 +317,20 @@ func workflowRunMetadataCacheNeedsRefresh(outputDir string, currentRun WorkflowR
 		return false, fmt.Errorf("failed to read cached workflow run API response: %w", err)
 	}
 	cached, err := parseWorkflowRunAPIResponse(output)
-	return err != nil || !cachedWorkflowRunMetadataIsCurrent(cached, currentRun, owner, repo), nil
+	return err != nil || !cachedWorkflowRunMetadataIsCurrent(cached, currentRun, owner, repo, hostname), nil
 }
 
-func cachedWorkflowRunMetadataIsCurrent(cached, current WorkflowRun, owner, repo string) bool {
+func cachedWorkflowRunMetadataIsCurrent(cached, current WorkflowRun, owner, repo, hostname string) bool {
 	if cached.DatabaseID != current.DatabaseID {
 		return false
 	}
-	if owner != "" && repo != "" && !strings.EqualFold(cached.Repository, filepath.Join(owner, repo)) {
+	if owner != "" && repo != "" && !strings.EqualFold(cached.Repository, buildRepoFlag(owner, repo, "")) {
+		return false
+	}
+	if hostname == "" {
+		hostname = workflowRunURLHostname(current.URL)
+	}
+	if hostname == "" || !strings.EqualFold(workflowRunURLHostname(cached.URL), hostname) {
 		return false
 	}
 	if current.Attempt > 0 && cached.Attempt != current.Attempt {
@@ -333,6 +340,14 @@ func cachedWorkflowRunMetadataIsCurrent(cached, current WorkflowRun, owner, repo
 		return false
 	}
 	return cached.Status == "completed"
+}
+
+func workflowRunURLHostname(runURL string) string {
+	parsed, err := url.Parse(runURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
 }
 
 // fetchJobDetails gets detailed job information including durations for a workflow run.
@@ -524,8 +539,8 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	totalFetched := len(runs)
 	if opts.OldestFetchedCreatedAt != nil {
 		var oldest time.Time
-		if totalFetched > 0 {
-			oldest = runs[totalFetched-1].CreatedAt
+		for _, run := range runs {
+			oldest = run.CreatedAt
 		}
 		*opts.OldestFetchedCreatedAt = oldest
 	}

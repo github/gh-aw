@@ -31,7 +31,7 @@ The package is designed to adapt to the execution environment. Native builds det
 |----------|-----------|-------------|
 | `ClearLine` | `func ClearLine()` | Clears the current stderr terminal line when stderr is a TTY. |
 | `ClearScreen` | `func ClearScreen()` | Clears the stderr terminal screen when stderr is a TTY. |
-| `ConfirmAction` | `func ConfirmAction(title, affirmative, negative string) (bool, error)` | Presents a confirmation prompt; native builds use `huh`, non-TTY mode falls back to text input, and WASM reports unsupported behavior. |
+| `ConfirmAction` | `func ConfirmAction(title, affirmative, negative string) (bool, error)` | Presents a confirmation prompt; native builds use `huh` when stdin and stderr are terminals, fall back to text input when only stderr is non-terminal, and reject non-terminal stdin. WASM reports unsupported behavior. |
 | `FormatBanner` | `func FormatBanner() string` | Returns the embedded `gh-aw` ASCII banner, styled in native TTY mode and empty in WASM. |
 | `FormatCommandMessage` | `func FormatCommandMessage(command string) string` | Formats a command-prefixed message (`$ ...`). |
 | `FormatCommandMessageStderr` | `func FormatCommandMessageStderr(command string) string` | Formats a command-prefixed message for stderr styling. |
@@ -102,7 +102,7 @@ The package is designed to adapt to the execution environment. Native builds det
 | `ResetTimeLocation` | `func ResetTimeLocation()` | Clears the configured `time.Time` display location override. |
 | `RunForm` | `func RunForm(fields []FormField) error` | Executes declarative forms in WASM builds, where it currently reports unsupported interactivity. |
 | `SetTimeLocation` | `func SetTimeLocation(location *time.Location)` | Sets the location used when rendering `time.Time` values. |
-| `ShowInteractiveList` | `func ShowInteractiveList(title string, items []ListItem) (string, error)` | Shows a single-selection interactive list; native builds use `huh` and non-TTY mode falls back to numbered text input. |
+| `ShowInteractiveList` | `func ShowInteractiveList(title string, items []ListItem) (string, error)` | Shows a single-selection interactive list; native builds use `huh` when stdin and stderr are terminals, fall back to numbered text input when only stderr is non-terminal, and reject non-terminal stdin. |
 | `ShowWelcomeBanner` | `func ShowWelcomeBanner(description string)` | Clears the screen and prints the interactive welcome banner and description to stderr. |
 | `ToRelativePath` | `func ToRelativePath(path string) string` | Converts an absolute path to a cwd-relative display path when possible. |
 

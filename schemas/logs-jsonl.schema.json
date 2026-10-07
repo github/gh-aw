@@ -1072,11 +1072,53 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "model_routing": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "effort": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "router_version": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "run_id"
                   ],
+                  "additionalProperties": false
+                },
+                "model_routing": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "effort": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "router_version": {
+                      "type": "string"
+                    }
+                  },
                   "additionalProperties": false
                 },
                 "delta": {
@@ -1175,6 +1217,63 @@
                       },
                       "required": [
                         "newly_present"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "model_routing": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "before": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "model": {
+                              "type": "string"
+                            },
+                            "effort": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "router_version": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "after": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "model": {
+                              "type": "string"
+                            },
+                            "effort": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "router_version": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "changed"
                       ],
                       "additionalProperties": false
                     }
@@ -1557,6 +1656,280 @@
                 "total_response_bytes",
                 "cache_efficiency",
                 "by_model"
+              ],
+              "additionalProperties": false
+            },
+            "model_routing": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                },
+                "objective_mode": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "labels": {
+                  "type": "object",
+                  "properties": {
+                    "task_type": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    },
+                    "task_complexity": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "mode": {
+                  "type": "string"
+                },
+                "classifier_model": {
+                  "type": "string"
+                },
+                "classifier_effort": {
+                  "type": "string"
+                },
+                "classifier_attempts": {
+                  "type": "integer"
+                },
+                "degraded_classification": {
+                  "type": "boolean"
+                },
+                "degraded_reason": {
+                  "type": "string"
+                },
+                "selected_id": {
+                  "type": "string"
+                },
+                "selected_provider": {
+                  "type": "string"
+                },
+                "selected_model": {
+                  "type": "string"
+                },
+                "selected_effort": {
+                  "type": "string"
+                },
+                "wire_model": {
+                  "type": "string"
+                },
+                "endpoint": {
+                  "type": "string"
+                },
+                "top_choices": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "effort": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "router_name": {
+                  "type": "string"
+                },
+                "router_version": {
+                  "type": "string"
+                },
+                "latency_ms": {
+                  "type": "integer"
+                },
+                "failure": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "routed_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                },
+                "outcome_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                },
+                "deviations": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "requested_model": {
+                        "type": "string"
+                      },
+                      "requested_effort": {
+                        "type": "string"
+                      },
+                      "selected_model": {
+                        "type": "string"
+                      },
+                      "selected_effort": {
+                        "type": "string"
+                      },
+                      "deviation": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "count"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "classifier_cost": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "type": "integer"
+                    },
+                    "input_tokens": {
+                      "type": "integer"
+                    },
+                    "output_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_read_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_write_tokens": {
+                      "type": "integer"
+                    },
+                    "aic": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "requests",
+                    "input_tokens",
+                    "output_tokens",
+                    "cache_read_tokens",
+                    "cache_write_tokens",
+                    "aic"
+                  ],
+                  "additionalProperties": false
+                },
+                "selected_model_cost": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "type": "integer"
+                    },
+                    "input_tokens": {
+                      "type": "integer"
+                    },
+                    "output_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_read_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_write_tokens": {
+                      "type": "integer"
+                    },
+                    "aic": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "requests",
+                    "input_tokens",
+                    "output_tokens",
+                    "cache_read_tokens",
+                    "cache_write_tokens",
+                    "aic"
+                  ],
+                  "additionalProperties": false
+                },
+                "deviated_traffic_cost": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "type": "integer"
+                    },
+                    "input_tokens": {
+                      "type": "integer"
+                    },
+                    "output_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_read_tokens": {
+                      "type": "integer"
+                    },
+                    "cache_write_tokens": {
+                      "type": "integer"
+                    },
+                    "aic": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "requests",
+                    "input_tokens",
+                    "output_tokens",
+                    "cache_read_tokens",
+                    "cache_write_tokens",
+                    "aic"
+                  ],
+                  "additionalProperties": false
+                },
+                "endpoint_only_deviation_normalized": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "status",
+                "labels",
+                "classifier_cost",
+                "selected_model_cost",
+                "deviated_traffic_cost"
               ],
               "additionalProperties": false
             },
@@ -2061,11 +2434,53 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "model_routing": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "model": {
+                              "type": "string"
+                            },
+                            "effort": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "router_version": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         }
                       },
                       "required": [
                         "run_id"
                       ],
+                      "additionalProperties": false
+                    },
+                    "model_routing": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "effort": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "router_version": {
+                          "type": "string"
+                        }
+                      },
                       "additionalProperties": false
                     },
                     "delta": {
@@ -2164,6 +2579,63 @@
                           },
                           "required": [
                             "newly_present"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "model_routing": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "before": {
+                              "type": [
+                                "null",
+                                "object"
+                              ],
+                              "properties": {
+                                "model": {
+                                  "type": "string"
+                                },
+                                "effort": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "string"
+                                },
+                                "router_version": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "after": {
+                              "type": [
+                                "null",
+                                "object"
+                              ],
+                              "properties": {
+                                "model": {
+                                  "type": "string"
+                                },
+                                "effort": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "string"
+                                },
+                                "router_version": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "changed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "changed"
                           ],
                           "additionalProperties": false
                         }
@@ -3312,6 +3784,280 @@
                     "total_response_bytes",
                     "cache_efficiency",
                     "by_model"
+                  ],
+                  "additionalProperties": false
+                },
+                "model_routing": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "schema": {
+                      "type": "string"
+                    },
+                    "objective": {
+                      "type": "string"
+                    },
+                    "objective_mode": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "labels": {
+                      "type": "object",
+                      "properties": {
+                        "task_type": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "string"
+                        },
+                        "task_complexity": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "classifier_model": {
+                      "type": "string"
+                    },
+                    "classifier_effort": {
+                      "type": "string"
+                    },
+                    "classifier_attempts": {
+                      "type": "integer"
+                    },
+                    "degraded_classification": {
+                      "type": "boolean"
+                    },
+                    "degraded_reason": {
+                      "type": "string"
+                    },
+                    "selected_id": {
+                      "type": "string"
+                    },
+                    "selected_provider": {
+                      "type": "string"
+                    },
+                    "selected_model": {
+                      "type": "string"
+                    },
+                    "selected_effort": {
+                      "type": "string"
+                    },
+                    "wire_model": {
+                      "type": "string"
+                    },
+                    "endpoint": {
+                      "type": "string"
+                    },
+                    "top_choices": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "effort": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "router_name": {
+                      "type": "string"
+                    },
+                    "router_version": {
+                      "type": "string"
+                    },
+                    "latency_ms": {
+                      "type": "integer"
+                    },
+                    "failure": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "routed_counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "outcome_counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "deviations": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "requested_model": {
+                            "type": "string"
+                          },
+                          "requested_effort": {
+                            "type": "string"
+                          },
+                          "selected_model": {
+                            "type": "string"
+                          },
+                          "selected_effort": {
+                            "type": "string"
+                          },
+                          "deviation": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "classifier_cost": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "integer"
+                        },
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "output_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_read_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_write_tokens": {
+                          "type": "integer"
+                        },
+                        "aic": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requests",
+                        "input_tokens",
+                        "output_tokens",
+                        "cache_read_tokens",
+                        "cache_write_tokens",
+                        "aic"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "selected_model_cost": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "integer"
+                        },
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "output_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_read_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_write_tokens": {
+                          "type": "integer"
+                        },
+                        "aic": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requests",
+                        "input_tokens",
+                        "output_tokens",
+                        "cache_read_tokens",
+                        "cache_write_tokens",
+                        "aic"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "deviated_traffic_cost": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "integer"
+                        },
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "output_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_read_tokens": {
+                          "type": "integer"
+                        },
+                        "cache_write_tokens": {
+                          "type": "integer"
+                        },
+                        "aic": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requests",
+                        "input_tokens",
+                        "output_tokens",
+                        "cache_read_tokens",
+                        "cache_write_tokens",
+                        "aic"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "endpoint_only_deviation_normalized": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "labels",
+                    "classifier_cost",
+                    "selected_model_cost",
+                    "deviated_traffic_cost"
                   ],
                   "additionalProperties": false
                 },

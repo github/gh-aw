@@ -16,6 +16,7 @@ import (
 )
 
 var addInteractiveLog = logger.New("cli:add_interactive")
+var addConfirmChanges = (*AddInteractiveConfig).confirmChanges
 
 // AddInteractiveConfig holds configuration for interactive add mode
 type AddInteractiveConfig struct {
@@ -230,7 +231,7 @@ func (c *AddInteractiveConfig) prepareAndConfirmAddInteractive() (workflowFiles 
 		return nil, nil, "", "", false, err
 	}
 
-	createPR, err = c.confirmChanges(workflowFiles, initializationPlan.files)
+	createPR, err = addConfirmChanges(c, workflowFiles, initializationPlan.files)
 	if err != nil {
 		return nil, nil, "", "", false, err
 	}

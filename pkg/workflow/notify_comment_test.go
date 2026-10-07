@@ -1436,6 +1436,12 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/token_usage.jsonl") {
 		t.Errorf("Expected usage artifact to include agent token usage path.\nGenerated steps:\n%s", allSteps)
 	}
+	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/model-routing.jsonl") {
+		t.Errorf("Expected usage artifact to include agent model-routing path.\nGenerated steps:\n%s", allSteps)
+	}
+	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/model-routing.jsonl") {
+		t.Errorf("Expected usage artifact to include agent model-routing path.\nGenerated steps:\n%s", allSteps)
+	}
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/execution.json") {
 		t.Errorf("Expected usage artifact to include agent execution evidence path.\nGenerated steps:\n%s", allSteps)
 	}
@@ -1504,6 +1510,12 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	}
 	if !strings.Contains(script, "/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl") {
 		t.Errorf("Expected collect script to include firewall audit token usage path for agent.\nScript:\n%s", script)
+	}
+	if !strings.Contains(script, "cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
+		t.Errorf("Expected collect script to copy agent model-routing logs into the compact usage artifact.\nScript:\n%s", script)
+	}
+	if !strings.Contains(script, "cp /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl /tmp/gh-aw/usage/agent/model-routing.jsonl") {
+		t.Errorf("Expected collect script to copy agent model-routing logs into the compact usage artifact.\nScript:\n%s", script)
 	}
 	// Verify the authoritative source is copied even when empty so its presence is
 	// distinguishable from missing accounting.
@@ -2064,14 +2076,23 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 func TestConclusionReportFailedJobsExpression(t *testing.T) {
 	compiler := NewCompiler()
 	reportFailedJobs := TemplatableBool("${{ inputs.report-failed-jobs }}")
-	steps := compiler.buildConclusionReportFailedJobsStep(&WorkflowData{
+	steps, err := compiler.buildConclusionReportFailedJobsStep(&WorkflowData{
 		Name: "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{
 			ReportFailedJobs: &reportFailedJobs,
 		},
 	}, string(constants.AgentJobName))
+	if err != nil {
+		t.Fatalf("Failed to build failed-job reporting step: %v", err)
+	}
 
 	output := strings.Join(steps, "")
+	if !strings.Contains(output, "GH_AW_JOB_RESULTS: ${{ toJSON(needs) }}") {
+		t.Errorf("failed-job reporting must receive needs keyed by stable job IDs: %q", output)
+	}
+	if !strings.Contains(output, `\"agent\":\"Agent\"`) {
+		t.Errorf("failed-job reporting must receive the compiler's display-name mapping: %q", output)
+	}
 	if !strings.Contains(output, "GH_AW_REPORT_FAILED_JOBS: ${{ inputs.report-failed-jobs }}") {
 		t.Errorf("report-failed-jobs expression was not emitted unquoted: %q", output)
 	}

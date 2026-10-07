@@ -205,7 +205,7 @@ async function createProjectView(projectUrl, viewConfig) {
   }
 
   const layout = typeof viewConfig.layout === "string" ? viewConfig.layout.trim() : "";
-  if (!layout || !["table", "board", "roadmap"].includes(layout)) {
+  if (layout !== "table" && layout !== "board" && layout !== "roadmap") {
     throw new Error(`${ERR_VALIDATION}: Invalid view layout "${layout}". Must be one of: table, board, roadmap`);
   }
 
@@ -230,6 +230,7 @@ async function createProjectView(projectUrl, viewConfig) {
 
   const route = projectInfo.scope === "orgs" ? "POST /orgs/{org}/projectsV2/{project_number}/views" : "POST /users/{user_id}/projectsV2/{project_number}/views";
 
+  /** @type {import("@octokit/types").Endpoints[typeof route]["parameters"]} */
   const params =
     projectInfo.scope === "orgs"
       ? {

@@ -8,7 +8,7 @@ steps:
 mcp-servers:
   agentdb:
     command: "npx"
-    args: ["agentdb@alpha", "mcp", "start"]
+    args: ["agentdb@3.0.0-alpha.20", "mcp", "start"]
     env:
       AGENTDB_PATH: "/tmp/gh-aw/cache-memory/agentdb-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}/discussions.rvf"
     allowed: ["*"]
