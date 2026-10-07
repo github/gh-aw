@@ -416,9 +416,8 @@ Simulate a wildcard network violation.
 
 // TestFormal_P10_WriteTokenIsolatedToSafeOutput (P10 TokenIsolation)
 //
-// Spec Section 5: write credentials must not be available during agent execution.
-// The ingestion app key may appear in a trusted post-agent mint step, not in the
-// execution environment; that token must not request write permissions by default.
+// Spec Section 5: write tokens and app keys must be absent from the agent job.
+// Mention filtering credentials are configured separately from write credentials.
 func TestFormal_P10_WriteTokenIsolatedToSafeOutput(t *testing.T) {
 	md := `---
 name: token-isolation-test
@@ -459,16 +458,9 @@ Token isolation test: verify the private key is unavailable during agent executi
 	safeOutputsSection, hasSafeOutputs := sections["safe_outputs"]
 	require.True(t, hasSafeOutputs, "compiled YAML must contain a safe_outputs job")
 
-	mintStart := strings.Index(agentSection, "      - name: Generate GitHub App token for output ingestion\n")
-	require.GreaterOrEqual(t, mintStart, 0)
-	executionStart := strings.Index(agentSection, "        id: agentic_execution\n")
-	require.GreaterOrEqual(t, executionStart, 0)
-	assert.Less(t, executionStart, mintStart)
-	require.Contains(t, agentSection, "      - name: Stop MCP Gateway\n")
-	assert.Less(t, strings.Index(agentSection, "      - name: Stop MCP Gateway\n"), mintStart)
-	assert.NotContains(t, agentSection[:mintStart], "APP_PRIVATE_KEY",
-		"the ingestion app key must not be present before agent execution finishes")
-	assert.Contains(t, agentSection[mintStart:], "private-key: ${{ secrets.APP_PRIVATE_KEY }}")
+	assert.NotContains(t, agentSection, "APP_PRIVATE_KEY",
+		"the safe-output write app key must not enter the agent job")
+	assert.NotContains(t, agentSection, "safe-outputs-ingestion-app-token")
 	assert.NotContains(t, agentSection, "permission-issues: write",
 		"the ingestion token must not request the safe_outputs job's write permissions")
 

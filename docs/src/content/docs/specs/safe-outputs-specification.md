@@ -319,7 +319,7 @@ The Safe Outputs MCP Gateway implements defense-in-depth through strict architec
 
 **Requirement AR1: Agent Isolation**
 
-Agents MUST execute without GitHub write permissions. Only read-level tokens SHALL be accessible to agent processes. Write-capable tokens MUST remain confined to trusted safe-output processing steps, including post-agent ingestion, and MUST NOT be accessible during agent execution.
+Agents MUST execute without GitHub write permissions. Only read-level tokens SHALL be accessible to agent processes. Safe-output write credentials MUST remain confined to downstream safe-output processing jobs. Dedicated mention-resolution credentials MUST be supplied only to trusted post-agent ingestion steps and MUST NOT be accessible during agent execution.
 
 **Verification**:
 
@@ -2136,13 +2136,16 @@ Requirements:
 
 **Ingestion credential requirements**:
 
-- When `safe-outputs.github-app` is configured, the compiler MUST mint a dedicated installation token in the `agent` job immediately before **Ingest agent output**, after agent execution. The token MUST use the configured installation owner, repositories, and explicit permission overrides, with read permissions for ingestion's repository and comment-author lookups and `members: read` when `mentions.allowed-teams` is configured.
+- Ingestion MUST use only the credentials configured under `safe-outputs.mentions.github-token` or `safe-outputs.mentions.github-app`. It MUST NOT inherit `safe-outputs.github-token`, `safe-outputs.github-app`, per-output credentials, or `GH_AW_GITHUB_TOKEN`.
+- When `safe-outputs.mentions.github-app` is configured, the compiler MUST mint a dedicated installation token in the `agent` job immediately before **Ingest agent output**, after agent execution and gateway shutdown. The token MUST use the configured installation owner, repositories, and explicit permission overrides, with read permissions for ingestion's comment-author lookups and `members: read` when `mentions.allowed-teams` is configured.
+- Without a mention-specific app, ingestion MUST NOT mint an app token or resolve its installation owner; it MUST use `safe-outputs.mentions.github-token` when configured, otherwise the default GitHub Actions token. Mention credentials MUST NOT change downstream safe-output write credentials.
 - Ingestion app credentials MUST be confined to trusted post-agent token-minting step inputs and MUST NOT be added to agent execution environments. The ingestion token MUST NOT inherit the safe-output handlers' write permissions; configured app permission overrides remain explicit author choices.
-- Token minting and installation-owner resolution MUST run even after an earlier step fails, matching ingestion's `always()` behavior. With `ignore-if-missing: true`, missing credentials MUST skip minting and ingestion MUST fall back to `safe-outputs.github-token`, then `GH_AW_GITHUB_TOKEN`, then `GITHUB_TOKEN`.
-- The same-job app token MUST take precedence over `safe-outputs.github-token`. Without an app, a configured global token MUST be used to resolve mention allowlists, including `mentions.allowed-teams`, before sanitization.
+- Token minting and installation-owner resolution MUST run even after an earlier step fails, matching ingestion's `always()` behavior. With `ignore-if-missing: true`, missing credentials MUST skip minting and ingestion MUST fall back to `safe-outputs.mentions.github-token`, then `GITHUB_TOKEN`.
+- The same-job mention app token MUST take precedence over `safe-outputs.mentions.github-token`.
 - Allowed team members' raw `@login` mentions MUST be preserved during ingestion so downstream handlers can notify those users.
-- Without a global app or token, ingestion MUST retain the default GitHub Actions token. Per-output token overrides and GitHub App tokens minted in the `safe_outputs` job MUST NOT be used by ingestion in the `agent` job.
-- A global token referencing `steps.<id>.outputs.*` MUST be produced by an earlier step in the `agent` job as well as in every other consuming job.
+- Without mention-specific credentials, ingestion MUST retain the default GitHub Actions token, regardless of configured write credentials.
+- A mention token referencing `steps.<id>.outputs.*` MUST be produced by an earlier step in the `agent` job; it MUST NOT require minting in the safe-output processing jobs.
+- Mention credentials MUST NOT be serialized into agent-visible validation or handler configuration.
 - Compiler debug logging SHOULD identify the ingestion token source without logging credential values or token expressions.
 
 **Transformation T6: Markdown Safety**

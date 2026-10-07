@@ -179,6 +179,9 @@ type MentionsConfig struct {
 	// AllowContext determines if mentions from event context are allowed (default: true)
 	AllowContext *bool `yaml:"allow-context,omitempty" json:"allowContext,omitempty"`
 
+	GitHubToken string           `yaml:"github-token,omitempty" json:"-"`
+	GitHubApp   *GitHubAppConfig `yaml:"github-app,omitempty" json:"-"`
+
 	// Allowed is a list of user/bot names always allowed (bots not allowed by default)
 	Allowed []string `yaml:"allowed,omitempty" json:"allowed,omitempty"`
 

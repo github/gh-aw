@@ -2123,7 +2123,16 @@ safe-outputs:
 
 **`allowed-teams`** lets organizations allow all members of specific GitHub teams to be mentioned without listing individual usernames. Team members are fetched from the GitHub API at runtime using `GET /orgs/{org}/teams/{team_slug}/members`. Bot accounts within the team are excluded. Use `org/team-slug` for cross-org teams or just `team-slug` to resolve against the current repository's organization.
 
-Configure `safe-outputs.github-token` or `safe-outputs.github-app` with access to team membership. **Ingest agent output** resolves allowed mentions before sanitization using the global token or a dedicated app token minted in the `agent` job after agent execution. The app token takes precedence and requests `members: read` when `allowed-teams` is configured. With `ignore-if-missing: true`, missing app credentials fall back to the global token, then `GH_AW_GITHUB_TOKEN`, then `GITHUB_TOKEN`. Per-output token overrides do not apply to ingestion.
+Configure `safe-outputs.mentions.github-token` or `safe-outputs.mentions.github-app` with read access to team membership. **Ingest agent output** resolves allowed mentions before sanitization using these dedicated credentials. It does not inherit `safe-outputs.github-token`, `safe-outputs.github-app`, or `GH_AW_GITHUB_TOKEN`; without mention-specific credentials it uses the default Actions token.
+
+```yaml wrap
+safe-outputs:
+  mentions:
+    github-token: ${{ secrets.MENTIONS_READ_PAT }}
+    allowed-teams: [my-org/my-team]
+```
+
+Alternatively, configure `safe-outputs.mentions.github-app` with the standard `client-id`, `private-key`, `owner`, `repositories`, and `permissions` fields. Its token is minted after agent execution and gateway shutdown, takes precedence over `mentions.github-token`, and requests `members: read` when `allowed-teams` is configured. With `ignore-if-missing: true`, missing app credentials fall back to `mentions.github-token`, then `GITHUB_TOKEN`. Omitting the mention-specific app disables ingestion app-token minting without disabling mention filtering. Downstream write credentials remain unchanged.
 
 > [!IMPORTANT]
 > `allowed-teams` requires the workflow token to have `read:org` scope. The default `GITHUB_TOKEN` does **not** include this scope. Use one of the following:

@@ -26,7 +26,7 @@ func TestOutputCollectionGitHubToken(t *testing.T) {
 		{name: "default token", safeOutputs: &SafeOutputsConfig{}},
 		{
 			name:        "step token with fallback",
-			safeOutputs: &SafeOutputsConfig{GitHubToken: "${{ steps.mint.outputs.token || secrets.MENTIONS_PAT || secrets.GITHUB_TOKEN }}"},
+			safeOutputs: &SafeOutputsConfig{Mentions: &MentionsConfig{GitHubToken: "${{ steps.mint.outputs.token || secrets.MENTIONS_PAT || secrets.GITHUB_TOKEN }}"}},
 			token:       "${{ steps.mint.outputs.token || secrets.MENTIONS_PAT || secrets.GITHUB_TOKEN }}",
 		},
 		{
@@ -36,19 +36,17 @@ func TestOutputCollectionGitHubToken(t *testing.T) {
 			},
 		},
 		{
-			name: "global token takes precedence over per-handler token",
+			name: "global token is not used",
 			safeOutputs: &SafeOutputsConfig{
 				GitHubToken: "${{ secrets.MENTIONS_PAT }}",
 				AddComments: &AddCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.COMMENT_PAT }}"}},
 			},
-			token: "${{ secrets.MENTIONS_PAT }}",
 		},
 		{
-			name: "safe outputs app token is minted in agent job",
+			name: "safe outputs app is not used",
 			safeOutputs: &SafeOutputsConfig{
 				GitHubApp: &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
 			},
-			token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token }}",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,7 +71,7 @@ func TestOutputCollectionGitHubAppToken(t *testing.T) {
 	}{
 		{name: "app overrides PAT", pat: "${{ secrets.PAT }}", token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token }}"},
 		{name: "missing credentials fall back to PAT", ignore: true, pat: "${{ secrets.PAT }}", token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token || secrets.PAT }}"},
-		{name: "missing credentials fall back to defaults", ignore: true, token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"},
+		{name: "missing credentials fall back to default Actions token", ignore: true, token: "${{ steps.safe-outputs-ingestion-app-token.outputs.token || secrets.GITHUB_TOKEN }}"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app := &GitHubAppConfig{
@@ -81,8 +79,8 @@ func TestOutputCollectionGitHubAppToken(t *testing.T) {
 				Owner: "my-org", Repositories: []string{"my-repo", "another-repo"}, IgnoreIfMissing: tt.ignore,
 			}
 			data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
-				GitHubApp: app, GitHubToken: tt.pat, AddComments: &AddCommentsConfig{},
-				Mentions: &MentionsConfig{AllowedTeams: []string{"my-org/my-team"}},
+				GitHubToken: "${{ secrets.WRITE_PAT }}", AddComments: &AddCommentsConfig{},
+				Mentions: &MentionsConfig{GitHubApp: app, GitHubToken: tt.pat, AllowedTeams: []string{"my-org/my-team"}},
 			}}
 			var yaml strings.Builder
 			require.NoError(t, NewCompiler().generateOutputCollectionStep(&yaml, data))
@@ -96,6 +94,7 @@ func TestOutputCollectionGitHubAppToken(t *testing.T) {
 			assert.NotContains(t, output, ": write\n")
 			assert.Contains(t, output, "github-token: "+tt.token+"\n")
 			assert.NotContains(t, output, "steps.safe-outputs-app-token.outputs.token")
+			assert.NotContains(t, output, "secrets.WRITE_PAT")
 			assert.Less(t, strings.Index(output, "id: safe-outputs-ingestion-app-token\n"), strings.Index(output, "- name: Ingest agent output\n"))
 			if tt.ignore {
 				assert.Contains(t, output, "if: ${{ always() && vars.APP_ID != '' && env.GH_AW_IGNORE_IF_MISSING_PRIVATE_KEY != '' }}")
@@ -118,7 +117,7 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 			}
 			data := &WorkflowData{
 				On:          "on:\n  workflow_call:\n",
-				SafeOutputs: &SafeOutputsConfig{GitHubApp: app},
+				SafeOutputs: &SafeOutputsConfig{Mentions: &MentionsConfig{GitHubApp: app}},
 			}
 			compiler := NewCompiler()
 			var yaml strings.Builder
@@ -140,6 +139,71 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 	}
 }
 
+func TestOutputCollectionMentionCredentialsIndependent(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		pat  string
+	}{
+		{name: "default token"},
+		{name: "dedicated mention PAT", pat: "${{ secrets.MENTIONS_PAT }}"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content := `---
+on: workflow_dispatch
+engine: claude
+safe-outputs:
+  github-token: ${{ secrets.WRITE_PAT }}
+  github-app:
+    client-id: ${{ vars.APP_ID }}
+    private-key: ${{ secrets.APP_KEY }}
+  mentions:
+    allowed-teams: [my-org/my-team]
+`
+			if tt.pat != "" {
+				content += "    github-token: " + tt.pat + "\n"
+			}
+			content += "  add-comment:\n---\n# Independent mention credentials\n"
+			file := writeStepTokenWorkflow(t, "mention-credentials", content)
+			compiler := NewCompiler()
+			data, err := compiler.ParseWorkflowFile(file)
+			require.NoError(t, err)
+			require.Equal(t, tt.pat, data.SafeOutputs.Mentions.GitHubToken)
+			require.NoError(t, compiler.CompileWorkflow(file))
+			lock, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
+			require.NoError(t, err)
+			agent := extractJobSection(string(lock), "agent")
+			require.Contains(t, agent, "- name: Ingest agent output\n")
+			ingest := strings.SplitN(strings.SplitN(agent, "- name: Ingest agent output\n", 2)[1], "\n      - ", 2)[0]
+			assert.NotContains(t, agent, "safe-outputs-ingestion-app-token")
+			assert.NotContains(t, ingest, "secrets.WRITE_PAT")
+			if tt.pat == "" {
+				assert.NotContains(t, ingest, "github-token:")
+			} else {
+				assert.Contains(t, ingest, "github-token: "+tt.pat)
+			}
+			assert.Equal(t, []string{"my-org/my-team"}, data.SafeOutputs.Mentions.AllowedTeams)
+			assert.Nil(t, data.SafeOutputs.Mentions.Enabled, "mention filtering policy must remain unchanged")
+			assert.Contains(t, ingest, "collect_ndjson_output.cjs")
+			assert.Contains(t, extractJobSection(string(lock), "safe_outputs"), "id: safe-outputs-app-token\n")
+		})
+	}
+}
+
+func TestOutputCollectionMentionTokenRejectsLiteral(t *testing.T) {
+	file := writeStepTokenWorkflow(t, "invalid-mention-token", `---
+on: workflow_dispatch
+safe-outputs:
+  add-comment:
+  mentions:
+    github-token: "literal-token"
+---
+# Invalid mention credential
+`)
+	_, err := NewCompiler().ParseWorkflowFile(file)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "github-token")
+}
+
 func TestAgenticOutputCollectionWithGitHubApp(t *testing.T) {
 	workflowFile := writeStepTokenWorkflow(t, "ingestion-app", `---
 on: workflow_dispatch
@@ -149,12 +213,20 @@ safe-outputs:
   github-token: ${{ secrets.PAT }}
   github-app:
     client-id: ${{ vars.APP_ID }}
-    private-key: ${{ secrets.APP_KEY }}
+    private-key: ${{ secrets.WRITE_APP_KEY }}
     owner: my-org
     repositories: [my-repo]
     permissions:
       members: read
   mentions:
+    github-token: ${{ secrets.MENTIONS_PAT }}
+    github-app:
+      client-id: ${{ vars.MENTIONS_APP_ID }}
+      private-key: ${{ secrets.MENTIONS_APP_KEY }}
+      owner: my-org
+      repositories: [my-repo]
+      permissions:
+        members: read
     allowed-teams: [my-org/my-team]
   add-comment:
 ---
@@ -167,10 +239,19 @@ safe-outputs:
 	assert.Contains(t, agent, "id: safe-outputs-ingestion-app-token\n")
 	assert.Contains(t, agent, "github-token: ${{ steps.safe-outputs-ingestion-app-token.outputs.token }}")
 	assert.NotContains(t, agent, "steps.safe-outputs-app-token.outputs.token")
-	assert.Less(t, strings.Index(agent, "id: agentic_execution\n"), strings.Index(agent, "id: safe-outputs-ingestion-app-token\n"))
+	assert.NotContains(t, agent, "secrets.WRITE_APP_KEY")
+	assert.Contains(t, agent, "private-key: ${{ secrets.MENTIONS_APP_KEY }}")
+	mintStart := strings.Index(agent, "      - name: Generate GitHub App token for output ingestion\n")
+	require.GreaterOrEqual(t, mintStart, 0)
+	require.Contains(t, agent, "id: agentic_execution\n")
+	require.Contains(t, agent, "      - name: Stop MCP Gateway\n")
+	assert.Less(t, strings.Index(agent, "id: agentic_execution\n"), mintStart)
+	assert.Less(t, strings.Index(agent, "      - name: Stop MCP Gateway\n"), mintStart)
+	assert.NotContains(t, agent[:mintStart], "secrets.MENTIONS_APP_KEY")
 	safeOutputs := extractJobSection(string(content), "safe_outputs")
 	assert.Contains(t, safeOutputs, "github-token: ${{ steps.safe-outputs-app-token.outputs.token }}")
 	assert.NotContains(t, safeOutputs, "steps.safe-outputs-ingestion-app-token.outputs.token")
+	assert.NotContains(t, safeOutputs, "secrets.MENTIONS_APP_KEY")
 }
 
 func TestAgenticOutputCollection(t *testing.T) {
@@ -190,8 +271,9 @@ tools:
 engine: claude
 strict: false
 safe-outputs:
-  github-token: ${{ secrets.MENTIONS_PAT }}
+  github-token: ${{ secrets.WRITE_PAT }}
   mentions:
+    github-token: ${{ secrets.MENTIONS_PAT }}
     allowed-teams: [my-org/my-team]
   add-labels:
     allowed: ["bug", "enhancement"]
@@ -251,7 +333,7 @@ This workflow tests the agentic output collection functionality.
 	require.Contains(t, lockContent, "- name: Ingest agent output\n")
 	ingestStep := strings.SplitN(strings.SplitN(lockContent, "- name: Ingest agent output\n", 2)[1], "\n      - ", 2)[0]
 	assert.Contains(t, ingestStep, "github-token: ${{ secrets.MENTIONS_PAT }}")
-	assert.Contains(t, extractJobSection(lockContent, "safe_outputs"), "github-token: ${{ secrets.MENTIONS_PAT }}")
+	assert.Contains(t, extractJobSection(lockContent, "safe_outputs"), "github-token: ${{ secrets.WRITE_PAT }}")
 
 	// Upload Safe Outputs and Upload sanitized agent output are now merged into the
 	// unified 'agent' artifact — individual upload steps no longer exist.

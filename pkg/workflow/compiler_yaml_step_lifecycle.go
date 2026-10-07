@@ -266,25 +266,28 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 }
 
 func (c *Compiler) generateOutputCollectionGitHubToken(yaml *strings.Builder, data *WorkflowData) string {
-	if data.SafeOutputs == nil {
+	if data.SafeOutputs == nil || data.SafeOutputs.Mentions == nil {
 		return ""
 	}
-	config := data.SafeOutputs
+	config := data.SafeOutputs.Mentions
 	app := config.GitHubApp
 	if app == nil {
+		if config.GitHubToken != "" {
+			compilerYamlStepLifecycleLog.Print("Ingest agent output uses safe-outputs.mentions.github-token for mention allowlist resolution")
+		}
 		return config.GitHubToken
 	}
 
 	permissions := NewPermissions()
-	if config.AddComments != nil {
-		commentPermissions := buildAddCommentPermissions(config.AddComments)
+	if data.SafeOutputs.AddComments != nil {
+		commentPermissions := buildAddCommentPermissions(data.SafeOutputs.AddComments)
 		for _, scope := range []PermissionScope{PermissionIssues, PermissionPullRequests} {
 			if _, ok := commentPermissions.Get(scope); ok {
 				permissions.Set(scope, PermissionRead)
 			}
 		}
 	}
-	if config.Mentions != nil && len(config.Mentions.AllowedTeams) > 0 {
+	if len(config.AllowedTeams) > 0 {
 		permissions.Set(PermissionMembers, PermissionRead)
 	}
 	const stepID = "safe-outputs-ingestion-app-token"
@@ -308,10 +311,14 @@ func (c *Compiler) generateOutputCollectionGitHubToken(yaml *strings.Builder, da
 	}
 	token := "${{ steps." + stepID + ".outputs.token }}"
 	if app.shouldIgnoreMissingKey() {
-		compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.github-app token with a configured/default token fallback")
-		return combineTokenExpressions(token, resolveSafeOutputGitHubToken(config.GitHubToken))
+		compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.mentions.github-app token with a mention-specific/default token fallback")
+		fallback := config.GitHubToken
+		if fallback == "" {
+			fallback = "${{ secrets.GITHUB_TOKEN }}"
+		}
+		return combineTokenExpressions(token, fallback)
 	}
-	compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.github-app token for mention allowlist resolution")
+	compilerYamlStepLifecycleLog.Print("Ingest agent output uses a same-job safe-outputs.mentions.github-app token for mention allowlist resolution")
 	return token
 }
 
@@ -404,9 +411,6 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 
 	yaml.WriteString("        with:\n")
 	if githubToken != "" {
-		if data.SafeOutputs.GitHubApp == nil {
-			compilerYamlStepLifecycleLog.Print("Ingest agent output uses safe-outputs.github-token for mention allowlist resolution")
-		}
 		yaml.WriteString("          github-token: " + githubToken + "\n")
 	} else {
 		compilerYamlStepLifecycleLog.Print("Ingest agent output uses the default GitHub Actions token for mention allowlist resolution")
