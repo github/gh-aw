@@ -31,6 +31,33 @@ The generated gateway upstream uses a fresh masked capability for each workflow 
 
 This compiler contract depends on the unified enclave implementation from `github/gh-aw-firewall#6992`. Until that change is available in an AWF release, pinning an older AWF version will not provide the enclave server.
 
+## Cloud Hypervisor enclave runtime
+
+> [!WARNING]
+> `enclaves[].runtime: cloud-hypervisor` is an experimental preview. Configuration and behavior may change without deprecation. Unsupported hosts, artifacts, and configurations fail closed; execution never falls back to Docker or another runtime.
+
+Set `runtime: cloud-hypervisor` on a static script or agent entry to select AWF's trusted host enclave microVM executor. Omitting `runtime`, or setting it to `docker`, retains Docker execution. Cloud Hypervisor enclaves require AWF `v0.28.47` or newer, GitHub-hosted Ubuntu x86_64 KVM runners, and release-attested enclave artifacts.
+
+```aw wrap
+on: workflow_dispatch
+runs-on: ubuntu-24.04
+engine: copilot
+sandbox:
+  agent:
+    runtime: docker
+    version: v0.28.47
+enclaves:
+  - script:
+    runtime: cloud-hypervisor
+    repos:
+      - repo: octo-org/private-service
+        sensitivity: confidential
+```
+
+The compiler enables the AWF preview and stages its runtime artifacts without changing the primary agent's runtime, mounts, or TTY. All enclave entries must select Cloud Hypervisor together: mixed Docker/default and VM entries, `dynamic`, and enclave `image` overrides are unsupported. The primary agent cannot use `sbx`, `nvx`, or `cloud-hypervisor`; `runner.topology: arc-dind` and Docker host path prefixes are also unsupported.
+
+Agent enclaves additionally require `agent.model`, the API proxy with a configured provider route matching their fixed engine/profile, and no Docker-in-Docker. Only the default `agent.engine: copilot` is currently implemented; its route requires the emitted `COPILOT_GITHUB_TOKEN` or `COPILOT_PROVIDER_API_KEY` credential, not just a target hostname or pricing overlay. Static `agent.github` and `agent.tools.github` access is unavailable in this VM preview because the scoped executor bearer handoff is not yet supported. Repository disclosure limits and the existing MCP tool contract remain unchanged.
+
 ## GitHub tool access from agent enclaves
 
 Prefer `agent.tools.github` for new workflows:

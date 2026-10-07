@@ -297,19 +297,14 @@ func appendAWFInstallationSteps(steps []GitHubActionStep, workflowData *Workflow
 	}
 
 	firewallConfig := getFirewallConfig(workflowData)
-	agentConfig := getAgentConfig(workflowData)
 	awfVersion := ""
 	if firewallConfig != nil {
 		awfVersion = firewallConfig.Version
 	}
 
-	if isCloudHypervisorRuntime(workflowData) {
-		steps = append(steps, generateCloudHypervisorKVMAccessStep())
-		steps = append(steps, generateCloudHypervisorHostPreflightStep())
-		steps = append(steps, generateCloudHypervisorBundleSetupStep(getAWFVersionForSetup(workflowData)))
-	}
+	steps = appendCloudHypervisorSetupSteps(steps, workflowData)
 
-	if awfInstall := generateAWFInstallationStep(awfVersion, agentConfig); len(awfInstall) > 0 {
+	if awfInstall := generateAWFInstallationStepForWorkflow(awfVersion, workflowData); len(awfInstall) > 0 {
 		steps = append(steps, awfInstall)
 	}
 
