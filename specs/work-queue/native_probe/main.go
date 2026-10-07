@@ -63,11 +63,11 @@ func execute(input request) (map[string]any, error) {
 	if input.Action == "typed_number_literal" {
 		if input.Literal != "NaN" && input.Literal != "+Infinity" && input.Literal != "-Infinity" &&
 			!json.Valid([]byte(input.Literal)) {
-			return nil, fmt.Errorf("adapter_invalid: expected a typed number literal")
+			return nil, errors.New("adapter_invalid: expected a typed number literal")
 		}
 		number, err := strconv.ParseFloat(input.Literal, 64)
 		if err != nil && !errors.Is(err, strconv.ErrRange) {
-			return nil, fmt.Errorf("adapter_invalid: expected a typed number literal")
+			return nil, errors.New("adapter_invalid: expected a typed number literal")
 		}
 		var value any = number
 		switch input.Container {
@@ -81,7 +81,7 @@ func execute(input request) (map[string]any, error) {
 				"numbers": []any{number}, "sentinel": "9007199254740993",
 			}}
 		default:
-			return nil, fmt.Errorf("adapter_invalid: expected root, object, array, or nested container")
+			return nil, errors.New("adapter_invalid: expected root, object, array, or nested container")
 		}
 		data, err := workqueue.CanonicalValue(value)
 		return map[string]any{"canonical": string(data)}, err
@@ -93,21 +93,32 @@ func execute(input request) (map[string]any, error) {
 		}
 		// JSON syntax is valid, but encoding/json repairs invalid string Unicode.
 		// Check original string tokens without imposing raw numeric spelling.
-		for offset := 0; offset < len(input.Data); offset++ {
-			if input.Data[offset] != '"' {
+		start, escaped := -1, false
+		for offset, character := range input.Data {
+			if start < 0 {
+				if character == '"' {
+					start = offset
+				}
 				continue
 			}
-			start := offset
-			offset++
-			for input.Data[offset] != '"' {
-				if input.Data[offset] == '\\' {
-					offset++
-				}
-				offset++
+			if escaped {
+				escaped = false
+				continue
+			}
+			if character == '\\' {
+				escaped = true
+				continue
+			}
+			if character != '"' {
+				continue
 			}
 			if _, err := workqueue.Canonical([]byte(input.Data[start : offset+1])); err != nil {
 				return nil, err
 			}
+			start = -1
+		}
+		if start >= 0 {
+			return nil, errors.New("adapter_invalid: unterminated typed JSON string")
 		}
 		record, err := workqueue.NewRequest("typed-probe", "typed-probe", workqueue.Actor{}, value)
 		return map[string]any{"canonical": string(record.Parameters)}, err
@@ -122,7 +133,7 @@ func execute(input request) (map[string]any, error) {
 			return nil, err
 		}
 		if len(commits) != 1 {
-			return nil, fmt.Errorf("adapter_invalid: expected exactly one commit")
+			return nil, errors.New("adapter_invalid: expected exactly one commit")
 		}
 		value, err := workqueue.Canonical([]byte(input.Data))
 		return map[string]any{"canonical": string(value)}, err

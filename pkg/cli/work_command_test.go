@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -452,8 +453,8 @@ func TestWorkCommandCurrentProtocolWithoutCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	var physical bytes.Buffer
-	for index := len(parsed) - 1; index >= 0; index-- {
-		line, err := json.Marshal(parsed[index])
+	for _, commit := range slices.Backward(parsed) {
+		line, err := json.Marshal(commit)
 		if err != nil {
 			t.Fatal(err)
 		}

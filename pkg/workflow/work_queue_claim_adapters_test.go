@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -55,7 +56,7 @@ func TestWorkQueueCustomAdapterDeclarationAndPreparationIsolation(t *testing.T) 
 		isolated := compiler.jobManager.jobs[name]
 		require.Len(t, isolated.Outputs, 1)
 		require.Empty(t, isolated.Strategy)
-		require.Contains(t, strings.Join(isolated.Steps, ""), fmt.Sprintf("GH_AW_CLAIM_ADAPTER_INDEX: %q", fmt.Sprint(index)))
+		require.Contains(t, strings.Join(isolated.Steps, ""), fmt.Sprintf("GH_AW_CLAIM_ADAPTER_INDEX: %q", strconv.Itoa(index)))
 	}
 	data.SafeOutputs.Jobs["custom"].Permissions = map[string]string{"contents": "write"}
 	require.ErrorContains(t, validateWorkQueueConfiguration(data), "cannot obtain")

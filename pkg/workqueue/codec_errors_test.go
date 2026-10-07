@@ -4,12 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestProtocolErrorPreservesCodeThroughWrapping(t *testing.T) {
+	rejection := queueError("queue_missing", "queue branch %s does not exist", "work-queue")
+	if rejection.Error() != "queue_missing: queue branch work-queue does not exist" {
+		t.Fatalf("changed rejection message: %v", rejection)
+	}
+	var protocol *ProtocolError
+	if !errors.As(fmt.Errorf("read failed: %w", rejection), &protocol) || protocol.Code != "queue_missing" {
+		t.Fatalf("wrapped rejection lost its stable code: %v", rejection)
+	}
+}
 
 func TestNativeCodecRejectionCodeParity(t *testing.T) {
 	data, err := os.ReadFile("../../specs/work-queue/fixtures/canonical.json")

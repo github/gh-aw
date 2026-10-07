@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -12,8 +13,8 @@ func noncanonicalMockLog(t *testing.T, mock *queueAPI, commits []QueueCommit) {
 	t.Helper()
 	installMockLog(t, mock, commits)
 	var data bytes.Buffer
-	for index := len(commits) - 1; index >= 0; index-- {
-		line, err := json.Marshal(commits[index])
+	for _, commit := range slices.Backward(commits) {
+		line, err := json.Marshal(commit)
 		if err != nil {
 			t.Fatal(err)
 		}

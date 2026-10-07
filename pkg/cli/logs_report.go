@@ -840,7 +840,10 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 	fmt.Fprint(w, console.RenderStruct(struct {
 		MCPFailures []mcpFailureSummaryDisplay `console:"title:⚠️  MCP Server Failures,omitempty"`
 	}{MCPFailures: mcpFailureSummaryDisplays(mcpFailures)}))
-	renderLogsWorkQueueToWriter(w, data.Runs)
+	if err := renderLogsWorkQueueToWriter(w, data.Runs); err != nil {
+		console.PrintErrorMessage("Cannot render work queue diagnostics: " + err.Error())
+		return
+	}
 
 	// Display concise summary at the end
 	fmt.Fprintln(os.Stderr, "") // Blank line for spacing

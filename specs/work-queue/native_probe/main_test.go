@@ -67,6 +67,7 @@ func TestTypedCanonicalPreservesTypedParsingAndValidStrings(t *testing.T) {
 		{"literal-surrogate-escape", `{"\\ud800":"\\udc00"}`, `{"\\ud800":"\\udc00"}`},
 		{"escaped-quote", `{"x":"a\"b"}`, `{"x":"a\"b"}`},
 		{"escaped-backslash-and-quote", `{"x":"\\\"tail"}`, `{"x":"\\\"tail"}`},
+		{"literal-Unicode-byte-offsets", "{\"\U0001f600\":\"\u00e9\\\"\U0001f600\\\\\"}", "{\"\U0001f600\":\"\u00e9\\\"\U0001f600\\\\\"}"},
 		{"replacement-scalar", `{"x":"\ufffd"}`, "{\"x\":\"\ufffd\"}"},
 	}
 	for _, test := range tests {

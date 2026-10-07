@@ -259,7 +259,9 @@ func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSn
 			if snapshot == nil || snapshot.Assignment == nil || len(snapshot.Assignment.Claims) != 1 {
 				return nil, errors.New("finish intent requires a selector for the original multi-Claim assignment")
 			}
-			intent.Handle = snapshot.Assignment.Claims[0].Handle
+			for _, claim := range snapshot.Assignment.Claims {
+				intent.Handle = claim.Handle
+			}
 		}
 		if err := decodeClosedWorkQueueObject(fields["parameters"], []string{"outcome"}, nil, &intent.Parameters); err != nil {
 			return nil, fmt.Errorf("finish parameters line %d: %w", index+1, err)
@@ -291,7 +293,7 @@ func readCurrentWorkQueueFinishIntents(path string, snapshot *WorkQueueCurrentSn
 }
 
 func validWorkQueueNativeID(value string) bool {
-	return len(value) > 0 && len(value) <= 256 && value[0] >= '1' && value[0] <= '9' &&
+	return len(value) > 0 && len(value) <= 256 && !strings.HasPrefix(value, "0") &&
 		!strings.ContainsFunc(value, func(r rune) bool { return r < '0' || r > '9' })
 }
 

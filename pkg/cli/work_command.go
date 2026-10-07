@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -342,9 +343,10 @@ func workSubmitCommand() *cobra.Command {
 			}
 			state, err := workRead(cmd)
 			var policy workqueue.Policy
+			var protocolError *workqueue.ProtocolError
 			if err == nil {
 				policy = *state.Policy
-			} else if strings.Contains(err.Error(), "queue_missing:") {
+			} else if errors.As(err, &protocolError) && protocolError.Code == "queue_missing" {
 				policy = workqueue.DefaultPolicy(actor.Principal, actor.Repository)
 			} else {
 				return err
@@ -376,7 +378,7 @@ func workSubmitCommand() *cobra.Command {
 				right, _ := json.Marshal(work)
 				left, _ = workqueue.Canonical(left)
 				right, _ = workqueue.Canonical(right)
-				if string(left) != string(right) {
+				if !bytes.Equal(left, right) {
 					return errors.New("work_conflict: idempotent submission changes immutable metadata")
 				}
 			}

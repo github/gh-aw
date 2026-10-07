@@ -106,10 +106,10 @@ func generateSafeOutputsCodeCoverageStagingUpload(builder *strings.Builder, data
 	builder.WriteString("      # Upload safe-outputs upload-code-coverage staging for the upload_code_coverage job\n")
 	builder.WriteString("      - name: Upload upload-code-coverage staging\n")
 	builder.WriteString("        if: always()\n")
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
+	builder.WriteString(fmt.Sprintf("        uses: %s\n", pinAction("actions/upload-artifact")))
 	builder.WriteString("        with:\n")
-	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName)
-	fmt.Fprintf(builder, "          path: %s\n", codeCoverageStagingDirExpr)
+	builder.WriteString(fmt.Sprintf("          name: %s%s\n", prefix, SafeOutputsUploadCodeCoverageStagingArtifactName))
+	builder.WriteString(fmt.Sprintf("          path: %s\n", codeCoverageStagingDirExpr))
 	builder.WriteString("          retention-days: 1\n")
 	builder.WriteString("          if-no-files-found: ignore\n")
 }

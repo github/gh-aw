@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -56,12 +57,8 @@ func TestWorkQueueClaimAdapterSchema(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			candidate := make(map[string]any, len(valid)+1)
-			for key, value := range valid {
-				candidate[key] = value
-			}
-			for key, value := range test.mutation {
-				candidate[key] = value
-			}
+			maps.Copy(candidate, valid)
+			maps.Copy(candidate, test.mutation)
 			require.Error(t, validate(candidate))
 		})
 	}
@@ -76,9 +73,7 @@ func TestWorkQueueClaimAdapterSchema(t *testing.T) {
 		for _, reserved := range []string{"claim_handle", "claim_id", "work_id", "dispatch_id", "receipt_id", "__proto__", "constructor", "prototype"} {
 			t.Run("native-"+field+"-"+reserved, func(t *testing.T) {
 				candidate := make(map[string]any, len(rest))
-				for key, value := range rest {
-					candidate[key] = value
-				}
+				maps.Copy(candidate, rest)
 				candidate[field] = map[string]any{reserved: "content"}
 				require.Error(t, validate(candidate))
 			})

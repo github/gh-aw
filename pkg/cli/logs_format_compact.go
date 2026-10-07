@@ -220,7 +220,10 @@ func renderLogsCompactToWriter(w io.Writer, data LogsData) {
 	}
 
 	// [location]
-	renderLogsWorkQueueToWriter(w, data.Runs)
+	if err := renderLogsWorkQueueToWriter(w, data.Runs); err != nil {
+		console.PrintErrorMessage("Cannot render work queue diagnostics: " + err.Error())
+		return
+	}
 	if data.LogsLocation != "" {
 		fmt.Fprintf(w, "[location] %s\n", data.LogsLocation)
 	}
@@ -400,7 +403,10 @@ func renderLogsCompactVerboseToWriter(w io.Writer, data LogsData) {
 		}
 	}
 
-	renderLogsWorkQueueToWriter(w, data.Runs)
+	if err := renderLogsWorkQueueToWriter(w, data.Runs); err != nil {
+		console.PrintErrorMessage("Cannot render work queue diagnostics: " + err.Error())
+		return
+	}
 
 	// [location]
 	if data.LogsLocation != "" {

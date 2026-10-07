@@ -278,21 +278,16 @@ func scriptNameToHandlerName(scriptName string) string {
 	parts := strings.FieldsFunc(scriptName, func(r rune) bool {
 		return r == '-' || r == '_'
 	})
-	var sb strings.Builder
-	sb.WriteString("handle")
-	for _, part := range parts {
-		if part != "" {
-			sb.WriteString(strings.ToUpper(part[:1]) + part[1:])
-		}
+	for index, part := range parts {
+		parts[index] = strings.ToUpper(part[:1]) + part[1:]
 	}
-	if sb.Len() == len("handle") {
+	if len(parts) == 0 {
 		if scriptName == "" {
-			sb.WriteString("Unknown")
-		} else {
-			sb.WriteString(strings.ToUpper(scriptName[:1]) + scriptName[1:])
+			return "handleUnknown"
 		}
+		return "handle" + strings.ToUpper(scriptName[:1]) + scriptName[1:]
 	}
-	return sb.String()
+	return "handle" + strings.Join(parts, "")
 }
 
 // generateSafeOutputScriptContent generates a complete JavaScript module for a custom safe-output

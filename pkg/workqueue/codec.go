@@ -42,8 +42,18 @@ var commitSchema = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	return compiler.Compile("QueueCommit.json")
 })
 
+// ProtocolError preserves a stable rejection code without requiring message matching.
+type ProtocolError struct {
+	Code    string
+	Message string
+}
+
+func (e *ProtocolError) Error() string {
+	return e.Code + ": " + e.Message
+}
+
 func queueError(code, message string, args ...any) error {
-	return fmt.Errorf("%s: %s", code, fmt.Sprintf(message, args...))
+	return &ProtocolError{Code: code, Message: fmt.Sprintf(message, args...)}
 }
 
 func readValue(decoder *json.Decoder, depth int) (any, error) {
@@ -290,13 +300,13 @@ func validateTypedNumbers(value reflect.Value, depth int) error {
 		if value.Len() > 16384 {
 			return queueError("resource_limit", "JSON array exceeds 16384 members")
 		}
-		for index := 0; index < value.Len(); index++ {
+		for index := range value.Len() {
 			if err := validateTypedNumbers(value.Index(index), depth+1); err != nil {
 				return err
 			}
 		}
 	case reflect.Struct:
-		for index := 0; index < value.NumField(); index++ {
+		for index := range value.NumField() {
 			field := value.Type().Field(index)
 			if field.PkgPath != "" || field.Tag.Get("json") == "-" {
 				continue

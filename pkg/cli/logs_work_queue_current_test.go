@@ -5,7 +5,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,7 +118,7 @@ func TestWorkQueueCurrentReport(t *testing.T) {
 	require.Len(t, report.FinishIntents, 2)
 	assert.Empty(t, report.FinishIntent)
 	var output bytes.Buffer
-	renderWorkQueueToWriter(&output, report)
+	require.NoError(t, renderWorkQueueToWriter(&output, report))
 	assert.Contains(t, output.String(), "captured ledger, not live authority")
 	assert.Contains(t, output.String(), "durable=completed delivery=pending")
 	assert.Contains(t, output.String(), "durable=cancelled")
@@ -310,7 +312,7 @@ func TestWorkQueueCurrentSnapshotRoles(t *testing.T) {
 			}
 			if scenario.role == "observer" {
 				var output bytes.Buffer
-				renderWorkQueueToWriter(&output, &WorkQueueReport{Snapshot: snapshot})
+				require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{Snapshot: snapshot}))
 				assert.Contains(t, output.String(), "observer (read-only diagnostics; no worker or publisher authority)")
 				assert.NotContains(t, output.String(), "durable=")
 				if scenario.absent {
@@ -625,7 +627,7 @@ func TestWorkQueueCurrentTrustedProvenanceAndBounds(t *testing.T) {
 	assert.NotContains(t, string(encoded), "private-task-content")
 	assert.NotContains(t, string(encoded), "99 checked")
 	var output bytes.Buffer
-	renderWorkQueueToWriter(&output, &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "h1\x1b[31m\n", Outcome: strings.Repeat("a", 4096)}}})
+	require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "h1\x1b[31m\n", Outcome: strings.Repeat("a", 4096)}}}))
 	assert.NotContains(t, output.String(), "\x1b")
 	assert.Less(t, output.Len(), 1024)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "bounded"), []byte("12345"), 0o600))
@@ -643,7 +645,7 @@ func TestWorkQueueCurrentValidationDoesNotExportValues(t *testing.T) {
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "private-token-value")
 	}
-	err := currentWorkQueueDiagnosticError("ledger", fmt.Errorf("ledger_invalid: payload contains private-token-value"))
+	err := currentWorkQueueDiagnosticError("ledger", errors.New("ledger_invalid: payload contains private-token-value"))
 	assert.Contains(t, err.Error(), "ledger_invalid")
 	assert.NotContains(t, err.Error(), "private-token-value")
 }
@@ -677,10 +679,31 @@ func TestWorkQueueCurrentCollectorAndHandlerLogProvenance(t *testing.T) {
 		assert.NotContains(t, operation.Message, "forged")
 	}
 	var output bytes.Buffer
-	renderWorkQueueToWriter(&output, report)
+	require.NoError(t, renderWorkQueueToWriter(&output, report))
 	assert.Contains(t, output.String(), "operation_logs: diagnostics only, not independent delivery evidence")
 	assert.NotContains(t, output.String(), "durable=")
 	assert.NotContains(t, output.String(), "delivery=verified")
+}
+
+type failingWorkQueueWriter struct {
+	successfulWrites int
+}
+
+func (w *failingWorkQueueWriter) Write(data []byte) (int, error) {
+	if w.successfulWrites > 0 {
+		w.successfulWrites--
+		return len(data), nil
+	}
+	return 0, io.ErrClosedPipe
+}
+
+func TestWorkQueueRenderingPreservesWriterErrors(t *testing.T) {
+	report := &WorkQueueReport{FinishIntent: "completed"}
+	require.ErrorIs(t, renderWorkQueueToWriter(&failingWorkQueueWriter{}, report), io.ErrClosedPipe)
+	for _, successfulWrites := range []int{0, 1} {
+		require.ErrorIs(t, renderLogsWorkQueueToWriter(&failingWorkQueueWriter{successfulWrites: successfulWrites}, []RunData{{WorkQueue: report}}), io.ErrClosedPipe)
+	}
+	require.NoError(t, renderWorkQueueToWriter(&failingWorkQueueWriter{}, nil))
 }
 
 func TestWorkQueueCurrentVerifiedAndFailedDelivery(t *testing.T) {

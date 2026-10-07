@@ -82,9 +82,11 @@ func (b Branch) RecoverDelivery(ctx context.Context, workID, requestID string) (
 	deadline := now.Add(time.Duration(remaining) * time.Millisecond)
 	last := DeliveryVerification{Disposition: "unknown"}
 	for attempt := 0; b.DeliveryVerifier != nil && attempt < recovery.MaxAttempts && time.Now().Before(deadline); attempt++ {
-		callContext, cancel := context.WithDeadline(ctx, deadline)
-		verification, verifyErr := b.DeliveryVerifier(callContext, state, *claim)
-		cancel()
+		verification, verifyErr := func() (DeliveryVerification, error) {
+			callContext, cancel := context.WithDeadline(ctx, deadline)
+			defer cancel()
+			return b.DeliveryVerifier(callContext, state, *claim)
+		}()
 		result.Attempts++
 		if verifyErr == nil && contractSupported {
 			last = verification

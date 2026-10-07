@@ -86,7 +86,7 @@ func (c *Compiler) generateWorkQueueIntentOriginStep(yaml *strings.Builder, data
 	}
 	yaml.WriteString("      - name: Capture authenticated work queue intent origin\n")
 	yaml.WriteString("        id: work_queue_intent_origin\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString(generateGitHubScriptWithRequire("capture_work_queue_intent_origin.cjs"))
@@ -159,7 +159,7 @@ func (c *Compiler) generateArcDindToolCacheRedirectStep(yaml *strings.Builder) {
 func (c *Compiler) generateArcDindNodePathStep(yaml *strings.Builder, ifCondition string) {
 	yaml.WriteString("      - name: Ensure Node.js is at daemon-visible path\n")
 	if ifCondition != "" {
-		fmt.Fprintf(yaml, "        if: %s\n", ifCondition)
+		yaml.WriteString(fmt.Sprintf("        if: %s\n", ifCondition))
 	}
 	yaml.WriteString("        run: |\n")
 	yaml.WriteString("          NODE_BIN=\"$(command -v node)\"\n")
@@ -248,9 +248,9 @@ func (c *Compiler) generateActivationArtifactAndCommentMemorySteps(yaml *strings
 	compilerYamlLog.Print("Adding activation artifact download step")
 	activationArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String()
 	yaml.WriteString("      - name: Download activation artifact\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/download-artifact"))
+	yaml.WriteString(fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")))
 	yaml.WriteString("        with:\n")
-	fmt.Fprintf(yaml, "          name: %s\n", activationArtifactName)
+	yaml.WriteString(fmt.Sprintf("          name: %s\n", activationArtifactName))
 	yaml.WriteString("          path: /tmp/gh-aw\n")
 	generateRestoreAmbientFoldersStep(yaml, data)
 
@@ -270,9 +270,9 @@ func (c *Compiler) generateActivationArtifactAndCommentMemorySteps(yaml *strings
 	}
 
 	yaml.WriteString("      - name: Prepare comment memory files\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
 	yaml.WriteString("        with:\n")
-	fmt.Fprintf(yaml, "          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken))
+	yaml.WriteString(fmt.Sprintf("          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)))
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
@@ -389,7 +389,7 @@ func (c *Compiler) addCustomStepsWithRuntimeInsertion(yaml *strings.Builder, cus
 	var blockScalarState yamlBlockScalarState
 
 	for i < len(lines) {
-		line := lines[i]
+		line := lines[i] //nolint:uncheckedsliceindex // The loop bounds the nonnegative cursor before this read; later steps advance it.
 		isBS := blockScalarState.update(line)
 
 		// Skip empty lines
@@ -422,7 +422,7 @@ func (c *Compiler) addCustomStepsWithRuntimeInsertion(yaml *strings.Builder, cus
 				// This is a checkout step (first, last, or both): copy all its lines until the next step
 				i++
 				for i < len(lines) {
-					nextLine := lines[i]
+					nextLine := lines[i] //nolint:uncheckedsliceindex // The nested loop rechecks the advancing nonnegative cursor.
 					nextTrimmed := strings.TrimSpace(nextLine)
 					nextIndent := len(nextLine) - len(strings.TrimLeft(nextLine, " "))
 

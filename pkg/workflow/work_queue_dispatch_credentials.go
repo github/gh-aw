@@ -63,12 +63,16 @@ func (c *Compiler) buildWorkQueueDispatchAppTokenSteps(data *WorkflowData, app *
 		condition += " && format('{0}', (" + expression + ")) != 'true'"
 	}
 	var steps []string
+	var step strings.Builder
 	for _, line := range lines {
-		if strings.HasPrefix(line, stepNameLinePrefix) {
-			steps = append(steps, line)
-		} else {
-			steps[len(steps)-1] += line
+		if strings.HasPrefix(line, stepNameLinePrefix) && step.Len() > 0 {
+			steps = append(steps, step.String())
+			step.Reset()
 		}
+		step.WriteString(line)
+	}
+	if step.Len() > 0 {
+		steps = append(steps, step.String())
 	}
 	return injectStepCondition(steps, &ExpressionNode{Expression: condition})
 }

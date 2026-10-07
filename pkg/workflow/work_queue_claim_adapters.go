@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -255,17 +256,17 @@ func validateWorkQueueClaimAdapters(data *WorkflowData) error {
 			return err
 		}
 		for _, input := range action.Inputs {
-			if input != nil && strings.Contains(fmt.Sprint(input.Default), "secrets.") {
+			if input != nil && strings.Contains(input.Default, "secrets.") {
 				return fmt.Errorf("work-queue: prepared action %q cannot pass secret credentials as inputs", name)
 			}
 		}
 	}
 	if len(data.SafeOutputs.Steps) > 0 {
 		if adapter := data.SafeOutputs.ClaimAdapters["raw_steps"]; adapter == nil || adapter.Mode != "prepared" {
-			return fmt.Errorf("work-queue: raw safe-outputs.steps require a trusted per-Claim delivery adapter named raw_steps")
+			return errors.New("work-queue: raw safe-outputs.steps require a trusted per-Claim delivery adapter named raw_steps")
 		}
 		if strings.Contains(fmt.Sprint(data.SafeOutputs.Steps), "secrets.") {
-			return fmt.Errorf("work-queue: prepared raw safe-output steps cannot expose write credentials or secrets")
+			return errors.New("work-queue: prepared raw safe-output steps cannot expose write credentials or secrets")
 		}
 		if err := validateWorkQueueAdapterSteps("raw_steps", data.SafeOutputs.Steps); err != nil {
 			return err
@@ -355,7 +356,7 @@ func validateWorkQueueGraphQLAdapter(name string, adapter *WorkQueueClaimAdapter
 		if len(path) > 256 || !pathPattern.MatchString(path) {
 			return fail("GraphQL verifier requires bounded native field paths")
 		}
-		for _, component := range strings.Split(path, ".") {
+		for component := range strings.SplitSeq(path, ".") {
 			if slices.Contains(reserved, component) {
 				return fail("GraphQL verifier contains a reserved field path")
 			}
@@ -414,7 +415,14 @@ func validateWorkQueueRestAdapter(name string, adapter *WorkQueueClaimAdapter) e
 		}
 		var fields []string
 		for _, match := range placeholderPattern.FindAllStringSubmatch(route, -1) {
-			fields = append(fields, match[1])
+			if len(match) != 2 {
+				return nil, fail("REST route placeholder requires exactly one field")
+			}
+			for index, field := range match {
+				if index == 1 {
+					fields = append(fields, field)
+				}
+			}
 		}
 		return fields, nil
 	}

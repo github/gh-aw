@@ -44,7 +44,7 @@ func TestWeightedAccountAndClassExactIntegerService(t *testing.T) {
 		policy.Pools["default"] = pool
 	})
 	nodes := []WorkDefinition{}
-	for i := 0; i < 18; i++ {
+	for i := range 18 {
 		node := testNode(t, commits, fmt.Sprintf("a%d", i))
 		node.FairnessKey = "a"
 		nodes = append(nodes, node)

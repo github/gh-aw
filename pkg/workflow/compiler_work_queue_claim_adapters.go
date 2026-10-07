@@ -3,7 +3,9 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -66,7 +68,7 @@ func (c *Compiler) buildWorkQueuePreparedAdapterJobs(data *WorkflowData, threatD
 				"        env:\n",
 				fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_TYPE: %q\n", name),
 				fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_CONFIG: %q\n", string(configuration)),
-				fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_INDEX: %q\n", fmt.Sprint(index)),
+				fmt.Sprintf("          GH_AW_CLAIM_ADAPTER_INDEX: %q\n", strconv.Itoa(index)),
 				"        with:\n",
 				"          script: |\n",
 				"            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n",
@@ -182,9 +184,7 @@ func (c *Compiler) buildWorkQueuePreparedAdapterJobs(data *WorkflowData, threatD
 
 func shallowCopyMap(value map[string]any) map[string]any {
 	result := make(map[string]any, len(value))
-	for key, field := range value {
-		result[key] = field
-	}
+	maps.Copy(result, value)
 	return result
 }
 

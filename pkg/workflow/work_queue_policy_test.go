@@ -467,7 +467,7 @@ func TestWorkQueuePolicySharedIdentityFixtures(t *testing.T) {
 	}
 	for _, entry := range fixture.Identity {
 		id := strings.Repeat(entry.Text, entry.Repeat)
-		require.Equal(t, entry.ExpectedUTF8Bytes, len(id), entry.Name)
+		require.Len(t, id, entry.ExpectedUTF8Bytes, entry.Name)
 		for _, field := range []string{"profile", "trust-domain"} {
 			t.Run(field+"/"+entry.Name, func(t *testing.T) {
 				profile, trust := "default", "trusted"

@@ -3,6 +3,7 @@ package workflow
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -31,37 +32,37 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 		return nil
 	}
 	if data.SafeOutputs != nil && len(data.SafeOutputs.ClaimAdapters) > 0 && !isWorkQueueWorker(data) {
-		return fmt.Errorf("safe-outputs.claim-adapters require a declared work-queue worker; unassigned dispatchers cannot delegate ordinary effects")
+		return errors.New("safe-outputs.claim-adapters require a declared work-queue worker; unassigned dispatchers cannot delegate ordinary effects")
 	}
 	value, configured := data.Tools["work-queue"]
 	if configured && value == false {
-		return fmt.Errorf("tools.work-queue: scheduling cannot be disabled; remove the tool to use an ordinary workflow")
+		return errors.New("tools.work-queue: scheduling cannot be disabled; remove the tool to use an ordinary workflow")
 	}
 	if !isWorkQueueEnabled(data) {
 		if _, exists := data.RawFrontmatter["work-queue-policy"]; exists {
-			return fmt.Errorf("work-queue-policy requires tools.work-queue")
+			return errors.New("work-queue-policy requires tools.work-queue")
 		}
 		return nil
 	}
 	if workQueueStorage(data) != "git" {
-		return fmt.Errorf("tools.work-queue.storage: only the version-3 Git backend is supported; Issues storage is unsupported")
+		return errors.New("tools.work-queue.storage: only the version-3 Git backend is supported; Issues storage is unsupported")
 	}
 	if isWorkQueueWorker(data) {
 		if _, configured := data.RawFrontmatter["run-name"]; configured {
-			return fmt.Errorf("work-queue: worker run-name is reserved for immutable dispatch correlation; remove run-name from frontmatter")
+			return errors.New("work-queue: worker run-name is reserved for immutable dispatch correlation; remove run-name from frontmatter")
 		}
 		data.RunName = workQueueWorkerRunName
 	}
 	if isWorkQueueParticipant(data) && data.StatusComment != nil && *data.StatusComment {
-		return fmt.Errorf("work-queue: status-comment writes are unscoped; use a Claim-scoped add-comment output")
+		return errors.New("work-queue: status-comment writes are unscoped; use a Claim-scoped add-comment output")
 	}
 	if config, ok := value.(map[string]any); ok {
 		if required, exists := config["require-assignment"]; exists && required == false && isWorkQueueWorker(data) {
-			return fmt.Errorf("tools.work-queue.require-assignment: queue workers cannot disable immutable assignment validation")
+			return errors.New("tools.work-queue.require-assignment: queue workers cannot disable immutable assignment validation")
 		}
 		if isWorkQueueWorker(data) && data.RawFrontmatter != nil {
 			if on, exists := data.RawFrontmatter["on"]; exists && !containsWorkflowDispatch(on) {
-				return fmt.Errorf("work-queue: workers require workflow_dispatch for immutable version-3 run binding")
+				return errors.New("work-queue: workers require workflow_dispatch for immutable version-3 run binding")
 			}
 		}
 	}
@@ -77,7 +78,7 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 		return fmt.Errorf("work-queue-policy: policy proposals require explicit worker-profiles or pools with the approved dispatch credential's numeric GitHub principal; the dispatcher's github.actor_id is not the launch credential. Omit policy settings to use the installed Policy, or declare approved profiles. Example:\nwork-queue-policy:\n  worker-profiles:\n    default:\n      workflow: .github/workflows/worker.lock.yml\n      ref: %s\n      principal: '12345'\n      trust-domain: default\n      credential-scope: repository\n      effect-scope: owner/repo\n      max-claims-per-dispatch: 1", strings.Repeat("a", 40))
 	}
 	if hasWorkQueuePolicyProposal(data) && !hasExplicitWorkQueueProducers(data) {
-		return fmt.Errorf("work-queue-policy: policy proposals require an explicit producers table with stable numeric GitHub principals; caller-relative github.actor_id defaults cannot pin the installed Policy across dispatcher and worker runs. Omit policy settings to consume the installed Policy, or declare approved producers. Example:\nwork-queue-policy:\n  producers:\n    '12345':\n      pools: [default]\n      priorities: [1, 2, 3, 4, 5]\n      fairness-keys: ['']")
+		return errors.New("work-queue-policy: policy proposals require an explicit producers table with stable numeric GitHub principals; caller-relative github.actor_id defaults cannot pin the installed Policy across dispatcher and worker runs. Omit policy settings to consume the installed Policy, or declare approved producers. Example:\nwork-queue-policy:\n  producers:\n    '12345':\n      pools: [default]\n      priorities: [1, 2, 3, 4, 5]\n      fairness-keys: ['']")
 	}
 	// Delegated effects require explicit trusted adapters and independent delivery evidence.
 	if data.SafeOutputs != nil {
@@ -92,21 +93,21 @@ func validateWorkQueueConfiguration(data *WorkflowData) error {
 		if data.SafeOutputs.UploadCodeCoverage != nil {
 			target := data.SafeOutputs.UploadCodeCoverage.TargetRef
 			if target == "" || !strings.HasPrefix(target, "refs/heads/") && !strings.HasPrefix(target, "refs/tags/") || strings.Contains(target, "${{") {
-				return fmt.Errorf("work-queue: upload-code-coverage requires a trusted per-Claim delivery adapter target-ref independently resolved to the immutable worker revision")
+				return errors.New("work-queue: upload-code-coverage requires a trusted per-Claim delivery adapter target-ref independently resolved to the immutable worker revision")
 			}
 		}
 		if data.SafeOutputs.CreateCodeScanningAlerts != nil {
 			target := data.SafeOutputs.CreateCodeScanningAlerts.TargetRef
 			if target == "" || !strings.HasPrefix(target, "refs/heads/") && !strings.HasPrefix(target, "refs/tags/") || strings.Contains(target, "${{") {
-				return fmt.Errorf("work-queue: create-code-scanning-alert requires a trusted per-Claim delivery adapter target-ref independently resolved to the immutable worker revision")
+				return errors.New("work-queue: create-code-scanning-alert requires a trusted per-Claim delivery adapter target-ref independently resolved to the immutable worker revision")
 			}
 		}
 		if data.SafeOutputs.CallWorkflow != nil || data.SafeOutputs.DispatchRepository != nil {
-			return fmt.Errorf("work-queue: delegated workflow/repository dispatch requires a trusted per-Claim delivery adapter; use work_queue_dispatch_next")
+			return errors.New("work-queue: delegated workflow/repository dispatch requires a trusted per-Claim delivery adapter; use work_queue_dispatch_next")
 		}
 	}
 	if data.LedgerConfig != nil || data.RepoMemoryConfig != nil || data.DriveMemoryConfig != nil {
-		return fmt.Errorf("work-queue: standalone persistent ledger/repository/drive writes require a trusted per-Claim delivery adapter")
+		return errors.New("work-queue: standalone persistent ledger/repository/drive writes require a trusted per-Claim delivery adapter")
 	}
 	return nil
 }
@@ -158,7 +159,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 	}
 	block, ok := raw.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("work-queue-policy must be an object; scheduling cannot be disabled")
+		return nil, errors.New("work-queue-policy must be an object; scheduling cannot be disabled")
 	}
 	allowed := []string{"mode", "class-weights", "accounting-weights", "producers", "pools", "limits", "worker-profiles", "outstanding", "dependencies"}
 	for key := range block {
@@ -193,33 +194,33 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 	if explicitProducers {
 		for principal := range result.Policy.Producers {
 			if !workQueueNativePrincipal.MatchString(principal) {
-				return nil, fmt.Errorf("work-queue-policy.producers: configured principals require stable positive decimal GitHub actor IDs, not logins or expressions. Example:\nwork-queue-policy:\n  producers:\n    '12345':\n      pools: [default]\n      priorities: [1, 2, 3, 4, 5]\n      fairness-keys: ['']")
+				return nil, errors.New("work-queue-policy.producers: configured principals require stable positive decimal GitHub actor IDs, not logins or expressions. Example:\nwork-queue-policy:\n  producers:\n    '12345':\n      pools: [default]\n      priorities: [1, 2, 3, 4, 5]\n      fairness-keys: ['']")
 			}
 		}
 	}
 	if result.Policy.Mode != "weighted-priority" && result.Policy.Mode != "strict-priority" {
-		return nil, fmt.Errorf("work-queue-policy.mode must be weighted-priority or strict-priority; scheduling cannot be disabled")
+		return nil, errors.New("work-queue-policy.mode must be weighted-priority or strict-priority; scheduling cannot be disabled")
 	}
 	if len(result.Policy.ClassWeights) != 5 {
-		return nil, fmt.Errorf("work-queue-policy.class-weights requires exactly five positive weights")
+		return nil, errors.New("work-queue-policy.class-weights requires exactly five positive weights")
 	}
 	for _, weight := range result.Policy.ClassWeights {
 		if weight < 1 || weight > 1000 {
-			return nil, fmt.Errorf("work-queue-policy weights must be integers from 1 to 1000")
+			return nil, errors.New("work-queue-policy weights must be integers from 1 to 1000")
 		}
 	}
 	if result.Policy.AccountingWeights[""] != 1 || len(result.Policy.AccountingWeights) > 1024 {
-		return nil, fmt.Errorf("work-queue-policy.accounting-weights requires default key weight 1 and at most 1024 keys")
+		return nil, errors.New("work-queue-policy.accounting-weights requires default key weight 1 and at most 1024 keys")
 	}
 	for key, weight := range result.Policy.AccountingWeights {
 		if len(key) > 128 || weight < 1 || weight > 1000 {
-			return nil, fmt.Errorf("work-queue-policy.accounting-weights: keys must be at most 128 bytes and weights 1 to 1000")
+			return nil, errors.New("work-queue-policy.accounting-weights: keys must be at most 128 bytes and weights 1 to 1000")
 		}
 	}
 	pool := result.Policy.Pools["default"]
 	if profiles, exists := block["worker-profiles"]; exists {
 		if _, explicit := block["pools"]; explicit {
-			return nil, fmt.Errorf("work-queue-policy: worker-profiles shorthand cannot be combined with pools")
+			return nil, errors.New("work-queue-policy: worker-profiles shorthand cannot be combined with pools")
 		}
 		encoded, _ := json.Marshal(normalizeWorkQueuePolicyValue(profiles, true))
 		decoder := json.NewDecoder(bytes.NewReader(encoded))
@@ -232,10 +233,10 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 			return nil, err
 		}
 		if len(pool.Profiles) == 0 {
-			return nil, fmt.Errorf("work-queue-policy.worker-profiles requires at least one approved profile")
+			return nil, errors.New("work-queue-policy.worker-profiles requires at least one approved profile")
 		}
 		if _, supplied := pool.Profiles[pool.DefaultProfile]; !supplied {
-			pool.DefaultProfile = slices.Sorted(maps.Keys(pool.Profiles))[0]
+			pool.DefaultProfile = slices.Min(slices.Collect(maps.Keys(pool.Profiles)))
 		}
 	}
 	if pools, ok := block["pools"].(map[string]any); ok {
@@ -267,7 +268,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 			pool.NativeLimit = limits.Dispatches
 		}
 		if _, supplied := outstanding["per-account-claims"]; supplied && limits.PerAccount < 1 {
-			return nil, fmt.Errorf("work-queue-policy.outstanding.per-account-claims must be positive when configured; omit it for no per-account cap")
+			return nil, errors.New("work-queue-policy.outstanding.per-account-claims must be positive when configured; omit it for no per-account cap")
 		}
 		pool.PerAccountLimit = limits.PerAccount
 	}
@@ -275,7 +276,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 		if duration, ok := dependencies["max-observation-age"].(string); ok {
 			age, err := time.ParseDuration(duration)
 			if err != nil || age.Milliseconds() < 1 || age > time.Hour {
-				return nil, fmt.Errorf("work-queue-policy.dependencies.max-observation-age must be between 1ms and 1h")
+				return nil, errors.New("work-queue-policy.dependencies.max-observation-age must be between 1ms and 1h")
 			}
 			pool.MaxObservationAgeMS = age.Milliseconds()
 		}
@@ -283,7 +284,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 			for _, repository := range repositories {
 				slug, ok := repository.(string)
 				if !ok || strings.Contains(slug, "${{") {
-					return nil, fmt.Errorf("work-queue-policy.dependencies.repositories requires literal repository slugs")
+					return nil, errors.New("work-queue-policy.dependencies.repositories requires literal repository slugs")
 				}
 				if _, _, ok := parseRepoSlugLiteral(slug); !ok {
 					return nil, fmt.Errorf("work-queue-policy.dependencies.repositories: invalid repository %q", slug)
@@ -293,7 +294,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 		}
 		if credentials, ok := dependencies["read-credentials"].(map[string]any); ok {
 			if len(credentials) > 64 {
-				return nil, fmt.Errorf("work-queue-policy.dependencies.read-credentials: at most 64 separate repository bindings are supported")
+				return nil, errors.New("work-queue-policy.dependencies.read-credentials: at most 64 separate repository bindings are supported")
 			}
 			seen := make(map[string]bool, len(credentials))
 			for repository, value := range credentials {
@@ -370,7 +371,7 @@ func parseWorkQueuePolicy(data *WorkflowData) (*WorkQueuePolicyConfig, error) {
 func bindWorkQueuePolicyValidationTemplates(policy workqueue.Policy) workqueue.Policy {
 	policy.Producers = maps.Clone(policy.Producers)
 	policy.Pools = maps.Clone(policy.Pools)
-	principal := "1"
+	var principal string
 	for index := 1; ; index++ {
 		principal = strconv.Itoa(index)
 		if _, occupied := policy.Producers[principal]; !occupied {
@@ -439,9 +440,9 @@ func normalizeWorkQueuePolicyValue(value any, dictionary bool) any {
 		}
 		return result
 	case []any:
-		result := make([]any, len(value))
-		for i, nested := range value {
-			result[i] = normalizeWorkQueuePolicyValue(nested, false)
+		result := make([]any, 0, len(value))
+		for _, nested := range value {
+			result = append(result, normalizeWorkQueuePolicyValue(nested, false))
 		}
 		return result
 	default:
@@ -504,9 +505,9 @@ func (c *Compiler) validateWorkQueueTargets(data *WorkflowData, markdownPath str
 			}
 			slices.Sort(names)
 			if len(names) == 0 {
-				return fmt.Errorf("work-queue: dispatcher must approve at least one compiler-managed queue worker")
+				return errors.New("work-queue: dispatcher must approve at least one compiler-managed queue worker")
 			}
-			pool.DefaultProfile = names[0]
+			pool.DefaultProfile = slices.Min(names)
 		}
 		data.WorkQueuePolicy.Policy.Pools["default"] = pool
 	}
