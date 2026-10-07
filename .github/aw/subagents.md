@@ -31,26 +31,33 @@ and key contents. Be concise and factual.
 
 ### Block boundary
 
-The block ends at the next `##` heading (any level-2 heading) or at EOF — no explicit end marker is needed. Place sub-agent blocks **at the bottom** of the file, after all main workflow content.
+The block ends at the next `##` heading (any level-2 heading) or at EOF. Place sub-agent blocks **at the bottom** of the file, after all main workflow content. If parent instructions follow a sub-agent, close it with ``## end agent: `name` `` so those instructions remain in the main prompt.
 
 ### Frontmatter fields
 
-Only two fields are supported inside a sub-agent frontmatter block:
+Sub-agent frontmatter is preserved as authored. Use fields and model values supported by the workflow's engine; gh-aw does not translate model aliases or insert the heading's name into the frontmatter.
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
-| `description` | No | — | Human-readable summary of the sub-agent's role |
-| `model` | No | `"inherited"` | Model override; `"inherited"` uses the parent workflow's model. Prefer model aliases (e.g. `small`, `large`) over specific model IDs for portability. |
+| `name` | Claude: yes | — | Claude's registered agent identifier. Use the same name as the inline heading. |
+| `description` | Claude: yes | — | Human-readable summary of the sub-agent's role |
+| `model` | No | Engine default | Engine-native model override. For Claude, `inherit` uses the parent model; `inherited` is not the inheritance sentinel. |
 
-Built-in aliases resolve to the best available model per provider and keep working as models are updated. Common sub-agent aliases:
+For Claude, include both required fields and use its native inheritance value:
 
-| Alias | Resolves to | When to use |
-|---|---|---|
-| `small` | `mini` → haiku, gpt-5-mini, gpt-5-nano, gemini-flash | Cheap, fast tasks: extraction, classification, formatting |
-| `large` | sonnet, gpt-5-pro, gpt-5, gemini-pro | Complex reasoning or synthesis tasks |
-| `inherited` | Parent workflow model | Default — use when the sub-agent needs the same capability as the parent |
+```markdown
+## agent: `file-summarizer`
+---
+name: file-summarizer
+description: Summarizes a file
+model: inherit
+---
+Read the requested file and return a concise summary.
+```
 
-All other fields (`engine`, `tools`, `network`, etc.) are stripped at runtime with a warning. Sub-agents inherit the parent's engine, tool access, and network configuration.
+Claude silently skips project agent files without `name`, even when the filename matches the inline heading. See [Claude's sub-agent frontmatter reference](https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields).
+
+Aliases such as `small` in the Copilot examples below are engine-specific, not portable substitutions. Other frontmatter fields are also preserved; native tool restrictions must use the engine's syntax. Sub-agents run within the parent's engine and network configuration.
 
 ---
 
@@ -199,6 +206,6 @@ changes. Return a bulleted list, one bullet per file.
 
 ## Limitations
 
-- Sub-agents do not support `engine:`, `tools:`, `network:`, or `mcp-servers:` fields — those are stripped at runtime.
+- gh-aw does not interpret sub-agent `engine:`, `tools:`, `network:`, or `mcp-servers:` fields as workflow configuration. Preserved fields are interpreted by the engine, if supported.
 - Sub-agents cannot define their own safe-output jobs.
 - Sub-agent blocks must appear in the main workflow file body; they are not resolved inside imported shared files.
