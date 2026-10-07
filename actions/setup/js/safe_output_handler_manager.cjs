@@ -411,8 +411,8 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
           }
 
           // Pass the mentions policy to handlers; aliases are resolved for each destination.
-          if (handlerConfig.mentions == null && config.mentions != null) {
-            handlerConfig.mentions = config.mentions;
+          if (MENTION_HANDLER_TYPES.has(type) && handlerConfig.mentions == null) {
+            handlerConfig.mentions = config.mentions ?? {};
           }
           // Inject shared PR review buffer registry into handlers that need it
           if (PR_REVIEW_HANDLER_TYPES.has(type)) {
@@ -426,7 +426,7 @@ async function loadHandlers(config, prReviewBufferRegistry, resolvedAllowedMenti
           if (handlerConfig[GITHUB_TOKEN_CONFIG_KEY] && typeof globalState.getOctokit === "function") {
             handlerGithubClient = globalState.getOctokit(handlerConfig[GITHUB_TOKEN_CONFIG_KEY]);
           }
-          if (MENTION_HANDLER_TYPES.has(type) && handlerConfig.mentions != null && handlerConfig.allowedMentionAliases == null) {
+          if (MENTION_HANDLER_TYPES.has(type) && handlerConfig.allowedMentionAliases == null) {
             if (Array.isArray(resolvedAllowedMentionAliases)) {
               handlerConfig.allowedMentionAliases = resolvedAllowedMentionAliases;
             } else {

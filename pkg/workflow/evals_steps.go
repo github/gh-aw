@@ -219,7 +219,7 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 		ModelCosts:        data.ModelCosts,      // propagate pricing providers so evals awf-config.json can resolve AI-credit costs
 		CompiledVersion:   data.CompiledVersion, // propagate compiler version so install steps can inject GH_AW_COMPILED_VERSION
 		NetworkPermissions: &NetworkPermissions{
-			Allowed: getThreatDetectionAdditionalAllowedDomains(data),
+			Allowed: getThreatDetectionAdditionalAllowedDomains(data, engineID),
 		},
 		SandboxConfig: &SandboxConfig{
 			Agent: &AgentSandboxConfig{

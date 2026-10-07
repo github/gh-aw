@@ -5,19 +5,17 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { repairJson, sanitizePrototypePollution } = require("./json_repair_helpers.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 const { ERR_API, ERR_PARSE } = require("./error_codes.cjs");
-const { isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
-const { getDefaultTargetRepo, parseAllowedRepos, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { isProbingNoopMessage } = require("./intent_probe.cjs");
 const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+
+const MENTION_AWARE_OUTPUT_TYPES = new Set(["add_comment", "close_discussion", "create_discussion", "create_issue", "create_pull_request", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"]);
 
 async function main() {
   try {
     const fs = require("fs");
     const { sanitizeContent } = require("./sanitize_content.cjs");
     const { validateItem, getMaxAllowedForType, getMinRequiredForType, hasValidationConfig, MAX_BODY_LENGTH: maxBodyLength, resetValidationConfigCache } = require("./safe_output_type_validator.cjs");
-    const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
-
     // Load validation config from file and set it in environment for the validator to read
     const validationConfigPath = process.env.GH_AW_VALIDATION_CONFIG_PATH || `${process.env.RUNNER_TEMP}/gh-aw/safeoutputs/validation.json`;
     /** @type {any} */
@@ -38,8 +36,10 @@ async function main() {
     const mentionsConfig = validationConfig?.mentions || null;
     const maxMentions = parseIntTemplatable(mentionsConfig?.max, 50);
 
-    // Resolve mentions for each output's destination before sanitizing it.
+    // Mention filtering happens in the trusted safe_outputs job. Preserve mentions
+    // in these output types until their destination and allowlist can be resolved.
     let allowedMentions = [];
+    let deferMentionFiltering = false;
 
     // maxBotMentions is populated after safeOutputsConfig is read below
     /** @type {number | undefined} */
@@ -68,7 +68,7 @@ async function main() {
               error: `Line ${lineNum}: ${fieldName} must be a string`,
             };
           }
-          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
+          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen, deferMentions: deferMentionFiltering });
           break;
         case "boolean":
           if (typeof value !== "boolean") {
@@ -99,11 +99,11 @@ async function main() {
               error: `Line ${lineNum}: ${fieldName} must be one of: ${inputSchema.options.join(", ")}`,
             };
           }
-          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
+          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen, deferMentions: deferMentionFiltering });
           break;
         default:
           if (typeof value === "string") {
-            normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen });
+            normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen, deferMentions: deferMentionFiltering });
           }
           break;
       }
@@ -224,46 +224,6 @@ async function main() {
     // indentation/pretty-printing, parsing will fail.
     const lines = outputContent.trim().split("\n");
 
-    function resolveMentionRepo(item, itemType) {
-      const typeConfig = expectedOutputTypes[itemType];
-      const defaultTargetRepo = getDefaultTargetRepo(typeConfig && typeof typeConfig === "object" ? typeConfig : undefined);
-      const allowedRepos = parseAllowedRepos(typeConfig?.allowed_repos ?? safeOutputsConfig?.allowed_repos);
-      return resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, "mention");
-    }
-
-    // Pre-scan: collect target issue authors from add_comment items with explicit item_number
-    // so they are included when sanitizing the corresponding comment.
-    const targetIssueAuthors = new Map();
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-      try {
-        const preview = JSON.parse(trimmedLine);
-        const previewType = (preview?.type || "").replace(/-/g, "_");
-        if (previewType === "add_comment" && preview.item_number != null && typeof preview.item_number === "number") {
-          const repoResult = resolveMentionRepo(preview, "add_comment");
-          if (!repoResult.success) {
-            core.info(`[MENTIONS] Skipping target issue author lookup: ${repoResult.error}`);
-            continue;
-          }
-          try {
-            const { data: issueData } = await github.rest.issues.get({
-              owner: repoResult.repoParts.owner,
-              repo: repoResult.repoParts.repo,
-              issue_number: preview.item_number,
-            });
-            if (issueData.user?.login && !isPayloadUserBot(issueData.user)) {
-              targetIssueAuthors.set(`${repoResult.repo.toLowerCase()}#${preview.item_number}`, issueData.user.login);
-            }
-          } catch (fetchErr) {
-            core.info(`[MENTIONS] Could not fetch issue #${preview.item_number} author for mention allowlist: ${getErrorMessage(fetchErr)}`);
-          }
-        }
-      } catch {
-        // Ignore parse errors - main loop will report them
-      }
-    }
-
     const parsedItems = [];
     const errors = collectionErrors;
     for (let i = 0; i < lines.length; i++) {
@@ -286,6 +246,7 @@ async function main() {
         core.info(`[INGESTION] Line ${i + 1}: Original type='${originalType}', Normalized type='${itemType}'`);
         // Update item.type to normalized value
         item.type = itemType;
+        deferMentionFiltering = MENTION_AWARE_OUTPUT_TYPES.has(itemType);
         if (!expectedOutputTypes[itemType]) {
           core.warning(`[INGESTION] Line ${i + 1}: Type '${itemType}' not found in expected types: ${JSON.stringify(Object.keys(expectedOutputTypes))}`);
           errors.push(`Line ${i + 1}: Unexpected output type '${itemType}'. Expected one of: ${Object.keys(expectedOutputTypes).join(", ")}`);
@@ -295,17 +256,6 @@ async function main() {
           core.info(`[INGESTION] Line ${i + 1}: Ignoring probing noop message (does not count against the noop budget): ${JSON.stringify(item.message)}`);
           continue;
         }
-        const repoResult = resolveMentionRepo(item, itemType);
-        allowedMentions = repoResult.success
-          ? await resolveAllowedMentionsFromPayload(
-              context,
-              github,
-              core,
-              mentionsConfig,
-              itemType === "add_comment" ? [targetIssueAuthors.get(`${repoResult.repo.toLowerCase()}#${item.item_number}`)].filter(Boolean) : undefined,
-              repoResult.repoParts
-            )
-          : [];
         const typeCount = parsedItems.filter(existing => existing.type === itemType).length;
         const maxAllowed = getMaxAllowedForType(itemType, expectedOutputTypes);
         if (typeCount >= maxAllowed) {
@@ -333,6 +283,7 @@ async function main() {
             allowedAliases: allowedMentions,
             maxMentions,
             maxBotMentions,
+            deferMentions: deferMentionFiltering,
             normalizeIssueClosingKeywords,
             dataEnabled: typeConfig !== null && typeof typeConfig === "object" && typeConfig.data_enabled === true,
             dataSchema: typeConfig !== null && typeof typeConfig === "object" ? typeConfig.data_schema : undefined,
