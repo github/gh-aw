@@ -109,6 +109,11 @@ func (c *Compiler) buildCodeScanningUploadJob(data *WorkflowData) (*Job, error) 
 
 	uploadSteps := c.buildCodeScanningUploadSteps(data, restoreToken)
 	steps := make([]string, 0, typeutil.SafeAllocationCapacity(len(tokenMintSteps), len(uploadSteps)))
+	if hasWorkflowCallTrigger(data.On) {
+		setupActionRef := c.resolveActionReference("./actions/setup", data)
+		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
+		steps = append(steps, c.generateSetupStepForJob("upload_code_scanning_sarif", data, setupActionRef, SetupActionDestination, false, "", "", "")...)
+	}
 	steps = append(steps, tokenMintSteps...)
 	steps = append(steps, uploadSteps...)
 

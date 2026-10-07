@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -318,6 +319,32 @@ Create an issue and add a comment.
 		"safe_outputs job should expose created_issue_number")
 	assert.Contains(t, yamlOutput, "comment_id: ${{ steps.process_safe_outputs.outputs.comment_id }}",
 		"safe_outputs job should expose comment_id")
+}
+
+func TestWorkflowCallDownstreamSetupComputesLocalPrefix(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{Name: "test", On: "workflow_call:"}
+	for _, jobName := range []string{"agent", "detection", "conclusion", "safe_outputs"} {
+		t.Run(jobName, func(t *testing.T) {
+			steps := strings.Join(compiler.generateSetupStepForJob(jobName, data, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
+			setup := strings.Index(steps, "id: setup\n")
+			prefix := strings.Index(steps, "id: artifact-prefix\n")
+			resolver := strings.Index(steps, "id: resolve-host-repo\n")
+			require.NotEqual(t, -1, setup)
+			require.Greater(t, prefix, setup)
+			require.Greater(t, resolver, prefix)
+			assert.Contains(t, steps, "INPUTS_JSON: ${{ toJSON(inputs) }}")
+			assert.Contains(t, steps, "compute_artifact_prefix.sh")
+		})
+	}
+	for _, jobName := range []string{"activation", "pre_activation"} {
+		steps := strings.Join(compiler.generateSetupStepForJob(jobName, data, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
+		assert.NotContains(t, steps, "id: artifact-prefix\n")
+	}
+	nonCall := &WorkflowData{Name: "test", On: "push:"}
+	steps := strings.Join(compiler.generateSetupStepForJob("agent", nonCall, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
+	assert.NotContains(t, steps, "id: artifact-prefix\n")
+	assert.NotContains(t, steps, "id: resolve-host-repo\n")
 }
 
 func TestHasWorkflowCallTrigger(t *testing.T) {

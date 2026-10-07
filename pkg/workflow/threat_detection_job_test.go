@@ -387,7 +387,7 @@ func TestDetectionActivationArtifactDownloadUsesActivationPrefixForWorkflowCall(
 		On: "workflow_call",
 	}, getActionPin), "")
 
-	expected := "name: ${{ needs.activation.outputs.artifact_prefix }}activation"
+	expected := "name: ${{ steps.artifact-prefix.outputs.prefix }}activation"
 	if !strings.Contains(steps, expected) {
 		t.Fatalf("Expected workflow_call detection activation download to use %q, got:\n%s", expected, steps)
 	}

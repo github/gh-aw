@@ -141,6 +141,11 @@ func (c *Compiler) buildUploadCodeCoverageJob(data *WorkflowData, mainJobName st
 	permissions := NewPermissionsContentsReadCodeQualityWritePRRead()
 
 	var steps []string
+	if hasWorkflowCallTrigger(data.On) {
+		setupActionRef := c.resolveActionReference("./actions/setup", data)
+		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
+		steps = append(steps, c.generateSetupStepForJob("upload_code_coverage", data, setupActionRef, SetupActionDestination, false, "", "", "")...)
+	}
 
 	// Download the coverage staging artifact produced by the agent job.
 	const downloadStepID = "download_upload_code_coverage_staging"

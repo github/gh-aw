@@ -50,7 +50,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	safeOutputs := data.SafeOutputs
 	if hasWorkflowCallTrigger(data.On) && safeOutputs.DispatchWorkflow != nil {
 		if safeOutputs.DispatchWorkflow.TargetRepoSlug == "" {
-			safeOutputs = safeOutputsWithDispatchTargetRepo(safeOutputs, "${{ needs.activation.outputs.target_repo }}")
+			safeOutputs = safeOutputsWithDispatchTargetRepo(safeOutputs, targetRepoExprForDownstreamJob())
 			safeOutputsConfigLog.Print("Injecting target_repo into dispatch_workflow config for workflow_call relay")
 		}
 		if safeOutputs.DispatchWorkflow.TargetRef == "" {

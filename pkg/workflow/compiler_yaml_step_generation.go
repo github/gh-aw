@@ -220,6 +220,12 @@ func (c *Compiler) generateSetupStep(data *WorkflowData, setupActionRef string, 
 
 func (c *Compiler) generateSetupStepForJob(jobName string, data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string {
 	steps := c.generateSetupStepWithArtifactClientCondition(data, setupActionRef, destination, enableArtifactClient, traceID, parentSpanID, artifactClientCondition)
+	if data != nil && hasWorkflowCallTrigger(data.On) && jobName != "activation" && jobName != "pre_activation" {
+		steps = append(steps, generateArtifactPrefixStep()...)
+		if !data.InlinedImports {
+			steps = append(steps, c.generateResolveHostRepoStep(data))
+		}
+	}
 	if data != nil && strings.Contains(strings.Join(steps, ""), "id: "+otlpOIDCMintStepID+"\n") {
 		c.recordGeneratedWildcardAppTokenStep(jobName, getOTLPGitHubAppTokenConfig(data.RawFrontmatter), otlpOIDCMintStepID)
 	}

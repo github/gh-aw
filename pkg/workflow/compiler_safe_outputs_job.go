@@ -254,7 +254,7 @@ func (c *Compiler) buildSafeOutputsDownloadSteps(data *WorkflowData, agentArtifa
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
 	if isWorkQueueEnabled(data) {
 		steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
-			ArtifactName: artifactPrefixExprForActivationJob(data) + constants.ActivationArtifactName.String(),
+			ArtifactName: artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String(),
 			DownloadPath: constants.TmpGhAwDirSlash,
 			SetupEnvStep: false,
 			StepName:     "Download activation artifact for work queue",
@@ -753,7 +753,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 			outputs["app_token_minting_failed"] = "${{ steps.safe-outputs-app-token.outcome == 'failure' }}"
 			var appTokenFallbackRepo string
 			if hasWorkflowCallTrigger(data.On) {
-				appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+				appTokenFallbackRepo = targetRepoNameExprForDownstreamJob()
 			}
 			preambleTokenSteps = append(preambleTokenSteps, c.buildGitHubAppTokenMintStepForRepository(
 				"safe_outputs",
@@ -825,7 +825,7 @@ func (c *Compiler) calculatePreambleInsertIndex(steps []string, data *WorkflowDa
 		insertIndex += len(c.generateCheckoutActionsFolder(data))
 		countTraceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		countParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
-		insertIndex += len(c.generateSetupStep(data, setupActionRef, SetupActionDestination, data.SafeOutputs != nil && data.SafeOutputs.UploadArtifact != nil, countTraceID, countParentSpanID))
+		insertIndex += len(c.generateSetupStepForJob("safe_outputs", data, setupActionRef, SetupActionDestination, data.SafeOutputs != nil && data.SafeOutputs.UploadArtifact != nil, countTraceID, countParentSpanID, ""))
 	}
 	if isOTLPHeadersPresent(data) {
 		insertIndex += strings.Count(generateOTLPHeadersMaskStep(), stepNameLinePrefix)

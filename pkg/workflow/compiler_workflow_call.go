@@ -69,24 +69,30 @@ func artifactPrefixExprForActivationJob(data *WorkflowData) string {
 	return "${{ steps.artifact-prefix.outputs.prefix }}"
 }
 
-// artifactPrefixExprForDownstreamJob returns the GitHub Actions expression for the artifact
-// prefix used in jobs that depend on the activation job (references an activation job output).
+// artifactPrefixExprForDownstreamJob returns the job-local artifact prefix step output.
 // Returns empty string for non-workflow_call workflows.
 func artifactPrefixExprForDownstreamJob(data *WorkflowData) string {
 	if !hasWorkflowCallTrigger(data.On) {
 		return ""
 	}
-	return "${{ needs.activation.outputs.artifact_prefix }}"
+	return "${{ steps.artifact-prefix.outputs.prefix }}"
 }
 
-// artifactPrefixExprForAgentDownstreamJob returns the expression for the artifact prefix in
-// jobs that only directly depend on the agent job (not the activation job).
+// artifactPrefixExprForAgentDownstreamJob returns the job-local artifact prefix step output.
 // Returns empty string for non-workflow_call workflows.
 func artifactPrefixExprForAgentDownstreamJob(data *WorkflowData) string {
 	if !hasWorkflowCallTrigger(data.On) {
 		return ""
 	}
-	return "${{ needs.agent.outputs.artifact_prefix }}"
+	return "${{ steps.artifact-prefix.outputs.prefix }}"
+}
+
+func targetRepoExprForDownstreamJob() string {
+	return "${{ steps.resolve-host-repo.outputs.target_repo || needs.activation.outputs.target_repo || github.repository }}"
+}
+
+func targetRepoNameExprForDownstreamJob() string {
+	return "${{ steps.resolve-host-repo.outputs.target_repo_name || needs.activation.outputs.target_repo_name || github.event.repository.name }}"
 }
 
 // injectWorkflowCallOutputs adds on.workflow_call.outputs declarations for safe-output results

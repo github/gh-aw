@@ -236,7 +236,7 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string {
 	if mentions := data.SafeOutputs.Mentions; mentions != nil && mentions.GitHubApp != nil {
 		fallbackRepo := ""
 		if hasWorkflowCallTrigger(data.On) {
-			fallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+			fallbackRepo = targetRepoNameExprForDownstreamJob()
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
 			"safe_outputs",

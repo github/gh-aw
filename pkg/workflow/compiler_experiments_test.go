@@ -295,7 +295,7 @@ func TestBuildExperimentArtifactDownloadStep_Generated(t *testing.T) {
 	assert.Contains(t, joined, "experiment", "should reference experiment artifact")
 	assert.Contains(t, joined, experimentsCacheDir, "should download to experiments cache dir")
 	assert.Contains(t, joined, "actions/download-artifact", "should use download-artifact action")
-	assert.Contains(t, joined, "${{ needs.activation.outputs.artifact_prefix }}", "workflow_call should use runtime prefix")
+	assert.Contains(t, joined, "${{ steps.artifact-prefix.outputs.prefix }}", "workflow_call should use runtime prefix")
 }
 
 func TestBuildExperimentArtifactDownloadStep_NoPrefix(t *testing.T) {

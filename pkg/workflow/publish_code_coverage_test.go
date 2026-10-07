@@ -218,6 +218,27 @@ func TestBuildUploadCodeCoverageJob(t *testing.T) {
 	}
 }
 
+func TestWorkflowCallUploadCodeCoverageComputesPrefixBeforeDownload(t *testing.T) {
+	c := NewCompiler()
+	data := &WorkflowData{
+		Name: "Test Workflow",
+		On:   "workflow_call:",
+		SafeOutputs: &SafeOutputsConfig{
+			UploadCodeCoverage: &UploadCodeCoverageConfig{},
+		},
+	}
+	job, err := c.buildUploadCodeCoverageJob(data, "agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := strings.Join(job.Steps, "")
+	prefix := strings.Index(steps, "id: artifact-prefix\n")
+	download := strings.Index(steps, "Download upload-code-coverage staging")
+	if prefix < 0 || download < prefix || !strings.Contains(steps, "name: ${{ steps.artifact-prefix.outputs.prefix }}") {
+		t.Fatalf("coverage staging must use a prefix computed before download:\n%s", steps)
+	}
+}
+
 func TestBuildUploadCodeCoverageJobRespectsZeroWaitTimeout(t *testing.T) {
 	c := NewCompiler()
 	data := &WorkflowData{

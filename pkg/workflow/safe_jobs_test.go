@@ -387,6 +387,29 @@ func TestBuildSafeJobs(t *testing.T) {
 	}
 }
 
+func TestWorkflowCallSafeJobComputesPrefixBeforeDownload(t *testing.T) {
+	c := NewCompiler()
+	data := &WorkflowData{
+		Name: "test-workflow",
+		On:   "workflow_call:",
+		SafeOutputs: &SafeOutputsConfig{
+			Jobs: map[string]*SafeJobConfig{
+				"deploy": {RunsOn: "runs-on: ubuntu-latest"},
+			},
+		},
+	}
+	_, err := c.buildSafeJobs(data, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps := strings.Join(c.jobManager.GetAllJobs()["deploy"].Steps, "")
+	prefix := strings.Index(steps, "id: artifact-prefix\n")
+	download := strings.Index(steps, "Download agent output artifact")
+	if prefix < 0 || download < prefix || !strings.Contains(steps, "${{ steps.artifact-prefix.outputs.prefix }}agent") {
+		t.Fatalf("safe job must compute prefix before downloading agent output:\n%s", steps)
+	}
+}
+
 func TestCompileWorkflowConclusionNeedsSafeJobsDeterministically(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "safe-jobs-ordering")
 

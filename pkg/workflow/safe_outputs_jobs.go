@@ -68,7 +68,7 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		// without the owner prefix when `owner` is also set.
 		var appTokenFallbackRepo string
 		if hasWorkflowCallTrigger(data.On) {
-			appTokenFallbackRepo = "${{ needs.activation.outputs.target_repo_name }}"
+			appTokenFallbackRepo = targetRepoNameExprForDownstreamJob()
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForRepository(
 			config.JobName,

@@ -389,6 +389,11 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 
 		// Build job steps
 		var steps []string
+		if hasWorkflowCallTrigger(data.On) {
+			setupActionRef := c.resolveActionReference("./actions/setup", data)
+			steps = append(steps, c.generateCheckoutActionsFolder(data)...)
+			steps = append(steps, c.generateSetupStepForJob(job.Name, data, setupActionRef, SetupActionDestination, false, "", "", "")...)
+		}
 
 		// Add step to download agent output artifact using shared helper.
 		// In workflow_call context, use the per-invocation prefix to avoid artifact name clashes.

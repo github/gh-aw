@@ -810,7 +810,7 @@ func TestBuildGitHubScriptStepNoWorkingDirectory(t *testing.T) {
 }
 
 // TestBuildGitHubScriptStepWorkflowCallArtifactPrefix verifies that agent artifact downloads
-// in buildGitHubScriptStep use needs.agent.outputs.artifact_prefix in workflow_call context.
+// in buildGitHubScriptStep use a job-local prefix in workflow_call context.
 // These steps are used in jobs that depend on the agent job (not activation), so the
 // agent-downstream prefix expression must be used.
 func TestBuildGitHubScriptStepWorkflowCallArtifactPrefix(t *testing.T) {
@@ -830,9 +830,8 @@ func TestBuildGitHubScriptStepWorkflowCallArtifactPrefix(t *testing.T) {
 	steps := compiler.buildGitHubScriptStep(workflowData, config)
 	stepsStr := strings.Join(steps, "")
 
-	// In workflow_call context, the download must reference needs.agent (not needs.activation)
-	// because buildSafeOutputJob-based jobs depend on agent, not activation.
-	agentPrefix := "${{ needs.agent.outputs.artifact_prefix }}agent"
+	// In workflow_call context, the download must use the locally computed prefix.
+	agentPrefix := "${{ steps.artifact-prefix.outputs.prefix }}agent"
 	if !strings.Contains(stepsStr, agentPrefix) {
 		t.Errorf("Expected buildGitHubScriptStep to use %q in workflow_call context, but it was not found.\nGenerated steps:\n%s", agentPrefix, stepsStr)
 	}

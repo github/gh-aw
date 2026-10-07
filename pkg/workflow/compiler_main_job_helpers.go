@@ -216,11 +216,9 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 	// Note: secret_verification_result is now an output of the activation job (not the agent job).
 	// The validate-secret step runs in the activation job, before context variable validation.
 
-	// Propagate the artifact prefix from the activation job so that downstream jobs depending
-	// only on the agent job (e.g. update_cache_memory, safe-jobs) can still access the prefix
-	// without needing a direct dependency on the activation job.
+	// Expose the locally computed prefix for consumers of the agent job output.
 	if hasWorkflowCallTrigger(data.On) {
-		outputs[constants.ArtifactPrefixOutputName] = "${{ needs.activation.outputs.artifact_prefix }}"
+		outputs[constants.ArtifactPrefixOutputName] = "${{ steps.artifact-prefix.outputs.prefix }}"
 		compilerMainJobLog.Print("Added artifact_prefix output to agent job (workflow_call context)")
 	}
 

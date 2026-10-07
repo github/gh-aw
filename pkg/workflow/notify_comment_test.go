@@ -1178,12 +1178,12 @@ func TestConclusionJobWorkflowCallArtifactPrefix(t *testing.T) {
 	allSteps := strings.Join(job.Steps, "\n")
 
 	// In workflow_call context, the artifact download must use the prefixed name
-	// to match the upload step which uses needs.activation.outputs.artifact_prefix.
-	prefixedArtifactName := "${{ needs.activation.outputs.artifact_prefix }}agent"
+	// to match the locally prefixed upload step.
+	prefixedArtifactName := "${{ steps.artifact-prefix.outputs.prefix }}agent"
 	if !strings.Contains(allSteps, prefixedArtifactName) {
 		t.Errorf("Expected conclusion job download step to use prefixed artifact name %q in workflow_call context, but it was not found.\nGenerated steps:\n%s", prefixedArtifactName, allSteps)
 	}
-	prefixedUsageArtifactName := "${{ needs.activation.outputs.artifact_prefix }}usage"
+	prefixedUsageArtifactName := "${{ steps.artifact-prefix.outputs.prefix }}usage"
 	if !strings.Contains(allSteps, prefixedUsageArtifactName) {
 		t.Errorf("Expected conclusion job usage artifact upload to use prefixed artifact name %q in workflow_call context, but it was not found.\nGenerated steps:\n%s", prefixedUsageArtifactName, allSteps)
 	}
