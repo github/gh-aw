@@ -57,7 +57,7 @@ function generateXMLMarker(workflowName, runUrl) {
   // Read engine metadata from environment variables
   const engineId = process.env.GH_AW_ENGINE_ID || "";
   const engineVersion = process.env.GH_AW_ENGINE_VERSION || "";
-  const engineModel = process.env.GH_AW_ENGINE_MODEL || "";
+  const engineModel = require("./model_fallback.cjs").getFallbackModel() || process.env.GH_AW_ENGINE_MODEL || "";
   const trackerId = process.env.GH_AW_TRACKER_ID || "";
   const runId = process.env.GITHUB_RUN_ID || "";
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";

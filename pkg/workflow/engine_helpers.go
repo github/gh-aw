@@ -30,6 +30,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"regexp"
@@ -157,6 +158,17 @@ func applyEngineHarnessRetryEnv(env map[string]string, workflowData *WorkflowDat
 	}
 
 	cfg := workflowData.EngineConfig
+	if len(nativeAWFFallbackModels(workflowData)) > 0 {
+		env["GH_AW_NATIVE_FALLBACK_MODELS"] = "1"
+	} else if len(cfg.FallbackModels) > 0 {
+		models, err := json.Marshal(cfg.FallbackModels)
+		if err != nil {
+			engineHelpersLog.Printf("Failed to serialize fallback models: %v", err)
+			return
+		}
+		env["GH_AW_FALLBACK_MODELS"] = string(models)
+	}
+	applyFallbackProviderEnv(env, workflowData)
 	if cfg.HarnessMaxRetries != "" {
 		env["GH_AW_HARNESS_MAX_RETRIES"] = cfg.HarnessMaxRetries
 	}

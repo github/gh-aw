@@ -89,6 +89,8 @@ describe("parse_token_usage", () => {
       delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
       delete process.env.GH_AW_TMP_DIR;
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
+      delete process.env.GH_AW_PHASE;
+      delete process.env.GH_AW_INFO_MODEL;
       process.env.GITHUB_STEP_SUMMARY = "";
 
       mockCore = {
@@ -138,6 +140,8 @@ describe("parse_token_usage", () => {
       delete process.env.GH_AW_AGENT_USAGE_JSONL_PATH;
       delete process.env.GH_AW_TMP_DIR;
       delete process.env.GH_AW_WRITE_EMPTY_USAGE;
+      delete process.env.GH_AW_PHASE;
+      delete process.env.GH_AW_INFO_MODEL;
       delete global.core;
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
@@ -208,6 +212,40 @@ describe("parse_token_usage", () => {
         provider: "unknown",
         ai_credits: 0,
       });
+    });
+
+    test.each(["agent", "detection"])("persists AWF actual-model attribution for the %s phase", async phase => {
+      const tokenUsagePath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+      const infoPath = path.join(tmpDir, "aw_info.json");
+      fs.mkdirSync(path.dirname(tokenUsagePath), { recursive: true });
+      fs.writeFileSync(infoPath, JSON.stringify({ model: "primary", fallback_model: "agent-recovery" }));
+      fs.writeFileSync(
+        tokenUsagePath,
+        JSON.stringify({
+          _schema: "token-usage/v0.28.44",
+          status: 200,
+          model: "secondary",
+          provider: "copilot",
+          input_tokens: 100,
+          output_tokens: 20,
+          ai_credits_this_response: 1,
+          model_fallback: { requested_model: "primary", model: "secondary", status: 503, attempt: 1 },
+        })
+      );
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_PHASE = phase;
+
+      await main();
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      const usage = JSON.parse(originalReadFileSync(path.join(tmpDir, "agent_usage.json"), "utf8"));
+      expect(usage.primary_model).toBe("secondary");
+      const info = JSON.parse(originalReadFileSync(infoPath, "utf8"));
+      expect(info[phase === "agent" ? "fallback_model" : "detection_fallback_model"]).toBe("secondary");
+      if (phase === "detection") {
+        expect(info.model).toBe("primary");
+        expect(info.fallback_model).toBe("agent-recovery");
+      }
     });
 
     test("writes authoritative Copilot checkpoint usage when proxy usage is unavailable", async () => {

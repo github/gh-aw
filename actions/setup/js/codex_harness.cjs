@@ -38,7 +38,7 @@ const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require(".
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
-const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
+const { runHarnessModelFallbackLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -57,7 +57,17 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
 const { resolveRetryConfig } = require("./harness_retry_config.cjs");
-const { applyModelFallback, injectModelFlagAfterExec, normalizeCodexModel, normalizeCodexModelArgs } = require("./model_fallback.cjs");
+const {
+  applyModelFallback,
+  injectModelFlagAfterExec,
+  normalizeCodexModel,
+  normalizeCodexModelArgs,
+  readFallbackModels,
+  isModelFallbackFailure,
+  recordFallbackModel,
+  replaceModelArgs,
+  resolveFallbackSelection,
+} = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 
@@ -806,7 +816,7 @@ async function main() {
 
   // Prompts remain on stdin; use a placeholder in the argument diagnostic.
   const hadPromptFile = args.includes("--prompt-file");
-  const safeArgs = hadPromptFile && resolvedArgs.length > 0 ? [...resolvedArgs.slice(0, -1), "<prompt via stdin>"] : resolvedArgs;
+  let safeArgs = hadPromptFile && resolvedArgs.length > 0 ? [...resolvedArgs.slice(0, -1), "<prompt via stdin>"] : resolvedArgs;
 
   // Inject --json after `exec` to stream structured JSONL events to stdout, making
   // Codex output machine-readable in CI without affecting the stderr progress stream.
@@ -815,15 +825,21 @@ async function main() {
   // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
   // This is best-effort: failures are logged but do not affect the agent run.
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. no api-proxy running in sandbox or test mode).
-  if (process.env.AWF_REFLECT_ENABLED === "1") {
-    await fetchAWFReflect({ logger: log });
-  }
+  const reflection = process.env.AWF_REFLECT_ENABLED === "1" ? await fetchAWFReflect({ logger: log }) : null;
   const codexHome = process.env.CODEX_HOME || "";
   let codexEnv = codexChildEnv;
+  const fallbackModels = readFallbackModels();
+  const primarySelection =
+    (fallbackModels.length > 0 || process.env.GH_AW_NATIVE_FALLBACK_MODELS === "1") && resolvedModel ? resolveFallbackSelection(resolvedModel, process.env.GH_AW_LLM_PROVIDER || "openai", reflection?.reflectData) : null;
+  if (primarySelection) {
+    resolvedArgs = replaceModelArgs(resolvedArgs, primarySelection.model);
+    if (codexModelEnvVar) codexEnv[codexModelEnvVar] = primarySelection.model;
+    codexEnv.GH_AW_LLM_PROVIDER = primarySelection.provider;
+  }
   const providerConfig = configureCodexProviderFromReflect({
     codexConfigPath: codexHome ? `${codexHome}/config.toml` : "",
     reflectPath: AWF_REFLECT_OUTPUT_PATH,
-    provider: process.env.GH_AW_LLM_PROVIDER || "openai",
+    provider: primarySelection?.provider || process.env.GH_AW_LLM_PROVIDER || "openai",
   });
   if (providerConfig.configured) {
     codexEnv = { ...codexEnv, ...providerConfig.env };
@@ -832,7 +848,7 @@ async function main() {
     const validation = validateCodexOpenAIBaseURLFromReflect({
       codexConfigPath: `${codexHome}/config.toml`,
       reflectPath: AWF_REFLECT_OUTPUT_PATH,
-      provider: process.env.GH_AW_LLM_PROVIDER || "openai",
+      provider: primarySelection?.provider || process.env.GH_AW_LLM_PROVIDER || "openai",
     });
     if (!validation.ok) {
       log(`fatal: ${validation.reason}`);
@@ -858,7 +874,31 @@ async function main() {
       ` minCumulativeInputTokens=${contextRebuildCircuitBreaker.minCumulativeInputTokens}` +
       ` pollIntervalMs=${contextRebuildCircuitBreaker.pollIntervalMs}`
   );
-  const retryRun = await runHarnessRetryLoop({
+  const retryRun = await runHarnessModelFallbackLoop({
+    fallbackModels,
+    shouldFallback: isModelFallbackFailure,
+    switchModel: async model => {
+      const selection = resolveFallbackSelection(model, process.env.GH_AW_LLM_PROVIDER || "openai", reflection?.reflectData);
+      resolvedArgs = replaceModelArgs(resolvedArgs, selection.model);
+      safeArgs = hadPromptFile ? [...resolvedArgs.slice(0, -1), "<prompt via stdin>"] : resolvedArgs;
+      if (codexModelEnvVar) codexEnv[codexModelEnvVar] = selection.model;
+      if (selection.baseUrl) {
+        const configured = configureCodexProviderFromReflect({
+          codexConfigPath: codexHome ? `${codexHome}/config.toml` : "",
+          reflectPath: AWF_REFLECT_OUTPUT_PATH,
+          provider: selection.provider,
+        });
+        if (!configured.configured) throw new Error(`Unable to configure Codex fallback provider '${selection.provider}'`);
+        codexEnv.OPENAI_BASE_URL = selection.baseUrl;
+        codexEnv.CODEX_API_KEY = process.env.COPILOT_DUMMY_BYOK || "dummy-byok-key-for-offline-mode";
+        codexEnv.OPENAI_API_KEY = codexEnv.CODEX_API_KEY;
+      }
+      codexEnv.GH_AW_LLM_PROVIDER = selection.provider;
+      resumeArgs = null;
+      lastThreadId = "";
+      recordFallbackModel(selection.resolvedModel);
+      codexEnv.GH_AW_INFO_MODEL = selection.resolvedModel;
+    },
     maxRetries: MAX_RETRIES,
     initialDelayMs: INITIAL_DELAY_MS,
     backoffMultiplier: BACKOFF_MULTIPLIER,

@@ -51,7 +51,7 @@ const {
   claudeSafeOutputsOffset,
   removeClaudePlugin,
 } = require("./claude_runtime.cjs");
-const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
+const { runHarnessModelFallbackLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -71,7 +71,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { MODEL_NOT_SUPPORTED_PATTERN: INVALID_MODEL_ERROR_PATTERN } = require("./detect_agent_errors.cjs");
-const { applyModelFallback, normalizeClaudeModel, normalizeClaudeModelArgs } = require("./model_fallback.cjs");
+const { applyModelFallback, normalizeClaudeModel, normalizeClaudeModelArgs, readFallbackModels, isModelFallbackFailure, recordFallbackModel, replaceModelArgs, resolveFallbackSelection } = require("./model_fallback.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 
 // Pattern to detect Anthropic API overload errors (HTTP 529).
@@ -423,17 +423,36 @@ async function main() {
     log(`fatal: ${e.message}`);
     process.exit(1);
   }
-  const freshRetryArgs = stripContinueArgs(initialArgs);
+  let freshRetryArgs = stripContinueArgs(initialArgs);
   // Args without --prompt-file, used as the base for --continue retries.
-  const continueBaseArgs = freshRetryArgs;
+  let continueBaseArgs = freshRetryArgs;
 
-  const safeInitialArgs = initialArgs;
-  const safeFreshRetryArgs = freshRetryArgs;
+  let safeInitialArgs = initialArgs;
+  let safeFreshRetryArgs = freshRetryArgs;
 
   // Fetch AWF API proxy reflection data before running the agent to capture initial proxy state.
   // This is best-effort: failures are logged but do not affect the agent run.
   const reflection = await fetchAWFReflect({ logger: log });
   const childEnv = await buildClaudeChildEnv(reflection.reflectData);
+  const primaryProvider = process.env.GH_AW_LLM_PROVIDER || "anthropic";
+  const fallbackModels = readFallbackModels();
+  function configureModel(selection) {
+    childEnv.GH_AW_LLM_PROVIDER = selection.provider;
+    childEnv.ANTHROPIC_MODEL = selection.model;
+    if (selection.baseUrl) {
+      childEnv.ANTHROPIC_BASE_URL = selection.baseUrl;
+      childEnv.ANTHROPIC_API_KEY = process.env.COPILOT_DUMMY_BYOK || "dummy-byok-key-for-offline-mode";
+      delete childEnv.ANTHROPIC_AUTH_TOKEN;
+    }
+    initialArgs = replaceModelArgs(initialArgs, selection.model);
+    freshRetryArgs = stripContinueArgs(initialArgs);
+    continueBaseArgs = freshRetryArgs;
+    safeInitialArgs = initialArgs;
+    safeFreshRetryArgs = freshRetryArgs;
+  }
+  if ((fallbackModels.length > 0 || process.env.GH_AW_NATIVE_FALLBACK_MODELS === "1") && childEnv.ANTHROPIC_MODEL) {
+    configureModel(resolveFallbackSelection(childEnv.ANTHROPIC_MODEL, primaryProvider, reflection.reflectData));
+  }
 
   // Pre-flight: skip the agent entirely when a noop has already been written by a prior step.
   // A noop indicates the work is complete or there is nothing to do — starting the agent
@@ -459,7 +478,23 @@ async function main() {
   // The same deadline guards both the retry loop and each active child process.
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
 
-  const retryRun = await runHarnessRetryLoop({
+  const retryRun = await runHarnessModelFallbackLoop({
+    fallbackModels,
+    shouldFallback: isModelFallbackFailure,
+    switchModel: async model => {
+      if (sessionHasProgress && process.env.GH_AW_CLAUDE_ALLOW_FRESH_RESTART !== "true") {
+        throw new Error("Claude model fallback would replay partial work; set GH_AW_CLAUDE_ALLOW_FRESH_RESTART=true only for replay-safe workflows");
+      }
+      const selection = resolveFallbackSelection(model, primaryProvider, reflection.reflectData);
+      configureModel(selection);
+      useContinueOnRetry = false;
+      continueDisabledPermanently = false;
+      startupRetriesUsed = 0;
+      sessionHasProgress = false;
+      sessionId = undefined;
+      recordFallbackModel(selection.resolvedModel);
+      childEnv.GH_AW_INFO_MODEL = selection.resolvedModel;
+    },
     maxRetries,
     initialDelayMs,
     backoffMultiplier,
@@ -514,7 +549,7 @@ async function main() {
     handleFailure: ({ attempt, result }) => {
       if (result.runtimeGuardFired && softTimeoutGuard) {
         emitSoftTimeoutSignal(softTimeoutGuard, "during execution", "Claude harness", log);
-        return { action: "stop" };
+        return { action: "stop", allowModelFallback: false };
       }
       if (result.watchdogFired && hasTerminalSafeOutput(safeOutputsPath, { byteOffset: result.safeOutputsByteOffset, logger: log })) {
         log("post-result watchdog stopped an idle process after terminal safe-output — treating as success");
@@ -602,7 +637,7 @@ async function main() {
         const reason = "Claude cannot safely resume completed work; refusing to replay the original task. Set GH_AW_CLAUDE_ALLOW_FRESH_RESTART=true only for replay-safe workflows.";
         emitInfrastructureIncomplete(reason, { logger: log });
         log(reason);
-        return { action: "stop" };
+        return { action: "stop", allowModelFallback: false };
       }
       if (attempt < maxRetries && result.hasOutput && (isSignalTermination || isCrashSignal)) {
         continueDisabledPermanently = true;
@@ -632,19 +667,19 @@ async function main() {
         const deniedCommands = denials.commands;
         emitMissingToolPermissionIssue({ deniedCommands, logger: log });
         log(`attempt ${attempt + 1}: detected numerous permission-denied issues — not retrying (classified as missing tool/permission issue)`);
-        return { action: "stop" };
+        return { action: "stop", allowModelFallback: false };
       }
 
       if (isMaxTurns) {
         log(`attempt ${attempt + 1}: max_turns exit — not retriable via --continue`);
-        return { action: "stop" };
+        return { action: "stop", allowModelFallback: false };
       }
 
       if (isNoDeferredMarker) {
         if (attempt < maxRetries && result.hasOutput) {
           if (!continueDisabledPermanently && !sessionId) {
             log("partial execution produced no session ID — not retrying to avoid resuming an unrelated conversation");
-            return { action: "stop" };
+            return { action: "stop", allowModelFallback: false };
           }
           useContinueOnRetry = false;
           continueDisabledPermanently = true;
@@ -689,7 +724,7 @@ async function main() {
       if (attempt < maxRetries && result.hasOutput) {
         if (!continueDisabledPermanently && !sessionId) {
           log("partial execution produced no session ID — not retrying to avoid resuming an unrelated conversation");
-          return { action: "stop" };
+          return { action: "stop", allowModelFallback: false };
         }
         const retryWithContinue = shouldRetryWithContinue({
           attempt,

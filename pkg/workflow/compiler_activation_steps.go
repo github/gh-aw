@@ -41,6 +41,14 @@ func (c *Compiler) addActivationSecretValidationStep(ctx *activationJobBuildCont
 		}
 		stepIDs = append(stepIDs, "validate-secret")
 	}
+	for _, step := range buildFallbackProviderValidationSteps(ctx.data) {
+		for _, line := range step {
+			ctx.steps = append(ctx.steps, line+"\n")
+			if id, ok := strings.CutPrefix(line, "        id: "); ok {
+				stepIDs = append(stepIDs, id)
+			}
+		}
+	}
 	for i, secretValidationStep := range buildSafeOutputSecretValidationSteps(ctx.data) {
 		for _, line := range secretValidationStep {
 			ctx.steps = append(ctx.steps, line+"\n")

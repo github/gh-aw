@@ -255,6 +255,15 @@
             }
           }
         },
+        "fallbackModels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Ordered list of concrete model IDs to retry with when the requested model fails with a model-specific error: upstream 5xx, a connection error/timeout before any response, or a 400/404 reporting the model as unsupported, not found, or not accessible. 401, 403, and 429 responses never trigger a fallback. The API proxy rewrites the request's model (body 'model' field, or the Gemini '/models/<model>:' path segment), and records the model that actually served the request in token-usage logs ('model' plus a 'model_fallback' object). A redundant '<provider>/' prefix is stripped. Each fallback model must pass the same model-policy and budget guards as the requested model."
+        },
         "modelRouter": {
           "type": "object",
           "description": "Model-router settings for Copilot-compatible BYOK upstreams.",

@@ -62,6 +62,10 @@ func resolveEngineLLMProvider(workflowData *WorkflowData, defaultProvider LLMPro
 }
 
 func resolveEngineLLMProviderFromModel(workflowData *WorkflowData, defaultProvider LLMProvider) LLMProvider {
+	if workflowData != nil && workflowData.EngineConfig != nil && len(workflowData.EngineConfig.FallbackModels) > 0 &&
+		workflowData.EngineConfig.LLMProvider == "" {
+		return fallbackModelProvider(workflowData.Model, defaultProvider)
+	}
 	if workflowData != nil && (workflowData.EngineConfig == nil || workflowData.EngineConfig.LLMProvider == "") &&
 		strings.HasPrefix(strings.ToLower(strings.TrimSpace(workflowData.Model)), "copilot/") {
 		return LLMProviderGitHub
@@ -95,6 +99,8 @@ func llmProviderSecretNames(provider LLMProvider) []string {
 		return []string{"COPILOT_GITHUB_TOKEN"}
 	case LLMProviderOpenAI:
 		return []string{"CODEX_API_KEY", "OPENAI_API_KEY"}
+	case "gemini":
+		return []string{"GEMINI_API_KEY"}
 	default:
 		return []string{"ANTHROPIC_API_KEY"}
 	}
@@ -111,6 +117,8 @@ func llmProviderSecretExpression(provider LLMProvider, workflowData *WorkflowDat
 		return "${{ secrets.COPILOT_GITHUB_TOKEN }}"
 	case LLMProviderOpenAI:
 		return "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"
+	case "gemini":
+		return "${{ secrets.GEMINI_API_KEY }}"
 	default:
 		return "${{ secrets.ANTHROPIC_API_KEY }}"
 	}

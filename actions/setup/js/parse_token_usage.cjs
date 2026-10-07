@@ -366,6 +366,9 @@ async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/cop
         primaryModel = model;
       }
     }
+    const { getFallbackModel, recordFallbackModelFromUsage } = require("./model_fallback.cjs");
+    const fallbackModel = recordFallbackModelFromUsage(content, process.env, undefined, message => core.warning(message));
+    primaryModel = fallbackModel || getFallbackModel(undefined, process.env.GH_AW_PHASE || "agent") || primaryModel;
 
     const agentUsage = {
       input_tokens: summary.totalInputTokens,

@@ -68,7 +68,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
+const { runHarnessModelFallbackLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs } = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -90,7 +90,7 @@ const { countPermissionDeniedIssues, hasNumerousPermissionDeniedIssues, extractD
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard, emitSoftTimeoutSignal, isAuthenticationFailedError: isCommonAuthenticationFailedError, parseAICreditsExceededProxyRejection } = require("./harness_retry_guard.cjs");
 const { isCrashSignalExitCode, crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { isCAPIQuotaExceededError, isCAPIServerError } = require("./detect_agent_errors.cjs");
-const { applyModelFallback } = require("./model_fallback.cjs");
+const { applyModelFallback, readFallbackModels, isModelFallbackFailure, recordFallbackModel, replaceModelArgs, resolveFallbackSelection } = require("./model_fallback.cjs");
 const { isRoutingReasoningEffort } = require("./copilot_routing_effort.cjs");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { resolveConfiguredCopilotModel, ModelAliasResolutionError } = require("./resolve_model_alias.cjs");
@@ -1233,6 +1233,8 @@ async function main() {
   // Skip when AWF_REFLECT_ENABLED is not "1" (e.g. sandbox.agent: false — no api-proxy running).
   /** @type {any} */
   let awfReflectData = null;
+  const fallbackModels = readFallbackModels();
+  const primaryProvider = process.env.GH_AW_LLM_PROVIDER || "github";
   const modelRoutingRequired = process.env.GH_AW_MODEL_ROUTING === "1";
   /** @type {any} */
   let modelRoutingSelection = null;
@@ -1257,17 +1259,18 @@ async function main() {
     }
   } else {
     applyModelFallback(process.env, "COPILOT_MODEL", log);
-    await applyCopilotModelAliasResolution({
-      awfReflectData,
-      logger: log,
-      refetchReflectData: async () => {
-        if (process.env.AWF_REFLECT_ENABLED !== "1") {
-          return null;
-        }
-        const refreshed = await fetchAWFReflect({ logger: log });
-        return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
-      },
-    });
+    if (fallbackModels.length === 0 && process.env.GH_AW_NATIVE_FALLBACK_MODELS !== "1")
+      await applyCopilotModelAliasResolution({
+        awfReflectData,
+        logger: log,
+        refetchReflectData: async () => {
+          if (process.env.AWF_REFLECT_ENABLED !== "1") {
+            return null;
+          }
+          const refreshed = await fetchAWFReflect({ logger: log });
+          return refreshed.ok && refreshed.reflectData ? refreshed.reflectData : null;
+        },
+      });
     if (!copilotSDKMode) {
       applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
     }
@@ -1294,7 +1297,21 @@ async function main() {
   let resolvedModel = "";
   let multiProviderJson = "";
   let primaryProviderName = "";
-  if (copilotSDKMode) {
+  let activeSelection = (fallbackModels.length > 0 || process.env.GH_AW_NATIVE_FALLBACK_MODELS === "1") && process.env.COPILOT_MODEL ? resolveFallbackSelection(process.env.COPILOT_MODEL, primaryProvider, awfReflectData) : null;
+  if (activeSelection) {
+    process.env.COPILOT_MODEL = activeSelection.model;
+    if (!copilotSDKMode) {
+      resolvedArgs = replaceModelArgs(resolvedArgs, activeSelection.model);
+      if (activeSelection.baseUrl) {
+        process.env.COPILOT_PROVIDER_BASE_URL = activeSelection.baseUrl;
+        process.env.COPILOT_PROVIDER_TYPE = activeSelection.provider === "anthropic" ? "anthropic" : "openai";
+        process.env.COPILOT_PROVIDER_API_KEY = process.env.COPILOT_DUMMY_BYOK || "dummy-byok-key-for-offline-mode";
+        applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+      }
+    }
+  }
+  async function configureSDKProvider(probeListeners) {
+    providerWireApi = "";
     const configuredModel = process.env.COPILOT_MODEL || "";
     const modelsJson = loadModelsJson();
 
@@ -1302,6 +1319,13 @@ async function main() {
     if (!multiProvider) {
       log("copilot-sdk driver mode: BYOK provider is required but could not be resolved from awf-reflect data — aborting");
       process.exit(1);
+    }
+    if (activeSelection) {
+      const selection = activeSelection;
+      const selectedProvider = multiProvider.providers.find(provider => provider.baseUrl === selection.baseUrl);
+      if (!selectedProvider) throw new Error(`Copilot SDK fallback provider '${selection.provider}' is unavailable`);
+      multiProvider.model = selection.model;
+      multiProvider.models = [{ id: selection.model, provider: selectedProvider.name }, ...multiProvider.models.filter(model => model.id !== selection.model)];
     }
     resolvedModel = multiProvider.model;
     // Set the primary provider's details as COPILOT_PROVIDER_* env vars for the headless sidecar
@@ -1335,7 +1359,7 @@ async function main() {
       models: multiProvider.models,
     });
 
-    const uniqueProviderBaseUrls = [...new Set(multiProvider.providers.map(provider => String(provider.baseUrl || "").trim()).filter(Boolean))];
+    const uniqueProviderBaseUrls = probeListeners ? [...new Set(multiProvider.providers.map(provider => String(provider.baseUrl || "").trim()).filter(Boolean))] : [];
     if (uniqueProviderBaseUrls.length === 0) {
       log("copilot-sdk driver mode: no provider baseUrls to probe — skipping listener readiness check");
     }
@@ -1351,6 +1375,9 @@ async function main() {
         process.exit(1);
       }
     }
+  }
+  if (copilotSDKMode) {
+    await configureSDKProvider(true);
   } else {
     logCopilotInferenceConfiguration({
       copilotSDKMode,
@@ -1385,7 +1412,7 @@ async function main() {
     routingEffort: modelRoutingSelection?.effort ?? null,
     multiProviderJson,
   });
-  const childEnv = Object.keys(sdkChildEnv).length > 0 ? { ...process.env, ...sdkChildEnv } : undefined;
+  let childEnv = Object.keys(sdkChildEnv).length > 0 ? { ...process.env, ...sdkChildEnv } : undefined;
 
   let delay = initialDelayMs;
   let lastExitCode = 1;
@@ -1418,38 +1445,83 @@ async function main() {
   };
   /** @type {Awaited<ReturnType<typeof startCopilotSDKServer>>} */
   let copilotSDKServer = null;
-  try {
-    if (copilotSDKMode) {
-      // Driver mode: the harness starts the sidecar; the driver subprocess only opens a client.
-      // Server args are provided via GH_AW_COPILOT_SDK_SERVER_ARGS (JSON-encoded CLI arg list
-      // generated by the Go engine).  The copilot binary is args[1] in the driver command:
-      //   node copilot_harness.cjs $GH_AW_NODE_EXEC copilot_sdk_driver.cjs <copilot-binary>
-      const copilotBin = args[1];
-      if (!copilotBin) {
-        log("copilot-sdk driver mode: missing copilot binary path in args[1]");
-        lastExitCode = 1;
-      } else {
-        let driverServerArgs = parseCopilotSDKServerArgsFromEnv(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, { logger: log });
-        if (process.env.GITHUB_WORKSPACE) {
-          driverServerArgs = [...driverServerArgs, "--add-dir", process.env.GITHUB_WORKSPACE];
-          log(`copilot-sdk driver mode: appended workspace --add-dir ${process.env.GITHUB_WORKSPACE}`);
-        }
-        log(`copilot-sdk driver mode: starting sidecar command=${copilotBin} args=${driverServerArgs.length}`);
-        copilotSDKServer = await startCopilotSDKServer({
-          command: copilotBin,
-          env: childEnv ?? process.env,
-          serverArgs: driverServerArgs.length > 0 ? driverServerArgs : undefined,
-          logger: log,
-        });
-      }
+  async function startSDKSidecar() {
+    // The harness owns the sidecar so a provider change can restart it with new routing.
+    const copilotBin = args[1];
+    if (!copilotBin) {
+      log("copilot-sdk driver mode: missing copilot binary path in args[1]");
+      lastExitCode = 1;
+      return;
     }
+    let driverServerArgs = parseCopilotSDKServerArgsFromEnv(process.env.GH_AW_COPILOT_SDK_SERVER_ARGS, { logger: log });
+    if (process.env.GITHUB_WORKSPACE) {
+      driverServerArgs = [...driverServerArgs, "--add-dir", process.env.GITHUB_WORKSPACE];
+      log(`copilot-sdk driver mode: appended workspace --add-dir ${process.env.GITHUB_WORKSPACE}`);
+    }
+    log(`copilot-sdk driver mode: starting sidecar command=${copilotBin} args=${driverServerArgs.length}`);
+    copilotSDKServer = await startCopilotSDKServer({
+      command: copilotBin,
+      env: childEnv ?? process.env,
+      serverArgs: driverServerArgs.length > 0 ? driverServerArgs : undefined,
+      logger: log,
+    });
+  }
+  try {
+    if (copilotSDKMode) await startSDKSidecar();
 
     // CLI mode always enters the retry loop.
     // Driver mode always enters when the sidecar started successfully.
     if (!copilotSDKMode || copilotSDKServer) {
       // Unified retry loop for CLI and driver modes.
       // --continue is a CLI concept; in SDK mode retries always restart the session fresh.
-      const retryRun = await runHarnessRetryLoop({
+      const retryRun = await runHarnessModelFallbackLoop({
+        fallbackModels,
+        shouldFallback: isModelFallbackFailure,
+        switchModel: async model => {
+          const selection = resolveFallbackSelection(model, primaryProvider, awfReflectData);
+          activeSelection = selection;
+          process.env.COPILOT_MODEL = selection.model;
+          process.env.GH_AW_LLM_PROVIDER = selection.provider;
+          useContinueOnRetry = false;
+          continueDisabledPermanently = false;
+          scheduledExit2Retries = 0;
+          scheduledExit2RetryAttempted = false;
+          modelNotSupportedReflectRetryAttempted = false;
+          if (copilotSDKMode) {
+            await stopCopilotSDKServer(copilotSDKServer, { logger: log });
+            copilotSDKServer = null;
+            await configureSDKProvider(false);
+            childEnv = {
+              ...process.env,
+              ...buildCopilotSDKChildEnv({
+                sdkEnv,
+                copilotSDKMode,
+                copilotConnectionToken,
+                providerBaseUrl,
+                providerType,
+                providerWireApi,
+                resolvedModel,
+                multiProviderJson,
+              }),
+            };
+            await startSDKSidecar();
+            if (!copilotSDKServer) throw new Error("Unable to start Copilot SDK sidecar for fallback model");
+          } else {
+            resolvedArgs = replaceModelArgs(resolvedArgs, selection.model);
+            if (selection.baseUrl) {
+              process.env.COPILOT_PROVIDER_BASE_URL = selection.baseUrl;
+              process.env.COPILOT_PROVIDER_API_KEY = process.env.COPILOT_DUMMY_BYOK || "dummy-byok-key-for-offline-mode";
+              process.env.COPILOT_PROVIDER_TYPE = selection.provider === "anthropic" ? "anthropic" : "openai";
+              delete process.env.COPILOT_PROVIDER_MODEL_ID;
+              delete process.env.COPILOT_PROVIDER_WIRE_MODEL;
+              delete process.env.COPILOT_PROVIDER_WIRE_API;
+              applyCopilotWireAPI({ modelsJson: loadModelsJson(), logger: log });
+            }
+            childEnv = { ...process.env, ...sdkEnv };
+          }
+          recordFallbackModel(selection.resolvedModel);
+          childEnv.GH_AW_INFO_MODEL = selection.resolvedModel;
+        },
         maxRetries,
         initialDelayMs,
         backoffMultiplier,

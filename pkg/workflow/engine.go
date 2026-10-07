@@ -88,7 +88,8 @@ type EngineConfig struct {
 	// Currently used by the Pi engine: each entry is passed to `pi install <extension>`.
 	Extensions []string
 
-	ModelRouting *CopilotModelRoutingConfig
+	ModelRouting   *CopilotModelRoutingConfig
+	FallbackModels []string
 
 	// CopilotSDK enables the GitHub Copilot SDK integration.
 	// When true the compiler enables a harness-managed Copilot CLI headless sidecar
@@ -452,6 +453,13 @@ func applyReferencedEngineFields(config *EngineConfig, engineObj map[string]any,
 	applyEnginePermissionMode(config, engineObj)
 	applyEngineContextWindowField(config, engineObj)
 	applyEngineModelRoutingField(config, engineObj)
+	if models, ok := engineObj["fallback-models"].([]any); ok {
+		for _, model := range models {
+			if name, ok := model.(string); ok {
+				config.FallbackModels = append(config.FallbackModels, name)
+			}
+		}
+	}
 	applyEngineTurnFields(config, engineObj, topLevel)
 	applyEngineConcurrencyField(config, engineObj)
 	applyEngineStringFields(config, engineObj)

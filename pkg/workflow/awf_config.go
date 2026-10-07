@@ -182,7 +182,8 @@ type AWFAPIProxyConfig struct {
 	// When nil, the AWF default (enabled=true, strategy=middle_power) is used.
 	// Set enabled=false to prevent AWF from silently rewriting deployment names, which
 	// is needed for BYOK Azure OpenAI deployments where rewriting causes HTTP 404.
-	ModelFallback *AWFModelFallbackConfig `json:"modelFallback,omitempty"`
+	ModelFallback  *AWFModelFallbackConfig `json:"modelFallback,omitempty"`
+	FallbackModels []string                `json:"fallbackModels,omitempty"`
 
 	// ModelMultipliers configures per-model AIC accounting multipliers in AWF.
 	ModelMultipliers map[string]float64 `json:"modelMultipliers,omitempty"`
