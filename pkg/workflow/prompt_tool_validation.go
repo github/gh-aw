@@ -11,7 +11,7 @@ import (
 )
 
 var promptToolImperative = regexp.MustCompile(`(?i)^(?:please\s+|you must\s+|must\s+)?(use|call|run)\s+(?:the\s+)?(?:tool\s+)?(.+)$`)
-var promptQualifiedTool = regexp.MustCompile(`^(?:mcp__([A-Za-z0-9_-]+)__([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\(([A-Za-z0-9_-]+)\))(?:$|[^A-Za-z0-9_])`)
+var promptQualifiedTool = regexp.MustCompile(`(?:^|[^A-Za-z0-9_])(?:mcp__([A-Za-z0-9_-]+)__([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\(([A-Za-z0-9_-]+)\))(?:$|[^A-Za-z0-9_])`)
 var promptBareTool = regexp.MustCompile(`^([a-z][a-z0-9_]+)(?:$|[\s\x60.,(])`)
 var promptListPrefix = regexp.MustCompile(`^(?:[-*+]\s+|\d+[.)]\s+)`)
 var promptExecutable = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
@@ -228,27 +228,31 @@ func promptInvocationRequirements(verb, target string, knownGitHubTools map[stri
 }
 
 func promptQualifiedRequirements(target string) ([]promptToolRequirement, bool) {
-	groups := promptQualifiedTool.FindStringSubmatch(target)
-	if len(groups) < 5 {
+	matches := promptQualifiedTool.FindAllStringSubmatch(target, -1)
+	if len(matches) == 0 {
 		return nil, false
 	}
-	var server, tool string
-	for index, group := range groups {
-		if group == "" {
+	var requirements []promptToolRequirement
+	for _, groups := range matches {
+		var server, tool string
+		for index, group := range groups {
+			if group == "" {
+				continue
+			}
+			switch index {
+			case 1, 3:
+				server = group
+			case 2, 4:
+				tool = group
+			}
+		}
+		// Native read tools are available by default; Read(path) is not an MCP reference.
+		if slices.Contains([]string{"Read", "read", "Glob", "glob", "Grep", "grep", "LS", "NotebookRead", "read_file", "read_many_files", "list_directory", "grep_search", "view"}, server) {
 			continue
 		}
-		switch index {
-		case 1, 3:
-			server = group
-		case 2, 4:
-			tool = group
-		}
+		requirements = append(requirements, promptToolRequirement{server: server, tool: tool, nativeMCP: true})
 	}
-	// Native read tools are available by default; Read(path) is not an MCP reference.
-	if slices.Contains([]string{"Read", "read", "Glob", "glob", "Grep", "grep", "LS", "NotebookRead", "read_file", "read_many_files", "list_directory", "grep_search", "view"}, server) {
-		return nil, true
-	}
-	return []promptToolRequirement{{server: server, tool: tool, nativeMCP: true}}, true
+	return requirements, true
 }
 
 func promptLiteralShellCommand(target string) bool {
@@ -362,7 +366,7 @@ func promptToolAvailable(data *WorkflowData, requirement promptToolRequirement, 
 	case "native-read":
 		return !promptShellDisabledByProvider(data)
 	case "safeoutputs":
-		return HasSafeOutputsEnabled(data.SafeOutputs)
+		return slices.Contains(collectSafeOutputsManifestTools(data.SafeOutputs), requirement.tool)
 	case "mcpscripts":
 		if !IsMCPScriptsEnabled(data.MCPScripts) {
 			return false

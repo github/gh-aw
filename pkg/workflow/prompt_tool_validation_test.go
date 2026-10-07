@@ -29,6 +29,7 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"unquoted stem", "Run gh issue list.", []promptToolRequirement{{command: "gh issue list"}}},
 		{"unquoted option", "Run jq --version.", []promptToolRequirement{{command: "jq --version"}}},
 		{"qualified", "Call `mcp__github__issue_read`.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
+		{"multiple qualified", "Call mcp__github__findings and mcp__github__summary.", []promptToolRequirement{{server: "github", tool: "findings", nativeMCP: true}, {server: "github", tool: "summary", nativeMCP: true}}},
 		{"server", "Use the tool github(issue_read).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"custom server", "Call inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"hyphenated script", "Call mcp__mcpscripts__read-outcomes.", []promptToolRequirement{{server: "mcpscripts", tool: "read-outcomes", nativeMCP: true}}},
@@ -169,6 +170,7 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 		{"safeoutput native mismatch", "engine: copilot\ntools:\n  cli-proxy: true\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Call mcp__safeoutputs__add_labels.", 1},
 		{"safeoutput wrapper instruction", "engine: copilot\ntools:\n  cli-proxy: true\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Use add_labels to label the issue.", 0},
 		{"safeoutput native retained", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  add-labels:\n", "Call mcp__safeoutputs__add_labels.", 0},
+		{"safeoutput tool not enabled", "engine: copilot\ntools:\n  cli-proxy: false\n  bash: [echo]\nsafe-outputs:\n  noop: {}\n", "Call mcp__safeoutputs__add_labels.", 1},
 		{"task fence pipeline denied", "engine: copilot\ntools:\n  bash: [find]\n", "Find all schema files and list them:\n```bash\nfind schemas -name '*.json' | schema-sort\n```", 1},
 		{"task fence pipeline allowed", "engine: copilot\ntools:\n  bash: [find, schema-sort]\n", "Find all schema files and list them:\n```bash\nfind schemas -name '*.json' | schema-sort\n```", 0},
 		{"script configured", "engine: codex\nmcp-scripts:\n  read-outcomes:\n    description: Read outcomes\n    run: echo outcomes\n", "Call mcp__mcpscripts__read-outcomes.", 0},
@@ -206,6 +208,40 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 		})
 	}
 
+}
+
+func TestPromptSafeOutputAvailabilityIncludesDynamicTools(t *testing.T) {
+	data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{
+		NoOp: &NoOpConfig{},
+		Scripts: map[string]*SafeScriptConfig{
+			"custom-script": {Script: "export default {}"},
+		},
+	}}
+	engine, err := NewCompiler().getAgenticEngine("copilot")
+	require.NoError(t, err)
+
+	require.True(t, promptToolAvailable(data, promptToolRequirement{server: "safeoutputs", tool: "noop", nativeMCP: true}, engine.GetCapabilities()))
+	require.True(t, promptToolAvailable(data, promptToolRequirement{server: "safeoutputs", tool: "custom_script", nativeMCP: true}, engine.GetCapabilities()))
+	require.False(t, promptToolAvailable(data, promptToolRequirement{server: "safeoutputs", tool: "add_labels", nativeMCP: true}, engine.GetCapabilities()))
+	require.False(t, promptToolAvailable(data, promptToolRequirement{server: "safeoutputs", tool: "unknown", nativeMCP: true}, engine.GetCapabilities()))
+}
+
+func TestPromptToolValidationChecksEveryQualifiedInvocation(t *testing.T) {
+	data := &WorkflowData{
+		AI: "copilot",
+		Tools: map[string]any{
+			"inventory": map[string]any{"command": "echo", "args": []any{}, "allowed": []any{"findings"}},
+		},
+		MarkdownContent: "Call mcp__inventory__findings and mcp__inventory__summary.",
+	}
+	data.ParsedTools = NewTools(data.Tools)
+	require.NoError(t, data.ParsedTools.ParseError())
+
+	compiler := NewCompiler()
+	output := testutil.CaptureStderr(t, func() { compiler.validatePromptTools(data, "test.md") })
+	require.Equal(t, 1, compiler.GetWarningCount())
+	require.Contains(t, output, "Prompt explicitly requires inventory(summary)")
+	require.NotContains(t, output, "Prompt explicitly requires inventory(findings)")
 }
 
 func TestPromptToolTaskFenceSortDenied(t *testing.T) {

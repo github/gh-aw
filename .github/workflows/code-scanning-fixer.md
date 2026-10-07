@@ -81,21 +81,21 @@ You are a security-focused code analysis agent that automatically fixes code sca
 
 **Oversized Patches**: A patch larger than the 4,096 KB safe-output limit is not retryable while the alert is unchanged:
 - Do not emit a pull request for an oversized patch
-- Record the alert fingerprint and patch-size outcome in cache memory, then discard the local edits and emit `noop`
+- Record the alert fingerprint and patch-size outcome in cache memory, then discard the local edits and invoke `safeoutputs noop` through bash
 - Skip that alert on later runs while its fingerprint is unchanged; reconsider it only if its rule, location, or message changes
 
-**Tool Usage**: Use the GitHub MCP tools for all GitHub read operations, the `edit` tool for code and cache changes, and the restricted `bash` tool only for allowed local inspection, patch preflight, and discarding local edits:
-- List code scanning alerts: `list_code_scanning_alerts`
-- Get alert details: `get_code_scanning_alert`
-- Read file contents: `get_file_contents`
-- Do not use shell commands to fetch or parse GitHub API responses.
+**Tool Usage**: GitHub reads and safe outputs are CLI-mounted; invoke `github <tool>` and `safeoutputs <tool>` through the restricted `bash` tool. Use the `edit` tool for code and cache changes, and `bash` for allowed local inspection, CLI invocations, patch preflight, and discarding local edits:
+- List code scanning alerts: `github list_code_scanning_alerts`
+- Get alert details: `github get_code_scanning_alert`
+- Do not call native GitHub MCP or safe-output tools, or use direct HTTP/`gh api` requests; use the mounted `github` CLI as the only GitHub API transport.
+- Read files in the checkout with allowed shell readers such as `sed`; do not use native `get_file_contents`.
 - Edit files: use the `edit` tool
 - Do not use the Copilot `read` tool for temporary files; use allowed shell readers such as `cat`, `head`, or `sed`
 - If a tool output is saved to a temporary file because it is too large, inspect it with simple allowed shell commands such as `grep`, `head`, `jq`, `sed`, or `tail`; do not use `python3` or compound shell assignment snippets for JSON parsing
 - Run each allowed shell command separately; do not chain commands with `;` or `&&`, use heredocs or redirection to write files, or wrap commands in `python3`. Do not run builds or formatters through the restricted shell.
 - Write cache records with the `edit` tool, not shell redirection.
-- Create pull request: emit a `create-pull-request` safe output directly after edits; do not invoke `safeoutputs` through bash
-- Report a stalled prior attempt: emit a `create-issue` safe output (diagnostic only, never a fix)
+- Create a pull request by invoking `safeoutputs create-pull-request` through bash immediately after edits.
+- Report a stalled prior attempt by invoking `safeoutputs create-issue` through bash (diagnostic only, never a fix).
 
 **Self-Assessment Checkpoint**: This workflow has a hard 40-minute timeout. A hang or timeout during the fix-attempt phase (steps 5-6) previously produced zero output and zero visibility. To avoid that:
 - Before starting the expensive analyze-and-fix work on a selected alert, immediately record an `in_progress` checkpoint in cache memory (step 3.5). This is cheap and happens before any risk of hanging.
@@ -114,7 +114,7 @@ Your goal is to:
 
 ## Workflow Steps
 
-Use native edit tools for writing cache records and report bodies rather than shell heredocs. Safe outputs are CLI-mounted: invoke `safeoutputs <tool>` through bash (use `--help` for parameters), not an invented native safe-output tool.
+Use the `edit` tool to write cache records, not shell heredocs. Pass report bodies as arguments to the `safeoutputs` CLI, invoked through bash (use `--help` for parameters).
 
 ### 1. Check Cache for Previously Fixed, Oversized, or Stalled Alerts
 
@@ -126,14 +126,14 @@ Before selecting an alert, check the cache memory for prior outcomes:
 - Build a set of successfully fixed alert numbers and a map of oversized alert fingerprints
 - **Detect a stalled prior attempt**: if the latest record for an alert number is `in_progress` (no later `fixed_at`, `patch_too_large`, or `stalled_reported` record supersedes it) and its `started_at` is more than 30 minutes in the past, treat that run as hung/timed out:
   - Re-fetch the alert's current details (step 4) to describe what is known about it
-  - Emit a `create-issue` safe output titled with the alert number and rule ID, summarizing: the alert that stalled, when the previous attempt started, and a note that it needs manual review or a retry
+  - Invoke `safeoutputs create-issue` through bash with a title containing the alert number and rule ID and a summary of the stalled alert, its start time, and the need for manual review or retry
   - Append `{"alert_number": ..., "fingerprint": ..., "outcome": "stalled_reported", "recorded_at": "...", "issue_number": ...}` to `/tmp/gh-aw/cache-memory/fixed-alerts.jsonl` so the same stall is not reported again
   - Exclude that alert from selection this run (step 3); it may be reconsidered on a future run once reported
   - Only report one stalled alert per run, then continue to step 2 to look for other unfixed alerts to work on this run
 
 ### 2. List All Open Alerts
 
-Run `github list_code_scanning_alerts` through bash to list all open code scanning alerts. The GitHub CLI wrapper is available; do not invent a `github-list_code_scanning_alerts` tool name.
+Run `github list_code_scanning_alerts` through bash to list all open code scanning alerts. The GitHub CLI wrapper is available; do not invoke a native GitHub MCP tool or invent a `github-list_code_scanning_alerts` tool name.
 - Sort the results in reverse importance/severity priority (highest first)
 - Use `rule.security_severity_level` when available (`critical > high > medium > low`)
 - Fall back to alert/rule severity when no security severity is present (`error > warning > note`)
@@ -170,7 +170,7 @@ Get detailed information about the selected alert using `github get_code_scannin
 ### 5. Analyze the Vulnerability
 
 Understand the security issue:
-- Read the affected file using `get_file_contents`.
+- Read the affected file from the checkout with an allowed shell reader such as `sed`.
 - Review the code context around the vulnerability (at least 20 lines before and after)
 - Understand the root cause of the security issue
 - Research the specific vulnerability type (use the rule ID and CWE)
@@ -188,13 +188,13 @@ Create code changes to address the security issue:
 
 ### 7. Create Pull Request
 
-Before emitting `create-pull-request`, preflight the complete generated patch, including binary removals:
+Before invoking `safeoutputs create-pull-request`, preflight the complete generated patch, including binary removals:
 - Measure the patch in bytes with the explicitly allowed single command `git diff --binary --no-ext-diff | wc -c`. The default `create-pull-request` safe-output limit is 4,096 KB (4,194,304 bytes).
-- If the patch exceeds that limit, do not emit `create-pull-request`. Append an oversized-patch JSON record to `/tmp/gh-aw/cache-memory/fixed-alerts.jsonl` using the selected alert number, its fingerprint, measured patch size, limit, and current timestamp.
-- Discard all local edits for that attempt, emit `noop` stating that the alert was skipped because its patch exceeds 4,096 KB, and exit successfully.
+- If the patch exceeds that limit, do not invoke `safeoutputs create-pull-request`. Append an oversized-patch JSON record to `/tmp/gh-aw/cache-memory/fixed-alerts.jsonl` using the selected alert number, its fingerprint, measured patch size, limit, and current timestamp.
+- Discard all local edits for that attempt, invoke `safeoutputs noop` through bash stating that the alert was skipped because its patch exceeds 4,096 KB, and exit successfully.
 - Do not record a patch-size outcome when measurement itself fails; report that tool failure normally.
 
-After making the code changes using the `edit` tool, emit a `create-pull-request` safe output:
+After making the code changes using the `edit` tool, invoke `safeoutputs create-pull-request` through bash with the remediation details:
 
 ```yaml
 create-pull-request:
