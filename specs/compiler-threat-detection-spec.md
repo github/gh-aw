@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.42
+**Version**: 1.0.43
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.43` | `v0.87.9` | Clarifies CTR-008 trusted `pull_request_target` checkouts: acknowledgment suppresses only the trigger warning, allowlisted checkouts require an exact literal repository/ref pair, and any configured `fetch` is rejected. |
 | `1.0.42` | `v0.87.9` | Audit-only; same-repository bot PR checkout authorization is a runtime trust control governed by the security architecture specification, not a new compiler threat rule. |
 | `1.0.41` | `v0.87.9` | Adds CTR-031; private-to-public flow opt-outs are rejected in strict mode and warned in non-strict mode because they can expose private data through public logs or destinations. |
 | `1.0.40` | `v0.87.9` | Adds CTR-030; activation sparse checkouts use the PR base SHA for pull-request and review events before loading runtime imports or skills. |
@@ -81,7 +82,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-005 Unsafe Output Route**: Reject direct write paths that bypass safe outputs.
 - **CTR-006 Template Injection**: Reject user-controlled expressions directly embedded in shell commands.
 - **CTR-007 Markdown Content Security**: Detect unsafe external markdown, including obfuscation, scripts, and social engineering.
-- **CTR-008 Pull Request Target Safety**: Reject unsafe `pull_request_target` checkout patterns.
+- **CTR-008 Pull Request Target Safety**: For `pull_request_target`, strict mode MUST warn about elevated permissions and secret access unless `on.pull_request_target.acknowledge-risk` is `true`. This acknowledgment suppresses only that warning; it MUST NOT authorize a checkout or suppress checkout diagnostics. An explicit `checkout: false` is accepted. Otherwise, every configured checkout MUST independently use either the supported base-repository/base-ref form or an exact, case-sensitive literal repository/ref pair in `on.pull_request_target.allowed-checkouts`. The allowlist path MUST reject expressions, wildcard refs, `refs/pull/...` refs, wiki checkouts, and omitted external refs. Neither the base-checkout nor allowlist path may accept any non-empty `fetch` value. An omitted checkout configuration is not equivalent to explicit `checkout: false`. In strict mode an unsafe checkout MUST be rejected; in non-strict mode it MUST produce a warning.
 - **CTR-009 Shell Expansion in Safe-Outputs**: Reject dangerous shell expansion in safe-output scripts.
 - **CTR-010 Expression Safety Allowlist**: Reject unauthorized or multiline GitHub Actions expressions.
 - **CTR-011 Network Firewall Configuration**: Reject missing firewall prerequisites and strict-mode wildcard domains.
@@ -153,7 +154,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-005 Unsafe Output Route | safe-output compiler/validation; setup safe-output and manifest helpers | safe-output and setup helper tests |
 | CTR-006 Template Injection | template/heredoc validation, `mcp_renderer_guard.go` | template-injection and MCP tests |
 | CTR-007 Markdown Content Security | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
-| CTR-008 Pull Request Target Safety | `markdown_security_scanner.go`, `pull_request_target_validation.go` | corresponding workflow and sanitizer tests |
+| CTR-008 Pull Request Target Safety | `pkg/workflow/pull_request_target_validation.go` | `pkg/workflow/pull_request_target_validation_test.go`; `specs/workflow-security/PullRequestTargetCheckout.tla` |
 | CTR-009 Shell Expansion in Safe-Outputs | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
 | CTR-010 Expression Safety Allowlist | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
 | CTR-011 Network Firewall Configuration | safe-output shell/push validation, expression validation, firewall validation | corresponding workflow tests |
@@ -196,7 +197,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-005** | CTR-005 Unsafe Output Route | Reject direct write paths that bypass safe outputs | Reject direct write paths that bypass safe outputs. | `CTR-005` |
 | **T-CTR-006** | CTR-006 Template Injection | Reject user-controlled expressions directly embedded in shell commands | Reject user-controlled expressions directly embedded in shell commands. | `CTR-006` |
 | **T-CTR-007** | CTR-007 Markdown Content Security | Detect unsafe external markdown, including obfuscation, scripts, and social engineering | Detect unsafe external markdown, including obfuscation, scripts, and social engineering. | `CTR-007` |
-| **T-CTR-008** | CTR-008 Pull Request Target Safety | Reject unsafe `pull_request_target` checkout patterns | Reject unsafe `pull_request_target` checkout patterns. | `CTR-008` |
+| **T-CTR-008** | CTR-008 Pull Request Target Safety | A `pull_request_target` workflow acknowledges trigger risk, configures base or external checkouts, or sets `fetch` | Suppress only the strict trigger warning when acknowledged; accept only explicit disablement, trusted base checkouts, or exact allowlisted literal repository/ref pairs without `fetch`; otherwise reject in strict mode and warn in non-strict mode. | `CTR-008` |
 | **T-CTR-009** | CTR-009 Shell Expansion in Safe-Outputs | Reject dangerous shell expansion in safe-output scripts | Reject dangerous shell expansion in safe-output scripts. | `CTR-009` |
 | **T-CTR-010** | CTR-010 Expression Safety Allowlist | Reject unauthorized or multiline GitHub Actions expressions | Reject unauthorized or multiline GitHub Actions expressions. | `CTR-010` |
 | **T-CTR-011** | CTR-011 Network Firewall Configuration | Reject missing firewall prerequisites and strict-mode wildcard domains | Reject missing firewall prerequisites and strict-mode wildcard domains. | `CTR-011` |

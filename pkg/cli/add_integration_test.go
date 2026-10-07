@@ -1065,13 +1065,9 @@ func TestAddWorkflowWithDispatchWorkflowFromSharedImport(t *testing.T) {
 	// workflow). The fetcher falls back to .yml when .md is 404, so both the main
 	// workflow and the dispatch-workflow dependency are written to disk.
 	//
-	// Note: pinned to a specific commit SHA that includes strict: false in smoke-copilot.md
-	// (required since sandbox.mcp.container is now blocked in strict mode),
-	// serena-go.md uses ./serena.md (explicitly-relative) so the fetcher correctly
-	// resolves it against shared/mcp/ rather than the top-level .github/workflows/,
-	// and tools.cli-proxy: true (not the deprecated mount-as-clis which was removed from
-	// the schema when the mount-as-clis-to-cli-proxy codemod was added).
-	workflowSpec := "github/gh-aw/.github/workflows/smoke-copilot.md@d555622"
+	// Pin to a revision that does not configure Copilot's native web-fetch tool,
+	// which is rejected during compilation in offline BYOK mode.
+	workflowSpec := "github/gh-aw/.github/workflows/smoke-copilot.md@ea6a6003e66a73f766df3d609ef4a8f97fc73184"
 
 	cmd := exec.Command(setup.binaryPath, "add", workflowSpec, "--verbose")
 	cmd.Dir = setup.tempDir

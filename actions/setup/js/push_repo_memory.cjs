@@ -10,7 +10,7 @@ const { getGitAuthEnv } = require("./git_auth_helpers.cjs");
 const { execGitSync } = require("./git_helpers.cjs");
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_validation.cjs");
-const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
+const { compileFileGlobPatterns, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = require("./temporary_id.cjs");
@@ -117,14 +117,15 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
     core.warning(`Failed to configure JSONL union-merge policy; concurrent JSONL rows may be lost on conflict: ${getErrorMessage(mergePolicyError)}`);
   }
 
-  execGitSync(["fetch", repoUrl, `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitAuthEnv, stdio: "pipe", suppressLogs: true });
+  const gitEnv = { ...process.env, ...(gitAuthEnv || {}) };
+  execGitSync(["fetch", repoUrl, `refs/heads/${branchName}`], { cwd: workspaceDir, env: gitEnv, stdio: "pipe", suppressLogs: true });
 
   const rebaseArgs = previousBaseRef ? ["rebase", "-X", "theirs", "--onto", remoteHead, previousBaseRef] : ["rebase", "-X", "theirs", "--onto", remoteHead, "--root"];
   try {
-    execGitSync(rebaseArgs, { cwd: workspaceDir, stdio: "inherit", suppressLogs: true });
+    execGitSync(rebaseArgs, { cwd: workspaceDir, env: gitEnv, stdio: "inherit", suppressLogs: true });
   } catch (rebaseError) {
     try {
-      execGitSync(["rebase", "--abort"], { cwd: workspaceDir, stdio: "pipe" });
+      execGitSync(["rebase", "--abort"], { cwd: workspaceDir, env: gitEnv, stdio: "pipe", suppressLogs: true });
     } catch {
       // Ignore cleanup failures; surface the original rebase error below.
     }
@@ -639,18 +640,6 @@ async function main() {
       )
     : new Set();
 
-  // Remove any pre-existing files in the checked-out branch that no longer pass the
-  // current allowed-extensions/file-glob filters (e.g. left over from a prior run with
-  // different filter settings). Without this, formatJSONFiles/runCustomMemoryValidation
-  // below would still process stale ineligible files even though the newly copied files
-  // are already filtered.
-  if (allowedExtensions.length > 0 || fileGlobFilter) {
-    const { removed } = filterIneligibleMemoryFiles(destMemoryPath, allowedExtensions, fileGlobFilter, core);
-    if (removed.length > 0) {
-      core.info(`Removed ${removed.length} stale ineligible file(s) from existing branch content`);
-    }
-  }
-
   // Recursively scan and collect files from artifact directory
   let filesToCopy = [];
   /** @type {Array<{path: string, reason: string}>} */
@@ -658,6 +647,7 @@ async function main() {
 
   // Compile glob patterns once, outside the scan loop
   const { patternStrs, compiledPatterns } = compileFileGlobPatterns(fileGlobFilter);
+  const isEligibleFile = relativePath => isMemoryFileEligible(relativePath, allowedExtensions, compiledPatterns).eligible;
   if (compiledPatterns.length > 0) {
     core.info(`File glob filter enabled with ${patternStrs.length} pattern(s):`);
     patternStrs.forEach((pat, idx) => {
@@ -799,7 +789,7 @@ async function main() {
     core.info("FORMAT_JSON is enabled: formatting .json files as human-readable...");
 
     try {
-      const formattedFiles = formatJSONFiles(destMemoryPath, maxFileSize);
+      const formattedFiles = formatJSONFiles(destMemoryPath, maxFileSize, isEligibleFile);
       ledgerActivity.normalized.push(...formattedFiles);
       for (const formattedFile of formattedFiles) {
         core.info(`Formatted JSON: ${formattedFile}`);
@@ -818,6 +808,7 @@ async function main() {
       memoryId,
       kind: "repo",
       timeoutSeconds: validationTimeoutSeconds,
+      isEligibleFile,
     });
     if (!customValidation.ok) {
       const reason = customValidation.timedOut ? `timed out after ${validationTimeoutSeconds} second(s)` : `exited with code ${customValidation.exitCode}`;
@@ -847,7 +838,14 @@ async function main() {
   // The :(literal) magic prefix tells Git to treat each entry as a plain string,
   // preventing glob expansion or pathspec-magic interpretation (e.g. :(top),
   // wildcards) even when a filename happens to contain those characters.
-  const literalPathspecs = Array.from(new Set(filesToCopy.map(file => `:(literal)${file.relativePath}`))).sort();
+  const managedPaths = [...filesToCopy.map(file => file.relativePath), ...ledgerActivity.normalized];
+  const literalPathspecs = Array.from(new Set(managedPaths.map(relativePath => `:(literal)${relativePath}`))).sort();
+
+  if (literalPathspecs.length === 0) {
+    core.info("No eligible memory files changed after normalization");
+    await writeLedgerSummary();
+    return;
+  }
 
   // Check if we have any changes to commit, scoped to managed memory files only.
   let changedFileCount = 0;

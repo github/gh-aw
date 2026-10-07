@@ -34,6 +34,39 @@ describe("memory_custom_validation", () => {
     expect(result.stdout).toContain("domain ok");
   });
 
+  it("filters the disposable validation copy without changing sibling files", () => {
+    fs.mkdirSync(path.join(tempDir, "nested"));
+    fs.mkdirSync(path.join(tempDir, "sibling-only"));
+    fs.mkdirSync(path.join(tempDir, ".git"));
+    fs.writeFileSync(path.join(tempDir, "state.json"), '{"ok":true}');
+    fs.writeFileSync(path.join(tempDir, "sibling.json"), "not JSON");
+    fs.writeFileSync(path.join(tempDir, "nested", "state.json"), '{"nested":true}');
+    fs.writeFileSync(path.join(tempDir, "nested", "sibling.json"), "not JSON");
+    fs.writeFileSync(path.join(tempDir, "sibling-only", "sibling.json"), "not JSON");
+    fs.writeFileSync(path.join(tempDir, ".git", "state.json"), "not JSON");
+
+    const result = runCustomMemoryValidation({
+      script: `
+        for (const relativePath of ["state.json", "nested/state.json"]) {
+          JSON.parse(fs.readFileSync(path.join(memoryRoot, relativePath), "utf8"));
+        }
+        if (fs.existsSync(path.join(memoryRoot, "sibling.json"))
+          || fs.existsSync(path.join(memoryRoot, "nested", "sibling.json"))
+          || fs.existsSync(path.join(memoryRoot, "sibling-only"))
+          || fs.existsSync(path.join(memoryRoot, ".git"))) throw new Error("ineligible files copied");
+      `,
+      memoryDir: tempDir,
+      kind: "repo",
+      timeoutSeconds: 5,
+      isEligibleFile: relativePath => relativePath === "state.json" || relativePath === "nested/state.json" || relativePath === ".git/state.json",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(path.join(tempDir, "sibling.json"), "utf8")).toBe("not JSON");
+    expect(fs.readFileSync(path.join(tempDir, "nested", "sibling.json"), "utf8")).toBe("not JSON");
+    expect(fs.readFileSync(path.join(tempDir, "sibling-only", "sibling.json"), "utf8")).toBe("not JSON");
+  });
+
   it("reports a nonzero validator separately from stdout", () => {
     const result = runCustomMemoryValidation({
       script: `

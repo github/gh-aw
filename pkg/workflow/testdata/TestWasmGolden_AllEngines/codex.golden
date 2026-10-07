@@ -19,7 +19,7 @@ run-name: "engine-codex-test"
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     if: needs.pre_activation.outputs.activated == 'true'
     runs-on: ubuntu-slim
@@ -320,7 +320,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -756,7 +756,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     runs-on: ubuntu-slim
     # Permissions for the pre_activation job (workflow permissions default to none).
     permissions:

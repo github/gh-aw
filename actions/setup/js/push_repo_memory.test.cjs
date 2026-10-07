@@ -1833,7 +1833,7 @@ describe("push_repo_memory.cjs - changed-file limit checks", () => {
     const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
     const helperContent = nodeFs.readFileSync(helperPath, "utf8");
 
-    expect(scriptContent).toContain("formatJSONFiles(destMemoryPath, maxFileSize)");
+    expect(scriptContent).toContain("formatJSONFiles(destMemoryPath, maxFileSize, isEligibleFile)");
     expect(helperContent).toContain('Buffer.byteLength(formatted, "utf8")');
     expect(helperContent).toContain("Formatted JSON exceeds max file size");
   });
@@ -1885,24 +1885,123 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
     expect(scriptContent).toContain("No eligible files to copy from artifact");
   });
 
-  it("filters stale ineligible files already present in the checked-out branch before format/validation (source check)", () => {
-    // Review feedback: after checking out an existing memory branch, files from prior
-    // runs that no longer match the current allowed-extensions/file-glob filters must
-    // not be left in destMemoryPath, since formatJSONFiles/runCustomMemoryValidation
-    // operate on the whole destMemoryPath, not just the newly-copied eligible files.
-    const nodeFs = require("fs");
-    const nodePath = require("path");
-    const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
-    const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+  it.each([false, true])("preserves sibling files through validation and concurrent-head retries (format-json: %s)", async formatJSON => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-shared-"));
+    const remoteDir = path.join(rootDir, "remote.git");
+    const workspaceDir = path.join(rootDir, "workspace");
+    const otherDir = path.join(rootDir, "other");
+    const artifactDir = path.join(rootDir, "artifact");
+    const branchName = "memory/shared";
+    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const git = (args, cwd = workspaceDir) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" });
+    const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+    const require = createRequire(import.meta.url);
+    const module = { exports: {} };
+    const siblingContent = '{"id":"sibling"}\n';
+    const siblingJSON = '{"sibling":true}';
+    let remoteHead;
 
-    expect(scriptContent).toContain("filterIneligibleMemoryFiles(destMemoryPath, allowedExtensions, fileGlobFilter, core)");
-    // The stale-file filter must run before destMemoryPath is formatted/validated.
-    const filterIdx = scriptContent.indexOf("filterIneligibleMemoryFiles(destMemoryPath");
-    const formatIdx = scriptContent.indexOf("formatJSONFiles(destMemoryPath, maxFileSize)");
-    const validateIdx = scriptContent.indexOf("runCustomMemoryValidation({");
-    expect(filterIdx).toBeGreaterThan(-1);
-    expect(filterIdx).toBeLessThan(formatIdx);
-    expect(filterIdx).toBeLessThan(validateIdx);
+    try {
+      fs.mkdirSync(workspaceDir);
+      fs.mkdirSync(artifactDir);
+      git(["init", "--bare", remoteDir]);
+      git(["init", "-b", branchName]);
+      git(["config", "user.name", "test"]);
+      git(["config", "user.email", "test@example.com"]);
+      fs.writeFileSync(path.join(workspaceDir, "grounding-old.jsonl"), siblingContent);
+      fs.writeFileSync(path.join(workspaceDir, "sibling.json"), siblingJSON);
+      fs.writeFileSync(path.join(workspaceDir, "jailbreak-old.jsonl"), '{"id":"old"}\n');
+      fs.writeFileSync(path.join(workspaceDir, "jailbreak-state.json"), '{"old":true}');
+      git(["add", "."]);
+      git(["commit", "-m", "base"]);
+      git(["remote", "add", "origin", remoteDir]);
+      git(["push", "origin", branchName]);
+      git(["checkout", "-b", "main"]);
+      fs.writeFileSync(path.join(artifactDir, "jailbreak-new.jsonl"), '{"id":"new"}\n');
+      fs.writeFileSync(path.join(artifactDir, "ignored.bin"), "ignored");
+
+      const pushSignedCommits = vi.fn(async ({ cwd, baseRef, gitAuthEnv }) => {
+        if (pushSignedCommits.mock.calls.length === 1) {
+          git(["clone", "--branch", branchName, remoteDir, otherDir]);
+          git(["config", "user.name", "test"], otherDir);
+          git(["config", "user.email", "test@example.com"], otherDir);
+          fs.writeFileSync(path.join(otherDir, "grounding-concurrent.jsonl"), '{"id":"concurrent"}\n');
+          git(["add", "."], otherDir);
+          git(["commit", "-m", "concurrent"], otherDir);
+          git(["push", "origin", "HEAD"], otherDir);
+          remoteHead = git(["rev-parse", "HEAD"], otherDir).trim();
+          const changedPaths = git(["diff", "--name-only", `${baseRef}..HEAD`], cwd)
+            .trim()
+            .split("\n");
+          expect(changedPaths).toEqual(formatJSON ? ["jailbreak-new.jsonl", "jailbreak-state.json"] : ["jailbreak-new.jsonl"]);
+          throw new Error("ERR_API: stale head");
+        }
+        expect(git(["status", "--porcelain"], cwd)).toBe("");
+        expect(fs.readFileSync(path.join(cwd, "grounding-old.jsonl"), "utf8")).toBe(siblingContent);
+        expect(fs.readFileSync(path.join(cwd, "sibling.json"), "utf8")).toBe(siblingJSON);
+        expect(baseRef).toBe(remoteHead);
+        expect(git(["rev-list", "--count", `${remoteHead}..HEAD`], cwd).trim()).toBe("1");
+        expect(fs.existsSync(path.join(cwd, "grounding-concurrent.jsonl"))).toBe(true);
+        expect(gitAuthEnv).toEqual({ REPO_MEMORY_TEST_AUTH: "present" });
+      });
+      const execGitSync = (args, options = {}) => {
+        const localArgs = [...args];
+        if (args[0] === "fetch") localArgs[1] = remoteDir;
+        if (args[0] === "remote" && args[1] === "set-url") localArgs[3] = remoteDir;
+        const result = git(localArgs, options.cwd || workspaceDir);
+        if (args[0] === "rebase") {
+          expect(options.env?.REPO_MEMORY_TEST_ENV).toBe("preserved");
+          expect(options.env?.REPO_MEMORY_TEST_AUTH).toBe("present");
+        }
+        return result;
+      };
+      const mocks = {
+        "./git_helpers.cjs": { execGitSync },
+        "./git_auth_helpers.cjs": { getGitAuthEnv: () => ({ REPO_MEMORY_TEST_AUTH: "present" }) },
+        "./push_signed_commits.cjs": { pushSignedCommits },
+      };
+      vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
+        require: id => mocks[id] || require(id),
+        module,
+        core,
+        context: { repo: { owner: "owner", repo: "repo" } },
+        github: {},
+        exec: {
+          getExecOutput: async () => ({ stdout: `${remoteHead}\trefs/heads/${branchName}\n` }),
+        },
+        setTimeout: callback => callback(),
+        process: {
+          env: {
+            ARTIFACT_DIR: artifactDir,
+            GITHUB_WORKSPACE: workspaceDir,
+            MEMORY_ID: "test",
+            TARGET_REPO: "owner/repo",
+            BRANCH_NAME: branchName,
+            GH_TOKEN: "test-token",
+            FILE_GLOB_FILTER: "jailbreak-*.jsonl jailbreak-*.json",
+            ALLOWED_EXTENSIONS: '[".jsonl", ".json"]',
+            FORMAT_JSON: String(formatJSON),
+            REPO_MEMORY_TEST_ENV: "preserved",
+            VALIDATION_SCRIPT_B64: Buffer.from(
+              `
+              const names = fs.readdirSync(memoryRoot).sort();
+              if (names.join() !== "jailbreak-new.jsonl,jailbreak-old.jsonl,jailbreak-state.json") throw new Error("incorrect validation scope");
+              if (${formatJSON} && !fs.readFileSync(path.join(memoryRoot, "jailbreak-state.json"), "utf8").includes("\\n")) throw new Error("not normalized");
+            `
+            ).toString("base64"),
+          },
+        },
+      });
+
+      await module.exports.main();
+
+      expect(core.setFailed).not.toHaveBeenCalled();
+      expect(pushSignedCommits).toHaveBeenCalledTimes(2);
+      expect(git(["status", "--porcelain"])).toBe("");
+      expect(fs.existsSync(path.join(workspaceDir, "ignored.bin"))).toBe(false);
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 
   describe("behavioral: scanDirectory's inline eligibility check against real fixtures", () => {
@@ -2258,7 +2357,7 @@ describe("push_repo_memory.cjs - signed commit push (pushSignedCommits delegatio
         delete global.core;
         fs.rmSync(rootDir, { recursive: true, force: true });
       }
-    });
+    }, 30_000);
 
     it("should retry at least 10 times with capped full-jitter backoff (regression guard)", () => {
       const nodeFs = require("fs");

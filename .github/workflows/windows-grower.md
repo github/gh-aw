@@ -28,7 +28,7 @@ tools:
     toolsets: [issues, repos, actions]
 jobs:
   windows_probe:
-    name: Windows runner probe
+    name: windows_probe
     needs: [activation]
     uses: ./.github/workflows/windows.lock.yml
     with:

@@ -47,6 +47,14 @@ enclaves:
 - A fresh masked capability is generated per workflow run and passed only to the MCP gateway and AWF, never to the primary agent environment.
 - `timeout:` per enclave entry is capped at 4,740 seconds (AWF reserves the final 60 seconds of its 4,800-second finite-disclosure bucket for cleanup). The gateway itself enforces a 4,860-second tool timeout (4,800s AWF bucket + 60s transport allowance) — treat this as an enforcement bound, not a wall-clock guarantee.
 
+## Experimental Cloud Hypervisor runtime
+
+`enclaves[].runtime: cloud-hypervisor` is an experimental preview for static script and agent enclaves on GitHub-hosted Ubuntu x86_64 KVM runners. Set `sandbox.agent.version: v0.28.47` or newer; the older default AWF version does not support this executor. Configuration and behavior may change without deprecation. Unsupported hosts, artifacts, or configurations fail closed without fallback to Docker or another runtime.
+
+Set the entry-level `runtime: cloud-hypervisor` on every enclave entry; omitted `runtime` and `docker` retain Docker execution and cannot be mixed with VM entries. The compiler enables the AWF preview and stages release-attested enclave artifacts without selecting a VM runtime for the primary agent or changing its mounts or TTY.
+
+Do not combine this preview with `dynamic`, enclave `image` overrides, Docker host path prefixes, `runner.topology: arc-dind`, or primary `sandbox.agent.runtime` values `sbx`, `nvx`, or `cloud-hypervisor`. Agent entries also require `agent.model`, the API proxy with a configured route for their fixed engine/profile, and no Docker-in-Docker. Only the default `agent.engine: copilot` is implemented; the emitted `COPILOT_GITHUB_TOKEN` or `COPILOT_PROVIDER_API_KEY` configures its route, not a target hostname or pricing overlay alone. Static `agent.github` and `agent.tools.github` access is unsupported in the VM preview until a scoped executor bearer handoff is available. Existing disclosure limits and MCP tools remain unchanged.
+
 ## Agent GitHub tool configuration
 
 Prefer this configuration shape for new workflows:

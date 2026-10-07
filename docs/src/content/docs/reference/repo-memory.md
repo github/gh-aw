@@ -178,11 +178,13 @@ Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required
 
 Branches auto-create as orphans by default, or clone with `--depth 1`. After validating `file-glob`, `max-file-size`, and `max-file-count`, gh-aw auto-commits and pushes when changes are present and threat detection passes.
 
+On a shared memory branch, `file-glob` and `allowed-extensions` scope normalization, validation, and persistence to eligible files. Existing files outside that scope are preserved, including files managed by other workflows.
+
 ### Custom validation
 
 Use `validation.script` when generic storage limits are not enough. The script is a JavaScript body executed with Node.js over the complete configured memory directory after `format-json` normalization and before artifact upload or branch commit. It runs in the agent job and is re-run in the repo-memory push job as defense in depth.
 
-Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"repo"`). These paths and the working directory point to a temporary copy of the memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
+Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"repo"`). These paths and the working directory point to a temporary copy of the eligible memory files, excluding the checkout's `.git` directory. Changes to this copy are not persisted and do not modify the original memory directory. This copy is not a sandbox: validators remain trusted code with the runner's filesystem permissions.
 
 Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
 
