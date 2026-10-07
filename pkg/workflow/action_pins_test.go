@@ -640,9 +640,6 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 			expectedVer:    "v7.0.1",
 			strictMode:     false,
 			shouldFallback: true,
-			// Note: When requesting v4 without dynamic resolution, the system uses v4.6.2's SHA
-			// (the highest v4.x.x version from hardcoded pins), but shows v4 in the comment
-			// to preserve the user's intent.
 		},
 		{
 			name:           "fallback to highest semver-compatible version for upload-artifact when requesting v5",
@@ -702,8 +699,8 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 					tt.repo, tt.requestedVer, result)
 			}
 
-			if tt.shouldFallback && !strings.Contains(result, "(source ") {
-				t.Errorf("getActionPinWithData(%s, %s) = %s, expected fallback to include resolved-version metadata",
+			if tt.shouldFallback && !strings.HasSuffix(result, "# "+expectedVersion) {
+				t.Errorf("getActionPinWithData(%s, %s) = %s, expected a single fallback version comment",
 					tt.repo, tt.requestedVer, result)
 			}
 		})
@@ -952,7 +949,7 @@ func TestApplyActionPinsToTypedSteps(t *testing.T) {
 	}
 }
 
-// TestGetActionPinWithData_V7Fallback verifies v7 fallback preserves source annotation.
+// TestGetActionPinWithData_V7Fallback verifies fallback uses the resolved version.
 func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 	data := &WorkflowData{
 		StrictMode: false,
@@ -970,9 +967,8 @@ func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 
 	t.Logf("Result: %s", result)
 
-	// Should include resolved + source format for fallback.
-	if !strings.Contains(result, "# v7.0.1 (source v7)") {
-		t.Errorf("Expected resolved/source comment format in result, got: %s", result)
+	if !strings.HasSuffix(result, "# v7.0.1") {
+		t.Errorf("Expected single resolved version comment in result, got: %s", result)
 	}
 
 	// Check the SHA matches v7 (resolves to v7.0.1 pin)
@@ -1061,9 +1057,9 @@ func TestGetActionPinWithData_ExactVersionResolution(t *testing.T) {
 	}
 }
 
-// TestFallbackVersionUsesRequestedVersionInComment tests that fallback comments
-// now record both resolved and source versions.
-func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
+// TestFallbackVersionUsesResolvedVersionInComment tests that fallback comments
+// use the version of the pinned SHA rather than a mismatched requested version.
+func TestFallbackVersionUsesResolvedVersionInComment(t *testing.T) {
 	tests := []struct {
 		name            string
 		repo            string
@@ -1072,17 +1068,17 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 		expectedSHA     string
 	}{
 		{
-			name:            "v8 falls back to v9 and comment records source v8",
+			name:            "v8 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v8",
-			expectedComment: "# v9 (source v8)",
+			expectedComment: "# v9",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 		{
-			name:            "v7 falls back to v9 and comment records source v7",
+			name:            "v7 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v7",
-			expectedComment: "# v9 (source v7)",
+			expectedComment: "# v9",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 	}
@@ -1098,7 +1094,7 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 				t.Fatalf("getActionPinWithData(%s, %s) returned error: %v", tt.repo, tt.requestedVer, err)
 			}
 
-			if !strings.Contains(result, tt.expectedComment) {
+			if !strings.HasSuffix(result, tt.expectedComment) {
 				t.Errorf("getActionPinWithData(%s, %s) = %s, expected comment to contain %s",
 					tt.repo, tt.requestedVer, result, tt.expectedComment)
 			}
@@ -1106,10 +1102,6 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 			if !strings.Contains(result, tt.expectedSHA) {
 				t.Errorf("getActionPinWithData(%s, %s) = %s, expected SHA %s",
 					tt.repo, tt.requestedVer, result, tt.expectedSHA)
-			}
-
-			if tt.requestedVer == "v8" && !strings.Contains(result, "# v9 (source v8)") {
-				t.Errorf("Expected v8 fallback comment to record resolved version v9, got: %s", result)
 			}
 		})
 	}
@@ -2083,5 +2075,60 @@ func TestMapPinnedUsesResolvesMirrorTag(t *testing.T) {
 	}
 	if !strings.Contains(output, "uses: internal/checkout@"+sha) {
 		t.Fatalf("mirror tag was not resolved through the action cache: %s", output)
+	}
+}
+
+func TestMapPinnedUsesPreservesExactMappingPerStepThroughSanitization(t *testing.T) {
+	setupNode := getActionPin("actions/setup-node")
+	input := "steps:\n" +
+		"- name: Mapped__gh_aw_exact_pin__\n" +
+		"  uses: " + setupNode + "\n" +
+		"- name: Ordinary\n" +
+		"  uses: " + setupNode + "\n" +
+		"- name: Script\n" +
+		"  run: echo \"${{ github.event.issue.title }}\"\n"
+	sanitized, _, err := sanitizeCustomStepsYAML(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sanitized, "Mapped__gh_aw_exact_pin__") {
+		t.Fatalf("sanitization dropped the exact-mapping provenance:\n%s", sanitized)
+	}
+
+	mapped, err := mapPinnedUsesInYAML(
+		"      - name: Mapped"+exactPinMappingMarker+"\n"+
+			"        uses: "+setupNode+" "+exactPinMappingMarker+"\n"+
+			"      - name: Ordinary\n"+
+			"        uses: "+setupNode+"\n",
+		map[string]string{"actions/setup-node@v1": "internal/setup-node@v1"},
+		map[string]string{"actions/": "mirror/actions-"}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(mapped, exactPinMappingMarker) {
+		t.Fatalf("internal mapping marker leaked into output:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: "+setupNode) {
+		t.Fatalf("exact-mapped step was prefix-rewritten:\n%s", mapped)
+	}
+	if !strings.Contains(mapped, "uses: "+strings.Replace(setupNode, "actions/setup-node@", "mirror/actions-setup-node@", 1)) {
+		t.Fatalf("ordinary step using the same reference was not prefix-rewritten:\n%s", mapped)
+	}
+}
+
+func TestApplyActionPinToTypedStepRejectsUnresolvedExactMapping(t *testing.T) {
+	data := &WorkflowData{
+		ActionPinMappings: map[string]string{
+			"actions/github-script@v9": "internal/missing@v1",
+		},
+	}
+	step := &WorkflowStep{Uses: "actions/github-script@v9"}
+
+	_, err := applyActionPinToTypedStep(step, data)
+	if err == nil {
+		t.Fatal("expected unresolved exact mapping to fail")
+	}
+	if !strings.Contains(err.Error(), "action pin mapping") {
+		t.Fatalf("expected mapping error, got: %v", err)
 	}
 }

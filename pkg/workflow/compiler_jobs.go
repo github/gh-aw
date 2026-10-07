@@ -295,7 +295,9 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 	frontmatter := data.RawFrontmatter
 	lockFilename := filepath.Base(stringutil.MarkdownToLockFile(markdownPath))
 
-	c.resolveSafeOutputActionSchemas(data, markdownPath)
+	if err := c.resolveSafeOutputActionSchemas(data, markdownPath); err != nil {
+		return fmt.Errorf("failed to resolve safe-output action schemas: %w", err)
+	}
 
 	activationJobCreated, err := c.buildActivationAndMainJobs(data, frontmatter, lockFilename)
 	if err != nil {
@@ -326,14 +328,15 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 	return nil
 }
 
-func (c *Compiler) resolveSafeOutputActionSchemas(data *WorkflowData, markdownPath string) {
+func (c *Compiler) resolveSafeOutputActionSchemas(data *WorkflowData, markdownPath string) error {
 	// Resolve custom safe-output actions early so that tool schemas (derived from action.yml)
 	// are available when buildMainJobWrapper → generateMCPSetup → generateToolsMetaJSON →
 	// generateDynamicTools runs. Without this early resolution the dynamic_tools entry for
 	// each action tool would have an empty schema because Inputs/ActionDescription are nil.
 	if data.SafeOutputs != nil && len(data.SafeOutputs.Actions) > 0 {
-		c.resolveAllActions(data, markdownPath)
+		return c.resolveAllActions(data, markdownPath)
 	}
+	return nil
 }
 
 // buildActivationAndMainJobs builds the activation chain and the primary agent job.

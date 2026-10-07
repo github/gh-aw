@@ -326,6 +326,30 @@ func TestBuildActionStepsFallbackPayload(t *testing.T) {
 	assert.Contains(t, fullYAML, "steps.process_safe_outputs.outputs.action_unknown_inputs_tool_payload", "Should reference payload output")
 }
 
+func TestFetchAndParseActionYAMLUsesMappedTargetMetadata(t *testing.T) {
+	cache := NewActionCache(t.TempDir())
+	const targetSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	require.True(t, cache.Set("internal/script", "v1", targetSHA))
+	targetInputs := map[string]*ActionYAMLInput{"title": {Required: true}}
+	cache.SetInputs("internal/script", "v1", targetInputs)
+	cache.SetActionDescription("internal/script", "v1", "Mapped action")
+
+	data := &WorkflowData{
+		ActionCache:    cache,
+		ActionResolver: NewActionResolver(cache),
+		ActionPinMappings: map[string]string{
+			"actions/source@v1": "internal/script@v1",
+		},
+	}
+	config := &SafeOutputActionConfig{Uses: "actions/source@v1"}
+
+	err := NewCompiler().fetchAndParseActionYAML("mapped-tool", config, "workflow.md", data)
+	require.NoError(t, err)
+	assert.Equal(t, "internal/script@"+targetSHA+" # v1 "+exactPinMappingMarker, config.ResolvedRef)
+	assert.Equal(t, targetInputs, config.Inputs)
+	assert.Equal(t, "Mapped action", config.ActionDescription)
+}
+
 // TestBuildActionStepsEmpty verifies no steps when no actions
 func TestBuildActionStepsEmpty(t *testing.T) {
 	compiler := NewCompiler()
