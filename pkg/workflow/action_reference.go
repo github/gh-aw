@@ -297,11 +297,17 @@ func (c *Compiler) convertToExternalActionsRef(localPath string, data *WorkflowD
 	if data != nil {
 		pinnedRef, err := getActionPinWithData(actionRepo, tag, data)
 		if err != nil {
+			if hasExactActionPinMapping(actionRepo, tag, data) {
+				actionRefLog.Printf("Failed to resolve exact action pin mapping for %s@%s: %v", actionRepo, tag, err)
+				return ""
+			}
 			// Log and fall through to tag-based reference (action mode is not strict)
 			actionRefLog.Printf("Failed to pin action %s@%s: %v, falling back to tag-based reference", actionRepo, tag, err)
 		} else if pinnedRef != "" {
 			actionRefLog.Printf("Action mode: resolved %s to SHA-pinned reference: %s", remoteRef, pinnedRef)
 			return pinnedRef
+		} else if hasExactActionPinMapping(actionRepo, tag, data) {
+			return ""
 		}
 	}
 
