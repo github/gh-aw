@@ -242,10 +242,11 @@ func matchesAnyGitHubExpression(value string, expectedExpressions ...string) boo
 }
 
 func matchesGitHubExpression(value string, expectedExpression string) bool {
+	const expressionCaptureIndex = 1
 	trimmed := strings.TrimSpace(value)
 	matches := pullRequestTargetGitHubExpressionPattern.FindStringSubmatch(trimmed)
-	if len(matches) != 2 {
-		return false
+	if len(matches) > expressionCaptureIndex {
+		return strings.TrimSpace(matches[expressionCaptureIndex]) == expectedExpression
 	}
-	return strings.TrimSpace(matches[1]) == expectedExpression
+	return false
 }

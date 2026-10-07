@@ -177,7 +177,7 @@ func TestBuildSharedPRCheckoutSteps(t *testing.T) {
 				{Ref: "develop"},
 			},
 			checkContains: []string{
-				"ref: develop",
+				"ref: \"develop\"",
 			},
 		},
 		{
