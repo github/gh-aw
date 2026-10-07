@@ -538,6 +538,8 @@ func TestEngineSecretConfigStructure(t *testing.T) {
 }
 
 func TestGetEngineSecretNameAndValue(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+
 	// Save current env and restore after test
 	oldCopilotToken := os.Getenv("COPILOT_GITHUB_TOKEN")
 	oldAnthropicKey := os.Getenv("ANTHROPIC_API_KEY")
