@@ -92,3 +92,5 @@
 {"id":"status_report_created","question":"Did the agent create a daily status report with relevant project updates?","answer":"UNKNOWN","model":"gpt-5.3-codex","timestamp":"2026-10-06T08:58:43.026Z","runid":"37439126240"}
 {"id":"project_activity_analyzed","question":"Did the agent analyze recent gh-aw project activity for the daily status report?","answer":"NO","model":"gpt-5.3-codex","timestamp":"2026-10-07T09:00:21.464Z","runid":"37597002854"}
 {"id":"status_report_created","question":"Did the agent create a daily status report with relevant project updates?","answer":"UNKNOWN","model":"gpt-5.3-codex","timestamp":"2026-10-07T09:00:21.464Z","runid":"37597002854"}
+{"id":"haiku_generated","question":"Did the agent produce an original three-line haiku about code, automation, or workflows with a 5-7-5 syllable pattern?","answer":"NO","model":"evals","timestamp":"2026-10-07T16:28:52.309Z","runid":"37651557211"}
+{"id":"haiku_printed","question":"Did the agent record the haiku with noop and print the same three lines as its final response without a title or commentary?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-07T16:28:52.309Z","runid":"37651557211"}
