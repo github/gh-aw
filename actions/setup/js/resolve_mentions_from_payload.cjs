@@ -10,6 +10,21 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { parseRepoSlug } = require("./repo_helpers.cjs");
 
 /**
+ * Use the mention-specific token for allowlist lookups instead of inheriting a
+ * downstream safe-output write token.
+ * @param {any} fallback
+ * @returns {any}
+ */
+function getMentionsGithubClient(fallback) {
+  const token = process.env.GH_AW_MENTIONS_GITHUB_TOKEN;
+  const globalState = /** @type {any} */ global;
+  if (token && typeof globalState.getOctokit === "function") {
+    return globalState.getOctokit(token);
+  }
+  return fallback;
+}
+
+/**
  * Push a non-bot user's login to the array if present.
  * @param {string[]} users - Target array
  * @param {{ login?: string, type?: string } | null | undefined} user - User object from payload
@@ -182,6 +197,7 @@ async function resolveAllowedMentionsFromPayload(context, github, core, mentions
   if (!context || !github || !core) {
     return [];
   }
+  github = getMentionsGithubClient(github);
 
   // If mentions is explicitly set to false, return empty array (all mentions escaped)
   if (mentionsConfig === false || mentionsConfig?.enabled === false) {
@@ -298,6 +314,7 @@ async function resolveDefaultMentions(context, github, core, mentionsConfig, def
 }
 
 module.exports = {
+  getMentionsGithubClient,
   resolveAllowedMentionsFromPayload,
   resolveMentionsForItem,
   resolveDefaultMentions,

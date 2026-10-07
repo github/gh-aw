@@ -44,6 +44,7 @@ const RUNTIME_TO_MENTION_ALIAS_MAP = {
  * @property {number} [maxMentions] - Maximum number of unique allowed aliases to preserve
  * @property {Set<string>} [allowedAliasesSeen] - Allowed aliases already preserved in this output item
  * @property {number} [maxBotMentions] - Maximum bot trigger references before filtering (default: 10)
+ * @property {boolean} [deferMentions] - Preserve mentions for filtering in the trusted safe-outputs job
  */
 
 /**
@@ -62,6 +63,7 @@ function sanitizeContent(content, maxLengthOrOptions) {
   let maxMentions;
   /** @type {number | undefined} */
   let maxBotMentions;
+  let deferMentions = false;
   /** @type {Set<string> | undefined} */
   let allowedAliasesSeen;
 
@@ -74,11 +76,12 @@ function sanitizeContent(content, maxLengthOrOptions) {
     allowedAliasesLowercase = expandAllowedAliases(normalizedAllowedAliases);
     maxMentions = maxLengthOrOptions.maxMentions;
     maxBotMentions = maxLengthOrOptions.maxBotMentions;
+    deferMentions = maxLengthOrOptions.deferMentions === true;
     allowedAliasesSeen = maxLengthOrOptions.allowedAliasesSeen;
   }
 
   // If no allowed aliases specified, use core sanitization (which neutralizes all mentions)
-  if (allowedAliasesLowercase.length === 0) {
+  if (allowedAliasesLowercase.length === 0 && !deferMentions) {
     return sanitizeContentCore(content, maxLength, maxBotMentions);
   }
 
@@ -132,7 +135,9 @@ function sanitizeContent(content, maxLengthOrOptions) {
 
   // Neutralize mentions after truncation so the length boundary cannot split an
   // inserted code-span delimiter and reactivate a mention.
-  sanitized = neutralizeMentions(sanitized, allowedAliasesLowercase, maxMentions, allowedAliasesSeen);
+  if (!deferMentions) {
+    sanitized = neutralizeMentions(sanitized, allowedAliasesLowercase, maxMentions, allowedAliasesSeen);
+  }
 
   // Neutralize GitHub references if restrictions are configured
   sanitized = neutralizeGitHubReferences(sanitized, allowedGitHubRefs);

@@ -122,7 +122,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 		},
 		{
-			name: "add-comment with issues:false - no issues permission and no discussions by default",
+			name: "add-comment with issues:false - read permission for PR target author lookup",
 			safeOutputs: &SafeOutputsConfig{
 				AddComments: &AddCommentsConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("1")},
@@ -130,6 +130,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 				},
 			},
 			expected: map[PermissionScope]PermissionLevel{
+				PermissionIssues:       PermissionRead,
 				PermissionPullRequests: PermissionWrite,
 			},
 		},
@@ -636,7 +637,7 @@ func TestComputePermissionsForSafeOutputsExcludesPerHandlerAppsFromGlobalAppToke
 	perms := computePermissionsForSafeOutputs(safeOutputs, true)
 	require.NotNil(t, perms)
 	assert.Equal(t, PermissionWrite, perms.permissions[PermissionActions])
-	assert.NotContains(t, perms.permissions, PermissionIssues)
+	assert.Equal(t, PermissionRead, perms.permissions[PermissionIssues])
 }
 
 func TestComputePermissionsForSafeOutputsDispatchRepositoryAppSplit(t *testing.T) {
@@ -699,9 +700,27 @@ Test workflow.
 
 	perms := computePermissionsForSafeOutputs(workflowData.SafeOutputs, true)
 	require.NotNil(t, perms)
-	assert.NotContains(t, perms.permissions, PermissionIssues)
+	assert.Equal(t, PermissionRead, perms.permissions[PermissionIssues])
 	assert.NotContains(t, perms.permissions, PermissionPullRequests)
 	assert.Equal(t, PermissionWrite, perms.permissions[PermissionContents])
+}
+
+func TestMentionResolutionPermissionsIncludeIssuesReadForPullRequestOnlyComments(t *testing.T) {
+	issues := false
+	pullRequests := true
+	safeOutputs := &SafeOutputsConfig{
+		AddComments: &AddCommentsConfig{Issues: &issues, PullRequests: &pullRequests},
+		Mentions:    &MentionsConfig{AllowedTeams: []string{"my-org/my-team"}},
+	}
+
+	jobPermissions := computePermissionsForSafeOutputs(safeOutputs, true)
+	require.Equal(t, PermissionRead, jobPermissions.permissions[PermissionIssues])
+	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionPullRequests])
+
+	mentionTokenPermissions := buildMentionResolutionPermissions(safeOutputs)
+	assert.Equal(t, PermissionRead, mentionTokenPermissions.permissions[PermissionIssues])
+	assert.Equal(t, PermissionRead, mentionTokenPermissions.permissions[PermissionPullRequests])
+	assert.Equal(t, PermissionRead, mentionTokenPermissions.permissions[PermissionMembers])
 }
 
 func TestBuildPreambleTokenStepsExcludesParsedPerHandlerApps(t *testing.T) {
