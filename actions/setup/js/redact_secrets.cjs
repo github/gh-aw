@@ -327,7 +327,6 @@ function writeProcessedFile(filePath, content, changed) {
     } else {
       fs.accessSync(filePath, fs.constants.W_OK);
     }
-    core.debug(`Made file writable for secret redaction: ${filePath}`);
     return;
   }
   try {
@@ -385,7 +384,7 @@ function processFile(filePath, secretValues, maskedValues = []) {
       fs.unlinkSync(filePath);
     } catch (cleanupError) {
       if (!isErrnoCode(cleanupError, "ENOENT")) {
-        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed: ${filePath}`);
+        throw new AggregateError([error, cleanupError], `${ERR_VALIDATION}: Failed to remove artifact source after secret redaction failed`);
       }
     }
     const reason = maskedValues.length || path.extname(filePath).toLowerCase() === ".html" ? "secret redaction failed" : getErrorMessage(error);

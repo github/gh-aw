@@ -113,18 +113,18 @@ describe("redact_secrets.cjs", () => {
           spy.mockRestore();
         }
       });
-      it.each(["EACCES", "EPERM"])("fails closed when read-only file permissions cannot be changed (%s)", code => {
+      it.each(["EACCES", "EPERM"])("fails closed without disclosing secrets in filenames or errors when permissions cannot be changed (%s)", code => {
         const { processFile } = require("./redact_secrets.cjs");
         const moduleDir = path.join(tempDir, "go-mod");
         fs.mkdirSync(moduleDir);
-        const file = path.join(moduleDir, "README.md");
+        const file = path.join(moduleDir, "secret-value-README.md");
         fs.writeFileSync(file, "secret-value", { mode: 0o444 });
         fs.chmodSync(moduleDir, 0o555);
         const chmod = vi.spyOn(fs, "chmodSync").mockImplementation(() => {
           throw Object.assign(new Error("permission denied: secret-value"), { code });
         });
         try {
-          expect(() => processFile(file, ["secret-value"], ["runtime-mask"])).toThrow(`Failed to remove artifact source after secret redaction failed: ${file}`);
+          expect(() => processFile(file, ["secret-value"], ["runtime-mask"])).toThrow(/^ERR_VALIDATION: Failed to remove artifact source after secret redaction failed$/);
           expect(fs.readFileSync(file, "utf8")).toBe("secret-value");
           expect(fs.statSync(file).mode & 0o777).toBe(0o444);
           expect(mockCore.info.mock.calls.flat().join("\n")).not.toContain("secret-value");
