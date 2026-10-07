@@ -128,6 +128,41 @@ function agentErrorDiagnosticText(content) {
   return [...diagnostics, ...collectNativeErrorEvidence(errors).diagnostics].join("\n");
 }
 
+const ENGINE_ERROR_SUMMARIES = Object.freeze({
+  authentication_failed: "Authentication failed",
+  inference_access_error: "Inference access denied by policy settings",
+  mcp_policy_error: "MCP servers were blocked by policy",
+  agentic_engine_timeout: "Engine timed out",
+  model_not_supported_error: "Requested model is not supported",
+  http_400_response_error: "Provider returned HTTP 400 Bad Request",
+  capi_quota_exceeded_error: "Provider quota or rate limit exceeded",
+  capi_server_error: "Provider server error after retries",
+  invocation_cap_exceeded: "Maximum LLM invocations exceeded",
+  max_cache_misses_exceeded: "Maximum consecutive cache misses exceeded",
+  missing_model_pricing_error: "Model has no AI credits pricing",
+  shell_expansion_guard_rejected: "Shell expansion guard rejected a command",
+  max_ai_credits_exceeded: "Maximum AI credits exceeded",
+  effective_tokens_limit_exceeded: "Effective token limit exceeded",
+  permission_denied_limit_exceeded: "Permission denial limit exceeded",
+  model_policy_violation: "Model policy violation",
+  awf_api_proxy_blocking_requests: "AWF API proxy blocked requests",
+  goal_already_active: "Session already has an active goal",
+  sandbox_runtime_crash: "Sandbox runtime crashed",
+});
+
+/**
+ * Preserve actionable error classes without publishing raw log lines or payloads.
+ * @param {string} content
+ * @returns {string}
+ */
+function agentErrorSummaryText(content) {
+  const execution = collectAgentExecution({ content });
+  return (execution?.data.categories || [])
+    .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
+    .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
+    .join("\n");
+}
+
 /**
  * @param {any[]} errors
  */
@@ -234,4 +269,4 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   return { type: "agent.execution", data };
 }
 
-module.exports = { collectAgentExecution, agentErrorDiagnosticText, validateAgentExecution, validateAgentExitCode, parseAgentExitCode, isAgentExecutionEvent };
+module.exports = { collectAgentExecution, agentErrorDiagnosticText, agentErrorSummaryText, validateAgentExecution, validateAgentExitCode, parseAgentExitCode, isAgentExecutionEvent };
