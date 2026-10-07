@@ -32,7 +32,7 @@ type PromptForm struct {
 // NewForm creates a huh form with gh-aw's default theme and accessibility mode.
 func NewForm(groups ...*huh.Group) *PromptForm {
 	accessible := IsAccessibleMode()
-	clearOnRun := tty.IsStdinTerminal() && tty.IsStderrTerminal() && !accessible
+	clearOnRun := tty.IsStderrTerminal() && !accessible
 	form := huh.NewForm(groups...).WithTheme(styles.HuhTheme).WithAccessible(accessible)
 	if clearOnRun {
 		form = form.WithHeight(promptReservedRows)

@@ -4,6 +4,7 @@ package console
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -52,18 +53,38 @@ func TestPromptFormDoesNotClearAccessibleOrNonTTYQuestion(t *testing.T) {
 }
 
 func TestPromptFormRunRejectsNonTTYStdin(t *testing.T) {
-	oldStdin := os.Stdin
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	t.Cleanup(func() { os.Stdin = oldStdin })
-	t.Cleanup(func() { r.Close() })
-	t.Cleanup(func() { w.Close() })
-	os.Stdin = r
+	for _, accessible := range []string{"0", "1"} {
+		t.Run("accessible="+accessible, func(t *testing.T) {
+			t.Setenv("ACCESSIBLE", accessible)
+			for _, method := range []string{"Run", "RunWithContext"} {
+				t.Run(method, func(t *testing.T) {
+					oldStdin := os.Stdin
+					r, w, err := os.Pipe()
+					require.NoError(t, err)
+					t.Cleanup(func() { os.Stdin = oldStdin })
+					t.Cleanup(func() { r.Close() })
+					t.Cleanup(func() { w.Close() })
+					_, err = w.WriteString("n\n")
+					require.NoError(t, err)
+					require.NoError(t, w.Close())
+					os.Stdin = r
 
-	form := &PromptForm{}
-	err = form.Run()
-
-	require.ErrorContains(t, err, "stdin and stderr must be TTYs")
+					var confirmed bool
+					form := NewConfirmForm(huh.NewConfirm().Value(&confirmed))
+					if method == "Run" {
+						err = form.Run()
+					} else {
+						err = form.RunWithContext(context.Background())
+					}
+					require.ErrorContains(t, err, "stdin and stderr must be TTYs")
+					var remaining bytes.Buffer
+					_, err = remaining.ReadFrom(r)
+					require.NoError(t, err)
+					require.Equal(t, "n\n", remaining.String(), "rejected prompts must not consume piped answers")
+				})
+			}
+		})
+	}
 }
 
 func TestIsCancelled(t *testing.T) {
