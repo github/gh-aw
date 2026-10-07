@@ -12,7 +12,56 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestOutputCollectionGitHubToken(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		safeOutputs *SafeOutputsConfig
+		token       string
+	}{
+		{name: "no safe outputs"},
+		{name: "default token", safeOutputs: &SafeOutputsConfig{}},
+		{
+			name:        "step token with fallback",
+			safeOutputs: &SafeOutputsConfig{GitHubToken: "${{ steps.mint.outputs.token || secrets.MENTIONS_PAT || secrets.GITHUB_TOKEN }}"},
+			token:       "${{ steps.mint.outputs.token || secrets.MENTIONS_PAT || secrets.GITHUB_TOKEN }}",
+		},
+		{
+			name: "per-handler token is not used",
+			safeOutputs: &SafeOutputsConfig{
+				AddComments: &AddCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.COMMENT_PAT }}"}},
+			},
+		},
+		{
+			name: "global token takes precedence over per-handler token",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubToken: "${{ secrets.MENTIONS_PAT }}",
+				AddComments: &AddCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: "${{ secrets.COMMENT_PAT }}"}},
+			},
+			token: "${{ secrets.MENTIONS_PAT }}",
+		},
+		{
+			name: "safe outputs app token is not available in agent job",
+			safeOutputs: &SafeOutputsConfig{
+				GitHubApp: &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var yaml strings.Builder
+			require.NoError(t, NewCompiler().generateOutputCollectionStep(&yaml, &WorkflowData{SafeOutputs: tt.safeOutputs}))
+			if tt.token == "" {
+				assert.NotContains(t, yaml.String(), "github-token:")
+			} else {
+				assert.Contains(t, yaml.String(), "        with:\n          github-token: "+tt.token+"\n          script: |\n")
+			}
+			assert.Contains(t, yaml.String(), "setupGlobals(core, github, context, exec, io, getOctokit);")
+		})
+	}
+}
 
 func TestAgenticOutputCollection(t *testing.T) {
 	// Create temporary directory for test files
@@ -31,6 +80,9 @@ tools:
 engine: claude
 strict: false
 safe-outputs:
+  github-token: ${{ secrets.MENTIONS_PAT }}
+  mentions:
+    allowed-teams: [my-org/my-team]
   add-labels:
     allowed: ["bug", "enhancement"]
 ---
@@ -86,9 +138,10 @@ This workflow tests the agentic output collection functionality.
 		t.Error("runner.tool_cache must not be interpolated directly in the shell script")
 	}
 
-	if !strings.Contains(lockContent, "- name: Ingest agent output") {
-		t.Error("Expected 'Ingest agent output' step to be in generated workflow")
-	}
+	require.Contains(t, lockContent, "- name: Ingest agent output\n")
+	ingestStep := strings.SplitN(strings.SplitN(lockContent, "- name: Ingest agent output\n", 2)[1], "\n      - ", 2)[0]
+	assert.Contains(t, ingestStep, "github-token: ${{ secrets.MENTIONS_PAT }}")
+	assert.Contains(t, extractJobSection(lockContent, "safe_outputs"), "github-token: ${{ secrets.MENTIONS_PAT }}")
 
 	// Upload Safe Outputs and Upload sanitized agent output are now merged into the
 	// unified 'agent' artifact — individual upload steps no longer exist.

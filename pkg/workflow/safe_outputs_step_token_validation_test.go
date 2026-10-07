@@ -65,7 +65,7 @@ jobs:
 	require.NoError(t, err)
 	lockYAML := string(lockContent)
 
-	for _, jobName := range []string{"safe_outputs", "conclusion"} {
+	for _, jobName := range []string{"agent", "safe_outputs", "conclusion"} {
 		section := extractJobSection(lockYAML, jobName)
 		require.NotEmpty(t, section, "expected %s job section", jobName)
 		assert.Contains(t, section, "id: octosts")
@@ -101,6 +101,42 @@ safe-outputs:
 	err := compiler.CompileWorkflow(workflowFile)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `has no step with id "octosts"`)
+	assert.Contains(t, err.Error(), "pre-steps:")
+}
+
+func TestSameJobStepTokenMissingInAgentIngestionFails(t *testing.T) {
+	workflowFile := writeStepTokenWorkflow(t, "missing-agent", `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+engine: claude
+strict: false
+safe-outputs:
+  add-comment:
+  mentions:
+    allowed-teams: [my-org/my-team]
+  github-token: ${{ steps.octosts.outputs.token || secrets.GITHUB_TOKEN }}
+jobs:
+  safe_outputs:
+    pre-steps:
+      - name: Mint token (safe outputs)
+        id: octosts
+        uses: `+stsMintStep+`
+  conclusion:
+    pre-steps:
+      - name: Mint token (conclusion)
+        id: octosts
+        uses: `+stsMintStep+`
+---
+
+# Missing agent ingestion token
+`)
+
+	err := NewCompiler().CompileWorkflow(workflowFile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `job "agent" has no step with id "octosts"`)
 	assert.Contains(t, err.Error(), "pre-steps:")
 }
 

@@ -2123,6 +2123,8 @@ safe-outputs:
 
 **`allowed-teams`** lets organizations allow all members of specific GitHub teams to be mentioned without listing individual usernames. Team members are fetched from the GitHub API at runtime using `GET /orgs/{org}/teams/{team_slug}/members`. Bot accounts within the team are excluded. Use `org/team-slug` for cross-org teams or just `team-slug` to resolve against the current repository's organization.
 
+Set `safe-outputs.github-token` to a token that can read team membership. The global token is also used by **Ingest agent output** to resolve allowed mentions before sanitization; a per-output `github-token` override does not apply to ingestion.
+
 > [!IMPORTANT]
 > `allowed-teams` requires the workflow token to have `read:org` scope. The default `GITHUB_TOKEN` does **not** include this scope. Use one of the following:
 > - A **classic PAT** with the `read:org` scope stored as a repository secret

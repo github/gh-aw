@@ -352,6 +352,11 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	}
 
 	yaml.WriteString("        with:\n")
+	// Resolve mention allowlists with the configured token before sanitization.
+	// Safe-output app tokens are minted in a different job and are unavailable here.
+	if data.SafeOutputs != nil && data.SafeOutputs.GitHubToken != "" {
+		yaml.WriteString("          github-token: " + resolveSafeOutputGitHubToken(data.SafeOutputs.GitHubToken) + "\n")
+	}
 	yaml.WriteString("          script: |\n")
 
 	// Load script from external file using require()
