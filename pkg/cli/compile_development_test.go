@@ -71,6 +71,7 @@ func TestDevelopmentCompilerFlags(t *testing.T) {
 	assert.Equal(t, "debug", state.FieldByName("environmentOverride").String())
 	regular := createAndConfigureCompiler(CompileConfig{})
 	assert.False(t, reflect.ValueOf(regular).Elem().FieldByName("dryRun").Bool(), "regular compilation must not disable persistence jobs")
+	assert.False(t, reflect.ValueOf(regular).Elem().FieldByName("configuredModelValidator").IsNil(), "regular compilation must check model pricing")
 }
 
 func TestDevelopmentModelChecksRequireInventoryWhenConfigured(t *testing.T) {
@@ -89,6 +90,95 @@ func TestDevelopmentModelChecksRequireInventoryWhenConfigured(t *testing.T) {
 		assert.Contains(t, messages[0], "inventory is unavailable")
 		inventory := &activeModelInventory{models: []string{"example-model"}}
 		assert.Empty(t, configuredModelValidationMessages(data, inventory, true))
+	}
+}
+
+func TestConfiguredModelPricingWarning(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		data    *workflow.WorkflowData
+		warning bool
+	}{
+		{
+			name: "unpriced model",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-future-model",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+			},
+			warning: true,
+		},
+		{
+			name: "reported model has pricing",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-6.1-sol",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+			},
+		},
+		{
+			name: "model with a known prefix but no exact price",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-6.1-sol-preview",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+			},
+			warning: true,
+		},
+		{
+			name: "configured alias to priced model",
+			data: &workflow.WorkflowData{
+				Model:         "preferred-model",
+				EngineConfig:  &workflow.EngineConfig{ID: "codex"},
+				ModelMappings: map[string][]string{"preferred-model": {"gpt-6.1-sol"}},
+			},
+		},
+		{
+			name: "configured fallback",
+			data: &workflow.WorkflowData{
+				Model:                   "gpt-future-model",
+				EngineConfig:            &workflow.EngineConfig{ID: "codex"},
+				DefaultAiCreditsPricing: &workflow.AiCreditsPricingConfig{Input: 1, Output: 1},
+			},
+		},
+		{
+			name: "frontmatter model pricing",
+			data: &workflow.WorkflowData{
+				Model:        "gpt-future-model",
+				EngineConfig: &workflow.EngineConfig{ID: "codex"},
+				ModelCosts: map[string]any{
+					"providers": map[string]any{
+						"openai": map[string]any{
+							"models": map[string]any{
+								"gpt-future-model": map[string]any{
+									"cost": map[string]string{"input": "0.000001", "output": "0.000001"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "dynamic model",
+			data: &workflow.WorkflowData{
+				Model:        "auto",
+				EngineConfig: &workflow.EngineConfig{ID: "copilot"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			message := configuredModelPricingWarning(test.data)
+			if test.warning {
+				require.Contains(t, message, "has no AI credits pricing")
+				assert.Contains(t, message, "models.default-ai-credits-pricing")
+				assert.Contains(t, message, "HTTP 400")
+			} else {
+				assert.Empty(t, message)
+			}
+		})
 	}
 }
 

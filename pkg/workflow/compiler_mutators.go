@@ -201,6 +201,11 @@ func (c *Compiler) SetConfiguredModelValidator(validator func(data *WorkflowData
 	c.configuredModelValidator = validator
 }
 
+// SetModelPricingResolver configures pricing lookup for models absent from workflow frontmatter.
+func (c *Compiler) SetModelPricingResolver(resolver func(ctx context.Context, provider, model string) (map[string]float64, bool)) {
+	c.modelPricingResolver = resolver
+}
+
 // GetWarningCount returns the current warning count
 func (c *Compiler) GetWarningCount() int {
 	return c.warningCount

@@ -28,6 +28,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -99,11 +100,16 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 		workflow.WithEngineOverride(config.EngineOverride),
 		workflow.WithFailFast(config.FailFast),
 	)
-	if config.activeModels != nil || config.DryRun {
-		compiler.SetConfiguredModelValidator(func(data *workflow.WorkflowData) []string {
-			return configuredModelValidationMessages(data, config.activeModels, config.DryRun)
-		})
-	}
+	compiler.SetModelPricingResolver(func(_ context.Context, provider, model string) (map[string]float64, bool) {
+		return findExactModelPricing(provider, model)
+	})
+	compiler.SetConfiguredModelValidator(func(data *workflow.WorkflowData) []string {
+		messages := configuredModelValidationMessages(data, config.activeModels, config.DryRun)
+		if warning := configuredModelPricingWarning(data); warning != "" {
+			messages = append(messages, warning)
+		}
+		return messages
+	})
 	compileCompilerSetupLog.Print("Created compiler instance")
 
 	// Configure compiler flags

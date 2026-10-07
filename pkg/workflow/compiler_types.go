@@ -79,11 +79,10 @@ type Compiler struct {
 	permissionWarningShown  map[string]string        // Tracks markdown paths and last warning fingerprint (frontmatter hash when available, otherwise formatted warning text)
 	allowedDomainsCache     map[string]allowedDomain // Cached allowed-domains per markdown path with the frontmatter hash that produced it
 	wildcardAppTokenSteps   map[appTokenStepKey]bool // Job-scoped compiler-generated token steps with explicit repositories: ["*"].
-	// modelPricingResolver is an optional callback for resolving per-token pricing of models that
-	// are absent from the embedded models.json catalog. When non-nil it is called during
-	// buildInitialWorkflowData for the workflow's configured model; any returned pricing is merged
-	// into WorkflowData.ModelCosts so it is embedded in GH_AW_INFO_MODEL_COSTS in the lock.yml.
-	// Injected by the cli package (which has access to the embedded catalog and models.dev download).
+	// modelPricingResolver is an optional callback for resolving per-token pricing not present in
+	// the frontmatter overlay. Any returned pricing is merged into WorkflowData.ModelCosts so it is
+	// embedded in GH_AW_INFO_MODEL_COSTS in the compiled lock.yml.
+	// Injected by the cli package, which has access to the local model pricing catalog.
 	modelPricingResolver     func(ctx context.Context, provider, model string) (map[string]float64, bool)
 	configuredModelValidator func(data *WorkflowData) []string
 }

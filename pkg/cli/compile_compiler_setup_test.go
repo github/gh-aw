@@ -3,10 +3,13 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/stretchr/testify/require"
 )
 
 func hasModelPricingResolver(compiler *workflow.Compiler) bool {
@@ -15,12 +18,42 @@ func hasModelPricingResolver(compiler *workflow.Compiler) bool {
 	return !reflect.ValueOf(compiler).Elem().FieldByName("modelPricingResolver").IsNil()
 }
 
-func TestCreateAndConfigureCompiler_DoesNotRegisterModelPricingResolverByDefault(t *testing.T) {
+func TestCreateAndConfigureCompiler_RegistersModelPricingResolver(t *testing.T) {
 	t.Parallel()
 	compiler := createAndConfigureCompiler(CompileConfig{})
-	if hasModelPricingResolver(compiler) {
-		t.Fatal("expected model pricing resolver to be nil by default")
+	if !hasModelPricingResolver(compiler) {
+		t.Fatal("expected local model pricing resolver to be registered")
 	}
+}
+
+func TestCreateAndConfigureCompilerInjectsCatalogPricing(t *testing.T) {
+	t.Parallel()
+	workflowPath := filepath.Join(t.TempDir(), "priced-model.md")
+	err := os.WriteFile(workflowPath, []byte(`---
+on:
+  workflow_dispatch:
+name: Priced Model
+engine: codex
+model: gpt-6.1-sol
+---
+Check model pricing.
+`), 0o600)
+	require.NoError(t, err)
+
+	data, err := createAndConfigureCompiler(CompileConfig{}).ParseWorkflowFile(workflowPath)
+	require.NoError(t, err)
+	providers, ok := data.ModelCosts["providers"].(map[string]any)
+	require.True(t, ok)
+	openai, ok := providers["openai"].(map[string]any)
+	require.True(t, ok)
+	models, ok := openai["models"].(map[string]any)
+	require.True(t, ok)
+	entry, ok := models["gpt-6.1-sol"].(map[string]any)
+	require.True(t, ok)
+	cost, ok := entry["cost"].(map[string]string)
+	require.True(t, ok)
+	require.Equal(t, "2e-06", cost["input"])
+	require.Equal(t, "1e-05", cost["output"])
 }
 
 // TestSetupRepositoryContext_ValidScheduleSeedLocksSlug verifies that when

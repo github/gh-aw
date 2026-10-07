@@ -160,6 +160,109 @@ func configuredModelValidationMessages(data *workflow.WorkflowData, inventory *a
 	return unknownConfiguredModelMessages(data, inventory)
 }
 
+func configuredModelPricingWarning(data *workflow.WorkflowData) string {
+	if data == nil || data.Model == "" || data.DefaultAiCreditsPricing != nil {
+		return ""
+	}
+	provider, model, ok := configuredModelPricingID(data, data.Model)
+	if !ok || hasModelCostOverlay(data.ModelCosts, provider, model) {
+		return ""
+	}
+	if configuredModelHasPricing(provider, model, data.ModelMappings, make(map[string]struct{})) {
+		return ""
+	}
+	return "Model " + data.Model + " has no AI credits pricing. Add models.providers.<provider>.models.<model>.cost or set models.default-ai-credits-pricing, map it to a model with pricing, or select a priced model; otherwise the AWF API proxy may reject inference requests with HTTP 400."
+}
+
+func configuredModelPricingID(data *workflow.WorkflowData, model string) (string, string, bool) {
+	model, _, _ = strings.Cut(strings.TrimSpace(model), "?")
+	if model == "" || strings.Contains(model, "${{") {
+		return "", "", false
+	}
+	var provider string
+	if strings.Contains(model, "/") {
+		var ok bool
+		provider, model, ok = strings.Cut(model, "/")
+		if !ok || provider == "" || model == "" {
+			return "", "", false
+		}
+	} else if data.EngineConfig == nil {
+		provider = "github-copilot"
+	} else if data.EngineConfig.LLMProvider != "" {
+		provider = string(data.EngineConfig.LLMProvider)
+	} else if data.EngineConfig.InlineProviderID != "" {
+		provider = data.EngineConfig.InlineProviderID
+	} else {
+		switch strings.ToLower(strings.TrimSpace(data.EngineConfig.ID)) {
+		case "claude":
+			provider = "anthropic"
+		case "codex":
+			provider = "openai"
+		case "copilot", "":
+			provider = "github-copilot"
+		default:
+			return "", "", false
+		}
+	}
+	provider = modelsdev.NormalizeProvider(provider)
+	model = strings.ToLower(strings.TrimSpace(model))
+	if provider == "" || model == "" || model == "auto" {
+		return "", "", false
+	}
+	return provider, model, true
+}
+
+func configuredModelHasPricing(provider, model string, aliases map[string][]string, visited map[string]struct{}) bool {
+	for alias, targets := range aliases {
+		if !strings.EqualFold(alias, model) {
+			continue
+		}
+		if _, ok := visited[alias]; ok || len(targets) == 0 {
+			return false
+		}
+		visited[alias] = struct{}{}
+		for _, target := range targets {
+			targetProvider, targetModel, ok := configuredModelPricingID(&workflow.WorkflowData{
+				EngineConfig: &workflow.EngineConfig{LLMProvider: workflow.LLMProvider(provider)},
+			}, target)
+			if !ok || !configuredModelHasPricing(targetProvider, targetModel, aliases, visited) {
+				delete(visited, alias)
+				return false
+			}
+		}
+		delete(visited, alias)
+		return true
+	}
+	_, ok := findExactModelPricing(provider, model)
+	return ok
+}
+
+func hasModelCostOverlay(costs map[string]any, provider, model string) bool {
+	providers, ok := costs["providers"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for name, rawProvider := range providers {
+		if modelsdev.NormalizeProvider(name) != provider {
+			continue
+		}
+		providerMap, ok := rawProvider.(map[string]any)
+		if !ok {
+			continue
+		}
+		models, ok := providerMap["models"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for name := range models {
+			if strings.EqualFold(name, model) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func stringSlice(value any) []string {
 	raw, ok := value.([]any)
 	if !ok {

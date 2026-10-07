@@ -141,6 +141,24 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 	return nil, false
 }
 
+func findExactModelPricing(provider, model string) (map[string]float64, bool) {
+	initModelPrices()
+
+	normalizedProvider := modelsdev.NormalizeProvider(provider)
+	comparableModel := modelsdev.NormalizeComparableModelID(model)
+	if normalizedProvider == "" || comparableModel == "" {
+		return nil, false
+	}
+	for _, record := range modelPriceRecords {
+		if record.provider == normalizedProvider &&
+			modelsdev.NormalizeComparableModelID(record.model) == comparableModel &&
+			len(record.pricing) > 0 {
+			return record.pricing, true
+		}
+	}
+	return nil, false
+}
+
 func usdToAIC(usd float64) float64 {
 	return usd / 0.01
 }
