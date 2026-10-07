@@ -31,7 +31,7 @@ URLs before replay/report. Never retrieve secrets.
 
 3. **Reproduce one boundary.** Choose compilation/prompt/MCP/agent/safe outputs. Run the real component with existing edge test doubles, minimal inputs, output assertions, disposable files and a timeout. Mock missing context/APIs/credentials. Never contact production or disable the firewall; leave OIDC, approvals, hosted tokens and runners unverified.
 
-4. **Fix and gate.** Add a minimal fix/regression. Compile current source with `--dry-run`: strict, staged, all validation/analysis, warnings as errors. Unsupported `--dry-run`, missing checks or failed compilation blocks live testing, not local diagnosis. Existing/generated locks need a successful gate for current hashes. Never downgrade, suppress findings, substitute `strict: true`, use `--approve`, or commit to erase warnings.
+4. **Fix and gate.** Add a minimal fix/regression. Compile current source with `--dry-run`: strict, staged, source validation, shellcheck and model checks, warnings as errors. Docker-based checks are optional; Docker unavailability does not block the gate. Recommend `gh aw validate WORKFLOW` when Docker is available, and run zizmor, actionlint and poutine if possible. Unsupported `--dry-run`, missing required checks or failed compilation blocks live testing, not local diagnosis. Existing/generated locks need a successful gate for current hashes. Never downgrade required checks, suppress findings, substitute `strict: true`, use `--approve`, or commit to erase warnings.
 
 5. **Constrain credentials.** Recommend, not require, a protected test environment and rotated, restricted development credentials. Inspect environments; provision only with authorization and revoke replaced credentials at their issuer. Never copy/rotate production secrets. Authorized repository/organization/enterprise shared secrets remain job-scoped, not automatically OS-exported; test environments do not isolate them. Keep production/dispatch credentials out of harnesses.
 
@@ -73,7 +73,17 @@ after explicitly authorized authentication/SSO repair and renewed live validatio
 gh aw compile WORKFLOW --dry-run
 # Optional reviewed test environment:
 gh aw compile WORKFLOW --dry-run --environment gh-aw-debug
+# Recommended when Docker is available (includes zizmor, actionlint and poutine):
+gh aw validate WORKFLOW
+# Optional scanners on the emitted dry-run lock file, when Docker is available:
+gh aw compile WORKFLOW --dry-run --zizmor --actionlint --poutine
 ```
+
+Docker-based scanners and `--validate-images` are opt-in, not dry-run gate
+requirements. Run zizmor, actionlint and poutine when possible; report unavailable
+checks as unverified, not passed. Without Docker, use a native `shellcheck` binary
+for the required run-step linting. Findings or failures from requested checks still
+fail the dry-run gate.
 
 `--environment` replaces every lock-file job's environment, including approval,
 custom and framework jobs. Review changed protections before live testing.

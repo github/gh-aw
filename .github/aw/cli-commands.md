@@ -54,6 +54,7 @@ gh aw compile                     # Compile all workflows
 gh aw compile <workflow-name>     # Compile a specific workflow
 gh aw compile <workflow-name> --dry-run  # Strict/staged debugging checks; warnings are errors
 gh aw compile <workflow-name> --dry-run --environment gh-aw-debug  # Optional all-job environment override
+gh aw compile <workflow-name> --dry-run --zizmor --actionlint --poutine  # Optional Docker-based scanners
 gh aw compile --strict            # Compile with strict mode validation
 gh aw compile --validate          # Enable workflow, image, and action SHA validation
 gh aw compile --fail-fast         # Stop at first error
@@ -62,6 +63,11 @@ gh aw compile --approve           # Approve new secrets / action changes
 ```
 
 **MCP equivalent**: `compile` tool
+
+Docker-based checks are optional for the dry-run gate. Recommend
+`gh aw validate <workflow-name>` when Docker is available; run zizmor, actionlint
+and poutine when possible. Without Docker, required run-step linting uses a native
+`shellcheck` binary. Report unavailable optional checks as unverified.
 
 ---
 

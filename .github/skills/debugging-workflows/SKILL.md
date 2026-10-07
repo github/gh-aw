@@ -487,12 +487,22 @@ gh aw logs --firewall
 ### Diagnostic and Development Compilation
 
 ```bash
-# Strict/staged development compilation with checks and warnings as errors
+# Strict/staged development compilation; Docker-based checks are optional
 gh aw compile <workflow> --dry-run
 
 # Recommended when using a reviewed test environment
 gh aw compile <workflow> --dry-run --environment gh-aw-debug
+
+# Recommended when Docker is available (runs zizmor, actionlint and poutine)
+gh aw validate <workflow>
+
+# Run those scanners on the emitted dry-run lock file when possible
+gh aw compile <workflow> --dry-run --zizmor --actionlint --poutine
 ```
+
+Docker unavailability does not block the dry-run gate. Use native `shellcheck`
+for required run-step linting without Docker, and report unavailable optional
+checks as unverified.
 
 ## Reference Commands
 

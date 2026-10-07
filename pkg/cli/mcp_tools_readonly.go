@@ -71,7 +71,7 @@ Returns a JSON array where each element has the following structure:
 // compileArgs holds the input parameters for the compile tool.
 type compileArgs struct {
 	Workflows   []string `json:"workflows,omitempty" jsonschema:"Workflow files to compile as an array (e.g., [\"workflow.md\"]) (empty for all)"`
-	DryRun      bool     `json:"dry_run,omitempty" jsonschema:"Disable compiler-managed GitHub mutations, stage safe outputs, record dry_run in aw_info.json, and enable strict validation and all checks; custom scripts and external MCP effects remain unverified; explicitly disabling a required check is rejected; does not upload or dispatch workflows"`
+	DryRun      bool     `json:"dry_run,omitempty" jsonschema:"Disable compiler-managed GitHub mutations, stage safe outputs, record dry_run in aw_info.json, and enable strict validation, shellcheck, and model checks; Docker-based scanners are opt-in; custom scripts and external MCP effects remain unverified; explicitly disabling a required check is rejected; does not upload or dispatch workflows"`
 	Environment string   `json:"environment,omitempty" jsonschema:"Override the environment on every generated job; reusable-workflow caller jobs are rejected"`
 	Strict      bool     `json:"strict,omitempty" jsonschema:"Override frontmatter to enforce strict mode validation for all workflows. Note: Workflows default to strict mode unless frontmatter sets strict: false"`
 	Zizmor      bool     `json:"zizmor,omitempty" jsonschema:"Run zizmor security scanner on generated .lock.yml files"`
@@ -164,7 +164,7 @@ Returns JSON array with validation results for each workflow:
 		var dockerUnavailableWarning string
 
 		// Check if any static analysis tools are requested that require Docker images
-		// Development mode delegates all checks to the CLI and must never downgrade them.
+		// Development mode delegates requested checks to the CLI without downgrading them.
 		if !args.DryRun && (args.Zizmor || args.Poutine || args.Actionlint || args.RunnerGuard || args.Syft || args.Grype || args.Grant || args.Yamllint) {
 			// Check if Docker images are available; if not, start downloading and return retry message
 			if err := CheckAndPrepareDockerImages(ctx, DockerImagesOptions{
