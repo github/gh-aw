@@ -63,6 +63,7 @@ func TestConclusionWorkQueueSummaryArtifactPrefix(t *testing.T) {
 		t.Run(tc.trigger, func(t *testing.T) {
 			data := &WorkflowData{
 				On:          tc.trigger,
+				GHES:        tc.trigger == "workflow_call",
 				Tools:       map[string]any{"work-queue": true},
 				SafeOutputs: &SafeOutputsConfig{},
 			}

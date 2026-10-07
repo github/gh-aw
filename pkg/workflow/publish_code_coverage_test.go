@@ -223,6 +223,7 @@ func TestWorkflowCallUploadCodeCoverageComputesPrefixBeforeDownload(t *testing.T
 	data := &WorkflowData{
 		Name: "Test Workflow",
 		On:   "workflow_call:",
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			UploadCodeCoverage: &UploadCodeCoverageConfig{},
 		},

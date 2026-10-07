@@ -1381,6 +1381,7 @@ func TestJobWithGitHubAppWorkflowCallUsesTargetRepoNameFallback(t *testing.T) {
 		Name: "Test Workflow",
 		On: `"on":
   workflow_call:`,
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			GitHubApp: &GitHubAppConfig{
 				AppID:      "${{ vars.APP_ID }}",
@@ -1402,7 +1403,7 @@ func TestJobWithGitHubAppWorkflowCallUsesTargetRepoNameFallback(t *testing.T) {
 	// Must use the repo-name-only output, NOT the full slug
 	assert.Less(t, strings.Index(stepsContent, "id: resolve-host-repo\n"), strings.Index(stepsContent, "id: safe-outputs-app-token\n"),
 		"local repository resolution must precede GitHub App token minting")
-	assert.Contains(t, stepsContent, "repositories: "+targetRepoNameExprForDownstreamJob(),
+	assert.Contains(t, stepsContent, "repositories: "+targetRepoNameExprForDownstreamJob(workflowData),
 		"GitHub App token step must use target_repo_name (repo name only) for workflow_call workflows")
 	assert.NotContains(t, stepsContent, "repositories: ${{ needs.activation.outputs.target_repo }}",
 		"GitHub App token step must not use target_repo (full slug) for workflow_call workflows")
@@ -1421,6 +1422,7 @@ func TestConclusionJobWithGitHubAppWorkflowCallUsesTargetRepoNameFallback(t *tes
 		Name: "Test Workflow",
 		On: `"on":
   workflow_call:`,
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			GitHubApp: &GitHubAppConfig{
 				AppID:      "${{ vars.APP_ID }}",
@@ -1438,7 +1440,7 @@ func TestConclusionJobWithGitHubAppWorkflowCallUsesTargetRepoNameFallback(t *tes
 	stepsContent := strings.Join(job.Steps, "")
 
 	// Must use the repo-name-only output, NOT the full slug
-	assert.Contains(t, stepsContent, "repositories: "+targetRepoNameExprForDownstreamJob(),
+	assert.Contains(t, stepsContent, "repositories: "+targetRepoNameExprForDownstreamJob(workflowData),
 		"Conclusion job GitHub App token step must use target_repo_name (repo name only) for workflow_call workflows")
 	assert.NotContains(t, stepsContent, "repositories: ${{ needs.activation.outputs.target_repo }}",
 		"Conclusion job GitHub App token step must not use target_repo (full slug) for workflow_call workflows")
@@ -1723,6 +1725,7 @@ func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *test
 		Name: "Test Workflow",
 		On: `"on":
   workflow_call:`,
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{},
 		},

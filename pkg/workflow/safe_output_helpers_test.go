@@ -818,6 +818,7 @@ func TestBuildGitHubScriptStepWorkflowCallArtifactPrefix(t *testing.T) {
 	workflowData := &WorkflowData{
 		Name: "Test Workflow",
 		On:   "workflow_call",
+		GHES: true,
 	}
 
 	config := GitHubScriptStepConfig{
@@ -839,6 +840,16 @@ func TestBuildGitHubScriptStepWorkflowCallArtifactPrefix(t *testing.T) {
 	// Ensure activation prefix is NOT used
 	if strings.Contains(stepsStr, "needs.activation.outputs.artifact_prefix") {
 		t.Errorf("Expected buildGitHubScriptStep NOT to use needs.activation.outputs.artifact_prefix (job does not depend on activation).\nGenerated steps:\n%s", stepsStr)
+	}
+
+	nonGHES := *workflowData
+	nonGHES.GHES = false
+	nonGHESTeps := strings.Join(compiler.buildGitHubScriptStep(&nonGHES, config), "")
+	if !strings.Contains(nonGHESTeps, "${{ needs.agent.outputs.artifact_prefix }}agent") {
+		t.Errorf("Expected non-GHES workflow_call to use the producer's artifact prefix.\nGenerated steps:\n%s", nonGHESTeps)
+	}
+	if strings.Contains(nonGHESTeps, "steps.artifact-prefix.outputs.prefix") {
+		t.Errorf("Non-GHES workflow_call should not recompute the artifact prefix.\nGenerated steps:\n%s", nonGHESTeps)
 	}
 }
 

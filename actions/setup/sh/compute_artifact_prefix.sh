@@ -8,7 +8,8 @@ set +o histexpand
 # workflow run, all invocations would upload artifacts with identical names
 # (e.g. "activation", "agent") causing 409 Conflict errors.
 #
-# This script derives a unique prefix from the workflow inputs so that each
+# This script derives a unique prefix from the workflow inputs and, outside GHES
+# compatibility mode, the current run attempt so that each
 # distinct invocation produces separate artifact names (e.g.
 # "a1b2c3d4-activation", "e5f6a7b8-activation").
 #
@@ -16,6 +17,11 @@ set +o histexpand
 #   INPUTS_JSON          (required) JSON-serialised workflow inputs, typically
 #                        set via ${{ toJSON(inputs) }} in the workflow step env.
 #                        Passed through an env-var to prevent template injection.
+#   GITHUB_RUN_ATTEMPT   (auto-provided by GitHub Actions) run attempt number,
+#                        included outside GHES compatibility mode.
+#   GH_AW_ARTIFACT_PREFIX_STABLE
+#                        when "true", omit the attempt so GHES downstream jobs
+#                        can address artifacts from earlier attempts.
 #
 # GitHub Actions output:
 #   prefix               8-hex-char SHA256 digest followed by "-"
@@ -23,9 +29,9 @@ set +o histexpand
 #
 # Uniqueness guarantee:
 #   - Two calls with different inputs → different prefixes (collision-resistant SHA256).
-#   - The same call gets the same prefix on every run attempt so downstream jobs can
-#     retrieve artifacts uploaded by successful jobs on an earlier attempt.
-#   - Two calls with identical inputs in the same workflow run → same prefix (conflict).
+#   - In stable mode, repeated attempts with the same inputs get the same prefix.
+#   - Outside stable mode, retries receive different prefixes.
+#   - Two calls with identical inputs in the same run attempt → same prefix (conflict).
 #     Callers MUST provide different inputs to avoid this edge case.
 #
 # Security:
@@ -41,7 +47,14 @@ INPUTS="${INPUTS_JSON:-{}}"
 echo "Computing artifact prefix from workflow inputs..."
 echo "  Inputs JSON length: ${#INPUTS} chars"
 
-PREFIX=$(printf '%s' "$INPUTS" | sha256sum | cut -c1-8)
+HASH_INPUT="$INPUTS"
+if [[ "${GH_AW_ARTIFACT_PREFIX_STABLE:-false}" != "true" ]]; then
+  ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+  echo "  GITHUB_RUN_ATTEMPT: ${ATTEMPT}"
+  HASH_INPUT="${INPUTS}::attempt=${ATTEMPT}"
+fi
+
+PREFIX=$(printf '%s' "$HASH_INPUT" | sha256sum | cut -c1-8)
 
 echo "  SHA256 digest (first 8 chars): ${PREFIX}"
 echo "  Artifact prefix: ${PREFIX}-"

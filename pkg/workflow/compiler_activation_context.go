@@ -178,7 +178,7 @@ func (c *Compiler) addActivationWorkflowCallResolutionSteps(ctx *activationJobBu
 	}
 	if hasWorkflowCallTrigger(ctx.data.On) {
 		compilerActivationJobLog.Print("Adding artifact prefix computation step for workflow_call trigger")
-		ctx.steps = append(ctx.steps, generateArtifactPrefixStep()...)
+		ctx.steps = append(ctx.steps, generateArtifactPrefixStep(ctx.data)...)
 		ctx.outputs[constants.ArtifactPrefixOutputName] = "${{ steps.artifact-prefix.outputs.prefix }}"
 	}
 }

@@ -220,8 +220,8 @@ func (c *Compiler) generateSetupStep(data *WorkflowData, setupActionRef string, 
 
 func (c *Compiler) generateSetupStepForJob(jobName string, data *WorkflowData, setupActionRef string, destination string, enableArtifactClient bool, traceID string, parentSpanID string, artifactClientCondition string) []string {
 	steps := c.generateSetupStepWithArtifactClientCondition(data, setupActionRef, destination, enableArtifactClient, traceID, parentSpanID, artifactClientCondition)
-	if data != nil && hasWorkflowCallTrigger(data.On) && jobName != "activation" && jobName != "pre_activation" {
-		steps = append(steps, generateArtifactPrefixStep()...)
+	if data != nil && data.GHES && hasWorkflowCallTrigger(data.On) && jobName != "activation" && jobName != "pre_activation" {
+		steps = append(steps, generateArtifactPrefixStep(data)...)
 		if !data.InlinedImports {
 			steps = append(steps, c.generateResolveHostRepoStep(data))
 		}

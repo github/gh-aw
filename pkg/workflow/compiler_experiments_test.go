@@ -287,6 +287,7 @@ func TestBuildExperimentArtifactDownloadStep_Generated(t *testing.T) {
 		WorkflowID:  "my-wf",
 		Experiments: map[string][]string{"caveman": {"yes", "no"}},
 		On:          "workflow_call:",
+		GHES:        true,
 	}
 	steps := buildExperimentArtifactDownloadSteps(data, getActionPin)
 	require.NotEmpty(t, steps, "steps should be generated when experiments are declared")

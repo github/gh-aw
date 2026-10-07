@@ -393,6 +393,7 @@ func TestWorkflowCallSafeJobComputesPrefixBeforeDownload(t *testing.T) {
 	data := &WorkflowData{
 		Name: "test-workflow",
 		On:   "workflow_call:",
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			Jobs: map[string]*SafeJobConfig{
 				"deploy": {RunsOn: "runs-on: ubuntu-latest"},

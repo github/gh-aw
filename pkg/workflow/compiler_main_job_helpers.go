@@ -216,9 +216,13 @@ func (c *Compiler) buildMainJobOutputs(data *WorkflowData) map[string]string {
 	// Note: secret_verification_result is now an output of the activation job (not the agent job).
 	// The validate-secret step runs in the activation job, before context variable validation.
 
-	// Expose the locally computed prefix for consumers of the agent job output.
+	// Expose the locally computed prefix in GHES mode, where cross-job outputs may be masked.
 	if hasWorkflowCallTrigger(data.On) {
-		outputs[constants.ArtifactPrefixOutputName] = "${{ steps.artifact-prefix.outputs.prefix }}"
+		if data.GHES {
+			outputs[constants.ArtifactPrefixOutputName] = "${{ steps.artifact-prefix.outputs.prefix }}"
+		} else {
+			outputs[constants.ArtifactPrefixOutputName] = "${{ needs.activation.outputs.artifact_prefix }}"
+		}
 		compilerMainJobLog.Print("Added artifact_prefix output to agent job (workflow_call context)")
 	}
 

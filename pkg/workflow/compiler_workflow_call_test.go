@@ -324,7 +324,7 @@ Create an issue and add a comment.
 
 func TestWorkflowCallDownstreamSetupComputesLocalPrefix(t *testing.T) {
 	compiler := NewCompiler()
-	data := &WorkflowData{Name: "test", On: "workflow_call:"}
+	data := &WorkflowData{Name: "test", On: "workflow_call:", GHES: true}
 	for _, jobName := range []string{"agent", "detection", "conclusion", "safe_outputs"} {
 		t.Run(jobName, func(t *testing.T) {
 			steps := strings.Join(compiler.generateSetupStepForJob(jobName, data, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
@@ -338,48 +338,76 @@ func TestWorkflowCallDownstreamSetupComputesLocalPrefix(t *testing.T) {
 			assert.Contains(t, steps, "compute_artifact_prefix.sh")
 		})
 	}
+	require.Contains(t, strings.Join(generateArtifactPrefixStep(data), ""), "GH_AW_ARTIFACT_PREFIX_STABLE: \"true\"")
 	for _, jobName := range []string{"activation", "pre_activation"} {
 		steps := strings.Join(compiler.generateSetupStepForJob(jobName, data, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
 		assert.NotContains(t, steps, "id: artifact-prefix\n")
 	}
+	nonGHES := &WorkflowData{Name: "test", On: "workflow_call:"}
+	steps := strings.Join(compiler.generateSetupStepForJob("agent", nonGHES, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
+	assert.NotContains(t, steps, "id: artifact-prefix\n")
+	assert.NotContains(t, steps, "id: resolve-host-repo\n")
+	assert.NotContains(t, strings.Join(generateArtifactPrefixStep(nonGHES), ""), "GH_AW_ARTIFACT_PREFIX_STABLE")
+	assert.Equal(t, "${{ needs.activation.outputs.artifact_prefix }}", artifactPrefixExprForDownstreamJob(nonGHES))
+	assert.Equal(t, "${{ needs.agent.outputs.artifact_prefix }}", artifactPrefixExprForAgentDownstreamJob(nonGHES))
+	assert.Equal(t, "${{ needs.activation.outputs.target_repo }}", targetRepoExprForDownstreamJob(nonGHES))
+	assert.Equal(t, "${{ needs.activation.outputs.target_repo_name }}", targetRepoNameExprForDownstreamJob(nonGHES))
 	nonCall := &WorkflowData{Name: "test", On: "push:"}
-	steps := strings.Join(compiler.generateSetupStepForJob("agent", nonCall, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
+	steps = strings.Join(compiler.generateSetupStepForJob("agent", nonCall, "./actions/setup", SetupActionDestination, false, "", "", ""), "")
 	assert.NotContains(t, steps, "id: artifact-prefix\n")
 	assert.NotContains(t, steps, "id: resolve-host-repo\n")
 }
 
-func TestWorkflowCallArtifactPrefixStableAcrossRunAttempts(t *testing.T) {
+func TestWorkflowCallArtifactPrefixAttemptBehavior(t *testing.T) {
 	scriptPath := filepath.Join("..", "..", "actions", "setup", "sh", "compute_artifact_prefix.sh")
 	inputs := `{"owner":"octo","repo":"hello-world"}`
-	var artifactNames []string
+	for _, tc := range []struct {
+		name       string
+		stable     bool
+		expectSame bool
+	}{
+		{name: "GHES retry uses producer prefix", stable: true, expectSame: true},
+		{name: "non-GHES retry uses current attempt prefix"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var artifactNames []string
+			for _, attempt := range []string{"1", "2"} {
+				outputPath := filepath.Join(t.TempDir(), "github-output")
+				cmd := exec.Command("bash", scriptPath)
+				env := make([]string, 0, len(os.Environ())+4)
+				for _, entry := range os.Environ() {
+					if !strings.HasPrefix(entry, "INPUTS_JSON=") &&
+						!strings.HasPrefix(entry, "GITHUB_RUN_ATTEMPT=") &&
+						!strings.HasPrefix(entry, "GITHUB_OUTPUT=") &&
+						!strings.HasPrefix(entry, "GH_AW_ARTIFACT_PREFIX_STABLE=") {
+						env = append(env, entry)
+					}
+				}
+				env = append(env,
+					"INPUTS_JSON="+inputs,
+					"GITHUB_RUN_ATTEMPT="+attempt,
+					"GITHUB_OUTPUT="+outputPath,
+				)
+				if tc.stable {
+					env = append(env, "GH_AW_ARTIFACT_PREFIX_STABLE=true")
+				}
+				cmd.Env = env
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "prefix script failed: %s", output)
 
-	for _, attempt := range []string{"1", "2"} {
-		outputPath := filepath.Join(t.TempDir(), "github-output")
-		cmd := exec.Command("bash", scriptPath)
-		env := make([]string, 0, len(os.Environ())+3)
-		for _, entry := range os.Environ() {
-			if !strings.HasPrefix(entry, "INPUTS_JSON=") &&
-				!strings.HasPrefix(entry, "GITHUB_RUN_ATTEMPT=") &&
-				!strings.HasPrefix(entry, "GITHUB_OUTPUT=") {
-				env = append(env, entry)
+				prefixOutput, err := os.ReadFile(outputPath)
+				require.NoError(t, err)
+				prefix := strings.TrimSpace(strings.TrimPrefix(string(prefixOutput), "prefix="))
+				require.NotEmpty(t, prefix)
+				artifactNames = append(artifactNames, prefix+"agent")
 			}
-		}
-		cmd.Env = append(env,
-			"INPUTS_JSON="+inputs,
-			"GITHUB_RUN_ATTEMPT="+attempt,
-			"GITHUB_OUTPUT="+outputPath,
-		)
-		output, err := cmd.CombinedOutput()
-		require.NoError(t, err, "prefix script failed: %s", output)
-
-		prefixOutput, err := os.ReadFile(outputPath)
-		require.NoError(t, err)
-		prefix := strings.TrimSpace(strings.TrimPrefix(string(prefixOutput), "prefix="))
-		require.NotEmpty(t, prefix)
-		artifactNames = append(artifactNames, prefix+"agent")
+			if tc.expectSame {
+				assert.Equal(t, artifactNames[0], artifactNames[1], "attempt 2 consumer should request attempt 1 producer's artifact")
+			} else {
+				assert.NotEqual(t, artifactNames[0], artifactNames[1], "non-GHES attempts should retain distinct artifact prefixes")
+			}
+		})
 	}
-
-	assert.Equal(t, artifactNames[0], artifactNames[1], "attempt 2 consumer should request attempt 1 producer's artifact")
 }
 
 func TestHasWorkflowCallTrigger(t *testing.T) {

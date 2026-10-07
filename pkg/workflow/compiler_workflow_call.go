@@ -30,33 +30,39 @@ func hasWorkflowCallOrDispatchTrigger(onSection string) bool {
 	return onSectionHasAnyTrigger(onSection, "workflow_call", "workflow_dispatch")
 }
 
-// generateArtifactPrefixStep creates a step that computes a stable, unique artifact name
-// prefix from a hash of the workflow_call inputs. This ensures artifact
+// generateArtifactPrefixStep creates a step that computes a unique artifact name
+// prefix from a hash of the workflow_call inputs. In GHES mode, prefixes are stable
+// across attempts so downstream jobs can address retained artifacts. This ensures artifact
 // names do not clash when the same reusable workflow is called multiple times within a
 // single workflow run (e.g. two jobs in the calling workflow each invoking the same lock.yml).
 //
 // The computation is delegated to actions/setup/sh/compute_artifact_prefix.sh (copied to
 // ${RUNNER_TEMP}/gh-aw/actions/ at runtime by the Setup Scripts step) which:
-//   - Hashes INPUTS_JSON using sha256, taking the first 8 hex chars.
+//   - Hashes INPUTS_JSON and, outside GHES mode, GITHUB_RUN_ATTEMPT using sha256.
 //   - Logs what it is hashing so the prefix is traceable in workflow logs.
 //   - Yields a value like "a1b2c3d4-".
 //
 // Uniqueness guarantee:
 //   - Two calls with different inputs → different prefixes.
-//   - Repeated attempts with the same inputs → the same prefix, so retained artifacts remain addressable.
+//   - In GHES mode, repeated attempts with the same inputs → the same prefix, so retained artifacts remain addressable.
+//   - Outside GHES mode, repeated attempts receive distinct prefixes.
 //   - Two calls with identical inputs in the same workflow run → same prefix (conflict).
 //     Callers MUST provide different inputs to avoid this edge case.
 //
 // Security note: inputs are passed through an environment variable rather than being
 // interpolated directly into the shell script to prevent template injection.
-func generateArtifactPrefixStep() []string {
-	return []string{
+func generateArtifactPrefixStep(data *WorkflowData) []string {
+	steps := []string{
 		"      - name: Compute artifact prefix\n",
 		"        id: artifact-prefix\n",
 		"        env:\n",
 		"          INPUTS_JSON: ${{ toJSON(inputs) }}\n",
-		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/compute_artifact_prefix.sh\"\n",
 	}
+	if data != nil && data.GHES {
+		steps = append(steps, "          GH_AW_ARTIFACT_PREFIX_STABLE: \"true\"\n")
+	}
+	steps = append(steps, "        run: bash \"${RUNNER_TEMP}/gh-aw/actions/compute_artifact_prefix.sh\"\n")
+	return steps
 }
 
 // artifactPrefixExprForActivationJob returns the GitHub Actions expression for the artifact
@@ -72,27 +78,39 @@ func artifactPrefixExprForActivationJob(data *WorkflowData) string {
 // artifactPrefixExprForDownstreamJob returns the job-local artifact prefix step output.
 // Returns empty string for non-workflow_call workflows.
 func artifactPrefixExprForDownstreamJob(data *WorkflowData) string {
-	if !hasWorkflowCallTrigger(data.On) {
+	if data == nil || !hasWorkflowCallTrigger(data.On) {
 		return ""
 	}
-	return "${{ steps.artifact-prefix.outputs.prefix }}"
+	if data.GHES {
+		return "${{ steps.artifact-prefix.outputs.prefix }}"
+	}
+	return "${{ needs.activation.outputs.artifact_prefix }}"
 }
 
 // artifactPrefixExprForAgentDownstreamJob returns the job-local artifact prefix step output.
 // Returns empty string for non-workflow_call workflows.
 func artifactPrefixExprForAgentDownstreamJob(data *WorkflowData) string {
-	if !hasWorkflowCallTrigger(data.On) {
+	if data == nil || !hasWorkflowCallTrigger(data.On) {
 		return ""
 	}
-	return "${{ steps.artifact-prefix.outputs.prefix }}"
+	if data.GHES {
+		return "${{ steps.artifact-prefix.outputs.prefix }}"
+	}
+	return "${{ needs.agent.outputs.artifact_prefix }}"
 }
 
-func targetRepoExprForDownstreamJob() string {
-	return "${{ steps.resolve-host-repo.outputs.target_repo || needs.activation.outputs.target_repo || github.repository }}"
+func targetRepoExprForDownstreamJob(data *WorkflowData) string {
+	if data != nil && data.GHES && hasWorkflowCallTrigger(data.On) {
+		return "${{ steps.resolve-host-repo.outputs.target_repo || needs.activation.outputs.target_repo || github.repository }}"
+	}
+	return "${{ needs.activation.outputs.target_repo }}"
 }
 
-func targetRepoNameExprForDownstreamJob() string {
-	return "${{ steps.resolve-host-repo.outputs.target_repo_name || needs.activation.outputs.target_repo_name || github.event.repository.name }}"
+func targetRepoNameExprForDownstreamJob(data *WorkflowData) string {
+	if data != nil && data.GHES && hasWorkflowCallTrigger(data.On) {
+		return "${{ steps.resolve-host-repo.outputs.target_repo_name || needs.activation.outputs.target_repo_name || github.event.repository.name }}"
+	}
+	return "${{ needs.activation.outputs.target_repo_name }}"
 }
 
 // injectWorkflowCallOutputs adds on.workflow_call.outputs declarations for safe-output results

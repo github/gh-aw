@@ -384,7 +384,8 @@ func TestDetectionJobDownloadsActivationArtifactBeforeAgentOutput(t *testing.T) 
 
 func TestDetectionActivationArtifactDownloadUsesActivationPrefixForWorkflowCall(t *testing.T) {
 	steps := strings.Join(buildDetectionActivationArtifactDownloadSteps(&WorkflowData{
-		On: "workflow_call",
+		On:   "workflow_call",
+		GHES: true,
 	}, getActionPin), "")
 
 	expected := "name: ${{ steps.artifact-prefix.outputs.prefix }}activation"

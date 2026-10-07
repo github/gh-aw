@@ -237,7 +237,7 @@ func (c *Compiler) addAppTokenMintingSteps(data *WorkflowData) []string { //noli
 	if mentions := data.SafeOutputs.Mentions; mentions != nil && mentions.GitHubApp != nil {
 		fallbackRepo := ""
 		if hasWorkflowCallTrigger(data.On) {
-			fallbackRepo = targetRepoNameExprForDownstreamJob()
+			fallbackRepo = targetRepoNameExprForDownstreamJob(data)
 		}
 		steps = append(steps, c.buildGitHubAppTokenMintStepForJob(
 			"safe_outputs",
@@ -295,20 +295,19 @@ func scriptNameToHandlerName(scriptName string) string {
 	parts := strings.FieldsFunc(scriptName, func(r rune) bool {
 		return r == '-' || r == '_'
 	})
-	handlerName := "handle"
+	var handlerParts []string
 	for _, part := range parts {
 		if part != "" {
-			handlerName += strings.ToUpper(part[:1]) + part[1:]
+			handlerParts = append(handlerParts, strings.ToUpper(part[:1])+part[1:])
 		}
 	}
-	if handlerName == "handle" {
+	if len(handlerParts) == 0 {
 		if scriptName == "" {
-			handlerName += "Unknown"
-		} else {
-			handlerName += strings.ToUpper(scriptName[:1]) + scriptName[1:]
+			return "handleUnknown"
 		}
+		return "handle" + strings.ToUpper(scriptName[:1]) + scriptName[1:]
 	}
-	return handlerName
+	return "handle" + strings.Join(handlerParts, "")
 }
 
 // generateSafeOutputScriptContent generates a complete JavaScript module for a custom safe-output

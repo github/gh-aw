@@ -1162,6 +1162,7 @@ func TestConclusionJobWorkflowCallArtifactPrefix(t *testing.T) {
 	workflowData := &WorkflowData{
 		Name: "Test Workflow",
 		On:   "workflow_call",
+		GHES: true,
 		SafeOutputs: &SafeOutputsConfig{
 			NoOp: &NoOpConfig{},
 		},

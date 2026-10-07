@@ -112,12 +112,13 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 			}
 			data := &WorkflowData{
 				On:          "on:\n  workflow_call:\n",
+				GHES:        true,
 				SafeOutputs: &SafeOutputsConfig{Mentions: &MentionsConfig{GitHubApp: app}},
 			}
 			compiler := NewCompiler()
 			output := strings.Join(compiler.addAppTokenMintingSteps(data), "")
 			assert.Contains(t, output, "- name: Derive GitHub App owner for mention resolution\n")
-			assert.Contains(t, output, "GH_AW_TARGET_REPOSITORY: "+targetRepoExprForDownstreamJob())
+			assert.Contains(t, output, "GH_AW_TARGET_REPOSITORY: "+targetRepoExprForDownstreamJob(data))
 			assert.Contains(t, output, "owner: ${{ steps.safe-outputs-mentions-app-token-owner.outputs.owner }}")
 			assert.NotContains(t, output, "permission-members:")
 			if wildcard {
@@ -126,7 +127,7 @@ func TestOutputCollectionGitHubAppOwnerAndWildcard(t *testing.T) {
 					jobName: "safe_outputs", id: "safe-outputs-mentions-app-token", clientID: app.AppID, privateKey: app.PrivateKey,
 				}])
 			} else {
-				assert.Contains(t, output, "repositories: "+targetRepoNameExprForDownstreamJob())
+				assert.Contains(t, output, "repositories: "+targetRepoNameExprForDownstreamJob(data))
 			}
 		})
 	}

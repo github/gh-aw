@@ -56,7 +56,7 @@ func (c *Compiler) generateInitialAndCheckoutSteps(yaml *strings.Builder, data *
 	// for .github/.agents sparse checkouts when called cross-repo.
 	// The activation job exposes this as needs.activation.outputs.target_repo.
 	if hasWorkflowCallTrigger(data.On) && !data.InlinedImports {
-		checkoutMgr.SetCrossRepoTargetRepo(targetRepoExprForDownstreamJob())
+		checkoutMgr.SetCrossRepoTargetRepo(targetRepoExprForDownstreamJob(data))
 	}
 
 	c.generateAppTokenAndDefaultCheckoutSteps(yaml, data, checkoutMgr, needsCheckout)

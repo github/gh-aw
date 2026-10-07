@@ -228,11 +228,12 @@ func TestInferSingleCheckoutRepositoryForGitHubAppOwner(t *testing.T) {
 		data := &WorkflowData{
 			On: `"on":
   workflow_call: {}`,
+			GHES: true,
 			CheckoutConfigs: []*CheckoutConfig{
 				{Path: "default"},
 			},
 		}
-		assert.Equal(t, targetRepoExprForDownstreamJob(), inferSingleCheckoutRepositoryForGitHubAppOwner(data), "workflow_call should infer target repository when no explicit checkout repository is set")
+		assert.Equal(t, targetRepoExprForDownstreamJob(data), inferSingleCheckoutRepositoryForGitHubAppOwner(data), "workflow_call should infer target repository when no explicit checkout repository is set")
 	})
 }
 
@@ -244,6 +245,7 @@ func TestWorkflowCallSafeOutputsAppTokenUsesRepositoryOwnerSource(t *testing.T) 
 		Name: "workflow-call-safe-outputs",
 		On: `"on":
   workflow_call: {}`,
+		GHES: true,
 		Permissions: `"permissions":
   contents: read
   issues: read`,
@@ -273,5 +275,5 @@ func TestWorkflowCallSafeOutputsAppTokenUsesRepositoryOwnerSource(t *testing.T) 
 	assert.Contains(t, safeOutputsSteps, "id: safe-outputs-app-token-owner", "safe outputs app token should include owner helper for expression repository")
 	assert.Contains(t, safeOutputsSteps, "owner: ${{ steps.safe-outputs-app-token-owner.outputs.owner }}", "safe outputs app token should consume derived owner output")
 	assert.Contains(t, safeOutputsSteps, "GH_AW_TARGET_REPOSITORY: ${{ inputs.target_repository }}", "safe outputs owner helper should target explicit checkout repository expression")
-	assert.Contains(t, safeOutputsSteps, "repositories: "+targetRepoNameExprForDownstreamJob(), "workflow_call safe outputs app token should default repositories to target_repo_name")
+	assert.Contains(t, safeOutputsSteps, "repositories: "+targetRepoNameExprForDownstreamJob(data), "workflow_call safe outputs app token should default repositories to target_repo_name")
 }
