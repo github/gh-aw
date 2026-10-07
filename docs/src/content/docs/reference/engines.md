@@ -78,6 +78,9 @@ Copilot, Anthropic, and OpenAI/Codex through matching configured AWF endpoints;
 Copilot requires AWF. Direct Anthropic/OpenAI API keys and base URLs are used
 only when AWF is disabled. Repository `.dsh` settings are preserved, telemetry
 is disabled, and native MCP is not enabled; configured tools use gh-aw's CLI proxy.
+GitHub toolsets, cache memory, and custom MCP servers remain configured on that
+transport. This does not enable restrictions on dsh's native shell/file tools;
+restricted bash command allowlists are rejected at compilation.
 
 The OpenCode sample routes `copilot`, `anthropic`, and `openai`/`codex` models
 through the selected AWF endpoint, retains configured MCP tools, and uses native

@@ -35,6 +35,7 @@ network:
   allowed:
     - defaults
     - github
+    - go
 tools:
   cache-memory: true
   github:
