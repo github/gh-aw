@@ -263,3 +263,42 @@ Test workflow.`
 		t.Errorf("Expected 'Download container images' to come before 'Start MCP Gateway', but found it after")
 	}
 }
+
+func TestMCPGatewayDockerCommandMatchesPredownloadImage(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "gateway-image-pin-test")
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	workflow := "---\non: issues\nengine: claude\ntools:\n  github:\n---\n# Test\nTest workflow."
+	if err := os.WriteFile(testFile, []byte(workflow), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(testFile); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(stringutil.MarkdownToLockFile(testFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	image := resolveContainerImage(constants.DefaultMCPGatewayContainer+":"+string(constants.DefaultMCPGatewayVersion), nil)
+	if !strings.Contains(image, "@sha256:") {
+		t.Fatalf("Default gateway image is not pinned: %s", image)
+	}
+	for _, prefix := range []string{
+		"export MCP_GATEWAY_DOCKER_COMMAND=",
+		`bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh"`,
+	} {
+		found := false
+		for _, line := range strings.Split(string(content), "\n") {
+			if strings.Contains(line, prefix) {
+				found = true
+				if !strings.Contains(line, image) {
+					t.Errorf("%s does not use pinned image %s: %s", prefix, image, line)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Missing %s in compiled lock", prefix)
+		}
+	}
+}
