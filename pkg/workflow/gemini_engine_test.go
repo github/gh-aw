@@ -3,12 +3,17 @@
 package workflow
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestGeminiEngine(t *testing.T) {
@@ -98,6 +103,7 @@ func TestGeminiEngineInstallation(t *testing.T) {
 			stepContent := strings.Join(steps[1], "\n")
 			assert.Contains(t, stepContent, "Install Gemini CLI", "Second step should install Gemini CLI")
 			assert.Contains(t, stepContent, "@google/gemini-cli", "Should install @google/gemini-cli package")
+			assert.Contains(t, stepContent, "@google/gemini-cli@"+string(constants.DefaultGeminiVersion))
 			assert.NotContains(t, stepContent, "NPM_CONFIG_MIN_RELEASE_AGE", "Gemini installation should not set npm release-age cooldown")
 		}
 	})
@@ -603,6 +609,37 @@ func TestGenerateGeminiSettingsStep(t *testing.T) {
 	})
 }
 
+func TestGeminiSettingsMergePinsAuthWithoutDroppingMCP(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, ".gemini")
+	require.NoError(t, os.Mkdir(configDir, 0o700))
+	settingsPath := filepath.Join(configDir, "settings.json")
+	require.NoError(t, os.WriteFile(settingsPath, []byte(`{
+		"mcpServers":{"github":{"httpUrl":"http://localhost:8080/mcp/github"}},
+		"security":{"auth":{"selectedType":"oauth-personal"},"folderTrust":{"enabled":true}},
+		"tools":{"exclude":["save_memory"]}
+	}`), 0o600))
+	step := NewGeminiEngine().generateGeminiSettingsStep(&WorkflowData{Name: "test"})
+	var steps []struct {
+		Run string
+		Env map[string]string
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(strings.Join(step, "\n")), &steps))
+	require.Len(t, steps, 1)
+	cmd := exec.Command("bash", "-c", steps[0].Run)
+	cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+dir, "GH_AW_GEMINI_BASE_CONFIG="+steps[0].Env["GH_AW_GEMINI_BASE_CONFIG"])
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	content, err := os.ReadFile(settingsPath)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"mcpServers":{"github":{"httpUrl":"http://localhost:8080/mcp/github"}},
+		"security":{"auth":{"selectedType":"gemini-api-key"},"folderTrust":{"enabled":true}},
+		"context":{"includeDirectories":["/tmp/"]},
+		"tools":{"exclude":["save_memory"],"core":["glob","grep_search","list_directory","read_file","read_many_files","mcp_github_*"]}
+	}`, string(content))
+}
+
 func TestGeminiVertexWIF(t *testing.T) {
 	engine := NewGeminiEngine()
 
@@ -700,6 +737,21 @@ func TestGeminiVertexWIF(t *testing.T) {
 		assert.Contains(t, stepContent, "GOOGLE_CLOUD_PROJECT: my-project", "Should set project env var")
 		assert.Contains(t, stepContent, "GOOGLE_CLOUD_LOCATION: us-central1", "Should set location env var")
 		assert.NotContains(t, stepContent, "GEMINI_API_KEY", "Should not include GEMINI_API_KEY with Vertex WIF")
+
+		var settingsSteps []struct {
+			Env map[string]string
+		}
+		require.NoError(t, yaml.Unmarshal([]byte(strings.Join(steps[0], "\n")), &settingsSteps))
+		require.Len(t, settingsSteps, 1)
+		var config struct {
+			Security struct {
+				Auth struct {
+					SelectedType string `json:"selectedType"`
+				}
+			}
+		}
+		require.NoError(t, json.Unmarshal([]byte(settingsSteps[0].Env["GH_AW_GEMINI_BASE_CONFIG"]), &config))
+		assert.Equal(t, "vertex-ai", config.Security.Auth.SelectedType)
 	})
 
 	t.Run("execution step defaults location to us-central1 when not configured", func(t *testing.T) {

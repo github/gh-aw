@@ -132,6 +132,9 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	if err := c.validateCodexCompatibility(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := validateGeminiProvider(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 
 	workflowPermissions, err := c.validatePermissions(workflowData, markdownPath)
 	if err != nil {

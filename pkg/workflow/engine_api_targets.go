@@ -268,6 +268,9 @@ const DefaultGeminiAPITarget = "generativelanguage.googleapis.com"
 // Returns empty string if the engine is not Gemini and no custom GEMINI_API_BASE_URL is configured.
 func GetGeminiAPITarget(workflowData *WorkflowData, engineName string) string {
 	awfHelpersLog.Printf("Getting Gemini API target for engine: %s", engineName)
+	if engineName == "gemini" && NewGeminiEngine().ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+		return ""
+	}
 	// Check for custom GEMINI_API_BASE_URL in engine.env
 	if customTarget := extractAPITargetHost(workflowData, "GEMINI_API_BASE_URL"); customTarget != "" {
 		awfHelpersLog.Printf("Using custom Gemini API target from GEMINI_API_BASE_URL: %s", customTarget)
@@ -332,6 +335,9 @@ func getEngineAPIHosts(data *WorkflowData, engine CodingAgentEngine) []string {
 		}
 		return []string{"api.openai.com"}
 	case *GeminiEngine:
+		if NewGeminiEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
+			return getEngineAPIHosts(data, NewCopilotEngine())
+		}
 		return []string{DefaultGeminiAPITarget}
 	default:
 		// Custom or unknown engine — no known API hosts without explicit api-target.

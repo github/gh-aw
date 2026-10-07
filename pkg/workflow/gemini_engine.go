@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
@@ -46,6 +47,19 @@ func (e *GeminiEngine) GetModelEnvVarName() string {
 	return constants.GeminiCLIModelEnvVar
 }
 
+func (e *GeminiEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvider {
+	return resolveEngineLLMProviderFromModel(workflowData, LLMProviderGoogle)
+}
+
+func geminiModelID(model string) string {
+	model = strings.TrimSpace(model)
+	if provider, id, found := strings.Cut(model, "/"); found &&
+		(strings.EqualFold(provider, "copilot") || strings.EqualFold(provider, "google") || strings.EqualFold(provider, "gemini")) {
+		return id
+	}
+	return model
+}
+
 // GetRequiredSecretNames returns the list of secrets required by the Gemini engine
 // This includes GEMINI_API_KEY and optionally MCP_GATEWAY_AGENT_ID, GITHUB_MCP_SERVER_TOKEN,
 // HTTP MCP header secrets, and mcp-scripts secrets.
@@ -55,8 +69,9 @@ func (e *GeminiEngine) GetRequiredSecretNames(workflowData *WorkflowData) []stri
 	geminiLog.Print("Collecting required secrets for Gemini engine")
 
 	var secrets []string
-	if !isGeminiVertexWIF(workflowData) {
-		secrets = append(secrets, "GEMINI_API_KEY")
+	provider := e.ResolveLLMProvider(workflowData)
+	if !isGeminiVertexWIF(workflowData) && (provider != LLMProviderGitHub || !hasCopilotRequestsWritePermission(workflowData)) {
+		secrets = append(secrets, llmProviderSecretNames(provider)...)
 	}
 
 	// Add common MCP secrets (MCP_GATEWAY_AGENT_ID if MCP servers present, mcp-scripts secrets)
@@ -91,11 +106,14 @@ func (e *GeminiEngine) GetSupportedEnvVarKeys() []string {
 // GetSecretValidationStep returns the secret validation step for the Gemini engine.
 // Returns an empty step if custom command is specified or if Google/Vertex WIF is configured.
 func (e *GeminiEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHubActionStep {
+	provider := e.ResolveLLMProvider(workflowData)
 	return BuildEngineSecretValidationStep(workflowData, EngineSecretValidationConfig{
-		SecretNames: []string{"GEMINI_API_KEY"},
+		SecretNames: llmProviderSecretNames(provider),
 		EngineName:  "Gemini CLI",
-		DocsURL:     "https://geminicli.com/docs/get-started/authentication/",
-		Skip:        isGeminiVertexWIF,
+		DocsURL:     llmProviderDocsURL(provider),
+		Skip: func(data *WorkflowData) bool {
+			return isGeminiVertexWIF(data) || provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(data)
+		},
 	})
 }
 
@@ -231,6 +249,10 @@ func (e *GeminiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		commandName = workflowData.EngineConfig.Command
 	}
+	provider := e.ResolveLLMProvider(workflowData)
+	if provider == LLMProviderGitHub {
+		commandName = fmt.Sprintf(`node %s/gemini_copilot.cjs %s`, SetupActionDestinationShell, commandName)
+	}
 
 	// Append the prompt arg raw (not through shellJoinArgs) to preserve shell expansion
 	geminiCommand := fmt.Sprintf(`%s %s --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"`, commandName, shellJoinArgs(geminiArgs))
@@ -277,7 +299,7 @@ func (e *GeminiEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 			PathSetup: "touch " + AgentStepSummaryPath,
 			// Exclude every env var whose step-env value is a secret so the agent
 			// cannot read raw token values via bash tools (env / printenv).
-			ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, e.GetRequiredSecretNames(workflowData)),
+			ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, append(e.GetRequiredSecretNames(workflowData), llmProviderSecretNames(provider)...)),
 		})
 	} else {
 		command = fmt.Sprintf(`set -o pipefail
@@ -311,7 +333,11 @@ touch %s
 		"GEMINI_CLI_TRUST_WORKSPACE": "true",
 	}
 	applyPlaywrightBrowserEnv(env, workflowData)
-	if !vertexWIF {
+	if provider == LLMProviderGitHub {
+		env["COPILOT_GITHUB_TOKEN"] = llmProviderSecretExpression(provider, workflowData)
+		env["GH_AW_GEMINI_COPILOT_MODEL"] = geminiModelID(workflowData.Model)
+		env["GH_AW_LLM_PROVIDER"] = string(provider)
+	} else if !vertexWIF {
 		// Set static API key when WIF is not configured.
 		// When WIF is active, authentication is handled by the AWF api-proxy sidecar
 		// via the AWF_AUTH_GCP_* env vars set through engine.auth.
@@ -335,9 +361,10 @@ touch %s
 
 	// When the firewall (AWF) is enabled with --enable-api-proxy, point Gemini CLI at the
 	// LLM gateway sidecar instead of the real googleapis.com endpoint.
-	if firewallEnabled {
+	if firewallEnabled && provider != LLMProviderGitHub {
 		env["GEMINI_API_BASE_URL"] = fmt.Sprintf("http://host.docker.internal:%d", constants.GeminiLLMGatewayPort)
-
+	}
+	if firewallEnabled {
 		// Set git identity environment variables so the first git commit succeeds inside the
 		// container. AWF's --env-all forwards these to the container, ensuring git does not
 		// rely on the host-side ~/.gitconfig which is not visible in the sandbox.
@@ -364,7 +391,7 @@ touch %s
 	// When model is not configured, let the Gemini CLI use its built-in default model.
 	if modelConfigured {
 		geminiLog.Printf("Setting %s env var for model: %s", constants.GeminiCLIModelEnvVar, workflowData.Model)
-		env[constants.GeminiCLIModelEnvVar] = workflowData.Model
+		env[constants.GeminiCLIModelEnvVar] = geminiModelID(workflowData.Model)
 	}
 
 	// Add custom environment variables from engine config.

@@ -19,6 +19,39 @@ To authenticate, either:
 
 2. configure keyless [Google Workload Identity Federation](/gh-aw/reference/auth/#google-workload-identity-federation-wif).
 
+The generated `.gemini/settings.json` selects API-key authentication explicitly so
+the sandbox's inference proxy URL does not select Gemini's unsupported gateway
+auth mode. Google Workload Identity Federation selects Vertex AI authentication
+instead. Neither setting stores credentials in the project configuration.
+Configured MCP servers are also included in Gemini's tool allowlist; their
+gateway-side tool restrictions still apply.
+
+## Using Copilot-hosted Gemini models
+
+Use a `copilot/gemini*` model with the AWF sandbox enabled:
+
+```yaml
+permissions:
+  contents: read
+  copilot-requests: write
+engine:
+  id: gemini
+  model: copilot/gemini-3.8-flash
+```
+
+`copilot-requests: write` uses `${{ github.token }}` for inference and does not
+require a PAT or `COPILOT_GITHUB_TOKEN` secret. Without that permission, provide
+`COPILOT_GITHUB_TOKEN` instead. A Google API key is not required for this route.
+
+A loopback bridge translates Gemini text, images, and function calls to Copilot
+Chat Completions through AWF's credential-isolated proxy. Completions are buffered
+per turn before being returned in Gemini's streaming format; utility model calls
+use the same selected Copilot model. Google-hosted tools, custom safety settings,
+cached-content requests, and the token-counting endpoint are not supported by
+this route. Native `web_fetch` can use Gemini CLI's direct-fetch fallback.
+Gemini's `topK` and thinking configuration use the Copilot model's defaults; the
+bridge reports this when those options are present.
+
 ## Example: scheduled repository report
 
 ```aw wrap title=".github/workflows/daily-status.md"

@@ -55,6 +55,23 @@ func computeGeminiToolsCore(tools map[string]any) []string {
 		return toolsCore
 	}
 
+	toolsCore = append(toolsCore, computeGeminiShellTools(tools)...)
+
+	// Map edit neutral tool to write_file and replace (Gemini's file write tools)
+	if _, hasEdit := tools["edit"]; hasEdit {
+		geminiToolsLog.Print("edit → replace, write_file")
+		toolsCore = append(toolsCore, "replace", "write_file")
+	}
+	if _, hasWebFetch := tools["web-fetch"]; hasWebFetch {
+		toolsCore = append(toolsCore, "web_fetch")
+	}
+
+	sort.Strings(toolsCore)
+	return toolsCore
+}
+
+func computeGeminiShellTools(tools map[string]any) []string {
+	var toolsCore []string
 	// Map bash neutral tool to run_shell_command
 	if bashConfig, hasBash := tools["bash"]; hasBash {
 		bashCommands, ok := bashConfig.([]any)
@@ -91,22 +108,24 @@ func computeGeminiToolsCore(tools map[string]any) []string {
 		}
 	}
 
-	// Map edit neutral tool to write_file and replace (Gemini's file write tools)
-	if _, hasEdit := tools["edit"]; hasEdit {
-		geminiToolsLog.Print("edit → replace, write_file")
-		toolsCore = append(toolsCore, "replace")
-		toolsCore = append(toolsCore, "write_file")
-	}
-
-	// Map web-fetch neutral tool to web_fetch (Gemini's native HTTP fetch tool)
-	// See: https://geminicli.com/docs/tools/web-fetch/
-	if _, hasWebFetch := tools["web-fetch"]; hasWebFetch {
-		geminiToolsLog.Print("web-fetch → web_fetch")
-		toolsCore = append(toolsCore, "web_fetch")
-	}
-
-	sort.Strings(toolsCore)
 	return toolsCore
+}
+
+func geminiBaseConfig(workflowData *WorkflowData, toolsCore []string) []byte {
+	authType := "gemini-api-key"
+	if isGeminiVertexWIF(workflowData) {
+		authType = "vertex-ai"
+	}
+	config := map[string]any{
+		"context":  map[string]any{"includeDirectories": []string{"/tmp/"}},
+		"tools":    map[string]any{"core": toolsCore},
+		"security": map[string]any{"auth": map[string]any{"selectedType": authType}},
+	}
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		panic(fmt.Sprintf("BUG: failed to marshal Gemini settings: %v", err))
+	}
+	return configJSON
 }
 
 // generateGeminiSettingsStep creates a GitHub Actions step that writes the
@@ -137,21 +156,8 @@ func (e *GeminiEngine) generateGeminiSettingsStep(workflowData *WorkflowData) Gi
 	toolsCore := computeGeminiToolsCore(tools)
 	geminiToolsLog.Printf("tools.core entries: %d", len(toolsCore))
 
-	// Build the settings JSON object
-	config := map[string]any{
-		"context": map[string]any{
-			"includeDirectories": []string{"/tmp/"},
-		},
-		"tools": map[string]any{
-			"core": toolsCore,
-		},
-	}
-
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		geminiToolsLog.Printf("ERROR: Failed to marshal Gemini settings: %v", err)
-		configJSON = []byte(`{"context":{"includeDirectories":["/tmp/"]},"tools":{"core":[]}}`)
-	}
+	// Proxy base URLs otherwise select Gemini's unsupported "gateway" auth mode.
+	configJSON := geminiBaseConfig(workflowData, toolsCore)
 
 	// Generate a shell script that:
 	// - Creates the .gemini directory if needed
@@ -161,6 +167,7 @@ func (e *GeminiEngine) generateGeminiSettingsStep(workflowData *WorkflowData) Gi
 	// The JSON config is passed via the GH_AW_GEMINI_BASE_CONFIG environment variable
 	// to avoid any shell quoting issues with special characters in the JSON.
 	//
+	// Gemini 0.63 also enforces tools.core on MCP tools, so retain configured servers.
 	// jq merge: '$existing * $base' means the RIGHT operand ($base) overrides the LEFT
 	// operand ($existing) for conflicting keys. Non-conflicting keys from $existing
 	// (e.g. mcpServers written by convert_gateway_config_gemini.sh) are preserved.
@@ -168,7 +175,7 @@ func (e *GeminiEngine) generateGeminiSettingsStep(workflowData *WorkflowData) Gi
 SETTINGS="$GITHUB_WORKSPACE/.gemini/settings.json"
 BASE_CONFIG="$GH_AW_GEMINI_BASE_CONFIG"
 if [ -f "$SETTINGS" ]; then
-  MERGED=$(jq -n --argjson base "$BASE_CONFIG" --argjson existing "$(cat "$SETTINGS")" '$existing * $base')
+  MERGED=$(jq -n --argjson base "$BASE_CONFIG" --argjson existing "$(cat "$SETTINGS")" '$existing * $base | .tools.core += [(.mcpServers // {} | keys[]) | "mcp_" + . + "_*"]')
   echo "$MERGED" > "$SETTINGS"
 else
   echo "$BASE_CONFIG" > "$SETTINGS"

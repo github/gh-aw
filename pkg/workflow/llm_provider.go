@@ -22,6 +22,7 @@ const (
 	LLMProviderGitHub    LLMProvider = "github"
 	LLMProviderAnthropic LLMProvider = "anthropic"
 	LLMProviderOpenAI    LLMProvider = "openai"
+	LLMProviderGoogle    LLMProvider = "google"
 )
 
 var llmProviderAliases = map[string]LLMProvider{
@@ -31,6 +32,8 @@ var llmProviderAliases = map[string]LLMProvider{
 	"github_models":  LLMProviderGitHub,
 	"anthropic":      LLMProviderAnthropic,
 	"openai":         LLMProviderOpenAI,
+	"google":         LLMProviderGoogle,
+	"gemini":         LLMProviderGoogle,
 }
 
 type llmProviderProfile struct {
@@ -81,6 +84,8 @@ func llmProviderProfileFor(provider LLMProvider) llmProviderProfile {
 			id:          LLMProviderOpenAI,
 			gatewayPort: constants.CodexLLMGatewayPort,
 		}
+	case LLMProviderGoogle:
+		return llmProviderProfile{id: provider, gatewayPort: constants.GeminiLLMGatewayPort}
 	default:
 		return llmProviderProfile{
 			id:          LLMProviderAnthropic,
@@ -95,6 +100,8 @@ func llmProviderSecretNames(provider LLMProvider) []string {
 		return []string{"COPILOT_GITHUB_TOKEN"}
 	case LLMProviderOpenAI:
 		return []string{"CODEX_API_KEY", "OPENAI_API_KEY"}
+	case LLMProviderGoogle:
+		return []string{"GEMINI_API_KEY"}
 	default:
 		return []string{"ANTHROPIC_API_KEY"}
 	}
@@ -111,6 +118,8 @@ func llmProviderSecretExpression(provider LLMProvider, workflowData *WorkflowDat
 		return "${{ secrets.COPILOT_GITHUB_TOKEN }}"
 	case LLMProviderOpenAI:
 		return "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"
+	case LLMProviderGoogle:
+		return "${{ secrets.GEMINI_API_KEY }}"
 	default:
 		return "${{ secrets.ANTHROPIC_API_KEY }}"
 	}
@@ -127,6 +136,8 @@ func llmProviderDocsURL(provider LLMProvider) string {
 		return "https://github.github.com/gh-aw/reference/engines/#github-copilot-default"
 	case LLMProviderOpenAI:
 		return "https://github.github.com/gh-aw/reference/engines/#openai-codex"
+	case LLMProviderGoogle:
+		return "https://geminicli.com/docs/get-started/authentication/"
 	default:
 		return "https://github.github.com/gh-aw/reference/engines/#anthropic-claude-code"
 	}
