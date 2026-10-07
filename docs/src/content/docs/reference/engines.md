@@ -21,6 +21,8 @@ Set `engine:` in workflow frontmatter and configure the corresponding authentica
 
 Copilot CLI is the default, so `engine:` can be omitted when using Copilot. Copilot SDK mode is an execution mode of the Copilot engine, not a separate engine; enable it with `engine: copilot` and `copilot-sdk: true`. See [Copilot SDK support](#copilot-sdk-support).
 
+Copilot also supports experimental per-run model and reasoning-effort selection through `engine.model-routing`. See [Model Routing](../model-routing/) for configuration, requirements, known limitations, and troubleshooting.
+
 ## Configuration conformance workflows
 
 This repository provides manual-only `engine-conformance-<engine-id>.md`
