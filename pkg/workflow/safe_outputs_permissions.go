@@ -172,6 +172,15 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 		permissions.Merge(handlerPermissions)
 	}
 
+	if safeOutputs.AddComments != nil && addCommentTargetsEnabled(safeOutputs.AddComments) {
+		// Mention resolution fetches explicit comment targets through the Issues API,
+		// including when add-comment is configured for pull requests only. Add this
+		// only when the selected safe-output token does not already have Issues access.
+		if _, hasIssuesPermission := permissions.Get(PermissionIssues); !hasIssuesPermission {
+			permissions.Set(PermissionIssues, PermissionRead)
+		}
+	}
+
 	if dispatchRepositoryPermissions := computeDispatchRepositoryPermissions(safeOutputs, excludePerHandlerApps); dispatchRepositoryPermissions != nil {
 		permissions.Merge(dispatchRepositoryPermissions)
 	}
@@ -215,6 +224,30 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 
 	safeOutputsPermissionsLog.Printf("Computed permissions with %d scopes", len(permissions.permissions))
 	return permissions
+}
+
+func buildMentionResolutionPermissions(safeOutputs *SafeOutputsConfig) *Permissions {
+	permissions := NewPermissions()
+	if safeOutputs == nil {
+		return permissions
+	}
+	if safeOutputs.AddComments != nil && addCommentTargetsEnabled(safeOutputs.AddComments) {
+		// The pre-handler author lookup uses issues.get for both issue and PR targets.
+		permissions.Set(PermissionIssues, PermissionRead)
+		if safeOutputs.AddComments.PullRequests == nil || *safeOutputs.AddComments.PullRequests {
+			permissions.Set(PermissionPullRequests, PermissionRead)
+		}
+	}
+	if safeOutputs.Mentions != nil && len(safeOutputs.Mentions.AllowedTeams) > 0 {
+		permissions.Set(PermissionMembers, PermissionRead)
+	}
+	return permissions
+}
+
+func addCommentTargetsEnabled(config *AddCommentsConfig) bool {
+	return config != nil &&
+		((config.Issues == nil || *config.Issues) ||
+			(config.PullRequests == nil || *config.PullRequests))
 }
 
 func computeDispatchRepositoryPermissions(safeOutputs *SafeOutputsConfig, excludePerToolApps bool) *Permissions {

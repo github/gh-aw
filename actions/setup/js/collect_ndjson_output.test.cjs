@@ -6,9 +6,19 @@ import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = _require("./constants.cjs");
 const incompleteOutput = JSON.stringify({
-  items: [{ type: "report_incomplete", reason: "missing_terminal_safe_output", details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed." }],
+  items: [
+    {
+      type: "report_incomplete",
+      reason: "missing_terminal_safe_output",
+      failureCause: "prompt_exhaustion",
+      retryCount: 0,
+      details: "Agent finished without emitting a terminal safe output; task completion could not be confirmed.\nFailure classification: prompt_exhaustion\nRetry attempts observed: 0",
+    },
+  ],
   errors: [],
   collectorEmptyOutputCause: "missing_terminal_safe_output",
+  collectorFailureCause: "prompt_exhaustion",
+  collectorRetryCount: 0,
 });
 describe("collect_ndjson_output.cjs", () => {
   let mockCore, collectScript;
@@ -1391,7 +1401,7 @@ describe("collect_ndjson_output.cjs", () => {
             parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].body).toBe("GitHub URLs: https://github.com/repo, https://api.github.com/users, https://githubusercontent.com/file. External: (example.com/redacted)");
         }),
-        it("should handle @mentions neutralization", async () => {
+        it("should defer mention filtering for trusted output processing", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
             ndjsonContent = '{"type": "create_issue", "title": "@mention Test", "body": "Hey @username and @org/team, check this out! But preserve email@domain.com"}';
           (fs.writeFileSync(testFile, ndjsonContent), (process.env.GH_AW_SAFE_OUTPUTS = testFile));
@@ -1400,9 +1410,10 @@ describe("collect_ndjson_output.cjs", () => {
           (fs.mkdirSync("/tmp/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
-          expect(parsedOutput.items[0].body).toBe("Hey `@username` and `@org/team`, check this out! But preserve email@domain.com");
+          expect(parsedOutput.items[0].body).toBe("Hey @username and @org/team, check this out! But preserve email@domain.com");
+          expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalled();
         }),
-        it("checks collaborators in each comment's target repository, never the workflow repository", async () => {
+        it("does not query collaborators during untrusted ingestion", async () => {
           global.context.payload.issue = { user: { login: "alice", type: "User" } };
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
           fs.writeFileSync(testFile, [JSON.stringify({ type: "add_comment", repo: "target-org/first", body: "Hello @alice" }), JSON.stringify({ type: "add_comment", repo: "target-org/second", body: "Hello @alice" })].join("\n"));
@@ -1411,11 +1422,11 @@ describe("collect_ndjson_output.cjs", () => {
 
           await eval(`(async () => { ${collectScript}; await main(); })()`);
 
-          expect(global.github.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "first" }));
-          expect(global.github.rest.repos.listCollaborators).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "second" }));
-          expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalledWith(expect.objectContaining({ owner: "test-owner", repo: "test-repo" }));
+          expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalled();
+          const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+          expect(parsed.items.map(item => item.body)).toEqual(["Hello @alice", "Hello @alice"]);
         }),
-        it("keeps target issue authors scoped to their own repository and issue", async () => {
+        it("does not query target issue authors during untrusted ingestion", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
           fs.writeFileSync(
             testFile,
@@ -1433,10 +1444,10 @@ describe("collect_ndjson_output.cjs", () => {
           await eval(`(async () => { ${collectScript}; await main(); })()`);
 
           const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
-          expect(parsed.items.map(item => item.body)).toEqual(["Hello @first-author", "Hello `@first-author`"]);
-          expect(global.github.rest.issues.get).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "first", issue_number: 7 }));
+          expect(parsed.items.map(item => item.body)).toEqual(["Hello @first-author", "Hello @first-author"]);
+          expect(global.github.rest.issues.get).not.toHaveBeenCalled();
         }),
-        it("looks up explicit issue authors in a configured target-repo", async () => {
+        it("does not look up explicit issue authors during untrusted ingestion", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
           fs.writeFileSync(testFile, JSON.stringify({ type: "add_comment", item_number: 7, body: "Hello @target-author" }));
           process.env.GH_AW_SAFE_OUTPUTS = testFile;
@@ -1445,11 +1456,11 @@ describe("collect_ndjson_output.cjs", () => {
 
           await eval(`(async () => { ${collectScript}; await main(); })()`);
 
-          expect(global.github.rest.issues.get).toHaveBeenCalledWith(expect.objectContaining({ owner: "target-org", repo: "target-repo", issue_number: 7 }));
+          expect(global.github.rest.issues.get).not.toHaveBeenCalled();
           const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
           expect(parsed.items[0].body).toBe("Hello @target-author");
         }),
-        it("does not query either repository for a disallowed per-item override", async () => {
+        it("does not query repositories for per-item overrides during untrusted ingestion", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
           fs.writeFileSync(testFile, JSON.stringify({ type: "add_comment", repo: "unauthorized/repo", body: "Hello @alice" }));
           process.env.GH_AW_SAFE_OUTPUTS = testFile;
@@ -1460,7 +1471,7 @@ describe("collect_ndjson_output.cjs", () => {
 
           expect(global.github.rest.repos.listCollaborators).not.toHaveBeenCalled();
           const parsed = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
-          expect(parsed.items[0].body).toBe("Hello `@alice`");
+          expect(parsed.items[0].body).toBe("Hello @alice");
         }),
         it("should preserve allowed aliases after max when no more than max occur", async () => {
           const allowed = Array.from({ length: 60 }, (_, i) => `user${i}`);
@@ -1481,7 +1492,7 @@ describe("collect_ndjson_output.cjs", () => {
           const parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].body).toBe("Thanks @user57, @user58, and @user59");
         }),
-        it("should apply the mention limit across all fields in one item", async () => {
+        it("should defer mention limits across all fields to trusted output processing", async () => {
           const validationPath = "/tmp/gh-aw/safeoutputs/validation.json";
           const validationConfig = JSON.parse(fs.readFileSync(validationPath, "utf8"));
           validationConfig.mentions = { allowContext: false, allowed: ["user1", "user2", "user3", "user4"], max: 3 };
@@ -1497,7 +1508,7 @@ describe("collect_ndjson_output.cjs", () => {
           const outputCall = mockCore.setOutput.mock.calls.find(call => call[0] === "output");
           const parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].title).toBe("@user1 @user2");
-          expect(parsedOutput.items[0].body).toBe("@user3 `@user4` @user1");
+          expect(parsedOutput.items[0].body).toBe("@user3 @user4 @user1");
         }),
         it("should neutralize bot trigger phrases", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",

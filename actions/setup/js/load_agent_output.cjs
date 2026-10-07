@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 
 const fs = require("fs");
 const { normalizeRuntimeMessage, normalizeClaimScope, readClaimScopeContext, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
@@ -37,7 +38,11 @@ function truncateForLogging(content) {
  * @returns {{
  *   success: true,
  *   items: any[],
- *   collectorEmptyOutputCause?: string
+ *   collectorEmptyOutputCause?: string,
+ *   collectorFailureCause?: string,
+ *   collectorDriverExitCode?: number,
+ *   collectorRetryCount?: number,
+ *   collectorEngineErrorType?: string
  * } | {
  *   success: false,
  *   items?: undefined,
@@ -115,6 +120,12 @@ function loadAgentOutput(options = {}) {
       })
       .filter(item => !currentClaimHandle() || (!item._claimScopeError && item.claim_handle === currentClaimHandle())),
     ...(typeof validatedOutput.collectorEmptyOutputCause === "string" ? { collectorEmptyOutputCause: validatedOutput.collectorEmptyOutputCause } : {}),
+    ...(Object.hasOwn(EMPTY_OUTPUT_FAILURE_CAUSES, validatedOutput.collectorFailureCause) ? { collectorFailureCause: validatedOutput.collectorFailureCause } : {}),
+    ...(Number.isSafeInteger(validatedOutput.collectorDriverExitCode) && validatedOutput.collectorDriverExitCode >= 0 && validatedOutput.collectorDriverExitCode <= 255
+      ? { collectorDriverExitCode: validatedOutput.collectorDriverExitCode }
+      : {}),
+    ...(Number.isSafeInteger(validatedOutput.collectorRetryCount) && validatedOutput.collectorRetryCount >= 0 ? { collectorRetryCount: validatedOutput.collectorRetryCount } : {}),
+    ...(typeof validatedOutput.collectorEngineErrorType === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(validatedOutput.collectorEngineErrorType) ? { collectorEngineErrorType: validatedOutput.collectorEngineErrorType } : {}),
   };
 }
 

@@ -30,7 +30,7 @@ const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usa
 const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
-const { EMPTY_OUTPUT_CAUSES } = require("./empty_output_outcome.cjs");
+const { EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const fs = require("fs");
 const https = require("https");
@@ -384,6 +384,7 @@ function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
  * @param {string} [options.missingModelPricingModelName]
  * @param {boolean} [options.shellExpansionGuardRejected]
  * @param {string} [options.emptyOutputCause]
+ * @param {string} [options.terminalOutputFailureCause]
  * @returns {string}
  */
 function buildFailureIssueTitle(options) {
@@ -419,6 +420,9 @@ function buildFailureIssueTitle(options) {
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
+  const terminalOutputFailureTitle =
+    typeof options.terminalOutputFailureCause === "string" && Object.hasOwn(EMPTY_OUTPUT_FAILURE_CAUSES, options.terminalOutputFailureCause) ? EMPTY_OUTPUT_FAILURE_CAUSES[options.terminalOutputFailureCause] : "";
+  if (terminalOutputFailureTitle) return `[aw] ${workflowName} ${terminalOutputFailureTitle}`;
   const emptyOutputCauseTitle = typeof options.emptyOutputCause === "string" && Object.prototype.hasOwnProperty.call(EMPTY_OUTPUT_CAUSES, options.emptyOutputCause) ? EMPTY_OUTPUT_CAUSES[options.emptyOutputCause] : "";
   if (emptyOutputCauseTitle) return `[aw] ${workflowName} ${emptyOutputCauseTitle}`;
   if (options.hasReportIncomplete) return `[aw] ${workflowName} reported incomplete result`;
@@ -436,12 +440,16 @@ function buildFailureIssueTitle(options) {
  * @param {string} options.branch - Triggering branch
  * @param {number|undefined} options.pullRequestNumber - Triggering pull request number
  * @param {string[]} options.failureCategories - Sorted failure categories
+ * @param {string} [options.failureCause] - Classified terminal-output failure cause
  * @returns {string} HTML comment marker
  */
 function generateFailureMatchMarker(options) {
   const { workflowId, branch, pullRequestNumber, failureCategories } = options;
   const parts = ["gh-aw-failure-issue: true", `workflow_id: ${workflowId}`, `branch: ${branch || ""}`, `failure_categories: ${failureCategories.join("|")}`];
 
+  if (typeof options.failureCause === "string" && Object.hasOwn(EMPTY_OUTPUT_FAILURE_CAUSES, options.failureCause)) {
+    parts.push(`failure_cause: ${options.failureCause}`);
+  }
   if (pullRequestNumber) {
     parts.push(`pull_request: ${pullRequestNumber}`);
   }
@@ -455,6 +463,7 @@ function generateFailureMatchMarker(options) {
  * @param {Object} options - Match criteria
  * @param {string} options.workflowId - Workflow identifier
  * @param {string[]} options.failureCategories - Sorted failure categories
+ * @param {string} [options.failureCause] - Classified terminal-output failure cause
  * @returns {boolean} True when the issue body matches and is not expired
  */
 function isReusableFailureIssue(body, options) {
@@ -479,6 +488,10 @@ function isReusableFailureIssue(body, options) {
 
   if ((failureMarker.workflow_id || "") !== options.workflowId) {
     return false;
+  }
+
+  if (typeof options.failureCause === "string") {
+    return failureMarker.failure_cause === options.failureCause;
   }
 
   return (failureMarker.failure_categories || "") === options.failureCategories.join("|");
@@ -520,14 +533,16 @@ function escapeGitHubSearchPhrase(value) {
  * @param {string} options.repo - Repository name
  * @param {string} options.workflowId - Workflow identifier
  * @param {string[]} options.failureCategories - Sorted failure categories
+ * @param {string} [options.failureCause] - Classified terminal-output failure cause
  * @returns {Promise<{number: number, html_url: string} | null>} Matching issue or null
  */
 async function findExistingFailureIssue(options) {
-  const { owner, repo, workflowId, failureCategories } = options;
+  const { owner, repo, workflowId, failureCategories, failureCause } = options;
   const windowStartMs = Date.now() - FAILURE_ISSUE_WINDOW_MS;
   const since = new Date(windowStartMs).toISOString().slice(0, 19) + "Z";
   const escapedWorkflowId = escapeGitHubSearchPhrase(workflowId);
-  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows created:>=${since} ` + `"gh-aw-agentic-workflow:" "workflow_id: ${escapedWorkflowId}" in:body`;
+  const failureCauseQuery = typeof failureCause === "string" ? ` "failure_cause: ${failureCause}"` : "";
+  const searchQuery = `repo:${owner}/${repo} is:issue is:open label:agentic-workflows created:>=${since} ` + `"gh-aw-agentic-workflow:" "workflow_id: ${escapedWorkflowId}"${failureCauseQuery} in:body`;
   const perPage = 100;
   for (let page = 1; ; page += 1) {
     const searchResult = await github.rest.search.issuesAndPullRequests({
@@ -554,6 +569,7 @@ async function findExistingFailureIssue(options) {
         isReusableFailureIssue(body, {
           workflowId,
           failureCategories,
+          failureCause,
         })
       ) {
         return {
@@ -1823,10 +1839,11 @@ function buildTimeoutContext(isTimedOut, timeoutMinutes) {
  * @param {boolean} isTimedOut
  * @param {boolean} hasMissingModelPricingError
  * @param {boolean} hasShellExpansionGuardRejected
+ * @param {boolean} hasTerminalOutputFailure
  * @returns {boolean}
  */
-function shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, hasMissingModelPricingError = false, hasShellExpansionGuardRejected = false) {
-  return agentConclusion === "failure" && !hasToolDenialsExceeded && !isTimedOut && !hasMissingModelPricingError && !hasShellExpansionGuardRejected;
+function shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, hasMissingModelPricingError = false, hasShellExpansionGuardRejected = false, hasTerminalOutputFailure = false) {
+  return agentConclusion === "failure" && !hasToolDenialsExceeded && !isTimedOut && !hasMissingModelPricingError && !hasShellExpansionGuardRejected && !hasTerminalOutputFailure;
 }
 
 /**
@@ -4310,10 +4327,12 @@ async function main() {
     }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
+    const terminalOutputFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
       transportWedge,
       emptyOutputCause,
+      terminalOutputFailureCause,
       isTimedOut,
       hasMissingSafeOutputs,
       hasReportIncomplete,
@@ -4465,6 +4484,7 @@ async function main() {
             repo,
             workflowId: workflowID,
             failureCategories,
+            failureCause: terminalOutputFailureCause,
           });
 
       // Build missing model pricing context once; both issue-create and issue-comment
@@ -4547,7 +4567,7 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected)
+        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
@@ -4791,7 +4811,7 @@ async function main() {
         // context is the more actionable signal.
         // Also suppress when missing-model-pricing is detected: the pricing error is the
         // root cause and the engine error block would be redundant noise.
-        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected)
+        const engineFailureContext = shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, missingModelPricingError, shellExpansionGuardRejected, Boolean(terminalOutputFailureCause))
           ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded })
           : "";
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
@@ -4910,6 +4930,7 @@ async function main() {
           branch: currentBranch,
           pullRequestNumber: pullRequest?.number,
           failureCategories,
+          failureCause: terminalOutputFailureCause,
         });
 
         // Add expiration marker inside the quoted footer section using helper
@@ -4995,6 +5016,7 @@ module.exports = {
   buildOptimizeTokenConsumptionContext,
   buildTimeoutContext,
   shouldBuildEngineFailureContext,
+  isReusableFailureIssue,
   isIssueWritePermissionError,
   setFailureIssueOutputs,
   buildAssignCopilotFailureContext,

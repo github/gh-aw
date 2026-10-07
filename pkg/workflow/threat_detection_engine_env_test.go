@@ -10,6 +10,46 @@ import (
 	yamlv3 "gopkg.in/yaml.v3"
 )
 
+func TestConclusionWarnsWhenDetectionHasNoVerdict(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+	steps := strings.Join(compiler.buildConclusionSetupSteps(data), "")
+	for _, want := range []string{
+		"Warn if threat detection produced no verdict",
+		"if: always() && needs.detection.result != 'skipped'",
+		"needs.detection.outputs.detection_reason == 'agent_failure'",
+		"needs.detection.outputs.detection_reason == 'parse_error'",
+		"needs.detection.outputs.detection_conclusion == ''",
+		"::warning::Threat detection produced no security verdict.",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("expected conclusion steps to contain %q", want)
+		}
+		data.SafeOutputs.AddComments = &AddCommentsConfig{}
+		enabled := true
+		data.StatusComment = &enabled
+		job, err := compiler.buildConclusionJob(data, "agent", []string{"add_comment"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(job.If, "!(needs.add_comment.outputs.comment_id) || needs.detection.result != 'skipped'") {
+			t.Fatal("missing verdict must allow conclusion even after publishing a comment")
+		}
+		if !strings.Contains(strings.Join(job.Steps, ""), "if: always() && !(needs.add_comment.outputs.comment_id)") {
+			t.Fatal("status-comment update must still suppress duplicate comments")
+		}
+	}
+	data.SafeOutputs.ThreatDetection = nil
+	steps = strings.Join(compiler.buildConclusionSetupSteps(data), "")
+	if strings.Contains(steps, "Warn if threat detection produced no verdict") {
+		t.Error("disabled detection must not produce a missing-verdict warning")
+	}
+}
+
 // TestBuildDetectionEngineExecutionStepPropagatesAPITarget verifies that when engine.api-target
 // is configured on the main engine, the threat detection AWF invocation also receives
 // --copilot-api-target and the GHE domains in --allow-domains.

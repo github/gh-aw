@@ -183,7 +183,7 @@ test("invalid note vote targets are rejected and audited without counting durabl
   }
 });
 
-test("appends canonical ledger state and delegates the upstream push", async () => {
+test("appends canonical ledger state without a configured Git identity and delegates the upstream push", async () => {
   const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-persist-"));
   const largeTransaction = transaction({ subject: "x".repeat(32500) });
   const config = { ...ledgerConfigs[0], max_patch_kb: 100 };
@@ -191,7 +191,7 @@ test("appends canonical ledger state and delegates the upstream push", async () 
   const previousCore = global.core;
   global.core = { debug: () => {}, info: () => {}, warning: () => {}, setFailed: () => {} };
   try {
-    execSync("git init && git config user.name test && git config user.email test@example.com && git commit --allow-empty -m base", {
+    execSync("git init && git -c user.name=test -c user.email=test@example.com commit --allow-empty -m base && git config user.name '' && git config user.email '' && git config user.useConfigOnly true", {
       cwd: workspaceDir,
       stdio: "pipe",
     });
@@ -217,6 +217,8 @@ test("appends canonical ledger state and delegates the upstream push", async () 
     });
     const shard = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim();
     const canonical = execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" });
+    assert.equal(execFileSync("git", ["log", "-1", "--format=%an <%ae>", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim(), "github-actions[bot] <github-actions[bot]@users.noreply.github.com>");
+    assert.equal(execFileSync("git", ["config", "user.name"], { cwd: workspaceDir, encoding: "utf8" }).trim(), "");
     assert.equal(persisted.persisted, 1);
     assert.equal(pushCalls.length, 1);
     assert.equal(pushCalls[0].baseRef, baseRef);

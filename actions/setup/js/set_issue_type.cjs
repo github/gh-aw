@@ -243,7 +243,13 @@ async function main(config = {}) {
       itemType: HANDLER_TYPE,
       supportsIssue: true,
     });
-    if (!targetResult.success) return { success: false, error: targetResult.error };
+    if (!targetResult.success) {
+      if (targetResult.shouldFail === false) {
+        core.warning(targetResult.error);
+        return { success: false, skipped: true, reason: targetResult.error, error: targetResult.error };
+      }
+      return { success: false, error: targetResult.error };
+    }
     const issueNumber = targetResult.number;
     core.info(`Resolved issue number: #${issueNumber}`);
 

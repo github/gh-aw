@@ -153,6 +153,31 @@ describe("set_issue_type (Handler Factory Architecture)", () => {
     );
   });
 
+  it("should skip when triggering target is outside issue context", async () => {
+    const originalContext = global.context;
+    global.context = { ...mockContext, eventName: "workflow_dispatch", payload: {} };
+
+    try {
+      const { main } = require("./set_issue_type.cjs");
+      const triggeringHandler = await main({ max: 5, issue_intent: true, target: "triggering" });
+      const result = await triggeringHandler({ type: "set_issue_type", issue_type: "Bug" }, {});
+
+      expect(result).toMatchObject({ success: false, skipped: true });
+      expect(result.error).toContain("not running in issue context");
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    } finally {
+      global.context = originalContext;
+    }
+  });
+
+  it("should fail when target resolution has a hard error", async () => {
+    const result = await handler({ type: "set_issue_type", issue_type: "Bug" }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).toBeUndefined();
+    expect(result.error).toContain('Target is "*"');
+  });
+
   it("should validate against allowed types list", async () => {
     const { main } = require("./set_issue_type.cjs");
     const handlerWithAllowed = await main({

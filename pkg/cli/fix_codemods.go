@@ -62,6 +62,7 @@ func getEarlyCodemods() []Codemod {
 		getNetworkFirewallCodemod(),
 		getCommandToSlashCommandCodemod(),
 		getWorkflowDispatchRequiredFalseCodemod(), // Set required: false for slash/label command triggers
+		getWorkflowDispatchAwContextRemovalCodemod(),
 		getMCPScriptsModeCodemod(),
 		getUploadAssetsCodemod(),
 		getMigrateWritePermissionsToReadCodemod(),
@@ -78,6 +79,7 @@ func getEarlyCodemods() []Codemod {
 		getInstallScriptURLCodemod(),
 		getBashAnonymousRemovalCodemod(),              // Replace bash: with bash: false
 		getBashSingleQuotedArgsCodemod(),              // Rewrite single-quoted bash args to double-quoted form
+		getCopilotWebFetchRemovalCodemod(),            // Remove native Copilot web-fetch, unavailable in offline BYOK mode
 		getBashAllowlistUnsupportedEngineCodemod(),    // Detect restricted tools.bash on engines that ignore it and emit guided error
 		getActivationOutputsCodemod(),                 // Transform needs.activation.outputs.* to steps.sanitized.outputs.*
 		getRolesToOnRolesCodemod(),                    // Move top-level roles to on.roles

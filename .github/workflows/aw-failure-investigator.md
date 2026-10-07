@@ -250,19 +250,21 @@ steps:
             '--repo',
             REPO,
             '--json',
-            'databaseId,url,name,workflowName,createdAt,conclusion,status,jobs',
+            'databaseId,url,name,workflowName,createdAt,conclusion,status',
           ]);
           if (!runView) continue;
 
+          const runJobs =
+            runApiJson(`repos/${REPO}/actions/runs/${runId}/jobs`, { per_page: '100' }) || {};
           const failedJobNames = [];
           const failedSteps = [];
           const truncatedErrorLogs = [];
           let agentJobConclusion = null;
 
-          for (const job of runView.jobs || []) {
+          for (const job of runJobs.jobs || []) {
             const jobName = job.name;
             const jobConclusion = String(job.conclusion || '').toLowerCase();
-            if (String(jobName || '').toLowerCase() === 'agent') {
+            if (String(jobName || '').trim().toLowerCase() === 'agent') {
               agentJobConclusion = jobConclusion || null;
             }
 
@@ -272,14 +274,14 @@ steps:
               for (const step of job.steps || []) {
                 if (isFailureConclusion(step.conclusion)) {
                   failedSteps.push({
-                    job_id: job.databaseId,
+                    job_id: job.id,
                     job_name: jobName,
                     step_name: step.name,
                   });
                 }
               }
 
-              const jobId = job.databaseId;
+              const jobId = job.id;
               if (jobId) {
                 const logText = runText([
                   'run',

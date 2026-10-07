@@ -3,11 +3,249 @@
 package workflow
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 )
+
+func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
+	compiler := NewCompiler()
+	for _, mainEngine := range []string{"claude", "codex", "copilot", "pi"} {
+		for _, detectionEngine := range []string{"claude", "codex", "copilot"} {
+			if mainEngine == detectionEngine {
+				continue
+			}
+			t.Run(mainEngine+" to "+detectionEngine, func(t *testing.T) {
+				mainProvider := LLMProvider("")
+				if mainEngine == "pi" {
+					mainProvider = "google"
+				}
+				data := &WorkflowData{
+					AI:    mainEngine,
+					Model: "main-alias",
+					EngineConfig: &EngineConfig{
+						ID:          mainEngine,
+						LLMProvider: mainProvider,
+						APITarget:   "main-provider.example.com",
+						Env: map[string]string{
+							"ANTHROPIC_BASE_URL":       "https://main-provider.example.com/api",
+							"OPENAI_BASE_URL":          "https://main-provider.example.com/v1",
+							"ANTHROPIC_API_KEY":        "${{ secrets.MAIN_PROVIDER_KEY }}",
+							"OPENAI_API_KEY":           "${{ secrets.MAIN_PROVIDER_KEY }}",
+							"ANTHROPIC_CUSTOM_HEADERS": "X-Provider: main-only",
+						},
+					},
+					ModelMappings: map[string][]string{
+						"sonnet":     {"main-only-model"},
+						"main-alias": {"main-only-model"},
+					},
+					SafeOutputs: &SafeOutputsConfig{
+						ThreatDetection: &ThreatDetectionConfig{
+							EngineConfig: &EngineConfig{
+								ID: detectionEngine,
+								Env: map[string]string{
+									"DETECTION_FLAG": "detection-only",
+								},
+							},
+						},
+					},
+					NetworkPermissions: &NetworkPermissions{
+						Allowed: []string{"main-provider.example.com"},
+					},
+				}
+				originalEnv := maps.Clone(data.EngineConfig.Env)
+				detectionData := buildExternalDetectorWorkflowData(data, detectionEngine)
+				if len(detectionData.EngineConfig.Env) != 1 || detectionData.EngineConfig.Env["DETECTION_FLAG"] != "detection-only" {
+					t.Fatalf("expected only detection-specific env, got %v", detectionData.EngineConfig.Env)
+				}
+				if detectionData.EngineConfig.APITarget != "" {
+					t.Fatal("main API target must not cross engine identities")
+				}
+				if len(getThreatDetectionAdditionalAllowedDomains(data, detectionEngine)) != 0 {
+					t.Fatal("main provider must not expand detection allowed domains")
+				}
+				if strings.Contains(strings.Join(detectionData.ModelMappings["sonnet"], ","), "main-only-model") {
+					t.Fatal("main model alias must not cross engine identities")
+				}
+				if len(detectionData.ModelMappings["sonnet"]) == 0 {
+					t.Fatal("built-in detection aliases must remain available")
+				}
+				for name, build := range map[string]func(*WorkflowData) []string{
+					"external": compiler.buildExternalDetectorExecutionStep,
+					"inline":   compiler.buildDetectionEngineExecutionStep,
+				} {
+					t.Run(name, func(t *testing.T) {
+						steps := strings.Join(build(data), "")
+						for _, forbidden := range []string{"main-provider.example.com", "MAIN_PROVIDER_KEY", "main-only", "main-only-model", "main-alias"} {
+							if strings.Contains(steps, forbidden) {
+								t.Errorf("main provider setting %q leaked into detection", forbidden)
+							}
+						}
+						if !strings.Contains(steps, "DETECTION_FLAG: detection-only") {
+							t.Error("detection-specific env was lost")
+						}
+					})
+				}
+				if !maps.Equal(originalEnv, data.EngineConfig.Env) {
+					t.Fatal("main engine env was mutated")
+				}
+				override := data.SafeOutputs.ThreatDetection.EngineConfig
+				override.Env["OPENAI_BASE_URL"] = "https://detection-provider.example.com/v1"
+				override.APITarget = "detection-target.example.com"
+				detectionData = buildExternalDetectorWorkflowData(data, detectionEngine)
+				if detectionData.EngineConfig.Env["OPENAI_BASE_URL"] != override.Env["OPENAI_BASE_URL"] ||
+					detectionData.EngineConfig.APITarget != override.APITarget {
+					t.Fatal("explicit detection provider overrides must be preserved across engines")
+				}
+			})
+		}
+	}
+}
+
+func TestDefaultThreatDetectionEngineMatchesMainProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     *WorkflowData
+		expected string
+	}{
+		{
+			name:     "pi openai provider",
+			data:     &WorkflowData{AI: "pi", Model: "openai/gpt-5", EngineConfig: &EngineConfig{ID: "pi"}},
+			expected: "codex",
+		},
+		{
+			name:     "pi anthropic provider",
+			data:     &WorkflowData{AI: "pi", EngineConfig: &EngineConfig{ID: "pi", LLMProvider: LLMProviderAnthropic}},
+			expected: "claude",
+		},
+		{
+			name:     "pi github provider",
+			data:     &WorkflowData{AI: "pi", EngineConfig: &EngineConfig{ID: "pi", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "claude using github provider",
+			data:     &WorkflowData{AI: "claude", EngineConfig: &EngineConfig{ID: "claude", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "codex using github provider",
+			data:     &WorkflowData{AI: "codex", EngineConfig: &EngineConfig{ID: "codex", LLMProvider: LLMProviderGitHub}},
+			expected: "copilot",
+		},
+		{
+			name:     "copilot using openai provider",
+			data:     &WorkflowData{AI: "copilot", EngineConfig: &EngineConfig{ID: "copilot", LLMProvider: LLMProviderOpenAI}},
+			expected: "codex",
+		},
+	}
+
+	compiler := NewCompiler()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := compiler.getThreatDetectionEngineID(test.data); got != test.expected {
+				t.Fatalf("getThreatDetectionEngineID() = %q, want %q", got, test.expected)
+			}
+		})
+	}
+}
+
+func TestThreatDetectionDoesNotInheritProviderSettingsAcrossEngineIDs(t *testing.T) {
+	data := &WorkflowData{
+		AI:    "pi",
+		Model: "openai/gpt-5",
+		EngineConfig: &EngineConfig{
+			ID:          "pi",
+			LLMProvider: LLMProviderOpenAI,
+			APITarget:   "main-only-target.example.com",
+			Env: map[string]string{
+				"OPENAI_BASE_URL": "https://main-only-provider.example.com/v1",
+				"OPENAI_API_KEY":  "${{ secrets.MAIN_PROVIDER_KEY }}",
+				"PI_CUSTOM_FLAG":  "main-only",
+			},
+		},
+		NetworkPermissions: &NetworkPermissions{
+			Allowed: []string{"main-only-provider.example.com"},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	compiler := NewCompiler()
+	engineID := compiler.getThreatDetectionEngineID(data)
+	if engineID != "codex" {
+		t.Fatalf("expected Pi/OpenAI to use Codex detection, got %q", engineID)
+	}
+	detectionData := buildExternalDetectorWorkflowData(data, engineID)
+	if len(detectionData.EngineConfig.Env) != 0 {
+		t.Fatalf("main engine environment must not cross engine IDs, got %v", detectionData.EngineConfig.Env)
+	}
+	if detectionData.EngineConfig.APITarget != "" {
+		t.Fatal("main API target must not cross engine IDs")
+	}
+	if got := getThreatDetectionAdditionalAllowedDomains(data, engineID); len(got) != 0 {
+		t.Fatalf("main provider domains must not cross engine IDs, got %v", got)
+	}
+
+	for name, build := range map[string]func(*WorkflowData) []string{
+		"external": compiler.buildExternalDetectorExecutionStep,
+		"inline":   compiler.buildDetectionEngineExecutionStep,
+	} {
+		t.Run(name, func(t *testing.T) {
+			steps := strings.Join(build(data), "")
+			for _, forbidden := range []string{"main-only-provider.example.com", "main-only-target.example.com", "MAIN_PROVIDER_KEY", "PI_CUSTOM_FLAG"} {
+				if strings.Contains(steps, forbidden) {
+					t.Errorf("main engine setting %q leaked into detection", forbidden)
+				}
+			}
+			if name == "external" {
+				if !strings.Contains(steps, "--engine codex") {
+					t.Error("external detector must use the provider-matched Codex engine")
+				}
+			}
+			if !strings.Contains(steps, "GH_AW_MODEL_DETECTION_CODEX: gpt-5") {
+				t.Error("Pi provider/model syntax was not normalized for Codex detection")
+			}
+		})
+	}
+}
+
+func TestMergeThreatDetectionEngineEnvSameEngine(t *testing.T) {
+	data := &WorkflowData{
+		AI: "claude",
+		EngineConfig: &EngineConfig{
+			ID: "claude",
+			Env: map[string]string{
+				"ANTHROPIC_BASE_URL": "https://main-provider.example.com",
+				"ANTHROPIC_API_KEY":  "${{ secrets.MAIN_PROVIDER_KEY }}",
+			},
+		},
+	}
+	for _, overrides := range []map[string]string{
+		nil,
+		{"ANTHROPIC_BASE_URL": ""},
+		{"ANTHROPIC_BASE_URL": "https://detection-provider.example.com"},
+	} {
+		merged := mergeThreatDetectionEngineEnv(data, "claude", overrides)
+		if merged["ANTHROPIC_API_KEY"] != data.EngineConfig.Env["ANTHROPIC_API_KEY"] {
+			t.Fatal("same-engine credentials must be inherited")
+		}
+		want := data.EngineConfig.Env["ANTHROPIC_BASE_URL"]
+		if override, ok := overrides["ANTHROPIC_BASE_URL"]; ok {
+			want = override
+		}
+		if merged["ANTHROPIC_BASE_URL"] != want {
+			t.Fatal("detection override must take precedence, including empty values")
+		}
+		merged["ANTHROPIC_BASE_URL"] = "mutated"
+		if data.EngineConfig.Env["ANTHROPIC_BASE_URL"] == "mutated" {
+			t.Fatal("merged env must not alias main engine env")
+		}
+	}
+}
 
 func TestExternalDetectorInheritsOpenAIBaseURL(t *testing.T) {
 	compiler := NewCompiler()

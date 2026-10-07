@@ -210,6 +210,36 @@ func TestValidateGitHubAppOnlyPermissions(t *testing.T) {
 	}
 }
 
+func TestValidateMentionGitHubAppPermissionsReadOnly(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		permissions map[string]string
+		wantError   bool
+	}{
+		{name: "read and none are accepted", permissions: map[string]string{"members": "read", "issues": "none"}},
+		{name: "write is rejected", permissions: map[string]string{"members": "write"}, wantError: true},
+		{name: "unknown levels are rejected", permissions: map[string]string{"issues": "admin"}, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateMentionGitHubAppPermissionsReadOnly(&WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{Mentions: &MentionsConfig{
+					GitHubApp: &GitHubAppConfig{Permissions: tc.permissions},
+				}},
+			})
+			if tc.wantError {
+				if err == nil {
+					t.Fatal("expected invalid mention app permissions to fail")
+				}
+				if !strings.Contains(err.Error(), "safe-outputs.mentions.github-app.permissions") {
+					t.Fatalf("expected mention-specific diagnostic, got: %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("expected read-only permissions to pass: %v", err)
+			}
+		})
+	}
+}
+
 func TestIsGitHubAppOnlyScope(t *testing.T) {
 	tests := []struct {
 		scope    PermissionScope
