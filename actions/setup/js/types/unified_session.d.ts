@@ -77,7 +77,14 @@ export interface RuntimeObservationData {
 }
 
 export interface ModelRoutingData {
-  [key: string]: JsonValue;
+  stage?: JsonValue;
+  routed?: JsonValue;
+  outcome?: JsonValue;
+  selected_model?: JsonValue;
+  selected_effort?: JsonValue;
+  router?: JsonValue;
+  request_id?: JsonValue;
+  deviations?: JsonValue;
 }
 
 export interface McpObservationData {

@@ -155,7 +155,7 @@ func modelRoutingFileExists(path string) bool {
 func analyzeModelRouting(runDir string) *ModelRoutingSummary {
 	path := findModelRoutingFile(runDir)
 	if path == "" {
-		return &ModelRoutingSummary{Status: "not_routed"}
+		return nil
 	}
 	return parseModelRoutingFile(path, tokenUsageEntriesForRun(runDir))
 }
@@ -301,7 +301,7 @@ func routingChoiceString(choice map[string]any, names ...string) string {
 func isAWFBefore02839(schema string) bool {
 	var major, minor, patch int
 	_, err := fmt.Sscanf(strings.TrimPrefix(strings.TrimPrefix(schema, "model-routing/"), "v"), "%d.%d.%d", &major, &minor, &patch)
-	return err == nil && (major < 0 || (major == 0 && (minor < 28 || (minor == 28 && patch < 39))))
+	return err == nil && major == 0 && (minor < 28 || (minor == 28 && patch < 39))
 }
 
 func appendRoutingDeviation(summary *ModelRoutingSummary, request modelRoutingRecord, deviation string) {
@@ -327,20 +327,25 @@ func aggregateModelRoutingCosts(summary *ModelRoutingSummary, requests []modelRo
 		if request.RequestID == "" {
 			continue
 		}
-		if request.Routed == "as_selected" {
+		switch request.Routed {
+		case "as_selected":
 			requestKinds[request.RequestID] = "selected"
-		} else {
+		case "deviated":
 			requestKinds[request.RequestID] = "deviated"
 		}
 	}
 
 	for _, entry := range usageEntries {
-		bucket := &summary.DeviatedTrafficCost
+		var bucket *ModelRoutingCost
 		switch {
 		case entry.Purpose == "routing_classification":
 			bucket = &summary.ClassifierCost
 		case requestKinds[entry.RequestID] == "selected":
 			bucket = &summary.SelectedModelCost
+		case requestKinds[entry.RequestID] == "deviated":
+			bucket = &summary.DeviatedTrafficCost
+		default:
+			continue
 		}
 		bucket.Requests++
 		bucket.InputTokens += entry.InputTokens

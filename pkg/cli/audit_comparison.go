@@ -178,6 +178,7 @@ func buildAuditComparisonCandidateFromSummary(summary *RunSummary, logsPath stri
 	posture := deriveAuditPosture(createdItems)
 	routing := summary.ModelRouting
 	if routing == nil {
+		// Older cached summaries do not contain model-routing data.
 		routing = analyzeModelRouting(logsPath)
 	}
 
@@ -498,10 +499,6 @@ func recommendAuditComparisonAction(label, currentConclusion string, delta *Audi
 	if delta == nil || label == "stable" {
 		return "No action needed; this run matches the selected successful baseline closely."
 	}
-	if delta.ModelRouting != nil && delta.ModelRouting.Changed {
-		return "Review the model-routing change against the selected successful baseline, including the selected model, effort, mode, and router version."
-	}
-
 	if delta.Posture.Before == "read_only" && delta.Posture.After == "write_capable" {
 		return "Review first-time write-capable behavior and add a guardrail before enabling by default."
 	}
@@ -510,6 +507,9 @@ func recommendAuditComparisonAction(label, currentConclusion string, delta *Audi
 	}
 	if delta.BlockedRequests.After > delta.BlockedRequests.Before {
 		return "Review network policy changes before treating the new blocked requests as normal behavior."
+	}
+	if delta.ModelRouting != nil && delta.ModelRouting.Changed {
+		return "Review the model-routing change against the selected successful baseline, including the selected model, effort, mode, and router version."
 	}
 	if delta.Turns.After > delta.Turns.Before {
 		return "Compare prompt or task-shape changes because this run needed more turns than the selected successful baseline."
