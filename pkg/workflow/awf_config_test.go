@@ -2755,6 +2755,54 @@ func TestIntersectModelPolicyRules_OverlapOnly(t *testing.T) {
 	assert.Equal(t, []string{"gpt-5"}, got)
 }
 
+func TestUnionModelPolicyRules(t *testing.T) {
+	tests := []struct {
+		name     string
+		local    []string
+		override []string
+		want     []string
+	}{
+		{name: "both empty", want: []string{}},
+		{name: "empty override", local: []string{"gpt-5", "gpt-5"}, want: []string{"gpt-5"}},
+		{name: "empty local", override: []string{"claude-opus", "claude-opus"}, want: []string{"claude-opus"}},
+		{
+			name:     "deduplicates and preserves first occurrence order",
+			local:    []string{"gpt-5", "claude-opus", "gpt-5"},
+			override: []string{"claude-opus", "gemini-pro", "gemini-pro", "gpt-5-pro"},
+			want:     []string{"gpt-5", "claude-opus", "gemini-pro", "gpt-5-pro"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localBefore := append([]string(nil), tt.local...)
+			overrideBefore := append([]string(nil), tt.override...)
+			got := unionModelPolicyRules(tt.local, tt.override)
+			assert.Equal(t, tt.want, got)
+			if len(got) > 0 {
+				got[0] = "changed"
+			}
+			assert.Equal(t, localBefore, tt.local)
+			assert.Equal(t, overrideBefore, tt.override)
+		})
+	}
+}
+
+func TestUnionModelPolicyRules_DuplicateHeavyInputs(t *testing.T) {
+	local := make([]string, 10000)
+	override := make([]string, 10000)
+	for i := range local {
+		local[i] = "gpt-5"
+		override[i] = "claude-opus"
+	}
+	override[len(override)-1] = "gpt-5"
+
+	got := unionModelPolicyRules(local, override)
+	assert.Equal(t, []string{"gpt-5", "claude-opus"}, got)
+	// Output capacity should grow with unique rules, not combined input lengths.
+	assert.Less(t, cap(got), len(local))
+}
+
 func TestBuildAWFConfigJSON_ModelPolicyConflictDisallowedWins(t *testing.T) {
 	config := AWFCommandConfig{
 		EngineName:     "copilot",

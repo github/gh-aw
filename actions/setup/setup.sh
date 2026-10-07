@@ -333,6 +333,7 @@ SAFE_OUTPUTS_FILES=(
   "messages_footer.cjs"
   "compact_numbers.cjs"
   "model_aliases.cjs"
+  "model_attribution.cjs"
   "messages_header.cjs"
   "messages_run_status.cjs"
   "messages_staged.cjs"

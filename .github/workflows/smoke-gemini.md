@@ -36,6 +36,9 @@ experiments:
     tags: [cost_optimization, smoke_tests]
 engine:
   id: gemini
+  fallback-models:
+    - gemini/gemini-3.8-flash
+    - gemini/gemini-2.5-pro
 strict: true
 imports:
   - shared/reporting-otlp.md

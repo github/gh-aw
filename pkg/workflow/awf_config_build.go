@@ -33,6 +33,9 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	if err := validateModelRouting(config.WorkflowData, config.EngineName); err != nil {
 		return "", err
 	}
+	if err := validateEngineFallbackModels(config.WorkflowData); err != nil {
+		return "", err
+	}
 
 	awfConfig := AWFConfigFile{
 		Schema: buildAWFConfigSchemaURL(firewallConfig),
@@ -138,6 +141,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 
 	apiProxy := &AWFAPIProxyConfig{
 		Enabled:             true,
+		FallbackModels:      nativeAWFFallbackModels(config.WorkflowData),
 		MaxRuns:             maxRuns,
 		MaxTurnCacheMisses:  maxTurnCacheMisses,
 		MaxAICredits:        maxAICredits,
@@ -161,7 +165,11 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 		awfConfigLog.Printf("Skipping apiProxy.enableTokenSteering: AWF version %q requires at least %s", getAWFImageTag(firewallConfig), constants.AWFTokenSteeringMinVersion)
 	}
 
-	if mf := extractModelFallback(config.WorkflowData); mf != nil {
+	if config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && len(config.WorkflowData.EngineConfig.FallbackModels) > 0 {
+		// An explicit ordered chain must not silently insert a catalog-selected model.
+		disabled := TemplatableBool("false")
+		apiProxy.ModelFallback = &AWFModelFallbackConfig{Enabled: &disabled}
+	} else if mf := extractModelFallback(config.WorkflowData); mf != nil {
 		apiProxy.ModelFallback = mf
 		enabledDisplay := "<unset>"
 		if mf.Enabled != nil {

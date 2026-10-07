@@ -5,7 +5,7 @@ services:
     ports:
       - 8888:8888
     env:
-      JUPYTER_TOKEN: ${{ secrets.JUPYTER_TOKEN || fromJSON('Missing required secret: JUPYTER_TOKEN') }}
+      JUPYTER_TOKEN: "${{ secrets.JUPYTER_TOKEN || fromJSON('Missing required secret: JUPYTER_TOKEN') }}"
     options: >-
       --health-cmd "curl -f http://localhost:8888/api || exit 1"
       --health-interval 10s

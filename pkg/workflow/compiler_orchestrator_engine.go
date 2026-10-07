@@ -160,7 +160,7 @@ func (c *Compiler) runStrictFrontmatterValidations(frontmatter map[string]any, n
 			name string
 			fn   func(map[string]any) error
 		}{
-			{name: "Env secrets", fn: c.validateEnvSecrets},
+			{name: "Env secrets", fn: c.validateEarlyEnvSecrets},
 			{name: "Steps secrets", fn: c.validateStepsSecrets},
 			{name: "Step shell scripts", fn: c.validateStepShellScripts},
 			{name: "Update check", fn: c.validateUpdateCheck},

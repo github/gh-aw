@@ -157,6 +157,7 @@ func applyEngineHarnessRetryEnv(env map[string]string, workflowData *WorkflowDat
 	}
 
 	cfg := workflowData.EngineConfig
+	applyFallbackProviderEnv(env, workflowData)
 	if cfg.HarnessMaxRetries != "" {
 		env["GH_AW_HARNESS_MAX_RETRIES"] = cfg.HarnessMaxRetries
 	}

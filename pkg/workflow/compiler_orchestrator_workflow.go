@@ -142,6 +142,13 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.validateWorkflowEngineSettings(ctx.cleanPath, ctx.workflowData); err != nil {
 		return err
 	}
+	if cfg := ctx.workflowData.EngineConfig; cfg != nil && len(cfg.FallbackModels) > 0 {
+		if err := c.withEffectiveStrictMode(ctx.frontmatter.Frontmatter, func() error {
+			return c.validateEnvSecretsWithModels(ctx.frontmatter.Frontmatter, ctx.workflowData.ModelMappings)
+		}); err != nil {
+			return err
+		}
+	}
 	return c.validateWorkflowToolConfigurations(ctx)
 }
 
@@ -163,6 +170,7 @@ func (c *Compiler) validateWorkflowEngineSettings(cleanPath string, workflowData
 		c.validatePlaywrightMode,
 		c.validateLSPSupport,
 		c.validateEngineHarnessScript,
+		validateEngineFallbackModels,
 		c.validateEngineDriver,
 		c.validateEngineMCPSessionTimeout,
 		c.validateEngineMCPToolTimeout,

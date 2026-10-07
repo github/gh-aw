@@ -103,7 +103,7 @@ func (e *CodexEngine) GetRequiredSecretNames(workflowData *WorkflowData) []strin
 	if provider != LLMProviderGitHub || !hasCopilotRequestsWritePermission(workflowData) {
 		secrets = append(secrets, llmProviderSecretNames(provider)...)
 	}
-	return append(secrets, collectCommonMCPSecrets(workflowData)...)
+	return append(append(secrets, collectCommonMCPSecrets(workflowData)...), fallbackProviderSecretNames(workflowData)...)
 }
 
 // GetSupportedEnvVarKeys returns the engine.env variable names that the Codex engine

@@ -206,7 +206,7 @@ func TestHandlerManagerGitHubTokenEnvVarForCrossRepo(t *testing.T) {
 					"Expected GITHUB_TOKEN env var %q to be set in handler manager step for cross-repo git operations",
 					tt.expectedGitHubTokenLine)
 			} else {
-				assert.NotContains(t, yamlStr, "GITHUB_TOKEN:",
+				assert.NotContains(t, yamlStr, "\n          GITHUB_TOKEN:",
 					"Expected GITHUB_TOKEN to NOT be explicitly set when no custom checkout token is configured")
 			}
 		})

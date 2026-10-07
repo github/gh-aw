@@ -344,6 +344,7 @@ func (c *Compiler) buildDetectionTokenUsageSummaryStep(data *WorkflowData) []str
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		"          GH_AW_TOKEN_USAGE_SUMMARY_TITLE: Threat Detection Token Usage\n",
+		"          GH_AW_PHASE: detection\n",
 		"          GH_AW_AGENT_USAGE_PATH: " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
 		"          GH_AW_AGENT_USAGE_JSONL_PATH: " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
 		"          GH_AW_WRITE_EMPTY_USAGE: \"true\"\n",

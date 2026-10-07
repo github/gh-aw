@@ -64,7 +64,10 @@ const DefaultGitHubMCPServerVersion Version = "v1.12.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.37"
+const DefaultFirewallVersion Version = "v0.28.44"
+
+// AWFFallbackModelsMinVersion is the first AWF release with ordered request-level fallback.
+const AWFFallbackModelsMinVersion Version = "v0.28.31"
 
 // DefaultRouterVersion is the default version of the gh-aw model router image.
 const DefaultRouterVersion Version = "0.1.3"

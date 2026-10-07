@@ -17,6 +17,9 @@ model: claude-haiku-4.5
 engine:
   id: claude
   model-provider: github
+  fallback-models:
+    - copilot/claude-sonnet-5
+    - copilot/claude-sonnet-4.6
   bare: true
 strict: true
 imports:
