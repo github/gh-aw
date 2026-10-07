@@ -170,7 +170,7 @@ describe("codex_harness.cjs", () => {
       const watchdog = createMCPCallWatchdog(100, () => time);
       watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "large" } }));
       time = 100;
-      watchdog.observePrefix('{"type":"item.completed","item":{"id":"large","type":"mcp_tool_call","server":"github","result":"');
+      watchdog.observePrefix('{"type":"item.com\\u0070leted","item":{"\\u0069d":"large","type":"mcp_tool_call","server":"github","result":"');
       expect(watchdog.expired()).toBe(false);
     });
   });

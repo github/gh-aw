@@ -114,6 +114,101 @@ function resolveMCPServerToolTimeouts(config, runtimeToolTimeoutSeconds) {
   );
 }
 
+function parseJsonPrefix(input) {
+  const incomplete = Symbol("incomplete");
+  let index = 0;
+
+  function isWhitespace(character) {
+    return character === " " || character === "\t" || character === "\n" || character === "\r";
+  }
+
+  function skipWhitespace() {
+    while (isWhitespace(input[index])) index++;
+  }
+
+  function parseString() {
+    const start = index++;
+    let escaped = false;
+    while (index < input.length) {
+      const character = input[index++];
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        try {
+          return JSON.parse(input.slice(start, index));
+        } catch {
+          return incomplete;
+        }
+      }
+    }
+    return incomplete;
+  }
+
+  function parseValue(depth = 0) {
+    if (depth > 64) throw new Error("JSON nesting limit exceeded");
+    skipWhitespace();
+    const character = input[index];
+    if (character === '"') {
+      const value = parseString();
+      return { value, complete: value !== incomplete };
+    }
+    if (character === "{" || character === "[") {
+      const isObject = character === "{";
+      const endCharacter = isObject ? "}" : "]";
+      index++;
+      const value = isObject ? Object.create(null) : [];
+      skipWhitespace();
+      if (input[index] === endCharacter) {
+        index++;
+        return { value, complete: true };
+      }
+      while (index < input.length) {
+        let key;
+        if (isObject) {
+          if (input[index] !== '"') return { value, complete: false };
+          key = parseString();
+          if (key === incomplete) return { value, complete: false };
+          skipWhitespace();
+          if (input[index++] !== ":") return { value, complete: false };
+        }
+        const child = parseValue(depth + 1);
+        if (child.value !== incomplete) {
+          if (isObject) value[key] = child.value;
+          else value.push(child.value);
+        }
+        if (!child.complete) return { value, complete: false };
+        skipWhitespace();
+        if (input[index] === endCharacter) {
+          index++;
+          return { value, complete: true };
+        }
+        if (input[index++] !== ",") return { value, complete: false };
+        skipWhitespace();
+      }
+      return { value, complete: false };
+    }
+
+    const start = index;
+    while (index < input.length && !isWhitespace(input[index]) && !",[]{}".includes(input[index])) {
+      index++;
+    }
+    if (start === index) return { value: incomplete, complete: false };
+    try {
+      return { value: JSON.parse(input.slice(start, index)), complete: true };
+    } catch {
+      return { value: incomplete, complete: false };
+    }
+  }
+
+  try {
+    return parseValue().value;
+  } catch {
+    return undefined;
+  }
+}
+
 function createMCPCallWatchdog(timeoutMs, now = Date.now) {
   const pending = new Map();
   function track(eventType, item) {
@@ -135,26 +230,8 @@ function createMCPCallWatchdog(timeoutMs, now = Date.now) {
       track(event?.type, event?.item);
     },
     observePrefix(prefix) {
-      const eventType = /^\s*\{\s*"type"\s*:\s*"(item\.started|item\.completed|item\.failed)"/.exec(prefix)?.[1];
-      if (!eventType) return;
-      const itemStart = /,\s*"item"\s*:\s*\{/.exec(prefix);
-      if (!itemStart) return;
-      const itemPrefix = prefix.slice(itemStart.index + itemStart[0].length);
-      if (!/(?:^|,)\s*"type"\s*:\s*"mcp_tool_call"/.test(itemPrefix)) return;
-      const idMatch = /(?:^|,)\s*"id"\s*:\s*("(?:\\.|[^"\\])*")/.exec(itemPrefix);
-      if (!idMatch) return;
-      const serverMatch = /(?:^|,)\s*"server(?:_name)?"\s*:\s*("(?:\\.|[^"\\])*")/.exec(itemPrefix);
-      let item;
-      try {
-        item = {
-          type: "mcp_tool_call",
-          id: JSON.parse(idMatch[1]),
-          ...(serverMatch ? { server: JSON.parse(serverMatch[1]) } : {}),
-        };
-      } catch {
-        return;
-      }
-      track(eventType, item);
+      const event = parseJsonPrefix(prefix);
+      track(event?.type, event?.item);
     },
     expiredTimeoutMs() {
       const current = now();
