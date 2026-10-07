@@ -25,6 +25,9 @@ permissions:
 name: Smoke Copilot
 engine:
   id: copilot
+  fallback-models:
+    - copilot/gpt-5.4
+    - copilot/claude-sonnet-5
   max-continuations: 2
   bare: true
 imports:
