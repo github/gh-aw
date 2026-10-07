@@ -114,12 +114,12 @@ display name or `github.actor`.
 {
   "mode": "weighted-priority",
   "class_weights": [8, 4, 2, 1, 1],
-  "accounting_weights": { "shared": 1 },
+  "accounting_weights": { "": 1 },
   "producers": {
     "REPLACE_WITH_PRODUCER_ACTOR_ID": {
       "pools": ["default"],
       "priorities": [1, 2, 3, 4, 5],
-      "fairness_keys": ["shared"]
+      "fairness_keys": [""]
     }
   },
   "pools": {
@@ -146,20 +146,26 @@ display name or `github.actor`.
     }
   },
   "limits": {
-    "ledger_bytes": 83886080,
+    "ledger_bytes": 67108864,
     "recovery_bytes": 16777216,
-    "payload_bytes": 4194304,
+    "payload_bytes": 16384,
     "graph_nodes": 4096,
-    "predecessors": 4096,
+    "predecessors": 64,
     "pending_nodes": 4096,
-    "operations": 4096,
+    "operations": 256,
     "assignment_bytes": 49152,
-    "result_bytes": 1048576,
-    "evidence_bytes": 1048576,
+    "result_bytes": 4096,
+    "evidence_bytes": 1024,
     "observation_writes": 4096
   }
 }
 ```
+
+This template uses the default empty accounting key and the runtime's maximum
+supported limits. The 64 MiB ordinary ledger budget and 16 MiB recovery reserve
+are separate; 80 MiB is not an admissible ordinary ledger limit. Limits may be
+lowered, not increased beyond the native bounds. Additional accounting keys
+must retain `"": 1` and explicitly grant their producer entitlements.
 
 Before installation, independently provision branch protections so only the
 trusted operator/host can write the queue branch, force updates and deletion are

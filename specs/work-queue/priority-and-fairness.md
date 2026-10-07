@@ -194,7 +194,7 @@ from the existing bounded model evidence.
 
 **Required default behavior:** without explicit priority or fairness grouping, the queue MUST feel like a normal FIFO work queue: one priority, one accounting bucket, and oldest-available Work selected next. This is the mandatory scheduler's default behavior, not a legacy mode or a scheduling opt-out.
 
-**Required worker batching:** one worker dispatch MAY carry several scheduler-selected Claims. The inbound assignment is always a bounded array, even for one Claim. Each Claim has independent finish intent, terminal state, and effect authorization; completing one must not require completing the rest.
+**Required worker batching:** one worker dispatch MAY carry several scheduler-selected Claims. The inbound assignment is a version-3 object containing a bounded `claims` array, even for one Claim. Each Claim has independent finish intent, terminal state, and effect authorization; completing one must not require completing the rest.
 
 **Required output attribution:** every safe-output message from a queue worker
 MUST resolve to exactly one assigned Claim before any handler runs. Trusted
@@ -562,9 +562,9 @@ The initial scheduler has exactly two levels: class and accounting key. Workflow
 
 The trusted producer/policy resolves the metadata once. A child's default priority and accounting key MUST inherit from its parent's trusted assignment. A child MUST NOT gain a better priority or a separate entitlement solely because the agent asks for it.
 
-Weights belong in authoritative queue policy, not in each Work's user-supplied metadata. There MUST be one positive integer weight per accounting key within an epoch, shared consistently across its appearances in classes. A simple initial range is 1-1000. Reject zero, negative, fractional, nonfinite, and out-of-range values.
+Weights belong in authoritative queue policy, not in each Work's user-supplied metadata. There MUST be one positive integer weight per accounting key within an epoch, shared consistently across its appearances in classes. The supported range is 1-1000; the default empty key MUST retain weight 1. Reject zero, negative, fractional, nonfinite, and out-of-range values.
 
-Key length, character set, and registered-key cardinality MUST be bounded and validated. A reasonable initial profile is a maximum of 128 UTF-8 bytes per key and 1024 registered keys per pool/epoch, with explicit administrator-approved increases. These are proposed engineering bounds. Never hash many unrelated tenants into one bucket or evict fairness debt silently.
+Key length, character set, and registered-key cardinality MUST be bounded and validated. The current engines support at most 128 UTF-8 bytes per key and 1024 registered keys in the queue-wide Policy, including the default empty key. Administrators cannot increase these implementation ceilings by installing a Policy. Never hash many unrelated tenants into one bucket or evict fairness debt silently.
 
 Idempotent resubmission MUST NOT update priority, key, enqueue age, or pool. Preserve the existing identity-based submission behavior; an explicit metadata conflict SHOULD be reported to the producer rather than represented as a successful update. A future reprioritization operation would require a separate trusted transaction with defined effects on existing reservations.
 
@@ -2032,12 +2032,13 @@ parsing, but does not eliminate whole-blob transfer costs of the Git backend or
 the single publication serialization point. Batching amortizes some of those
 costs; per-Claim completion deliberately retains independent commits.
 
-Install explicit resource bounds in Policy. The following are proposed initial
-engineering defaults, not measured throughput/SLO claims:
+Install explicit resource bounds in Policy. The following are current runtime
+defaults and hard ceilings, not measured throughput/SLO claims. A Policy may
+lower them but cannot increase them:
 
-| Resource | Proposed starting bound |
+| Resource | Supported default / ceiling |
 |---|---|
-| Canonical ledger new-admission watermark | 64 MiB, plus separately reserved lifecycle/recovery headroom |
+| Canonical ledger new-admission watermark | 64 MiB ordinary budget plus 16 MiB separately reserved lifecycle/recovery headroom |
 | Work payload including immutable plan | 16 KiB of canonical UTF-8 JSON; smaller if required for a valid single-Claim assignment |
 | Nodes / Work predecessors | 4,096 nodes per graph, 64 predecessors per node |
 | Nonterminal or delivery-pending nodes | 4,096 per pool |
@@ -2370,7 +2371,16 @@ search were stopped before exhaustion after 588,795 and 109,949,148 distinct
 states respectively. Neither reported a violation, but that is not a pass.
 Their original bounds, configurations, logs, and checkpoints remain available.
 The exhausted cases and explicit negative/witness outcomes are the verified
-scope of this change.
+scope of this change. The fresh
+[2026-10-07 source-bound review](verification-2026-10-07.json) ran all 60
+registered configurations: 15 positive cases exhausted after a separate longer
+fork-model rerun, and all 33 negative controls plus nine guarded witnesses
+returned their exact expected diagnostic. The local `WorkQueue`,
+`QueueOrdering` and `FairDAGGitHub` searches remain unexhausted; none is a pass.
+The trace runner also emitted and checked 18 sampled trajectories and nine
+guarded witness traces across historical/current abstractions. Sampling and
+repeated partial searches do not finish the combined suite or verify native
+runtime refinement.
 
 | Area | Acceptance criterion |
 |---|---|
@@ -2611,12 +2621,13 @@ unexecuted formal, supported-host, performance, or deployment-security gate.
 | Immutable arrays, actual run binding and conservative native recovery | Implemented with bounded arrays, attempt-1 authority, private authenticated evidence, one sender marker and conservative uncertain-launch retention. Local native/SDK recovery tests pass; hosted immutable-SHA dispatch compatibility remains a separate gate |
 | Universal Claim-scoped outputs, independent outcomes and custom/deferred paths | Built-in, custom/raw, prepared code/tree, GraphQL/REST, native asset, persistent-memory and queue-control paths are wired through scoped authorization and independent native readback. The joined queue and safe-output regression suite passes 3,206 tests in 86 files with eight skips. Real single-/multi-Claim entrypoints cover private execution after ambient flag changes, selectors, per-member minimum/maximum counts, retained factory fences, preparation, artifact identities/receipts and independent finalization. This is local path coverage, not proof of arbitrary external effect atomicity or exactly-once delivery |
 | Disabled-queue safe-output compatibility | Modified legacy integration surfaces were reviewed against the PR base. Regression coverage preserves ordinary payloads, parsing, global counts, custom inputs, dispatch conversion, diagnostics and patch discovery; a collector differential matches 24 of 24 baseline cases. Stray role/assignment metadata cannot activate the queue, while an existing private Claim frame remains enforced. The joined suite above includes existing ordinary safe-output tests; finite cases do not prove equivalence for every possible input |
-| Compiler/MCP/operator/explain/trace and workflow examples | Implemented with current-only operator/snapshot/intent validation and credential-free observers/previews. Full native/probe/compiler/parser suites, focused operator regressions and WASM build pass; all 325 workflows recompile. Compiler DryRun disables queue tools and mutation jobs. Closed Claim-adapter parsing preserves exact numbers; log writers surface original/short-write failures |
+| Compiler/MCP/operator/explain/trace and workflow examples | Implemented with current-only operator/snapshot/intent validation and credential-free observers/previews. Earlier native/probe/compiler/parser, operator and WASM checks pass. After merging main at `8e829d4c66`, all 328 workflows compile and isolated drift checking passes; a stale reusable-workflow caller lock was regenerated, not hand-edited. Compiler DryRun disables queue tools and mutation jobs. The onboarding Policy is exercised by the real runtime validator and uses supported empty-key/size bounds. Closed Claim-adapter parsing preserves exact numbers; log writers surface original/short-write failures |
 | Independent service-deviation and eventual-service evidence | Bounded sibling model: 30 fixed + 60,360 dynamic states exhausted; four exact negative controls; full hierarchy/runtime refinement still outstanding |
 | Complete lifecycle/runtime refinement and supported-host integration | Bounded lifecycle safety: 208,108 exhausted states, eleven exact negative controls and three witnesses; full runtime/host refinement remains unverified |
 | Retained-history, contention and recovery-headroom operating envelope | An earlier combined-source local capture passed 50 measurements/checks, including actual Go/JS cold replay and serialization at 1/16/64/80 MiB, bounded graph/assignment limits and recovery headroom, with 136 dependency hashes stable during that capture. It has not been regenerated after the safe-output review changes. These are historical shared-host samples and structural closure checks, not current-source release evidence, universal closure proof, live Git/network contention, supported-host/API measurements or deployment SLOs |
-| Existing `FairDAGGitHub` and `QueueOrdering` exhaustive searches | Incomplete; no observed violation is not a pass |
-| Full JS typecheck/existing dependency-based tests | At intermediate checkpoint commit `aedb66aaf432d53e4034ce8fb585789ddd377735` (2026-10-07), the commit record reported formatting, build, standard/custom Go lint, JavaScript lint, schema freshness and impacted Go tests passing. No dedicated Actions run for that gate was identified; run `37651827241` is a Code scanning AI findings run, not publication-gate evidence. At the later final checkpoint, genuine TypeScript 7.0.2 and Vitest 5.0.3 are restored; combined runtime tests pass. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. The final publication gate's setup-JavaScript phase stops at the unchanged `create_project.cjs:253` type error, before its test command; the independently executed joined runtime suite passes. The global typecheck and overall publication gate are not passed |
+| Current-source queue formal review and traces | All 60 registered configurations exercised; 15 positive cases exhausted and 33 negative controls plus nine guarded witnesses returned exact expected outcomes. Initial fork-model interruption is retained separately from its later fresh 70,602-state exhaustion. Eighteen seeded simulations and nine exact witness traces were checked with unchanged source/tool hashes. `WorkQueue`, `QueueOrdering` and `FairDAGGitHub` remain unexhausted; no observed violation is not a pass. See the dated source-bound record |
+| ESLint factory formalization and actual-code comparison | Six bounded safety graphs exhaust 31,730 distinct states; nine deliberate controls, seven guarded witnesses and 16 independently replayed/tamper-checked traces cover factory lifecycle, scope, cardinality and exit-zero semantics. Executable observations cover all 66 registered/configured rules, actual ESLint warning/error exits, native Claim checks and collector per-Claim limits. Policy/producers/profile admission and whole-contract native readback remain assumptions. There is no automatic factory DAG; warning-only clean and prompt-only quality/global assignment bars are explicitly distinguished from runtime guarantees. See the [factory model](../eslint-factory/README.md) |
+| Full JS typecheck/existing dependency-based tests | The earlier `create_project.cjs` SDK layout error is fixed in merge checkpoint `2dcce92c1c`, using validated literals and endpoint-derived request typing without unsafe casts. Genuine TypeScript 7.0.2 typecheck passes; 36 project tests include 12 layout/endpoint/invalid-input regressions. The post-merge final gate passes 2,122 setup-JavaScript tests in 52 selected files, impacted Go tests, build, standard Go lint, change-scoped custom Go lint, JavaScript lint and schema freshness. Its first aggregate invocation stopped only at one stale workflow lock; regeneration and separate 328-workflow drift checking now pass. This is component evidence, not a claim that the earlier failed aggregate invocation succeeded or that global custom lint is clean. The approved feed does not supply pinned `@types/node` 26.6.4; existing 26.6.3 remains without changing pins. No dedicated hosted Actions run is claimed |
 | TypeSpec schema generation | Dependency-free emitter/drift checks and pinned official TypeSpec 1.16.0 compilation/emission pass. The fail-closed supported-subset comparison passes all 41 schemas, including validation constraints and custom identity bounds; it is not general schema or runtime equivalence proof |
 | Protected launch credentials, immutable effect targets and native delivery verification | Implemented with exact selected-client/profile proofs, immutable Work/profile/ancestor target intersection and private native readback. Both public and compiler control entry points reject missing/invalid protected launch metadata before client construction or queue publication, while previews and submit-only controls remain credential-independent. Local positive and refusal regressions pass; writer deployment automation is separate |
 | Workflow administrator bootstrap and live native-dispatch host compatibility | Automatic workflow bootstrap is unsupported: initialize Policy through an explicitly authenticated operator/trusted host. Hosted immutable-SHA dispatch and the pinned run-details response remain unverified live compatibility gates; injected SDK checks are not hosted evidence |

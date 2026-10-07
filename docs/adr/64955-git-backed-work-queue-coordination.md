@@ -33,14 +33,14 @@ Claim, and a snapshot prediction never selects the authoritative Work.
 | Replay | Reconstruct the unique QueueCommit chain and every operation prefix; reject malformed/forked/unauthorized history and nonconforming selection or packing. Physical record permutation/duplicate removal preserves that same chain. |
 | Queue ordering | Mandatory priority/account fairness; causal-position FIFO within eligible buckets. Defaults are one class/key and FIFO. Charge one durable Claim, including each batched member and failed launch. |
 | Dispatcher | Stage pool/budget intents, never select a preferred Work or invent Claim authority. Trusted CAS publication regenerates the complete fair packable prefix on a conflict. |
-| Worker | Receive one immutable bounded `work_queue_assignment` array; default size one, larger compatible groups explicit. Authenticate the actual run and attempt independently. |
+| Worker | Receive one immutable version-3 `work_queue_assignment` object containing a bounded `claims` array; default size one, larger compatible groups explicit. Authenticate the actual run and attempt independently. |
 | External effects | Every safe output resolves to one Claim; only the original single-Claim assignment permits omitted selectors. Check binding, ownership, same-Claim Completion and resource scope before effects. Mixed outcomes settle independently. |
 | Publication | Stable requests bind semantic meaning, not tentative winners or branch SHA. Checked Git publication and request recovery prevent duplicate charges after ambiguous acknowledgments. |
 | DAG | Work predecessors require verified Results; typed Issue/PR vertices require fresh satisfying Observations. Completion or overall native success alone is insufficient. |
 | Recovery | Fence one sender before dispatch. Retain uncertain reservations; release only on definitive nonlaunch or exact terminal evidence. Result/DeliveryFailure closes delivery without replaying completed effects. |
 | Compaction | Canonicalize/deduplicate complete commits without changing causal positions, requests, charges, Results or history. No authoritative sidecar. |
 
-The [formal verification notes and reproducible checker](../../specs/work-queue/README.md) document the invariants and assumptions. The bounded model checks support a parameterized inductive proof argument, not a mechanically checked unbounded proof or proof that a future runtime implementation refines the model.
+The [formal verification notes and reproducible checker](../../specs/work-queue/README.md) document the invariants and assumptions. The retained historical arbitration model has a parameterized inductive proof argument; the successor models provide bounded checks. Neither establishes a mechanically checked unbounded proof or refinement of the current runtime.
 
 Use `work-queue` for public names, branches, and artifact filenames, and
 `work_queue` for AW context fields and MCP tool prefixes. The
@@ -80,7 +80,7 @@ An external service could provide efficient queue operations and atomic ownershi
 
 #### Alternative 2: A Mutable Current-State Snapshot
 
-A single projected-state file with version-checked updates would reduce read and replay costs and could enforce ownership through careful update rules. It was not chosen because it replaces explicit transaction history with a separate mutable-state reconciliation protocol. The append-only fact model makes arbitration, recovery, and compaction share one replay implementation and provides an inspectable transaction history.
+A single projected-state file with version-checked updates would reduce read and replay costs and could enforce ownership through careful update rules. It was not chosen because it replaces explicit transaction history with a separate mutable-state reconciliation protocol. The causal QueueCommit log makes scheduling, recovery, and compaction share one replay implementation and provides an inspectable transaction history.
 
 ### Consequences
 
@@ -103,7 +103,10 @@ A single projected-state file with version-checked updates would reduce read and
 
 - Batching reduces reusable setup overhead, not Claim charges, and isolates
   authorization rather than agent memory/filesystem visibility.
-- The guarantee is a single externally effective winner, not exactly-once agent execution or atomic external operation batches. Eventual progress also requires available workflows and successful retries.
+- Each Claim has one authorized worker attempt; this does not serialize arbitrary
+  different Work nodes writing the same resource, provide exactly-once agent
+  execution, or make external operation batches atomic. Eventual progress also
+  requires available workflows and successful retries.
 
 ---
 
