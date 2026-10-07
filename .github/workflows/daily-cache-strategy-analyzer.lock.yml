@@ -2644,6 +2644,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
+          GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,api.github.com,github.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}

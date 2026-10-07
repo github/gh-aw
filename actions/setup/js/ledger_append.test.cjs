@@ -7,6 +7,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { main, transactionPath } from "./ledger_append.cjs";
+import { validateTransactions } from "./push_ledger_changes.cjs";
+import { createReducer } from "./ledger_builtin.cjs";
 
 test("collects validated appends and writes the versioned artifact", async () => {
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-append-"));
@@ -93,6 +95,73 @@ test("rejects invalid append envelopes with input kinds but without payload cont
       message: `Invalid ledger append message type: expected "ledger_append", received ${receivedType}`,
     });
   }
+});
+
+test("Caveman table upsert rejects the reported key field and persists the corrected payload shape", async () => {
+  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-caveman-"));
+  const previousRunnerTemp = process.env.RUNNER_TEMP;
+  process.env.RUNNER_TEMP = runnerTemp;
+  const config = {
+    name: "caveman-run-history",
+    type: "table",
+    key: "run_id",
+    schema: {
+      type: "object",
+      required: ["record_type", "run_id", "date", "files_processed", "files_optimized", "planned_outcome"],
+      properties: {
+        record_type: { enum: ["caveman_run"] },
+        run_id: { type: "string" },
+        date: { type: "string" },
+        files_processed: { type: "integer", minimum: 0 },
+        files_optimized: { type: "integer", minimum: 0 },
+        planned_outcome: { enum: ["pull_request_requested", "noop"] },
+      },
+      additionalProperties: false,
+    },
+    max_record_kb: 4,
+    max_segment_kb: 100,
+    max_patch_kb: 10,
+  };
+  const rejectedPayload = {
+    key: "37372003041",
+    ledger: "caveman-run-history",
+    operation: "upsert",
+    value: { date: "2026-10-05", files_optimized: 0, files_processed: 5, planned_outcome: "noop", record_type: "caveman_run", run_id: "37372003041" },
+    type: "ledger_append",
+  };
+  try {
+    const rejected = await main({ ledgers: [config] });
+    await rejected(rejectedPayload);
+    assert.throws(() => rejected.finalize(), { name: "TypeError", message: 'Invalid ledger operation fields: unexpected field "key" for upsert' });
+    assert.equal(fs.existsSync(transactionPath()), false);
+
+    const { key, ...correctedPayload } = rejectedPayload;
+    const invalidRunId = await main({ ledgers: [config] });
+    await invalidRunId({ ...correctedPayload, value: { ...correctedPayload.value, run_id: Number(key) } });
+    assert.throws(() => invalidRunId.finalize(), /string primary key: "run_id"/);
+
+    const corrected = await main({ ledgers: [config] });
+    await corrected(correctedPayload);
+    corrected.finalize();
+    const artifact = JSON.parse(fs.readFileSync(transactionPath(), "utf8"));
+    assert.doesNotThrow(() => validateTransactions(artifact, [config]));
+    const record = artifact.ledgers["caveman-run-history"].appends[0].record;
+    assert.equal(Object.hasOwn(record, "key"), false);
+    assert.deepEqual(record.value, correctedPayload.value);
+    const reducer = createReducer(config);
+    reducer.apply(record);
+    assert.deepEqual(reducer.output().tables.state.rows, [{ key, value: JSON.stringify(Object.fromEntries(Object.entries(record.value).sort())) }]);
+  } finally {
+    if (previousRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previousRunnerTemp;
+    fs.rmSync(runnerTemp, { recursive: true, force: true });
+  }
+});
+
+test("built-in transaction diagnostics name unknown fields without their values", async () => {
+  const handler = await main({ ledgers: [{ name: "events", type: "log" }] });
+  await handler({ operation: "append", value: "private payload", extra: "private metadata" });
+  assert.throws(() => handler.finalize(), { name: "TypeError", message: 'Invalid built-in transaction fields: unexpected field "extra"' });
 });
 
 test("rejects invalid records at finalization", async () => {

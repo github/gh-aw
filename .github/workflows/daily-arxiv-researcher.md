@@ -26,6 +26,7 @@ tools:
   repo-memory:
     branch-name: memory/arxiv-paper-ledger
     allowed-extensions: [".json", ".md"]
+    max-patch-size: 51200
     format-json: true
   bash:
     - "*"

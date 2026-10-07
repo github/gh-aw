@@ -43,8 +43,10 @@ function normalizeLedgerAppends(requests, { transactionId, ledgerNames, ledgers 
         : request.record
     );
     if (options.type) {
-      if (Object.keys(request).some(key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].includes(key)))
-        throw new TypeError("Invalid built-in transaction fields");
+      const invalidField = Object.keys(request).find(
+        key => !["ledger", "temp_id", "operation", "value", "key", "patch", "name", "amount", "work", "filter", "result", "reason", "subject", "note", "citations", "note_id", "vote"].includes(key)
+      );
+      if (invalidField !== undefined) throw new TypeError(`Invalid built-in transaction fields: unexpected field ${JSON.stringify(invalidField)}`);
       validateOperation(record, options);
     } else if (options.schema) {
       const schemaError = validateValueAgainstSchema(record, options.schema);
