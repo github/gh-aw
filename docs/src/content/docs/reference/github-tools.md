@@ -19,7 +19,7 @@ tools:
     toolsets: [repos, issues, pull_requests, actions]
 ```
 
-**Available**: `context`, `repos`, `issues`, `pull_requests`, `users`, `actions`, `code_security`, `discussions`, `labels`, `notifications`, `orgs`, `projects`, `gists`, `search`, `dependabot`, `experiments`, `secret_protection`, `security_advisories`, `stargazers`
+**Available**: `context`, `repos`, `issues`, `pull_requests`, `users`, `actions`, `code_security`, `discussions`, `labels`, `notifications`, `orgs`, `projects`, `gists`, `dependabot`, `secret_protection`, `security_advisories`, `stargazers`
 
 **Shorthand values**:
 
