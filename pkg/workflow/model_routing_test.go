@@ -122,7 +122,7 @@ func TestThreatDetectionDoesNotUseModelRouting(t *testing.T) {
 	}
 }
 
-func TestCompiledRoutedWorkflowDoesNotRouteDetection(t *testing.T) {
+func TestCompiledRoutedWorkflowDoesNotRouteDetectionOrEvals(t *testing.T) {
 	for _, external := range []bool{false, true} {
 		for _, override := range []bool{false, true} {
 			name := "inline"
@@ -156,6 +156,10 @@ safe-outputs:
         allowed-models: [gpt-5.4-mini]
 `
 				}
+				source += `evals:
+  - id: quality
+    question: Did the workflow produce a useful result?
+`
 				source += "features:\n  gh-aw-detection: "
 				if external {
 					source += "true\n"
@@ -175,6 +179,12 @@ safe-outputs:
 				require.Contains(t, detection, "COPILOT_MODEL: detection")
 				for _, forbidden := range []string{"modelRouting", `"routing"`, "GH_AW_MODEL_ROUTING", "gh-aw-router"} {
 					require.NotContains(t, detection, forbidden)
+				}
+				evals := extractJobSection(string(compiled), "evals")
+				require.NotEmpty(t, evals)
+				require.Contains(t, string(compiled), "Prepare model-routing conversation")
+				for _, forbidden := range []string{"modelRouting", `"routing"`, "GH_AW_MODEL_ROUTING", "gh-aw-router"} {
+					require.NotContains(t, evals, forbidden)
 				}
 			})
 		}
