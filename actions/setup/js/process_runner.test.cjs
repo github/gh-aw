@@ -139,6 +139,32 @@ describe("process_runner.cjs", () => {
       }
     });
 
+    it("preserves a bounded stdout prefix when dropping an oversized line", async () => {
+      const observedLines = [];
+      const observedPrefixes = [];
+      const original = process.stdout.write;
+      process.stdout.write = () => true;
+      try {
+        const result = await runProcess({
+          command: process.execPath,
+          args: ["-e", `process.stdout.write(JSON.stringify({type:"item.completed",item:{id:"call-1",type:"mcp_tool_call",server:"github",result:"x".repeat(1048576)}})+"\\n")`],
+          attempt: 0,
+          log: () => {},
+          maxCollectedOutputBytes: 1024,
+          onStdoutLine: line => observedLines.push(line),
+          onStdoutLinePrefix: prefix => observedPrefixes.push(prefix),
+        });
+        expect(result.exitCode).toBe(0);
+        expect(observedLines).toEqual([]);
+        expect(observedPrefixes).toHaveLength(1);
+        expect(observedPrefixes[0]).toContain('"id":"call-1"');
+        expect(observedPrefixes[0]).toContain('"server":"github"');
+        expect(observedPrefixes[0]).toHaveLength(64 * 1024);
+      } finally {
+        process.stdout.write = original;
+      }
+    });
+
     it("kills descendants holding inherited stdio when the runtime guard fires", async () => {
       const result = await runProcess({
         command: process.execPath,
@@ -485,6 +511,7 @@ describe("process_runner.cjs", () => {
 
     it("terminates a running process when runtime guard requests it", async () => {
       const logs = [];
+      const triggered = [];
       let checks = 0;
       const result = await runProcess({
         command: process.execPath,
@@ -495,8 +522,9 @@ describe("process_runner.cjs", () => {
           shouldTerminate: () => {
             checks += 1;
             if (checks < 3) return false;
-            return { terminate: true, reason: "test guard tripped" };
+            return { terminate: true, reason: "test guard tripped", event: { type: "agent.execution", data: { categories: ["test_guard"], errorCodes: [], errorTypes: [] } } };
           },
+          onTriggered: decision => triggered.push(decision),
           pollIntervalMs: 25,
           termGraceMs: 200,
         },
@@ -505,6 +533,7 @@ describe("process_runner.cjs", () => {
       expect(result.runtimeGuardFired).toBe(true);
       expect(result.runtimeGuardReason).toContain("test guard tripped");
       expect(result.watchdogFired).toBe(false);
+      expect(triggered).toEqual([{ terminate: true, reason: "test guard tripped", event: { type: "agent.execution", data: { categories: ["test_guard"], errorCodes: [], errorTypes: [] } } }]);
       expect(logs.some(line => line.includes("runtime guard requested termination"))).toBe(true);
     });
 
