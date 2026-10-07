@@ -51,11 +51,23 @@ type downloadArtifactsOptions struct {
 // usage artifact. In this mode, workflow-run log downloads are intentionally skipped
 // to minimize API and transfer volume for lightweight reporting paths.
 func isUsageOnlyArtifactFilter(artifactFilter []string) bool {
-	return len(artifactFilter) == 1 && artifactFilter[0] == constants.UsageArtifactName.String()
+	if len(artifactFilter) != 1 {
+		return false
+	}
+	for _, artifact := range artifactFilter {
+		return artifact == constants.UsageArtifactName.String()
+	}
+	return false
 }
 
 func isInfoOnlyArtifactFilter(artifactFilter []string) bool {
-	return len(artifactFilter) == 1 && artifactFilter[0] == constants.InfoArtifactName.String()
+	if len(artifactFilter) != 1 {
+		return false
+	}
+	for _, artifact := range artifactFilter {
+		return artifact == constants.InfoArtifactName.String()
+	}
+	return false
 }
 
 // isInfoWithOptionalUsageArtifactFilter reports whether the artifact filter requests

@@ -539,8 +539,8 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	totalFetched := len(runs)
 	if opts.OldestFetchedCreatedAt != nil {
 		var oldest time.Time
-		if totalFetched > 0 {
-			oldest = runs[totalFetched-1].CreatedAt
+		for _, run := range runs {
+			oldest = run.CreatedAt
 		}
 		*opts.OldestFetchedCreatedAt = oldest
 	}
