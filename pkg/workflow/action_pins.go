@@ -17,6 +17,9 @@ import (
 var actionPinsLog = logger.New("workflow:action_pins")
 var pinnedUsesLine = regexp.MustCompile(`(?m)^(?: {8}uses: | {6}- uses: )[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[a-fA-F0-9]{40}(?:[ \t]*#[ \t]*[^\r\n]*)?$`)
 
+// Keep exact mappings distinct from ordinary uses of the same target until prefix rewriting finishes.
+const exactPinMappingMarker = "__gh_aw_exact_pin__"
+
 // Type aliases — callers within pkg/workflow use these names directly.
 
 // ActionYAMLInput is defined in pkg/actionpins; aliased here so all files in
@@ -69,7 +72,8 @@ func getActionPin(repo string) string {
 		actionPinsLog.Printf("No embedded pins found for repo: %s", repo)
 		return ""
 	}
-	return actionpins.FormatPinnedActionReference(repo, pins[0].SHA, pins[0].Version)
+	pin := pins[0] //nolint:uncheckedsliceindex // The empty case returns above.
+	return actionpins.FormatPinnedActionReference(repo, pin.SHA, pin.Version)
 }
 
 func getActionPinForData(repo string, data *WorkflowData) string {
@@ -148,32 +152,66 @@ func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, w
 	}
 	ctx := &actionpins.PinContext{Mappings: mappings, PrefixMappings: prefixes, Warnings: warnings, Resolver: resolver}
 	var mappingErr error
-	rewritten := pinnedUsesLine.ReplaceAllStringFunc(content, func(line string) string {
-		if mappingErr != nil {
-			return line
+	exactMappedStep := false
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "      - ") {
+			exactMappedStep = false
+		}
+		if markerIndex := strings.Index(line, exactPinMappingMarker); markerIndex >= 0 {
+			exactMappedStep = true
+			line = strings.Replace(line, " "+exactPinMappingMarker, "", 1)
+			line = strings.Replace(line, exactPinMappingMarker, "", 1)
+			if strings.HasPrefix(strings.TrimSpace(line), "uses:") {
+				line = strings.TrimRight(line, " \t")
+				if withoutCommentMarker, ok := strings.CutSuffix(line, "#"); ok {
+					line = strings.TrimRight(withoutCommentMarker, " \t")
+				}
+			}
+			if strings.TrimSpace(strings.TrimPrefix(line, "name:")) == "" ||
+				strings.TrimSpace(strings.TrimPrefix(line, "      - name:")) == "" ||
+				strings.TrimSpace(strings.TrimPrefix(line, "        name:")) == "" {
+				if strings.HasPrefix(line, "      - name:") {
+					line = "      - name: \"\""
+				} else if strings.HasPrefix(line, "        name:") {
+					line = "        name: \"\""
+				} else {
+					line = "name: \"\""
+				}
+			}
+		}
+		if !pinnedUsesLine.MatchString(line) || exactMappedStep {
+			lines[i] = line
+			continue
 		}
 		before, reference, _ := strings.Cut(line, "uses: ")
 		indentation := before + "uses: "
-		repo, suffix, _ := strings.Cut(reference, "@")
-		_, version, _ := strings.Cut(suffix, " # ")
-		version = strings.TrimSpace(version)
-		if _, sourceVersion, found := strings.Cut(version, " (source "); found && strings.HasSuffix(sourceVersion, ")") {
-			version = strings.TrimSuffix(sourceVersion, ")")
-		}
+		repo, version := pinnedUsesRepoAndSourceVersion(reference)
 		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
 			ref, err := actionpins.ResolveActionPin(repo, version, ctx)
 			if err == nil && ref != "" {
-				return indentation + ref
+				lines[i] = indentation + ref
+				continue
 			}
 			if err == nil {
 				err = errors.New("mapped target has no resolvable pin")
 			}
 			mappingErr = fmt.Errorf("unable to resolve action pin mapping for %s@%s: %w", repo, version, err)
-			return line
+			continue
 		}
-		return indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
-	})
-	return rewritten, mappingErr
+		lines[i] = indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
+	}
+	return strings.Join(lines, "\n"), mappingErr
+}
+
+func pinnedUsesRepoAndSourceVersion(reference string) (string, string) {
+	repo, suffix, _ := strings.Cut(reference, "@")
+	_, version, _ := strings.Cut(suffix, " # ")
+	version = strings.TrimSpace(version)
+	if _, sourceVersion, found := strings.Cut(version, " (source "); found && strings.HasSuffix(sourceVersion, ")") {
+		version = strings.TrimSuffix(sourceVersion, ")")
+	}
+	return repo, version
 }
 
 func actionPinWarningsForWorkflows(workflows []*WorkflowData) map[string]bool {
@@ -303,9 +341,17 @@ func getActionPinWithData(actionRepo, version string, data *WorkflowData) (strin
 	if ctx != nil {
 		if _, mapped := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]; mapped {
 			ctx.GHES = false
+			ctx.Mappings = data.ActionPinMappings
 		}
 	}
-	return actionpins.ResolveActionPin(actionRepo, version, ctx)
+	ref, err := actionpins.ResolveActionPin(actionRepo, version, ctx)
+	if err == nil && ref != "" && hasExactActionPinMapping(actionRepo, version, data) {
+		if !strings.Contains(ref, " # ") {
+			ref += " #"
+		}
+		ref += " " + exactPinMappingMarker
+	}
+	return ref, err
 }
 
 func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext {
@@ -435,6 +481,12 @@ func applyActionPinToTypedStep(step *WorkflowStep, data *WorkflowData) (*Workflo
 
 	pinnedRef, err := getActionPinWithData(actionRepo, rawVersion, data)
 	if err != nil || pinnedRef == "" {
+		if hasExactActionPinMapping(actionRepo, rawVersion, data) {
+			if err == nil {
+				err = errors.New("mapped target has no resolvable pin")
+			}
+			return nil, fmt.Errorf("unable to resolve action pin mapping for %s@%s: %w", actionRepo, rawVersion, err)
+		}
 		actionPinsLog.Printf("Skipping pin for %s@%s: no pin available", actionRepo, rawVersion)
 		return step, nil
 	}
@@ -442,7 +494,16 @@ func applyActionPinToTypedStep(step *WorkflowStep, data *WorkflowData) (*Workflo
 	actionPinsLog.Printf("Pinned action: %s@%s -> %s", actionRepo, rawVersion, pinnedRef)
 	result := step.Clone()
 	result.Uses = pinnedRef
+	result.exactActionPinMapping = hasExactActionPinMapping(actionRepo, rawVersion, data)
 	return result, nil
+}
+
+func hasExactActionPinMapping(actionRepo, version string, data *WorkflowData) bool {
+	if data == nil {
+		return false
+	}
+	_, ok := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]
+	return ok
 }
 
 // applyActionPinsToTypedSteps applies SHA pinning to a slice of typed WorkflowStep pointers.

@@ -52,7 +52,9 @@ func TestGenerateGitHubMCPLockdownDetectionStepGeneratedWithExplicitGuardPolicy(
 		},
 	}
 
-	NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data)
+	if err := NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data); err != nil {
+		t.Fatal(err)
+	}
 	output := yaml.String()
 
 	// The detection step must still be generated even when guard policies are explicitly
@@ -77,7 +79,9 @@ func TestGenerateGitHubMCPLockdownDetectionStepGeneratedWhenNoGuardPolicy(t *tes
 		},
 	}
 
-	NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data)
+	if err := NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data); err != nil {
+		t.Fatal(err)
+	}
 	output := yaml.String()
 
 	assert.Contains(t, output, "determine-automatic-lockdown", "detection step should be generated when no explicit guard policy")
@@ -98,7 +102,9 @@ func TestGenerateGitHubMCPLockdownDetectionStepEmitsPrivateToPublicFlowsEnv(t *t
 		},
 	}
 
-	NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data)
+	if err := NewCompiler().generateGitHubMCPLockdownDetectionStep(&yaml, data); err != nil {
+		t.Fatal(err)
+	}
 	output := yaml.String()
 
 	assert.Contains(t, output, "determine-automatic-lockdown", "detection step should be generated")

@@ -44,7 +44,6 @@
 #   - actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 #   - actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
 #   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-#   - actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
 #   - actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
 #   - actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
 #
@@ -556,7 +555,7 @@ jobs:
           CREATE_ORPHAN: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/clone_repo_memory_branch.sh"
       - name: Fetch and parse arXiv papers
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: "const fs = require('fs');\nconst https = require('https');\n\nconst BASE_DIR = '/tmp/gh-aw/agent/arxiv';\nconst PAPERS_JSON = `${BASE_DIR}/papers.json`;\nconst NEW_PAPERS_JSON = `${BASE_DIR}/new-papers.json`;\nconst SEEN_IDS_JSON = '/tmp/gh-aw/cache-memory/seen-paper-ids.json';\n\nfs.mkdirSync(BASE_DIR, { recursive: true });\n\nconst ARXIV_URL = 'https://export.arxiv.org/api/query?search_query=(cat:cs.AI+OR+cat:cs.SE+OR+cat:cs.LG)+AND+(agentic+OR+%22multi-agent%22+OR+%22llm+agent%22+OR+%22workflow+automation%22+OR+%22code+generation%22+OR+%22ai+agent%22)&max_results=25&sortBy=submittedDate&sortOrder=descending';\n\nlet xml = '';\ntry {\n  xml = await new Promise((resolve, reject) => {\n    const req = https.get(ARXIV_URL, { timeout: 30000 }, res => {\n      const chunks = [];\n      res.on('data', c => chunks.push(c));\n      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));\n    });\n    req.on('error', reject);\n    req.on('timeout', () => { req.destroy(); reject(new Error('request timed out')); });\n  });\n} catch (e) {\n  core.warning(`arXiv fetch failed: ${e.message}`);\n}\n\nconst decodeEntities = s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"');\nconst getText = (tag, s) => {\n  const m = s.match(new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)</${tag}>`));\n  return m ? decodeEntities(m[1].replace(/\\s+/g, ' ').trim()) : '';\n};\nconst getAllText = (tag, s) => {\n  const re = new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)</${tag}>`, 'g');\n  const out = []; let m;\n  while ((m = re.exec(s)) !== null) out.push(decodeEntities(m[1].replace(/\\s+/g, ' ').trim()));\n  return out;\n};\nconst getAllAttr = (tag, attr, s) => {\n  const re = new RegExp(`<${tag}[^>]*${attr}=\"([^\"]*)\"`, 'g');\n  const out = []; let m;\n  while ((m = re.exec(s)) !== null) out.push(m[1]);\n  return out;\n};\n\nconst papers = [];\nconst entryRe = /<entry>([\\s\\S]*?)<\\/entry>/g;\nlet em;\nwhile ((em = entryRe.exec(xml)) !== null) {\n  const entry = em[1];\n  const idUrl = getText('id', entry);\n  const arxivId = idUrl.replace(/.*abs\\//, '').trim();\n  if (!arxivId) continue;\n  papers.push({\n    id: arxivId,\n    title: getText('title', entry),\n    abstract: getText('summary', entry).slice(0, 800),\n    authors: getAllText('name', entry).slice(0, 3),\n    published: getText('published', entry).slice(0, 10),\n    categories: getAllAttr('category', 'term', entry).slice(0, 3),\n    url: `https://arxiv.org/abs/${arxivId}`\n  });\n}\n\nconst fetchedAt = new Date().toISOString().slice(0, 10);\nfs.writeFileSync(PAPERS_JSON, JSON.stringify({ fetched_at: fetchedAt, count: papers.length, papers }, null, 2));\n\nconst seenIds = new Set();\nif (fs.existsSync(SEEN_IDS_JSON)) {\n  try {\n    const d = JSON.parse(fs.readFileSync(SEEN_IDS_JSON, 'utf8'));\n    for (const id of (d.ids || [])) seenIds.add(id);\n  } catch (_) {}\n}\n\nconst newPapers = papers.filter(p => !seenIds.has(p.id));\nfs.writeFileSync(NEW_PAPERS_JSON, JSON.stringify({\n  total_fetched: papers.length,\n  already_seen: papers.length - newPapers.length,\n  new_count: newPapers.length,\n  fetched_at: fetchedAt,\n  papers: newPapers\n}, null, 2));\n\ncore.info(`Parsed ${papers.length} papers, ${newPapers.length} new`);"
 
@@ -593,7 +592,7 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.28.44 --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}

@@ -16,17 +16,18 @@ var stepTypesLog = logger.New("workflow:step_types")
 // WorkflowStep represents a single step in a GitHub Actions workflow job
 // This struct provides type safety and compile-time validation for step configurations
 type WorkflowStep struct {
-	Name             string            `yaml:"name,omitempty"`
-	ID               string            `yaml:"id,omitempty"`
-	If               string            `yaml:"if,omitempty"`
-	Uses             string            `yaml:"uses,omitempty"`
-	Run              string            `yaml:"run,omitempty"`
-	WorkingDirectory string            `yaml:"working-directory,omitempty"`
-	Shell            string            `yaml:"shell,omitempty"`
-	With             map[string]any    `yaml:"with,omitempty"`
-	Env              map[string]string `yaml:"env,omitempty"`
-	ContinueOnError  *TemplatableBool  `yaml:"continue-on-error,omitempty"` // Can be bool or string expression
-	TimeoutMinutes   int               `yaml:"timeout-minutes,omitempty"`
+	Name                  string            `yaml:"name,omitempty"`
+	ID                    string            `yaml:"id,omitempty"`
+	If                    string            `yaml:"if,omitempty"`
+	Uses                  string            `yaml:"uses,omitempty"`
+	Run                   string            `yaml:"run,omitempty"`
+	WorkingDirectory      string            `yaml:"working-directory,omitempty"`
+	Shell                 string            `yaml:"shell,omitempty"`
+	With                  map[string]any    `yaml:"with,omitempty"`
+	Env                   map[string]string `yaml:"env,omitempty"`
+	ContinueOnError       *TemplatableBool  `yaml:"continue-on-error,omitempty"` // Can be bool or string expression
+	TimeoutMinutes        int               `yaml:"timeout-minutes,omitempty"`
+	exactActionPinMapping bool
 }
 
 // IsUsesStep returns true if this step uses an action (has a "uses" field)
@@ -39,8 +40,12 @@ func (s *WorkflowStep) IsUsesStep() bool {
 func (s *WorkflowStep) ToMap() map[string]any {
 	result := make(map[string]any)
 
-	if s.Name != "" {
-		result["name"] = s.Name
+	name := s.Name
+	if s.exactActionPinMapping {
+		name += exactPinMappingMarker
+	}
+	if name != "" {
+		result["name"] = name
 	}
 	if s.ID != "" {
 		result["id"] = s.ID
@@ -201,14 +206,15 @@ func parseStepTimeoutMinutes(val any) int {
 // Clone creates a deep copy of the WorkflowStep
 func (s *WorkflowStep) Clone() *WorkflowStep {
 	clone := &WorkflowStep{
-		Name:             s.Name,
-		ID:               s.ID,
-		If:               s.If,
-		Uses:             s.Uses,
-		Run:              s.Run,
-		WorkingDirectory: s.WorkingDirectory,
-		Shell:            s.Shell,
-		TimeoutMinutes:   s.TimeoutMinutes,
+		Name:                  s.Name,
+		ID:                    s.ID,
+		If:                    s.If,
+		Uses:                  s.Uses,
+		Run:                   s.Run,
+		WorkingDirectory:      s.WorkingDirectory,
+		Shell:                 s.Shell,
+		TimeoutMinutes:        s.TimeoutMinutes,
+		exactActionPinMapping: s.exactActionPinMapping,
 	}
 
 	if s.ContinueOnError != nil {
