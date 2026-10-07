@@ -62,7 +62,9 @@ func (c *Compiler) parseUploadCodeCoverageConfig(outputMap map[string]any) *Uplo
 	}
 
 	if configMap, ok := configData.(map[string]any); ok {
-		config.TargetRef, _ = configMap["target-ref"].(string)
+		if target, ok := configMap["target-ref"].(string); ok {
+			config.TargetRef = target
+		}
 		if failOnError, exists := configMap["fail-on-error"]; exists {
 			if b, ok := failOnError.(bool); ok {
 				config.FailOnError = &b

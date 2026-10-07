@@ -43,7 +43,8 @@ func (c *Compiler) buildWorkQueueDispatchAppTokenSteps(data *WorkflowData, app *
 		&dispatchApp, permissions, "", inferSingleCheckoutRepositoryForGitHubAppOwner(data),
 		"Mint trusted work queue dispatch token", workQueueDispatchAppTokenStepID,
 	)
-	condition := "env.GH_AW_SAFE_OUTPUTS_STAGED != 'true'"
+	var condition strings.Builder
+	condition.WriteString("env.GH_AW_SAFE_OUTPUTS_STAGED != 'true'")
 	var staged []*string
 	if data.SafeOutputs != nil {
 		staged = append(staged, resolveSafeOutputsStagedValue(c.trialMode, data.SafeOutputs.Staged))
@@ -56,11 +57,14 @@ func (c *Compiler) buildWorkQueueDispatchAppTokenSteps(data *WorkflowData, app *
 			continue
 		}
 		if !isExpression(*value) {
-			condition = "false"
+			condition.Reset()
+			condition.WriteString("false")
 			break
 		}
 		expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(*value, "${{"), "}}"))
-		condition += " && format('{0}', (" + expression + ")) != 'true'"
+		condition.WriteString(" && format('{0}', (")
+		condition.WriteString(expression)
+		condition.WriteString(")) != 'true'")
 	}
 	var steps []string
 	var step strings.Builder
@@ -74,5 +78,5 @@ func (c *Compiler) buildWorkQueueDispatchAppTokenSteps(data *WorkflowData, app *
 	if step.Len() > 0 {
 		steps = append(steps, step.String())
 	}
-	return injectStepCondition(steps, &ExpressionNode{Expression: condition})
+	return injectStepCondition(steps, &ExpressionNode{Expression: condition.String()})
 }
