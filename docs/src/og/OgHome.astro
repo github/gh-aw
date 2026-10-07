@@ -21,9 +21,9 @@ import logoSvg from '../assets/agentic-workflow-light.svg?raw';
       <div class="og-text">
         <p class="og-brand"><span class="og-logo" set:html={logoSvg} />GitHub Agentic Workflows</p>
         <h1>
-          <span>Intelligent GitHub</span>
-          <span>repository automation,</span>
-          <span class="og-muted">with your own agents.</span>
+          <span>Intelligent automation</span>
+          <span>for GitHub, <span class="og-muted">with your</span></span>
+          <span class="og-muted">own agents.</span>
         </h1>
         <p class="og-url">github.github.com/gh-aw</p>
       </div>
@@ -93,7 +93,7 @@ import logoSvg from '../assets/agentic-workflow-light.svg?raw';
     letter-spacing: -0.035em;
     line-height: 1.06;
   }
-  h1 span {
+  h1 > span {
     display: block;
   }
   /* The hero visual is sized for a page; scale it to fit the card height. */

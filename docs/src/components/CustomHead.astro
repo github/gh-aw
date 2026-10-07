@@ -25,7 +25,7 @@ const isHomePage = isDocsHomePage || rawPageTitle === siteTitle;
 const ogTitle = isHomePage ? siteTitle : `${rawPageTitle} | ${siteTitle}`;
 
 // Default description (110-160 chars optimal for OG)
-const defaultDescription = 'Intelligent GitHub repository automation with Copilot, Claude Code, Codex or Gemini. Agents triage, investigate and open pull requests safely in GitHub Actions.';
+const defaultDescription = 'Intelligent automation for GitHub with Copilot, Claude, Codex or Gemini. Agents triage, investigate and open pull requests with guardrails and cost controls.';
 const pageDescription = entry?.data?.description || defaultDescription;
 
 // Social image: the site card (src/og/OgHome.astro, `npm run og`) for the home
@@ -41,7 +41,7 @@ const socialImage = hasPageImage
   : 'https://github.github.com/gh-aw/og-home-1200x630.png';
 const socialImageAlt = hasPageImage
   ? `${rawPageTitle}, from the GitHub Agentic Workflows docs.`
-  : 'GitHub Agentic Workflows: intelligent GitHub repository automation, with your own agents.';
+  : 'GitHub Agentic Workflows: intelligent automation for GitHub, with your own agents.';
 const configuredSite = Astro.site ?? new URL('https://github.github.com');
 const siteOrigin = configuredSite.origin;
 const siteUrl = new URL(import.meta.env.BASE_URL, configuredSite).toString();

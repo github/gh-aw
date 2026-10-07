@@ -22,7 +22,7 @@ test("gives the docs homepage a site-level social card", async ({ page }) => {
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "GitHub Agentic Workflows");
   await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "website");
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://github.github.com/gh-aw/og-home-1200x630.png");
-  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute("content", /repository automation/);
+  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute("content", /intelligent automation for GitHub/);
 });
 
 test("serves the social image", async ({ request }) => {
