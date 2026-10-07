@@ -29,6 +29,19 @@ func TestConclusionWarnsWhenDetectionHasNoVerdict(t *testing.T) {
 		if !strings.Contains(steps, want) {
 			t.Errorf("expected conclusion steps to contain %q", want)
 		}
+		data.SafeOutputs.AddComments = &AddCommentsConfig{}
+		enabled := true
+		data.StatusComment = &enabled
+		job, err := compiler.buildConclusionJob(data, "agent", []string{"add_comment"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(job.If, "!(needs.add_comment.outputs.comment_id) || needs.detection.result != 'skipped'") {
+			t.Fatal("missing verdict must allow conclusion even after publishing a comment")
+		}
+		if !strings.Contains(strings.Join(job.Steps, ""), "if: always() && !(needs.add_comment.outputs.comment_id)") {
+			t.Fatal("status-comment update must still suppress duplicate comments")
+		}
 	}
 	data.SafeOutputs.ThreatDetection = nil
 	steps = strings.Join(compiler.buildConclusionSetupSteps(data), "")

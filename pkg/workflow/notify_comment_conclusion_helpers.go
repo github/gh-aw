@@ -14,6 +14,21 @@ import (
 
 const conclusionWorkQueueActivationArtifactDir = "${{ runner.temp }}/gh-aw-activation"
 
+func buildDetectionNoVerdictCondition() ConditionNode {
+	job := "needs." + string(constants.DetectionJobName)
+	reason := BuildPropertyAccess(job + ".outputs.detection_reason")
+	return BuildAnd(
+		BuildNotEquals(BuildPropertyAccess(job+".result"), BuildStringLiteral("skipped")),
+		BuildOr(
+			BuildEquals(reason, BuildStringLiteral("agent_failure")),
+			BuildOr(
+				BuildEquals(reason, BuildStringLiteral("parse_error")),
+				BuildEquals(BuildPropertyAccess(job+".outputs.detection_conclusion"), BuildStringLiteral("")),
+			),
+		),
+	)
+}
+
 // buildConclusionSetupSteps extracts the common setup, token minting, and artifact steps.
 func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	var steps []string
@@ -58,7 +73,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	if IsDetectionJobEnabled(data.SafeOutputs) {
 		steps = append(steps,
 			"      - name: Warn if threat detection produced no verdict\n",
-			"        if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')\n",
+			fmt.Sprintf("        if: %s\n", RenderCondition(BuildAnd(BuildFunctionCall("always"), buildDetectionNoVerdictCondition()))),
 			"        run: echo \"::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs.\"\n",
 		)
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
@@ -590,7 +605,11 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	condition := BuildAnd(alwaysFunc, BuildOr(agentNotSkipped, activationGuardrailsFailed))
 
 	if slices.Contains(safeOutputJobNames, "add_comment") {
-		return BuildAnd(condition, &NotNode{Child: BuildPropertyAccess("needs.add_comment.outputs.comment_id")})
+		noComment := ConditionNode(&NotNode{Child: BuildPropertyAccess("needs.add_comment.outputs.comment_id")})
+		if IsDetectionJobEnabled(data.SafeOutputs) {
+			noComment = BuildOr(noComment, buildDetectionNoVerdictCondition())
+		}
+		return BuildAnd(condition, noComment)
 	}
 	return condition
 }

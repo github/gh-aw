@@ -19,7 +19,8 @@ func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
 			}
 			t.Run(mainEngine+" to "+detectionEngine, func(t *testing.T) {
 				data := &WorkflowData{
-					AI: mainEngine,
+					AI:    mainEngine,
+					Model: "main-alias",
 					EngineConfig: &EngineConfig{
 						ID:        mainEngine,
 						APITarget: "main-provider.example.com",
@@ -32,7 +33,8 @@ func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
 						},
 					},
 					ModelMappings: map[string][]string{
-						"sonnet": {"main-only-model"},
+						"sonnet":     {"main-only-model"},
+						"main-alias": {"main-only-model"},
 					},
 					SafeOutputs: &SafeOutputsConfig{
 						ThreatDetection: &ThreatDetectionConfig{
@@ -71,7 +73,7 @@ func TestDetectionProviderSettingsIsolatedAcrossEngines(t *testing.T) {
 				} {
 					t.Run(name, func(t *testing.T) {
 						steps := strings.Join(build(data), "")
-						for _, forbidden := range []string{"main-provider.example.com", "MAIN_PROVIDER_KEY", "main-only", "main-only-model"} {
+						for _, forbidden := range []string{"main-provider.example.com", "MAIN_PROVIDER_KEY", "main-only", "main-only-model", "main-alias"} {
 							if strings.Contains(steps, forbidden) {
 								t.Errorf("main provider setting %q leaked into detection", forbidden)
 							}

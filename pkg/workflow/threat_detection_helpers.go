@@ -276,11 +276,15 @@ func engineCoreSecretVarNames(engineID string) []string {
 // interpret it. Workflows using a custom engine run detection on a built-in engine that
 // does not understand the custom engine's model IDs, so their model is not inherited and
 // the detection engine's own default model is used instead.
-func inheritedDetectionModel(data *WorkflowData) string {
+func inheritedDetectionModel(data *WorkflowData, detectionEngineID string) string {
 	if data == nil {
 		return ""
 	}
 	engineID := ResolveEngineID(data)
+	// Cross-engine detection uses built-in aliases, not the main engine's alias definitions.
+	if engineID != detectionEngineID && len(data.ModelMappings[data.Model]) > 0 {
+		return ""
+	}
 	if engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
 		return data.Model
 	}

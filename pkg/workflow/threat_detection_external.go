@@ -36,7 +36,7 @@ func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data
 		codexLogsDir = path.Join(codexHomeDir, "logs")
 	}
 	detectionData := buildExternalDetectorWorkflowData(data, "codex")
-	detectionData.Model = inheritedDetectionModel(data)
+	detectionData.Model = inheritedDetectionModel(data, engineID)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		detectionData.Model = data.SafeOutputs.ThreatDetection.Model
 	}
@@ -462,7 +462,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || ... || 'auto' }}, and when no org var
 	// is set COPILOT_MODEL is 'auto'. The AWF API proxy has no pricing for 'auto' and
 	// returns HTTP 400, causing every inference attempt to fail.
-	resolvedDetectionModel := inheritedDetectionModel(data)
+	resolvedDetectionModel := inheritedDetectionModel(data, engineID)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.Model != "" {
 		resolvedDetectionModel = data.SafeOutputs.ThreatDetection.Model
 	}
