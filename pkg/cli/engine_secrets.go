@@ -24,6 +24,8 @@ import (
 
 var engineSecretsLog = logger.New("cli:engine_secrets")
 
+var errUnsupportedClaudeOAuthToken = errors.New("CLAUDE_CODE_OAUTH_TOKEN is not supported for Claude workflows; use ANTHROPIC_API_KEY or configure Anthropic Workload Identity Federation instead")
+
 // Overridable for testing
 var (
 	engineSecretsPromptFn = func(req SecretRequirement, config EngineSecretConfig) error {
@@ -337,6 +339,9 @@ func ensureSecretAvailable(req SecretRequirement, config EngineSecretConfig) err
 	}
 
 	// Secret not found, prompt user for it
+	if req.IsEngineSecret && req.EngineName == string(constants.ClaudeEngine) && os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" { //nolint:osgetenvlibrary
+		return errUnsupportedClaudeOAuthToken
+	}
 	return engineSecretsPromptFn(req, config)
 }
 
@@ -704,6 +709,10 @@ func GetEngineSecretNameAndValue(engine string, existingSecrets map[string]struc
 				break
 			}
 		}
+	}
+
+	if engine == string(constants.ClaudeEngine) && value == "" && os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" { //nolint:osgetenvlibrary
+		return "", "", false, errUnsupportedClaudeOAuthToken
 	}
 
 	return secretName, value, false, nil

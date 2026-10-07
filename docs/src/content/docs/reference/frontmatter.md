@@ -766,6 +766,8 @@ Enable experimental or optional compiler and runtime behaviors as key-value pair
 
 Enables enhanced security validation for production workflows. Default: `true`.
 
+For `pull_request_target` workflows, the `on.pull_request_target` options documented in [Explicit Trusted Checkout Policy](/gh-aw/reference/checkout/#explicit-trusted-checkout-policy) can declare fixed trusted checkout pairs and acknowledge the trigger-specific warning without disabling strict mode.
+
 ```yaml wrap
 strict: false  # Disable enhanced security validation for development/testing
 ```

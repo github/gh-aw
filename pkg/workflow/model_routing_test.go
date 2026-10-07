@@ -62,6 +62,135 @@ func TestBuildAWFConfigJSON_ModelRouting(t *testing.T) {
 	assertModelRoutingImagesInManifest(t, data, images)
 }
 
+func TestThreatDetectionDoesNotUseModelRouting(t *testing.T) {
+	routing := &CopilotModelRoutingConfig{
+		Goal: "cost", Mode: "balanced", AllowedModels: []string{"gpt-5.4-mini"},
+	}
+	for _, override := range []bool{false, true} {
+		name := "inherited"
+		if override {
+			name = "detection engine override"
+		}
+		t.Run(name, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:           "copilot",
+				EngineConfig: &EngineConfig{ID: "copilot", ModelRouting: routing},
+				NetworkPermissions: &NetworkPermissions{
+					Firewall: &FirewallConfig{Enabled: true},
+				},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{Model: "gpt-5.4-mini"},
+				},
+			}
+			if override {
+				data.SafeOutputs.ThreatDetection.EngineConfig = &EngineConfig{
+					ID: "copilot", ModelRouting: routing,
+				}
+			}
+
+			detectionData := buildExternalDetectorWorkflowData(data, "copilot")
+			require.Nil(t, detectionData.EngineConfig.ModelRouting)
+			require.Same(t, routing, data.EngineConfig.ModelRouting)
+			if override {
+				require.Same(t, routing, data.SafeOutputs.ThreatDetection.EngineConfig.ModelRouting)
+			}
+
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName: "copilot", WorkflowData: detectionData,
+			})
+			require.NoError(t, err)
+			var config map[string]any
+			require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+			require.NotContains(t, config, "experimental")
+			require.NotContains(t, config["apiProxy"].(map[string]any), "routing")
+			require.NotContains(t, config["container"].(map[string]any)["images"].(map[string]any), awfImageRoleRouter)
+
+			compiler := NewCompiler()
+			for path, build := range map[string]func(*WorkflowData) []string{
+				"external": compiler.buildExternalDetectorExecutionStep,
+				"inline":   compiler.buildDetectionEngineExecutionStep,
+			} {
+				t.Run(path, func(t *testing.T) {
+					steps := strings.Join(build(data), "")
+					require.Contains(t, steps, "COPILOT_MODEL: gpt-5.4-mini")
+					require.NotContains(t, steps, "GH_AW_MODEL_ROUTING")
+					require.NotContains(t, steps, "modelRouting")
+					require.NotContains(t, steps, `"routing"`)
+				})
+			}
+		})
+	}
+}
+
+func TestCompiledRoutedWorkflowDoesNotRouteDetectionOrEvals(t *testing.T) {
+	for _, external := range []bool{false, true} {
+		for _, override := range []bool{false, true} {
+			name := "inline"
+			if external {
+				name = "external"
+			}
+			if override {
+				name += " with override"
+			}
+			t.Run(name, func(t *testing.T) {
+				source := `---
+on: workflow_dispatch
+strict: false
+engine:
+  id: copilot
+  model-routing:
+    goal: cost
+    mode: balanced
+    allowed-models: [gpt-5.4-mini]
+safe-outputs:
+  create-issue:
+  threat-detection:
+    model: gpt-5.4-mini
+`
+				if override {
+					source += `    engine:
+      id: copilot
+      model-routing:
+        goal: cost
+        mode: balanced
+        allowed-models: [gpt-5.4-mini]
+`
+				}
+				source += `evals:
+  - id: quality
+    question: Did the workflow produce a useful result?
+`
+				source += "features:\n  gh-aw-detection: "
+				if external {
+					source += "true\n"
+				} else {
+					source += "false\n"
+				}
+				source += "---\nReport a finding.\n"
+				dir := t.TempDir()
+				workflowPath := filepath.Join(dir, "routed.md")
+				require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0o600))
+				require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+				compiled, err := os.ReadFile(filepath.Join(dir, "routed.lock.yml"))
+				require.NoError(t, err)
+				require.Contains(t, string(compiled), "Prepare model-routing conversation")
+				detection := extractJobSection(string(compiled), "detection")
+				require.NotEmpty(t, detection)
+				require.Contains(t, detection, "COPILOT_MODEL: detection")
+				for _, forbidden := range []string{"modelRouting", `"routing"`, "GH_AW_MODEL_ROUTING", "gh-aw-router"} {
+					require.NotContains(t, detection, forbidden)
+				}
+				evals := extractJobSection(string(compiled), "evals")
+				require.NotEmpty(t, evals)
+				require.Contains(t, string(compiled), "Prepare model-routing conversation")
+				for _, forbidden := range []string{"modelRouting", `"routing"`, "GH_AW_MODEL_ROUTING", "gh-aw-router"} {
+					require.NotContains(t, evals, forbidden)
+				}
+			})
+		}
+	}
+}
+
 func TestBuildAWFConfigJSON_ModelRoutingUsesEffectiveAWFVersion(t *testing.T) {
 	data := &WorkflowData{
 		EngineConfig: &EngineConfig{

@@ -486,7 +486,8 @@ async function pushSignedCommits({
   let graphqlParentIsAncestorOfHead = true;
   if (firstGraphqlParentOid) {
     try {
-      const ancestryCheck = await exec.getExecOutput("git", ["merge-base", "--is-ancestor", firstGraphqlParentOid, "HEAD"], { cwd, ignoreReturnCode: true });
+      // Partial clones may fetch a missing remote head during this probe.
+      const ancestryCheck = await exec.getExecOutput("git", ["merge-base", "--is-ancestor", firstGraphqlParentOid, "HEAD"], { cwd, env: { ...process.env, ...(gitAuthEnv || {}) }, ignoreReturnCode: true });
       graphqlParentIsAncestorOfHead = ancestryCheck.exitCode === 0;
     } catch {
       // Ancestry probe failed — ignored, keep the default (true) and avoid rewrite.

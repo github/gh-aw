@@ -364,7 +364,7 @@ func generateCheckoutStepLines(entry *resolvedCheckout, index int, keepCredentia
 		fmt.Fprintf(&sb, "          repository: %s\n", entry.key.repository)
 	}
 	if entry.ref != "" {
-		fmt.Fprintf(&sb, "          ref: %s\n", entry.ref)
+		writeCheckoutRef(&sb, entry.ref)
 	}
 	if entry.key.path != "" {
 		fmt.Fprintf(&sb, "          path: %s\n", entry.key.path)

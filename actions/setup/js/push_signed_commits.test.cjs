@@ -1047,7 +1047,7 @@ describe("push_signed_commits integration tests", () => {
   });
 
   describe("git auth environment propagation", () => {
-    it("should pass gitAuthEnv to ls-remote in the signed-commit path", async () => {
+    it("should pass gitAuthEnv to ls-remote and the partial-clone ancestry probe", async () => {
       const gitAuthEnv = {
         GIT_CONFIG_COUNT: "1",
         GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
@@ -1059,6 +1059,9 @@ describe("push_signed_commits integration tests", () => {
       process.env[sentinelKey] = sentinelValue;
 
       const getExecOutput = vi.fn(async (_program, args) => {
+        if (args[0] === "merge-base") {
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
         if (args[0] === "rev-list") {
           return {
             exitCode: 0,
@@ -1122,6 +1125,17 @@ describe("push_signed_commits integration tests", () => {
       const lsRemoteCall = getExecOutput.mock.calls.find(call => call[1][0] === "ls-remote");
       expect(lsRemoteCall).toBeDefined();
       expect(lsRemoteCall[2]).toEqual(
+        expect.objectContaining({
+          cwd: workDir,
+          env: expect.objectContaining({
+            ...gitAuthEnv,
+            [sentinelKey]: sentinelValue,
+          }),
+        })
+      );
+      const ancestryCall = getExecOutput.mock.calls.find(call => call[1][0] === "merge-base");
+      expect(ancestryCall).toBeDefined();
+      expect(ancestryCall[2]).toEqual(
         expect.objectContaining({
           cwd: workDir,
           env: expect.objectContaining({

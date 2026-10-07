@@ -511,7 +511,9 @@ func (c *Compiler) generateEngineInstallAndPreAgentSteps(yaml *strings.Builder, 
 	}
 
 	// Add GitHub MCP lockdown detection step if needed
-	c.generateGitHubMCPLockdownDetectionStep(yaml, data)
+	if err := c.generateGitHubMCPLockdownDetectionStep(yaml, data); err != nil {
+		return nil, err
+	}
 
 	// Add step to parse blocked-users and approval-labels guard variables into JSON arrays
 	c.generateParseGuardVarsStep(yaml, data)

@@ -266,7 +266,8 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 // buildUsageArtifactUploadSteps creates steps that collect and upload a compact usage artifact.
 // The artifact includes aw_info.json, aw-info.jsonl, agent_usage.json, agent_usage.jsonl, detection_usage.jsonl,
 // evals.jsonl, evals token usage and execution evidence, A/B experiment state and assignments,
-// grader results, threat-detection outcome/verdict, and agent/detection token usage JSONL files
+// grader results, threat-detection outcome/verdict, and agent/detection token usage and
+// model-routing JSONL files
 // (when present), so the audit command can mine these results from the usage artifact alone.
 // It also downloads the safe-outputs-items artifact so that generate_usage_activity_summary.cjs
 // can include safe-output item counts in the activity summary without requiring a separate artifact download.
@@ -295,6 +296,7 @@ func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction 
 		"            /tmp/gh-aw/usage/graders/grader_results.json\n",
 		"            /tmp/gh-aw/usage/github_rate_limits.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/token_usage.jsonl\n",
+		"            /tmp/gh-aw/usage/agent/model-routing.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/execution.json\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",

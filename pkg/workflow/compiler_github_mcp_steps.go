@@ -86,11 +86,11 @@ func githubLockdownStepConfiguredGuardValues(githubTool any) (minIntegrity strin
 // repos to "all" if they are not already configured.
 // This applies regardless of whether a GitHub App token is configured, because repo-scoping
 // is not a substitute for author-integrity filtering inside a repository.
-func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
+func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) error {
 	githubTool := data.Tools["github"]
 	if !githubLockdownDetectionStepEnabled(data) {
 		githubConfigLog.Print("Skipping GitHub MCP lockdown detection step: GitHub tool not enabled")
-		return
+		return nil
 	}
 
 	// NOTE: Do NOT skip this step when guard policies are explicitly configured.
@@ -107,15 +107,26 @@ func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder,
 	pinnedAction, err := getActionPinWithData(actionRepo, actionVersion, data)
 	if err != nil {
 		githubConfigLog.Printf("Failed to resolve %s@%s: %v", actionRepo, actionVersion, err)
-		// In strict mode, this error would have been returned by getActionPinWithData
-		// In normal mode, we fall back to using the version tag without pinning
-		pinnedAction = fmt.Sprintf("%s@%s", actionRepo, actionVersion)
+		if hasExactActionPinMapping(actionRepo, actionVersion, data) {
+			return fmt.Errorf("failed to resolve mapped action %s@%s: %w", actionRepo, actionVersion, err)
+		} else {
+			// In strict mode, this error would have been returned by getActionPinWithData.
+			// In normal mode, we fall back to using the version tag without pinning.
+			pinnedAction = fmt.Sprintf("%s@%s", actionRepo, actionVersion)
+		}
+	}
+	if pinnedAction == "" && hasExactActionPinMapping(actionRepo, actionVersion, data) {
+		return fmt.Errorf("failed to resolve mapped action %s@%s: target has no available pin", actionRepo, actionVersion)
 	}
 
 	configuredMinIntegrity, configuredRepos, privateToPublicFlowsAllow := githubLockdownStepConfiguredGuardValues(githubTool)
 
 	// Generate the step using the determine_automatic_lockdown.cjs action
-	yaml.WriteString("      - name: Determine automatic lockdown mode for GitHub MCP Server\n")
+	stepName := "      - name: Determine automatic lockdown mode for GitHub MCP Server"
+	if hasExactActionPinMapping(actionRepo, actionVersion, data) {
+		stepName += exactPinMappingMarker
+	}
+	yaml.WriteString(stepName + "\n")
 	yaml.WriteString("        id: determine-automatic-lockdown\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", pinnedAction)
 	yaml.WriteString("        env:\n")
@@ -134,6 +145,7 @@ func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder,
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const determineAutomaticLockdown = require('${{ runner.temp }}/gh-aw/actions/determine_automatic_lockdown.cjs');\n")
 	yaml.WriteString("            await determineAutomaticLockdown(github, context, core);\n")
+	return nil
 }
 
 // serializeEnvStringValue converts a workflow config value to a string suitable for a

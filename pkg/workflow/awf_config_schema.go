@@ -51,10 +51,26 @@ func validateAWFConfigJSON(configJSON string) error {
 		return fmt.Errorf("invalid AWF config JSON: expected generated output to be valid JSON for schema validation; parse error: %w. This indicates a compiler bug; please report it", err)
 	}
 	normalizeTemplatableModelFallbackEnabled(doc)
+	normalizeCloudHypervisorBundleReleaseTag(doc)
 	if err := schema.Validate(doc); err != nil {
 		return fmt.Errorf("invalid AWF config JSON: expected generated output to satisfy the embedded schema; review the referenced field path and fix that workflow/frontmatter value: %w", err)
 	}
 	return nil
+}
+
+// The bundle setup resolves the release tag before AWF consumes the config.
+func normalizeCloudHypervisorBundleReleaseTag(doc any) {
+	root, ok := doc.(map[string]any)
+	if !ok {
+		return
+	}
+	config, ok := root["cloudHypervisor"].(map[string]any)
+	if !ok {
+		return
+	}
+	if config["artifactReleaseTag"] == "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG}" {
+		config["artifactReleaseTag"] = string(constants.DefaultFirewallVersion)
+	}
 }
 
 // normalizeTemplatableModelFallbackEnabled adjusts a generated AWF config document

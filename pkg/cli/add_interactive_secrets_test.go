@@ -102,6 +102,17 @@ func TestAddInteractiveConfig_resolveEngineApiKeyCredential(t *testing.T) {
 	}
 }
 
+func TestAddInteractiveConfig_resolveEngineApiKeyCredential_ClaudeOAuthToken(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "private-oauth-token")
+
+	config := &AddInteractiveConfig{EngineOverride: "claude"}
+	_, _, err := config.resolveEngineApiKeyCredential()
+	require.ErrorContains(t, err, "CLAUDE_CODE_OAUTH_TOKEN")
+	require.ErrorContains(t, err, "ANTHROPIC_API_KEY")
+	assert.NotContains(t, err.Error(), "private-oauth-token")
+}
+
 func TestAddInteractiveConfig_configureEngineAPISecret_noWriteAccess(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
