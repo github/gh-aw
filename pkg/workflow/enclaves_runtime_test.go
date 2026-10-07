@@ -60,6 +60,12 @@ func TestValidateCloudHypervisorEnclaves(t *testing.T) {
 		{"primary sbx", func(data *WorkflowData) { data.SandboxConfig.Agent.Runtime = "sbx" }, "sandbox.agent.runtime: sbx"},
 		{"primary VM", func(data *WorkflowData) { data.SandboxConfig.Agent.Runtime = AgentRuntimeCloudHypervisor }, "sandbox.agent.runtime: cloud-hypervisor"},
 		{"primary NVX", func(data *WorkflowData) { data.SandboxConfig.Agent.Runtime = "nvx" }, "sandbox.agent.runtime: nvx"},
+		{"primary docker-sudo-iptables", func(data *WorkflowData) {
+			data.SandboxConfig.Agent.Runtime = AgentRuntimeDockerSudoIptables
+		}, "use sandbox.agent.runtime: docker"},
+		{"gh-proxy", func(data *WorkflowData) {
+			data.Tools["github"] = map[string]any{"mode": "gh-proxy"}
+		}, "tools.github.mode: gh-proxy"},
 		{"agent path prefix", func(data *WorkflowData) {
 			data.SandboxConfig.Agent.Args = []string{"--docker-host-path-prefix", "/shared"}
 		}, "--docker-host-path-prefix"},

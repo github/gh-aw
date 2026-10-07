@@ -20,12 +20,33 @@ func hasCloudHypervisorEnclaves(workflowData *WorkflowData) bool {
 	return false
 }
 
+func validateCloudHypervisorEnclavePrimaryRuntime(workflowData *WorkflowData) error {
+	if !hasCloudHypervisorEnclaves(workflowData) {
+		return nil
+	}
+	agent := getAgentConfig(workflowData)
+	if agent == nil {
+		return nil
+	}
+	switch agent.Runtime {
+	case AgentRuntimeDockerSudoIptables:
+		return errors.New("enclaves cloud-hypervisor runtime is incompatible with sandbox.agent.runtime: docker-sudo-iptables; use sandbox.agent.runtime: docker")
+	case "sbx", AgentRuntimeCloudHypervisor, "nvx":
+		return fmt.Errorf("enclaves cloud-hypervisor runtime is incompatible with sandbox.agent.runtime: %s; use a Docker primary agent runtime", agent.Runtime)
+	default:
+		return nil
+	}
+}
+
 func validateCloudHypervisorEnclaves(workflowData *WorkflowData) error {
 	if !hasCloudHypervisorEnclaves(workflowData) {
 		return nil
 	}
 	if isArcDindTopology(workflowData) {
 		return errors.New("enclaves cloud-hypervisor runtime is incompatible with runner.topology: arc-dind; use GitHub-hosted Ubuntu x86_64 KVM runners")
+	}
+	if isCliProxyNeeded(workflowData) {
+		return errors.New("enclaves cloud-hypervisor runtime is incompatible with tools.github.mode: gh-proxy and integrity-reactions; remove those settings")
 	}
 	args := customAWFArgs(workflowData)
 	if hasEnabledAWFArg(args, "--enable-dind") {
@@ -44,12 +65,6 @@ func validateCloudHypervisorEnclaves(workflowData *WorkflowData) error {
 			case "sbx", "cloud-hypervisor", "nvx":
 				return fmt.Errorf("enclaves cloud-hypervisor runtime is incompatible with --container-runtime %s; use a Docker primary agent runtime", runtime)
 			}
-		}
-	}
-	if agent := getAgentConfig(workflowData); agent != nil {
-		switch agent.Runtime {
-		case "sbx", AgentRuntimeCloudHypervisor, "nvx":
-			return fmt.Errorf("enclaves cloud-hypervisor runtime is incompatible with sandbox.agent.runtime: %s; use a Docker primary agent runtime", agent.Runtime)
 		}
 	}
 	for i, enclave := range workflowData.Enclaves {
