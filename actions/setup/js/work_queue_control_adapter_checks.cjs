@@ -810,6 +810,7 @@ async function verifyCompiledDispatchIdentity(input) {
       };
       await new AsyncFunction("require", "core", "github", "context", "exec", "io", "getOctokit", input.script)(localRequire, core, fixture.githubClient, fixture.dispatcherContext, {}, {}, getOctokit);
       assert.equal(canonical(fixture.state.policy), canonical(input.policy));
+      assert.ok(result, "compiled runtime must return its dispatch receipt");
       if (mode === "wrong-publisher") {
         assert.equal(identityReads, 0);
         assert.equal(posts, 0);

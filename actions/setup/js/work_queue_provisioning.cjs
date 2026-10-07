@@ -28,7 +28,7 @@ function assignmentInputType(contents) {
   }
   try {
     const document = parseDocument(contents, { uniqueKeys: true, merge: true });
-    if (document.errors.length || document.warnings.length) throw new Error("invalid workflow YAML");
+    if (!document || document.errors.length || document.warnings.length) throw new Error("invalid workflow YAML");
     workflow = document.toJS({ mapAsMap: true, maxAliasCount: 100 });
   } catch {
     throw queueError("policy_missing", "approved worker route has invalid or unbounded workflow YAML");
