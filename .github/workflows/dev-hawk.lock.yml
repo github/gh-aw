@@ -92,7 +92,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     needs: pre_activation
     # zizmor: ignore[dangerous-triggers] - workflow_run trigger is secured with role and fork validation
     if: >
@@ -426,7 +426,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -1295,7 +1295,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -1645,7 +1645,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -1945,7 +1945,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   evals:
-    name: Evaluations
+    name: evals
     needs:
       - activation
       - agent
@@ -2249,7 +2249,7 @@ jobs:
           persist-credentials: false
 
   pre_activation:
-    name: Pre-activation
+    name: pre_activation
     if: >
       github.event.workflow_run.event == 'workflow_dispatch' && contains(fromJSON('["pelikhan","cmuto09","dsyme","mnkiefer","davidslater","zarenner","lpcox","salmanmkc","gh-aw-bot"]'), github.event.workflow_run.actor.login)
     runs-on: ubuntu-slim
@@ -2302,7 +2302,7 @@ jobs:
             await main();
 
   push_evals_state:
-    name: Push evaluations state
+    name: push_evals_state
     needs:
       - activation
       - evals
@@ -2388,7 +2388,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent

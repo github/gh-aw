@@ -89,7 +89,7 @@ env:
 
 jobs:
   activation:
-    name: Activation
+    name: activation
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
@@ -439,7 +439,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
 
   agent:
-    name: Agent
+    name: agent
     needs: activation
     if: needs.activation.outputs.daily_ai_credits_exceeded != 'true'
     runs-on: ubuntu-latest
@@ -1319,7 +1319,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   conclusion:
-    name: Conclusion
+    name: conclusion
     needs:
       - activation
       - agent
@@ -1683,7 +1683,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
   detection:
-    name: Detection
+    name: detection
     needs:
       - activation
       - agent
@@ -1993,7 +1993,7 @@ jobs:
           bash "${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh" /tmp/gh-aw/threat-detection/detection_result.json
 
   evals:
-    name: Evaluations
+    name: evals
     needs:
       - activation
       - agent
@@ -2334,7 +2334,7 @@ jobs:
           persist-credentials: false
 
   push_evals_state:
-    name: Push evaluations state
+    name: push_evals_state
     needs:
       - activation
       - evals
@@ -2421,7 +2421,7 @@ jobs:
           persist-credentials: false
 
   push_experiments_state:
-    name: Push experiments state
+    name: push_experiments_state
     needs: activation
     if: always() && (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-slim
@@ -2504,7 +2504,7 @@ jobs:
           persist-credentials: false
 
   safe_outputs:
-    name: Safe outputs
+    name: safe_outputs
     needs:
       - activation
       - agent

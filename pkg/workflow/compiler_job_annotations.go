@@ -29,16 +29,16 @@ var generatedJobNames = map[string]string{
 	"send_slack_message":                        "Send Slack message",
 }
 
-// annotateGeneratedJobs adds human-readable names and explains the job-scoped
-// permissions after all compiler and author permission augmentations have run.
+// annotateGeneratedJobs gives unnamed jobs their ID as a display name and explains
+// job-scoped permissions after all compiler and author augmentations have run.
 func (c *Compiler) annotateGeneratedJobs(data *WorkflowData) {
 	if data == nil {
 		return
 	}
 	sourceComments := sourceJobPermissionComments(data.FrontmatterYAML)
 	for id, job := range c.jobManager.GetAllJobs() {
-		if displayName, generated := generatedJobNames[id]; generated && job.DisplayName == "" {
-			job.DisplayName = displayName
+		if job.DisplayName == "" {
+			job.DisplayName = id
 		}
 		if job.Permissions == "" {
 			continue
