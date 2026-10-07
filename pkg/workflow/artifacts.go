@@ -26,7 +26,7 @@ type ArtifactDownloadConfig struct {
 // buildArtifactDownloadSteps creates steps to download a GitHub Actions artifact.
 // pinAction is used to resolve the download-artifact action reference; callers inside
 // a Compiler method should pass c.getActionPin to honour the per-compilation GHES compat flag.
-func buildArtifactDownloadSteps(config ArtifactDownloadConfig, pinAction func(string) string) []string {
+func buildArtifactDownloadSteps(config ArtifactDownloadConfig, pinAction func(string) string) []string { //nolint:largefunc // Keeps all download options and environment setup in one ordered builder.
 	artifactsLog.Printf("Building artifact download steps: artifact=%s, path=%s, setupEnv=%v",
 		config.ArtifactName, config.DownloadPath, config.SetupEnvStep)
 

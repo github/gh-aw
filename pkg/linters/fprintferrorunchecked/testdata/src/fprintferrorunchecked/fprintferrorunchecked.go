@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // BadFprintfMultiReturnAllBlanks discards both return values of fmt.Fprintf with blanks.
@@ -126,6 +127,13 @@ func GoodConsoleOutput() {
 	fmt.Fprintf(os.Stderr, "diagnostic: %s", "example")
 	_, _ = fmt.Fprintln(os.Stdout, "result")
 	_, _ = fmt.Fprint(os.Stderr, "progress")
+}
+
+func GoodStringBuilderWrites() {
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "formatted: %s", "value")
+	_, _ = fmt.Fprint(&builder, " text")
+	_, _ = fmt.Fprintln(&builder, " line")
 }
 
 func BadNonConsoleFile(f *os.File) {

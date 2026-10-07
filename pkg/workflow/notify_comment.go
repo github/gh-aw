@@ -276,7 +276,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 	return append(steps, buildUsageArtifactPublishSteps(prefix, hasDetection, pinAction)...)
 }
 
-func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction func(string) string) []string {
+func buildUsageArtifactPublishSteps(prefix string, hasDetection bool, pinAction func(string) string) []string { //nolint:largefunc // Keeps the usage artifact's primary and retry uploads together.
 	usageArtifactName := prefix + "usage"
 	steps := buildUsageArtifactCollectionStep(hasDetection)
 	steps = append(steps, buildUsageActivityGenerationStep(pinAction)...)

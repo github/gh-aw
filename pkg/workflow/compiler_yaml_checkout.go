@@ -155,7 +155,7 @@ func (c *Compiler) generateImportCheckoutAndMergeSteps(yaml *strings.Builder, da
 
 	compilerYamlLog.Printf("Adding merge remote .github folder step")
 	yaml.WriteString("      - name: Merge remote .github folder\n")
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	yaml.WriteString("        env:\n")
 
 	// Set repository imports if present
@@ -205,12 +205,12 @@ func (c *Compiler) generateRepositoryImportCheckouts(yaml *strings.Builder, repo
 		checkoutPath := fmt.Sprintf(".github/aw/imports/%s-%s-%s", owner, repo, sanitizedRef)
 
 		// Generate the checkout step
-		yaml.WriteString(fmt.Sprintf("      - name: Checkout repository import %s/%s@%s\n", owner, repo, ref))
-		yaml.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")))
+		fmt.Fprintf(yaml, "      - name: Checkout repository import %s/%s@%s\n", owner, repo, ref)
+		fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("actions/checkout"))
 		yaml.WriteString("        with:\n")
-		yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
-		yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
-		yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+		fmt.Fprintf(yaml, "          repository: %s/%s\n", owner, repo)
+		fmt.Fprintf(yaml, "          ref: %s\n", ref)
+		fmt.Fprintf(yaml, "          path: %s\n", checkoutPath)
 		yaml.WriteString("          sparse-checkout: |\n")
 		yaml.WriteString("            .github/\n")
 		yaml.WriteString("          persist-credentials: false\n")
@@ -264,12 +264,12 @@ func (c *Compiler) generateLegacyAgentImportCheckout(yaml *strings.Builder, agen
 	checkoutPath := fmt.Sprintf("/tmp/gh-aw/repo-imports/%s-%s-%s", owner, repo, sanitizedRef)
 
 	// Generate the checkout step
-	yaml.WriteString(fmt.Sprintf("      - name: Checkout agent import %s/%s@%s\n", owner, repo, ref))
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")))
+	fmt.Fprintf(yaml, "      - name: Checkout agent import %s/%s@%s\n", owner, repo, ref)
+	fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("actions/checkout"))
 	yaml.WriteString("        with:\n")
-	yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
-	yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
-	yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+	fmt.Fprintf(yaml, "          repository: %s/%s\n", owner, repo)
+	fmt.Fprintf(yaml, "          ref: %s\n", ref)
+	fmt.Fprintf(yaml, "          path: %s\n", checkoutPath)
 	yaml.WriteString("          sparse-checkout: |\n")
 	yaml.WriteString("            .github/\n")
 	yaml.WriteString("          persist-credentials: false\n")
@@ -293,7 +293,7 @@ func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
 
 	// Step 1: Setup Go for building the CLI
 	yaml.WriteString("      - name: Setup Go for CLI build\n")
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("actions/setup-go")))
+	fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("actions/setup-go"))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          go-version-file: go.mod\n")
 	yaml.WriteString("          cache: true\n")
@@ -317,12 +317,12 @@ func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
 
 	// Step 3: Setup Docker Buildx
 	yaml.WriteString("      - name: Setup Docker Buildx\n")
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("docker/setup-buildx-action")))
+	fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("docker/setup-buildx-action"))
 
 	// Step 4: Build Docker image
 	// Use the Dockerfile at the repository root which expects BINARY build arg
 	yaml.WriteString("      - name: Build gh-aw Docker image\n")
-	yaml.WriteString(fmt.Sprintf("        uses: %s\n", getActionPin("docker/build-push-action")))
+	fmt.Fprintf(yaml, "        uses: %s\n", getActionPin("docker/build-push-action"))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          context: .\n")
 	yaml.WriteString("          platforms: linux/amd64\n")

@@ -122,11 +122,29 @@ func checkUncheckedFprintAssign(pass *analysis.Pass, assign *ast.AssignStmt, noL
 
 func reportUncheckedFprint(pass *analysis.Pass, call *ast.CallExpr, funcName string, noLintIndex nolint.DirectiveIndex) {
 	position := pass.Fset.PositionFor(call.Pos(), false)
-	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") || isConsoleOutput(pass, call) {
+	if nolint.HasDirectiveForLinter(position, noLintIndex, "fprintferrorunchecked") ||
+		isConsoleOutput(pass, call) ||
+		writesToStringBuilder(pass, call) {
 		return
 	}
 	pkgLog.Printf("flagging unchecked fmt.%s() error at %s:%d", funcName, position.Filename, position.Line)
 	pass.ReportRangef(call, "error return from fmt.%s() is not checked; write failures may be silently ignored", funcName)
+}
+
+func writesToStringBuilder(pass *analysis.Pass, call *ast.CallExpr) bool {
+	if len(call.Args) == 0 {
+		return false
+	}
+	writerType := types.Unalias(pass.TypesInfo.TypeOf(call.Args[0])) //nolint:uncheckedsliceindex // len(call.Args) is checked above.
+	writerPointer, ok := writerType.(*types.Pointer)
+	if !ok {
+		return false
+	}
+	builderType, ok := types.Unalias(writerPointer.Elem()).(*types.Named)
+	if !ok || builderType.Obj().Pkg() == nil {
+		return false
+	}
+	return builderType.Obj().Pkg().Path() == "strings" && builderType.Obj().Name() == "Builder"
 }
 
 // Console writes are best-effort diagnostics; unlike file or network writes,
