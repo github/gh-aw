@@ -82,6 +82,17 @@ func (c *Compiler) SetForceStaged(force bool) {
 	c.forceStaged = force
 }
 
+// SetDryRun stages safe outputs and disables compiler-managed GitHub mutations.
+func (c *Compiler) SetDryRun(enabled bool) {
+	c.dryRun = enabled
+}
+
+// SetEnvironmentOverride replaces the environment on every generated job.
+// An empty name disables the override.
+func (c *Compiler) SetEnvironmentOverride(name string) {
+	c.environmentOverride = name
+}
+
 // SetFileTracker sets the file tracker for tracking created files
 func (c *Compiler) SetFileTracker(tracker FileCreationTracker) {
 	c.fileTracker = tracker

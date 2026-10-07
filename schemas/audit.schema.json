@@ -635,10 +635,14 @@
             },
             "repository": {
               "type": "string"
+            },
+            "dry_run": {
+              "type": "boolean"
             }
           },
           "required": [
-            "engine_id"
+            "engine_id",
+            "dry_run"
           ],
           "additionalProperties": false
         },

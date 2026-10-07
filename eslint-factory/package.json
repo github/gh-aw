@@ -12,6 +12,9 @@
     "lint:setup-js:changed": "npm run build && cd ../actions/setup/js && \"$INIT_CWD\"/node_modules/.bin/eslint --config \"$INIT_CWD\"/eslint.config.cjs '*.cjs'",
     "test": "vitest run"
   },
+  "overrides": {
+    "source-map-js": "1.2.1"
+  },
   "devDependencies": {
     "@types/eslint": "^9.6.1",
     "@types/node": "^24.0.13",

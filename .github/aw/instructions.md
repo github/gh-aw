@@ -8,7 +8,8 @@ This optional file defines repository-local workflow authoring standards for ins
 
 ## Scope
 
-These rules apply when creating, editing, reviewing, and upgrading agentic workflow files.
+These rules apply when creating, editing, reviewing, diagnosing, patching,
+actively debugging, and upgrading agentic workflows.
 
 ## Precedence
 
@@ -20,6 +21,7 @@ If a rule conflicts, this repository overlay takes precedence.
 Add your repository-specific standards here, for example:
 
 - **CRITICAL INVARIANT:** After **any** modification to agentic workflow markdown files (`.github/workflows/*.md`), you **must** run a one-shot `gh aw compile` before stopping. Agents must not use `--watch`, because watch mode does not terminate automatically.
+- For diagnosis, patching, or active debugging, follow [debug-agentic-workflow.md](debug-agentic-workflow.md) for mode selection, evidence triage and live gates; log/audit references do not authorize live runs.
 - Required shared include(s) for new workflows
 - Standard frontmatter defaults
 - Frontmatter ordering/style conventions

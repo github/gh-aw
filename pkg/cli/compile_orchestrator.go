@@ -19,7 +19,7 @@ var compileUpdateContainerPins = updateContainerPins
 
 // CompileWorkflows compiles workflows based on the provided configuration
 func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.WorkflowData, error) { //nolint:largefunc // Existing compilation lifecycle remains centralized.
-	config = applyWorkspaceStrictMode(config)
+	config = applyWorkspaceStrictMode(applyDevelopmentCompileMode(config))
 	compileOrchestratorLog.Printf("Starting workflow compilation: files=%d, validate=%v, watch=%v, noEmit=%v",
 		len(config.MarkdownFiles), config.Validate, config.Watch, config.NoEmit)
 
@@ -29,6 +29,10 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
 		return nil, ctx.Err()
 	default:
+	}
+
+	if err := validateCompileConfig(config); err != nil {
+		return nil, err
 	}
 
 	if config.Watch && IsRunningInCI() {
@@ -44,9 +48,8 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 		}
 	}
 
-	// Validate configuration
-	if err := validateCompileConfig(config); err != nil {
-		return nil, err
+	if config.Models && config.activeModels == nil {
+		PrepareCompileModelValidation(ctx, &config)
 	}
 
 	// Validate action mode if specified

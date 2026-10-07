@@ -278,6 +278,9 @@ func (c *Compiler) buildCallWorkflowJobs(data *WorkflowData, markdownPath string
 			Uses:  workflowPath,
 			With:  with,
 		}
+		if c.dryRun {
+			callJob.If = "false"
+		}
 
 		// Infer the minimal set of secrets required by the worker workflow so we can
 		// pass them explicitly instead of using secrets: inherit. This requires the

@@ -345,7 +345,37 @@ func TestBuildAgenticWorkflowsSkillContent(t *testing.T) {
 		t.Fatalf("expected generated skill content to avoid agent cross-references:\n%s", content)
 	}
 	assert.Contains(t, content, "Design workflows from scratch via interview: `.github/aw/designer.md`")
+	assert.Contains(t, content, "Diagnose, patch, audit, or actively debug workflows: `.github/aw/debug-agentic-workflow.md`")
+	assert.NotContains(t, content, "local-debug.md")
+	assert.NotContains(t, content, "Debug, audit, or investigate workflows: `.github/aw/debug-agentic-workflow.md`")
 	assert.Contains(t, content, agenticWorkflowsOTELSkillParagraph)
+}
+
+func TestUnifiedDebuggingInstructions(t *testing.T) {
+	t.Parallel()
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to locate test file")
+	awDir := filepath.Join(filepath.Dir(file), "..", "..", ".github", "aw")
+	content, err := os.ReadFile(filepath.Join(awDir, "debug-agentic-workflow.md"))
+	require.NoError(t, err)
+	for _, section := range []string{
+		"## Choose the Mode",
+		"## Strategy",
+		"## Live Debug Loop",
+		"## 403 and Codespaces Credential Triage",
+		"## Development Compilation",
+		"## Collect Existing Evidence",
+		"## Identify the First Failing Boundary",
+		"## Fix and Report",
+	} {
+		assert.Contains(t, string(content), section)
+	}
+	assert.Contains(t, string(content), "gh aw mcp inspect WORKFLOW --server NAME")
+	assert.Contains(t, string(content), "gh aw audit RUN_ID RUN_ID_2 RUN_ID_3 --group --json")
+	assert.Contains(t, string(content), "Explicit no-dispatch rules")
+	assert.Contains(t, string(content), "No automatic dispatch retries")
+	_, err = os.Stat(filepath.Join(awDir, "local-debug.md"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestBuildAgenticWorkflowsSkillContentEnsuresOTELParagraph(t *testing.T) {
@@ -389,6 +419,8 @@ func TestBuildAgenticWorkflowsSkillContentFallsBackToEmbeddedFileList(t *testing
 	assert.NotContains(t, content, agenticWorkflowsSkillFileListPlaceholder, "expected generated skill content to replace the file-list placeholder")
 	assert.Contains(t, content, "- `.github/aw/create-agentic-workflow.md`\n", "expected embedded fallback markdown file list to be used")
 	assert.Contains(t, content, "- `.github/aw/designer.md`\n", "expected generated skill content to include designer instruction file")
+	assert.Contains(t, content, "- `.github/aw/debug-agentic-workflow.md`\n", "expected unified debugging to remain discoverable without remote access")
+	assert.NotContains(t, content, "local-debug.md")
 }
 
 func TestCheckedInAgenticWorkflowsSkillMatchesGeneratedContent(t *testing.T) {

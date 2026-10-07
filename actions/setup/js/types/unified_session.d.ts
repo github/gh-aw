@@ -193,6 +193,7 @@ export interface WorkflowInfoData {
   mcpgVersion?: JsonValue;
   requestedModel?: JsonValue;
   triggerType?: JsonValue;
+  dryRun?: JsonValue;
   workflow?: JsonValue;
   repository?: JsonValue;
   runId?: JsonValue;

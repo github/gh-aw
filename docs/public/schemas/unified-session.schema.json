@@ -485,6 +485,7 @@
         "mcpgVersion": { "$ref": "#/definitions/JsonValue" },
         "requestedModel": { "$ref": "#/definitions/JsonValue" },
         "triggerType": { "$ref": "#/definitions/JsonValue" },
+        "dryRun": { "$ref": "#/definitions/JsonValue" },
         "workflow": { "$ref": "#/definitions/JsonValue" },
         "repository": { "$ref": "#/definitions/JsonValue" },
         "runId": { "$ref": "#/definitions/JsonValue" }

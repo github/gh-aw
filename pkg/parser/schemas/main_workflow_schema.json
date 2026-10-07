@@ -3883,6 +3883,10 @@
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "API proxy sidecar image that holds provider credentials."
                         },
+                        "router": {
+                          "$ref": "#/$defs/awf_pinned_image",
+                          "description": "Model router sidecar image used by engine.model-routing."
+                        },
                         "cli-proxy": {
                           "$ref": "#/$defs/awf_pinned_image",
                           "description": "CLI proxy sidecar image used by tools.github.mode: gh-proxy, integrity-reactions, or raw --difc-proxy-host AWF arguments."

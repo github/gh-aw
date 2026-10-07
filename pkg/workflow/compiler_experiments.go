@@ -616,14 +616,16 @@ func (c *Compiler) generateExperimentCacheSteps(data *WorkflowData, experimentNa
 	steps = append(steps, c.generatePickExperimentStep(data, experimentNames)...)
 
 	// ── Step 3: Save experiment cache ─────────────────────────────────────────
-	steps = append(steps,
-		"      - name: Save experiment state\n",
-		"        if: always()\n",
-		fmt.Sprintf("        uses: %s\n", getActionPin("actions/cache/save")),
-		"        with:\n",
-		fmt.Sprintf("          key: %s\n", cacheKey),
-		fmt.Sprintf("          path: %s\n", experimentsCacheDir),
-	)
+	if !data.DryRun {
+		steps = append(steps,
+			"      - name: Save experiment state\n",
+			"        if: always()\n",
+			fmt.Sprintf("        uses: %s\n", getActionPin("actions/cache/save")),
+			"        with:\n",
+			fmt.Sprintf("          key: %s\n", cacheKey),
+			fmt.Sprintf("          path: %s\n", experimentsCacheDir),
+		)
+	}
 
 	steps = append(steps, c.generateExperimentArtifactUploadStep(data, sanitizedID)...)
 	return steps

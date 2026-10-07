@@ -30,6 +30,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		notifyCommentLog.Printf("Skipping job: no safe-outputs configured")
 		return nil, nil // No safe-outputs configured, no need for conclusion job
 	}
+	data = c.dryRunConclusionData(data)
 	steps, err := c.buildConclusionJobSteps(data, mainJobName, safeOutputJobNames)
 	if err != nil {
 		return nil, err

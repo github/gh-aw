@@ -1874,6 +1874,25 @@ func TestMainWorkflowSchema_CreateDiscussionRequiredCategoryAllowed(t *testing.T
 	}
 }
 
+func TestMainWorkflowSchema_SandboxAgentRouterImageAllowed(t *testing.T) {
+	t.Parallel()
+
+	frontmatter := map[string]any{
+		"on": "daily",
+		"sandbox": map[string]any{
+			"agent": map[string]any{
+				"images": map[string]any{
+					"router": "registry.example.com/approved/router:v0.1.3@sha256:" + strings.Repeat("a", 64),
+				},
+			},
+		},
+	}
+
+	if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
+		t.Fatalf("expected sandbox.agent.images.router to pass schema validation, got: %v", err)
+	}
+}
+
 func TestMainWorkflowSchema_BodyFootersAllowed(t *testing.T) {
 	t.Parallel()
 

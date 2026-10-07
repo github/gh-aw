@@ -52,8 +52,10 @@ Compile workflow `.md` files into GitHub Actions `.lock.yml` files.
 ```bash
 gh aw compile                     # Compile all workflows
 gh aw compile <workflow-name>     # Compile a specific workflow
+gh aw compile <workflow-name> --dry-run  # Strict/staged debugging checks; warnings are errors
+gh aw compile <workflow-name> --dry-run --environment gh-aw-debug  # Optional all-job environment override
 gh aw compile --strict            # Compile with strict mode validation
-gh aw compile --validate          # Validate without emitting lock files
+gh aw compile --validate          # Enable workflow, image, and action SHA validation
 gh aw compile --fail-fast         # Stop at first error
 gh aw compile --purge             # Remove orphaned .lock.yml files
 gh aw compile --approve           # Approve new secrets / action changes
@@ -66,9 +68,25 @@ gh aw compile --approve           # Approve new secrets / action changes
 ### `gh aw run`
 
 > [!IMPORTANT]
-> **Always prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution by short name, validates inputs, and enables correct run-tracking with `gh aw audit` and `gh aw logs`.
+> **When dispatch is permitted and human-validated, prefer `gh aw run` over `gh workflow run <file>.lock.yml`** — it handles workflow resolution, input validation, and run-tracking. This preference grants no authorization.
 
 Trigger a workflow on demand using `workflow_dispatch`.
+
+For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md):
+respect explicit no-dispatch contexts, and handle `403 Forbidden` from a
+permitted run attempt by stopping live debugging and returning to diagnosis/
+patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation
+profile, not run access or authorization; each live-test revision requires
+human validation.
+
+Follow the shared live-outcome table for unknown dispatch results, moved refs,
+run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching
+run-count budget; examples below do not grant approval.
+
+Codespaces may still return SAML-related 403 responses. Check the active token
+source and SSO authorization using the shared credential triage; environment
+tokens override stored CLI credentials. Do not automatically replace tokens or
+retry a denied run.
 
 ```bash
 gh aw run                           # Interactive mode — pick workflow and fill inputs
@@ -79,7 +97,8 @@ gh aw run <workflow-name> --repeat 3              # Run 4 times total (1 + 3 rep
 gh aw run <workflow-name> --raw-field key=value   # Pass a specific input
 ```
 
-**MCP equivalent**: Not available. Fallback: use the GitHub MCP server's `create_workflow_dispatch` with `workflow_id: <workflow-name>.lock.yml`.
+**MCP equivalent**: Not available. Copilot cloud agents must not substitute an
+API/MCP dispatch or request manual dispatch as a workaround.
 
 ---
 
@@ -114,7 +133,14 @@ gh aw audit <run-id> --json         # JSON output
 gh aw audit <base-id> <compare-id>  # Diff two runs (regression detection)
 gh aw audit <id1> <id2> <id3> --json  # Multi-run diff
 gh aw audit <id1> <id2> --group     # Grouped findings: one entry per [run, code] with occurrence counts
+gh aw audit <id1> <id2> <id3> --group --json  # Per-run finding codes for recurrence checks
 ```
+
+Plain multi-run diffs focus on metrics/firewall/tools. For recurring errors, use
+grouped findings and cached individual reports/logs to compare first failing boundaries and normalized
+error/tool/status signatures across comparable runs. Count each run once,
+report matching/inspectable runs and IDs, and account for workflow/revision/configuration
+differences. Missing evidence is unknown, not proof that the error disappeared.
 
 **MCP equivalent**: `audit` tool (single run) / `audit-diff` tool (multi-run comparison)
 
@@ -313,7 +339,7 @@ gh aw json-schema logs-jsonl
 |---|---|
 | `gh aw status` | `status` |
 | `gh aw compile` | `compile` |
-| `gh aw run` | *(use GitHub MCP `create_workflow_dispatch`)* |
+| `gh aw run` | Not provided; no API/MCP/manual-dispatch substitution |
 | `gh aw logs` | `logs` |
 | `gh aw audit` | `audit` |
 | `gh aw audit <id1> <id2>` | `audit-diff` |

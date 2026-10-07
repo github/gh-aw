@@ -1,12 +1,19 @@
 ---
 name: debugging-workflows
-description: Debug gh-aw workflows using run logs, audits, and failure triage.
+description: Diagnose gh-aw failures using logs and audits; follow the shared strategy for patches and permitted active debug loops.
 ---
 
 
-# Debugging GitHub Agentic Workflows
+# Workflow Diagnosis and Debugging Evidence
 
-Use this guide to debug GitHub Agentic Workflows: download and analyze logs, audit runs, and trace workflow behavior.
+Use this reference to diagnose workflows: download/analyze existing logs, audit
+runs, and trace failures. These reads are not an active debug loop.
+
+Follow the [shared local-first strategy](../../aw/debug-agentic-workflow.md) for all
+reproduction, fixes, uploads, and live tests. This page is an evidence and CLI
+reference, not a separate execution policy. Respect explicit no-dispatch contexts.
+Apply its live-outcome table, credential triage and untrusted-evidence rules.
+Without accessible existing logs, use source/fixtures; never dispatch for evidence.
 
 ## Table of Contents
 
@@ -24,7 +31,7 @@ Use this guide to debug GitHub Agentic Workflows: download and analyze logs, aud
 
 ```bash
 # Download logs from the last 24 hours
-gh aw logs --start-date -1d -o /tmp/workflow-logs
+gh aw logs --start-date -1d -o .github/aw/logs/recent
 
 # Download logs for a specific workflow
 gh aw logs weekly-research --start-date -1d
@@ -60,7 +67,7 @@ gh aw logs
 gh aw logs <workflow-name>
 
 # Download with custom output directory
-gh aw logs -o ./my-logs
+gh aw logs -o .github/aw/logs/custom
 ```
 
 ### Filter Options
@@ -125,10 +132,10 @@ When you run `gh aw logs`, the following artifacts are downloaded for each run:
 
 ```bash
 # Download failed runs from last week
-gh aw logs --start-date -1w -o /tmp/debug-logs
+gh aw logs --start-date -1w -o .github/aw/logs/debug
 
 # Check the summary for patterns
-cat /tmp/debug-logs/summary.json | jq '.runs[] | select(.conclusion == "failure")'
+cat .github/aw/logs/debug/summary.json | jq '.runs[] | select(.conclusion == "failure")'
 ```
 
 ## Auditing Specific Runs
@@ -167,6 +174,21 @@ gh aw audit 1234567890 --parse
 gh aw audit 1234567890 -v
 ```
 
+### Check Whether an Error Recurs
+
+```bash
+# Compare existing runs, without dispatching new ones
+gh aw audit 1234567890 1234567891 1234567892 --group --json
+```
+
+Use grouped per-run finding codes/counts, then cached individual reports/logs
+for exact signatures. Plain multi-run diffs focus on metrics/firewall/tools;
+absent findings or skipped runs do not prove the error disappeared.
+Match the first failing boundary and normalized error/tool/status signature
+across comparable workflows, revisions, triggers/inputs and configurations. Count each
+matching run once, report matching/inspectable runs and IDs, and keep missing
+evidence unknown. Repeated HTTP 403 alone does not establish one root cause.
+
 ### Audit Report Contents
 
 The audit command provides:
@@ -185,8 +207,8 @@ gh aw audit 1234567890 --json > audit.json
 
 # Extract key information
 cat audit.json | jq '{
-  status: .status,
-  conclusion: .conclusion,
+  status: .overview.status,
+  conclusion: .overview.conclusion,
   errors: .errors,
   missing_tools: .missing_tools,
   tool_usage: .tool_usage
@@ -207,7 +229,7 @@ on:
   issues:
     types: [opened]
 permissions:
-  issues: write
+  contents: read
 timeout-minutes: 10
 engine: copilot
 tools:
@@ -215,6 +237,7 @@ tools:
     mode: remote
     toolsets: [default]
 safe-outputs:
+  staged: true
   create-issue:
     labels: [ai-generated]
 ---
@@ -297,13 +320,17 @@ tools:
 - HTTP 403 (Forbidden) errors
 - "Resource not accessible" errors
 
-**Solution**: Add required permissions:
+**Solution**: First distinguish SAML/token-source denial from missing permissions
+using the shared credential triage. Grant required read permissions to the agent and configure writes
+through safe outputs. Keep debugging outputs staged; inspect individual job/token
+permissions rather than adding write permissions to the agent:
 
 ```yaml
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
+safe-outputs:
+  staged: true
+  create-issue: {}
 ```
 
 ### Safe-Input Errors
@@ -334,7 +361,7 @@ mcp-scripts:
 
 ```yaml
 safe-outputs:
-  staged: false  # Set to false to actually create resources
+  staged: true  # Preview safe outputs while debugging
   create-issue:
     labels: [ai-generated]
 ```
@@ -405,22 +432,17 @@ timeout-minutes: 30  # Increase from default
 
 ### Polling In-Progress Runs
 
-When a run is still executing:
-
-```bash
-# Poll until completion
-while true; do
-  output=$(gh aw audit <run-id> --json 2>&1)
-  if echo "$output" | grep -q '"status":.*"\(completed\|failure\|cancelled\)"'; then
-    echo "$output"
-    break
-  fi
-  echo "⏳ Run still in progress. Waiting 45 seconds..."
-  sleep 45
-done
-```
+Classify command exit separately from workflow outcome. A nonzero audit exit may
+mean artifacts are not ready: confirm the same run with
+`gh run view <run-id> --json status,headSha,conclusion`, then poll within the
+approved interval/deadline. Audit/log permission denial blocks further live
+iteration; report evidence unavailable, not workflow failure. Follow the shared
+outcome table for dispatch timeouts and SHA mismatches; never redispatch for logs.
 
 ### Inspecting MCP Configuration
+
+Preflight declarations, startup effects and isolated test bindings using the
+shared strategy before commands that can start/connect servers.
 
 ```bash
 # Inspect MCP servers for a workflow
@@ -462,17 +484,14 @@ gh aw logs --parse
 gh aw logs --firewall
 ```
 
-### Debug Mode Compilation
+### Diagnostic and Development Compilation
 
 ```bash
-# Compile with verbose output
-gh aw compile --verbose
+# Strict/staged development compilation with checks and warnings as errors
+gh aw compile <workflow> --dry-run
 
-# Compile with strict security checks
-gh aw compile --strict
-
-# Run security scanners
-gh aw compile --actionlint --zizmor --poutine
+# Recommended when using a reviewed test environment
+gh aw compile <workflow> --dry-run --environment gh-aw-debug
 ```
 
 ## Reference Commands
@@ -496,6 +515,7 @@ gh aw compile --actionlint --zizmor --poutine
 | `gh aw audit <url>` | Audit from GitHub URL |
 | `gh aw audit <run-id> --json` | Output as JSON |
 | `gh aw audit <run-id> --parse` | Parse logs to Markdown |
+| `gh aw audit <id1> <id2> ... --group --json` | Group existing-run findings for recurrence |
 
 ### MCP Commands
 
@@ -511,15 +531,14 @@ gh aw compile --actionlint --zizmor --poutine
 | `gh aw status` | Show all workflow status |
 | `gh aw compile` | Compile all workflows |
 | `gh aw compile <workflow>` | Compile specific workflow |
-| `gh aw compile --strict` | Compile with security checks |
+| `gh aw compile <workflow> --dry-run` | Enforce shared development-testing checks |
 
-### Workflow Execution Commands
+### Active Debugging Commands (Permitted Contexts Only)
 
 | Command | Description |
 |---------|-------------|
-| `gh aw run <workflow>` | Trigger workflow manually |
-| `gh workflow run <name>.lock.yml` | Alternative trigger method |
-| `gh run watch <run-id>` | Monitor running workflow |
+| `gh aw run <workflow> --ref <reviewed-ref>` | Only after shared human-validation gates; explicit no-dispatch rules take precedence |
+| `gh run view <run-id> --json status,headSha,conclusion` | Same-run monitoring within approved bounds |
 
 ## Additional Resources
 

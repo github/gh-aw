@@ -227,6 +227,8 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 | `gh aw compile my-workflow` | Compile specific workflow |
 | `gh aw compile --verbose` | Enable verbose output |
 | `gh aw compile --strict` | Enhanced security validation |
+| `gh aw compile my-workflow --dry-run` | Compile for development testing with staging, all analysis tools, and warnings as errors |
+| `gh aw compile my-workflow --environment gh-aw-debug` | Replace the environment on every generated job |
 | `gh aw compile --no-emit` | Validate without generating files |
 | `gh aw compile --actionlint --zizmor --poutine --grant` | Run security scanners |
 | `gh aw compile --actionlint --zizmor --poutine --yamllint` | Run security scanners |
@@ -245,6 +247,63 @@ Pre-activation runs gating checks sequentially before any AI execution. Any fail
 
 > [!NOTE]
 > The `--actions-repo` flag overrides the default `github/gh-aw-actions` repository used when `--action-mode action` is set. Use it together with `--action-tag` to compile against a branch or fork during development.
+
+### Development Testing Mode
+
+`--dry-run` enables `--strict`, `--staged`, `--validate`, `--validate-images`,
+`--actionlint`, `--zizmor`, `--poutine`, `--runner-guard`, `--syft`, `--grype`,
+`--grant`, `--yamllint`, `--shellcheck`, and `--models`. These settings are
+forced regardless of frontmatter; explicitly disabling a required flag is rejected. Compiler warnings,
+including safe-update warnings, and scanner failures cause a nonzero exit status
+and invalid JSON validation results. Missing required tools block compilation
+rather than silently skipping checks. Model checking uses the observed active
+model inventory; development compilation fails if that inventory is unavailable
+and the workflow declares `models` policies or `engine.models`. It does not prove
+live model availability.
+
+```bash
+gh aw compile my-workflow --dry-run --environment gh-aw-debug
+```
+
+The optional `--environment NAME` replaces every job's environment in compiled
+`.lock.yml` files, including
+existing name/URL objects, manual-approval environments, custom jobs, and framework
+jobs. It accepts a literal, non-blank name of at most 255 characters. Expressions
+and control characters are rejected. GitHub Actions does not allow an environment
+on reusable-workflow caller jobs, so compilation fails if such a job is present
+instead of silently leaving it outside the override. Configure the environment in
+the called workflow and compile the caller without the override when using
+reusable workflows.
+
+A protected test environment with rotated, restricted development credentials
+is recommended, not required. Replacing an approval environment also replaces
+its protection rules: configure and review the test environment's protections.
+Authorized repository, organization, and enterprise-provided shared secrets
+remain in the job's applicable secret scope; an environment name is not secret
+isolation and does not automatically export secrets into process environment
+variables.
+
+Dry-run mode stages safe outputs and disables compiler-managed GitHub mutations:
+push jobs, memory/cache persistence, reusable safe-output calls, work-queue
+operations, reactions, status/failure comments and issues, label removal, and
+issue locking. `aw_info.json` records the boolean `dry_run` flag. Failure handling,
+local diagnostics, step summaries, and run artifacts remain enabled. No new
+memory-tool fields are required; ordinary compilation preserves persistence.
+
+Custom scripts/jobs, agent shell commands, external MCP servers, and custom
+credentials remain unverified and are explicitly reported at runtime. Dry-run is
+not an execution sandbox or a guarantee that those extensions cannot mutate GitHub.
+
+`--dry-run` cannot be combined with `--no-emit`, `--watch`, `--approve`, or
+`--allow-action-refs`, because those options bypass required checks or the trusted
+safe-update baseline. It is distinct from `--action-mode dev`, does not change
+action reference mode, and does not upload, push, dispatch, or run workflows.
+Generated files remain available for inspection after failed checks and must not
+be treated as approved artifacts.
+
+For diagnosis/patching versus active debugging, live-test review gates, and
+Codespaces/SAML triage, follow the
+[shared local-debugging strategy](https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md).
 
 ## Debugging Compilation
 
