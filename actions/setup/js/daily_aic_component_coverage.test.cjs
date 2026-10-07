@@ -424,6 +424,16 @@ it("maps the Evaluations display name and job_id to their components", async () 
   await expect(g.result).resolves.toBeCloseTo(4);
 });
 
+it("prefers the agent job_id over a conflicting billable display name", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":4}' }, [job("Detection", { id: 1, job_id: "agent" })]);
+  await expect(f.result).resolves.toBe(4);
+});
+
+it.each(["detection", "evals"])("prefers the %s job_id over the Agent display name", async component => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":1}', [`${component}/token_usage.jsonl`]: '{"aic":2}' }, [job("Agent", { id: 1 }), job("Agent", { id: 2, job_id: component })]);
+  await expect(f.result).resolves.toBe(3);
+});
+
 it("requires accounting for executed jobs with generated display names", async () => {
   const f = evaluate({}, [job("Agent")]);
   await expect(f.result).rejects.toThrow("Missing accounting for executed agent component");
