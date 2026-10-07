@@ -952,7 +952,7 @@ func TestApplyActionPinsToTypedSteps(t *testing.T) {
 	}
 }
 
-// TestGetActionPinWithData_V7Fallback verifies v7 fallback preserves source annotation.
+// TestGetActionPinWithData_V7Fallback verifies fallback uses the resolved version.
 func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 	data := &WorkflowData{
 		StrictMode: false,
@@ -970,9 +970,8 @@ func TestGetActionPinWithData_V7Fallback(t *testing.T) {
 
 	t.Logf("Result: %s", result)
 
-	// Should include resolved + source format for fallback.
-	if !strings.Contains(result, "# v7.0.1 (source v7)") {
-		t.Errorf("Expected resolved/source comment format in result, got: %s", result)
+	if !strings.HasSuffix(result, "# v7.0.1") {
+		t.Errorf("Expected single resolved version comment in result, got: %s", result)
 	}
 
 	// Check the SHA matches v7 (resolves to v7.0.1 pin)
@@ -1061,9 +1060,9 @@ func TestGetActionPinWithData_ExactVersionResolution(t *testing.T) {
 	}
 }
 
-// TestFallbackVersionUsesRequestedVersionInComment tests that fallback comments
-// now record both resolved and source versions.
-func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
+// TestFallbackVersionUsesResolvedVersionInComment tests that fallback comments
+// use the version of the pinned SHA rather than a mismatched requested version.
+func TestFallbackVersionUsesResolvedVersionInComment(t *testing.T) {
 	tests := []struct {
 		name            string
 		repo            string
@@ -1072,17 +1071,17 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 		expectedSHA     string
 	}{
 		{
-			name:            "v8 falls back to v9 and comment records source v8",
+			name:            "v8 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v8",
-			expectedComment: "# v9 (source v8)",
+			expectedComment: "# v9",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 		{
-			name:            "v7 falls back to v9 and comment records source v7",
+			name:            "v7 falls back to v9 and comment records v9",
 			repo:            "actions/github-script",
 			requestedVer:    "v7",
-			expectedComment: "# v9 (source v7)",
+			expectedComment: "# v9",
 			expectedSHA:     "3a2844b7e9c422d3c10d287c895573f7108da1b3",
 		},
 	}
@@ -1098,7 +1097,7 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 				t.Fatalf("getActionPinWithData(%s, %s) returned error: %v", tt.repo, tt.requestedVer, err)
 			}
 
-			if !strings.Contains(result, tt.expectedComment) {
+			if !strings.HasSuffix(result, tt.expectedComment) {
 				t.Errorf("getActionPinWithData(%s, %s) = %s, expected comment to contain %s",
 					tt.repo, tt.requestedVer, result, tt.expectedComment)
 			}
@@ -1106,10 +1105,6 @@ func TestFallbackVersionUsesRequestedVersionInComment(t *testing.T) {
 			if !strings.Contains(result, tt.expectedSHA) {
 				t.Errorf("getActionPinWithData(%s, %s) = %s, expected SHA %s",
 					tt.repo, tt.requestedVer, result, tt.expectedSHA)
-			}
-
-			if tt.requestedVer == "v8" && !strings.Contains(result, "# v9 (source v8)") {
-				t.Errorf("Expected v8 fallback comment to record resolved version v9, got: %s", result)
 			}
 		})
 	}

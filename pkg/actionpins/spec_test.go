@@ -601,17 +601,17 @@ func TestSpec_PublicAPI_ResolveActionPin_EmbeddedMatch(t *testing.T) {
 }
 
 // TestSpec_DynamicResolution_VersionCommentConsistency validates that when dynamic resolution
-// succeeds and the returned SHA matches an embedded pin, the version comment includes both
-// the resolved version and the source version — consistent with the embedded-fallback path.
+// succeeds and the returned SHA matches an embedded pin, the comment contains
+// a single version tag matching the pinned SHA.
 func TestSpec_DynamicResolution_VersionCommentConsistency(t *testing.T) {
 	t.Parallel()
 	known := "actions/checkout"
 	latestPin, ok := actionpins.GetLatestActionPinByRepo(known)
 	require.True(t, ok, "prerequisite: known repo must be in embedded data")
 
-	t.Run("shows resolved version and source version when SHA matches embedded pin", func(t *testing.T) {
+	t.Run("shows resolved version when source tag does not match the resolved pin", func(t *testing.T) {
 		// Simulate dynamic resolution returning the same SHA as the embedded pin,
-		// but requested with a shorter version tag (e.g. "v4" instead of "v4.1.2").
+		// but requested with a different version tag.
 		sourceVersion := "v4"
 		ctx := &actionpins.PinContext{
 			Resolver: &testSHAResolver{sha: latestPin.SHA},
@@ -619,9 +619,20 @@ func TestSpec_DynamicResolution_VersionCommentConsistency(t *testing.T) {
 		}
 		result, err := actionpins.ResolveActionPin(known, sourceVersion, ctx)
 		require.NoError(t, err)
-		assert.Contains(t, result, latestPin.SHA, "result should contain the resolved SHA")
-		assert.Contains(t, result, latestPin.Version, "result should contain the resolved version")
-		assert.Contains(t, result, sourceVersion, "result should contain the source version")
+		assert.Equal(t, actionpins.FormatPinnedActionReference(known, latestPin.SHA, latestPin.Version), result)
+	})
+
+	t.Run("preserves exact source release tag when resolved pin uses major tag", func(t *testing.T) {
+		const repo = "actions/github-script"
+		pin, ok := actionpins.GetLatestActionPinByRepo(repo)
+		require.True(t, ok)
+		require.Equal(t, "v9", pin.Version)
+
+		result, err := actionpins.ResolveActionPin(repo, "v9.0.0", &actionpins.PinContext{
+			Resolver: &testSHAResolver{sha: pin.SHA},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, actionpins.FormatPinnedActionReference(repo, pin.SHA, "v9.0.0"), result)
 	})
 
 	t.Run("shows only source version when SHA is not in embedded pins", func(t *testing.T) {

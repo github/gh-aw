@@ -208,7 +208,7 @@ func resolveNonStrictHardcodedPin(actionRepo, version string, matchingPins []Act
 
 	actionPinsLog.Printf("Using version in non-strict mode: %s@%s (requested) → %s@%s (used)",
 		actionRepo, version, actionRepo, selectedPin.Version)
-	return formatPinnedActionWithResolution(actionRepo, selectedPin.SHA, version, selectedPin.Version)
+	return FormatPinnedActionReference(actionRepo, selectedPin.SHA, selectedPin.Version)
 }
 
 // ResolveLatestActionPin returns the pinned action reference for a given repository,

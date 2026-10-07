@@ -3,6 +3,8 @@ package actionpins
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/semverutil"
 )
 
 // getLatestActionPinReference returns the pinned reference for the latest version of the repo.
@@ -36,7 +38,10 @@ func formatPinnedActionWithResolution(repo, sha, sourceVersion, resolvedVersion 
 		return FormatPinnedActionReference(repo, sha, resolvedVersion)
 	}
 	actionPinsLog.Printf("Version resolved: source=%s resolved=%s for repo=%s", sourceVersion, resolvedVersion, repo)
-	return FormatPinnedActionReference(repo, sha, resolvedVersion+" (source "+sourceVersion+")")
+	if semverutil.IsActionVersionTag(sourceVersion) && strings.HasPrefix(sourceVersion, resolvedVersion+".") {
+		return FormatPinnedActionReference(repo, sha, sourceVersion)
+	}
+	return FormatPinnedActionReference(repo, sha, resolvedVersion)
 }
 
 // FormatCacheKey generates a cache key for action resolution.
