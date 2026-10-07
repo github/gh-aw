@@ -31,6 +31,7 @@ const { extractShellCommandFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
 const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { EMPTY_OUTPUT_CAUSES } = require("./empty_output_outcome.cjs");
+const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const fs = require("fs");
 const https = require("https");
 const os = require("os");
@@ -285,6 +286,7 @@ function parseHTMLCommentMetadata(body, markerKey) {
 function buildFailureMatchCategories(options) {
   const categories = [];
 
+  if (options.transportWedge) categories.push("transport_wedge");
   if (options.isTimedOut) categories.push("timed_out");
   if (options.hasAssignmentErrors) categories.push("assignment_errors");
   if (options.hasAssignCopilotFailures) categories.push("assign_copilot_failures");
@@ -331,11 +333,32 @@ function buildFailureMatchCategories(options) {
   return categories.sort();
 }
 
+function hasMCPTransportWedge(sessionContent) {
+  if (!sessionContent.includes('"transport_wedge"')) return false;
+  return sessionContent.split(/\r?\n/).some(line => {
+    try {
+      const event = JSON.parse(line);
+      return isAgentExecutionEvent(event) && event.data.categories.includes("transport_wedge");
+    } catch {
+      return false;
+    }
+  });
+}
+
+function getAgentStdioLogPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-stdio.log") : "/tmp/gh-aw/agent-stdio.log";
+}
+
+function getAgentSessionPath(agentOutputFile = process.env.GH_AW_AGENT_OUTPUT) {
+  return agentOutputFile ? path.join(path.dirname(agentOutputFile), "agent-session.jsonl") : "/tmp/gh-aw/agent-session.jsonl";
+}
+
 /**
  * Build a precise failure issue title for known failure classes.
  * Falls back to the generic failure title when no specific class matches.
  * @param {Object} options
  * @param {string} options.workflowName
+ * @param {boolean} [options.transportWedge]
  * @param {boolean} options.isTimedOut
  * @param {boolean} options.hasMissingSafeOutputs
  * @param {boolean} options.hasReportIncomplete
@@ -392,6 +415,7 @@ function buildFailureIssueTitle(options) {
     const agentName = sanitizeContent(options.copilotAgentNotFound, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH).replace(/\s+/g, " ").trim();
     return `[aw] ${workflowName} could not find configured Copilot agent "${agentName}"`;
   }
+  if (options.transportWedge) return `[aw] ${workflowName} stalled on an MCP tool call`;
   if (options.isTimedOut) return `[aw] ${workflowName} timed out`;
   if (options.hasToolDenialsExceeded) return `[aw] ${workflowName} exceeded tool denial limit`;
   if (options.hasCacheMissMisconfiguration) return `[aw] ${workflowName} has cache-memory miss misconfiguration`;
@@ -4276,10 +4300,19 @@ async function main() {
 
     // Sanitize workflow name for title
     const sanitizedWorkflowName = sanitizeContent(workflowName, { maxLength: 100 });
+    let transportWedge = false;
+    if (agentConclusion === "failure") {
+      try {
+        transportWedge = hasMCPTransportWedge(fs.readFileSync(getAgentSessionPath(), "utf8"));
+      } catch {
+        core.debug("Unified agent session unavailable for MCP watchdog classification");
+      }
+    }
     // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
     const emptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     const issueTitle = buildFailureIssueTitle({
       workflowName: sanitizedWorkflowName,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasMissingSafeOutputs,
@@ -4308,6 +4341,7 @@ async function main() {
     });
     const failureCategories = buildFailureMatchCategories({
       agentConclusion,
+      transportWedge,
       emptyOutputCause,
       isTimedOut,
       hasAssignmentErrors,
@@ -5019,6 +5053,9 @@ module.exports = {
   CASCADE_ROLLUP_TITLE,
   FAILURE_TITLE_PATTERN,
   buildFailureMatchCategories,
+  hasMCPTransportWedge,
+  getAgentStdioLogPath,
+  getAgentSessionPath,
   buildFailureIssueTitle,
   FAILURE_CATEGORIES_PATH,
 };

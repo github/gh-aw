@@ -6,6 +6,7 @@ on:
   schedule: weekly on wednesday around 12:00
 max-daily-ai-credits: 10000
 permissions:
+  actions: read
   contents: read
   issues: read
   pull-requests: read
@@ -39,6 +40,7 @@ network:
 tools:
   cli-proxy: true
   playwright:
+  agentic-workflows:
   bash:
     - "date *"
     - "echo *"
@@ -157,7 +159,7 @@ Extract code snippets from the blog page and validate them against the latest ag
    - Name files sequentially: `snippet-1.md`, `snippet-2.md`, etc.
    - Store the temporary directory path in a variable for cleanup
 
-4. **Validate All Snippets**: Use `gh aw compile` with the `--dir` flag to validate all snippets at once
+4. **Validate All Snippets**: Use the `agentic-workflows` MCP `compile` tool (preferred; the `gh aw` CLI may be unavailable in the sandbox) to validate the snippets. If the shell supports it, `gh aw compile` with the `--dir` flag validates all snippets at once
    ```bash
    gh aw compile --no-emit --validate --dir "$TEMP_DIR"
    ```

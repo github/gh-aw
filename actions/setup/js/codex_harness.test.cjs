@@ -18,6 +18,7 @@ const {
   isInvalidModelError,
   isUnsupportedModelToolsError,
   isInvalidRequestError,
+  extractInvalidRequestErrorCode,
   isReconnectExhaustedError,
   countPermissionDeniedIssues,
   hasNumerousPermissionDeniedIssues,
@@ -41,6 +42,8 @@ const {
   DEFAULT_CONTEXT_REBUILD_POLL_INTERVAL_MS,
   DEFAULT_CONTEXT_REBUILD_TERM_GRACE_MS,
   resolvePostResultWatchdogIdleTimeoutMs,
+  createMCPCallWatchdog,
+  resolveMCPServerToolTimeouts,
   DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS,
   MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS,
   MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS,
@@ -117,6 +120,61 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
 }
 
 describe("codex_harness.cjs", () => {
+  describe("MCP call watchdog", () => {
+    it("times out only an outstanding MCP call, not other output or completed calls", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(120_000, () => time);
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "1", name: "search_repositories" } }));
+      time = 119_999;
+      watchdog.observe(JSON.stringify({ type: "item.completed", item: { type: "agent_message", id: "other" } }));
+      expect(watchdog.expired()).toBe(false);
+      time = 120_000;
+      expect(watchdog.expired()).toBe(true);
+      watchdog.observe(JSON.stringify({ type: "item.completed", item: { type: "mcp_tool_call", id: "1" } }));
+      expect(watchdog.expired()).toBe(false);
+    });
+
+    it("clears failed calls and ignores malformed events", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(100, () => time);
+      watchdog.observe("{");
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "2" } }));
+      watchdog.observe(JSON.stringify({ type: "item.failed", item: { type: "mcp_tool_call", id: "2" } }));
+      time = 200;
+      expect(watchdog.expired()).toBe(false);
+    });
+
+    it("uses per-server timeouts after the global timeout override", () => {
+      const timeouts = resolveMCPServerToolTimeouts(
+        {
+          defaults: { mcp_servers: { github: { tool_timeout_sec: 60 }, search: { tool_timeout_sec: 30 } } },
+          overrides: { mcp_servers: { github: { tool_timeout_sec: 180 } } },
+        },
+        90
+      );
+      expect(timeouts).toEqual({ github: 180, search: 90 });
+
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(
+        item => timeouts[item.server] * 1000 + 60_000,
+        () => time
+      );
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "1", server: "github" } }));
+      time = 239_999;
+      expect(watchdog.expired()).toBe(false);
+      time = 240_000;
+      expect(watchdog.expiredTimeoutMs()).toBe(240_000);
+    });
+
+    it("clears an oversized completion from its bounded lifecycle prefix", () => {
+      let time = 0;
+      const watchdog = createMCPCallWatchdog(100, () => time);
+      watchdog.observe(JSON.stringify({ type: "item.started", item: { type: "mcp_tool_call", id: "large" } }));
+      time = 100;
+      watchdog.observePrefix('{"type":"item.com\\u0070leted","item":{"\\u0069d":"large","type":"mcp_tool_call","server":"github","result":"');
+      expect(watchdog.expired()).toBe(false);
+    });
+  });
   describe("native exec orchestration", () => {
     it("preserves a native argument-parse exit without retrying a deterministic startup error", () => {
       const { result, calls } = runHarnessFixture(`process.stderr.write("error: unexpected argument '--invalid' found\\n\\nUsage: codex exec [OPTIONS] [PROMPT]\\n");process.exit(2);`);
@@ -149,6 +207,46 @@ process.stdout.write(JSON.stringify({type:"turn.completed",usage:{input_tokens:1
       expect(calls[1].args).not.toContain("--last");
       expect(calls[1].stdin).toContain("Complete only unfinished work");
       expect(calls[1].stdin).not.toBe(calls[0].stdin);
+    });
+
+    it.each(["stdout", "stderr"])("stops after an invalid_request_body resume rejection on %s and reports the cause", stream => {
+      const id = "0199a213-81c0-7800-8aa1-bbab2a035a53";
+      const dir = makeHarnessTempDir("invalid-request-body-");
+      const safeOutputsPath = path.join(dir, "safe-outputs.jsonl");
+      const safeOutputsCLI = path.join(dir, "safeoutputs.cjs");
+      fs.writeFileSync(
+        safeOutputsCLI,
+        `#!${process.execPath}
+const fs = require("fs");
+const args = process.argv.slice(2);
+const item = { type: args[0] };
+for (let i = 1; i < args.length; i += 2) item[args[i].slice(2)] = args[i + 1];
+fs.appendFileSync(process.env.GH_AW_SAFE_OUTPUTS, JSON.stringify(item) + "\\n");
+`
+      );
+      fs.chmodSync(safeOutputsCLI, 0o700);
+      const { result, calls } = runHarnessFixture(
+        `
+process.stdout.write(JSON.stringify({type:"thread.started",thread_id:"${id}"})+"\\n");
+const resumed = process.argv.includes("resume");
+const message = resumed ? JSON.stringify({error:{message:"Invalid 'input[13].id': 'ctco_example'. Expected an ID that begins with 'fc'.",code:"invalid_request_body"}}) : "connection reset";
+process.${stream}.write(JSON.stringify({type:"turn.failed",error:{message}})+"\\n");
+process.exit(1);`,
+        { env: { GH_AW_HARNESS_MAX_RETRIES: "3", GH_AW_SAFE_OUTPUTS: safeOutputsPath, GH_AW_SAFEOUTPUTS_CLI: safeOutputsCLI } }
+      );
+      expect(result.status).toBe(1);
+      expect(calls).toHaveLength(2);
+      expect(calls[1].args).toEqual(["exec", "--json", "resume", id, "-"]);
+      expect(result.stderr).toContain("invalid_request_body (HTTP 400) — not retrying");
+      const items = fs
+        .readFileSync(safeOutputsPath, "utf8")
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ type: "report_incomplete", reason: "infrastructure_error" });
+      expect(items[0].details).toContain("request-body rejection (invalid_request_body)");
+      expect(items[0].details).toContain("not retrying");
     });
 
     it("does not select a session when ephemeral mode prevents persistence", () => {
@@ -785,11 +883,26 @@ env_key = "OPENAI_API_KEY"
       expect(isInvalidRequestError('{"type":"turn.failed","error":{"type":"invalid_request_error"}}')).toBe(true);
     });
 
+    it("extracts the invalid request error code", () => {
+      expect(extractInvalidRequestErrorCode('{"type":"turn.failed","error":{"type":"invalid_request_error"}}')).toBe("invalid_request_error");
+      expect(extractInvalidRequestErrorCode('{"type":"turn.failed","error":{"code":"invalid_request_body"}}')).toBe("invalid_request_body");
+      expect(extractInvalidRequestErrorCode('{"type":"item.completed","item":{"text":"invalid_request_body"}}')).toBeNull();
+    });
+
+    it("returns true for the observed nested invalid_request_body item-ID rejection", () => {
+      const output = String.raw`{"type":"turn.failed","error":{"message":"{\"error\":{\"message\":\"Invalid 'input[13].id': 'ctco_example'. Expected an ID that begins with 'fc'.\",\"code\":\"invalid_request_body\"}}\n"}}`;
+      expect(isInvalidRequestError(output)).toBe(true);
+      expect(isInvalidRequestError('{"type":"turn.failed","error":{"code":"invalid_request_body"}}')).toBe(true);
+    });
+
     it("returns false for unrelated errors and tool transcript content", () => {
       expect(isInvalidRequestError("rate_limit_exceeded")).toBe(false);
       expect(isInvalidRequestError("500 Internal Server Error")).toBe(false);
       expect(isInvalidRequestError("GitHub API responded with 400 Bad Request")).toBe(false);
       expect(isInvalidRequestError('{"type":"item.completed","item":{"type":"tool_call_output","output":"invalid_request_error"}}')).toBe(false);
+      expect(isInvalidRequestError('{"type":"item.completed","item":{"type":"agent_message","text":"invalid_request_body"}}')).toBe(false);
+      expect(isInvalidRequestError('{"type":"item.completed","item":{"type":"tool_call_output","output":"invalid_request_body"}}')).toBe(false);
+      expect(isInvalidRequestError("invalid_request_body")).toBe(false);
       expect(isInvalidRequestError("")).toBe(false);
     });
   });
