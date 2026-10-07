@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/gitutil"
@@ -54,14 +53,7 @@ func ResolveActionPin(actionRepo, version string, ctx *PinContext) (result strin
 	if !exactMapped {
 		defer func() { result = applyActionPinPrefix(originalRepo, result, ctx) }()
 	} else if ctx.MarkExactMappings {
-		defer func() {
-			if result != "" {
-				if !strings.Contains(result, " # ") {
-					result += " #"
-				}
-				result += " [gh-aw-exact-pin]"
-			}
-		}()
+		defer func() { result = markExactActionPinMapping(result) }()
 	}
 	actionRepo, version = applyActionPinMapping(actionRepo, version, ctx)
 	mapped := actionRepo != originalRepo || version != originalVersion

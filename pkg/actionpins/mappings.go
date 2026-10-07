@@ -8,6 +8,16 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 )
 
+func markExactActionPinMapping(reference string) string {
+	if reference == "" {
+		return reference
+	}
+	if !strings.Contains(reference, " # ") {
+		reference += " #"
+	}
+	return reference + " [gh-aw-exact-pin]"
+}
+
 // applyActionPinPrefix rewrites only the repository in a resolved reference.
 // The source action is resolved before this is called, so mirrors need no API access.
 func applyActionPinPrefix(repo, pinnedRef string, ctx *PinContext) string {

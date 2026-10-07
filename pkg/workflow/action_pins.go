@@ -183,11 +183,11 @@ func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, w
 		repo, suffix, _ := strings.Cut(reference, "@")
 		_, version, _ := strings.Cut(suffix, " # ")
 		version = strings.TrimSpace(version)
-		if strings.HasSuffix(reference, " # [gh-aw-exact-pin]") {
-			return indentation + strings.TrimSuffix(reference, " # [gh-aw-exact-pin]")
+		if ref, found := strings.CutSuffix(reference, " # [gh-aw-exact-pin]"); found {
+			return indentation + ref
 		}
-		if strings.HasSuffix(reference, " [gh-aw-exact-pin]") {
-			return indentation + strings.TrimSuffix(reference, " [gh-aw-exact-pin]")
+		if ref, found := strings.CutSuffix(reference, " [gh-aw-exact-pin]"); found {
+			return indentation + ref
 		}
 		if _, ok := mappings[actionpins.FormatCacheKey(repo, version)]; ok {
 			ref, err := actionpins.ResolveActionPin(repo, version, ctx)
@@ -203,6 +203,21 @@ func mapPinnedUsesInYAML(content string, mappings, prefixes map[string]string, w
 		return indentation + actionpins.ApplyResolvedActionPinPrefix(repo, reference, ctx)
 	})
 	return rewritten, mappingErr
+}
+
+func actionPinWarningsForWorkflows(workflows []*WorkflowData) map[string]bool {
+	for _, data := range workflows {
+		if data != nil && data.ActionPinWarnings != nil {
+			return data.ActionPinWarnings
+		}
+	}
+	warnings := make(map[string]bool) //nolint:seenmapbool // PinContext.Warnings requires map[string]bool for shared deduplication.
+	for _, data := range workflows {
+		if data != nil {
+			data.ActionPinWarnings = warnings
+		}
+	}
+	return warnings
 }
 
 // getCachedActionPinFromResolver returns the pinned action reference for repo,

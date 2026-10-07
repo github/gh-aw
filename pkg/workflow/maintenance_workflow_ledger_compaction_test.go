@@ -183,6 +183,50 @@ func TestGenerateMaintenanceWorkflow_LedgerCompaction(t *testing.T) {
 	assert.Contains(t, yaml, "schedule:")
 }
 
+func TestGeneratedWorkflowActionPinNotificationsAreShared(t *testing.T) {
+	dir := t.TempDir()
+	enabled := true
+	warnings := make(map[string]bool)
+	data := &WorkflowData{
+		Name: "test", WorkflowID: "test",
+		Command: []string{"test"}, CommandEvents: []string{"issue_comment"}, CommandCentralized: true,
+		ActionPinWarnings: warnings,
+		CheckoutConfigs: []*CheckoutConfig{
+			{Repository: "org/side-a", Current: true},
+			{Repository: "org/side-b", Current: true},
+		},
+		SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{Expires: 48}},
+	}
+	script := getActionPin("actions/github-script")
+	scriptSHA, _, _ := strings.Cut(strings.TrimPrefix(script, "actions/github-script@"), " ")
+	exactKey := "actions/github-script@" + latestActionVersionForRepo(t, "actions/github-script")
+	config := &RepoConfig{
+		AutoUpgrade:       &enabled,
+		ActionPins:        map[string]string{exactKey: "internal/github-script@" + scriptSHA},
+		ActionPinPrefixes: map[string]string{"actions/": "mirror/actions-"},
+	}
+	workflows := []*WorkflowData{nil, data}
+	output := captureStderrOutput(t, func() {
+		_, err := mapPinnedUsesInYAML("        uses: "+script+"\n", config.ActionPins, config.ActionPinPrefixes, warnings, nil)
+		require.NoError(t, err)
+		require.NoError(t, GenerateMaintenanceWorkflow(context.Background(), GenerateMaintenanceWorkflowOptions{
+			WorkflowDataList: workflows, WorkflowDir: dir, Version: "v1.0.0", ActionMode: ActionModeDev, RepoConfig: config,
+		}))
+		require.NoError(t, GenerateCentralSlashCommandWorkflow(context.Background(), workflows, dir, config))
+	})
+	require.Equal(t, 1, strings.Count(output, "Action pin mapping applied: "+exactKey+" →"))
+	require.Equal(t, 1, strings.Count(output, "Action pin mapping applied: actions/checkout →"))
+	files, err := filepath.Glob(filepath.Join(dir, "*.yml"))
+	require.NoError(t, err)
+	require.Len(t, files, 5)
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		require.NoError(t, err)
+		require.NotContains(t, string(content), "uses: actions/", file)
+		require.Contains(t, string(content), "uses: internal/github-script@"+scriptSHA, file)
+	}
+}
+
 func TestMaintenanceActionPinPrefixes(t *testing.T) {
 	dir := t.TempDir()
 	data := &WorkflowData{

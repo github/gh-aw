@@ -161,6 +161,7 @@ func sideRepoAppTokenMintStepYAML(app *GitHubAppConfig, targetRepo string) strin
 
 // generateAllSideRepoMaintenanceWorkflowsOptions configures side-repo maintenance workflow generation.
 type generateAllSideRepoMaintenanceWorkflowsOptions struct {
+	pinWarnings      map[string]bool
 	workflowDataList []*WorkflowData
 	workflowDir      string
 	version          string
@@ -207,6 +208,7 @@ func generateSideRepoMaintenanceFiles(ctx context.Context, targets []SideRepoTar
 			hasExpires:     opts.hasExpires,
 			minExpiresDays: opts.minExpiresDays,
 			repoConfig:     opts.repoConfig,
+			pinWarnings:    opts.pinWarnings,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate side-repo maintenance workflow for %s: %w", target.Repository, err)
@@ -242,6 +244,7 @@ func isSideRepoMaintenanceWorkflowFile(name string) bool {
 // generateSideRepoMaintenanceWorkflowOptions configures generation of a single side-repo
 // maintenance workflow.
 type generateSideRepoMaintenanceWorkflowOptions struct {
+	pinWarnings    map[string]bool
 	target         SideRepoTarget
 	outPath        string
 	version        string
@@ -269,7 +272,7 @@ func generateSideRepoMaintenanceWorkflow(
 		return fmt.Errorf("failed to finalize side-repo maintenance workflow YAML: %w", err)
 	}
 	if opts.repoConfig != nil {
-		content, err = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, nil, opts.resolver)
+		content, err = mapPinnedUsesInYAML(content, opts.repoConfig.ActionPins, opts.repoConfig.ActionPinPrefixes, opts.pinWarnings, opts.resolver)
 		if err != nil {
 			return err
 		}
