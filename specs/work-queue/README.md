@@ -376,12 +376,35 @@ at explicit local resource budgets. `WorkQueue`, `QueueOrdering`,
 `FairDAGFork` and `FairDAGGitHub` were **not passes in that initial run**.
 An independent longer `FairDAGFork` rerun subsequently exhausted 70,602 states
 at depth 28 in 6m47s. It did not resume or add the earlier partial search.
-The latest per-configuration result is therefore 15 exhausted searches,
+That review's per-configuration result was 15 exhausted searches,
 42 exact expected controls/witnesses and three unfinished searches:
 `WorkQueue`, `QueueOrdering` and `FairDAGGitHub`.
-Earlier counts below are retained evidence, not substitutes for those verdicts.
-The models/configurations remained hash-identical after merging main; no claim
-is made that model checking verifies current Go/JavaScript runtime refinement.
+
+The separate [2026-10-07 refinement record](verification-2026-10-07-refinement.json)
+supersedes that status without rewriting the earlier capture. The registered
+suite now includes the projection-corruption control: **16 positive searches
+exhausted, 34 negative controls and nine guarded witnesses matched their exact
+expected outcomes, and two searches remain unfinished**. `FairDAGGitHub`
+exhausted 1,055,182 distinct states at depth 20 in 8m39s, with zero states
+remaining and its original bounds, constraints and safety conjuncts retained.
+TLC uses 64-bit fingerprints; that run reports optimistic collision probability
+`5.2E-7` and actual-fingerprint estimate `3.2E-8`, not mathematical certainty.
+
+Both historical searches successfully restored complete, pinned local TLC
+checkpoints and continued for another 1,200 seconds. `WorkQueue` reached
+38,640,894 distinct states at depth 22 with 7,079,332 queued; `QueueOrdering`
+reached 51,756,372 at depth 17 with 23,003,758 queued. **Neither exhausted or
+passed.** These are actual continuations, not sums of independent searches.
+Checkpoint recovery rolls back to the saved checkpoint, which can precede the
+last interrupted progress report. Local restore succeeded; portable checkpoint
+archives remain unvalidated. The earlier nominal 1,800-second searches actually
+ran about 2,226–2,227 seconds; the record preserves both budget and measured time.
+
+The refined sources also produced 18 seeded simulations with 309 sampled states
+and nine exact guarded witness traces. Their model/configuration hashes still
+match after merging main at `303b4028106137af47924a4bc079b8d3fdd8884c`.
+Earlier counts below remain historical evidence. Neither finite model checking
+nor sampled traces verify Go/JavaScript runtime or supported-host refinement.
 
 ### Evaluation refinements without state-space reduction
 
@@ -424,8 +447,9 @@ changed-clock mutations must produce the exact action-property/invariant
 diagnostics. Removing the deterministic cache maps each revised state to
 exactly one original state; complete replay reconstructs it uniquely.
 These finite comparisons supplement this extension/algebraic equivalence
-argument; they do not exhaust the three larger requested configurations or
-prove runtime refinement.
+argument. They are separate from the larger searches above and do not prove
+runtime refinement. All five comparisons and both exact mutation controls
+passed; the default `FairBatch` graph still has 13,662 distinct states at depth 20.
 
 To reproduce the comparison against the last unrefined source:
 
