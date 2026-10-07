@@ -76,8 +76,8 @@ func intersectModelPolicyRules(local, override []string) []string {
 }
 
 func unionModelPolicyRules(local, override []string) []string {
-	result := make([]string, 0, len(local)+len(override))
-	seen := make(map[string]struct{}, len(local)+len(override))
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
 	for _, model := range local {
 		if _, ok := seen[model]; ok {
 			continue
