@@ -43,7 +43,15 @@ const REQUEST_REJECTION_ERROR_CATEGORIES = new Set([
  * in a first-class incomplete signal when the agent emitted no valid outputs.
  * @param {string[]} errors
  * @param {string} [rootDir]
- * @returns {{type: string, reason: string, details?: string}}
+ * @returns {{
+ *   type: string,
+ *   reason: string,
+ *   failureCause: string,
+ *   driverExitCode?: number,
+ *   retryCount: number,
+ *   engineErrorType?: string,
+ *   details?: string
+ * }}
  */
 function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw") {
   const diagnostics = new Set(["Agent finished without emitting a terminal safe output; task completion could not be confirmed.", ...errors]);

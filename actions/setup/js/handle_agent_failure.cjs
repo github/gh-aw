@@ -361,6 +361,7 @@ function buildFailureMatchCategories(options) {
  * @param {string} [options.missingModelPricingModelName]
  * @param {boolean} [options.shellExpansionGuardRejected]
  * @param {string} [options.emptyOutputCause]
+ * @param {string} [options.terminalOutputFailureCause]
  * @returns {string}
  */
 function buildFailureIssueTitle(options) {
@@ -508,6 +509,7 @@ function escapeGitHubSearchPhrase(value) {
  * @param {string} options.repo - Repository name
  * @param {string} options.workflowId - Workflow identifier
  * @param {string[]} options.failureCategories - Sorted failure categories
+ * @param {string} [options.failureCause] - Classified terminal-output failure cause
  * @returns {Promise<{number: number, html_url: string} | null>} Matching issue or null
  */
 async function findExistingFailureIssue(options) {
@@ -1813,6 +1815,7 @@ function buildTimeoutContext(isTimedOut, timeoutMinutes) {
  * @param {boolean} isTimedOut
  * @param {boolean} hasMissingModelPricingError
  * @param {boolean} hasShellExpansionGuardRejected
+ * @param {boolean} hasTerminalOutputFailure
  * @returns {boolean}
  */
 function shouldBuildEngineFailureContext(agentConclusion, hasToolDenialsExceeded, isTimedOut, hasMissingModelPricingError = false, hasShellExpansionGuardRejected = false, hasTerminalOutputFailure = false) {
