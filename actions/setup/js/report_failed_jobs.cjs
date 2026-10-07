@@ -13,12 +13,12 @@ const GITHUB_API_VERSION = "2022-11-28";
 const FAILED_JOBS_ISSUE_EXPIRES_HOURS = 24 * 7; // 1 week
 
 /**
- * Known builtin job names whose failures are already reported
+ * Stable builtin job IDs whose failures are already reported
  * by the handle_agent_failure step (the agent job) or are framework-internal
  * (conclusion = current job, pre_activation/activation = reported via agent failure issue flags,
  * safe-outputs/safe_outputs and detection = handled by dedicated conclusion reporting).
  */
-const BUILTIN_REPORTED_JOB_NAMES = new Set(["agent", "conclusion", "activation", "pre_activation", "pre-activation", "safe_outputs", "safe-outputs", "detection"]);
+const BUILTIN_REPORTED_JOB_IDS = new Set(["agent", "conclusion", "activation", "pre_activation", "pre-activation", "safe_outputs", "safe-outputs", "detection"]);
 
 /**
  * Check whether an error is a GitHub permission error for issues write.
@@ -61,17 +61,38 @@ function formatFailedJobsList(jobs) {
 }
 
 /**
- * Query all jobs for the current workflow run and return failed non-builtin jobs.
+ * Filter failures by stable IDs from needs; use the jobs API only for display names and links.
  * @returns {Promise<Array<{name: string, html_url: string | null}>>}
  */
 async function getFailedNonBuiltinJobs() {
+  let jobResults;
+  let jobDisplayNames;
+  try {
+    jobResults = JSON.parse(process.env.GH_AW_JOB_RESULTS || "");
+    jobDisplayNames = JSON.parse(process.env.GH_AW_JOB_DISPLAY_NAMES || "");
+  } catch (error) {
+    throw new Error(`Failed to parse failed-job reporting metadata: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!jobResults || typeof jobResults !== "object" || Array.isArray(jobResults) || !jobDisplayNames || typeof jobDisplayNames !== "object" || Array.isArray(jobDisplayNames)) {
+    throw new Error("GH_AW_JOB_RESULTS and GH_AW_JOB_DISPLAY_NAMES must be JSON objects");
+  }
+  const failedJobIds = Object.keys(jobResults).filter(jobId => {
+    if (jobResults[jobId]?.result !== "failure") return false;
+    if (BUILTIN_REPORTED_JOB_IDS.has(jobId)) {
+      core.info(`Skipping builtin job ID: ${jobId} (handled by dedicated failure reporting)`);
+      return false;
+    }
+    return true;
+  });
+  if (failedJobIds.length === 0) return [];
+
   const { owner, repo } = context.repo;
   const runId = context.runId;
 
   core.info(`Querying jobs for workflow run ${runId}`);
 
   /** @type {Array<{name: string, html_url: string | null}>} */
-  const failedJobs = [];
+  const runJobs = [];
 
   let page = 1;
   const perPage = 100;
@@ -93,12 +114,7 @@ async function getFailedNonBuiltinJobs() {
       if (job.conclusion !== "failure") {
         continue;
       }
-      if (BUILTIN_REPORTED_JOB_NAMES.has(job.name)) {
-        core.info(`Skipping builtin job: ${job.name} (already reported by agent failure handler)`);
-        continue;
-      }
-      core.info(`Found failed non-builtin job: ${job.name}`);
-      failedJobs.push({ name: job.name, html_url: job.html_url });
+      runJobs.push({ name: job.name, html_url: job.html_url });
     }
 
     if (jobs.length < perPage) {
@@ -107,7 +123,16 @@ async function getFailedNonBuiltinJobs() {
     page++;
   }
 
-  return failedJobs;
+  const matchesName = (name, display) => name === display || name.startsWith(`${display} (`) || name.startsWith(`${display} / `);
+  const knownIds = new Set([...Object.keys(jobResults), ...Object.keys(jobDisplayNames)]);
+  return failedJobIds.flatMap(jobId => {
+    const displayName = jobDisplayNames[jobId] || jobId;
+    const matchingJobs = runJobs.filter(job => matchesName(job.name, displayName));
+    const ambiguousName = [...knownIds].some(otherId => otherId !== jobId && matchingJobs.some(job => matchesName(job.name, jobDisplayNames[otherId] || otherId)));
+    if (matchingJobs.length > 0 && !ambiguousName) return matchingJobs;
+    core.warning(`Could not uniquely match failed job ID ${jobId} to its API display name; linking to the workflow run`);
+    return [{ name: jobId, html_url: process.env.GH_AW_RUN_URL || null }];
+  });
 }
 
 /**
@@ -200,4 +225,4 @@ async function main() {
   }
 }
 
-module.exports = { main, getFailedNonBuiltinJobs, formatFailedJobsList, BUILTIN_REPORTED_JOB_NAMES };
+module.exports = { main, getFailedNonBuiltinJobs, formatFailedJobsList, BUILTIN_REPORTED_JOB_IDS };
