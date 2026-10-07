@@ -222,6 +222,7 @@ function memoryTreeDigest(dirPath) {
  *   memoryId?: string,
  *   kind: "repo" | "cache" | "drive",
  *   timeoutSeconds?: number,
+ *   isEligibleFile?: (relativePath: string) => boolean,
  * }} options
  */
 function runCustomMemoryValidation(options) {
@@ -252,7 +253,9 @@ function runCustomMemoryValidation(options) {
       dereference: true,
       filter: sourcePath => {
         const relativePath = path.relative(options.memoryDir, sourcePath);
-        return relativePath === "" || relativePath.split(path.sep)[0] !== ".git";
+        if (relativePath === "") return true;
+        if (relativePath.split(path.sep)[0] === ".git") return false;
+        return !options.isEligibleFile || fs.statSync(sourcePath).isDirectory() || options.isEligibleFile(relativePath.replace(/\\/g, "/"));
       },
     });
   } catch (error) {
