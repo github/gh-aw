@@ -38,7 +38,7 @@ function evaluate(files, jobs, overrides = {}) {
       artifacts: [
         { id: 10, name: "usage", createdAt: new Date(overrides.artifactTime || later) },
         ...["agent", "detection", "evals"].map(name => {
-          const latest = jobs.filter(item => item.name === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
+          const latest = jobs.filter(item => (item.name.toLowerCase() === "evaluations" ? "evals" : item.name.toLowerCase()) === name && item.conclusion !== "skipped").sort((a, b) => b.run_attempt - a.run_attempt)[0];
           return { id: latest?.id, name, createdAt: new Date(overrides.producerTime || latest?.completed_at || time) };
         }),
       ],
@@ -103,6 +103,25 @@ it("counts an empty detection accounting file as zero AIC", async () => {
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"component":"detection"'));
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"aic":0,"reason":"empty_detection_accounting"'));
   expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining('"source":"detection/token_usage.jsonl"'));
+});
+
+it("counts compiler-generated Agent, Detection and Evaluations jobs using their lowercase accounting paths", async () => {
+  const f = evaluate(
+    {
+      "agent/token_usage.jsonl": '{"aic":18.02604}',
+      "detection/token_usage.jsonl": '{"aic":30.08748}',
+      "evals/token_usage.jsonl": '{"aic":1}',
+    },
+    [job("Agent"), job("Detection"), job("Evaluations")]
+  );
+  await expect(f.result).resolves.toBeCloseTo(49.11352);
+  expect(f.client.listArtifacts).toHaveBeenCalledOnce();
+  expect(global.core.info).not.toHaveBeenCalledWith(expect.stringContaining('"reason":"no_billable_jobs"'));
+});
+
+it("treats differently cased names for the same component as ambiguous", async () => {
+  const f = evaluate({}, [job("Agent", { id: 1 }), job("agent", { id: 2 })]);
+  await expect(f.result).rejects.toThrow("Ambiguous daily AIC component jobs");
 });
 
 it("still requires accounting when detection/token_usage.jsonl is missing (not empty)", async () => {
@@ -403,6 +422,16 @@ it("maps the Evaluations display name and job_id to their components", async () 
   await expect(f.result).resolves.toBeCloseTo(3);
   const g = evaluate({ "agent_usage.jsonl": '{"aic":4}' }, [job("Display", { job_id: "agent" })]);
   await expect(g.result).resolves.toBeCloseTo(4);
+});
+
+it("prefers the agent job_id over a conflicting billable display name", async () => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":4}' }, [job("Detection", { id: 1, job_id: "agent" })]);
+  await expect(f.result).resolves.toBe(4);
+});
+
+it.each(["detection", "evals"])("prefers the %s job_id over the Agent display name", async component => {
+  const f = evaluate({ "agent/token_usage.jsonl": '{"aic":1}', [`${component}/token_usage.jsonl`]: '{"aic":2}' }, [job("Agent", { id: 1 }), job("Agent", { id: 2, job_id: component })]);
+  await expect(f.result).resolves.toBe(3);
 });
 
 it("requires accounting for executed jobs with generated display names", async () => {
