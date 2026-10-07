@@ -15,7 +15,7 @@ import {
   assertRemediationBackend,
   main as publishQueueControls,
 } from "./work_queue_dispatch.cjs";
-import { cancelBeforeLaunch, cancellationOperations, reconcileDispatch } from "./work_queue_reconciler.cjs";
+import { cancelBeforeLaunch, cancellationOperations, reconcileDispatch, reconciliationCandidates } from "./work_queue_reconciler.cjs";
 import { appendCommit, newRequest, serializeProjection } from "./work_queue_replay.cjs";
 import { assignmentOnly } from "./work_queue_scheduler.cjs";
 import { nodeId } from "./work_queue_graph.cjs";
@@ -90,6 +90,22 @@ function failedFixture(disposition) {
 }
 
 describe("native queue launch fencing and conservative recovery", () => {
+  it("rotates bounded reconciliation sweeps so every outstanding dispatch is revisited", () => {
+    const dispatches = new Map(
+      Array.from({ length: 17 }, (_, index) => {
+        const dispatch_id = `dispatch-${String(index + 1).padStart(2, "0")}`;
+        return [dispatch_id, { dispatch_id, pool: "default", released: false, state: "uncertain" }];
+      })
+    );
+    const seen = new Set();
+    for (let runNumber = 1; runNumber <= 17; runNumber++) {
+      const batch = reconciliationCandidates({ dispatches }, "default", 16, runNumber);
+      expect(batch).toHaveLength(16);
+      for (const dispatch of batch) seen.add(dispatch.dispatch_id);
+    }
+    expect(seen).toEqual(new Set(dispatches.keys()));
+  });
+
   it("canonicalizes context casing before start, binding and release without changing existing request history", async () => {
     const { fixture, options, post } = setup();
     options.context = { ...options.context, repo: { owner: "OWNER", repo: "REPO" } };
@@ -467,7 +483,12 @@ describe("native queue launch fencing and conservative recovery", () => {
       dispatchClient: fake.githubClient,
       readWorkQueueLog: undefined,
       publishWorkQueueRequest: undefined,
-      core: { info: vi.fn(), setOutput: vi.fn() },
+      core: {
+        info: vi.fn(),
+        setOutput: vi.fn(),
+        setFailed: vi.fn(),
+        summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() },
+      },
     };
     const call = remediationVerifier => publishQueueControls({ ...producer, remediationVerifier });
     try {
@@ -1404,6 +1425,12 @@ describe("native queue launch fencing and conservative recovery", () => {
       throw new Error("invalid protected metadata consumed a credential");
     });
     Object.defineProperty(config, "github-token", { get: tokenAccess });
+    const core = {
+      info: vi.fn(),
+      setOutput: vi.fn(),
+      setFailed: vi.fn(),
+      summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() },
+    };
     try {
       fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "missing-protected-binding", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } })}\n`);
       const result = await publishQueueControls({
@@ -1414,14 +1441,45 @@ describe("native queue launch fencing and conservative recovery", () => {
         validateDispatchCredential: undefined,
         publishWorkQueueRequest: publish,
         readWorkQueueLog: read,
-        core: { info: vi.fn(), setOutput: vi.fn() },
+        core,
       });
       expect(result.receipts).toEqual([expect.objectContaining({ status: "blocked" })]);
+      expect(result).toMatchObject({ status: "recovery_required", success: false });
+      expect(core.setOutput).toHaveBeenCalledWith("work_queue_controls_status", "recovery_required");
+      expect(core.setFailed).toHaveBeenCalled();
+      expect(core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Blocked intents: 1"));
       expect(tokenAccess).not.toHaveBeenCalled();
       expect(read).not.toHaveBeenCalled();
       expect(publish).not.toHaveBeenCalled();
       expect(post).not.toHaveBeenCalled();
       expect(fixture.state.claims.size).toBe(0);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the controls step and summarizes a durable but uncertain launch without retrying the POST", async () => {
+    const { fixture, options, post } = setup({ granted: false, count: 1 });
+    post.mockRejectedValue(new Error("request timed out"));
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-control-unresolved-"));
+    const filename = path.join(directory, "intents.jsonl");
+    const core = {
+      info: vi.fn(),
+      setOutput: vi.fn(),
+      setFailed: vi.fn(),
+      summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() },
+    };
+    const config = { ...options.config, work_queue_dispatch_credential: { kind: "authenticated" }, work_queue_enabled: true };
+    try {
+      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "uncertain-launch", kind: "dispatch_next", parameters: { pool: "default", max_claims: 1, max_dispatches: 1 } })}\n`);
+      const result = await publishQueueControls({ ...options, config, intentPath: filename, core });
+      expect(result).toMatchObject({ status: "recovery_required", success: false });
+      expect(result.receipts[0]).toMatchObject({ status: "durable", launches: [expect.objectContaining({ state: "launch_unresolved" })] });
+      expect(core.setOutput).toHaveBeenCalledWith("work_queue_controls_status", "recovery_required");
+      expect(core.setFailed).toHaveBeenCalled();
+      expect(core.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Unresolved launches: 1"));
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(fixture.state.dispatches.values().next().value).toMatchObject({ released: false });
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

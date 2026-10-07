@@ -188,15 +188,25 @@ async function cancelBeforeLaunch(options) {
   return releaseAssignment(options, assignment, evidence);
 }
 
+function reconciliationCandidates(projection, pool, limit, runNumber) {
+  const candidates = [...projection.dispatches.values()]
+    .filter(dispatch => !dispatch.released && dispatch.state !== "reserved" && (pool === undefined || dispatch.pool === pool))
+    .sort((left, right) => {
+      const runPriority = Number(!!right.run) - Number(!!left.run);
+      if (runPriority !== 0) return runPriority;
+      return left.dispatch_id < right.dispatch_id ? -1 : left.dispatch_id > right.dispatch_id ? 1 : 0;
+    });
+  if (candidates.length <= limit) return candidates;
+  const offset = Number.isSafeInteger(runNumber) && runNumber > 0 ? (runNumber - 1) % candidates.length : 0;
+  return Array.from({ length: limit }, (_, index) => candidates[(offset + index) % candidates.length]);
+}
+
 async function reconcileQueue(options) {
   if (isStagedMode(options) || isStagedMode(options.config)) return { version: 3, status: "staged_preview", reconciled: 0, results: [] };
   const limit = options.maxReconciliations ?? 16;
   integer(limit, 1, 16, "native reconciliation batch limit");
   const latest = await loadQueue(options);
-  const candidates = [...latest.projection.dispatches.values()]
-    .filter(dispatch => !dispatch.released && dispatch.state !== "reserved" && (options.pool === undefined || dispatch.pool === options.pool))
-    .sort((left, right) => Number(!!right.run) - Number(!!left.run))
-    .slice(0, limit);
+  const candidates = reconciliationCandidates(latest.projection, options.pool, limit, options.context?.runNumber);
   const results = [];
   for (const dispatch of candidates) {
     const assignment = assignmentForDispatch(latest.projection, dispatch.dispatch_id);
@@ -210,4 +220,4 @@ async function reconcileQueue(options) {
   return { version: 3, reconciled: results.length, results };
 }
 
-module.exports = { lifecycleEvidence, cancellationOperations, releaseAssignment, discoverRuns, returnedRunHint, reconcileDispatch, reconcileQueue, cancelBeforeLaunch };
+module.exports = { lifecycleEvidence, cancellationOperations, releaseAssignment, discoverRuns, returnedRunHint, reconcileDispatch, reconcileQueue, reconciliationCandidates, cancelBeforeLaunch };

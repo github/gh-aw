@@ -476,10 +476,27 @@ async function main(options = {}) {
   } catch {
     result = { version: 3, receipts: [{ status: "blocked", reason: "staged_queue_intents_invalid" }], remaining_dispatches: 0 };
   }
-  coreApi.setOutput("work_queue_requests", JSON.stringify(result));
   const durable = result.receipts.filter(receipt => receipt.status === "durable").length;
   const blocked = result.receipts.filter(receipt => receipt.status === "blocked").length;
-  coreApi.info(`Work queue controls: ${durable} checked requests; ${blocked} blocked intents`);
+  const unresolved = result.receipts.reduce((count, receipt) => count + (receipt.launches || []).filter(launch => !["bound", "released", "staged_preview"].includes(launch.state)).length, 0);
+  const recoveryRequired = blocked > 0 || unresolved > 0;
+  const status = recoveryRequired ? "recovery_required" : "ok";
+  const summary = ["## Work queue controls", "", `Status: **${recoveryRequired ? "Recovery required" : "Complete"}**`, "", `- Durable requests: ${durable}`, `- Blocked intents: ${blocked}`, `- Unresolved launches: ${unresolved}`].join(
+    "\n"
+  );
+  result = { ...result, status, success: !recoveryRequired, summary };
+  coreApi.setOutput("work_queue_requests", JSON.stringify(result));
+  coreApi.setOutput("work_queue_controls_status", status);
+  coreApi.info(`Work queue controls: ${durable} durable requests; ${blocked} blocked intents; ${unresolved} unresolved launches`);
+  if (coreApi.summary?.addRaw && coreApi.summary?.write) {
+    coreApi.summary.addRaw(summary);
+    await coreApi.summary.write();
+  }
+  if (recoveryRequired) {
+    const failure = "Work queue controls require recovery; inspect the work_queue_requests output and step summary.";
+    if (typeof coreApi.setFailed === "function") coreApi.setFailed(failure);
+    else throw new Error(failure);
+  }
   return result;
 }
 
