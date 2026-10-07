@@ -743,7 +743,7 @@ func TestEmitGeneralToolWarnings_PiThreatDetectionAuthWarning(t *testing.T) {
 			},
 		},
 		{
-			name: "does not warn with explicit Copilot token",
+			name: "warns when Copilot token is configured only on the main Pi engine",
 			data: &WorkflowData{
 				AI: "pi",
 				EngineConfig: &EngineConfig{
@@ -755,6 +755,25 @@ func TestEmitGeneralToolWarnings_PiThreatDetectionAuthWarning(t *testing.T) {
 				Permissions: "permissions:\n  contents: read\n",
 				SafeOutputs: &SafeOutputsConfig{
 					ThreatDetection: &ThreatDetectionConfig{},
+				},
+			},
+			wantWarning: true,
+		},
+		{
+			name: "does not warn with explicit detection Copilot token",
+			data: &WorkflowData{
+				AI:           "pi",
+				EngineConfig: &EngineConfig{ID: "pi"},
+				Permissions:  "permissions:\n  contents: read\n",
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: &ThreatDetectionConfig{
+						EngineConfig: &EngineConfig{
+							ID: "copilot",
+							Env: map[string]string{
+								"COPILOT_GITHUB_TOKEN": "${{ secrets.DETECTION_COPILOT_TOKEN }}",
+							},
+						},
+					},
 				},
 			},
 		},

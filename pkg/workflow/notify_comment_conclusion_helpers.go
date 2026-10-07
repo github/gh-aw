@@ -56,6 +56,11 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	// expects, letting detection-phase usage surface in the usage artifact and count toward
 	// the AI-credits budget cap (see gh-aw#54047).
 	if IsDetectionJobEnabled(data.SafeOutputs) {
+		steps = append(steps,
+			"      - name: Warn if threat detection produced no verdict\n",
+			"        if: always() && needs.detection.result != 'skipped' && (needs.detection.outputs.detection_reason == 'agent_failure' || needs.detection.outputs.detection_reason == 'parse_error' || needs.detection.outputs.detection_conclusion == '')\n",
+			"        run: echo \"::warning::Threat detection produced no security verdict. Review the detection job logs before trusting the agent outputs.\"\n",
+		)
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)

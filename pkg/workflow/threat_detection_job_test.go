@@ -439,6 +439,20 @@ func TestBuildDetectionJobNeedsIncludesMainEngineEnvJobs(t *testing.T) {
 	if !slices.Contains(job.Needs, "router") {
 		t.Fatalf("expected detection job needs to include 'router' (referenced via main engine OPENAI_BASE_URL); got needs: %v", job.Needs)
 	}
+
+	data.SafeOutputs.ThreatDetection.EngineConfig.ID = "copilot"
+	data.SafeOutputs.ThreatDetection.EngineConfig.Env["CUSTOM_FLAG"] = "${{ needs.detection_router.outputs.flag }}"
+	data.Jobs["detection_router"] = map[string]any{}
+	job, err = compiler.buildDetectionJob(data)
+	if err != nil {
+		t.Fatalf("buildDetectionJob() with different engine error: %v", err)
+	}
+	if slices.Contains(job.Needs, "router") {
+		t.Fatalf("different detection engine must not depend on main provider job; got needs: %v", job.Needs)
+	}
+	if !slices.Contains(job.Needs, "detection_router") {
+		t.Fatalf("detection-specific env job dependency was lost; got needs: %v", job.Needs)
+	}
 }
 
 // TestDetectionJobEnvironmentInheritance verifies that the detection job correctly

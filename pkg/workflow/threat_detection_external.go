@@ -136,6 +136,11 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	if ResolveEngineID(data) == engineID {
+		detectionData.ModelMappings = data.ModelMappings
+	} else {
+		detectionData.ModelMappings = MergeImportedModelAliases(nil, nil)
+	}
 	if pullPolicy := dockerImagePullPolicy(data); pullPolicy != "" {
 		detectionData.RawFrontmatter = map[string]any{"docker-image-pull-policy": pullPolicy}
 	}
@@ -488,16 +493,12 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		resolvedDetectionModel = extractPiModelID(resolvedDetectionModel)
 	}
 	threatDetectionData.Model = resolvedDetectionModel
-	// Propagate the model alias map so the detection AWF config includes
-	// apiProxy.models, enabling the harness to resolve aliases (e.g. "haiku") to
-	// concrete model IDs before the Copilot CLI makes inference requests.
-	threatDetectionData.ModelMappings = data.ModelMappings
 	// Propagate default AI credits pricing so the detection AWF config includes
 	// apiProxy.defaultAiCreditsPricing when the main workflow configures it.
 	threatDetectionData.DefaultAiCreditsPricing = data.DefaultAiCreditsPricing
 
 	threatDetectionData.NetworkPermissions = &NetworkPermissions{
-		Allowed: getThreatDetectionAdditionalAllowedDomains(data),
+		Allowed: getThreatDetectionAdditionalAllowedDomains(data, engineID),
 	}
 	// Add a read-write mount so the threat-detect binary can write
 	// detection_result.json inside the container and it becomes visible

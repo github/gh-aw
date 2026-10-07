@@ -70,19 +70,18 @@ func isThreatDetectionExplicitlyDisabledInConfigs(configs []string) bool {
 	return false
 }
 
-func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData) []string {
+func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData, engineID string) []string {
 	if data == nil || data.NetworkPermissions == nil {
 		return []string{}
 	}
 
-	// Evaluate the effective merged detection environment (main + detection-specific
-	// overrides) so that a custom base URL configured only in
+	// Evaluate the effective detection environment so that a custom base URL configured only in
 	// safe-outputs.threat-detection.engine.env also triggers domain propagation.
 	var detectionSpecificEnv map[string]string
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.EngineConfig != nil {
 		detectionSpecificEnv = data.SafeOutputs.ThreatDetection.EngineConfig.Env
 	}
-	effectiveEnv := mergeThreatDetectionEngineEnv(data, detectionSpecificEnv)
+	effectiveEnv := mergeThreatDetectionEngineEnv(data, engineID, detectionSpecificEnv)
 
 	hasCustomTarget := effectiveEnv["OPENAI_BASE_URL"] != "" ||
 		effectiveEnv["ANTHROPIC_BASE_URL"] != "" ||
@@ -112,13 +111,13 @@ func getThreatDetectionAdditionalAllowedDomains(data *WorkflowData) []string {
 }
 
 // mergeThreatDetectionEngineEnv composes detection engine env vars from the main
-// engine env and detection-specific overrides.
+// engine env and detection-specific overrides, inheriting only for the same engine.
 //
-// Detection values take precedence when keys overlap. When detectionEnv is empty,
+// Detection values take precedence when keys overlap. For the same engine, when detectionEnv is empty,
 // it still returns a copy of the main env map to avoid aliasing/mutation of the
 // parent WorkflowData.EngineConfig.Env by downstream detection-specific updates.
-func mergeThreatDetectionEngineEnv(data *WorkflowData, detectionEnv map[string]string) map[string]string {
-	if data == nil || data.EngineConfig == nil || len(data.EngineConfig.Env) == 0 {
+func mergeThreatDetectionEngineEnv(data *WorkflowData, engineID string, detectionEnv map[string]string) map[string]string {
+	if data == nil || ResolveEngineID(data) != engineID || data.EngineConfig == nil || len(data.EngineConfig.Env) == 0 {
 		return detectionEnv
 	}
 	if len(detectionEnv) == 0 {
@@ -155,8 +154,8 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(d) != LLMProviderGitHub {
 		d.EngineConfig.LLMProvider = LLMProviderOpenAI
 	}
-	d.EngineConfig.Env = mergeThreatDetectionEngineEnv(data, d.EngineConfig.Env)
-	if d.EngineConfig.APITarget == "" && data.EngineConfig != nil {
+	d.EngineConfig.Env = mergeThreatDetectionEngineEnv(data, engineID, d.EngineConfig.Env)
+	if d.EngineConfig.APITarget == "" && data.EngineConfig != nil && ResolveEngineID(data) == engineID {
 		d.EngineConfig.APITarget = data.EngineConfig.APITarget
 	}
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {

@@ -56,7 +56,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	// Detection resolves its own budgets independently of the main agent.
 	detectionEngineConfig := resolveExternalDetectorEngineConfig(data, engineSetting)
 	resetDetectionEngineTaskSettings(detectionEngineConfig)
-	detectionEngineConfig.Env = mergeThreatDetectionEngineEnv(data, detectionEngineConfig.Env)
+	detectionEngineConfig.Env = mergeThreatDetectionEngineEnv(data, engineSetting, detectionEngineConfig.Env)
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxAICredits != 0 {
 		detectionEngineConfig.MaxAICredits = data.SafeOutputs.ThreatDetection.MaxAICredits
 	}
@@ -95,10 +95,10 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 		resolvedDetectionModel = "detection"
 	}
 
-	// Inherit APITarget from the main engine config for GHE/custom endpoints if not already set.
+	// Inherit APITarget for GHE/custom endpoints only when the engines match.
 	// This ensures the threat detection AWF invocation receives the same --copilot-api-target
 	// and GHE-specific domains in --allow-domains as the main agent AWF invocation.
-	if detectionEngineConfig.APITarget == "" && data.EngineConfig != nil && data.EngineConfig.APITarget != "" {
+	if detectionEngineConfig.APITarget == "" && data.EngineConfig != nil && ResolveEngineID(data) == engineSetting {
 		detectionEngineConfig.APITarget = data.EngineConfig.APITarget
 	}
 	if engineSetting == "copilot" && originalEngineID == "pi" {
@@ -120,7 +120,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	// bash: ["*"] allows all shell commands — AWF's network firewall is the primary
 	// constraint, so restricting individual bash commands inside the sandbox adds friction
 	// without meaningful security benefit.
-	// ModelMappings is propagated so the detection awf-config.json includes the alias map
+	// For matching engines, ModelMappings is propagated so the detection awf-config.json includes the alias map
 	// (apiProxy.models). Without it, copilot_harness.cjs cannot resolve alias model names
 	// (e.g. "small") to concrete ids before spawning the Copilot CLI in the detection job.
 	threatDetectionData := buildThreatDetectionWorkflowData(data, engineSetting)
@@ -129,13 +129,12 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 	}
 	threatDetectionData.Model = resolvedDetectionModel
 	threatDetectionData.EngineConfig = detectionEngineConfig
-	threatDetectionData.ModelMappings = data.ModelMappings // propagate alias map so detection awf-config.json can resolve model aliases
 	var detectionFirewall *FirewallConfig
 	if threatDetectionData.NetworkPermissions != nil {
 		detectionFirewall = threatDetectionData.NetworkPermissions.Firewall
 	}
 	threatDetectionData.NetworkPermissions = &NetworkPermissions{
-		Allowed:  getThreatDetectionAdditionalAllowedDomains(data),
+		Allowed:  getThreatDetectionAdditionalAllowedDomains(data, engineSetting),
 		Firewall: detectionFirewall,
 	}
 

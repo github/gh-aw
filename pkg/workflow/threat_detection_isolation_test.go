@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,6 +16,69 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
+
+func TestThreatDetectionSplitEngineProviderIsolation(t *testing.T) {
+	for _, mainEngine := range []string{"claude", "codex"} {
+		for _, externalDetector := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/external=%t", mainEngine, externalDetector), func(t *testing.T) {
+				baseURL, apiKey := "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY"
+				if mainEngine == "codex" {
+					baseURL, apiKey = "OPENAI_BASE_URL", "OPENAI_API_KEY"
+				}
+				tmpDir := testutil.TempDir(t, "split-engine-provider-*")
+				workflowPath := filepath.Join(tmpDir, "split-engine.md")
+				content := fmt.Sprintf(`---
+on: push
+engine:
+  id: %s
+  env:
+    %s: https://openrouter.ai/api
+    %s: ${{ secrets.OPENROUTER_API_KEY }}
+network:
+  allowed: [defaults, openrouter.ai]
+safe-outputs:
+  create-issue:
+  threat-detection:
+    engine:
+      id: copilot
+      model: sonnet
+features:
+  gh-aw-detection: %t
+---
+Review documentation.
+`, mainEngine, baseURL, apiKey, externalDetector)
+				if err := os.WriteFile(workflowPath, []byte(content), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+					t.Fatal(err)
+				}
+				result, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+				if err != nil {
+					t.Fatal(err)
+				}
+				compiled := string(result)
+				agent := extractJobSection(compiled, "agent")
+				if !strings.Contains(agent, "openrouter.ai") || !strings.Contains(agent, "secrets.OPENROUTER_API_KEY") {
+					t.Fatal("main agent provider settings must remain intact")
+				}
+				detection := extractJobSection(compiled, "detection")
+				if detection == "" {
+					t.Fatal("detection job missing")
+				}
+				for _, forbidden := range []string{baseURL, apiKey, "openrouter.ai", "secrets.OPENROUTER_API_KEY"} {
+					if strings.Contains(detection, forbidden) {
+						t.Errorf("main provider setting %q leaked into compiled detection job", forbidden)
+					}
+				}
+				conclusion := extractJobSection(compiled, "conclusion")
+				if !strings.Contains(conclusion, "::warning::Threat detection produced no security verdict.") {
+					t.Fatal("conclusion must visibly warn about a missing verdict")
+				}
+			})
+		}
+	}
+}
 
 func TestThreatDetectionIsolation(t *testing.T) {
 	compiler := NewCompiler()
