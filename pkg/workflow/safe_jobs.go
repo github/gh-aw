@@ -455,6 +455,9 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 				}
 			}
 		}
+		if hasWorkflowCallTrigger(data.On) && c.actionMode.IsDev() {
+			steps = append(steps, c.generateRestoreActionsSetupStep())
+		}
 
 		job.Steps = steps
 

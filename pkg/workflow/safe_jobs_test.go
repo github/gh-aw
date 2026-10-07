@@ -389,6 +389,7 @@ func TestBuildSafeJobs(t *testing.T) {
 
 func TestWorkflowCallSafeJobComputesPrefixBeforeDownload(t *testing.T) {
 	c := NewCompiler()
+	c.SetActionMode(ActionModeDev)
 	data := &WorkflowData{
 		Name: "test-workflow",
 		On:   "workflow_call:",
@@ -407,6 +408,9 @@ func TestWorkflowCallSafeJobComputesPrefixBeforeDownload(t *testing.T) {
 	download := strings.Index(steps, "Download agent output artifact")
 	if prefix < 0 || download < prefix || !strings.Contains(steps, "${{ steps.artifact-prefix.outputs.prefix }}agent") {
 		t.Fatalf("safe job must compute prefix before downloading agent output:\n%s", steps)
+	}
+	if strings.Index(steps, "Restore actions folder") < download {
+		t.Fatalf("safe job must restore dev-mode setup action after user steps:\n%s", steps)
 	}
 }
 

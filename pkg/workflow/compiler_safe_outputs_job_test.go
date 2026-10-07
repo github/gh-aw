@@ -1716,6 +1716,7 @@ func TestCreateCodeScanningAlertUploadJob(t *testing.T) {
 
 func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *testing.T) {
 	compiler := NewCompiler()
+	compiler.SetActionMode(ActionModeDev)
 	compiler.jobManager = NewJobManager()
 
 	workflowData := &WorkflowData{
@@ -1738,6 +1739,7 @@ func TestCreateCodeScanningAlertUploadJobWorkflowCallDependsOnActivation(t *test
 	uploadSteps := strings.Join(uploadJob.Steps, "")
 	assert.Less(t, strings.Index(uploadSteps, "id: artifact-prefix\n"), strings.Index(uploadSteps, "Download SARIF artifact"))
 	assert.NotContains(t, uploadSteps, "needs.activation.outputs.artifact_prefix")
+	assert.Greater(t, strings.Index(uploadSteps, "Restore actions folder"), strings.Index(uploadSteps, "Restore checkout to triggering commit"))
 }
 
 // TestBuildSafeOutputItemsManifestUploadStep verifies that the upload step includes

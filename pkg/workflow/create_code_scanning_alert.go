@@ -172,6 +172,9 @@ func (c *Compiler) buildCodeScanningUploadSteps(data *WorkflowData, restoreToken
 	steps = append(steps, "          ref: ${{ github.ref }}\n")
 	steps = append(steps, "          sha: ${{ github.sha }}\n")
 	steps = append(steps, "          wait-for-processing: true\n")
+	if hasWorkflowCallTrigger(data.On) && c.actionMode.IsDev() {
+		steps = append(steps, c.generateRestoreActionsSetupStep())
+	}
 
 	return steps
 }
