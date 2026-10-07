@@ -29,7 +29,7 @@ mcp-servers:
 Ruflo MCP shared configuration for GitHub Agentic Workflows.
 
 Why stdio instead of Docker:
-- Ruflo's published setup guidance centers on `npx ruflo mcp start`
+- Ruflo's published setup guidance centers on `npx ruflo@3.54.1 mcp start`
 - No official GHCR/Docker image for the MCP server was identified from upstream docs
 
 Runtime requirements:
