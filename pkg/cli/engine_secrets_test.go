@@ -317,6 +317,35 @@ func TestEnsureSecretAvailable_ExistingCopilotSecret(t *testing.T) {
 	})
 }
 
+func TestEnsureSecretAvailableClaudeOAuthToken(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "private-oauth-token")
+	req := SecretRequirement{
+		Name:           "ANTHROPIC_API_KEY",
+		IsEngineSecret: true,
+		EngineName:     string(constants.ClaudeEngine),
+	}
+	originalPrompt := engineSecretsPromptFn
+	t.Cleanup(func() { engineSecretsPromptFn = originalPrompt })
+	prompted := false
+	engineSecretsPromptFn = func(_ SecretRequirement, _ EngineSecretConfig) error {
+		prompted = true
+		return nil
+	}
+
+	err := ensureSecretAvailable(req, EngineSecretConfig{})
+	require.ErrorIs(t, err, errUnsupportedClaudeOAuthToken)
+	assert.NotContains(t, err.Error(), "private-oauth-token")
+	assert.False(t, prompted)
+
+	t.Run("existing repository secret is accepted", func(t *testing.T) {
+		err := ensureSecretAvailable(req, EngineSecretConfig{
+			ExistingSecrets: map[string]struct{}{"ANTHROPIC_API_KEY": {}},
+		})
+		require.NoError(t, err)
+	})
+}
+
 func TestStringContainsSecretName(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -618,6 +647,37 @@ func TestGetEngineSecretNameAndValue(t *testing.T) {
 		assert.Equal(t, "COPILOT_GITHUB_TOKEN", name)
 		assert.Empty(t, value, "Should prefer existing repo secret over environment")
 		assert.True(t, existsInRepo, "Should indicate secret exists in repo")
+	})
+}
+
+func TestGetEngineSecretNameAndValueClaudeOAuthToken(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "private-oauth-token")
+
+	t.Run("unsupported token alone", func(t *testing.T) {
+		_, _, _, err := GetEngineSecretNameAndValue("claude", nil)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "CLAUDE_CODE_OAUTH_TOKEN")
+		require.ErrorContains(t, err, "ANTHROPIC_API_KEY")
+		require.ErrorContains(t, err, "Workload Identity Federation")
+		assert.NotContains(t, err.Error(), "private-oauth-token")
+	})
+
+	t.Run("API key in environment takes precedence", func(t *testing.T) {
+		t.Setenv("ANTHROPIC_API_KEY", "supported-api-key")
+		name, value, exists, err := GetEngineSecretNameAndValue("claude", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "ANTHROPIC_API_KEY", name)
+		assert.Equal(t, "supported-api-key", value)
+		assert.False(t, exists)
+	})
+
+	t.Run("repository secret takes precedence", func(t *testing.T) {
+		name, value, exists, err := GetEngineSecretNameAndValue("claude", map[string]struct{}{"ANTHROPIC_API_KEY": {}})
+		require.NoError(t, err)
+		assert.Equal(t, "ANTHROPIC_API_KEY", name)
+		assert.Empty(t, value)
+		assert.True(t, exists)
 	})
 }
 
