@@ -43,6 +43,51 @@ func TestWorkflowRunUnmarshal(t *testing.T) {
 	assert.Equal(t, 2, runs[0].Attempt, "Attempt should be populated")
 }
 
+func TestLogsCachedWorkflowRunMetadataIsCurrent(t *testing.T) {
+	t.Parallel()
+
+	updatedAt := time.Date(2026, time.September, 1, 10, 2, 0, 0, time.UTC)
+	cached := WorkflowRun{
+		DatabaseID: 42,
+		URL:        "https://github.com/octo/repo/actions/runs/42",
+		Repository: "octo/repo",
+		Attempt:    3,
+		Status:     "completed",
+		UpdatedAt:  updatedAt,
+	}
+	tests := []struct {
+		name      string
+		current   WorkflowRun
+		owner     string
+		repo      string
+		hostname  string
+		cachedURL string
+		want      bool
+	}{
+		{name: "matching repository", current: cached, owner: "octo", repo: "repo", want: true},
+		{name: "case insensitive repository", current: cached, owner: "Octo", repo: "Repo", want: true},
+		{name: "implicit repository", current: cached, want: true},
+		{name: "matching enterprise host", current: WorkflowRun{DatabaseID: 42, URL: "https://ghe.example.com/octo/repo/actions/runs/42"}, owner: "octo", repo: "repo", hostname: "GHE.EXAMPLE.COM", cachedURL: "https://ghe.example.com/octo/repo/actions/runs/42", want: true},
+		{name: "different requested host", current: cached, owner: "octo", repo: "repo", hostname: "ghe.example.com"},
+		{name: "different inferred host", current: WorkflowRun{DatabaseID: 42, URL: "https://ghe.example.com/octo/repo/actions/runs/42"}, owner: "octo", repo: "repo"},
+		{name: "missing host context", current: WorkflowRun{DatabaseID: 42}, owner: "octo", repo: "repo"},
+		{name: "different repository", current: cached, owner: "other", repo: "repo"},
+		{name: "different run", current: WorkflowRun{DatabaseID: 43}, owner: "octo", repo: "repo"},
+		{name: "different attempt", current: WorkflowRun{DatabaseID: 42, Attempt: 4}, owner: "octo", repo: "repo"},
+		{name: "newer update", current: WorkflowRun{DatabaseID: 42, UpdatedAt: updatedAt.Add(time.Minute)}, owner: "octo", repo: "repo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			testCached := cached
+			if tt.cachedURL != "" {
+				testCached.URL = tt.cachedURL
+			}
+			assert.Equal(t, tt.want, cachedWorkflowRunMetadataIsCurrent(testCached, tt.current, tt.owner, tt.repo, tt.hostname))
+		})
+	}
+}
+
 func TestFilterIgnoredWorkflowRuns(t *testing.T) {
 	runs := []WorkflowRun{{DatabaseID: 100}, {DatabaseID: 200}, {DatabaseID: 300}}
 
@@ -149,7 +194,7 @@ func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
 	require.NoError(t, os.WriteFile(fakeGH, []byte(fakeGHScript), 0o755))
 	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	currentRun := WorkflowRun{DatabaseID: 42, Attempt: 3, Status: "completed"}
+	currentRun := WorkflowRun{DatabaseID: 42, URL: "https://github.com/octo/repo/actions/runs/42", Attempt: 3, Status: "completed"}
 	run, err := fetchAndCacheWorkflowRunMetadata(context.Background(), currentRun, outputDir, "octo", "repo", "", false)
 	require.NoError(t, err)
 	assert.Equal(t, int64(42), run.DatabaseID)
@@ -172,7 +217,7 @@ func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "api repos/octo/repo/actions/runs/42\n", string(argsLog))
 
-	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "other-repo")
+	needsRefresh, err := workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "other-repo", "")
 	require.NoError(t, err)
 	assert.True(t, needsRefresh, "a cache entry from another repository must be refreshed")
 
@@ -180,12 +225,12 @@ func TestFetchAndCacheWorkflowRunMetadata(t *testing.T) {
 		DatabaseID: 42,
 		Attempt:    4,
 		Status:     "completed",
-	}, "octo", "repo")
+	}, "octo", "repo", "")
 	require.NoError(t, err)
 	assert.True(t, needsRefresh, "a cache entry from another attempt must be refreshed")
 
 	require.NoError(t, os.WriteFile(cachePath, []byte(strings.Replace(string(cached), `"status":"completed"`, `"status":"in_progress"`, 1)), 0o600))
-	needsRefresh, err = workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "repo")
+	needsRefresh, err = workflowRunMetadataCacheNeedsRefresh(outputDir, currentRun, "octo", "repo", "")
 	require.NoError(t, err)
 	assert.True(t, needsRefresh, "a mutable cache entry must be refreshed")
 
